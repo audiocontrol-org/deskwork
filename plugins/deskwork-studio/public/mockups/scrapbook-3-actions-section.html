@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Scrapbook mockup 3 · Actions sheet section</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none; border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 36, "wght" 500; font-size: 1.6rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 1.6rem; text-align: center; }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; margin-top: 0.8rem; text-align: center; max-width: 410px; }
+  .phone { width: 410px; height: 880px; background: #050505; border-radius: 50px; padding: 12px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04); position: relative; }
+  .phone::before { content: ''; position: absolute; top: 22px; left: 50%; transform: translateX(-50%); width: 110px; height: 30px; background: #000; border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper); background-image: var(--noise); border-radius: 38px; overflow: hidden; position: relative; font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px; font-family: -apple-system, system-ui, sans-serif; font-size: 0.95rem; font-weight: 600; color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px; color: var(--ink); font-family: -apple-system, system-ui, sans-serif; font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* ============================================================
+   *  Scrapbook · Actions sheet section
+   *  Direction: zero new chrome. The existing Actions sheet
+   *  gains a "Folio" section between Document and Decisions,
+   *  rendering scrapbook items as compact rows with tap-to-open
+   *  semantics. The sheet itself becomes a "everything you can
+   *  do with this entry" panel.
+   * ============================================================ */
+
+  .strip { position: absolute; top: 0; left: 0; right: 0; height: 84px; padding: 56px 1rem 0; background: var(--paper); border-bottom: 1px solid var(--red); z-index: 50; display: flex; align-items: center; gap: 0.7rem; }
+  .strip-back { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); text-decoration: none; padding: 0.28rem 0.5rem; border: 1px solid var(--paper-3); border-radius: 2px; }
+  .stamp { margin-left: auto; font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 18, "wght" 600; font-size: 0.92rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); border: 2px solid var(--ink); padding: 0.16rem 0.5rem; transform: rotate(-1.5deg); background: var(--paper); }
+
+  .article { position: absolute; top: 84px; left: 0; right: 0; bottom: 64px; overflow-y: auto; padding: 1.2rem 1.4rem 2rem; }
+  .article-kicker { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); margin-bottom: 0.5rem; }
+  .article-title { font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 48, "wght" 500; font-size: 2rem; line-height: 1.1; margin-bottom: 1rem; }
+  .article p { font-family: var(--display); font-size: 1.04rem; line-height: 1.5; margin-bottom: 0.9rem; }
+  .article p mark { background: var(--highlight); padding: 0 0.1em; border-radius: 1px; }
+  .article h2 { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; margin: 1.5rem 0 0.6rem; border-bottom: 1px solid var(--red); padding-bottom: 0.3rem; }
+
+  .tabbar { position: absolute; bottom: 0; left: 0; right: 0; height: 64px; background: var(--paper); background-image: var(--noise); border-top: 1px solid var(--red); box-shadow: 0 -2px 16px rgba(26,22,20,0.06); display: grid; grid-template-columns: 1fr 1fr 1fr; z-index: 60; }
+  .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.18rem; border: none; background: transparent; cursor: pointer; padding: 0.4rem 0.4rem 0.6rem; color: var(--faded); font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase; position: relative; }
+  .tab .glyph { font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 24, "wght" 500; font-size: 1.5rem; line-height: 1; color: var(--faded); }
+  .tab.active { color: var(--red); }
+  .tab.active .glyph { color: var(--red); }
+  .tab.active::after { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 30px; height: 2px; background: var(--red); }
+  .tab .count { position: absolute; top: 8px; right: 30%; background: var(--red); color: var(--paper); font-size: 0.55rem; line-height: 1; padding: 0.18rem 0.32rem; border-radius: 8px; letter-spacing: 0.04em; min-width: 1rem; text-align: center; }
+
+  /* Sheet — Actions, with new Folio section inside */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 64px;
+    height: 70%;
+    background: var(--paper); background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -16px 40px rgba(26,22,20,0.18);
+    border-radius: 24px 24px 0 0;
+    z-index: 70;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sheet-handle { align-self: center; width: 44px; height: 5px; background: var(--paper-3); border-radius: 4px; margin: 0.55rem 0 0.7rem; }
+  .sheet-head { padding: 0 1.4rem 0.7rem; border-bottom: 1px solid var(--red); display: flex; align-items: baseline; gap: 0.6rem; }
+  .sheet-kicker { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--red); }
+  .sheet-meta { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.06em; color: var(--faded); margin-left: auto; }
+  .sheet-body { flex: 1; overflow-y: auto; padding: 0.6rem 1.4rem 1.4rem; }
+
+  /* Section headers (Document / Folio / Decisions) */
+  .section {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--faded);
+    margin: 0.85rem 0 0.5rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .section::after { content: ''; flex: 1; border-bottom: 1px dashed var(--paper-3); }
+  .section:first-child { margin-top: 0; }
+  .section-meta {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    margin-left: 0.4rem; text-transform: none;
+  }
+  .section-meta a { color: var(--blue); text-decoration: none; border-bottom: 1px dashed var(--paper-3); padding-bottom: 1px; }
+
+  /* Action button (Edit, Approve, Iterate, etc.) */
+  .action {
+    width: 100%; text-align: left;
+    background: var(--paper); border: 1px solid var(--paper-3);
+    border-left: 3px solid var(--paper-3);
+    padding: 0.7rem 0.85rem;
+    font-family: var(--display); font-size: 0.95rem;
+    color: var(--ink);
+    margin-bottom: 0.4rem;
+    display: flex; align-items: center; gap: 0.6rem;
+    cursor: pointer; border-radius: 2px;
+  }
+  .action .gly {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.3rem; line-height: 1; color: var(--faded);
+    width: 1.4rem; text-align: center;
+  }
+  .action .a-meta {
+    margin-left: auto; font-family: var(--mono);
+    font-size: 0.6rem; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--faded);
+  }
+  .action[data-a="edit"]    { border-left-color: var(--ink); color: var(--ink); }
+  .action[data-a="approve"] { border-left-color: var(--green); color: var(--green); }
+  .action[data-a="approve"] .gly { color: var(--green); }
+  .action[data-a="iterate"] { border-left-color: var(--blue); color: var(--blue); }
+  .action[data-a="iterate"] .gly { color: var(--blue); }
+  .action[data-a="reject"]  { border-left-color: var(--red); color: var(--red); }
+  .action[data-a="reject"] .gly { color: var(--red); }
+  .action[data-a="cancel"]  { border-left-color: var(--faded); color: var(--faded); }
+  .action[data-a="cancel"] .gly { color: var(--faded); }
+
+  /* Folio item row — compact, mono filename + extension chip */
+  .folio-row {
+    width: 100%; text-align: left;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-left: 3px solid var(--paper-3);
+    padding: 0.5rem 0.65rem 0.5rem 0.7rem;
+    margin-bottom: 0.32rem;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--ink);
+    display: flex; align-items: center; gap: 0.55rem;
+    cursor: pointer; border-radius: 2px;
+  }
+  .folio-row .swatch {
+    width: 24px; height: 24px;
+    flex-shrink: 0;
+    border-radius: 1px;
+    border: 1px solid var(--paper-3);
+  }
+  .folio-row .swatch.image { background: linear-gradient(135deg, rgba(184, 54, 42, 0.4) 0%, rgba(42, 75, 124, 0.4) 100%), var(--paper-3); }
+  .folio-row .swatch.text { background: repeating-linear-gradient(180deg, var(--paper-2) 0, var(--paper-2) 3px, var(--paper-3) 3.5px, var(--paper-3) 4.5px); }
+  .folio-row .swatch.audio { background: linear-gradient(90deg, rgba(42, 75, 124, 0.3), rgba(42, 75, 124, 0.6), rgba(42, 75, 124, 0.3)); }
+  .folio-row .fname {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; min-width: 0;
+  }
+  .folio-row .fext {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.35rem;
+    border-radius: 1px;
+    border: 1px solid var(--paper-3);
+    color: var(--red);
+    flex-shrink: 0;
+  }
+  .folio-row .fext.audio { color: var(--blue); }
+  .folio-row .fext.text { color: var(--green); }
+  .folio-row .fsize {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    color: var(--faded);
+    flex-shrink: 0;
+    min-width: 3rem; text-align: right;
+  }
+
+  .scrim { position: absolute; top: 84px; left: 0; right: 0; bottom: calc(64px + 70%); background: linear-gradient(to bottom, transparent, rgba(245,241,232,0.85)); pointer-events: none; z-index: 65; }
+
+  .narrative { margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.6; }
+  .narrative strong { color: var(--paper); font-style: italic; font-weight: 500; }
+  .narrative em { color: var(--paper); font-style: italic; }
+  .narrative p { margin-bottom: 0.8rem; }
+  .narrative .label { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem; }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Scrapbook 3 · Actions sheet section.</h1>
+<div class="demo-sub">Zero new chrome — folio nests inside Actions</div>
+
+<div class="frames">
+
+  <!-- Frame A: Actions tab tapped, sheet open, three sections visible -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <a class="strip-back" href="#">← Studio</a>
+          <span class="stamp">Drafting</span>
+        </div>
+
+        <div class="article">
+          <div class="article-kicker">Architecture · v0.16</div>
+          <h1 class="article-title">Deskwork architectural thesis.</h1>
+          <p>Read this before touching any deskwork code.</p>
+        </div>
+
+        <div class="scrim"></div>
+
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <span class="sheet-kicker">⊕ Actions</span>
+            <span class="sheet-meta">5 folio items · 4 decisions</span>
+          </div>
+          <div class="sheet-body">
+
+            <div class="section">Document</div>
+            <button class="action" data-a="edit">
+              <span class="gly">✎</span>Edit<span class="a-meta">Open editor</span>
+            </button>
+
+            <div class="section">Folio<span class="section-meta"><a href="#">open viewer ↗</a></span></div>
+            <button class="folio-row">
+              <span class="swatch image"></span>
+              <span class="fname">decision-strip-overflow.png</span>
+              <span class="fext">PNG</span>
+              <span class="fsize">184 KB</span>
+            </button>
+            <button class="folio-row">
+              <span class="swatch image"></span>
+              <span class="fname">marginalia-rail-1px.png</span>
+              <span class="fext">PNG</span>
+              <span class="fsize">92 KB</span>
+            </button>
+            <button class="folio-row">
+              <span class="swatch text"></span>
+              <span class="fname">audit-2026-05-03.md</span>
+              <span class="fext text">MD</span>
+              <span class="fsize">4.1 KB</span>
+            </button>
+            <button class="folio-row">
+              <span class="swatch audio"></span>
+              <span class="fname">interview-take-1.mp3</span>
+              <span class="fext audio">MP3</span>
+              <span class="fsize">1.2 MB</span>
+            </button>
+            <button class="folio-row">
+              <span class="swatch image"></span>
+              <span class="fname">phone-strip-compaction.png</span>
+              <span class="fext">PNG</span>
+              <span class="fsize">76 KB</span>
+            </button>
+
+            <div class="section">Decisions</div>
+            <button class="action" data-a="approve">
+              <span class="gly">✓</span>Approve<span class="a-meta">Stage advance</span>
+            </button>
+            <button class="action" data-a="iterate">
+              <span class="gly">↻</span>Iterate<span class="a-meta">New version</span>
+            </button>
+
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab"><span class="glyph">§</span><span>Outline</span></button>
+          <button class="tab"><span class="glyph">✎</span><span>Notes</span><span class="count">3</span></button>
+          <button class="tab active"><span class="glyph">⊕</span><span>Actions</span></button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · Actions sheet open · three sections — Document / Folio / Decisions · folio items between Edit and the decision verbs · tap to open</div>
+  </div>
+
+  <!-- Frame B: scrolled to the bottom (Decisions section) -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <a class="strip-back" href="#">← Studio</a>
+          <span class="stamp">Drafting</span>
+        </div>
+
+        <div class="article">
+          <div class="article-kicker">Architecture · v0.16</div>
+          <h1 class="article-title">Deskwork architectural thesis.</h1>
+          <p>Read this before touching any deskwork code.</p>
+        </div>
+
+        <div class="scrim"></div>
+
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <span class="sheet-kicker">⊕ Actions</span>
+            <span class="sheet-meta">scrolled to decisions</span>
+          </div>
+          <div class="sheet-body">
+            <div class="section">Folio<span class="section-meta"><a href="#">open viewer ↗</a></span></div>
+            <button class="folio-row">
+              <span class="swatch audio"></span>
+              <span class="fname">interview-take-1.mp3</span>
+              <span class="fext audio">MP3</span>
+              <span class="fsize">1.2 MB</span>
+            </button>
+            <button class="folio-row">
+              <span class="swatch image"></span>
+              <span class="fname">phone-strip-compaction.png</span>
+              <span class="fext">PNG</span>
+              <span class="fsize">76 KB</span>
+            </button>
+
+            <div class="section">Decisions</div>
+            <button class="action" data-a="approve">
+              <span class="gly">✓</span>Approve<span class="a-meta">Stage advance</span>
+            </button>
+            <button class="action" data-a="iterate">
+              <span class="gly">↻</span>Iterate<span class="a-meta">New version</span>
+            </button>
+            <button class="action" data-a="reject">
+              <span class="gly">✕</span>Reject<span class="a-meta">Send back</span>
+            </button>
+            <button class="action" data-a="cancel">
+              <span class="gly">⊘</span>Cancel<span class="a-meta">Stop work</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab"><span class="glyph">§</span><span>Outline</span></button>
+          <button class="tab"><span class="glyph">✎</span><span>Notes</span><span class="count">3</span></button>
+          <button class="tab active"><span class="glyph">⊕</span><span>Actions</span></button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · scrolled to bottom · decisions remain stamp-green / proof-blue / red-pencil / faded · folio rows have neutral border-left-paper-3 (data, not action)</div>
+  </div>
+
+</div>
+
+<div class="narrative">
+  <p><span class="label">Pattern</span><strong>Zero new chrome.</strong> The existing Actions sheet (already wired in for Edit + decision verbs) becomes the home for everything you can do with this entry — including reaching its supporting materials. Three sections: <em>Document</em> (Edit), <em>Folio</em> (scrapbook items), <em>Decisions</em> (Approve / Iterate / Reject / Cancel). Section headers use the existing dashed-rule pattern from the Format sheet.</p>
+  <p><span class="label">Folio rows</span>Each item is a one-line row: 24px swatch (format-specific gradient like the chips in Mockup 2) + filename in mono + format chip + size. Reads as a press-check directory listing. Per-format chip color (red PNG / blue MP3 / green MD) carries the same accent map already shipped. Tapping a row opens the file in the standalone scrapbook viewer (or inline lightbox for images).</p>
+  <p><span class="label">Section meta</span>"Folio" header carries an <em>open viewer ↗</em> link in proof-blue — preserves the standalone-viewer affordance without making it a full row.</p>
+  <p><span class="label">Sheet height</span>70% (vs. 60% for Notes / Format sheets) because the Actions sheet now carries more content. Drag-handle still pulls to 90% / dismisses to 0%. Sheet body scrolls cleanly between sections.</p>
+  <p><span class="label">Strong</span>Most minimal of the three directions. No new tab, no new strip, no new visual artifact. Discoverability is concentrated in the Actions sheet — the operator already opens this for decisions; Folio is right there too. Semantic placement: Folio is "context for the decision," and lives next to the decisions in the same sheet.</p>
+  <p><span class="label">Weak</span>Discoverability cost is the trade-off. The operator has to know that Actions also holds the scrapbook. The Notes count is at-a-glance via the tab badge; Folio count requires opening the sheet. Mitigation: the Actions tab could also surface a small kraft dot indicator when the entry has folio items (similar to a notification dot). Or carry a count beneath the Actions glyph similar to Notes (but two count badges on one tab gets noisy). The header's "5 folio items · 4 decisions" gives the at-a-glance count once you've opened the sheet.</p>
+</div>
+
+</body>
+</html>

@@ -66,6 +66,10 @@ export function handleAnnotate(
         text: d.text,
         ...(d.category !== undefined ? { category: d.category } : {}),
         ...(typeof d.anchor === 'string' ? { anchor: d.anchor } : {}),
+        // #200 — W3C TextQuoteSelector prefix/suffix for anchor
+        // disambiguation. Optional; absent for legacy comments.
+        ...(typeof d.anchorPrefix === 'string' ? { anchorPrefix: d.anchorPrefix } : {}),
+        ...(typeof d.anchorSuffix === 'string' ? { anchorSuffix: d.anchorSuffix } : {}),
       });
       appendAnnotation(projectRoot, config, annotation);
       return ok({ annotation });

@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T14:45:27.911Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "address",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "commentId": "d711cab9-a69f-4e9d-9359-1acad44e13ad",
+    "version": 1,
+    "disposition": "addressed",
+    "reason": "Removed the 'Iterate on binary images' entry from Non-goals; image iteration is now supported. See § Graphical entries for the four supported paths (agent regeneration / programmatic transformation / SVG edits / operator-supplied replacement).",
+    "id": "e7a9d373-e05b-45f1-8626-00ae76b8f67b",
+    "createdAt": "2026-05-16T14:45:27.911Z"
+  }
+}

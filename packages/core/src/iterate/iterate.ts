@@ -16,7 +16,6 @@ interface IterateResult {
   entryId: string;
   stage: Stage;
   version: number;
-  reviewState: 'in-review';
 }
 
 /**
@@ -93,31 +92,20 @@ export async function iterateEntry(projectRoot: string, opts: IterateOptions): P
     markdown,
   });
 
-  // Update sidecar
+  // Update sidecar. Per DESKWORK-STATE-MACHINE.md (Commandment III),
+  // `reviewState` is RETIRED — the schema field is gone. zod's
+  // non-strict read drops vestigial keys from legacy on-disk sidecars
+  // automatically, so no destructure is needed here.
   const updated: Entry = {
     ...sidecar,
     iterationByStage: { ...sidecar.iterationByStage, [sidecar.currentStage]: newVersion },
-    reviewState: 'in-review',
     updatedAt: at,
   };
   await writeSidecar(projectRoot, updated);
-
-  // Emit review-state-change if state actually changed
-  if (sidecar.reviewState !== 'in-review') {
-    await appendJournalEvent(projectRoot, {
-      kind: 'review-state-change',
-      at,
-      entryId: sidecar.uuid,
-      stage: sidecar.currentStage,
-      from: sidecar.reviewState ?? null,
-      to: 'in-review',
-    });
-  }
 
   return {
     entryId: sidecar.uuid,
     stage: sidecar.currentStage,
     version: newVersion,
-    reviewState: 'in-review',
   };
 }

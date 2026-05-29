@@ -114,37 +114,16 @@ describe('validateAll - journal-sidecar', () => {
     expect(journalFails).toEqual([]);
   });
 
-  it('flags when latest review-state-change.to disagrees with sidecar.reviewState', async () => {
+  it('does NOT flag review-state-change journal events (the journal-sidecar reviewState invariant is retired per Commandment III)', async () => {
+    // Pre-Phase-0.2: this test asserted that the validator flagged
+    // disagreement between the latest `review-state-change.to` event
+    // and `sidecar.reviewState`. With reviewState retired, both halves
+    // of the comparison are gone — the field doesn't exist on the
+    // schema, and the validator no longer runs the comparison. The
+    // event kind itself stays in the journal-events schema for
+    // historical-read compat.
     const uuid = '33333333-3333-3333-3333-333333333333';
-    const slug = 'review-mismatch';
-    await writeFile(
-      join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
-      entryJson(uuid, slug, 'Drafting', 'in-review'),
-    );
-    await writeFile(
-      join(projectRoot, '.deskwork', 'calendar.md'),
-      calendarMd(uuid, slug, 'Drafting'),
-    );
-    await mkdir(join(projectRoot, 'docs', slug), { recursive: true });
-    await writeFile(join(projectRoot, 'docs', slug, 'index.md'), '');
-
-    await appendJournalEvent(projectRoot, {
-      kind: 'review-state-change',
-      at: NOW,
-      entryId: uuid,
-      stage: 'Drafting',
-      from: 'in-review',
-      to: 'approved',
-    });
-
-    const result = await validateAll(projectRoot);
-    const journalFails = result.failures.filter((f) => f.category === 'journal-sidecar');
-    expect(journalFails.some((f) => f.entryId === uuid && /review/.test(f.message))).toBe(true);
-  });
-
-  it('treats undefined sidecar.reviewState as null when comparing against journal', async () => {
-    const uuid = '44444444-4444-4444-4444-444444444444';
-    const slug = 'review-null';
+    const slug = 'review-historical';
     await writeFile(
       join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
       entryJson(uuid, slug, 'Drafting'),
@@ -156,13 +135,14 @@ describe('validateAll - journal-sidecar', () => {
     await mkdir(join(projectRoot, 'docs', slug), { recursive: true });
     await writeFile(join(projectRoot, 'docs', slug, 'index.md'), '');
 
+    // Historical event still appendable + readable, just not validated.
     await appendJournalEvent(projectRoot, {
       kind: 'review-state-change',
       at: NOW,
       entryId: uuid,
       stage: 'Drafting',
-      from: 'approved',
-      to: null,
+      from: 'in-review',
+      to: 'approved',
     });
 
     const result = await validateAll(projectRoot);

@@ -164,7 +164,12 @@ describe('checkPreconditions', () => {
   });
 });
 
-import { verifyNpmStatus, DESKWORK_PACKAGES, type NpmViewer } from '../lib/release-helpers.js';
+import {
+  verifyNpmStatus,
+  verifyNpmStatusUntilPublished,
+  DESKWORK_PACKAGES,
+  type NpmViewer,
+} from '../lib/release-helpers.js';
 
 describe('verifyNpmStatus', () => {
   it('reports all unpublished when viewer returns false for every spec', () => {
@@ -201,6 +206,79 @@ describe('verifyNpmStatus', () => {
       '@deskwork/cli@0.9.6',
       '@deskwork/studio@0.9.6',
     ]);
+  });
+});
+
+describe('verifyNpmStatusUntilPublished', () => {
+  it('returns on the first attempt when every spec is already visible', async () => {
+    const viewer: NpmViewer = () => true;
+    const sleeps: number[] = [];
+    const sleep = (ms: number) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    };
+    const r = await verifyNpmStatusUntilPublished('0.26.5', { viewer, sleep });
+    expect(r.unpublished).toEqual([]);
+    expect(r.published).toEqual([...DESKWORK_PACKAGES]);
+    expect(sleeps).toEqual([]);
+  });
+
+  it('retries with exponential backoff until every spec becomes visible', async () => {
+    // Simulates CDN propagation: studio first visible on the 3rd probe.
+    let probes = 0;
+    const viewer: NpmViewer = (spec) => {
+      if (spec.startsWith('@deskwork/studio@')) {
+        probes += 1;
+        return probes >= 3;
+      }
+      return true;
+    };
+    const sleeps: number[] = [];
+    const sleep = (ms: number) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    };
+    const r = await verifyNpmStatusUntilPublished('0.26.5', {
+      viewer,
+      sleep,
+      initialBackoffMs: 100,
+      maxBackoffMs: 1000,
+    });
+    expect(r.unpublished).toEqual([]);
+    // First probe sees studio unpublished; sleep(100) → second probe sees
+    // studio unpublished; sleep(200) → third probe sees studio published.
+    expect(sleeps).toEqual([100, 200]);
+  });
+
+  it('caps backoff at maxBackoffMs', async () => {
+    const viewer: NpmViewer = () => false;
+    const sleeps: number[] = [];
+    const sleep = (ms: number) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    };
+    await verifyNpmStatusUntilPublished('0.26.5', {
+      viewer,
+      sleep,
+      maxAttempts: 6,
+      initialBackoffMs: 100,
+      maxBackoffMs: 300,
+    });
+    // 5 backoffs between 6 attempts: 100, 200, 300 (capped), 300, 300.
+    expect(sleeps).toEqual([100, 200, 300, 300, 300]);
+  });
+
+  it('returns the final report (unpublished still set) when budget exhausts', async () => {
+    const viewer: NpmViewer = () => false;
+    const sleep = () => Promise.resolve();
+    const r = await verifyNpmStatusUntilPublished('0.26.5', {
+      viewer,
+      sleep,
+      maxAttempts: 3,
+      initialBackoffMs: 10,
+    });
+    expect(r.unpublished).toEqual([...DESKWORK_PACKAGES]);
+    expect(r.published).toEqual([]);
   });
 });
 
@@ -338,6 +416,27 @@ describe('atomicPush', () => {
       expect(rig.sh('git rev-parse v0.0.1').trim()).toBe(localTagBefore);
       const { rmSync } = await import('node:fs');
       rmSync(otherClone, { recursive: true, force: true });
+    } finally {
+      rig.cleanup();
+    }
+  });
+
+  it('pushes when branch === main (no duplicate refspec)', async () => {
+    // Solo-maintainer direct-to-main workflow: the release branch IS main.
+    // The atomic-push call previously passed both 'HEAD:main' and
+    // 'HEAD:refs/heads/main', which git rejects with "dst ref
+    // refs/heads/main receives from more than one src".
+    const rig = createRig();
+    try {
+      rig.sh('git checkout main');
+      rig.sh('echo release > release.txt && git add release.txt && git commit -m "chore: release v0.0.1"');
+      rig.sh('git tag -a v0.0.1 -m "test release"');
+      await atomicPush({ tag: 'v0.0.1', branch: 'main', cwd: rig.localPath });
+      const remoteMainSha = rig.sh('git rev-parse origin/main').trim();
+      const localHeadSha = rig.sh('git rev-parse HEAD').trim();
+      expect(remoteMainSha).toBe(localHeadSha);
+      const remoteTagsRaw = rig.sh('git ls-remote --tags origin v0.0.1');
+      expect(remoteTagsRaw).toMatch(/refs\/tags\/v0\.0\.1/);
     } finally {
       rig.cleanup();
     }

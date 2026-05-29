@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Dashboard mockup 1b · Press tabs · revised</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --kraft-2: #D9C8A2;
+    --kraft-paper: #EDE0C2;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .meta a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+  }
+  h1.demo-title {
+    color: var(--paper);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.6rem;
+    margin-bottom: 0.4rem;
+    text-align: center;
+  }
+  .demo-sub {
+    color: var(--faded-2);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 1.6rem;
+    text-align: center;
+  }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+    text-align: center;
+    max-width: 410px;
+  }
+  .phone {
+    width: 410px;
+    height: 880px;
+    background: #050505;
+    border-radius: 50px;
+    padding: 12px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+  .screen {
+    width: 100%; height: 100%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .ios-clock {
+    position: absolute; top: 28px; left: 32px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.95rem; font-weight: 600;
+    color: var(--ink); z-index: 110;
+  }
+  .ios-icons {
+    position: absolute; top: 30px; right: 32px;
+    color: var(--ink);
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110;
+  }
+
+  /* ============================================================
+   *  REVISED MOBILE METAPHOR
+   *  Desktop: rubber-stamp-on-paper (rotation, ink texture, off-kilter)
+   *  Mobile : letterpress-tag (flat, doubled border, wider tracking)
+   *
+   *  Why it changed: rotated stamps cluster in vertical lists and
+   *  read as "the page is crooked" rather than "this was hand-stamped."
+   *  The press-check aesthetic stays — cream paper, JetBrains Mono
+   *  kickers, Newsreader italic display, red-pencil accents. What
+   *  changes is the EXPRESSION of "this is a stamped mark":
+   *
+   *    - rotation removed
+   *    - 2px doubled border (outer ink + 1px inner paper inset)
+   *    - letter-spacing 0.12em with small-caps for "engraved" read
+   *    - subtle text-shadow halo (ink-bleed, NOT drop shadow)
+   *
+   *  Net effect: stamps look pressed, not tilted. Vertical stacks
+   *  are quiet instead of jittery.
+   *
+   *  Plus: tab 3 is now Compose (was Folio). Folio was the soft spot
+   *  in the original narrative; Compose is a real working surface
+   *  with three creation verbs: + New / ⤓ Ingest / ⊜ Shortform.
+   * ============================================================ */
+
+  /* Hero strip — flat mark (no rotation) */
+  .strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    padding: 56px 1rem 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .strip-mark {
+    /* FLAT: no rotation. Doubled border + wider tracking
+       reads as "letterpress nameplate" instead of "rubber stamp." */
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 1rem;
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    box-shadow: inset 0 0 0 1px var(--paper); /* inner paper bleed */
+    padding: 0.06rem 0.5rem;
+    background: var(--paper);
+    letter-spacing: 0.02em;
+  }
+  .strip-mark em { color: var(--red); font-style: italic; }
+  .strip-vol {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faded);
+  }
+  .strip-help {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+
+  /* Filter strip */
+  .filterbar {
+    position: absolute;
+    top: 56px; left: 0; right: 0;
+    height: 40px;
+    padding: 0.4rem 0.7rem;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 49;
+    display: flex; align-items: center; gap: 0.4rem;
+    overflow-x: auto;
+  }
+  .filterbar::-webkit-scrollbar { display: none; }
+  .findbox {
+    flex-shrink: 0;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    padding: 0.25rem 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    min-width: 7.5rem;
+    display: flex; align-items: center; gap: 0.3rem;
+  }
+  .findbox .icon { color: var(--red); }
+  .chip {
+    flex-shrink: 0;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faded);
+    cursor: pointer;
+  }
+  .chip.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .body {
+    position: absolute;
+    top: 96px; left: 0; right: 0; bottom: 64px;
+    overflow-y: auto;
+    padding: 0.6rem 0 1.4rem;
+  }
+
+  .stage-head {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    padding: 0.85rem 1rem 0.4rem;
+    border-bottom: 1px solid var(--paper-3);
+  }
+  .stage-glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.4rem;
+    color: var(--red);
+    line-height: 1;
+  }
+  .stage-name {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .stage-count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+  }
+
+  .row {
+    padding: 0.7rem 1rem 0.85rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    display: grid;
+    grid-template-columns: 1.4rem 1fr;
+    column-gap: 0.5rem;
+    row-gap: 0.25rem;
+  }
+  .row.depth-1 { padding-left: 1.7rem; }
+  .row-num {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    padding-top: 0.2rem;
+  }
+  .row-slug {
+    grid-column: 2; grid-row: 1;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+  }
+  .row-slug a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--paper-3); }
+  .row-title {
+    grid-column: 2; grid-row: 2;
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.95rem;
+    line-height: 1.25;
+    color: var(--ink);
+  }
+  .row-foot {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 0.45rem;
+    display: flex; align-items: center; gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  /* ============================================================
+   *  STAMPS — flat, letterpress-tag treatment
+   *  Compare against the original (-1.2deg rotation, single border):
+   *  this version has NO rotation, a 2px ink border with a 1px
+   *  inset paper layer (doubled-border feel), wider letter-spacing,
+   *  and a 0.4px text-shadow halo simulating ink-into-paper bleed.
+   * ============================================================ */
+  .stamp {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 14, "wght" 600;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 2px solid currentColor;
+    box-shadow: inset 0 0 0 1px var(--paper);
+    padding: 0.06rem 0.42rem;
+    background: var(--paper);
+    line-height: 1.2;
+    flex-shrink: 0;
+    text-shadow: 0 0 0.4px currentColor;
+  }
+  .stamp.review { color: var(--red); }
+  .stamp.iterating { color: var(--blue); }
+  .stamp.approved { color: var(--green); }
+
+  .iter-pip {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    text-transform: uppercase;
+  }
+
+  .act {
+    flex-shrink: 0;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 2px;
+    padding: 0.18rem 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .act.open { color: var(--ink); }
+  .act.approve { color: var(--green); border-color: var(--green); }
+  .act.iterate { color: var(--blue); border-color: var(--blue); }
+  .act.cancel  { color: var(--faded); }
+  .act.scrap   { color: var(--kraft); border-color: var(--kraft-2); }
+
+  /* Tab bar — Compose replaces Folio */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -2px 16px rgba(26,22,20,0.06);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    z-index: 60;
+  }
+  .tab {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.18rem;
+    border: none; background: transparent; cursor: pointer;
+    padding: 0.4rem 0.4rem 0.6rem;
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    position: relative;
+  }
+  .tab .glyph {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.5rem; line-height: 1; color: var(--faded);
+  }
+  .tab.active { color: var(--red); }
+  .tab.active .glyph { color: var(--red); }
+  .tab.active::after {
+    content: ''; position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 30px; height: 2px; background: var(--red);
+  }
+  .tab .count {
+    position: absolute; top: 8px; right: 28%;
+    background: var(--red); color: var(--paper);
+    font-size: 0.55rem; line-height: 1;
+    padding: 0.18rem 0.32rem; border-radius: 8px;
+    letter-spacing: 0.04em; min-width: 1rem; text-align: center;
+  }
+  /* Compose tab — uses red-pencil "+" glyph (creation verb) */
+  .tab.compose .glyph {
+    font-family: var(--mono);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 1.7rem;
+    color: var(--red);
+  }
+
+  /* Sheet (slides up over body) */
+  .sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 64px;
+    height: 60%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -16px 40px rgba(26,22,20,0.18);
+    border-radius: 24px 24px 0 0;
+    z-index: 70;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sheet-handle {
+    align-self: center;
+    width: 44px;
+    height: 5px;
+    background: var(--paper-3);
+    border-radius: 4px;
+    margin: 0.55rem 0 0.7rem;
+  }
+  .sheet-head {
+    padding: 0 1.2rem 0.7rem;
+    border-bottom: 1px solid var(--red);
+    display: flex; align-items: baseline; gap: 0.6rem;
+  }
+  .sheet-kicker {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .sheet-meta {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    margin-left: auto;
+  }
+  .sheet-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.85rem 1rem 1.2rem;
+  }
+
+  /* Compose sheet — list of creation verbs.
+     Each verb is a card; tap copies the slash command to clipboard
+     (per THESIS Consequence 2 — the agent does the work; the studio routes intent). */
+  .verb {
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-left: 3px solid var(--red);
+    border-radius: 2px;
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 0.6rem;
+    cursor: pointer;
+    box-shadow: 0 1px 0 rgba(26,22,20,0.05);
+  }
+  .verb-head {
+    display: flex; align-items: baseline; gap: 0.55rem;
+    margin-bottom: 0.3rem;
+  }
+  .verb-glyph {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.35rem; line-height: 1;
+    color: var(--red);
+  }
+  .verb-name {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.05rem;
+    color: var(--ink);
+  }
+  .verb-cmd {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--blue);
+    border: 1px solid var(--paper-3);
+    background: var(--paper-2);
+    border-radius: 2px;
+    padding: 0.18rem 0.4rem;
+  }
+  .verb-desc {
+    font-family: var(--display);
+    font-size: 0.92rem;
+    line-height: 1.4;
+    color: var(--ink);
+  }
+  .verb-desc em { color: var(--red); font-style: italic; }
+  .verb-foot {
+    margin-top: 0.5rem;
+    padding-top: 0.45rem;
+    border-top: 1px dashed var(--paper-3);
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    text-transform: uppercase;
+  }
+
+  .scrim {
+    position: absolute;
+    top: 96px; left: 0; right: 0;
+    bottom: calc(64px + 60%);
+    background: linear-gradient(to bottom, transparent, rgba(245,241,232,0.85));
+    pointer-events: none;
+    z-index: 65;
+  }
+
+  /* Comparison strip — show original vs. revised stamp side-by-side */
+  .compare-block {
+    margin: 3rem auto 0;
+    max-width: 720px;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--red);
+    padding: 1.2rem 1.4rem;
+    color: var(--paper);
+    font-family: var(--display);
+  }
+  .compare-block h3 {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.7rem;
+  }
+  .compare-block .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    background: transparent;
+    padding: 0.5rem 0;
+    border-bottom: 0;
+    align-items: center;
+  }
+  .compare-block .label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #C7BEAE;
+    margin-bottom: 0.4rem;
+  }
+  .compare-block .demo {
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    padding: 0.85rem 1rem;
+    border-radius: 2px;
+    color: var(--ink);
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .original-stamp {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 14, "wght" 600;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--red);
+    border: 2px solid var(--red);
+    padding: 0.04rem 0.4rem;
+    background: var(--paper);
+    transform: rotate(-1.2deg);
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Dashboard 1b · Press tabs · revised.</h1>
+<div class="demo-sub">Mockup 1 + Compose tab + flat mobile stamps</div>
+
+<div class="frames">
+
+  <!-- Frame A: revised home — flat stamps, Compose tab visible -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><em>Press-</em>Check</span>
+          <span class="strip-vol">Vol. 01 · № 12</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+          <button class="chip active">All</button>
+          <button class="chip">Planned</button>
+          <button class="chip">Drafting</button>
+          <button class="chip">Final</button>
+        </div>
+
+        <div class="body">
+
+          <div class="stage-head">
+            <span class="stage-glyph">§</span>
+            <span class="stage-name">Planned</span>
+            <span class="stage-count">1</span>
+          </div>
+          <div class="row">
+            <span class="row-num">01</span>
+            <div class="row-slug"><a href="#">deskwork-plugin/issue-158-ux-audit</a></div>
+            <div class="row-title">Issue 158 · UX audit</div>
+            <div class="row-foot">
+              <a class="act open" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <button class="act cancel">cancel ⊘</button>
+              <a class="act scrap" href="#">▦ 0</a>
+            </div>
+          </div>
+
+          <div class="stage-head">
+            <span class="stage-glyph">✎</span>
+            <span class="stage-name">Drafting</span>
+            <span class="stage-count">5</span>
+          </div>
+          <div class="row">
+            <span class="row-num">02</span>
+            <div class="row-slug"><a href="#">post-release-acceptance-design</a></div>
+            <div class="row-title">Post-release customer acceptance playbook</div>
+            <div class="row-foot">
+              <span class="stamp review">In review</span>
+              <span class="iter-pip">it. 02</span>
+              <a class="act open" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <a class="act scrap" href="#">▦ 4</a>
+            </div>
+          </div>
+          <div class="row depth-1">
+            <span class="row-num">03</span>
+            <div class="row-slug"><a href="#">…/v016-verification-walk</a></div>
+            <div class="row-title">v0.16.0 verification walk</div>
+            <div class="row-foot">
+              <a class="act open" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <button class="act cancel">cancel ⊘</button>
+              <a class="act scrap" href="#">▦ 1</a>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-num">04</span>
+            <div class="row-slug"><a href="#">release-skill-design</a></div>
+            <div class="row-title">Release skill design</div>
+            <div class="row-foot">
+              <span class="stamp iterating">Iterating</span>
+              <span class="iter-pip">it. 03</span>
+              <a class="act open" href="#">open →</a>
+              <button class="act iterate">iterate →</button>
+              <a class="act scrap" href="#">▦ 2</a>
+            </div>
+          </div>
+          <div class="row depth-1">
+            <span class="row-num">05</span>
+            <div class="row-slug"><a href="#">…/open-issue-tranche-proposal</a></div>
+            <div class="row-title">Open issue tranche proposal</div>
+            <div class="row-foot">
+              <span class="stamp review">In review</span>
+              <span class="iter-pip">it. 01</span>
+              <a class="act open" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <a class="act scrap" href="#">▦ 0</a>
+            </div>
+          </div>
+
+          <div class="stage-head">
+            <span class="stage-glyph">⊕</span>
+            <span class="stage-name">Final</span>
+            <span class="stage-count">1</span>
+          </div>
+          <div class="row">
+            <span class="row-num">06</span>
+            <div class="row-slug"><a href="#">studio-mobile-first</a></div>
+            <div class="row-title">Studio mobile-first</div>
+            <div class="row-foot">
+              <span class="stamp approved">Approved</span>
+              <a class="act open" href="#">open →</a>
+              <a class="act scrap" href="#">▦ 1</a>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="tabbar">
+          <button class="tab active">
+            <span class="glyph">§</span>
+            <span>Pipeline</span>
+          </button>
+          <button class="tab">
+            <span class="glyph">✎</span>
+            <span>Press</span>
+            <span class="count">3</span>
+          </button>
+          <button class="tab compose">
+            <span class="glyph">+</span>
+            <span>Compose</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · revised home · flat stamps (no rotation) · Compose replaces Folio · stamps now read as letterpress tags, not tilted rubber stamps</div>
+  </div>
+
+  <!-- Frame B: Compose sheet open — three creation verbs -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><em>Press-</em>Check</span>
+          <span class="strip-vol">Vol. 01 · № 12</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+          <button class="chip active">All</button>
+          <button class="chip">Planned</button>
+          <button class="chip">Drafting</button>
+          <button class="chip">Final</button>
+        </div>
+
+        <div class="body">
+          <div class="stage-head">
+            <span class="stage-glyph">§</span>
+            <span class="stage-name">Planned</span>
+            <span class="stage-count">1</span>
+          </div>
+          <div class="row">
+            <span class="row-num">01</span>
+            <div class="row-slug">deskwork-plugin/issue-158-ux-audit</div>
+            <div class="row-title">Issue 158 · UX audit</div>
+          </div>
+        </div>
+
+        <div class="scrim"></div>
+
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <span class="sheet-kicker">+ Compose · creation verbs</span>
+            <span class="sheet-meta">tap copies the command</span>
+          </div>
+          <div class="sheet-body">
+
+            <article class="verb">
+              <div class="verb-head">
+                <span class="verb-glyph">+</span>
+                <span class="verb-name">New idea</span>
+                <span class="verb-cmd">/deskwork:add</span>
+              </div>
+              <div class="verb-desc">Capture a new pitch as an <em>Ideas</em>-stage entry. Scaffolds an <em>idea.md</em> with sidecar; the agent picks up from there.</div>
+              <div class="verb-foot">tap → clipboard · paste in Claude Code</div>
+            </article>
+
+            <article class="verb">
+              <div class="verb-head">
+                <span class="verb-glyph">⤓</span>
+                <span class="verb-name">Ingest existing</span>
+                <span class="verb-cmd">/deskwork:ingest</span>
+              </div>
+              <div class="verb-desc">Backfill markdown that already exists on disk. Walks files / globs, derives slug + state + date, and (after dry-run) writes calendar rows.</div>
+              <div class="verb-foot">tap → clipboard · paste in Claude Code</div>
+            </article>
+
+            <article class="verb">
+              <div class="verb-head">
+                <span class="verb-glyph">⊜</span>
+                <span class="verb-name">Shortform start</span>
+                <span class="verb-cmd">/deskwork:shortform-start</span>
+              </div>
+              <div class="verb-desc">Start a LinkedIn / Reddit / YouTube / Instagram draft for a Published or Drafting entry. Same review pipeline as longform.</div>
+              <div class="verb-foot">tap → clipboard · paste in Claude Code</div>
+            </article>
+
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab">
+            <span class="glyph">§</span>
+            <span>Pipeline</span>
+          </button>
+          <button class="tab">
+            <span class="glyph">✎</span>
+            <span>Press</span>
+            <span class="count">3</span>
+          </button>
+          <button class="tab compose active">
+            <span class="glyph">+</span>
+            <span>Compose</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · Compose sheet open · 60% height · three creation verbs as cards · tap copies <em style="color: var(--blue); font-style: italic;">/deskwork:&lt;verb&gt;</em> to clipboard (THESIS C2 — agent does the work)</div>
+  </div>
+
+</div>
+
+<!-- Side-by-side comparison: original vs. revised stamp treatment -->
+<div class="compare-block">
+  <h3>Stamp treatment · before / after</h3>
+  <div class="row">
+    <div>
+      <div class="label">Original (desktop reading)</div>
+      <div class="demo">
+        <span class="original-stamp">In review</span>
+        <span class="original-stamp" style="color: var(--blue); border-color: var(--blue);">Iterating</span>
+        <span class="original-stamp" style="color: var(--green); border-color: var(--green);">Approved</span>
+      </div>
+      <div style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.45;">Rotated <em>−1.2deg</em>, single border. Reads as "rubber stamp pressed at an angle" on desktop.</div>
+    </div>
+    <div>
+      <div class="label">Revised (mobile reading)</div>
+      <div class="demo">
+        <span class="stamp review">In review</span>
+        <span class="stamp iterating">Iterating</span>
+        <span class="stamp approved">Approved</span>
+      </div>
+      <div style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.45;">Flat, doubled border (2px outer + 1px inset paper), wider tracking, ink-bleed text-shadow. Reads as "letterpress tag" — pressed, not tilted.</div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.6;">
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">What changed</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">Two revisions to the picked Mockup 1.</strong> First: tab 3 is now <em style="color: var(--paper);">Compose</em> instead of Folio (the soft spot in the original narrative). Compose holds three creation verbs — <em style="color: var(--paper);">/deskwork:add</em>, <em style="color: var(--paper);">/deskwork:ingest</em>, <em style="color: var(--paper);">/deskwork:shortform-start</em> — surfaced as cards that copy the slash command to the clipboard, per THESIS Consequence 2 (UI routes intent; agent does the work). Second: every stamp on mobile is flat (no rotation). The press-check vocabulary stays — cream paper, JetBrains Mono kickers, Newsreader italic display, red-pencil accents — but the EXPRESSION of "this is a stamped mark" shifts from "rubber-stamp-on-paper" (rotation, ink-pressure asymmetry) to "letterpress-tag" (doubled border, wider tracking, ink-bleed text-shadow).</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Why rotation read messy on mobile</span>On desktop, rotated stamps cluster across horizontal real estate — they look like an editor pressed each one independently, with hand variability. The eye reads it as <em style="color: var(--paper);">human craft</em>. On mobile, with rows stacked vertically and stamps clustering near each other in tight 22-line-height cells, the same 1.2deg rotation reads as <em style="color: var(--paper);">the page is crooked</em> — the angular delta is more visible relative to the row height, and multiple rotations stacked vertically compound. The eye reads it as <em style="color: var(--paper);">misalignment</em>, not craft.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">How "stamped" still reads without rotation</span>Three signals do the work that rotation used to do on desktop: (1) <strong style="color: var(--paper); font-style: italic; font-weight: 500;">doubled border</strong> — 2px outer ink + 1px inset paper layer, simulating the imprint outline of a rubber stamp on textured paper; (2) <strong style="color: var(--paper); font-style: italic; font-weight: 500;">wider tracking + small caps</strong> — 0.12em letter-spacing reads as engraved/pressed type, not casual italic; (3) <strong style="color: var(--paper); font-style: italic; font-weight: 500;">ink-bleed text-shadow</strong> — 0.4px halo simulates ink seeping into paper fibers, NOT a drop shadow (drop shadows look digital).</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Hero strip mark</span>Same treatment. The "Press-Check" wordmark on the hero strip used to rotate −1.5deg; revised it sits flat with the same doubled-border, ink-bleed treatment. The 1px red-pencil rule under the strip continues to read as the masthead baseline, so the press-check signal is still <em style="color: var(--paper);">there</em> — it's just expressed as letterpress nameplate rather than hand-pressed stamp.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Compose tab — why a third tab and not a FAB</span>A floating action button would have been the standard mobile shape, but it breaks the press-check vocabulary (round buttons, Material shadows, Roboto labels) — every other piece of mobile chrome on this surface is a flat letterpress chip. A third tab keeps the chrome consistent: same 64px tabbar, same italic-display glyph + mono label, same red-pencil active accent. The "+" glyph is JetBrains Mono (not italic display) to read as <em style="color: var(--paper);">creation operator</em> rather than <em style="color: var(--paper);">stage marker</em> — the only typographic deviation in the bar, signaling "this tab does something different."</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Compose sheet shape</span>Reuses the established sheet (60% height, drag handle, red baseline, scrim). Each verb is a card with: italic display name, JetBrains Mono command chip in proof-blue (matches Source/Preview accents), prose description in display, and a <em style="color: var(--paper);">tap → clipboard · paste in Claude Code</em> footer to make the affordance unambiguous. Order: <em style="color: var(--paper);">add</em> (most frequent) → <em style="color: var(--paper);">ingest</em> (adoption / one-shot) → <em style="color: var(--paper);">shortform-start</em> (advanced).</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Implementation note</span>The CSS deltas vs. the entry-review surface are minimal — the entry-review's stamp class can keep its rotation in place (single stamp per screen, proud signature element), while the dashboard introduces a <em style="color: var(--paper);">.stamp</em> override that drops rotation, doubles the border, and widens tracking. Both stamps inherit the same color palette and font-family. Recommended approach for Task 1.2: add a base <em style="color: var(--paper);">--stamp-rotation</em> custom property defaulting to <em style="color: var(--paper);">−1.2deg</em>, override to <em style="color: var(--paper);">0</em> on dashboard rows, and let the rest of the CSS (border, tracking, shadow) cascade.</p>
+</div>
+
+</body>
+</html>

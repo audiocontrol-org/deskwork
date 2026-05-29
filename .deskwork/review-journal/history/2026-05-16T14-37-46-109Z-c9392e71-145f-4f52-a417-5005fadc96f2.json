@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T14:37:46.109Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "version": 1,
+    "range": {
+      "start": 14851,
+      "end": 14888
+    },
+    "text": "Templates are starting points for user configuration, not the bounding space of possible pipeline configurations",
+    "category": "other",
+    "anchor": "Per-stage columns are template-aware.",
+    "id": "1c507d88-587e-4762-a833-cbda5f528bc7",
+    "createdAt": "2026-05-16T14:37:46.109Z"
+  }
+}

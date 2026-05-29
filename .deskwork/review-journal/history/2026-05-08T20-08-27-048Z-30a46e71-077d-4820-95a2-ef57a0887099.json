@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-08T20:08:27.048Z",
+  "entryId": "36a268a4-c7ac-4802-8992-20319a08fa92",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "36a268a4-c7ac-4802-8992-20319a08fa92",
+    "version": 1,
+    "range": {
+      "start": 0,
+      "end": 17
+    },
+    "text": "this is a test",
+    "category": "other",
+    "anchor": "Operator framing ",
+    "id": "176f2009-e46a-4103-a868-87761f14a7f3",
+    "createdAt": "2026-05-08T20:08:27.048Z"
+  }
+}

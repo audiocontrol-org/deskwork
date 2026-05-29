@@ -1,0 +1,24 @@
+{
+  "id": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "timestamp": "2026-05-16T07:13:10.152Z",
+  "event": "ingest",
+  "slug": "graphical-entries-design",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/superpowers/specs/2026-05-16-graphical-entries-design.md",
+  "frontmatterSnapshot": {
+    "title": "Graphical entries — design spec",
+    "slug": "graphical-entries",
+    "date": "2026-05-16",
+    "status": "draft",
+    "deskwork": {
+      "doc": "design-spec"
+    }
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}

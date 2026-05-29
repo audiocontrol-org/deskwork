@@ -16,7 +16,7 @@ Current version + per-release notes live on the [GitHub releases page](https://g
 
 ### Capabilities
 
-- **Editorial lifecycle** — Ideas → Planned → Outlining → Drafting → Review → Published, with structured review iteration loops.
+- **Editorial lifecycle** — eight stages: Ideas → Planned → Outlining → Drafting → Final → Published (linear pipeline), plus Blocked and Cancelled (off-pipeline). Universal verbs (iterate / approve / cancel) operate on any stage. The canonical state-machine spec is [`DESKWORK-STATE-MACHINE.md`](DESKWORK-STATE-MACHINE.md).
 - **Hierarchical content** — slugs accept `/`-separated segments (`the-outbound/characters/strivers`) and every lifecycle skill, calendar surface, and studio page works at any depth. Long-form projects (novels, essay collections, multi-chapter guides) live alongside flat blog posts in the same calendar. Per-entry `--layout {index|readme|flat}` controls the on-disk shape; `directoryIsHierarchicalNode` keeps untracked organizational dirs out of the slug.
 - **Cross-platform shortform composition** — author LinkedIn / Reddit / YouTube / Instagram posts for any tracked entry through the **same review surface** as longform (no parallel composer). Each draft is a real markdown file under the entry's scrapbook; the studio renders a small platform/channel header above the longform editor; approval writes the body into the calendar's distribution record. See [`plugins/deskwork/README.md`](plugins/deskwork/README.md#shortform--cross-platform-posts) for the lifecycle.
 - **Refactor-proof binding** — calendar entries join to their content files via a UUID written into each markdown's frontmatter (`id: <uuid>`), not via a cached path. Renaming or moving a file in the content tree doesn't break the binding; deskwork rediscovers it on the next read by scanning `contentDir` for the matching id. The `deskwork doctor` command audits the binding metadata across calendar, files, and review workflows, and repairs ambiguous cases interactively.
@@ -46,18 +46,69 @@ The plugins ship as thin shells. On the first invocation after marketplace insta
 
 See each plugin's `README.md` under `plugins/` for configuration and usage. The `deskwork` plugin README documents the host content-schema requirement (Astro projects must allow the `deskwork:` namespace in frontmatter) and the `doctor` maintenance command.
 
+### Install scope: user vs project
+
+Claude Code records each `/plugin install` as either a **user-scope** install (`scope: "user"`) or a **project-scope** install (`scope: "local"`, bound to the project directory you ran the command in). The scope affects two things:
+
+1. **Where the plugin is visible.** User-scope installs apply across every Claude Code session on the machine. Project-scope installs apply only to sessions started from that specific project directory.
+2. **How updates flow.** When the marketplace catalog advances to a newer version (see *Getting updates* below), Claude Code auto-upgrades user-scope installs to the new version. **Project-scope installs do NOT auto-upgrade** — they stay pinned to the version that was current at install time until you explicitly re-install in that project. *(This scope-driven upgrade asymmetry is not currently documented in Claude Code's user-facing plugin docs; it's observable behavior verified against `~/.claude/plugins/installed_plugins.json`.)*
+
+**Which scope to pick:**
+
+- **User-scope (recommended for most adopters)** — `/plugin install <plugin>@<marketplace>` ensures every project on your machine sees the same plugin version, and a single `/plugin marketplace update` keeps them all current. Default to this unless you have a specific reason to pin.
+- **Project-scope (for pinning)** — when you need a specific project to stay on a specific plugin version regardless of what the marketplace says next. Useful for reproducible builds, debugging a regression against a known-good version, or temporarily holding a project back while you migrate.
+
+**Inspect your install state** by reading `~/.claude/plugins/installed_plugins.json`. Each plugin lists every install instance with its `scope`, `installPath` (`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`), and `version`. If you installed deskwork from multiple worktrees over time, you'll typically see one `scope: "user"` entry plus several `scope: "local"` entries, each pinned to whatever version was current the moment you ran `/plugin install` in that project.
+
+**Filesystem layout:**
+
+```
+~/.claude/plugins/
+├── marketplaces/<marketplace>/         # git clone of the marketplace repo
+│                                       # (advances on `/plugin marketplace update`)
+├── cache/<marketplace>/<plugin>/<version>/   # checked-out plugin payload
+│                                             # (Claude Code loads from here)
+└── installed_plugins.json              # registry: which (plugin, version)
+                                        # is installed at which scope
+```
+
 ### Getting updates
 
-deskwork tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest:
+deskwork tracks the default branch of `audiocontrol-org/deskwork`. Claude Code splits the update flow into a marketplace-catalog refresh + a per-plugin payload fetch (the analogue of `apt update` + `apt upgrade`, or `brew update` + `brew upgrade`). The actual command sequence depends on whether your installs are user-scope or project-scope (see *Install scope* above).
+
+**If all your installs are user-scope (the recommended default):**
 
 ```
 /plugin marketplace update deskwork
 /reload-plugins
 ```
 
-The first invocation of any deskwork skill after an update may rerun the plugin tree's `npm install --omit=dev` if the pinned `@deskwork/*` version changed (still a one-time ~30s step per update). Subsequent invocations are fast.
+The marketplace update advances the catalog. Claude Code then auto-upgrades the user-scope installs to the new manifest version. `/reload-plugins` activates the new code in the current session without requiring a restart.
 
-By default, third-party marketplaces don't auto-update — run those two commands when you want to refresh. To toggle auto-update, use `/plugin` and look for the **Marketplaces** tab.
+**If you have project-scope installs to upgrade:**
+
+```
+/plugin marketplace update deskwork
+/plugin install deskwork@deskwork           # if installed at project-scope here
+/plugin install deskwork-studio@deskwork    # if installed at project-scope here
+/plugin install dw-lifecycle@deskwork       # if installed at project-scope here
+/reload-plugins
+```
+
+The per-plugin `/plugin install` re-fetches the payload at the now-current manifest version, in the current project's scope. Run it from each project where you have project-scope installs you want to upgrade. *(If you have NO project-scope installs in this project, the `/plugin install` calls are still safe — they're no-ops against user-scope installs that already auto-upgraded.)*
+
+**Mixed-scope adopters** (one plugin at user-scope, another at project-scope in this project): only the user-scope ones auto-upgrade on `marketplace update`; the project-scope ones need explicit `/plugin install`. The symptom is "I ran update and only some plugins picked up the new version." That's the scope distinction at work.
+
+**What each command does:**
+- `/plugin marketplace update <name>` — refresh the marketplace catalog (the git clone at `~/.claude/plugins/marketplaces/<name>/`). Does NOT itself fetch plugin payloads. May trigger auto-upgrade for user-scope installs.
+- `/plugin install <plugin>@<marketplace>` — fetch the plugin's payload at the catalog's current version into `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`. Records the install (or upgrade) in `installed_plugins.json`. Scope depends on the session context (user vs project).
+- `/reload-plugins` — re-read plugin code from the on-disk cache into the running Claude Code session. Does NOT fetch anything; it's the activation step after a fetch.
+
+The first invocation of any deskwork skill after an upgrade may rerun the plugin tree's `npm install --omit=dev` if the pinned `@deskwork/*` version changed (still a one-time ~30s step per upgrade). Subsequent invocations are fast.
+
+**Catalog auto-update.** By default, third-party marketplaces don't auto-update the catalog — run `/plugin marketplace update` when you want to refresh. To toggle catalog auto-update, use `/plugin` and look for the **Marketplaces** tab. Auto-update only refreshes the catalog and (per the scope-driven behavior above) auto-upgrades user-scope installs; project-scope installs still need explicit `/plugin install` to advance.
+
+**Why the asymmetry?** Most package managers separate manifest-refresh from version-upgrade for safety (`apt update` ≠ `apt upgrade`; `brew update` ≠ `brew upgrade`). Claude Code follows the same model for project-scope installs (where pinning is intentional) but auto-upgrades user-scope installs (where global currency is intentional). If you want all your installs to track the latest automatically, install at user-scope. If you want a project to hold a specific version, install at project-scope.
 
 ### Pinning to a stable release
 

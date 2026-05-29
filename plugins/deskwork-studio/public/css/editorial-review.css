@@ -43,6 +43,13 @@
   --er-highlight-soft: #F9E8BE;
   --er-stamp-green: #2E5D45;
   --er-stamp-purple: #5A3E5F;
+  /* Kraft brown — the press-check palette's neutral accent. Used for
+   * non-mutating verbs (open scrapbook, view, induct, block) where a
+   * destructive red or terminal green would mis-signal. The value
+   * (#8A7250) traces to the dashboard-row-4 mockup. Without this token
+   * defined, `var(--er-kraft)` references fall back to no color and
+   * those chips/glyphs render invisible against the paper background. */
+  --er-kraft: #8A7250;
 
   /* Type */
   --er-font-display: 'Fraunces', 'Newsreader', Georgia, 'Times New Roman', serif;
@@ -79,12 +86,34 @@
    * `.er-page-grid`; marginalia is `position: relative` inside its own
    * column rather than `position: fixed` on the viewport. These tokens
    * are the layout contract — see `.er-page` / `.er-page-grid` below. */
-  --er-page-max:        var(--er-container-wide);   /* 78rem outer page frame */
-  --er-page-pad-x:      var(--er-space-6);
+  /* Page-frame width tokens. Pre-#244-follow-up these were sized for
+   * a "single tangible page on the desk" feel at the cost of a lot
+   * of horizontal whitespace at desktop widths. Operator pushed back
+   * — at 1920px viewport the prior `--er-page-max: 78rem + --er-page-pad-x: 4rem`
+   * combo left ~400px of paper margin on each side (336 outer body
+   * bg + 64 page padding), eating ~41% of the viewport on margins.
+   * Tightened: page can now grow to 92rem (saves ~224px on each
+   * outer margin at 1920px), inner padding drops to space-4 (saves
+   * ~36px on each side), grid gap drops to space-4 (saves ~12px),
+   * article column grows to 56rem max (~896px) so the body uses the
+   * reclaimed space for actual reading width. */
+  /* Iteration 8 (operator: 'right now, the margin/padding on the
+   * right of the review column reads like an oddly wide gutter
+   * between the review column and the marginalia column. You've got
+   * the gutter and the right margin flipped'). Iter-7 made the gutter
+   * too wide (81px) at the expense of the marginalia's right margin.
+   * Flip them: the gutter goes BACK to a slim editorial gap (page-gap
+   * space-3 = 41px total visible), and the substantial breathing
+   * lives as page-pad-right (space-6 = 64px) between marginalia
+   * and the page right edge. Page-pad-x stays space-4 on the left
+   * (29px = article left inset). */
+  --er-page-max:        88rem;
+  --er-page-pad-x:      var(--er-space-4);
+  --er-page-pad-right:  var(--er-space-6);
   --er-page-pad-y:      var(--er-space-5);
-  --er-article-col:     minmax(28rem, 42rem);
-  --er-marginalia-col:  minmax(16rem, 19rem);
-  --er-page-gap:        var(--er-space-5);
+  --er-article-col:     minmax(28rem, 68rem);
+  --er-marginalia-col:  minmax(18rem, 22rem);
+  --er-page-gap:        var(--er-space-3);
 }
 
 /* ---------- Scoped reset + page chrome ---------- */
@@ -909,88 +938,6 @@ body[data-review-ui="scrapbook"] {
   margin-left: auto;
 }
 
-.er-galley {
-  background: var(--er-paper);
-  border: var(--er-rule-thin);
-  margin-bottom: var(--er-space-3);
-  padding: var(--er-space-3) var(--er-space-3) var(--er-space-3) var(--er-space-4);
-  position: relative;
-  transition: transform 200ms ease, box-shadow 200ms ease;
-}
-.er-galley:hover {
-  transform: translateY(-1px);
-  box-shadow: 2px 2px 0 rgba(26,22,20,0.08);
-}
-.er-galley.focused {
-  border-color: var(--er-red-pencil);
-  box-shadow: 0 0 0 3px rgba(184,54,42,0.15);
-  animation: er-focus-pulse 2.4s ease-out;
-}
-
-.er-galley-accent {
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 6px;
-}
-.er-galley[data-platform="reddit"]    .er-galley-accent { background: #E26A3A; }
-.er-galley[data-platform="youtube"]   .er-galley-accent { background: #C2322A; }
-.er-galley[data-platform="linkedin"]  .er-galley-accent { background: #2A4B7C; }
-.er-galley[data-platform="instagram"] .er-galley-accent { background: #9B3D73; }
-
-.er-galley-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--er-space-2);
-  margin-bottom: var(--er-space-2);
-  flex-wrap: wrap;
-}
-.er-galley-head h3 {
-  font-family: var(--er-font-display);
-  font-variation-settings: "opsz" 36, "wght" 500;
-  font-size: 1.3rem;
-  margin: 0;
-}
-.er-galley-head .channel {
-  font-family: var(--er-font-display);
-  font-style: italic;
-  font-size: 0.95rem;
-  color: var(--er-ink-soft);
-}
-.er-galley-head .version {
-  margin-left: auto;
-  font-family: var(--er-font-mono);
-  font-size: 0.75rem;
-  color: var(--er-faded);
-}
-
-.er-galley textarea {
-  width: 100%;
-  min-height: 7rem;
-  padding: var(--er-space-2);
-  font: inherit;
-  font-family: var(--er-font-display);
-  font-variation-settings: "opsz" 18, "wght" 400;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  background: var(--er-paper-2);
-  border: var(--er-rule-thin);
-  color: var(--er-ink);
-  resize: vertical;
-  border-radius: 2px;
-}
-.er-galley textarea:focus {
-  outline: none;
-  border-color: var(--er-proof-blue);
-  background: var(--er-paper);
-}
-
-.er-galley-actions {
-  display: flex;
-  gap: var(--er-space-1);
-  margin-top: var(--er-space-2);
-  flex-wrap: wrap;
-}
-
 /* ---------- Longform review chrome ---------- */
 
 [data-review-ui="longform"] {
@@ -1017,7 +964,9 @@ body[data-review-ui="scrapbook"] {
   z-index: 40;
   background: var(--er-paper);
   border-bottom: var(--er-rule-med);
-  padding: var(--er-space-2) var(--er-space-3);
+  /* Tighter vertical padding to compact the chrome. The strip is
+   * permanent on the surface so every saved pixel pays back. */
+  padding: var(--er-space-1) var(--er-space-3);
   display: flex;
   align-items: center;
   gap: var(--er-space-3);
@@ -1122,9 +1071,12 @@ body:has([data-review-ui="longform"]) .site-footer {
   color: var(--er-ink-soft);
   background: var(--er-paper);
 }
-@media (max-width: 900px) {
-  .er-strip-hint { display: none; }
-}
+/* The strip hint ('select text to mark · double-click to edit · ?
+ * for shortcuts') was useful as a first-time-user tutorial but is
+ * permanent overhead for everyone else. Hide globally; the `?` button
+ * still surfaces the same affordances modally for anyone who needs
+ * the reference. Saves an entire row of strip height. */
+.er-strip-hint { display: none; }
 .er-strip-right { margin-left: auto; display: flex; gap: var(--er-space-1); flex-wrap: wrap; align-items: center; }
 
 /*
@@ -1310,10 +1262,18 @@ body:has([data-review-ui="longform"]) .site-footer {
   background: var(--er-paper);
   border: 1px solid var(--er-paper-3);
   border-radius: 2px;
+  /* Paper-on-desk drop shadow. Three layers so the lift reads at
+   * close range and from across the room: the 1px highlight gives
+   * the page a definite top edge against the cream body; the larger
+   * 32px-blur cast is the soft ambient shadow under a loose galley
+   * proof; the closer 6px-blur cast plants the paper on the desk
+   * surface so it doesn't look like it's floating. Stronger than the
+   * pre-iteration-4 values because the wider body margins now show
+   * more desk around the paper, so the shadow has room to breathe. */
   box-shadow:
     0 1px 0 var(--er-paper-3),
-    0 14px 28px -10px rgba(26, 22, 20, 0.18),
-    0 4px 8px -2px rgba(26, 22, 20, 0.06);
+    0 18px 38px -12px rgba(26, 22, 20, 0.22),
+    0 6px 12px -2px rgba(26, 22, 20, 0.10);
   position: relative;
 }
 
@@ -1321,7 +1281,13 @@ body:has([data-review-ui="longform"]) .site-footer {
   display: grid;
   grid-template-columns: var(--er-article-col) 1px var(--er-marginalia-col);
   gap: 0 var(--er-page-gap);
-  padding: var(--er-page-pad-y) var(--er-page-pad-x);
+  /* Asymmetric horizontal padding: the right side gets a larger
+   * inset so the marginalia element ends with substantial cream
+   * margin between it and the page right edge. Operator framing —
+   * the gutter (article ↔ marginalia) should be a slim editorial
+   * gap, and the right margin (marginalia ↔ page edge) should be
+   * the prominent breathing room. */
+  padding: var(--er-page-pad-y) var(--er-page-pad-right) var(--er-page-pad-y) var(--er-page-pad-x);
   align-items: start;
 }
 
@@ -1497,6 +1463,23 @@ body.er-focus-mode .er-marginalia-tab {
   /* Allow long words / quotes to wrap inside the column instead of
    * blowing out the grid track. */
   min-width: 0;
+  /* Override the grid's `align-items: start` for this column so the
+   * marginalia element spans the full row height. The sticky head
+   * (`.er-marginalia-head`) needs a containing block that lives across
+   * the entire document scroll; without `stretch` the column shrinks
+   * to its content height (~head + empty-state) and the sticky head
+   * gets dragged out of view as soon as the operator scrolls past it. */
+  align-self: stretch;
+  /* Base transition for the marginalia stow/unstow opacity fade.
+   * Operator requested the marginalia toggle match the outline
+   * drawer's brief easing animation. The toggle controller
+   * (`marginalia-toggle.ts`) sets/clears inline opacity around the
+   * grid-template change; this transition makes those changes
+   * interpolate. The grid track itself still snaps to display:none
+   * (CSS Grid recomputes tracks synchronously when a track's child
+   * vanishes) — the fade smooths the visual exit but the column
+   * reflow at the end is instant. */
+  transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .er-marginalia-head {
@@ -1515,8 +1498,22 @@ body.er-focus-mode .er-marginalia-tab {
   text-transform: uppercase;
   color: var(--er-faded);
   border-bottom: 1px solid var(--er-red-pencil);
-  padding-bottom: var(--er-space-1);
+  padding: var(--er-space-1) 0;
   margin: 0 0 var(--er-space-2);
+  /* Sticky so the header + stow affordance stay visible while the
+   * margin notes themselves scroll with the document (each note is
+   * absolutely-positioned alongside its `<mark>`). Top offset uses
+   * `--er-chrome-bottom`, which `initStickyOffset()` measures from
+   * `.er-strip`'s actual rendered bottom on every viewport / strip
+   * resize. The strip is `flex-wrap: wrap` so its height ranges from
+   * ~70px (single row at narrow widths) to ~175px (multi-row at
+   * wide widths) — a static `top` works at one width but lands the
+   * head behind the strip at another. Fallback `7rem` is a safe
+   * default when the JS hasn't run yet. */
+  position: sticky;
+  top: var(--er-chrome-bottom, 7rem);
+  z-index: 5;
+  background: var(--er-paper);
 }
 
 .er-marginalia-empty {
@@ -2497,7 +2494,7 @@ body.er-focus-mode .er-focus-save-hint {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 26rem;
+  width: 22rem;
   max-width: 92vw;
   z-index: 206;
   background: var(--er-paper);
@@ -2514,10 +2511,29 @@ body.er-focus-mode .er-focus-save-hint {
   transform: translateX(0);
 }
 
+/* Desktop split layout (#244 follow-up) — when the drawer is open at
+ * desktop widths, push the entire review shell right by the drawer's
+ * width so the article column is fully visible alongside the TOC.
+ * Operator framing: *"On desktop, there's plenty of room to fit the
+ * table of contents drawer without overlapping/covering the review
+ * surface."*
+ *
+ * Mobile (< 64rem) keeps the existing overlay behavior — there's not
+ * enough horizontal room to split. The transition matches the drawer's
+ * own slide-in timing so the two motions feel like one. */
+@media (min-width: 64rem) {
+  .er-review-shell {
+    transition: margin-left 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  body:has(.er-outline-drawer--open) .er-review-shell {
+    margin-left: 22rem;
+  }
+}
+
 .er-outline-drawer-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.55rem;
   padding: var(--er-space-3);
   border-bottom: 1px solid var(--er-faded-2);
 }
@@ -2528,19 +2544,37 @@ body.er-focus-mode .er-focus-save-hint {
   text-transform: uppercase;
   color: var(--er-red-pencil);
 }
-.er-outline-drawer-close {
-  font-family: var(--er-font-display);
-  font-size: 1.5rem;
-  line-height: 1;
+/* Stow chevron mirroring `.er-marginalia-stow` so the "hide-this-rail"
+ * affordance is visually consistent across both rails. The chevron
+ * points LEFT here because the drawer lives on the LEFT edge of the
+ * viewport — clicking ‹-pointing-left "pushes" the drawer off-stage,
+ * matching the spatial mental model (mirror of the marginalia
+ * stow on the right). */
+.er-outline-drawer-stow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
   background: transparent;
-  border: 0;
   color: var(--er-faded);
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  line-height: 1;
   cursor: pointer;
-  padding: 0 0.35rem;
-  transition: color 120ms ease;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
-.er-outline-drawer-close:hover {
+.er-outline-drawer-stow:hover {
   color: var(--er-red-pencil);
+  border-color: var(--er-red-pencil);
+  background: var(--er-paper);
+}
+.er-outline-drawer-stow:focus-visible {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 1px;
 }
 
 /* Drawer body typography. Every rule carries the parent
@@ -2652,6 +2686,79 @@ body.er-focus-mode .er-focus-save-hint {
   color: var(--er-ink-soft);
   background: transparent;
   padding: 0;
+}
+
+/* Horizontal rule separating curated outline from auto-TOC inside
+ * the drawer body, when both render. */
+.er-outline-drawer-rule {
+  border: 0;
+  border-top: 1px dashed var(--er-faded-2);
+  margin: var(--er-space-3) 0;
+}
+
+/* ---------- Auto-extracted Table of Contents (#244) ---------- */
+
+.er-outline-drawer-body .er-toc {
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  line-height: 1.55;
+}
+.er-outline-drawer-body .er-toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.er-outline-drawer-body .er-toc-item {
+  margin: 0.05rem 0;
+  padding: 0;
+}
+/* Depth-driven indent. Top-level (h2 → depth 2) sits flush; deeper
+ * headings step in 0.9rem each level so the doc shape is legible at
+ * a glance. */
+.er-outline-drawer-body .er-toc-item--d2 { padding-left: 0; }
+.er-outline-drawer-body .er-toc-item--d3 { padding-left: 0.9rem; }
+.er-outline-drawer-body .er-toc-item--d4 { padding-left: 1.8rem; }
+
+.er-outline-drawer-body .er-toc-link {
+  display: block;
+  padding: 0.25rem 0.4rem;
+  color: var(--er-ink-soft) !important;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 2px 2px 0;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.er-outline-drawer-body .er-toc-link:hover,
+.er-outline-drawer-body .er-toc-link:focus-visible {
+  background: var(--er-paper-2);
+  color: var(--er-ink) !important;
+  border-left-color: var(--er-faded-2);
+  outline: none;
+}
+/* Active section — the heading currently in view, marked by
+ * scroll-spy in entry-review/toc.ts. */
+.er-outline-drawer-body .er-toc-link.is-active {
+  color: var(--er-red-pencil) !important;
+  border-left-color: var(--er-red-pencil);
+  background: var(--er-paper-2);
+}
+
+/* Smooth-scroll for jump-link clicks — disabled when the operator
+ * has prefers-reduced-motion set. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* When jumping to a heading, leave room above so the heading isn't
+ * pinned at the very top of the viewport (the strip + folio chrome
+ * cover ~94px on desktop). */
+.er-page h2,
+.er-page h3,
+.er-page h4 {
+  scroll-margin-top: 6rem;
 }
 
 /* In focus mode, the drawer still works — it slides over the
@@ -2970,6 +3077,17 @@ body.er-focus-mode .er-outline-tab {
 @keyframes er-poll-pulse {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
+}
+
+/* On mobile the polling indicator sits bottom-right at the same
+ * coordinates as the Compose FAB (.er-compose-fab in dashboard-mobile.css
+ * — bottom: 16px; right: 16px; z-index: 65). The FAB occludes the
+ * indicator. Per DESIGN-STANDARDS.md § Mobile chrome restraint, hide
+ * the indicator entirely on mobile; polling itself keeps running. */
+@media (max-width: 600px) {
+  .er-poll-indicator {
+    display: none;
+  }
 }
 
 /* ---------- Error banner (longform route when workflow missing) ---------- */
@@ -3429,6 +3547,21 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   align-items: center;
   gap: var(--er-space-3);
   flex-wrap: wrap;
+  /* iOS Safari fix: flex children default to `min-width: auto` which
+   * lets them claim their intrinsic content width — at narrow phone
+   * viewports (376px) the HISTORICAL-STAGE label + dropdown group
+   * + ? button group exceeded viewport, pushing the strip wider than
+   * the page on real iOS. min-width: 0 on every flex child lets
+   * flex-shrink clamp them; the additional `overflow-x: clip` on
+   * the strip itself contains anything that still tries to overflow. */
+  overflow-x: clip;
+}
+[data-review-ui="longform"] .er-strip-inner > * {
+  min-width: 0;
+  max-width: 100%;
+}
+[data-review-ui="longform"] .er-strip {
+  overflow-x: clip;
 }
 
 /* When strip-inner is missing (no markup adjustment yet), fall back
@@ -3475,24 +3608,743 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
 }
 
 /* MOBILE — below 48rem (768px) */
-@media (max-width: 48rem) {
-  /* Pre-Dispatch-A: marginalia at this breakpoint became a fixed-bottom
-   * collapsible sheet because the desktop layout pinned marginalia to
-   * the viewport. With the page-grid (Issue #154 Dispatch A), the
-   * 64rem media query already collapses marginalia to a single column
-   * stacked below the article. The bottom-sheet treatment is reserved
-   * for a follow-up dispatch (B) if we want to bring it back; the
-   * single-column stack is the mobile experience for now. */
+/* Mobile bar + sheet are phone-only (≤48rem). At desktop the elements
+ * exist in the DOM (they're rendered server-side by mobile-bar.ts so
+ * they're available when the viewport crosses the breakpoint without a
+ * page reload), but they MUST be hidden — otherwise they render as
+ * static blocks at the end of the document body, below the article. */
+.er-mobile-bar,
+.er-mobile-sheet {
+  display: none;
+}
 
-  /* Scrapbook drawer (Dispatch D): the bottom-anchored drawer is now
-   * the primary scrapbook surface and remains visible at narrow widths.
-   * The shared transition + height variables are defined in the main
-   * .er-scrapbook-drawer block; the peek line truncates via
-   * text-overflow: ellipsis when the viewport gets tight. The legacy
-   * mobile-specific aria-expanded override (max-height 3rem / 50vh) was
-   * removed because the new mechanism uses body[data-drawer], not
-   * aria-expanded on the aside, and the shared height transition is
-   * already viewport-friendly. */
+/* The strip Source/Preview pill + edit-mode Done button are phone-only —
+ * their companion `display: inline-flex` rules live inside the
+ * `(max-width: 48rem)` block. On desktop a span-in-flex-container
+ * blockifies via Chrome's flex-item rules, so we need unconditional
+ * top-level `display: none` defaults to keep them out of the desktop
+ * strip. */
+.er-strip-mode-mobile,
+.er-strip-edit-done {
+  display: none;
+}
+
+@media (max-width: 48rem) {
+  /* =========================================================================
+   * Mobile review surface — bottom tab bar + sheet pattern
+   * (Mockup 1, operator-validated direction.)
+   *
+   * The pre-2026-05-08 mobile UX was a desktop layout compressed onto a phone:
+   * side-rail drawers with vertical pull-tabs, marginalia stacked below an
+   * entire article column, outline-drawer competing with the strip for the
+   * top of the viewport. Operator framing: "crappy repurposing of what's
+   * clearly meant for a desktop interface, half-assed onto a mobile UI."
+   *
+   * The redesign mirrors the iOS-native bottom-sheet pattern (Apple Maps,
+   * Music, Mail, Notes): a 64px tab bar pinned to the viewport bottom with
+   * three peers (Outline · Notes · Actions); tapping a tab slides up a sheet
+   * over the article. Decision buttons that lived in the top-strip's
+   * `.er-strip-right` move to the Actions sheet (Approve / Iterate / Reject /
+   * Cancel / ?). The bidirectional mark↔note linking (tap a highlighted run
+   * to open the Notes sheet scrolled to the matching note; tap a note to
+   * close the sheet and scroll the article to its mark) is wired in
+   * `mobile-sheet-bar.ts`.
+   *
+   * Visual reference: /static/mockups/mobile-1-bottom-sheet.html
+   * ========================================================================= */
+
+  /* --- Hide every desktop side-rail / overlay at phone widths ------------- */
+
+  /* The right-edge marginalia pull-tab and left-edge outline pull-tab are
+   * desktop affordances replaced by the bottom tab bar. */
+  [data-review-ui="longform"] .er-marginalia-tab,
+  [data-review-ui="longform"] .er-outline-tab {
+    display: none !important;
+  }
+
+  /* The outline drawer's left-edge slide-in mode: the body content stays in
+   * the DOM (used as the source for the Outline sheet's slot), but the
+   * drawer itself never renders on mobile — when "open" on desktop it slides
+   * in from the left; on mobile we don't want that visual at all. */
+  [data-review-ui="longform"] .er-outline-drawer {
+    display: none !important;
+  }
+
+  /* The desktop marginalia element is hidden — its `[data-sidebar-list]`
+   * children are relocated by `mobile-sheet-bar.ts` into the Notes sheet
+   * slot at boot. Hiding here (rather than display:none in JS) keeps the
+   * source of truth in CSS for the cascade. */
+  [data-review-ui="longform"] .er-marginalia {
+    display: none;
+  }
+
+  /* The decision buttons (Approve / Iterate / Reject / Cancel / ?) move
+   * from the top strip to the Actions sheet. The induct picker is already
+   * hidden via the `<30rem` rule below; here we hide the entire group. */
+  [data-review-ui="longform"] .er-strip-right {
+    display: none !important;
+  }
+
+  /* --- Bottom tab bar ----------------------------------------------------- */
+
+  .er-mobile-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: var(--er-paper);
+    background-image:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    border-top: 1px solid var(--er-red-pencil);
+    box-shadow: 0 -2px 16px rgba(26, 22, 20, 0.06);
+    display: grid;
+    /* Review mode: 4 cells (Outline · Notes · Scrapbook · Actions).
+     * Edit mode: 3 cells (Format · Notes · Save) — overridden below.
+     * The server-side helper at `packages/studio/src/pages/mobile-bar.ts`
+     * caps total cells at `MAX_CELLS = 6` (the entry-review bar reuses
+     * the Notes slot across modes, so 4+3-1 = 6 distinct cells). If you
+     * widen the bar's cell budget, bump `MAX_CELLS` in lockstep. */
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    z-index: 60;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body[data-edit-mode="editing"] .er-mobile-bar {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  /* Tab labels and glyph compact slightly at 4 cells — at ~97.5px per
+   * cell on a 390px viewport, the existing 0.62rem mono caps and
+   * 1.5rem glyph still fit, but tightening padding gives the count
+   * badge breathing room. */
+  .er-mobile-bar .er-mobile-tab {
+    padding-inline: 0.25rem;
+  }
+  body[data-edit-mode="editing"] .er-mobile-bar .er-mobile-tab {
+    padding-inline: 0.4rem;
+  }
+
+  /* The desktop scrapbook drawer is `position: fixed bottom: 0
+   * z-index: 55`, which on phone hides behind the mobile bar
+   * (z-index 60). Its content lives on as the source-of-truth that
+   * the Scrapbook sheet slot clones from — but the drawer chrome
+   * itself shouldn't render. */
+  [data-review-ui="longform"] .er-scrapbook-drawer {
+    display: none !important;
+  }
+
+  /* Scrapbook tab — kraft glyph, kraft count badge to distinguish
+   * "context for the entry" from the red-pencil "marks operator left."
+   * Active tab still flips to red (consistent with other tabs). */
+  .er-mobile-tab--scrapbook .er-mobile-tab-glyph {
+    color: #8A7250;
+  }
+  .er-mobile-tab--scrapbook[aria-expanded="true"] .er-mobile-tab-glyph {
+    color: var(--er-red-pencil);
+  }
+  .er-mobile-tab-count--kraft {
+    background: #8A7250 !important;
+    color: var(--er-paper) !important;
+  }
+  .er-mobile-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.18rem;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    padding: 0.4rem 0.4rem 0.6rem;
+    color: var(--er-faded);
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    position: relative;
+    transition: color 160ms ease;
+  }
+  .er-mobile-tab .er-mobile-tab-glyph {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--er-faded);
+    transition: color 160ms ease;
+  }
+  .er-mobile-tab[aria-expanded="true"],
+  .er-mobile-tab[aria-expanded="true"] .er-mobile-tab-glyph {
+    color: var(--er-red-pencil);
+  }
+  .er-mobile-tab[aria-expanded="true"]::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 2px;
+    background: var(--er-red-pencil);
+  }
+  .er-mobile-tab-count {
+    position: absolute;
+    top: 6px;
+    right: 30%;
+    background: var(--er-red-pencil);
+    color: var(--er-paper);
+    font-size: 0.55rem;
+    line-height: 1;
+    padding: 0.18rem 0.32rem;
+    border-radius: 8px;
+    letter-spacing: 0.04em;
+    min-width: 1rem;
+    text-align: center;
+  }
+  .er-mobile-tab-count[hidden] { display: none; }
+
+  /* Reserve room at the article body's bottom for the tab bar so the last
+   * paragraph isn't permanently obscured. */
+  body:has([data-review-ui="longform"]) {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  /* --- Sheet host --------------------------------------------------------- */
+
+  .er-mobile-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    height: 60vh;
+    max-height: 100dvh;
+    background: var(--er-paper);
+    background-image:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    border-top: 1px solid var(--er-red-pencil);
+    box-shadow: 0 -16px 40px rgba(26, 22, 20, 0.18);
+    border-radius: 24px 24px 0 0;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(100%);
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+  }
+  .er-mobile-sheet[hidden] { display: none; }
+  body[data-mobile-sheet-open] .er-mobile-sheet {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .er-mobile-sheet-handle {
+    align-self: center;
+    flex-shrink: 0;
+    width: 64px;
+    height: 22px;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    padding: 0.55rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* #268: opt the handle out of native touch scrolling so the
+       sheet-controller's touchmove handler can route the drag to the
+       drag-to-dismiss gesture instead of the page-scroll consumer.
+       Matches the precedent at dashboard-mobile.css .er-compose-handle. */
+    touch-action: none;
+  }
+  .er-mobile-sheet-handle:active { cursor: grabbing; }
+  .er-mobile-sheet-handle-bar {
+    display: block;
+    width: 44px;
+    height: 5px;
+    background: var(--er-paper-3);
+    border-radius: 4px;
+    transition: background 160ms ease;
+  }
+  .er-mobile-sheet-handle:hover .er-mobile-sheet-handle-bar,
+  .er-mobile-sheet-handle:focus-visible .er-mobile-sheet-handle-bar {
+    background: var(--er-red-pencil);
+  }
+  .er-mobile-sheet-head {
+    padding: 0.1rem 1.2rem 0.65rem;
+    border-bottom: 1px solid var(--er-red-pencil);
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-shrink: 0;
+  }
+  .er-mobile-sheet-kicker {
+    font-family: var(--er-font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--er-red-pencil);
+  }
+  .er-mobile-sheet-meta {
+    font-family: var(--er-font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin-left: auto;
+  }
+  .er-mobile-sheet-close {
+    background: transparent;
+    border: 1px solid var(--er-paper-3);
+    color: var(--er-faded);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.15rem 0.45rem;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .er-mobile-sheet-close:hover {
+    color: var(--er-red-pencil);
+    border-color: var(--er-red-pencil);
+  }
+  .er-mobile-sheet-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.8rem 1.2rem 1.4rem;
+  }
+  .er-mobile-sheet-slot[hidden] { display: none; }
+
+  /* Inside the sheet, the relocated marginalia list and outline body need
+   * sensible defaults — they were styled for desktop columns. */
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] .er-marginalia-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: margin-note;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] .er-marginalia-item {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    transition: background 160ms ease;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] .er-marginalia-item.er-mobile-flash {
+    background: var(--er-highlight, rgba(184, 54, 42, 0.12));
+  }
+
+  /* Outline list inside the sheet — clone of `.er-outline-drawer-body`'s
+   * existing styling, scoped here so the sheet renders the same TOC. */
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] {
+    font-family: var(--er-font-display);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] ul,
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] li {
+    padding: 0;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] a {
+    display: block;
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px dashed var(--er-paper-3);
+    text-decoration: none;
+    color: var(--er-ink);
+    font-family: var(--er-font-display);
+    font-size: 0.95rem;
+    line-height: 1.4;
+    transition: background 120ms ease;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] a:hover,
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] a:focus-visible {
+    background: rgba(184, 54, 42, 0.08);
+    color: var(--er-red-pencil);
+  }
+
+  /* Actions sheet — the decision buttons re-rendered as a comfortable
+   * stack instead of crammed into the top strip. Each row is a full-width
+   * tap target with per-action color accents on the left edge. */
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="actions"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .er-mobile-action {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    padding: 0.95rem 1rem;
+    background: var(--er-paper);
+    border: 1px solid var(--er-paper-3);
+    border-left: 3px solid var(--er-red-pencil);
+    border-radius: 2px;
+    color: var(--er-ink);
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 1.05rem;
+    text-align: left;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 120ms ease, transform 120ms ease;
+  }
+  .er-mobile-action:hover { background: var(--er-paper-2); transform: translateX(2px); }
+  .er-mobile-action[data-action="approve"] { border-left-color: var(--er-stamp-green); color: var(--er-stamp-green); }
+  .er-mobile-action[data-action="iterate"] { border-left-color: var(--er-proof-blue); color: var(--er-proof-blue); }
+  .er-mobile-action[data-action="reject"]  { border-left-color: var(--er-red-pencil); color: var(--er-red-pencil); }
+  .er-mobile-action[data-action="cancel"]  { border-left-color: var(--er-faded); color: var(--er-faded); }
+  .er-mobile-action[data-action="edit"]    { border-left-color: var(--er-ink); color: var(--er-ink); }
+
+  /* Section header for grouped actions inside the Actions sheet —
+   * "Document" (Edit) vs "Decisions" (Approve / Iterate / Reject /
+   * Cancel). Edit is a local file action distinct from state-machine
+   * verbs; the section break makes the semantic split visible. */
+  .er-mobile-action-section {
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin: 0.85rem 0 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .er-mobile-action-section::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px dashed var(--er-paper-3);
+  }
+  .er-mobile-action-section:first-child { margin-top: 0; }
+  .er-mobile-action[disabled] { opacity: 0.45; cursor: not-allowed; }
+  .er-mobile-action .er-mobile-action-glyph {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-size: 1.3rem;
+    line-height: 1;
+    width: 1.4rem;
+    text-align: center;
+  }
+  .er-mobile-action .er-mobile-action-meta {
+    margin-left: auto;
+    font-family: var(--er-font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    font-style: normal;
+  }
+
+  /* Comment composer when relocated into the Notes sheet at boot.
+   * The annotations controller sets inline `position: absolute; top:
+   * <selection-y-px>; left: 0; right: 0; z-index: 2` for desktop's
+   * column layout — meaningful when the composer sits inside the
+   * marginalia column alongside the article. Inside the sheet's
+   * notes slot the composer should flow statically at the top of the
+   * scrollable body so the operator sees it the moment the sheet
+   * opens. `!important` overrides the controller's inline styles. */
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] [data-comment-composer] {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: auto !important;
+    margin: 0 0 var(--er-space-3);
+  }
+
+  /* iOS Safari zooms the layout viewport when a text input with
+   * font-size < 16px receives focus — that zoom then exposes any
+   * sub-pixel horizontal overflow as a "slosh" gesture, fighting the
+   * operator's vertical scroll. Force every focusable text surface on
+   * the review surface to ≥16px at phone widths. Covers:
+   *   - composer textarea + category <select>
+   *   - inline edit form textarea (.er-marginalia-edit-textarea) +
+   *     its category <select>
+   *   - CodeMirror's `.cm-content` contenteditable (the actual
+   *     edit-mode source surface — same iOS zoom rule applies to
+   *     contenteditable elements as to <textarea>)
+   *   - any future input the review surface adds
+   * Scoped under [data-review-ui] so host-site form rendering is
+   * unaffected. */
+  [data-review-ui] textarea,
+  [data-review-ui] input[type="text"],
+  [data-review-ui] input[type="search"],
+  [data-review-ui] input[type="email"],
+  [data-review-ui] input[type="url"],
+  [data-review-ui] input:not([type]),
+  [data-review-ui] select,
+  [data-review-ui] .cm-content,
+  [data-review-ui] [contenteditable="true"],
+  [data-review-ui] [contenteditable=""] {
+    font-size: 16px !important;
+  }
+
+  /* Article-body marks gain a subtle flash when the operator scrolls to
+   * one via the bidirectional link from the Notes sheet. The class is
+   * added by `mobile-sheet-bar.ts` and removed after the animation
+   * completes. */
+  [data-review-ui="longform"] mark[data-annotation-id].er-mobile-flash {
+    animation: er-mobile-flash-pulse 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes er-mobile-flash-pulse {
+    0%   { background: var(--er-highlight, #FAEABF); box-shadow: 0 0 0 4px rgba(184, 54, 42, 0.18); }
+    60%  { background: var(--er-highlight, #FAEABF); box-shadow: 0 0 0 0 rgba(184, 54, 42, 0); }
+    100% { background: var(--er-highlight, #FAEABF); box-shadow: 0 0 0 0 rgba(184, 54, 42, 0); }
+  }
+
+  /* =========================================================================
+   * Mobile editor — press-check tab bar (Mockup 2)
+   *
+   * The mobile bar stays VISIBLE in edit mode; CSS swaps which three of
+   * the five rendered tabs are shown based on `body[data-edit-mode]`:
+   *   - Review mode: Outline · Notes · Actions
+   *   - Edit mode:   Format  · Notes · Save
+   * Source/Preview moves to a dedicated pill in the top strip
+   * (`.er-strip-mode-mobile`). The desktop edit-toolbar is hidden on
+   * phone in edit mode — its ergonomics (split-pane, 7+ controls in a
+   * single row) collapse on phone widths per #239 / #241.
+   *
+   * Visual reference: /static/mockups/editor-2-press-check-tabbar.html
+   * ========================================================================= */
+
+  /* Tab visibility swap. The Notes tab has neither modifier so it shows in
+   * both modes. The bar's three visible cells stay aligned because we use
+   * `display:none` rather than `visibility:hidden` — grid auto-flows the
+   * remaining children into 1fr / 1fr / 1fr. */
+  body[data-edit-mode="editing"] .er-mobile-tab--review {
+    display: none;
+  }
+  body:not([data-edit-mode="editing"]) .er-mobile-tab--edit {
+    display: none;
+  }
+
+  /* Save tab — colored kicker + glyph in edit mode; stamp-green pulse when
+   * the buffer is dirty. The dirty signal comes from
+   * `body[data-edit-dirty]` set by edit-mode.ts's updateSaveState(). */
+  body[data-edit-mode="editing"] .er-mobile-tab--save {
+    color: var(--er-stamp-green);
+  }
+  body[data-edit-mode="editing"] .er-mobile-tab--save .er-mobile-tab-glyph {
+    color: var(--er-stamp-green);
+  }
+  body[data-edit-mode="editing"][data-edit-dirty] .er-mobile-tab--save {
+    background: rgba(46, 93, 69, 0.06);
+  }
+  body[data-edit-mode="editing"][data-edit-dirty] .er-mobile-tab--save::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    right: 26%;
+    width: 7px;
+    height: 7px;
+    background: var(--er-stamp-green);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(46, 93, 69, 0.18);
+    animation: er-save-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes er-save-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(46, 93, 69, 0.20); }
+    50%      { box-shadow: 0 0 0 5px rgba(46, 93, 69, 0.06); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body[data-edit-mode="editing"][data-edit-dirty] .er-mobile-tab--save::before {
+      animation: none;
+    }
+  }
+
+  /* Stamp turns stamp-green when the operator enters edit mode. The press-
+   * check signature is preserved (rotation, border, italic), but the color
+   * shift signals "you are mutating this entry" without adding chrome. */
+  body[data-edit-mode="editing"] [data-review-ui="longform"] .er-stamp[data-state-label] {
+    color: var(--er-stamp-green);
+    border-color: var(--er-stamp-green);
+  }
+
+  /* Hide the desktop edit toolbar on phone — its layout (mode tabs +
+   * 7-button action row) is hostile at this breakpoint per #239. The
+   * mobile bar's Save tab + the strip's Source/Preview pill cover the
+   * full set of operator-facing affordances on phone. */
+  body[data-edit-mode="editing"] .er-edit-toolbar {
+    display: none !important;
+  }
+  /* The desktop rule (lines ~2182) collapses .er-strip-right + .er-strip-center
+   * when the edit-toolbar is visible. On phone the toolbar is hidden, so
+   * `:has()` no longer matches and the strip stays at full chrome — but
+   * `.er-strip-right` is hidden by the legacy phone rule and the center is
+   * the load-bearing one (carries the stamp). No additional override needed. */
+
+  /* --- Strip Source/Preview pill (phone-only, edit mode) ----------------- */
+
+  .er-strip-mode-mobile {
+    display: none;
+    margin-left: auto;
+    border: 1px solid var(--er-paper-3);
+    border-radius: 2px;
+    background: var(--er-paper);
+    overflow: hidden;
+  }
+  body[data-edit-mode="editing"] .er-strip-mode-mobile {
+    display: inline-flex;
+  }
+  .er-strip-mode-btn {
+    border: 0;
+    background: transparent;
+    font-family: var(--er-font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    padding: 0.36rem 0.6rem;
+    cursor: pointer;
+    border-right: 1px solid var(--er-paper-3);
+  }
+  .er-strip-mode-btn:last-child { border-right: 0; }
+  .er-strip-mode-btn[aria-pressed="true"] {
+    background: var(--er-proof-blue);
+    color: var(--er-paper);
+  }
+
+  /* --- Strip ✕ Done button (phone-only, edit mode) ------------------------ */
+
+  body[data-edit-mode="editing"] .er-strip-edit-done {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32rem;
+    border: 1px solid var(--er-paper-3);
+    border-radius: 2px;
+    background: var(--er-paper);
+    color: var(--er-ink);
+    cursor: pointer;
+    padding: 0.32rem 0.55rem;
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .er-strip-edit-done-glyph {
+    color: var(--er-faded);
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  /* --- Format sheet · press-check key grid -------------------------------- */
+
+  .er-mobile-sheet-slot--format {
+    padding-top: 0.6rem;
+  }
+  .er-fkey-section {
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin: 0.85rem 0 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .er-fkey-section::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px dashed var(--er-paper-3);
+  }
+  .er-fkey-section:first-child { margin-top: 0; }
+  .er-fkey-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.55rem;
+  }
+  .er-fkey {
+    background: var(--er-paper-2);
+    border: 1px solid var(--er-paper-3);
+    border-radius: 4px;
+    padding: 0.85rem 0.4rem;
+    cursor: pointer;
+    color: var(--er-ink);
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    box-shadow: 0 1px 0 rgba(26, 22, 20, 0.06);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    min-height: 64px;
+    transition: background 120ms ease, transform 120ms ease;
+  }
+  .er-fkey:active {
+    background: var(--er-paper-3);
+    transform: translateY(1px);
+  }
+  .er-fkey-face {
+    font-family: var(--er-font-display);
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--er-ink);
+  }
+  .er-fkey-label {
+    font-size: 0.6rem;
+  }
+  .er-fkey--h1 .er-fkey-face { color: var(--er-red-pencil); font-weight: 600; font-style: italic; }
+  .er-fkey--h2 .er-fkey-face { color: var(--er-proof-blue); font-weight: 500; font-style: italic; }
+  .er-fkey--h3 .er-fkey-face { font-weight: 500; font-style: italic; font-size: 1.15rem; }
+  .er-fkey--bold .er-fkey-face strong { font-weight: 700; }
+  .er-fkey--em .er-fkey-face em { font-style: italic; }
+  .er-fkey--code .er-fkey-face {
+    font-family: var(--er-font-mono);
+    font-size: 0.95rem;
+    background: var(--er-paper);
+    padding: 0.05rem 0.3rem;
+    border-radius: 2px;
+  }
+  .er-fkey--link .er-fkey-face {
+    color: var(--er-red-pencil);
+    border-bottom: 2px solid var(--er-red-pencil);
+    padding-bottom: 1px;
+  }
+  .er-fkey--quote .er-fkey-face {
+    font-style: italic;
+    color: var(--er-faded);
+    font-size: 1.6rem;
+    line-height: 0.9;
+  }
+  .er-fkey--list .er-fkey-face,
+  .er-fkey--ol .er-fkey-face {
+    font-size: 0.85rem;
+    line-height: 1.05;
+  }
+  .er-fkey--hr {
+    grid-column: span 2;
+  }
+  .er-fkey--hr .er-fkey-face {
+    color: var(--er-faded);
+    letter-spacing: 0.2em;
+  }
+  .er-fkey--fence .er-fkey-face {
+    font-family: var(--er-font-mono);
+    font-size: 0.78rem;
+  }
+
+  /* Reduced motion: disable sheet slide; collapse remains, just instant. */
+  @media (prefers-reduced-motion: reduce) {
+    .er-mobile-sheet { transition: none; }
+    @keyframes er-mobile-flash-pulse { from, to { background: var(--er-highlight, #FAEABF); } }
+  }
+
+  /* --- Legacy mobile rules below stay; they're scoped to elements that
+   *     the mobile-bar+sheet doesn't replace (strip-galley, slug, etc.). - */
 
   /* Strip elements drop to essentials: back link + state stamp + ? for
    * shortcuts. Edit / filed / version slot all hide. */
@@ -3526,10 +4378,20 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   }
 }
 
-/* TINY — below 30rem (480px) — most-aggressive collapse */
+/* TINY — below 30rem (480px) — most-aggressive collapse.
+ *
+ * Mirror of the f7c3266 desktop strip compaction (175 → 102px) for phone
+ * widths. The decision buttons (Edit / Approve / Iterate / Reject /
+ * Cancel / ?) stay — operator needs them to clipboard-copy the skill
+ * command for cross-device paste into Claude Code (per THESIS Consequence
+ * 2). Tightening padding + font-size + gap collapses the 6-button
+ * `.er-strip-right` from two internal rows to one, dropping the overall
+ * strip from ~122px to ~70px on a 390-wide viewport — gives the operator
+ * back ~50px of vertical real estate before content begins.
+ *
+ * Verified via scripts/smoke-er-viewport-regressions.mjs at desktop
+ * (1920×1080, strip stays ≤110px) and phone (390×844, strip ≤80px). */
 @media (max-width: 30rem) {
-  /* Strip drops to back-link + state stamp only. ? shortcuts still
-   * available via the toggle button. */
   [data-review-ui="longform"] .er-strip-back {
     font-size: 0.7rem;
     padding: 0.2rem 0.4rem;
@@ -3539,6 +4401,110 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     font-size: 0.75rem;
     padding: 0.2rem 0.5rem;
     transform: rotate(-1deg);  /* slightly less rotation at this scale */
+  }
+
+  /* Tighten outer flex layout: smaller gap between back / center / right
+   * groups so the strip-right has more horizontal room before wrapping
+   * to its own outer row. */
+  [data-review-ui="longform"] .er-strip-inner {
+    gap: var(--er-space-2);
+  }
+
+  /* Hide the strip's `::before` registration mark (`+`) on phone. At
+   * desktop it's an editorial decoration that frames the press-check
+   * aesthetic; on a 390px-wide viewport it consumes ~47px of the
+   * strip's content area (mark + flex gap), shrinking `.er-strip-inner`
+   * from a possible 350px down to 303px. That 47px is the budget the
+   * 6 decision buttons need to fit on a single internal row. The mark
+   * is decorative-only — no information loss from hiding. */
+  [data-review-ui="longform"] .er-strip::before {
+    display: none;
+  }
+
+  /* Hide the historical-stage induct picker on phone. It's a 210px-wide
+   * label + dropdown that forces `.er-strip-right` to a second internal
+   * row on every pipeline-active entry (e.g. Drafting/Outline/Final).
+   * Same THESIS Consequence-2 logic as the other decision buttons:
+   * induct is a skill command (`/deskwork:induct <slug>`) executed via
+   * Claude Code on desktop; reaching for it on phone is a rare cross-
+   * device flow that doesn't justify the chrome real-estate cost.
+   * Operator can still induct from a desktop session. The induct-picker
+   * is also the subject of #193 (broaden which stages surface it);
+   * if the picker becomes more central, revisit this hide.
+   *
+   * Specificity note: entry-review.css ships
+   *   [data-review-ui="entry-review"] .er-entry-control--history
+   *     { display: inline-flex }
+   * at (0,2,0). It loads AFTER editorial-review.css, so a same-
+   * specificity rule here loses the source-order tiebreak. Chain both
+   * data-review-ui scopes to lift this to (0,3,0) and win the cascade.
+   * (Body has data-review-ui="entry-review"; the inner shell carries
+   * data-review-ui="longform"; the picker lives inside both.) */
+  [data-review-ui="entry-review"] [data-review-ui="longform"] .er-entry-control--history {
+    display: none;
+  }
+
+  /* Decision-button group: tighter inter-button gap and smaller buttons
+   * so all six (Edit + Approve + Iterate + Reject + Cancel + ?) fit on
+   * one internal row inside `.er-strip-right`.
+   *
+   * `width: 100%` is load-bearing: when the strip-inner's outer wrap
+   * pushes `.er-strip-right` to its own row, flex's single-pass sizing
+   * leaves it at content-shrunk width (~303px) and the buttons wrap
+   * internally to a second row. Width: 100% forces the row-2 strip-right
+   * to take the full 358px available, giving the 6 buttons (~317px
+   * needed) room on a single internal row. */
+  [data-review-ui="longform"] .er-strip-right {
+    gap: 4px;
+    width: 100%;
+  }
+  [data-review-ui="longform"] .er-strip .er-btn-small {
+    font-size: 0.66rem;
+    padding: 0.15rem 0.4rem;
+  }
+
+  /* Collapse the strip's row 1 (back-link + stage stamp) on scroll.
+   *
+   * `initStripCollapse()` (`entry-review/strip-collapse.ts`) sets
+   * `body[data-strip-stuck]` whenever the strip's top equals its sticky
+   * offset (i.e. the strip is pinned because the operator has scrolled
+   * past its at-rest position). When unstuck — at the top of the page —
+   * the attribute is removed and row 1 returns.
+   *
+   * The collapse hides `.er-strip-back` (← STUDIO) and `.er-strip-center`
+   * (the FINAL/DRAFTING/IDEAS stage stamp). On phone these read as
+   * navigation context: useful at page top, but pure overhead while
+   * reading — the operator already knows what entry they're on, and the
+   * decision buttons in row 2 are what actually need to stay reachable.
+   *
+   * `max-height: 0` + `opacity: 0` + zeroed margin/padding gives a smooth
+   * collapse instead of a `display: none` flash. Reduced-motion users
+   * get an instant snap (no transition) — collapse still works, just
+   * without the easing. */
+  [data-review-ui="longform"] .er-strip-back,
+  [data-review-ui="longform"] .er-strip-center {
+    overflow: hidden;
+    transition:
+      max-height 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 160ms ease,
+      margin 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      padding 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    max-height: 4rem;
+    opacity: 1;
+  }
+  body[data-strip-stuck] [data-review-ui="longform"] .er-strip-back,
+  body[data-strip-stuck] [data-review-ui="longform"] .er-strip-center {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-review-ui="longform"] .er-strip-back,
+    [data-review-ui="longform"] .er-strip-center {
+      transition: none;
+    }
   }
 }
 
@@ -3631,13 +4597,13 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   font-weight: 500;
 }
 
-@media (max-width: 60rem) {
-  /* On narrow viewports the strip already drops the inline hint
-   * (line 1090). Drop the per-button shortcut chips too — they
-   * crowd the button row. The shortcuts modal stays available. */
-  [data-review-ui="longform"] .er-shortcut-chip {
-    display: none;
-  }
+/* The per-button shortcut chips (a a / i i / r r underneath each
+ * decision button) added an entire row of height to the strip while
+ * duplicating information the `?` shortcuts modal already shows.
+ * Hide globally; operator who memorizes shortcuts uses them, others
+ * use the modal. Saves a second row of strip height. */
+[data-review-ui="longform"] .er-shortcut-chip {
+  display: none;
 }
 
 /* ---------- Longform review refinement (Phase 2 follow-up — Issue 7) ---------- */
@@ -3864,3 +4830,386 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
  * declared in the main `<table>` rule keeps the surface clean.
  * If a horizontal-scroll affordance is ever wanted, it should live on
  * a wrapping element (added via rehype) rather than on `<table>`. */
+
+/* ---------------------------------------------------------------------
+ * Phone hard-clip on html + body (#240/#241 iOS follow-up).
+ *
+ * Even with `overflow-x: hidden` set, iOS Safari can still allow
+ * touch-scroll horizontally when a descendant's intrinsic size is
+ * wider than viewport (e.g. CodeMirror's internal scroller, a wide
+ * markdown table that we constrained to its own scroll container, the
+ * er-folio nav whose computed scrollWidth is ~8px over viewport).
+ * `overflow-x: clip` is a stronger containment value that does NOT
+ * create a scroll container (overflow-x: hidden does), so iOS can't
+ * treat the page as horizontally scrollable. Apply at the top of the
+ * cascade so every page on phone gets the protection.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  html, body {
+    overflow-x: clip;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Phone overflow containment (#240) — review + edit surfaces.
+ *
+ * Markdown bodies frequently include fenced code blocks (long lines that
+ * default to white-space: pre and overflow horizontally) and tables
+ * (sized to widest content). Either pushes the entry-review page wider
+ * than the viewport, producing a page-level horizontal scroll that
+ * fights the operator's vertical thumb-scroll on phone.
+ *
+ * Strategy:
+ *   - <pre> / <pre><code> wrap long lines (white-space: pre-wrap);
+ *     formatting is preserved, no per-block scroll needed in most cases.
+ *   - <table> becomes a horizontally-scrollable block — wide tables
+ *     scroll inside their own container, page stays stationary.
+ *   - inline <code>, <p>, <li> get overflow-wrap: anywhere so long URLs
+ *     / file paths can't overflow.
+ *   - .er-page + .er-edit-preview get min-width: 0 so grid/flex parents
+ *     don't claim intrinsic content width.
+ *   - html / body get `overflow-x: clip` (set above at the top of this
+ *     phone block) as defense-in-depth — any new offender stays
+ *     contained without re-opening a page-level scroll.
+ *     CRITICAL: do NOT use `overflow-x: hidden` on body here. `hidden`
+ *     creates a scrolling box that becomes the containing block for any
+ *     `position: sticky` descendant — including `.er-strip` — and the
+ *     sticky element scrolls away with the content instead of pinning
+ *     to the viewport. `clip` does the same containment without
+ *     creating a scroll container, so sticky still binds to the
+ *     viewport. The decision-strip's whole job on phone is to stay
+ *     pinned at the top so the operator can hit Approve/Iterate/etc.
+ *     while reading; `hidden` here silently broke that.
+ *
+ * Desktop layout untouched; every rule is gated by the media query.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  /* The desktop rule sets `.er-page { width: 100% }`. Combined with
+   * the `@media (max-width: 40rem)` rule above that adds `margin: 0
+   * var(--er-space-1)`, the article box ends up at 100% + 16px (the
+   * margins are added on top of the 100% width), overflowing the
+   * viewport by 16px on every phone load. Switch to width:auto so the
+   * box solves to parent-minus-margins. */
+  .er-page {
+    width: auto;
+  }
+  .er-page,
+  .er-edit-preview {
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* Fenced code blocks: wrap long lines instead of overflowing.
+   * `white-space: pre-wrap` keeps interior whitespace; `word-break:
+   * break-word` + `overflow-wrap: anywhere` ensure even a single long
+   * unbreakable token can't overflow. */
+  .er-page pre,
+  .er-page pre code,
+  .er-edit-preview pre,
+  .er-edit-preview pre code {
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  /* Inline code + body prose: break long URLs / paths anywhere. */
+  .er-page :not(pre) > code,
+  .er-page p,
+  .er-page li,
+  .er-edit-preview :not(pre) > code,
+  .er-edit-preview p,
+  .er-edit-preview li {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  /* Tables: scroll within their own block, not the whole page. */
+  .er-page table,
+  .er-edit-preview table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Edit-mode entry label — visible only on phone (#241).
+ *
+ * Server-rendered `.er-edit-entry-label` carries the entry's title so
+ * the operator knows what they're editing when the rest of the page
+ * chrome is hidden in mobile edit mode (the desktop strip + folio
+ * already convey this on wider viewports). Hidden by default; the
+ * mobile media block below shows it. */
+.er-edit-entry-label {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------
+ * Phone edit-mode fills viewport (#241) — entry-review surface.
+ *
+ * Operator framing: *"in edit mode, the chrome is completely
+ * uninteresting and the only thing i care about is the text editor.
+ * You don't want to get distracted and accidentally leave the editor
+ * with unsaved changes."*
+ *
+ * On phone in edit mode (detected via `:has([data-edit-panes-host]
+ * :not([hidden]))`), hide app-level chrome that has dangerous
+ * navigation taps (folio nav, ← studio link, marginalia drawer,
+ * scrapbook drawer), pin the edit-toolbar at the top, and fix the
+ * editor pane so it fills the rest of the viewport. The body itself
+ * is set to `overflow: hidden` so the operator can't accidentally
+ * scroll the editor partway off-screen.
+ *
+ * Desktop layout untouched.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  /* Both html and body need overflow:hidden — `window.scrollTo` and
+   * touch-scroll target the documentElement (html); locking only body
+   * leaves the page free to drift. Also drop the body padding the
+   * desktop layout reserves for the absolutely-positioned strip /
+   * decision-strip — those are display:none in mobile edit mode and
+   * the reservation just adds dead space the editor can't use. */
+  html:has([data-edit-panes-host]:not([hidden])),
+  body:has([data-edit-panes-host]:not([hidden])) {
+    overflow: hidden;
+    height: 100dvh;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) {
+    padding: 0 !important;
+    margin: 0;
+  }
+
+  /* Hide app chrome — every clickable thing here is either irrelevant
+   * to editing or a tap-trap that loses unsaved changes. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-folio,
+  body:has([data-edit-panes-host]:not([hidden])) .er-strip,
+  body:has([data-edit-panes-host]:not([hidden])) .er-marginalia,
+  body:has([data-edit-panes-host]:not([hidden])) .er-marginalia-tab,
+  body:has([data-edit-panes-host]:not([hidden])) .er-page-gutter,
+  body:has([data-edit-panes-host]:not([hidden])) .er-pencil-btn,
+  body:has([data-edit-panes-host]:not([hidden])) .er-poll-indicator,
+  body:has([data-edit-panes-host]:not([hidden])) .er-toast,
+  body:has([data-edit-panes-host]:not([hidden])) .er-scrapbook-drawer,
+  body:has([data-edit-panes-host]:not([hidden])) [data-scrapbook-drawer],
+  body:has([data-edit-panes-host]:not([hidden])) .er-outline-drawer,
+  body:has([data-edit-panes-host]:not([hidden])) .er-outline-tab {
+    display: none !important;
+  }
+
+  /* Reveal the entry-label inside the toolbar so operator knows
+   * what they're editing. Compact, single-line ellipsis.
+   *
+   * `min-width: 0` is load-bearing: the flex default `min-width: auto`
+   * lets a flex item expand to its intrinsic content width, which on
+   * iOS Safari blows past the toolbar's box and side-scrolls the page
+   * even with `overflow:hidden + text-overflow:ellipsis` set. With
+   * `min-width: 0`, flex-shrink can clamp the label to its allotted
+   * basis and the ellipsis takes over visually. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-entry-label {
+    display: block;
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 0.95rem;
+    color: var(--er-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+    padding: 0 0 0.2rem;
+    border-bottom: 1px solid var(--er-faded-2);
+  }
+  /* Defensive: every direct child of the toolbar gets min-width:0 so
+   * none can expand the toolbar past viewport. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-toolbar > * {
+    min-width: 0;
+  }
+  /* Cap the toolbar itself at viewport width — last-resort containment
+   * if any future child sneaks past. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-toolbar {
+    max-width: 100vw;
+    overflow: hidden;
+  }
+
+  /* Lay the review shell out as a flex column locked to the dynamic
+   * viewport height: toolbar takes its natural height, editor takes
+   * the rest. `dvh` shrinks when iOS shows the keyboard so the editor
+   * stays above the keyboard. No magic numbers — layout solves itself. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-review-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-toolbar {
+    flex: 0 0 auto;
+    margin: 0;
+    max-width: none;
+    border-bottom: 1px solid var(--er-faded-2);
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-page {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+    background: var(--er-paper);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-page-grid {
+    flex: 1 1 0;
+    min-height: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-draft-frame {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) [data-edit-panes-host] {
+    flex: 1 1 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-panes {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    border: 0;
+    overflow: hidden;
+    /* `display: grid` is preserved (the existing source/split/preview
+     * column tracks remain in effect — the #239 mobile rule already
+     * collapses split → source). Add an explicit single-row track so
+     * the source pane can resolve `height: 100%` against it. */
+    grid-template-rows: 1fr;
+  }
+  /* CodeMirror inside fills the source pane completely. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-source {
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    overflow: hidden;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-source .cm-editor,
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-source .cm-scroller {
+    height: 100%;
+  }
+  /* Force CodeMirror to never offer horizontal scroll on phone.
+   * `EditorView.lineWrapping` is enabled in the editor config but
+   * iOS Safari can still expose horizontal scroll on the .cm-scroller
+   * when a single token (UUID, long URL, hash) can't wrap at any
+   * character. Hard-clip the scroller and tell every line to break
+   * at any character. */
+  body:has([data-edit-panes-host]:not([hidden])) .cm-scroller {
+    overflow-x: hidden !important;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .cm-content,
+  body:has([data-edit-panes-host]:not([hidden])) .cm-line {
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    max-width: 100%;
+  }
+  /* Lock body via position:fixed in mobile edit mode — iOS Safari
+   * sometimes ignores body overflow:hidden once a descendant has
+   * triggered a scroll context. position:fixed pins the body to the
+   * viewport so no kind of scroll moves it.
+   *
+   * `width: 100%` (not `100vw`) so the body tracks the *visual*
+   * viewport. When iOS shows the soft keyboard the visual viewport
+   * shrinks (e.g. 402 → 352 wide) but `100vw` stays at the original
+   * "large" viewport width, so the body would extend past the
+   * visible area and the page would slosh horizontally. `100%`
+   * inherits from the html element's box and shrinks with the
+   * keyboard. */
+  body:has([data-edit-panes-host]:not([hidden])) {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Phone edit-mode chrome trim (#239) — entry-review surface.
+ *
+ * Desktop edit mode shows Source/Split/Preview tabs + Outline / Focus /
+ * Save / Cancel / ? buttons in a single chrome bar above a side-by-side
+ * editor + preview. On phone (390px) the same shape becomes hostile:
+ *   - the action row wraps to two lines (~57px tall)
+ *   - data-view="split" forces a 1fr/1fr grid → ~190px-wide source pane
+ *   - CodeMirror's gutter eats another ~30px
+ *
+ * Trim to the essentials on phone:
+ *   - one mode toggle (Source / Preview only — no Split lane)
+ *   - Save + Cancel
+ * Hide Outline (already reachable via marginalia drawer), Focus (phone
+ * is already fullscreen), and the `?` shortcuts button (no keyboard).
+ *
+ * Force any `data-view="split"` to render as source-only on phone: split
+ * panes don't fit at this width regardless of the operator's pref.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  .er-edit-toolbar {
+    padding: var(--er-space-1) var(--er-space-2);
+    gap: var(--er-space-1);
+  }
+  /* Hide the Split mode tab — only Source ↔ Preview makes sense at
+   * this width. The remaining pair stays as a 2-tab pill. */
+  .er-edit-modes [data-edit-view="split"] {
+    display: none;
+  }
+  .er-edit-mode-btn {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+  }
+  /* Hide Outline / Focus / ? — desktop-only affordances. Save + Cancel
+   * stay visible; data-edit-hint stays so save state can be surfaced. */
+  .er-edit-actions [data-action="outline-drawer"],
+  .er-edit-actions [data-action="focus-mode"],
+  .er-edit-actions [data-action="shortcuts"] {
+    display: none;
+  }
+  .er-edit-actions {
+    gap: 0.3rem;
+  }
+  /* Force split → source on phone. The grid columns + the source pane
+   * borders + the preview's display:none all line up with what
+   * `data-view="source"` already produces; we just override the split
+   * variant. */
+  .er-edit-panes[data-view="split"] {
+    grid-template-columns: 1fr 0;
+  }
+  .er-edit-panes[data-view="split"] .er-edit-preview {
+    display: none;
+  }
+  .er-edit-panes[data-view="split"] .er-edit-source {
+    border-right: 0;
+  }
+  /* Hide CodeMirror's gutter (line numbers + fold marks) on phone —
+   * recovers ~30px of horizontal budget for the source itself. */
+  .er-edit-source .cm-gutters {
+    display: none !important;
+  }
+  /* Reduce the editor pane min-height — phone viewport is shorter than
+   * desktop, the 30rem floor pushes the bottom strip off-screen. */
+  .er-edit-panes {
+    min-height: 0;
+    height: 60vh;
+  }
+}

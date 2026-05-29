@@ -64,6 +64,8 @@ PLUGINS=(deskwork deskwork-studio dw-lifecycle)
 REPAIRED=()
 HEALTHY=()
 ERRORS=()
+DEP_REPAIRED=()
+DEP_ERRORS=()
 
 # ---------- helpers ----------
 
@@ -168,6 +170,105 @@ verify_version() {
   local version=$2
   local bin_path="$CACHE_BASE/$plugin/$version/bin/$plugin"
   [[ -x "$bin_path" ]]
+}
+
+# List the runtime dependencies declared in a plugin's package.json.
+# Output: one dep name per line; empty output for packages with no
+# declared runtime deps (or when the package.json is unreadable). The
+# package.json read is best-effort — any parse failure surfaces an
+# empty list, which forces the caller to treat the plugin as
+# "no deps to probe" rather than mid-stream-erroring.
+plugin_declared_deps() {
+  local plugin_dir=$1
+  local pkg="$plugin_dir/package.json"
+  [[ -f "$pkg" ]] || return 0
+  PKG_PATH="$pkg" node -e '
+    try {
+      const p = JSON.parse(require("fs").readFileSync(process.env.PKG_PATH, "utf8"));
+      const deps = p.dependencies || {};
+      for (const name of Object.keys(deps)) {
+        if (name) console.log(name);
+      }
+    } catch (e) { /* unreadable manifest -> empty list */ }
+  ' 2>/dev/null
+}
+
+# Return the list of declared runtime deps missing from
+# $plugin_dir/node_modules/<dep>/package.json. One name per line.
+# Empty output means every declared dep is installed (or the plugin
+# declared no deps).
+plugin_missing_deps() {
+  local plugin_dir=$1
+  local dep
+  while IFS= read -r dep; do
+    [[ -z "$dep" ]] && continue
+    if [[ ! -f "$plugin_dir/node_modules/$dep/package.json" ]]; then
+      echo "$dep"
+    fi
+  done < <(plugin_declared_deps "$plugin_dir")
+}
+
+# Run `npm install --omit=dev --workspaces=false` in a plugin directory.
+# Used by the repair phase when a plugin's declared deps are missing.
+# Stdout/stderr surface to the calling shell so operators see install
+# progress; npm's --loglevel=error keeps the noise tolerable.
+run_plugin_install() {
+  local plugin_dir=$1
+  (
+    cd "$plugin_dir"
+    npm install --omit=dev --workspaces=false \
+      --no-audit --no-fund --loglevel=error
+  ) >&2
+}
+
+# Per-plugin dep audit: walk every plugin we're responsible for,
+# probe the marketplace clone's plugin directory for missing declared
+# deps, and either report (--check) or install (full repair).
+#
+# The clone is where the bin shim resolves PLUGIN_ROOT to. We probe
+# the same path the shim probes; the false-positive that TF-004 named
+# (clone's node_modules missing ajv etc., but --check says "healthy")
+# is the gap this loop closes.
+process_plugin_deps() {
+  local plugin=$1
+  local plugin_dir="$MARKETPLACE_CLONE/plugins/$plugin"
+  [[ -d "$plugin_dir" ]] || return 0
+
+  local missing
+  missing=$(plugin_missing_deps "$plugin_dir")
+  if [[ -z "$missing" ]]; then
+    return 0
+  fi
+
+  # Compress the missing list to a single space-separated line for the
+  # operator-facing report.
+  local missing_line
+  missing_line=$(echo "$missing" | tr '\n' ' ' | sed 's/ *$//')
+
+  if [[ $CHECK_ONLY -eq 1 ]]; then
+    err "  $plugin: missing declared deps: $missing_line"
+    DEP_ERRORS+=("$plugin")
+    return 0
+  fi
+
+  log "  $plugin: installing missing deps ($missing_line)"
+  if run_plugin_install "$plugin_dir"; then
+    # Verify the install actually landed the deps it was supposed to.
+    local still_missing
+    still_missing=$(plugin_missing_deps "$plugin_dir")
+    if [[ -n "$still_missing" ]]; then
+      local still_line
+      still_line=$(echo "$still_missing" | tr '\n' ' ' | sed 's/ *$//')
+      err "  $plugin: npm install completed but deps still missing: $still_line"
+      DEP_ERRORS+=("$plugin")
+    else
+      DEP_REPAIRED+=("$plugin")
+      log "  $plugin: deps installed"
+    fi
+  else
+    err "  $plugin: npm install failed"
+    DEP_ERRORS+=("$plugin")
+  fi
 }
 
 # Restore a plugin/version cache subtree from the marketplace clone.
@@ -326,6 +427,11 @@ main() {
   for plugin in "${PLUGINS[@]}"; do
     log "checking $plugin"
     process_plugin "$plugin"
+    # Dep audit on the marketplace clone's plugin directory. The bin
+    # shim resolves PLUGIN_ROOT here; missing declared deps in the
+    # clone are the TF-004 failure shape `--check` previously lied
+    # about.
+    process_plugin_deps "$plugin"
   done
 
   prune_registry
@@ -350,14 +456,37 @@ main() {
     exit 1
   fi
 
-  if [[ ${#REPAIRED[@]} -gt 0 ]]; then
+  local any_repaired=0
+  if [[ ${#REPAIRED[@]} -gt 0 ]] || [[ ${#DEP_REPAIRED[@]} -gt 0 ]]; then
+    any_repaired=1
+  fi
+
+  if [[ $any_repaired -eq 1 ]]; then
+    local repaired_summary=""
+    if [[ ${#REPAIRED[@]} -gt 0 ]]; then
+      repaired_summary="${REPAIRED[*]}"
+    fi
+    if [[ ${#DEP_REPAIRED[@]} -gt 0 ]]; then
+      if [[ -n "$repaired_summary" ]]; then
+        repaired_summary="$repaired_summary; deps: ${DEP_REPAIRED[*]}"
+      else
+        repaired_summary="deps: ${DEP_REPAIRED[*]}"
+      fi
+    fi
     if [[ $QUIET -eq 1 ]]; then
       # In quiet mode: announce what was repaired (the SessionStart
       # hook should still tell the operator if it actually fixed
       # something).
-      echo "deskwork repair-install: repaired ${REPAIRED[*]}"
+      echo "deskwork repair-install: repaired $repaired_summary"
     else
-      log "repaired: ${REPAIRED[*]}"
+      log "repaired: $repaired_summary"
+    fi
+  elif [[ ${#DEP_ERRORS[@]} -gt 0 ]]; then
+    # --check mode found missing deps but cannot repair (read-only).
+    # Caller below promotes this to exit 1 so the diagnostic stops
+    # lying about healthy state.
+    if [[ $QUIET -eq 0 ]]; then
+      log "needs repair: deps missing for ${DEP_ERRORS[*]}"
     fi
   elif [[ $QUIET -eq 0 ]]; then
     log "all plugins healthy."
@@ -380,6 +509,21 @@ main() {
 
   if [[ ${#ERRORS[@]} -gt 0 ]]; then
     err "errors during restore: ${ERRORS[*]}"
+    exit 1
+  fi
+
+  # In --check mode, missing deps are an unrepaired diagnostic. Exit 1
+  # so operator-facing tooling (and SessionStart hooks invoking
+  # `--check`) get a truthful signal: the state is not all-clear.
+  # In repair mode, dep-install failures are repair errors and exit 1
+  # via the DEP_ERRORS path below.
+  if [[ $CHECK_ONLY -eq 1 ]] && [[ ${#DEP_ERRORS[@]} -gt 0 ]]; then
+    err "  In Claude Code, run:"
+    err "    ${BASH_SOURCE[0]##*/}    # (without --check, to repair)"
+    exit 1
+  fi
+  if [[ ${#DEP_ERRORS[@]} -gt 0 ]]; then
+    err "errors during dep install: ${DEP_ERRORS[*]}"
     exit 1
   fi
 }

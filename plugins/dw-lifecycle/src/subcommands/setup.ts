@@ -5,7 +5,12 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config.js';
 import { resolveFeatureDir } from '../docs.js';
-import { repoRoot, expandWorktreeName } from '../repo.js';
+import {
+  repoRoot,
+  expandWorktreeName,
+  findWorktreeForBranch,
+  mainWorktreePath,
+} from '../repo.js';
 import { validateSlug, validateTargetVersion } from '../slug.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +22,7 @@ interface SetupArgs {
   targetVersion?: string;
   title?: string;
   definitionFile?: string;
+  workplanFile?: string;
 }
 
 interface FeatureDefinitionSections {
@@ -42,6 +48,7 @@ function parseArgs(args: string[]): SetupArgs {
   let targetVersion: string | undefined;
   let title: string | undefined;
   let definitionFile: string | undefined;
+  let workplanFile: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -52,6 +59,8 @@ function parseArgs(args: string[]): SetupArgs {
       title = nextArg(args, ++i);
     } else if (a === '--definition') {
       definitionFile = nextArg(args, ++i);
+    } else if (a === '--workplan') {
+      workplanFile = nextArg(args, ++i);
     } else if (!slug && !a.startsWith('--')) {
       slug = a;
     }
@@ -59,10 +68,10 @@ function parseArgs(args: string[]): SetupArgs {
 
   if (!slug) {
     throw new Error(
-      'Usage: dw-lifecycle setup <slug> [--target <version>] [--title <title>] [--definition <path>]'
+      'Usage: dw-lifecycle setup <slug> [--target <version>] [--title <title>] [--definition <path>] [--workplan <path>]'
     );
   }
-  return { slug, targetVersion, title, definitionFile };
+  return { slug, targetVersion, title, definitionFile, workplanFile };
 }
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
@@ -241,12 +250,18 @@ function branchExists(root: string, branchName: string): boolean {
 }
 
 export async function setup(args: string[]): Promise<void> {
-  const { slug, targetVersion, title, definitionFile } = parseArgs(args);
+  const { slug, targetVersion, title, definitionFile, workplanFile } = parseArgs(args);
   validateSlug(slug);
   if (targetVersion) {
     validateTargetVersion(targetVersion);
   }
-  const root = repoRoot();
+  // `root` is the MAIN worktree path (where `.dw-lifecycle/config.json`
+  // lives). When the helper is invoked from a sibling feature worktree
+  // (per the skill's documented step 2), the current worktree's
+  // `git rev-parse --show-toplevel` returns the SIBLING path; config
+  // would not be found there. Always resolve config from the main
+  // worktree.
+  const root = mainWorktreePath();
   const cfg = loadConfig(root);
   const target = targetVersion ?? cfg.docs.defaultTargetVersion;
 
@@ -254,32 +269,78 @@ export async function setup(args: string[]): Promise<void> {
     throw new Error(`Templates dir not found: ${TEMPLATES_DIR}`);
   }
 
-  const dir = resolveFeatureDir(cfg, root, slug, { stage: 'inProgress', targetVersion: target });
-  if (existsSync(dir)) {
-    throw new Error(`Feature directory already exists: ${dir}. Refusing to overwrite.`);
-  }
-
-  // Pre-flight: branch + worktree path collisions
+  // The skill's documented flow invokes `superpowers:using-git-worktrees`
+  // before this helper (see plugins/dw-lifecycle/skills/setup/SKILL.md
+  // step 2). When that pre-creation has happened, we must NOT re-create
+  // the branch+worktree — both #196 (doubled worktree) and #209 (abort
+  // on existing branch) trace back to the helper assuming it owns
+  // creation exclusively. Detect the pre-created case and reuse it.
   const branchName = `${cfg.branches.prefix}${slug}`;
+  const canonicalWorktreePath = join(
+    dirname(root),
+    expandWorktreeName(cfg.worktrees.naming, slug, root),
+  );
+  let worktreePath = canonicalWorktreePath;
+  let createdWorktree = false;
+
   if (branchExists(root, branchName)) {
-    throw new Error(`Branch already exists: ${branchName}`);
+    const existing = findWorktreeForBranch(root, branchName);
+    if (!existing) {
+      throw new Error(
+        `Branch ${branchName} exists but no worktree is checked out for it. ` +
+          `Either remove the branch (\`git branch -D ${branchName}\`) and re-run, ` +
+          `or check it out in a worktree first.`,
+      );
+    }
+    worktreePath = existing;
+  } else {
+    if (existsSync(worktreePath)) {
+      throw new Error(`Worktree path already exists: ${worktreePath}`);
+    }
+    // Pre-flight: input file existence — before creating the worktree, so
+    // a typo doesn't strand the user with a worktree they need to clean up.
+    if (definitionFile && !existsSync(definitionFile)) {
+      throw new Error(`Definition file not found: ${definitionFile}`);
+    }
+    if (workplanFile && !existsSync(workplanFile)) {
+      throw new Error(`Workplan file not found: ${workplanFile}`);
+    }
+    execFileSync('git', ['-C', root, 'worktree', 'add', worktreePath, '-b', branchName, 'HEAD'], {
+      stdio: 'inherit',
+    });
+    createdWorktree = true;
   }
 
-  const worktreePath = join(dirname(root), expandWorktreeName(cfg.worktrees.naming, slug, root));
-  if (existsSync(worktreePath)) {
-    throw new Error(`Worktree path already exists: ${worktreePath}`);
+  // Existence check for the feature dir runs against the resolved
+  // worktreePath (where the docs will land), not against `root`.
+  // Tolerate a pre-existing directory (e.g. seeded handoff files from a
+  // related feature, scope-inventory dumps). Refuse only if a template
+  // file we'd write already exists — that's authored content that must
+  // not be overwritten silently.
+  const dir = resolveFeatureDir(cfg, worktreePath, slug, {
+    stage: 'inProgress',
+    targetVersion: target,
+  });
+  if (existsSync(dir)) {
+    const collisions = ['prd.md', 'workplan.md', 'README.md'].filter((name) =>
+      existsSync(join(dir, name)),
+    );
+    if (collisions.length > 0) {
+      throw new Error(
+        `Refusing to overwrite existing template file(s) in ${dir}: ${collisions.join(', ')}. ` +
+          `Move or rename the existing file(s) and re-run setup.`,
+      );
+    }
   }
 
-  // Pre-flight: definition file must exist before we create the worktree, so a typo
-  // doesn't strand the user with a worktree they need to clean up.
+  // Re-check inputs after dir-existence; the reuse path skips the
+  // pre-creation block above, so this catches typos in that flow.
   if (definitionFile && !existsSync(definitionFile)) {
     throw new Error(`Definition file not found: ${definitionFile}`);
   }
-
-  // Create branch + worktree off the current HEAD (avoids hardcoding "main").
-  execFileSync('git', ['-C', root, 'worktree', 'add', worktreePath, '-b', branchName, 'HEAD'], {
-    stdio: 'inherit',
-  });
+  if (workplanFile && !existsSync(workplanFile)) {
+    throw new Error(`Workplan file not found: ${workplanFile}`);
+  }
 
   // From this point on the worktree exists. If anything below fails, roll it back
   // so the user isn't left with a half-scaffolded feature directory.
@@ -321,11 +382,36 @@ export async function setup(args: string[]): Promise<void> {
       writeFileSync(wpPath, seedWorkplanFromDefinition(wp, definition), 'utf8');
     }
 
+    // Optionally replace workplan body with a pre-authored file (#212).
+    // The skill's chain (brainstorming → writing-plans → setup) produces
+    // a workplan body in a temp file; without this flag, the agent had
+    // to scaffold-then-overwrite manually. The file's content becomes
+    // the body; standard frontmatter (slug, targetVersion, date) gets
+    // prepended. If the file already includes a frontmatter block, it
+    // passes through unchanged.
+    if (workplanFile) {
+      const wpPath = join(docsDir, 'workplan.md');
+      const body = readFileSync(workplanFile, 'utf8');
+      const out = body.startsWith('---\n')
+        ? body
+        : `---\nslug: ${slug}\ntargetVersion: "${target}"\ndate: ${
+            new Date().toISOString().slice(0, 10)
+          }\n---\n\n${body.startsWith('\n') ? body.slice(1) : body}`;
+      writeFileSync(wpPath, out, 'utf8');
+    }
+
     console.log(
       JSON.stringify({ slug, target, branch: branchName, worktreePath, docsDir }, null, 2)
     );
   } catch (err) {
     const origMessage = err instanceof Error ? err.message : String(err);
+    if (!createdWorktree) {
+      // Reused a pre-existing worktree+branch — operator (or
+      // superpowers:using-git-worktrees) created it before we ran. Do
+      // NOT remove it; that would destroy state we don't own. Surface
+      // the scaffolding failure as-is.
+      throw new Error(`Setup failed during scaffolding: ${origMessage}.`);
+    }
     let rollbackOk = true;
     try {
       execFileSync('git', ['-C', root, 'worktree', 'remove', '--force', worktreePath], {

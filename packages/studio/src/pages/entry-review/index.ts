@@ -31,6 +31,7 @@ import {
   renderMarkdownToHtml,
 } from '@deskwork/core/review/render';
 import { splitOutline } from '@deskwork/core/outline-split';
+import { extractToc, type TocEntry } from '@deskwork/core/review/toc';
 import type { ContentIndex } from '@deskwork/core/content-index';
 import { resolveCalendarPath } from '@deskwork/core/paths';
 import { readCalendar } from '@deskwork/core/calendar';
@@ -41,6 +42,8 @@ import type { StudioContext } from '../../routes/api.ts';
 import { html, unsafe, escapeHtml, gloss, type RawHtml } from '../html.ts';
 import { layout } from '../layout.ts';
 import { renderEditorialFolio } from '../chrome.ts';
+import { renderMasthead } from '../masthead.ts';
+import { renderMastheadMenu } from '../masthead-menu.ts';
 import { renderScrapbookDrawer } from '../review-scrapbook-drawer.ts';
 import { loadEntryReviewData, type EntryReviewData } from './data.ts';
 import { renderVersionsStrip } from './version-strip.ts';
@@ -48,6 +51,13 @@ import { renderEditToolbar } from './edit-toolbar.ts';
 import { renderEditPanes } from './edit-panes.ts';
 import { renderOutlineDrawer } from './outline-drawer.ts';
 import { renderMarginalia, renderMarginaliaTab } from './marginalia.ts';
+import { renderMobileBar } from '../mobile-bar.ts';
+import {
+  renderMobileSheet,
+  renderStripModeSegment,
+  renderStripEditExit,
+  getEntryReviewBarCells,
+} from './mobile-sheet.ts';
 import { renderDecisionStrip } from './decision-strip.ts';
 import { renderShortcutsOverlay } from './shortcuts.ts';
 import { renderEntryNotFound } from './not-found.ts';
@@ -74,6 +84,7 @@ interface PreparedRender {
   readonly fm: Record<string, unknown>;
   readonly bodyHtml: string;
   readonly outlineHtml: string;
+  readonly tocEntries: readonly TocEntry[];
 }
 
 function stringField(v: unknown): string | undefined {
@@ -111,7 +122,12 @@ async function prepareRender(
     ? await renderMarkdownToHtml(split.outline, renderCtx)
     : '';
 
-  return { fm, bodyHtml: renderedHtml, outlineHtml };
+  // #244 — extract TOC from the rendered body's headings. The renderer
+  // ran rehype-slug so every h2/h3/h4 carries an `id` attribute; the
+  // extractor reads the `id` + visible text into a flat list.
+  const tocEntries = extractToc(renderedHtml);
+
+  return { fm, bodyHtml: renderedHtml, outlineHtml, tocEntries };
 }
 
 /**
@@ -191,7 +207,7 @@ export async function renderEntryReviewPage(
     return { status: 404, html: renderEntryNotFound(entryId, reason) };
   }
 
-  const { fm, bodyHtml, outlineHtml } = await prepareRender(data.markdown, {
+  const { fm, bodyHtml, outlineHtml, tocEntries } = await prepareRender(data.markdown, {
     entryId: data.entry.uuid,
     site: data.site,
   });
@@ -215,6 +231,23 @@ export async function renderEntryReviewPage(
   const historicalBadge = data.historical
     ? unsafe(html`<span class="er-strip-historical" title="Historical version (read-only)">historical · v${data.historical.versionNumber}</span>`)
     : unsafe('');
+
+  // v7 universal masthead (mobile-only at this commit). The kicker
+  // reads `entry · <stage> · № <version>`; the slug occupies the
+  // bottom row; the inline meta carries the historical badge when a
+  // historical view is active. Step 2.2.8 retires the er-strip-back
+  // redundant with the masthead's `←`.
+  const versionLabel = state.currentVersion !== null
+    ? `№ ${state.currentVersion}`
+    : '№ —';
+  const mastheadKicker = `entry · ${stageLabel.toLowerCase()} · ${versionLabel}`;
+  const mastheadMeta = data.historical
+    ? `historical · v${data.historical.versionNumber}`
+    : undefined;
+  const mastheadOpts = mastheadMeta === undefined
+    ? { kicker: mastheadKicker, slug: data.entry.slug, isHub: false } as const
+    : { kicker: mastheadKicker, slug: data.entry.slug, metaInline: mastheadMeta, isHub: false } as const;
+  const masthead = renderMasthead(mastheadOpts);
 
   // The page-grid composes the article column + the marginalia rail.
   // Mirrors the legacy longform layout (`.er-page-grid` with the
@@ -253,6 +286,8 @@ export async function renderEntryReviewPage(
 
   const body = html`
     <div data-review-ui="longform" class="er-review-shell">
+      ${masthead}
+      ${renderMastheadMenu()}
       ${renderEditorialFolio('longform', folioSpine)}
       <div class="er-strip">
         <div class="er-strip-inner">
@@ -268,16 +303,20 @@ export async function renderEntryReviewPage(
             <span class="er-strip-hint">select text to <span class="er-gloss" data-term="marginalia" tabindex="0" role="button" aria-describedby="glossary-marginalia">mark</span> · double-click to edit · <kbd>?</kbd> for shortcuts</span>
           </span>
           ${decisionStrip}
+          ${renderStripModeSegment()}
+          ${renderStripEditExit()}
         </div>
       </div>
-      ${renderEditToolbar(outlineHtml.length > 0)}
+      ${renderEditToolbar(outlineHtml.length > 0, titleField)}
       <article class="er-page" data-entry-uuid="${data.entry.uuid}">
         ${unsafe(pageGrid)}
       </article>
       ${renderMarginaliaTab()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
-      ${renderOutlineDrawer(outlineHtml)}
+      ${renderOutlineDrawer(outlineHtml, tocEntries)}
       ${scrapbookDrawer}
+      ${renderMobileBar({ contextual: getEntryReviewBarCells() })}
+      ${renderMobileSheet()}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
@@ -294,6 +333,7 @@ export async function renderEntryReviewPage(
         '/static/css/blog-figure.css',
         '/static/css/review-viewport.css',
         '/static/css/scrap-row.css',
+        '/static/css/mobile-shell.css',
       ],
       bodyAttrs: 'data-review-ui="entry-review"',
       bodyHtml: body,

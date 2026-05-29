@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Dashboard mockup 1 · Press tabs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --kraft-2: #D9C8A2;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .meta a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+  }
+  h1.demo-title {
+    color: var(--paper);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.6rem;
+    margin-bottom: 0.4rem;
+    text-align: center;
+  }
+  .demo-sub {
+    color: var(--faded-2);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 1.6rem;
+    text-align: center;
+  }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+    text-align: center;
+    max-width: 410px;
+  }
+  .phone {
+    width: 410px;
+    height: 880px;
+    background: #050505;
+    border-radius: 50px;
+    padding: 12px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+  .screen {
+    width: 100%; height: 100%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .ios-clock {
+    position: absolute; top: 28px; left: 32px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.95rem; font-weight: 600;
+    color: var(--ink); z-index: 110;
+  }
+  .ios-icons {
+    position: absolute; top: 30px; right: 32px;
+    color: var(--ink);
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110;
+  }
+
+  /* ============================================================
+   *  Dashboard · press tabs
+   *  56px hero strip + sticky 40px filter strip = 96px chrome.
+   *  Bottom 64px tabs swap which slice of the calendar shows:
+   *    Pipeline (full stage list) · Press (needs-attention queue) · Folio (scrapbook overview)
+   *  Closes #237 (no row collapse), #238 (96px not 1500px), #243 (no em-dash).
+   * ============================================================ */
+
+  /* Hero strip — compressed masthead (#238) */
+  .strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    padding: 56px 1rem 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .strip-mark {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 1rem;
+    color: var(--ink);
+    transform: rotate(-1.5deg);
+    border: 2px solid var(--ink);
+    padding: 0.05rem 0.45rem;
+    background: var(--paper);
+  }
+  .strip-mark em { color: var(--red); font-style: italic; }
+  .strip-vol {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faded);
+  }
+  .strip-help {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+
+  /* Filter strip — sticky just below the hero */
+  .filterbar {
+    position: absolute;
+    top: 56px; left: 0; right: 0;
+    height: 40px;
+    padding: 0.4rem 0.7rem;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 49;
+    display: flex; align-items: center; gap: 0.4rem;
+    overflow-x: auto;
+  }
+  .filterbar::-webkit-scrollbar { display: none; }
+  .findbox {
+    flex-shrink: 0;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    padding: 0.25rem 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    min-width: 7.5rem;
+    display: flex; align-items: center; gap: 0.3rem;
+  }
+  .findbox .icon { color: var(--red); }
+  .chip {
+    flex-shrink: 0;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faded);
+    cursor: pointer;
+  }
+  .chip.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  /* Body — pipeline rows (default Pipeline tab) */
+  .body {
+    position: absolute;
+    top: 96px; left: 0; right: 0; bottom: 64px;
+    overflow-y: auto;
+    padding: 0.6rem 0 1.4rem;
+  }
+
+  .stage-head {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    padding: 0.85rem 1rem 0.4rem;
+    border-bottom: 1px solid var(--paper-3);
+  }
+  .stage-glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.4rem;
+    color: var(--red);
+    line-height: 1;
+  }
+  .stage-name {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .stage-count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+  }
+
+  /* The row — STACKED layout (#237 fix). Slug on top in mono,
+     title below in italic Newsreader, status stamp + actions
+     on a third row. No grid columns to collapse. */
+  .row {
+    padding: 0.7rem 1rem 0.85rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    display: grid;
+    grid-template-columns: 1.4rem 1fr;
+    column-gap: 0.5rem;
+    row-gap: 0.25rem;
+  }
+  .row.depth-1 { padding-left: 1.7rem; }
+  .row-num {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    padding-top: 0.2rem;
+  }
+  .row-slug {
+    grid-column: 2; grid-row: 1;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+  }
+  .row-slug a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--paper-3); }
+  .row-title {
+    grid-column: 2; grid-row: 2;
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.95rem;
+    line-height: 1.25;
+    color: var(--ink);
+  }
+  .row-foot {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 0.45rem;
+    display: flex; align-items: center; gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  /* Stamps — explicit class set per state. NEVER an em-dash (#243).
+     Pre-review entries simply have NO stamp. */
+  .stamp {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 14, "wght" 600;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 2px solid currentColor;
+    padding: 0.04rem 0.4rem;
+    transform: rotate(-1.2deg);
+    background: var(--paper);
+    line-height: 1.2;
+    flex-shrink: 0;
+  }
+  .stamp.review { color: var(--red); }
+  .stamp.iterating { color: var(--blue); }
+  .stamp.approved { color: var(--green); }
+
+  .iter-pip {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+  }
+
+  /* Action chips — wrap onto multiple lines if needed.
+     Slug column gets all the breathing room (#237). */
+  .act {
+    flex-shrink: 0;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 2px;
+    padding: 0.18rem 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .act.open { color: var(--ink); }
+  .act.approve { color: var(--green); border-color: var(--green); }
+  .act.iterate { color: var(--blue); border-color: var(--blue); }
+  .act.cancel  { color: var(--faded); }
+  .act.scrap   { color: var(--kraft); border-color: var(--kraft-2); }
+
+  /* Bottom tab bar (mirrors review surface: 64px, 3 tabs) */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -2px 16px rgba(26,22,20,0.06);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    z-index: 60;
+  }
+  .tab {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.18rem;
+    border: none; background: transparent; cursor: pointer;
+    padding: 0.4rem 0.4rem 0.6rem;
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    position: relative;
+  }
+  .tab .glyph {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.5rem; line-height: 1; color: var(--faded);
+  }
+  .tab.active { color: var(--red); }
+  .tab.active .glyph { color: var(--red); }
+  .tab.active::after {
+    content: ''; position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 30px; height: 2px; background: var(--red);
+  }
+  .tab .count {
+    position: absolute; top: 8px; right: 28%;
+    background: var(--red); color: var(--paper);
+    font-size: 0.55rem; line-height: 1;
+    padding: 0.18rem 0.32rem; border-radius: 8px;
+    letter-spacing: 0.04em; min-width: 1rem; text-align: center;
+  }
+  .tab.folio .glyph { color: var(--kraft); }
+  .tab.folio .count { background: var(--kraft); }
+
+  /* PRESS TAB body — vertical list of "needs your attention now" cards.
+     Reuses the same row geometry as the pipeline view. */
+  .press-list { padding: 0.5rem 1rem 1rem; }
+  .press-card {
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-left: 3px solid var(--red);
+    border-radius: 2px;
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 0.6rem;
+    box-shadow: 0 1px 0 rgba(26,22,20,0.05);
+  }
+  .press-card.iterating { border-left-color: var(--blue); }
+  .press-card.approved  { border-left-color: var(--green); }
+  .press-card-kicker {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.3rem;
+    display: flex; gap: 0.5rem; align-items: baseline;
+  }
+  .press-card-kicker .at {
+    color: var(--faded);
+    margin-left: auto;
+  }
+  .press-card-slug {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  .press-card-title {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.05rem;
+    line-height: 1.2;
+    margin: 0.18rem 0 0.55rem;
+  }
+  .press-card-foot {
+    display: flex; gap: 0.35rem; flex-wrap: wrap;
+    padding-top: 0.45rem;
+    border-top: 1px dashed var(--paper-3);
+  }
+  .press-empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--faded);
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Dashboard 1 · Press tabs.</h1>
+<div class="demo-sub">Pipeline · Press · Folio — three tabs, mirroring review surface</div>
+
+<div class="frames">
+
+  <!-- Frame A: Pipeline tab (default), full stage list -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><em>Press-</em>Check</span>
+          <span class="strip-vol">Vol. 01 · № 12</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+          <button class="chip active">All</button>
+          <button class="chip">Planned</button>
+          <button class="chip">Drafting</button>
+          <button class="chip">Final</button>
+        </div>
+
+        <div class="body">
+
+          <div class="stage-head">
+            <span class="stage-glyph">§</span>
+            <span class="stage-name">Planned</span>
+            <span class="stage-count">1</span>
+          </div>
+          <div class="row">
+            <span class="row-num">01</span>
+            <div class="row-slug"><a href="#">deskwork-plugin/issue-158-ux-audit</a></div>
+            <div class="row-title">Issue 158 · UX audit</div>
+            <div class="row-foot">
+              <a class="act open" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <button class="act cancel">cancel ⊘</button>
+              <a class="act scrap" href="#">▦ 0</a>
+            </div>
+          </div>
+
+          <div class="stage-head">
+            <span class="stage-glyph">✎</span>
+            <span class="stage-name">Drafting</span>
+            <span class="stage-count">5</span>
+          </div>
+          <div class="row">
+            <span class="row-num">02</span>
+            <div class="row-slug"><a href="#">post-release-acceptance-design</a></div>
+            <div class="row-title">Post-release customer acceptance playbook</div>
+            <div class="row-foot">
+              <span class="stamp review">In review</span>
+              <span class="iter-pip">it. 02</span>
+              <a class="act open" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <a class="act scrap" href="#">▦ 4</a>
+            </div>
+          </div>
+          <div class="row depth-1">
+            <span class="row-num">03</span>
+            <div class="row-slug"><a href="#">…/v016-verification-walk</a></div>
+            <div class="row-title">v0.16.0 verification walk</div>
+            <div class="row-foot">
+              <a class="act open" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <button class="act cancel">cancel ⊘</button>
+              <a class="act scrap" href="#">▦ 1</a>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-num">04</span>
+            <div class="row-slug"><a href="#">release-skill-design</a></div>
+            <div class="row-title">Release skill design</div>
+            <div class="row-foot">
+              <span class="stamp iterating">Iterating</span>
+              <span class="iter-pip">it. 03</span>
+              <a class="act open" href="#">open →</a>
+              <button class="act iterate">iterate →</button>
+              <a class="act scrap" href="#">▦ 2</a>
+            </div>
+          </div>
+          <div class="row depth-1">
+            <span class="row-num">05</span>
+            <div class="row-slug"><a href="#">…/open-issue-tranche-proposal</a></div>
+            <div class="row-title">Open issue tranche proposal</div>
+            <div class="row-foot">
+              <span class="stamp review">In review</span>
+              <span class="iter-pip">it. 01</span>
+              <a class="act open" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <a class="act scrap" href="#">▦ 0</a>
+            </div>
+          </div>
+
+          <div class="stage-head">
+            <span class="stage-glyph">⊕</span>
+            <span class="stage-name">Final</span>
+            <span class="stage-count">1</span>
+          </div>
+          <div class="row">
+            <span class="row-num">06</span>
+            <div class="row-slug"><a href="#">studio-mobile-first</a></div>
+            <div class="row-title">Studio mobile-first</div>
+            <div class="row-foot">
+              <span class="stamp approved">Approved</span>
+              <a class="act open" href="#">open →</a>
+              <a class="act scrap" href="#">▦ 1</a>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="tabbar">
+          <button class="tab active">
+            <span class="glyph">§</span>
+            <span>Pipeline</span>
+          </button>
+          <button class="tab">
+            <span class="glyph">✎</span>
+            <span>Press</span>
+            <span class="count">3</span>
+          </button>
+          <button class="tab folio">
+            <span class="glyph">▦</span>
+            <span>Folio</span>
+            <span class="count">12</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · pipeline tab · stacked rows (no collapse) · 96px chrome (was ~1500px) · stamps for review/iterating/approved · NO em-dash for missing state</div>
+  </div>
+
+  <!-- Frame B: Press tab — needs-attention queue -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><em>Press-</em>Check</span>
+          <span class="strip-vol">Vol. 01 · № 12</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+          <button class="chip">All</button>
+          <button class="chip active">In&nbsp;review</button>
+          <button class="chip">Iterating</button>
+          <button class="chip">Approved</button>
+        </div>
+
+        <div class="body">
+          <div class="press-list">
+
+            <article class="press-card">
+              <div class="press-card-kicker">
+                <span>§ Drafting</span>
+                <span class="at">5 min ago</span>
+              </div>
+              <div class="press-card-slug">post-release-acceptance-design</div>
+              <div class="press-card-title">Post-release customer acceptance playbook.</div>
+              <div class="press-card-foot">
+                <span class="stamp review">In review</span>
+                <span class="iter-pip">it. 02</span>
+                <a class="act open" href="#">open →</a>
+                <button class="act approve">approve →</button>
+              </div>
+            </article>
+
+            <article class="press-card iterating">
+              <div class="press-card-kicker">
+                <span>§ Drafting</span>
+                <span class="at">12 min ago</span>
+              </div>
+              <div class="press-card-slug">release-skill-design</div>
+              <div class="press-card-title">Release skill design.</div>
+              <div class="press-card-foot">
+                <span class="stamp iterating">Iterating</span>
+                <span class="iter-pip">it. 03</span>
+                <a class="act open" href="#">open →</a>
+                <button class="act iterate">iterate →</button>
+              </div>
+            </article>
+
+            <article class="press-card">
+              <div class="press-card-kicker">
+                <span>§ Drafting · sub</span>
+                <span class="at">42 min ago</span>
+              </div>
+              <div class="press-card-slug">deskwork-plugin/open-issue-tranche-proposal</div>
+              <div class="press-card-title">Open issue tranche proposal.</div>
+              <div class="press-card-foot">
+                <span class="stamp review">In review</span>
+                <span class="iter-pip">it. 01</span>
+                <a class="act open" href="#">open →</a>
+                <button class="act approve">approve →</button>
+              </div>
+            </article>
+
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab">
+            <span class="glyph">§</span>
+            <span>Pipeline</span>
+          </button>
+          <button class="tab active">
+            <span class="glyph">✎</span>
+            <span>Press</span>
+            <span class="count">3</span>
+          </button>
+          <button class="tab folio">
+            <span class="glyph">▦</span>
+            <span>Folio</span>
+            <span class="count">12</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · press tab · "needs your attention now" cards · review-red, iterating-blue, approved-green left rails · 3 in queue</div>
+  </div>
+
+</div>
+
+<div style="margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.6;">
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Pattern</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">The same 64px bottom-tab-bar idiom as the review surface — but operating at the calendar level.</strong> Pipeline is the home tab (full stage list). Press is a focused queue: the entries that have a live <em style="color: var(--paper);">reviewState</em> (in-review / iterating / approved) — the things the operator owes a decision on. Folio is the cross-cutting scrapbook overview (one tap → list of every entry's scrapbook count). Three tabs, one task each.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">#238 fix</span>The hero strip is <strong style="color: var(--paper); font-style: italic; font-weight: 500;">56px</strong>. The mark is the rotated press-check stamp ("<em>Press-</em>Check"), the volume kicker rides next to it, the help link is on the right. Total chrome above the body = 56 + 40 (filter strip) = <strong style="color: var(--paper); font-style: italic; font-weight: 500;">96px</strong>, down from ~1500px. The first row is visible without scrolling at 390×844.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">#237 fix</span>Each row is a <strong style="color: var(--paper); font-style: italic; font-weight: 500;">2-column grid</strong>: row-num column + content column. Slug, title, and action foot stack as rows in the content column. No <em style="color: var(--paper);">auto minmax(0, 1fr) auto auto</em> grid to collapse. <em style="color: var(--paper);">overflow-wrap: anywhere</em> on the slug handles the long deeply-nested cases (<em style="color: var(--paper);">deskwork-plugin/issue-158-ux-audit</em>) without word-per-line breakdown.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">#243 fix</span>Pre-review entries simply have no stamp. The em-dash placeholder is gone. The action chips and the (deliberately omitted) stamp align as siblings in the same flex row — there's no grid alignment to defend with a placeholder.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Strong</span>Predictable. The operator's muscle memory from entry-review transfers directly: bottom tabs swap, sheets/lists slide in, stamps and chips speak the same vocabulary. Press-queue work has a dedicated tab, not a sidebar that gets stacked below the pipeline (the desktop pattern was real-estate-driven, not affordance-driven).</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Weak</span>The Folio tab is the soft spot — a "scrapbook chip count overview" is a real but minor surface. The tab might be better used for something the operator visits more often (e.g. <em style="color: var(--paper);">Cancelled / Blocked</em> recovery). The press-tab framing also conflates "in review" with "iterating" — they're different operator obligations and might want sub-segments inside the press tab.</p>
+</div>
+
+</body>
+</html>

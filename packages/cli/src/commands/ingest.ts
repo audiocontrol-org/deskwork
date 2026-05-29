@@ -51,7 +51,7 @@ import { absolutize, fail, parseArgs } from '@deskwork/core/cli-args';
 import { appendJournal } from '@deskwork/core/journal';
 import { updateFrontmatter } from '@deskwork/core/frontmatter';
 import { createFreshEntrySidecar } from '@deskwork/core/entry/create';
-import type { Stage as EntryStage, ReviewState } from '@deskwork/core/schema/entry';
+import type { Stage as EntryStage } from '@deskwork/core/schema/entry';
 import {
   candidateToEntry,
   discoverIngestCandidates,
@@ -217,19 +217,22 @@ export async function run(argv: string[]): Promise<void> {
  * Published`). Mirrors Phase 30's migration policy in
  * `packages/core/src/calendar/parse.ts:LEGACY_STAGE_MAP`:
  *   - `Paused`  → `Blocked` (paused stage retired; closest off-pipeline stage)
- *   - `Review`  → `Drafting` + `reviewState: 'in-review'` (review is a
- *                 state-of-being inside Drafting under the entry-centric model)
+ *   - `Review`  → `Drafting` (legacy Review stage is closest to Drafting in
+ *                 the entry-centric pipeline)
  * Legacy values that already exist in the entry-centric set pass through.
+ *
+ * Per DESKWORK-STATE-MACHINE.md (v5) Commandment VI: new code must not
+ * write `reviewState` into sidecars. The previous Review→Drafting mapping
+ * also set `reviewState: 'in-review'`; that field is now retired and
+ * never set on new ingest output. Existing sidecars retain their legacy
+ * reviewState for read-only back-compat.
  */
-function mapStageToEntry(stage: Stage): {
-  currentStage: EntryStage;
-  reviewState?: ReviewState;
-} {
+function mapStageToEntry(stage: Stage): { currentStage: EntryStage } {
   switch (stage) {
     case 'Paused':
       return { currentStage: 'Blocked' };
     case 'Review':
-      return { currentStage: 'Drafting', reviewState: 'in-review' };
+      return { currentStage: 'Drafting' };
     default:
       return { currentStage: stage };
   }
@@ -249,7 +252,7 @@ function ingestCandidateToCreateParams(
   stage: Stage,
   uuid: string,
 ): Parameters<typeof createFreshEntrySidecar>[1] {
-  const { currentStage, reviewState } = mapStageToEntry(stage);
+  const { currentStage } = mapStageToEntry(stage);
   return {
     uuid,
     slug: candidate.derivedSlug,
@@ -257,7 +260,6 @@ function ingestCandidateToCreateParams(
     ...(candidate.description ? { description: candidate.description } : {}),
     currentStage,
     source: 'manual',
-    ...(reviewState !== undefined ? { reviewState } : {}),
     artifactPath: candidate.relativePath,
     ...(currentStage === 'Published'
       ? { datePublishedDate: candidate.derivedDate }

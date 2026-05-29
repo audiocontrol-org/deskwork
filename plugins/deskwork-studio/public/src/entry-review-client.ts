@@ -22,9 +22,13 @@ import { createEditModeController } from './entry-review/edit-mode.ts';
 import { initMarginaliaToggle } from './entry-review/marginalia-toggle.ts';
 import { wireMarginaliaPositioning } from './entry-review/marginalia-position.ts';
 import { initOutlineDrawer } from './entry-review/outline-drawer.ts';
+import { initStickyOffset } from './entry-review/sticky-offset.ts';
+import { initStripCollapse } from './entry-review/strip-collapse.ts';
+import { initMobileSheetBar } from './entry-review/mobile-sheet-bar.ts';
 import { initScrapbookDrawerToggle } from './entry-review/scrapbook-drawer.ts';
 import { initShortcuts } from './entry-review/shortcuts.ts';
 import { copyOrShowFallback } from './clipboard.ts';
+import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
 const ENTRY_API = '/api/dev/editorial-review/entry';
 
@@ -174,6 +178,15 @@ function initPressCheckSurface(): void {
 
   const marginaliaToggle = initMarginaliaToggle();
 
+  // Mobile sheet bar must initialize before the annotations controller
+  // so the unstowMarginalia callback can reach `mobileSheetBar.openSheet`.
+  // On phone, the composer lives inside the Notes sheet (relocated by
+  // `initMobileSheetBar`); the controller's "show composer" path needs
+  // to also open that sheet so the operator sees what they're typing into.
+  const mobileSheetBar = initMobileSheetBar({
+    entrySlug: state.slug,
+  });
+
   const annotations = createAnnotationsController({
     state,
     showToast,
@@ -183,8 +196,21 @@ function initPressCheckSurface(): void {
     },
     // #188 — adding marginalia is an implicit ask to open the marginalia
     // drawer. The annotations controller invokes this just before
-    // opening the composer.
-    unstowMarginalia: () => marginaliaToggle.applyState(false),
+    // opening the composer. On phone, the composer lives inside the Notes
+    // sheet (relocated at boot by `initMobileSheetBar`), so we ALSO open
+    // that sheet — without it, `composer.hidden = false` flips a
+    // never-displayed element under a hidden sheet.
+    //
+    // #269 — uses `requestComposerFocus` (NOT `openSheet`) so the
+    // composer-focus path is idempotent (already-open Notes stays open
+    // instead of toggle-closing) AND the sheet body's scrollTop is
+    // reset so the composer at the top of the slot is visible
+    // regardless of any prior scroll state from a previous Notes
+    // viewing session.
+    unstowMarginalia: () => {
+      marginaliaToggle.applyState(false);
+      if (mobileSheetBar.isMobile()) mobileSheetBar.requestComposerFocus();
+    },
   });
 
   // #190 — keep marginalia items vertically aligned with their marks
@@ -200,6 +226,7 @@ function initPressCheckSurface(): void {
       approveBtn: optEl<HTMLButtonElement>('[data-action="approve"]'),
       iterateBtn: optEl<HTMLButtonElement>('[data-action="iterate"]'),
       rejectBtn: optEl<HTMLButtonElement>('[data-action="reject"]'),
+      cancelBtn: optEl<HTMLButtonElement>('[data-action="cancel"][data-entry-uuid]'),
     },
   });
 
@@ -231,6 +258,10 @@ function initPressCheckSurface(): void {
   const outline = initOutlineDrawer();
   initScrapbookDrawerToggle();
   initScrapbookLightbox(document);
+  initStickyOffset();
+  initStripCollapse();
+  // (mobileSheetBar already initialized above so the annotations controller
+  // can hook its openSheet for the composer flow.)
 
   initShortcuts({
     showToast,
@@ -278,3 +309,4 @@ function initPressCheckSurface(): void {
 
 wireStageActions();
 initPressCheckSurface();
+initMastheadPopover();

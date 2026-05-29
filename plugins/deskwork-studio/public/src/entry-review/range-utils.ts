@@ -7,6 +7,7 @@
  * innerText collapses inter-block whitespace differently).
  */
 
+import { diff_match_patch } from 'diff-match-patch';
 import type { DraftRange } from './state.ts';
 
 export function computeOffsetFromRange(
@@ -119,21 +120,176 @@ export function extractQuote(root: HTMLElement, offsets: DraftRange): string {
 }
 
 /**
- * Try to re-locate a prior-version anchor in the current body. Returns
- * a current-body range when the anchor appears exactly once, null
- * otherwise. Missing anchors return null.
+ * Try to re-locate a prior-version anchor in the current body using
+ * the W3C Web Annotation TextQuoteSelector model (exact + prefix +
+ * suffix), with diff-match-patch Bitap as a fuzzy fallback for the
+ * case where the anchor text itself was minimally edited by an
+ * iteration. Returns a current-body range when disambiguation
+ * succeeds, null otherwise.
+ *
+ * Algorithm (per #200's design decision; reference:
+ * https://www.w3.org/TR/annotation-model/#text-quote-selector
+ * and Hypothesis's `dom-anchor-text-quote`):
+ *
+ *   1. Find all occurrences of `anchor` in the current text.
+ *      - Zero matches AND originalStart provided → fall through to
+ *        fuzzy fallback (the anchor text was edited).
+ *      - Zero matches AND no originalStart → null.
+ *      - Exactly one match → return that range. Single-match is
+ *        unambiguous; prefix/suffix add no signal. Back-compat
+ *        path for legacy comments without context.
+ *      - 2+ matches → score each candidate by character-boundary
+ *        match count against the captured prefix+suffix. Score the
+ *        prefix from the right edge backward (chars closer to the
+ *        anchor matter most) and the suffix from the left edge
+ *        forward. Return the highest-scoring candidate. Null on
+ *        score-of-zero, sub-threshold, or tie.
+ *
+ *   2. Fuzzy fallback (when exact returns null AND originalStart is
+ *      provided): use diff-match-patch's Bitap-based `match_main`
+ *      to find the closest approximate match near the original
+ *      position. Threshold tuned to permit single-word edits but
+ *      reject unrelated text. Returns approximate range —
+ *      anchor.length applied to the matched start position (the
+ *      end may drift slightly if the quote was edited; operator
+ *      can correct via edit-comment if needed).
+ *
+ * Pass `originalStart` (the comment's `range.start` from when it
+ * was authored) to enable the fuzzy fallback. Omit it for legacy
+ * back-compat behavior (exact + prefix/suffix only).
  */
 export function rebaseAnchor(
   root: HTMLElement,
   anchor: string | undefined,
+  anchorPrefix?: string,
+  anchorSuffix?: string,
+  originalStart?: number,
 ): DraftRange | null {
   if (!anchor || anchor.length === 0) return null;
   const text = plainText(root);
-  const first = text.indexOf(anchor);
-  if (first < 0) return null;
-  const next = text.indexOf(anchor, first + 1);
-  if (next >= 0) return null; // ambiguous — refuse to guess.
-  return { start: first, end: first + anchor.length };
+
+  // Collect every occurrence of the anchor.
+  const candidates: number[] = [];
+  let i = -1;
+  while ((i = text.indexOf(anchor, i + 1)) !== -1) candidates.push(i);
+
+  if (candidates.length === 0) return fuzzyFallback(text, anchor, originalStart);
+  // Always-trust path for single matches preserves legacy behavior and
+  // covers comments without captured prefix/suffix.
+  const first = candidates[0];
+  if (candidates.length === 1 && first !== undefined) {
+    return { start: first, end: first + anchor.length };
+  }
+
+  // Multiple matches; without context we cannot disambiguate.
+  const hasContext = (anchorPrefix && anchorPrefix.length > 0)
+    || (anchorSuffix && anchorSuffix.length > 0);
+  if (!hasContext) return null;
+
+  function scoreAt(pos: number): number {
+    let score = 0;
+    if (anchorPrefix && anchorPrefix.length > 0) {
+      // Match chars from the boundary backward (chars closer to the
+      // anchor weighted equally; stop at first mismatch).
+      const actualPrefix = text.slice(Math.max(0, pos - anchorPrefix.length), pos);
+      const k = Math.min(anchorPrefix.length, actualPrefix.length);
+      for (let n = 1; n <= k; n++) {
+        if (anchorPrefix[anchorPrefix.length - n] === actualPrefix[actualPrefix.length - n]) {
+          score++;
+        } else {
+          break;
+        }
+      }
+    }
+    if (anchorSuffix && anchorSuffix.length > 0) {
+      const sliceEnd = pos + anchor!.length + anchorSuffix.length;
+      const actualSuffix = text.slice(pos + anchor!.length, sliceEnd);
+      const k = Math.min(anchorSuffix.length, actualSuffix.length);
+      for (let n = 0; n < k; n++) {
+        if (anchorSuffix[n] === actualSuffix[n]) {
+          score++;
+        } else {
+          break;
+        }
+      }
+    }
+    return score;
+  }
+
+  const scored = candidates.map((pos) => ({ pos, score: scoreAt(pos) }));
+  scored.sort((a, b) => b.score - a.score);
+  const top = scored[0];
+  // Minimum meaningful score: a single boundary-character match (e.g.
+  // the trailing space of the prefix coincidentally aligns with a
+  // word boundary in the candidate's surroundings) is noise. Require
+  // ≥3 chars of cumulative boundary match — enough that the operator
+  // can trust the disambiguation. Tunable if iPhone-walk surfaces
+  // false negatives.
+  const MIN_MEANINGFUL_SCORE = 3;
+  if (!top || top.score < MIN_MEANINGFUL_SCORE) {
+    return fuzzyFallback(text, anchor, originalStart);
+  }
+  const second = scored[1];
+  if (second && second.score === top.score) {
+    return fuzzyFallback(text, anchor, originalStart); // tie → try fuzzy
+  }
+  return { start: top.pos, end: top.pos + anchor.length };
+}
+
+/**
+ * diff-match-patch Bitap fuzzy fallback. Returns a current-body range
+ * when the anchor approximately matches near `originalStart`, null
+ * otherwise. Returns null when `originalStart` is undefined (legacy
+ * call path that opts out of fuzzy match).
+ *
+ * Threshold/distance tuned conservatively to avoid false-positive
+ * matches against unrelated text:
+ *   - Match_Threshold = 0.4 → accept ~40% similarity (Hypothesis
+ *     default is 0.5; we tighten slightly because false positives
+ *     on iterations are worse than missing a few real matches —
+ *     the operator can re-anchor manually).
+ *   - Match_Distance = 1000 → location-distance weight; matches
+ *     within 1000 chars of the original position get a similarity
+ *     bonus.
+ */
+// diff-match-patch's Bitap-based match_bitap_ throws
+// "Pattern too long for this browser." when the pattern's length
+// exceeds Match_MaxBits (default 32 — the JS bitwise-operator word
+// size). We can't safely raise Match_MaxBits without overflowing the
+// bit-vector math, so guard the call at the boundary instead: long
+// anchors fall back to "refuse to guess" (the same disposition the
+// algorithm already takes for tied-context candidates). This matches
+// the existing conservative tuning rationale documented above —
+// false positives are worse than missing a few real matches; operators
+// re-anchor manually if a long-anchor comment needs precise placement.
+//
+// Issue: long anchors (e.g. "Per-stage columns are template-aware." —
+// 37 chars) on the graphical-entries spec review surface caused an iOS
+// review banner: "Failed to load annotations: Pattern too long for
+// this browser." Surfaced on iOS specifically because Safari's
+// text-node concatenation drifts subtly from Chromium's, dropping
+// exact matches that would otherwise succeed on desktop. The bug is
+// browser-agnostic in source (dmp's JS throw); iOS just exercised it.
+const DMP_MATCH_MAX_BITS = 32;
+
+function fuzzyFallback(
+  text: string,
+  anchor: string,
+  originalStart: number | undefined,
+): DraftRange | null {
+  if (typeof originalStart !== 'number') return null;
+  if (anchor.length > DMP_MATCH_MAX_BITS) return null;
+  const dmp = new diff_match_patch();
+  dmp.Match_Threshold = 0.4;
+  dmp.Match_Distance = 1000;
+  const pos = dmp.match_main(text, anchor, originalStart);
+  if (pos === -1) return null;
+  // End-position is approximate; uses the original anchor.length. If
+  // the quote was edited, the highlighted text may not align exactly
+  // with the actual matched substring. Acceptable trade-off — the
+  // operator sees the comment near the right location and can adjust
+  // via edit-comment if needed.
+  return { start: pos, end: pos + anchor.length };
 }
 
 /**

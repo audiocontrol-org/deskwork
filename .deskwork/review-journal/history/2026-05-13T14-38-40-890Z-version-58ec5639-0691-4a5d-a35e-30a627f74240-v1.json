@@ -1,0 +1,15 @@
+{
+  "id": "version-58ec5639-0691-4a5d-a35e-30a627f74240-v1",
+  "timestamp": "2026-05-13T14:38:40.890Z",
+  "entry": {
+    "kind": "version",
+    "at": "2026-05-13T14:38:40.890Z",
+    "workflowId": "58ec5639-0691-4a5d-a35e-30a627f74240",
+    "version": {
+      "version": 1,
+      "markdown": "---\ndeskwork:\n  id: probe-fixture-shortform-uuid\ntitle: Studio mobile-first probe fixture (shortform)\nplatform: linkedin\nchannel: main\n---\n\n# Studio mobile-first probe fixture\n\nThis is a seeded shortform workflow used by `probe-mobile-shortform.mjs` and `smoke-er-viewport-regressions.mjs` to exercise the v7 shortform-review surface. It exists so the probes can drive the Iter/Apprv/Canc bar against a real workflow at the phone viewport.\n\n## Body\n\nA second heading exists so the TOC drawer cell composes (cell omitted only when <2 headings). The markdown deliberately stays short to avoid breaking word-wrap measurements.\n",
+      "createdAt": "2026-05-13T14:38:40.890Z",
+      "originatedBy": "agent"
+    }
+  }
+}

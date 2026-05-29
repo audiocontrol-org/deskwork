@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cross-bar 2 refined v3 · collapsed destination picker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+CROSS-BAR 2 (SPLIT BAR) · REFINED v3
+collapse nav to a single destination picker
+============================================================
+
+OPERATOR'S QUESTION
+  "What would it look like if, instead of enumerating the nav
+  options, we collapsed them all to a single affordance that
+  opens a list of choices?"
+
+WHAT THIS REFINEMENT EXPLORES
+  The bar's left side becomes ONE picker cell instead of 2-3
+  destination tabs. The cell's label is the operator's current
+  destination + a small chevron signaling "tap reveals more."
+  Tap → slide-up sheet (Phase 2.1 sheet-controller) listing
+  every studio destination. Pick one → navigate there + sheet
+  closes.
+
+  Contextual region grows to 1-5 cells (one more than v2-A's
+  1-4 cap, two more than v1's 1-3 cap). The bar's max stays
+  at 6.
+
+THE SHAPE
+  +──────────+─────+─────+─────+─────+─────+
+  |  ⌗      |kraft|     |     |     |     |
+  | Desk ▾  |hair-|Outl.|Notes|Scrap|Acts.|
+  +──────────+line-+─────+─────+─────+─────+
+   destination picker       contextual cells (up to 5)
+
+WHY THIS MIGHT BE THE RIGHT MOVE
+  · Conceptual clarity: the bar's left side is "where am I /
+    go elsewhere"; the bar's right side is "do work here."
+    One job per region. The kraft hairline reads as a
+    semantic divider, not just a structural rule.
+  · The destination namespace can grow without bar geometry
+    changing. Adding Folio, Content tree, or future
+    destinations doesn't widen nav from 2 to 3 to 4 cells
+    — they just appear as new rows in the picker sheet.
+  · Mirrors how every other UI element in the studio uses
+    sheets — actions, outline, notes, scrapbook, format all
+    open in sheets. Making navigation use the same mechanic
+    is consistent vocabulary, not a foreign pattern.
+  · The "where am I" cue is preserved: the picker cell shows
+    the current destination name. Operators reading the bar
+    bottom-up see the label first.
+
+WHAT THIS MIGHT LOSE
+  · Two-tap to switch destinations (tap picker → tap target)
+    vs. one-tap in the 2-nav v2-A direction. Operators
+    switching frequently between Desk + Short pay the extra
+    tap each switch.
+  · Discoverability: the destination list is hidden at rest.
+    The chevron ▾ is the only at-rest cue that more
+    destinations exist. Mitigated by the chevron being a
+    universal "menu" signifier; not mitigated by anything else.
+  · The picker cell's tap target competes for the operator's
+    eye with contextual cells. Visual weight needs careful
+    tuning.
+
+  These costs land most heavily on the surfaces that switch
+  destinations most often. Today there are only two daily-
+  frequent destinations (Desk + Short). If operators rarely
+  switch mid-task, the two-tap cost is rarely paid. If
+  they cross-reference Desk + Short constantly, the cost is
+  paid all day.
+
+ALTERNATIVE WORTH NAMING (D-2, not lead)
+  Masthead-title-tap. The folio's surface title (e.g.
+  "Pipeline.") becomes tappable with a ▾ chevron after it.
+  Same sheet opens. Bar gets ZERO nav cells; contextual
+  region is the full 6-cell bar. Maximum bar real estate
+  for work. Costs: top-of-screen tap target (worse thumb
+  reach on tall phones); the masthead title becomes a
+  dual-purpose element (label + control), which is the
+  iOS Mail / "tap mailbox name" pattern.
+
+  Noted here for completeness but NOT mocked in detail.
+  Decide bar-picker vs masthead-tap separately if needed.
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: #C7BEAE; font-family: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+  body { max-width: 1180px; margin: 0 auto; }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.8rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.5rem; text-align: center; }
+
+  .banner {
+    max-width: 880px; margin: 0 auto 2.5rem;
+    padding: 1.05rem 1.3rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--blue);
+    font-family: var(--display); font-size: 0.96rem; line-height: 1.6;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--blue); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+  .banner blockquote {
+    margin: 0.5rem 0 0.7rem 1rem;
+    padding-left: 0.8rem;
+    border-left: 2px solid var(--red);
+    font-style: italic; color: var(--paper);
+  }
+
+  h2.section {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.5rem; color: var(--paper);
+    margin: 3rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--red);
+    display: flex; align-items: baseline; gap: 1rem;
+  }
+  h2.section .num {
+    font-family: var(--mono); font-style: normal;
+    font-size: 0.7rem; letter-spacing: 0.16em;
+    color: var(--red); text-transform: uppercase;
+  }
+
+  .section-lede {
+    color: #C7BEAE; font-size: 0.96rem; line-height: 1.6;
+    margin-bottom: 1.5rem; max-width: 800px;
+  }
+  .section-lede em { color: var(--paper); font-style: italic; }
+  .section-lede code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+
+  /* ============ BAR — shared component ============ */
+  .barframe {
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.3), 0 1px 0 rgba(245,241,232,0.05);
+    width: 390px; max-width: 100%;
+  }
+  .barframe-head {
+    padding: 0.55rem 0.85rem 0.5rem;
+    border-bottom: 1px solid var(--paper-3);
+    display: flex; justify-content: space-between; align-items: baseline;
+    background: var(--paper);
+    background-image: var(--noise);
+    position: relative;
+  }
+  .barframe-kicker {
+    font-family: var(--mono); font-size: 0.52rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+  }
+  .barframe-name {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 0.95rem; color: var(--ink);
+  }
+  .barframe-route {
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--faded);
+  }
+  .barframe-body {
+    height: 56px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--faded);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .masthead-help {
+    position: absolute;
+    top: 0.55rem; right: 0.85rem;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1; text-decoration: none;
+  }
+  .split-bar {
+    height: 56px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    display: grid;
+    grid-template-columns: var(--cols, repeat(6, 1fr));
+    position: relative;
+  }
+  .bar-cell {
+    background: transparent; border: none;
+    border-right: 1px solid var(--paper-3);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    font-weight: 500;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.12rem;
+    line-height: 1;
+    cursor: pointer; text-decoration: none;
+    padding: 0.35rem 0.18rem;
+    position: relative;
+    min-width: 0;
+  }
+  .bar-cell:last-child { border-right: 0; }
+  .bar-cell-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  /* picker cell: shows the active destination name + chevron */
+  .bar-cell.picker {
+    color: var(--ink);
+    background: var(--paper);
+  }
+  .bar-cell.picker .bar-cell-glyph {
+    color: var(--red);
+  }
+  .bar-cell.picker .picker-label {
+    display: inline-flex; align-items: baseline; gap: 0.18rem;
+  }
+  .bar-cell.picker .chevron {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--red);
+    font-weight: 600;
+    transform: translateY(-0.04rem);
+  }
+  .bar-cell.picker.sheet-open .bar-cell-glyph,
+  .bar-cell.picker.sheet-open .chevron { transform: rotate(180deg); }
+  .bar-cell.picker.sheet-open .chevron { transform: rotate(180deg) translateY(0.04rem); }
+  .bar-cell.picker.sheet-open {
+    background: var(--paper-2);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  .bar-cell.divider-left {
+    border-left: 1.5px solid var(--kraft);
+    margin-left: -1px;
+  }
+  .bar-cell.iterate .bar-cell-glyph { color: var(--blue); }
+  .bar-cell.approve .bar-cell-glyph { color: var(--green); }
+  .bar-cell.cancel  .bar-cell-glyph { color: var(--red); }
+  .bar-cell.save    .bar-cell-glyph { color: var(--green); }
+  .bar-cell.compose .bar-cell-glyph { color: var(--red); }
+  .bar-cell.filter  .bar-cell-glyph { color: var(--faded); }
+  .bar-cell.search  .bar-cell-glyph { color: var(--faded); }
+  .bar-cell.context-tab .bar-cell-glyph { color: var(--faded); }
+  .bar-cell.context-tab.active .bar-cell-glyph { color: var(--red); }
+  .bar-cell.context-tab.active {
+    color: var(--ink); background: var(--paper);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  .bar-cell.save.dirty .bar-cell-glyph { color: var(--green); }
+  .bar-cell.save.dirty {
+    background: rgba(46, 93, 69, 0.08);
+    color: var(--ink);
+    box-shadow: inset 0 2px 0 var(--green);
+  }
+  .bar-cell .badge {
+    position: absolute;
+    top: 0.18rem; right: 0.22rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.45rem;
+    padding: 0 0.16rem;
+    border-radius: 1px; line-height: 1.2;
+    letter-spacing: 0;
+  }
+  .bar-cell .badge.kraft { background: var(--kraft); }
+  .bar-cell .badge.green { background: var(--green); }
+
+  /* ============ ANATOMY DIAGRAM ============ */
+  .anatomy {
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    padding: 1.8rem 1.5rem 2.2rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+  }
+  .anatomy-bar-wrap {
+    max-width: 590px; margin: 0 auto 0.5rem;
+    position: relative;
+  }
+  .anatomy-bar {
+    height: 84px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-radius: 4px;
+    border: 1px solid var(--paper-3);
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+  }
+  .anatomy-bar .bar-cell {
+    font-size: 0.65rem;
+    padding: 0.5rem 0.25rem;
+    gap: 0.2rem;
+  }
+  .anatomy-bar .bar-cell-glyph { font-size: 1.5rem; }
+  .anatomy-bar .bar-cell { letter-spacing: 0.18em; }
+  .anatomy-bar .bar-cell.picker .chevron { font-size: 0.85rem; }
+  .anatomy-callouts {
+    margin-top: 1.4rem;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 0.9rem;
+    font-family: var(--mono); font-size: 0.66rem;
+    color: var(--paper-3); line-height: 1.5;
+  }
+  .anatomy-callout {
+    padding: 0.6rem 0.8rem;
+    background: rgba(245, 241, 232, 0.04);
+    border-left: 2px solid var(--red);
+  }
+  .anatomy-callout strong {
+    color: var(--paper);
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 16, "wght" 500;
+    font-size: 0.86rem;
+    display: block; margin-bottom: 0.3rem;
+    letter-spacing: 0; text-transform: none;
+  }
+  .anatomy-callout em { color: var(--paper); font-style: italic; font-family: var(--display); }
+  .anatomy-callout code { font-family: var(--mono); color: var(--paper); font-size: 0.7rem; }
+  .anatomy-callout.kraft { border-left-color: var(--kraft); }
+  .anatomy-callout.blue  { border-left-color: var(--blue); }
+
+  /* ============ COMPARISON ============ */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  @media (max-width: 900px) { .compare { grid-template-columns: 1fr; } }
+  .compare-side {
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    padding: 1.1rem 1.2rem;
+    border-radius: 4px;
+  }
+  .compare-side h4 {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 0.8rem;
+    color: var(--paper); font-weight: normal;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.15);
+    padding-bottom: 0.5rem;
+  }
+  .compare-side .label {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.05rem; color: var(--paper);
+    margin-bottom: 0.5rem;
+  }
+  .compare-side .barframe { width: 100%; max-width: 100%; }
+  .compare-side .barframe-body { height: 36px; font-size: 0.5rem; }
+  .compare-side .barframe-head { padding: 0.4rem 0.6rem 0.35rem; }
+  .compare-side .barframe-kicker { font-size: 0.48rem; }
+  .compare-side .barframe-name { font-size: 0.85rem; }
+  .compare-side .note {
+    margin-top: 0.7rem; font-family: var(--display);
+    font-size: 0.88rem; line-height: 1.5; color: #C7BEAE;
+  }
+  .compare-side .note em { color: var(--paper); font-style: italic; }
+  .compare-side .note code { font-family: var(--mono); font-size: 0.78rem; color: var(--paper); }
+  .compare-side.winner {
+    border-color: rgba(46, 93, 69, 0.5);
+    background: rgba(46, 93, 69, 0.06);
+  }
+  .compare-side.winner h4 { color: var(--green); }
+
+  /* ============ CONTEXTS MATRIX ============ */
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+    margin-top: 0.5rem;
+  }
+  @media (max-width: 900px) { .matrix { grid-template-columns: 1fr; } }
+
+  /* ============ PHONE FRAMES ============ */
+  .hardcase-row {
+    display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;
+    margin-top: 1.5rem;
+  }
+  .phone { width: 370px; height: 800px; background: #050505;
+           border-radius: 46px; padding: 10px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; flex-shrink: 0; }
+  .phone::before { content: ''; position: absolute;
+                   top: 20px; left: 50%; transform: translateX(-50%);
+                   width: 100px; height: 27px; background: #000;
+                   border-radius: 14px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 36px; overflow: hidden; position: relative;
+            font-size: 15.5px; line-height: 1.5; color: var(--ink); }
+  .ios-clock { position: absolute; top: 26px; left: 30px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 28px; right: 30px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.78rem; letter-spacing: 0.05em; z-index: 110; }
+  .top-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 76px; padding: 52px 1rem 0.5rem;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 50;
+  }
+  .top-masthead-grid {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    column-gap: 0.5rem;
+    align-items: end;
+  }
+  .top-mast-kicker {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); line-height: 1.2; margin-bottom: 0.15rem;
+  }
+  .top-mast-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.06rem 0.32rem;
+    margin-right: 0.32rem;
+    letter-spacing: 0.18em; font-size: 0.5rem;
+  }
+  .top-mast-slug {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .top-mast-r {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded); line-height: 1.2; text-align: right;
+  }
+  .top-mast-r .num {
+    color: var(--ink); font-size: 0.9rem; font-weight: 500;
+    letter-spacing: 0; display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .mast-help {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.78rem;
+    font-weight: 600; line-height: 1;
+    text-decoration: none;
+    align-self: end;
+    margin-bottom: 0.05rem;
+  }
+  .surface-body {
+    position: absolute; top: 76px; left: 0; right: 0; bottom: 56px;
+    overflow-y: auto;
+  }
+  .surface-body .rv-body { padding: 1rem 1.1rem 1.3rem; }
+  .rv-body h1 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 32, "wght" 500;
+    font-size: 1.3rem; line-height: 1.15;
+    margin-bottom: 0.35rem; color: var(--ink);
+  }
+  .rv-body .dek {
+    font-family: var(--display); font-size: 0.86rem;
+    color: var(--faded); margin-bottom: 0.8rem;
+    line-height: 1.4;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.6rem;
+  }
+  .rv-body p {
+    font-family: var(--display); font-size: 0.9rem;
+    line-height: 1.55; margin-bottom: 0.7rem; color: var(--ink);
+  }
+  .rv-body h2 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.02rem; line-height: 1.2;
+    color: var(--red); margin: 1rem 0 0.4rem;
+  }
+  .rv-body em { font-style: italic; color: var(--red); }
+  .rv-body .pin {
+    display: inline-block; width: 1rem; height: 1rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.55rem;
+    border-radius: 50%; text-align: center; line-height: 1rem;
+    margin-left: 0.2rem; vertical-align: super;
+  }
+  .phone-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    z-index: 60;
+  }
+  .phone .split-bar { box-shadow: 0 -2px 6px rgba(26, 22, 20, 0.05); }
+  .caption {
+    color: #C7BEAE; font-family: var(--mono);
+    font-size: 0.65rem; letter-spacing: 0.16em;
+    text-transform: uppercase; margin-top: 0.8rem;
+    text-align: center; max-width: 370px; line-height: 1.55;
+  }
+  .caption strong { color: var(--paper); }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+
+  /* ============ PICKER SHEET ============ */
+  .scrim {
+    position: absolute; inset: 0;
+    background: rgba(26, 22, 20, 0.42);
+    z-index: 70;
+    border-radius: 36px;
+  }
+  .picker-sheet {
+    position: absolute; left: 0; right: 0; bottom: 56px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    box-shadow:
+      0 -10px 30px rgba(26, 22, 20, 0.18),
+      0 -2px 6px rgba(26, 22, 20, 0.08);
+    padding: 0.55rem 0 0;
+    z-index: 80;
+    display: flex; flex-direction: column;
+  }
+  .picker-handle {
+    align-self: center;
+    width: 44px; height: 4px;
+    background: var(--paper-3);
+    border-radius: 2px;
+    margin-bottom: 0.55rem;
+  }
+  .picker-head {
+    padding: 0.35rem 1.1rem 0.7rem;
+    border-bottom: 1px dashed var(--paper-3);
+  }
+  .picker-kicker {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.15rem;
+  }
+  .picker-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.3rem; color: var(--ink); line-height: 1.1;
+  }
+  .picker-list { padding: 0.2rem 0 0.6rem; }
+  .picker-item {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr auto;
+    align-items: center;
+    column-gap: 0.7rem;
+    padding: 0.75rem 1.1rem;
+    border-bottom: 1px dotted var(--paper-3);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .picker-item:last-child { border-bottom: 0; }
+  .picker-item-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.25rem; line-height: 1;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    color: var(--red);
+    text-align: center;
+  }
+  .picker-item-label {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.05rem; color: var(--ink); line-height: 1.15;
+  }
+  .picker-item-route {
+    display: block;
+    font-family: var(--mono); font-size: 0.58rem;
+    color: var(--faded);
+    letter-spacing: 0.08em;
+    margin-top: 0.18rem;
+  }
+  .picker-item-active {
+    width: 0.55rem; height: 0.55rem;
+    border-radius: 50%;
+    background: var(--red);
+    flex-shrink: 0;
+  }
+  .picker-item-future {
+    opacity: 0.45;
+  }
+  .picker-item-future .picker-item-glyph {
+    color: var(--faded);
+  }
+  .picker-item-future .picker-item-label {
+    color: var(--faded);
+  }
+  .picker-item-future-tag {
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--kraft);
+  }
+  .picker-foot {
+    padding: 0.55rem 1.1rem 0.7rem;
+    border-top: 1px dashed var(--paper-3);
+  }
+  .picker-foot a {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--blue);
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+  }
+  .picker-foot a:hover { color: var(--ink); }
+
+  /* ============ CALLOUTS ============ */
+  .callout {
+    margin-top: 1rem;
+    padding: 0.95rem 1.2rem;
+    background: rgba(245, 241, 232, 0.05);
+    border-left: 3px solid var(--red);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.95rem; line-height: 1.6;
+  }
+  .callout.green { border-left-color: var(--green); }
+  .callout.kraft { border-left-color: var(--kraft); }
+  .callout.blue  { border-left-color: var(--blue); }
+  .callout strong {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper); display: block; margin-bottom: 0.4rem;
+    font-weight: normal;
+  }
+  .callout em { color: var(--paper); font-style: italic; }
+  .callout code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+  .callout ul { padding-left: 1.2rem; margin-top: 0.45rem; }
+  .callout li { margin-bottom: 0.3rem; }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">Cross-bar 2 · refined v3 · collapsed destination picker.</h1>
+<div class="demo-sub">One picker cell · opens a slide-up list of every studio destination · contextual region grows to 1–5 cells</div>
+
+<div class="banner">
+  <span class="kicker">Cross-bar 2 refinement v3 · operator's question</span>
+  <blockquote>
+    "What would it look like if, instead of enumerating the nav options, we collapsed them all to a single affordance that opens a list of choices?"
+  </blockquote>
+  Like this. The bar's left side becomes <em>one picker cell</em> showing the current destination + a small chevron. Tap → a slide-up sheet listing every studio destination (Desk · Short · Manual · and any future addition). Pick one → navigate + sheet closes. The contextual region grows from v2-A's 1-4 cells to <em>1-5</em>. The conceptual win is bigger than the cell-count math: the bar now has <em>one job per region</em> — the left is "where am I / go elsewhere," the right is "do work here," and the kraft hairline reads as a semantic divider, not just a structural rule.
+</div>
+
+<!-- ============================================================
+     SECTION 1: PICKER CELL ANATOMY
+============================================================ -->
+<h2 class="section"><span class="num">§ 1</span> The picker cell</h2>
+<p class="section-lede">
+  Single cell. Top: the current destination's glyph (rotates red when active). Bottom: the destination name + a small <code>▾</code> chevron. Tap behavior: opens a slide-up sheet listing every destination via Phase 2.1's <code>createSlideUpSheet()</code>. When the sheet is open, the chevron rotates 180° and the cell gets a red-pencil top inset rule + paper-2 background (the "I'm active" treatment, since you're picking from this cell).
+</p>
+
+<div class="anatomy">
+  <div class="anatomy-bar-wrap">
+    <nav class="anatomy-bar">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">⌗</span>
+        <span class="picker-label">Desk <span class="chevron">▾</span></span>
+      </a>
+      <button class="bar-cell context-tab divider-left">
+        <span class="bar-cell-glyph">§</span><span>Outl.</span>
+      </button>
+      <button class="bar-cell context-tab">
+        <span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span>
+      </button>
+      <button class="bar-cell context-tab">
+        <span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span>
+      </button>
+      <button class="bar-cell context-tab">
+        <span class="bar-cell-glyph">⊕</span><span>Acts.</span>
+      </button>
+      <button class="bar-cell context-tab">
+        <span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="anatomy-callouts">
+    <div class="anatomy-callout">
+      <strong>Picker cell (1 cell)</strong>
+      Replaces the 2-3 nav cells from v1/v2. Cell label IS the current destination (no abstract "Menu" or "More"). Top glyph is the destination's icon, color-shifted to red so the cell reads as "you are here / tap to switch."
+    </div>
+    <div class="anatomy-callout kraft">
+      <strong>Kraft hairline divider</strong>
+      Same as v1/v2 — the structural punctuation between regions. Visually the bar still reads as two regions; the difference is the left region is one cell instead of 2-3.
+    </div>
+    <div class="anatomy-callout">
+      <strong>Contextual region (1–5 cells)</strong>
+      Up to 5 cells now (vs v2-A's 4, v1's 3). Surface-specific. Cell width at 6 cells / 390px = 65px. <em>Entry-review can carry Outline · Notes · Scrap · Acts. · TOC simultaneously</em> — every v0.18 affordance plus the still-missing #244 TOC drawer in one bar.
+    </div>
+    <div class="anatomy-callout blue">
+      <strong>Sheet trigger</strong>
+      Tap → Phase 2.1 <code>createSlideUpSheet()</code> opens with the destinations list. Same controller as Actions / Outline / Notes sheets. No new client-side primitive.
+    </div>
+    <div class="anatomy-callout">
+      <strong>Active-state semantics</strong>
+      Tapping the picker doesn't navigate — it opens the sheet. To navigate, the operator taps a row in the sheet. Tapping the currently-active destination in the sheet returns to that destination's root URL (useful when nested in a sub-surface like entry-review).
+    </div>
+    <div class="anatomy-callout">
+      <strong>Chevron rotation</strong>
+      The <code>▾</code> rotates 180° when the sheet is open. Single visual cue: cell + chevron + bar-state together communicate "menu open." Mirrors macOS / iOS popover patterns.
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 2: v2-A vs v3 COMPARISON
+============================================================ -->
+<h2 class="section"><span class="num">§ 2</span> v2-A vs v3 — what changes</h2>
+<p class="section-lede">
+  Entry-review review-mode is the surface where both refinements show their hand. v2-A kept Manual at a masthead glyph + put Scrapbook back in the bar. v3 collapses nav to one picker cell + adds a 5th contextual cell (TOC arrives).
+</p>
+
+<div class="compare">
+
+  <div class="compare-side">
+    <h4>v2-A · 2-nav cells · ? in masthead</h4>
+    <div class="label">Entry-review (review mode)</div>
+    <div class="barframe">
+      <div class="barframe-head">
+        <div>
+          <div class="barframe-kicker">entry · drafting</div>
+          <div class="barframe-name">Studio mobile-first.</div>
+        </div>
+        <div class="barframe-route" style="margin-right: 1.7rem;">v3 · 2h</div>
+        <a class="masthead-help" href="#">?</a>
+      </div>
+      <div class="barframe-body">(article body)</div>
+      <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+        <a class="bar-cell nav" href="#" style="color:var(--ink);background:var(--paper);box-shadow:inset 0 2px 0 var(--red);"><span class="bar-cell-glyph" style="color:var(--red);">⌗</span><span>Desk</span></a>
+        <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+        <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+      </nav>
+    </div>
+    <div class="note">
+      4 contextual cells. Scrapbook restored. <em>TOC drawer (#244) wouldn't fit — no 5th cell available.</em> Operator switches Desk ↔ Short with one tap.
+    </div>
+  </div>
+
+  <div class="compare-side winner">
+    <h4>v3 · 1 picker cell · all destinations in sheet</h4>
+    <div class="label">Entry-review (review mode)</div>
+    <div class="barframe">
+      <div class="barframe-head">
+        <div>
+          <div class="barframe-kicker">entry · drafting</div>
+          <div class="barframe-name">Studio mobile-first.</div>
+        </div>
+        <div class="barframe-route">v3 · 2h</div>
+      </div>
+      <div class="barframe-body">(article body)</div>
+      <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+        <a class="bar-cell picker" href="#">
+          <span class="bar-cell-glyph">⌗</span>
+          <span class="picker-label">Desk <span class="chevron">▾</span></span>
+        </a>
+        <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+      </nav>
+    </div>
+    <div class="note">
+      <em>5 contextual cells.</em> Outline · Notes · Scrap · Acts. · <em>TOC</em>. Closes #244 inline on entry-review longform too, not just shortform. Operator pays one extra tap to switch destinations.
+    </div>
+  </div>
+
+</div>
+
+<div class="callout green">
+  <strong>The trade in one sentence</strong>
+  v3 trades one tap on destination switching (rare) for one more contextual cell on every surface (common). For an operator who reviews entries all day and switches between Desk and Short only at session boundaries, this is a good deal. For one who cross-references Desk ↔ Short constantly mid-review, it's not.
+</div>
+
+<!-- ============================================================
+     SECTION 3: THE PICKER SHEET (live phone frames)
+============================================================ -->
+<h2 class="section"><span class="num">§ 3</span> The picker sheet · open state</h2>
+<p class="section-lede">
+  Tap the picker cell. The bar's chevron rotates 180°; a slide-up sheet appears above the bar (the bar stays visible so the operator's mental model of "where the picker lives" holds). Destinations are listed with their glyph + name + route. Active destination has a red dot. Future destinations are dimmed with a "future" tag — earned chrome, not promised vapor.
+</p>
+
+<div class="hardcase-row">
+
+  <!-- Demo 1: closed (at rest, entry-review) -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div class="top-masthead-grid">
+          <div>
+            <div class="top-mast-kicker">entry · drafting · № 12</div>
+            <div class="top-mast-slug">studio-mobile-first-prd</div>
+          </div>
+          <div class="top-mast-r">v3<br><span class="num">2h</span></div>
+          <a class="mast-help" href="#">?</a>
+        </div>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>Studio mobile-first — PRD.</h1>
+          <p class="dek">Extend the press-check vocabulary across every studio surface.</p>
+          <h2>Problem</h2>
+          <p>The dashboard, shortform desk, and review surfaces all ship desktop-shaped CSS.<span class="pin">3</span></p>
+          <p>The v0.17 + v0.18 entry-review rebuild proved that press-check on mobile reads beautifully.<span class="pin">5</span></p>
+          <h2>Scope</h2>
+          <p>Four sequenced cuts: Dashboard → Shortform → Standalone scrapbook → Help + Index.</p>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+          <a class="bar-cell picker" href="#">
+            <span class="bar-cell-glyph">⌗</span>
+            <span class="picker-label">Desk <span class="chevron">▾</span></span>
+          </a>
+          <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>At rest · entry-review.</strong><br>
+    Picker shows "Desk ▾" — operator's current destination tree.<br>
+    5 contextual cells: <em>Outl. · Notes · Scrap · Acts. · TOC</em>.
+  </div>
+  </div>
+
+  <!-- Demo 2: picker sheet open -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div class="top-masthead-grid">
+          <div>
+            <div class="top-mast-kicker">entry · drafting · № 12</div>
+            <div class="top-mast-slug">studio-mobile-first-prd</div>
+          </div>
+          <div class="top-mast-r">v3<br><span class="num">2h</span></div>
+          <a class="mast-help" href="#">?</a>
+        </div>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>Studio mobile-first — PRD.</h1>
+          <p class="dek">Extend the press-check vocabulary across every studio surface.</p>
+          <p>The dashboard, shortform desk, and review surfaces all ship desktop-shaped CSS.</p>
+        </div>
+      </div>
+
+      <!-- Scrim above content, below sheet + bar -->
+      <div class="scrim"></div>
+
+      <div class="picker-sheet">
+        <div class="picker-handle"></div>
+        <div class="picker-head">
+          <div class="picker-kicker">Go to</div>
+          <div class="picker-title">Studio destinations</div>
+        </div>
+        <div class="picker-list">
+          <a class="picker-item" href="#">
+            <span class="picker-item-glyph">⌗</span>
+            <span>
+              <span class="picker-item-label">Desk</span>
+              <span class="picker-item-route">/dev/editorial-studio · pipeline view</span>
+            </span>
+            <span class="picker-item-active" title="active"></span>
+          </a>
+          <a class="picker-item" href="#">
+            <span class="picker-item-glyph">⊟</span>
+            <span>
+              <span class="picker-item-label">Shortform</span>
+              <span class="picker-item-route">/dev/editorial-review-shortform · social distribution</span>
+            </span>
+          </a>
+          <a class="picker-item" href="#">
+            <span class="picker-item-glyph">§</span>
+            <span>
+              <span class="picker-item-label">Manual</span>
+              <span class="picker-item-route">/dev/editorial-help · glossary &amp; reference</span>
+            </span>
+          </a>
+          <a class="picker-item picker-item-future" href="#">
+            <span class="picker-item-glyph">▦</span>
+            <span>
+              <span class="picker-item-label">Folio</span>
+              <span class="picker-item-route">/dev/scrapbook · standalone asset browser <span class="picker-item-future-tag">(phase 3)</span></span>
+            </span>
+          </a>
+          <a class="picker-item picker-item-future" href="#">
+            <span class="picker-item-glyph">⊞</span>
+            <span>
+              <span class="picker-item-label">Content tree</span>
+              <span class="picker-item-route">/dev/content · file browser <span class="picker-item-future-tag">(phase 3)</span></span>
+            </span>
+          </a>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+          <a class="bar-cell picker sheet-open" href="#">
+            <span class="bar-cell-glyph">⌗</span>
+            <span class="picker-label">Desk <span class="chevron">▾</span></span>
+          </a>
+          <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Picker sheet open.</strong><br>
+    Sheet sits ABOVE the bar; bar stays visible.<br>
+    Active dest. has a red dot; future destinations dimmed with phase tag.
+  </div>
+  </div>
+
+  <!-- Demo 3: shortform review at rest -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div class="top-masthead-grid">
+          <div>
+            <div class="top-mast-kicker">
+              <span class="platform">linkedin</span>
+              <span>deskwork-blog</span>
+            </div>
+            <div class="top-mast-slug">v021-mobile-first-shortform</div>
+          </div>
+          <div class="top-mast-r">galley<br><span class="num">№ 03</span></div>
+          <a class="mast-help" href="#">?</a>
+        </div>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>What I learned shipping mobile-first.</h1>
+          <p class="dek">Three iterations on the state-stamp pattern; what finally worked was retiring it on mobile.</p>
+          <p>Press-check vocabulary, take three.</p>
+          <p>The first iterations leaned on rotated rubber stamps.</p>
+          <p>Letterpress tags were no better.</p>
+          <p>The third draft retires state surfacing entirely on mobile.</p>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+          <a class="bar-cell picker" href="#">
+            <span class="bar-cell-glyph">⊟</span>
+            <span class="picker-label">Short <span class="chevron">▾</span></span>
+          </a>
+          <button class="bar-cell iterate divider-left"><span class="bar-cell-glyph">↻</span><span>Iter.</span></button>
+          <button class="bar-cell approve"><span class="bar-cell-glyph">✓</span><span>Apprv.</span></button>
+          <button class="bar-cell cancel"><span class="bar-cell-glyph">⊘</span><span>Canc.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">2</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">№</span><span>Vers.</span><span class="badge kraft">3</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Shortform review · picker shows "Short ▾".</strong><br>
+    Iter · Apprv · Canc + TOC + <em>Versions</em> (5 contextual cells).<br>
+    Versions tab now fits — wasn't possible in v2-A.
+  </div>
+  </div>
+
+</div>
+
+<div class="callout blue">
+  <strong>The sheet's "future destinations" semantic</strong>
+  Future destinations (Folio in Phase 3, Content tree in Phase 3) appear as dimmed rows with a <code>(phase N)</code> tag at the right. Tapping them shows a toast: <em>"Coming in Phase 3 — see the studio roadmap."</em> The roadmap is reachable from the sheet's footer link. Operators see the destination namespace's <em>shape</em> at all times; future expansion doesn't surprise them. The pattern earns the chrome: the sheet's height grows by one row per destination, never more.
+</div>
+
+<!-- ============================================================
+     SECTION 4: CONTEXTS MATRIX
+============================================================ -->
+<h2 class="section"><span class="num">§ 4</span> Contexts matrix · 1-picker</h2>
+<p class="section-lede">
+  Nine contexts re-rendered with the single picker cell. Every surface now reads the same way: <em>"You are in [destination] ▾. Here are this surface's actions."</em>
+</p>
+
+<div class="matrix">
+
+  <!-- 1. Studio index -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">1 · studio index</div>
+        <div class="barframe-name">The studio.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(directory)</div>
+    <nav class="split-bar" style="--cols: repeat(1, 1fr);">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">⊞</span>
+        <span class="picker-label">Studio <span class="chevron">▾</span></span>
+      </a>
+    </nav>
+  </div>
+
+  <!-- 2. Dashboard -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">2 · dashboard</div>
+        <div class="barframe-name">Pipeline.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-studio</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(stage tiles)</div>
+    <nav class="split-bar" style="--cols: repeat(2, 1fr);">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">⌗</span>
+        <span class="picker-label">Desk <span class="chevron">▾</span></span>
+      </a>
+      <button class="bar-cell compose divider-left"><span class="bar-cell-glyph">+</span><span>Compose</span></button>
+    </nav>
+  </div>
+
+  <!-- 3. Shortform desk -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">3 · shortform desk</div>
+        <div class="barframe-name">In flight.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-review-shortform</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(workflow list)</div>
+    <nav class="split-bar" style="--cols: repeat(2, 1fr);">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">⊟</span>
+        <span class="picker-label">Short <span class="chevron">▾</span></span>
+      </a>
+      <button class="bar-cell filter divider-left"><span class="bar-cell-glyph">⌕</span><span>Filter</span></button>
+    </nav>
+  </div>
+
+  <!-- 4. Entry-review · review -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">4 · entry · review</div>
+        <div class="barframe-name">Mobile-first.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-review/entry/&lt;uuid&gt;</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(article + marginalia)</div>
+    <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">⌗</span>
+        <span class="picker-label">Desk <span class="chevron">▾</span></span>
+      </a>
+      <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+    </nav>
+  </div>
+
+  <!-- 5. Entry-review · edit -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">5 · entry · edit</div>
+        <div class="barframe-name">Editing.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">(same; mode=editing)</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(source / split / preview)</div>
+    <nav class="split-bar" style="--cols: repeat(4, 1fr);">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">⌗</span>
+        <span class="picker-label">Desk <span class="chevron">▾</span></span>
+      </a>
+      <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">¶</span><span>Fmt.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+      <button class="bar-cell save dirty"><span class="bar-cell-glyph">✓</span><span>Save</span><span class="badge green">●</span></button>
+    </nav>
+  </div>
+
+  <!-- 6. Shortform review -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">6 · shortform · review</div>
+        <div class="barframe-name">linkedin · v021</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-review/&lt;wid&gt;</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(short body)</div>
+    <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">⊟</span>
+        <span class="picker-label">Short <span class="chevron">▾</span></span>
+      </a>
+      <button class="bar-cell iterate divider-left"><span class="bar-cell-glyph">↻</span><span>Iter.</span></button>
+      <button class="bar-cell approve"><span class="bar-cell-glyph">✓</span><span>Apprv.</span></button>
+      <button class="bar-cell cancel"><span class="bar-cell-glyph">⊘</span><span>Canc.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">2</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">№</span><span>Vers.</span><span class="badge kraft">3</span></button>
+    </nav>
+  </div>
+
+  <!-- 7. Scrapbook viewer -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">7 · scrapbook viewer</div>
+        <div class="barframe-name">Folio.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/scrapbook/…</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(asset grid)</div>
+    <nav class="split-bar" style="--cols: repeat(3, 1fr);">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">⌗</span>
+        <span class="picker-label">Desk <span class="chevron">▾</span></span>
+      </a>
+      <button class="bar-cell filter divider-left"><span class="bar-cell-glyph">⌕</span><span>Filter</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">↗</span><span>Open</span></button>
+    </nav>
+  </div>
+
+  <!-- 8. Content tree -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">8 · content tree</div>
+        <div class="barframe-name">Browse.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/content/&lt;site&gt;/…</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(file tree)</div>
+    <nav class="split-bar" style="--cols: repeat(2, 1fr);">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">⌗</span>
+        <span class="picker-label">Desk <span class="chevron">▾</span></span>
+      </a>
+      <button class="bar-cell search divider-left"><span class="bar-cell-glyph">⌕</span><span>Search</span></button>
+    </nav>
+  </div>
+
+  <!-- 9. Manual -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">9 · manual</div>
+        <div class="barframe-name">Compositor's manual.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-help</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(docs body)</div>
+    <nav class="split-bar" style="--cols: repeat(1, 1fr);">
+      <a class="bar-cell picker" href="#">
+        <span class="bar-cell-glyph">§</span>
+        <span class="picker-label">Manual <span class="chevron">▾</span></span>
+      </a>
+    </nav>
+  </div>
+
+</div>
+
+<div class="callout">
+  <strong>The bar's cell-count math under v3</strong>
+  <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-family: var(--mono); font-size: 0.72rem; color: var(--paper-3); line-height: 1.5;">
+    <tr style="color: var(--paper);">
+      <th style="text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Surface</th>
+      <th style="text-align: right; padding: 0.3rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Cells</th>
+      <th style="text-align: right; padding: 0.3rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Width</th>
+      <th style="text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Δ from v2-A</th>
+    </tr>
+    <tr><td style="padding: 0.25rem 0.5rem;">Studio index</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">1</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">390px</td>
+        <td style="padding: 0.25rem 0.5rem; color: var(--paper-3);">−1 cell (nav collapses)</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem;">Dashboard</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">2</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">195px</td>
+        <td style="padding: 0.25rem 0.5rem; color: var(--paper-3);">−1 cell</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem;">Shortform desk</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">2</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">195px</td>
+        <td style="padding: 0.25rem 0.5rem; color: var(--paper-3);">−1 cell</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem;">Entry-review review</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">6</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">65px</td>
+        <td style="padding: 0.25rem 0.5rem; color: #6fa080;">same (+1 contextual = TOC)</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem;">Entry-review edit</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">4</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">98px</td>
+        <td style="padding: 0.25rem 0.5rem; color: var(--paper-3);">−1 cell</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem;">Shortform review</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">6</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">65px</td>
+        <td style="padding: 0.25rem 0.5rem; color: #6fa080;">same (+1 = Versions tab fits)</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem;">Scrapbook viewer</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">3</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">130px</td>
+        <td style="padding: 0.25rem 0.5rem; color: var(--paper-3);">−1 cell</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem;">Content tree</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">2</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">195px</td>
+        <td style="padding: 0.25rem 0.5rem; color: var(--paper-3);">−1 cell</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem;">Manual</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">1</td>
+        <td style="padding: 0.25rem 0.5rem; text-align: right;">390px</td>
+        <td style="padding: 0.25rem 0.5rem; color: var(--paper-3);">−1 cell</td></tr>
+  </table>
+  <p style="margin-top: 0.7rem; font-style: italic; color: var(--paper-3);">
+    Most surfaces shrink by 1 cell — the bar carries less, which is fine since they had headroom. The two heavy review surfaces (Entry · Shortform) stay at 6 cells but trade a nav cell for a 5th contextual cell — the actual win. The Studio index and Manual go to a single bar cell — bar reads almost as a "title" of the destination, which is consistent.
+  </p>
+</div>
+
+<!-- ============================================================
+     SECTION 5: WHAT V3 UNLOCKS
+============================================================ -->
+<h2 class="section"><span class="num">§ 5</span> What v3 unlocks</h2>
+
+<div class="callout green">
+  <strong>1 · TOC drawer on entry-review longform (closes #244 inline)</strong>
+  v2-A could only fit TOC on shortform (where the 3-verb contextual stays under cap). v3 gives entry-review the 5th cell needed for a TOC tab — same operator-perceivable behavior as the longform outline-drawer, surfaced via the bar. Means #244 closes on BOTH review surfaces in one shape, not two.
+</div>
+
+<div class="callout green">
+  <strong>2 · Shortform review carries Versions as a tab</strong>
+  v2-A had no room for a Versions tab; the operator's only way to switch versions was a hidden gesture or a sub-page navigation. v3 fits Versions as the 6th cell (with a kraft-tone badge showing version count). Single-tap version switching.
+</div>
+
+<div class="callout green">
+  <strong>3 · Destination namespace is unbounded</strong>
+  v1/v2 capped destinations at the bar's nav-region width. Adding Folio (Phase 3), Content tree (Phase 3), or any future destination required widening the nav region or replacing existing tabs. v3 holds destinations in the picker sheet — adding one is just adding a row. Operator sees the namespace's <em>shape</em> in the sheet (including future destinations with phase tags) at all times.
+</div>
+
+<div class="callout kraft">
+  <strong>4 · One job per region</strong>
+  Cleanest conceptual model of the three refinements. Left region = "where am I / go elsewhere." Right region = "do work here." Operators don't have to learn which tabs do what — the kraft hairline IS the rule.
+</div>
+
+<!-- ============================================================
+     SECTION 6: WHAT V3 COSTS
+============================================================ -->
+<h2 class="section"><span class="num">§ 6</span> What v3 costs</h2>
+
+<div class="callout">
+  <strong>1 · Two-tap destination switching</strong>
+  v1/v2 = one tap to switch destinations. v3 = tap picker → tap target = two taps. The cost is paid once per switch. For operators who switch destinations rarely (most), this is fine. For operators who cross-reference Desk ↔ Short mid-task, this adds friction every time.
+  <em>Mitigations:</em>
+  <ul>
+    <li>Tap-and-hold on the picker could expose a "quick switch" gesture (skipping the sheet, going directly to the most-recent other destination). Not in the lead spec; reachable refinement.</li>
+    <li>Keyboard shortcut on desktop: <code>cmd+1</code> Desk · <code>cmd+2</code> Short · etc. Doesn't help on mobile but operators with keyboard often dock to switch.</li>
+  </ul>
+</div>
+
+<div class="callout">
+  <strong>2 · Destination list hidden at rest</strong>
+  The operator can't see "Manual exists" until they open the picker. The chevron <code>▾</code> says <em>more</em>, not <em>what</em>. This is the canonical hamburger-menu critique. For domain-specific tools where the operator already knows the destinations (deskwork's case), it's tolerable. For a discovery-shaped surface (consumer apps), it's a known failure mode.
+</div>
+
+<div class="callout">
+  <strong>3 · Picker cell competes for the operator's eye</strong>
+  In review surfaces with 5 contextual verbs, the picker becomes a 6th cell that doesn't do work. Some operators may tap it expecting an action and then learn it's nav. The visual weight (ink color, light paper bg) is calibrated to read as "title-like" but it's still a button. <em>Real-device testing required.</em>
+</div>
+
+<div class="callout">
+  <strong>4 · No at-a-glance signal of available destinations</strong>
+  v1/v2 made all three destinations visible at all times — a wayfinding map. v3's affordance trades that map for a list-on-demand. Operators learn the namespace once, then the bar is mute about it. For the studio's small namespace (3-5 destinations), this is probably fine. For a larger namespace it would matter more.
+</div>
+
+<!-- ============================================================
+     SECTION 7: ALTERNATIVE D-2 (briefly)
+============================================================ -->
+<h2 class="section"><span class="num">§ 7</span> Alternative D-2 (not lead) · masthead-title tap</h2>
+<p class="section-lede">
+  An even more aggressive form: drop the picker cell from the bar entirely. The masthead's surface title becomes tappable with a small <code>▾</code> chevron after it. Same destination sheet opens. The bar gets zero nav region — pure 6-cell contextual.
+</p>
+
+<div class="compare">
+
+  <div class="compare-side">
+    <h4>D-2 · masthead-title tap · bar is pure contextual</h4>
+    <div class="label">Entry-review (review mode) — masthead-tap variant</div>
+    <div class="barframe">
+      <div class="barframe-head">
+        <div>
+          <div class="barframe-kicker">entry · drafting</div>
+          <div class="barframe-name">
+            Studio mobile-first.
+            <span style="color: var(--red); font-family: var(--mono); font-size: 0.72rem; font-style: normal; margin-left: 0.3rem;">▾</span>
+          </div>
+        </div>
+        <div class="barframe-route" style="margin-right: 1.7rem;">v3 · 2h</div>
+        <a class="masthead-help" href="#">?</a>
+      </div>
+      <div class="barframe-body">(article body)</div>
+      <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">¶</span><span>Fmt.</span></button>
+      </nav>
+    </div>
+    <div class="note">
+      Bar carries 6 contextual cells. <em>The masthead title "Studio mobile-first." gets a small ▾</em> indicating tappable. Tap → same destination sheet. Most aggressive form; loses the kraft-divider semantics of v3.
+    </div>
+  </div>
+
+  <div class="compare-side">
+    <h4>D-2 trade-offs</h4>
+    <p class="note" style="margin-top: 0;">
+      <em>Pro:</em> Maximum bar real estate — 6 cells of pure work.<br>
+      <em>Pro:</em> Tappable title IS the destination signifier — purest metaphor.<br>
+      <em>Con:</em> Top-of-screen tap — worse thumb reach.<br>
+      <em>Con:</em> Loses the kraft-divider's semantic split-bar identity (the v3 picker preserves it).<br>
+      <em>Con:</em> The masthead title now does two jobs (label + control).<br>
+      <em>Con:</em> Discoverability — the <code>▾</code> on a title is easy to miss; chevrons on bar cells read more clearly as "menu."
+    </p>
+    <p class="note" style="margin-top: 0.6rem; font-style: italic; color: var(--paper-3);">
+      Worth naming so the operator can pick if they want it. Not the lead because the bar-picker cell holds the picker affordance bottom-anchored AND keeps the split-bar identity intact.
+    </p>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     SECTION 8: OPEN QUESTIONS
+============================================================ -->
+<h2 class="section"><span class="num">§ 8</span> Open questions for operator pick</h2>
+
+<div class="callout">
+  <strong>Q1 · v2-A vs v3 · which trade do you take?</strong>
+  v2-A: one-tap destination switching, 1-4 contextual cells, Scrapbook stays, TOC fits only on shortform.<br>
+  v3: two-tap destination switching, 1-5 contextual cells, Scrapbook stays, TOC fits on both review surfaces, Versions tab fits on shortform, destination namespace unbounded.
+</div>
+
+<div class="callout">
+  <strong>Q2 · v3 picker label · destination name or just glyph?</strong>
+  This mockup shows "Desk ▾" with both glyph and label. Alternative: just a glyph + ▾ chevron (cell is narrower; label is read from the masthead's kicker). Recommend: keep both — the explicit label reduces the cognitive load of "what am I in" when the masthead is dense.
+</div>
+
+<div class="callout">
+  <strong>Q3 · v3 vs D-2 (masthead-title tap)?</strong>
+  D-2 lets the bar carry one MORE contextual cell (6 vs 5). Cost: tappable masthead title (worse thumb reach + chevron easier to miss). Most operators won't reach for it. If you want this for completeness in a future-state, mockup is partial and ready to drill into; if v3 is "good enough," stop here.
+</div>
+
+<div class="callout">
+  <strong>Q4 · Should future destinations show up in the picker sheet today?</strong>
+  This mockup shows Folio (Phase 3) and Content tree (Phase 3) as dimmed rows with phase tags. Alternative: hide them entirely until they ship. Recommend: show with phase tags — the operator sees the namespace's shape and isn't surprised by future expansions. Dimmed rows are not promises; they're roadmap signals.
+</div>
+
+</body>
+</html>

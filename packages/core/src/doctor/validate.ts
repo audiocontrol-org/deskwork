@@ -284,19 +284,12 @@ async function validateJournalSidecar(projectRoot: string): Promise<ValidationFa
       }
     }
 
-    const reviewChanges = events.filter((e) => e.kind === 'review-state-change');
-    const latestReview = reviewChanges.at(-1);
-    if (latestReview && latestReview.kind === 'review-state-change') {
-      const sidecarReview = entry.reviewState ?? null;
-      if (latestReview.to !== sidecarReview) {
-        failures.push({
-          category: 'journal-sidecar',
-          message: `latest review-state-change.to=${String(latestReview.to)} does not match sidecar reviewState=${String(sidecarReview)}`,
-          entryId: entry.uuid,
-          path,
-        });
-      }
-    }
+    // Per DESKWORK-STATE-MACHINE.md Commandment III, reviewState is
+    // RETIRED — there is no sidecar.reviewState to compare against, so
+    // the journal-sidecar review-state invariant is removed entirely.
+    // Historical `review-state-change` events still parse cleanly (the
+    // event kind stays in the schema for read compat); they're just no
+    // longer validated against a sidecar field.
   }
   return failures;
 }

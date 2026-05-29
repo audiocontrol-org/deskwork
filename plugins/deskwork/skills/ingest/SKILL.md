@@ -133,16 +133,19 @@ Multiple paths in one call are supported. Glob expansion uses the deepest static
 
 ### State derivation
 
-By default, the helper reads the `state:` frontmatter field and normalizes it onto the calendar's six lanes:
+By default, the helper reads the `state:` frontmatter field and normalizes it onto the post-redesign 8 stages (per `DESKWORK-STATE-MACHINE.md`):
 
 | Frontmatter value | Lane |
 |---|---|
 | `published`, `publish` | Published |
-| `review`, `reviewing`, `in-review` | Review |
+| `final` | Final |
 | `drafting`, `draft` | Drafting |
 | `outline`, `outlining` | Outlining |
 | `planned` | Planned |
 | `idea`, `ideas` | Ideas |
+| `blocked` | Blocked |
+| `cancelled`, `canceled` | Cancelled |
+| `review`, `reviewing`, `in-review` | Drafting (legacy alias — `Review` was the pre-redesign stage; mapped to Drafting) |
 | (anything else) | **ambiguous** — operator must pass `--state` |
 
 Files without a `state:` field default to `Drafting` — `/deskwork:ingest` is for existing content with body text; for new ideas use `/deskwork:add`.

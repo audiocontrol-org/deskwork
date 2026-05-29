@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T14:45:27.912Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "address",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "commentId": "1ae54900-4105-49d2-933a-8bfbb680b6ca",
+    "version": 1,
+    "disposition": "addressed",
+    "reason": "Two parts: (a) Renamed the templates section to 'presets, not the bounding space' and added explicit text that lanes are unbounded + custom pipelines are first-class. (b) Added a new § CRUD support section covering lanes, groups, and pipelines; expanded studio rendering with a lane-visibility panel + many-lane overflow handling; added new Phase 5 for lane/pipeline CRUD skills + studio surfaces.",
+    "id": "8a0c8e05-38c3-4cf2-ab7a-4951784c034f",
+    "createdAt": "2026-05-16T14:45:27.912Z"
+  }
+}

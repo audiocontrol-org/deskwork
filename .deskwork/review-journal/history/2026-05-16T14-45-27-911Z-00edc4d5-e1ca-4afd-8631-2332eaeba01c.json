@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T14:45:27.911Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "address",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "commentId": "fb3a8a92-a3af-4976-b5bd-e1208dd8502c",
+    "version": 1,
+    "disposition": "addressed",
+    "reason": "Removed the CLI-level refusal; the verb-semantics table now states all artifact kinds are supported. The image iteration section enumerates the supported paths and gives the agent guidance on picking the right one per comment + available tooling.",
+    "id": "504b5cdc-c19a-49e9-a745-db638188f259",
+    "createdAt": "2026-05-16T14:45:27.911Z"
+  }
+}

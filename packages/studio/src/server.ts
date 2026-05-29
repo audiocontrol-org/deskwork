@@ -442,6 +442,21 @@ export function createApp(ctx: StudioContext): Hono {
   // Convenience root redirect to the studio index.
   app.get('/', (c) => c.redirect('/dev/'));
 
+  // Document root — serves top-level project files (DESKWORK-STATE-MACHINE.md,
+  // THESIS.md, README.md, DESIGN-STANDARDS.md, etc.) so the studio's URL
+  // namespace mirrors the project filesystem layout. Registered LAST so
+  // every more-specific route (`/dev/*`, `/api/*`, `/static/*`, the `/`
+  // redirect) matches first; only unmatched paths fall through to a
+  // filesystem lookup against the project root. Symlinks in `public/`
+  // didn't survive serveStatic's resolution (operator-reported 2026-05-09);
+  // serving the project root directly removes the need for symlinks at all.
+  app.use(
+    '*',
+    serveStatic({
+      root: ctx.projectRoot,
+    }),
+  );
+
   return app;
 }
 
@@ -529,11 +544,53 @@ async function main(): Promise<void> {
     const { createServer: createViteServer } = await import('vite');
     const { getRequestListener } = await import('@hono/node-server');
     const http = await import('node:http');
+    const net = await import('node:net');
     const { join } = await import('node:path');
+
+    // Vite's HMR WebSocket needs its own port. Default is 24678. When
+    // multiple worktrees run dev studios simultaneously, the second
+    // worktree's Vite cannot bind 24678 — it silently fails to spin
+    // up an HMR WS server, and the browser ends up trying to connect
+    // to whatever process IS on 24678 (the OTHER worktree's Vite).
+    // The handshake fails with HTTP 426; the Vite client falls back
+    // to "polling for restart" mode which page-reloads several times
+    // per second. That presents to the operator as "pathologically
+    // refreshing as fast as possible." Walk forward to find a free
+    // port so each concurrent worktree gets its own HMR slot.
+    const findFreePort = async (base: number, max: number): Promise<number> => {
+      for (let p = base; p <= max; p += 1) {
+        const free = await new Promise<boolean>((resolve) => {
+          const probe = net.createServer();
+          probe.once('error', () => resolve(false));
+          probe.once('listening', () => {
+            probe.close(() => resolve(true));
+          });
+          // Bind to all interfaces (dual-stack IPv4+IPv6) so the probe
+          // matches what Vite actually does. A previous version of this
+          // helper bound 127.0.0.1 only and got false-positives when
+          // another worktree's Vite was on IPv6 wildcard (*:24678) —
+          // the IPv4 probe succeeded, then Vite's actual bind failed.
+          probe.listen(p);
+        });
+        if (free) return p;
+      }
+      throw new Error(
+        `deskwork-studio: no free HMR port in [${base}, ${max}]. ` +
+          `Another worktree's dev studio is likely holding the range.`,
+      );
+    };
+    const hmrPort = await findFreePort(24678, 24777);
 
     const viteRoot = join(pluginRoot(), 'public');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        allowedHosts: true,
+        // Pin the HMR WS to the port we just verified free. Without
+        // this, Vite uses its default 24678 and silently loses to
+        // any other worktree that grabbed it first.
+        hmr: { port: hmrPort },
+      },
       appType: 'custom',
       root: viteRoot,
     });

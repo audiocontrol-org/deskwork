@@ -2,6 +2,8 @@
 
 Extract the editorial calendar skills from audiocontrol.org into an open-source Claude Code plugin. The plugin (codename "deskwork") manages the editorial lifecycle from idea capture through publication and distribution tracking. Ships as part of a multi-plugin monorepo.
 
+> **Issue closures since 2026-05-29.** The status rows below preserve their historical "issue closures pending operator verification post-release" phrasing where Phase 27 / Phase 33+ / Phase 34 / Phase 35 first shipped the fixes. The repo-wide issue-closure audit at [`docs/1.0/001-IN-PROGRESS/hygiene/issue-closure-audit-2026-05-29.md`](../../001-IN-PROGRESS/hygiene/issue-closure-audit-2026-05-29.md) verified each fix-landed claim against current code and formally closed the corresponding GitHub issues. Closures relevant to rows below: **Phase 27 / clipboard tranche** — #74, #99, #103, #104, #105, #106, #107, #108; **Phase 33+ scrapbook redesign** — #155, #156, #157, #159, #160, #161 (umbrella stays open by design), #163, #165, #166, #167, #168; **Phase 34a/b/c/d/e** — #151 (moot premise), #152, #176, #178, #181, #182; **Phase 35** — #199; **Phase 22+++++** — #165 (Tailscale default); **Phase 26-era polish** — #99 (intake). Phase 34 umbrella (#170) + Phase 34a tracker (#171) stay open until margin-note authoring + version-strip are formally verified per `agent-discipline.md`'s "issue closure requires verification in a formally-installed release" rule.
+
 ### Status
 
 | Phase | Description | Status |

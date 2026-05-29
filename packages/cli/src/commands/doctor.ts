@@ -61,16 +61,36 @@ import { repairAll } from '@deskwork/core/doctor/repair';
 import { maybeMigrate } from './doctor-migrate-gate.ts';
 
 const KNOWN_FLAGS = ['site', 'fix'] as const;
-const BOOLEAN_FLAGS = ['yes', 'json', 'check'] as const;
+const BOOLEAN_FLAGS = ['yes', 'json', 'check', 'help'] as const;
+
+const USAGE = [
+  'Usage: deskwork doctor <project-root> [--site <slug>] [--fix <rule|all>] [--yes] [--json] [--check]',
+  '',
+  'Validates the editorial calendar + content tree + workflow store.',
+  '',
+  'Flags:',
+  '  --site <slug>     Restrict to one site; default = every site.',
+  '  --fix <rule|all>  Engage repair mode for the named rule(s).',
+  '  --yes             Non-interactive repair (skip ambiguous).',
+  '  --json            Emit JSON instead of human-readable text.',
+  '  --check           Dry-run preview of the entry-centric migration.',
+  '  --help, -h        Print this help and exit.',
+].join('\n');
 
 export async function run(argv: string[]): Promise<void> {
+  // #215 issue 3: previously `deskwork doctor --help` errored with
+  // `Unknown flag: --help` because parseInput only recognized
+  // KNOWN/BOOLEAN_FLAGS. Detect it before parsing so a typo-or-help
+  // probe surfaces usage instead of an error.
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(USAGE + '\n');
+    process.exit(0);
+  }
+
   const { positional, flags, booleans } = parseInput(argv);
 
   if (positional.length < 1) {
-    fail(
-      'Usage: deskwork doctor <project-root> [--site <slug>] [--fix <rule|all>] [--yes] [--json] [--check]',
-      2,
-    );
+    fail(USAGE, 2);
   }
 
   const [rootArg] = positional;
@@ -327,16 +347,22 @@ function serializeRepair(r: RepairResult): Record<string, unknown> {
 }
 
 function emitText(report: DoctorReport, opts: EmitOptions): void {
+  // #215 issue 4: the legacy/calendar-level pass is one of TWO passes
+  // (this one + entry-centric validation, which runs after this returns).
+  // The previous "Doctor: clean" framing implied an overall verdict —
+  // automation grepping for `clean` would report success even when the
+  // entry-centric pass surfaced failures. Scope the line explicitly so
+  // the operator and any consumers can tell the passes apart.
   if (report.findings.length === 0) {
     process.stdout.write(
-      `Doctor: clean (no findings across ${report.sites.length} site(s))\n`,
+      `Calendar-level audit: clean (no findings across ${report.sites.length} site(s))\n`,
     );
     return;
   }
 
   const byRule = groupBy(report.findings, (f) => f.ruleId);
   process.stdout.write(
-    `Doctor: ${report.findings.length} finding(s) across ${report.sites.length} site(s)\n\n`,
+    `Calendar-level audit: ${report.findings.length} finding(s) across ${report.sites.length} site(s)\n\n`,
   );
   for (const rule of RULES) {
     const findings = byRule.get(rule.id);

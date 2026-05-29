@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cross-bar 2 refined v4 · Desk as hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+CROSS-BAR 2 (SPLIT BAR) · REFINED v4
+the Desk is the hub. nothing else.
+============================================================
+
+OPERATOR'S FRAMING
+  "I think we might be able to get away with just a link to
+  the desk, since there's a link to the shortform workflow
+  from the desk (or, there should be). That makes the Desk
+  the hub of all activity—the home base—which I think makes
+  sense."
+
+WHAT v4 COMMITS TO
+  · The Desk is the hub. Every other surface is a leaf reached
+    BY navigating from the Desk.
+  · The bar has NO nav region. Pure 1-6 contextual cells.
+  · Every non-Desk surface carries a single "← Desk" link in
+    the masthead's right-rail (alongside the existing ? help
+    affordance).
+  · No picker cell. No picker sheet. No chevron. No destination
+    namespace to enumerate in chrome.
+  · The Desk itself absorbs surfaces that today live separately:
+    the Shortform desk's workflow-list collapses into a
+    Shortform section on the Desk. Content tree's root surfaces
+    as a "Files" tile or section. Future destinations slot in
+    the same way.
+
+WHY THIS IS THE CLEANEST DIRECTION
+  · Single mental model. Operators learn ONE pattern: from
+    anywhere, tap "← Desk" to return home. From Desk, drill
+    into anything.
+  · The chrome budget reflects the work's actual shape: the
+    Desk is the busy thing; every other surface is doing
+    one focused job.
+  · The split-bar's two-region identity simplifies into a
+    single-region bar that's just "what you can do here."
+    The kraft hairline retires (or moves to a different role).
+  · No destination namespace maintenance. Adding Folio /
+    Content tree / future surfaces means adding a section
+    to Desk — same way we add stage tiles today. No bar-cell
+    geometry change. No picker-sheet row to add.
+
+WHAT THIS PRESUMES
+  · The Desk's information architecture absorbs more
+    surfaces. Today's Desk shows 8 stage tiles (Ideas /
+    Planned / Outlining / Drafting / Final / Published /
+    Blocked / Cancelled) for longform pipeline. v4 says
+    the Desk ALSO shows: a Shortform section (workflows
+    by platform); a Files section (content tree entry-
+    point); a Folio section (scrapbook entry-point);
+    future destinations as additional sections.
+
+  · The Shortform desk URL (/dev/editorial-review-shortform)
+    may either go away (its content lives as a Desk section)
+    OR stay as a deep-link convenience that simply returns
+    "← Desk" via the universal back affordance.
+
+WHAT v4 LOSES
+  · One-tap destination switching is gone. EVERY destination
+    switch requires returning to the Desk first. For
+    operators who cross-reference Desk ↔ Shortform mid-
+    task, this adds taps.
+  · The Desk page itself grows. More sections to scroll
+    through before reaching the longform pipeline's tiles.
+    The "favor structure over scrolling" principle from
+    DESIGN-STANDARDS.md applies here — section tiles fold
+    elegantly, but the page grows.
+  · The chrome simplification is purchased by Desk-page
+    complexity. We move complexity into the page where
+    it can be progressively-disclosed, instead of into
+    chrome that's always visible.
+
+ALTERNATIVE NAMED, NOT MOCKED
+  Apply v4 + keep ONE other small nav affordance: the
+  "← Desk" link COULD be in the bar's left cell (instead
+  of the masthead). Same shape; the back-affordance just
+  lives in different chrome. Bottom-anchored tap target
+  better for thumb reach. The mockup leads with masthead
+  placement (matches existing er-strip-back precedent) but
+  flags bar-left as a worthy alternative.
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: #C7BEAE; font-family: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+  body { max-width: 1180px; margin: 0 auto; }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.8rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.5rem; text-align: center; }
+
+  .banner {
+    max-width: 880px; margin: 0 auto 2.5rem;
+    padding: 1.05rem 1.3rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--red);
+    font-family: var(--display); font-size: 0.96rem; line-height: 1.6;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+  .banner blockquote {
+    margin: 0.5rem 0 0.7rem 1rem;
+    padding-left: 0.8rem;
+    border-left: 2px solid var(--red);
+    font-style: italic; color: var(--paper);
+  }
+
+  h2.section {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.5rem; color: var(--paper);
+    margin: 3rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--red);
+    display: flex; align-items: baseline; gap: 1rem;
+  }
+  h2.section .num {
+    font-family: var(--mono); font-style: normal;
+    font-size: 0.7rem; letter-spacing: 0.16em;
+    color: var(--red); text-transform: uppercase;
+  }
+
+  .section-lede {
+    color: #C7BEAE; font-size: 0.96rem; line-height: 1.6;
+    margin-bottom: 1.5rem; max-width: 800px;
+  }
+  .section-lede em { color: var(--paper); font-style: italic; }
+  .section-lede code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+
+  /* ============ HUB DIAGRAM ============ */
+  .hub-diagram {
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    padding: 2rem 1.5rem;
+    border-radius: 6px;
+    margin: 0 auto 2rem;
+    max-width: 880px;
+    position: relative;
+  }
+  .hub-svg {
+    width: 100%; max-width: 720px; height: 360px;
+    display: block; margin: 0 auto;
+  }
+  .hub-svg text { font-family: var(--display); font-style: italic;
+                  font-variation-settings: "opsz" 20, "wght" 500;
+                  fill: var(--paper); }
+  .hub-svg .node-label {
+    font-family: var(--mono); font-style: normal; font-size: 0.7rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    fill: var(--paper-3);
+  }
+  .hub-svg .desk-label {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 32, "wght" 500;
+    font-size: 1.55rem;
+    fill: var(--paper);
+  }
+  .hub-svg .arrow { stroke: var(--paper-3); stroke-width: 1; fill: none; opacity: 0.6; }
+  .hub-svg .arrow-active { stroke: var(--red); stroke-width: 1.5; }
+  .hub-svg .hub-circle {
+    fill: var(--paper); stroke: var(--red); stroke-width: 2;
+  }
+  .hub-svg .leaf-circle {
+    fill: var(--paper-3); stroke: var(--kraft); stroke-width: 1;
+    opacity: 0.85;
+  }
+  .hub-svg .leaf-circle-future {
+    fill: transparent; stroke: var(--kraft); stroke-width: 1;
+    stroke-dasharray: 3 2;
+    opacity: 0.6;
+  }
+  .hub-svg .future-tag {
+    font-family: var(--mono); font-size: 0.55rem;
+    fill: var(--kraft); font-style: normal;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* ============ BAR — shared component ============ */
+  .barframe {
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.3), 0 1px 0 rgba(245,241,232,0.05);
+    width: 390px; max-width: 100%;
+  }
+  .barframe-head {
+    padding: 0.55rem 0.85rem 0.5rem;
+    border-bottom: 1px solid var(--paper-3);
+    display: flex; justify-content: space-between; align-items: baseline;
+    background: var(--paper);
+    background-image: var(--noise);
+    position: relative;
+    gap: 0.5rem;
+  }
+  .barframe-kicker {
+    font-family: var(--mono); font-size: 0.52rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+  }
+  .barframe-name {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 0.95rem; color: var(--ink);
+  }
+  .barframe-route {
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--faded);
+  }
+  .barframe-body {
+    height: 56px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--faded);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .masthead-help {
+    display: flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+    line-height: 1; text-decoration: none;
+    flex-shrink: 0;
+  }
+  .masthead-back {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--blue);
+    text-decoration: none;
+    border-bottom: 1px solid var(--blue);
+    padding-bottom: 1px;
+    flex-shrink: 0;
+    display: inline-flex; align-items: baseline; gap: 0.2rem;
+  }
+  .masthead-back .arrow {
+    font-family: var(--mono); font-size: 0.7rem;
+    color: var(--blue);
+  }
+  .masthead-back .dest {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.8rem; text-transform: none; letter-spacing: 0;
+    color: var(--blue);
+  }
+  .split-bar {
+    height: 56px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    /* v4: no kraft border-left as the bar has no regions. The bar
+       is just paper-2 with a single hairline at the top. */
+    display: grid;
+    grid-template-columns: var(--cols, repeat(6, 1fr));
+    position: relative;
+  }
+  .bar-cell {
+    background: transparent; border: none;
+    border-right: 1px solid var(--paper-3);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    font-weight: 500;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.12rem;
+    line-height: 1;
+    cursor: pointer; text-decoration: none;
+    padding: 0.35rem 0.18rem;
+    position: relative;
+    min-width: 0;
+  }
+  .bar-cell:last-child { border-right: 0; }
+  .bar-cell-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .bar-cell.iterate .bar-cell-glyph { color: var(--blue); }
+  .bar-cell.approve .bar-cell-glyph { color: var(--green); }
+  .bar-cell.cancel  .bar-cell-glyph { color: var(--red); }
+  .bar-cell.save    .bar-cell-glyph { color: var(--green); }
+  .bar-cell.compose .bar-cell-glyph { color: var(--red); }
+  .bar-cell.filter  .bar-cell-glyph { color: var(--faded); }
+  .bar-cell.search  .bar-cell-glyph { color: var(--faded); }
+  .bar-cell.context-tab .bar-cell-glyph { color: var(--faded); }
+  .bar-cell.context-tab.active .bar-cell-glyph { color: var(--red); }
+  .bar-cell.context-tab.active {
+    color: var(--ink); background: var(--paper);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  .bar-cell.save.dirty .bar-cell-glyph { color: var(--green); }
+  .bar-cell.save.dirty {
+    background: rgba(46, 93, 69, 0.08);
+    color: var(--ink);
+    box-shadow: inset 0 2px 0 var(--green);
+  }
+  .bar-cell .badge {
+    position: absolute;
+    top: 0.18rem; right: 0.22rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.45rem;
+    padding: 0 0.16rem;
+    border-radius: 1px; line-height: 1.2;
+    letter-spacing: 0;
+  }
+  .bar-cell .badge.kraft { background: var(--kraft); }
+  .bar-cell .badge.green { background: var(--green); }
+
+  /* ============ CONTEXTS MATRIX ============ */
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+    margin-top: 0.5rem;
+  }
+  @media (max-width: 900px) { .matrix { grid-template-columns: 1fr; } }
+
+  /* ============ PHONE FRAMES ============ */
+  .hardcase-row {
+    display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;
+    margin-top: 1.5rem;
+  }
+  .phone { width: 370px; height: 800px; background: #050505;
+           border-radius: 46px; padding: 10px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; flex-shrink: 0; }
+  .phone::before { content: ''; position: absolute;
+                   top: 20px; left: 50%; transform: translateX(-50%);
+                   width: 100px; height: 27px; background: #000;
+                   border-radius: 14px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 36px; overflow: hidden; position: relative;
+            font-size: 15.5px; line-height: 1.5; color: var(--ink); }
+  .ios-clock { position: absolute; top: 26px; left: 30px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 28px; right: 30px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.78rem; letter-spacing: 0.05em; z-index: 110; }
+  .top-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 76px; padding: 52px 1rem 0.5rem;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 50;
+  }
+  .top-masthead.dashboard { border-bottom: 1px solid var(--red); }
+  .top-masthead-grid {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    column-gap: 0.6rem;
+    align-items: end;
+  }
+  .top-mast-kicker {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); line-height: 1.2; margin-bottom: 0.15rem;
+  }
+  .top-mast-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.06rem 0.32rem;
+    margin-right: 0.32rem;
+    letter-spacing: 0.18em; font-size: 0.5rem;
+  }
+  .top-mast-slug {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .top-mast-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 26, "wght" 500;
+    font-size: 1.1rem; line-height: 1.1; color: var(--ink);
+  }
+  .top-mast-r {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded); line-height: 1.2; text-align: right;
+  }
+  .top-mast-r .num {
+    color: var(--ink); font-size: 0.9rem; font-weight: 500;
+    letter-spacing: 0; display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .mast-affordances {
+    display: flex; flex-direction: column; align-items: flex-end;
+    gap: 0.25rem;
+    align-self: end;
+  }
+  .mast-help-phone {
+    display: flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.7rem;
+    font-weight: 600; line-height: 1;
+    text-decoration: none;
+  }
+  .mast-back-phone {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--blue);
+    text-decoration: none;
+    border-bottom: 1px solid var(--blue);
+    padding-bottom: 1px;
+    display: inline-flex; align-items: baseline; gap: 0.2rem;
+  }
+  .mast-back-phone .arrow { font-family: var(--mono); font-size: 0.65rem; }
+  .mast-back-phone .dest {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.75rem; text-transform: none; letter-spacing: 0;
+  }
+  .surface-body {
+    position: absolute; top: 76px; left: 0; right: 0; bottom: 56px;
+    overflow-y: auto;
+  }
+  .surface-body.no-bar { bottom: 0; }
+  .surface-body .rv-body { padding: 1rem 1.1rem 1.3rem; }
+  .rv-body h1 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 32, "wght" 500;
+    font-size: 1.3rem; line-height: 1.15;
+    margin-bottom: 0.35rem; color: var(--ink);
+  }
+  .rv-body .dek {
+    font-family: var(--display); font-size: 0.86rem;
+    color: var(--faded); margin-bottom: 0.8rem;
+    line-height: 1.4;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.6rem;
+  }
+  .rv-body p {
+    font-family: var(--display); font-size: 0.9rem;
+    line-height: 1.55; margin-bottom: 0.7rem; color: var(--ink);
+  }
+  .rv-body h2 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.02rem; line-height: 1.2;
+    color: var(--red); margin: 1rem 0 0.4rem;
+  }
+  .rv-body em { font-style: italic; color: var(--red); }
+  .rv-body .pin {
+    display: inline-block; width: 1rem; height: 1rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.55rem;
+    border-radius: 50%; text-align: center; line-height: 1rem;
+    margin-left: 0.2rem; vertical-align: super;
+  }
+  .phone-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    z-index: 60;
+  }
+  .phone .split-bar { box-shadow: 0 -2px 6px rgba(26, 22, 20, 0.05); }
+  .caption {
+    color: #C7BEAE; font-family: var(--mono);
+    font-size: 0.65rem; letter-spacing: 0.16em;
+    text-transform: uppercase; margin-top: 0.8rem;
+    text-align: center; max-width: 370px; line-height: 1.55;
+  }
+  .caption strong { color: var(--paper); }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+
+  /* ============ DESK SECTIONS DIAGRAM ============ */
+  .desk-sections {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--paper-3); line-height: 1.5;
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+  }
+  .desk-sections th {
+    text-align: left; color: var(--paper);
+    font-weight: 500;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1.5px solid var(--red);
+    letter-spacing: 0.06em;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    background: rgba(245, 241, 232, 0.05);
+  }
+  .desk-sections td {
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.08);
+    vertical-align: top;
+  }
+  .desk-sections tr:last-child td { border-bottom: 0; }
+  .desk-sections tr:nth-child(even) td { background: rgba(245, 241, 232, 0.02); }
+  .desk-sections code {
+    font-family: var(--mono); color: var(--paper);
+    font-size: 0.7rem; background: rgba(245, 241, 232, 0.05);
+    padding: 0.05rem 0.3rem; border-radius: 2px;
+  }
+  .desk-sections .new-tag {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--green);
+    border: 1px solid var(--green);
+    padding: 0.05rem 0.32rem;
+    border-radius: 2px;
+    margin-left: 0.35rem;
+  }
+  .desk-sections .future-tag {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--kraft);
+    border: 1px solid var(--kraft);
+    padding: 0.05rem 0.32rem;
+    border-radius: 2px;
+    margin-left: 0.35rem;
+  }
+
+  /* ============ CALLOUTS ============ */
+  .callout {
+    margin-top: 1rem;
+    padding: 0.95rem 1.2rem;
+    background: rgba(245, 241, 232, 0.05);
+    border-left: 3px solid var(--red);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.95rem; line-height: 1.6;
+  }
+  .callout.green { border-left-color: var(--green); }
+  .callout.kraft { border-left-color: var(--kraft); }
+  .callout.blue  { border-left-color: var(--blue); }
+  .callout strong {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper); display: block; margin-bottom: 0.4rem;
+    font-weight: normal;
+  }
+  .callout em { color: var(--paper); font-style: italic; }
+  .callout code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+  .callout ul { padding-left: 1.2rem; margin-top: 0.45rem; }
+  .callout li { margin-bottom: 0.3rem; }
+
+  /* ============ COMPARISON ============ */
+  .compare-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.8rem;
+    margin-top: 1rem;
+  }
+  @media (max-width: 1100px) { .compare-row { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .compare-row { grid-template-columns: 1fr; } }
+  .compare-cell {
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    padding: 0.85rem 1rem;
+    border-radius: 4px;
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.86rem; line-height: 1.5;
+  }
+  .compare-cell h5 {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--paper); margin-bottom: 0.5rem;
+    font-weight: 500;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.15);
+    padding-bottom: 0.35rem;
+  }
+  .compare-cell.lead { border-color: rgba(46, 93, 69, 0.5); background: rgba(46, 93, 69, 0.06); }
+  .compare-cell.lead h5 { color: var(--green); }
+  .compare-cell em { color: var(--paper); font-style: italic; }
+  .compare-cell code { font-family: var(--mono); font-size: 0.75rem; color: var(--paper); }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">Cross-bar 2 · refined v4 · Desk as hub.</h1>
+<div class="demo-sub">Zero nav region in the bar · "← Desk" lives in the masthead · all surfaces are leaves of the Desk</div>
+
+<div class="banner">
+  <span class="kicker">Cross-bar 2 refinement v4 · operator's framing</span>
+  <blockquote>
+    "I think we might be able to get away with just a link to the desk, since there's a link to the shortform workflow from the desk (or, there should be). That makes the Desk the hub of all activity—the home base—which I think makes sense."
+  </blockquote>
+  Right. v4 commits to a <em>star</em> navigation model: the Desk is the hub; every other surface is a leaf reached BY navigating from the Desk. The bar has <em>no nav region at all</em> — pure 1-6 contextual cells. Every non-Desk surface carries a "← Desk" link in the masthead's right-rail (alongside the existing <code>?</code> help glyph). No picker cell, no picker sheet, no chevron, no destination namespace to enumerate in chrome. The Desk absorbs the surfaces that today live separately — Shortform workflows surface as a section on the Desk; Folio (scrapbook viewer entry-point) becomes a tile; future destinations slot in the same way.
+</div>
+
+<!-- ============================================================
+     SECTION 1: THE STAR DIAGRAM
+============================================================ -->
+<h2 class="section"><span class="num">§ 1</span> The navigation model</h2>
+<p class="section-lede">
+  Single mental model: from anywhere, tap <em>← Desk</em> to return home. From Desk, drill into anything. <em>The hub holds the destinations the chrome doesn't have to.</em>
+</p>
+
+<div class="hub-diagram">
+  <svg class="hub-svg" viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg">
+    <!-- Center hub: Desk -->
+    <circle class="hub-circle" cx="360" cy="180" r="62"/>
+    <text class="desk-label" x="360" y="175" text-anchor="middle">Desk</text>
+    <text class="node-label" x="360" y="200" text-anchor="middle" style="font-size: 0.55rem;">/dev/editorial-studio</text>
+
+    <!-- Leaf: entry-review longform (top) -->
+    <circle class="leaf-circle" cx="360" cy="50" r="32"/>
+    <text class="node-label" x="360" y="46" text-anchor="middle" style="font-size: 0.55rem;">entry</text>
+    <text class="node-label" x="360" y="58" text-anchor="middle" style="font-size: 0.55rem;">review</text>
+    <path class="arrow arrow-active" d="M 360,118 L 360,82" marker-end="url(#arrowhead)"/>
+    <path class="arrow" d="M 360,82 L 360,118" marker-end="url(#arrowhead)" opacity="0.4"/>
+
+    <!-- Leaf: shortform workflow (right) -->
+    <circle class="leaf-circle" cx="558" cy="100" r="34"/>
+    <text class="node-label" x="558" y="96" text-anchor="middle" style="font-size: 0.55rem;">shortform</text>
+    <text class="node-label" x="558" y="108" text-anchor="middle" style="font-size: 0.55rem;">workflow</text>
+    <path class="arrow arrow-active" d="M 414,140 L 530,114"/>
+    <path class="arrow" d="M 530,118 L 414,144" opacity="0.4"/>
+
+    <!-- Leaf: scrapbook viewer (right-bottom) -->
+    <circle class="leaf-circle" cx="608" cy="240" r="32"/>
+    <text class="node-label" x="608" y="236" text-anchor="middle" style="font-size: 0.55rem;">scrapbook</text>
+    <text class="node-label" x="608" y="248" text-anchor="middle" style="font-size: 0.55rem;">viewer</text>
+    <path class="arrow arrow-active" d="M 422,210 L 580,232"/>
+
+    <!-- Leaf: manual (bottom) -->
+    <circle class="leaf-circle" cx="450" cy="320" r="28"/>
+    <text class="node-label" x="450" y="316" text-anchor="middle" style="font-size: 0.55rem;">manual</text>
+    <text class="node-label" x="450" y="328" text-anchor="middle" style="font-size: 0.55rem;">(?  glyph)</text>
+    <path class="arrow arrow-active" d="M 400,234 L 437,295"/>
+
+    <!-- Leaf: content tree (left-bottom) -->
+    <circle class="leaf-circle leaf-circle-future" cx="240" cy="300" r="28"/>
+    <text class="node-label" x="240" y="296" text-anchor="middle" style="font-size: 0.55rem;">content</text>
+    <text class="node-label" x="240" y="308" text-anchor="middle" style="font-size: 0.55rem;">tree</text>
+    <text class="future-tag" x="240" y="354" text-anchor="middle">phase 3</text>
+    <path class="arrow" d="M 320,222 L 264,283"/>
+
+    <!-- Leaf: folio (left) -->
+    <circle class="leaf-circle leaf-circle-future" cx="142" cy="180" r="34"/>
+    <text class="node-label" x="142" y="176" text-anchor="middle" style="font-size: 0.55rem;">folio</text>
+    <text class="node-label" x="142" y="188" text-anchor="middle" style="font-size: 0.55rem;">(standalone)</text>
+    <text class="future-tag" x="142" y="240" text-anchor="middle">phase 3</text>
+    <path class="arrow" d="M 298,180 L 176,180"/>
+
+    <!-- Leaf: content-tree (above-left) -->
+    <circle class="leaf-circle leaf-circle-future" cx="190" cy="80" r="28"/>
+    <text class="node-label" x="190" y="76" text-anchor="middle" style="font-size: 0.55rem;">files</text>
+    <text class="node-label" x="190" y="88" text-anchor="middle" style="font-size: 0.55rem;">(tree)</text>
+    <text class="future-tag" x="190" y="35" text-anchor="middle">phase 3</text>
+    <path class="arrow" d="M 312,150 L 214,98"/>
+
+    <!-- arrow marker -->
+    <defs>
+      <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <polygon points="0 0, 6 3, 0 6" fill="#DFD7BF" opacity="0.7"/>
+      </marker>
+    </defs>
+  </svg>
+
+  <div style="margin-top: 0.5rem; text-align: center; font-family: var(--mono);
+              font-size: 0.62rem; letter-spacing: 0.16em;
+              text-transform: uppercase; color: var(--paper-3);">
+    <span style="color: var(--paper); border-bottom: 1px solid var(--red); padding-bottom: 1px;">Solid</span> · operator path · "← Desk" returns from any leaf<br>
+    <span style="font-style: italic; color: var(--faded-2); text-transform: none; letter-spacing: 0; font-family: var(--display); font-size: 0.85rem;">leaves with dashed outlines arrive in Phase 3</span>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 2: WHAT THE DESK ABSORBS
+============================================================ -->
+<h2 class="section"><span class="num">§ 2</span> What the Desk absorbs</h2>
+<p class="section-lede">
+  v4 says the Desk's information architecture grows to hold every reachable destination. The longform pipeline stage tiles stay (v0.19 shipped); new sections surface for shortform workflows, future folio entry-point, future content tree entry-point. Operators reach EVERYTHING via the Desk; the Desk reflects EVERYTHING the operator can do.
+</p>
+
+<table class="desk-sections">
+  <thead>
+    <tr>
+      <th style="width: 22%;">Desk section</th>
+      <th style="width: 26%;">Renders</th>
+      <th style="width: 22%;">Tap →</th>
+      <th style="width: 30%;">Today</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><em>Longform pipeline tiles</em></td>
+      <td>Stage tiles: Ideas · Planned · Outlining · Drafting · Final · Published · Blocked · Cancelled</td>
+      <td>Stage's row list (collapsible)</td>
+      <td>Shipped in v0.19</td>
+    </tr>
+    <tr>
+      <td><em>Shortform section</em> <span class="new-tag">v4 new</span></td>
+      <td>One sub-tile per platform: <code>linkedin</code>, <code>reddit</code>, <code>youtube</code>, <code>instagram</code> · workflow count per platform</td>
+      <td>That platform's workflow list (collapsible OR navigate to shortform-review)</td>
+      <td>Today: <code>/dev/editorial-review-shortform</code> is a SEPARATE surface. v4 collapses it INTO the Desk as a section.</td>
+    </tr>
+    <tr>
+      <td><em>Folio tile</em> <span class="future-tag">phase 3</span></td>
+      <td>One tile with a folio-icon glyph + count of project-level assets</td>
+      <td>Standalone scrapbook viewer</td>
+      <td>Doesn't exist yet (Phase 3 / Task 3.1). v4 reserves a section.</td>
+    </tr>
+    <tr>
+      <td><em>Files tile</em> <span class="future-tag">phase 3</span></td>
+      <td>One tile labeled "Files" with the content tree's root path</td>
+      <td>Content tree at the project root</td>
+      <td><code>/dev/content/&lt;site&gt;</code> exists today but isn't surfaced. v4 makes it findable.</td>
+    </tr>
+    <tr>
+      <td><em>(future destinations)</em></td>
+      <td>New tiles slot in as new surfaces ship</td>
+      <td>Their root surfaces</td>
+      <td>Phase 4+ growth shape</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout green">
+  <strong>The architectural commitment</strong>
+  Picking v4 commits the Desk to being the operator's home page in a real sense — not just "where pipeline lives" but "where the whole studio lives." The Desk's information architecture grows as surfaces are added. The cost is paid by the Desk page (sections + scroll); the benefit is paid back at every other surface (clean masthead + bar, single back-link).
+  <br><br>
+  The "favor structure over scrolling" principle (DESIGN-STANDARDS.md § Principles) applies. Sections are collapsible tiles by default; the page surfaces structure, not rows. Operators scan structure, drill into a section, do work, return.
+</div>
+
+<!-- ============================================================
+     SECTION 3: BAR ANATOMY UNDER v4
+============================================================ -->
+<h2 class="section"><span class="num">§ 3</span> Bar anatomy under v4 · no nav region</h2>
+<p class="section-lede">
+  The bar has one job now: <em>"do work on this surface."</em> All cells are contextual. The kraft hairline divider retires — there's no split to mark. The bar shrinks-or-grows surface by surface; on surfaces with no contextual work (Manual), the bar is <em>absent entirely</em>.
+</p>
+
+<div class="hardcase-row">
+
+  <!-- DEMO 1: Desk · no bar, Compose floats -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:48</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead dashboard">
+        <div class="top-masthead-grid">
+          <div>
+            <div class="top-mast-kicker">The compositor's desk</div>
+            <div class="top-mast-title">Pipeline + Press.</div>
+          </div>
+          <div class="top-mast-r" style="grid-column: 2;">drafting<br><span class="num">№ 5</span></div>
+          <div class="mast-affordances">
+            <a class="mast-help-phone" href="#" title="Manual">?</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-body no-bar">
+        <div style="padding: 0.75rem 0;">
+          <!-- Longform pipeline section header -->
+          <div style="background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
+                      border-top: 1px solid var(--paper-3);
+                      padding: 0.55rem 1rem;
+                      font-family: var(--mono); font-size: 0.55rem;
+                      letter-spacing: 0.18em; text-transform: uppercase;
+                      color: var(--red);">
+            ☰ Longform pipeline <span style="color: var(--faded); letter-spacing: 0.12em;">· 17 entries</span>
+          </div>
+
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 22, 'wght' 500;
+                         font-size: 1.1rem; color: var(--red); text-align: center;">✎</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">Drafting</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         letter-spacing: 0.06em; color: var(--faded);
+                         text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">5</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--red); text-align: center;">›</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 22, 'wght' 500;
+                         font-size: 1.1rem; color: var(--red); text-align: center;">※</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">Final</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">4</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--red); text-align: center;">›</span>
+          </div>
+
+          <!-- Shortform section header — NEW under v4 -->
+          <div style="background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
+                      border-top: 1px solid var(--paper-3);
+                      padding: 0.55rem 1rem;
+                      font-family: var(--mono); font-size: 0.55rem;
+                      letter-spacing: 0.18em; text-transform: uppercase;
+                      color: var(--blue);
+                      margin-top: 0.75rem;">
+            ⊟ Shortform · by platform <span style="color: var(--faded); letter-spacing: 0.12em;">· 7 workflows</span>
+          </div>
+
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="background: var(--red); color: var(--paper);
+                         font-family: var(--mono); font-size: 0.5rem;
+                         padding: 0.06rem 0.32rem;
+                         letter-spacing: 0.12em;">in</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">LinkedIn</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">3</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--blue); text-align: center;">›</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="background: var(--blue); color: var(--paper);
+                         font-family: var(--mono); font-size: 0.5rem;
+                         padding: 0.06rem 0.32rem;
+                         letter-spacing: 0.12em;">r/</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">Reddit</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">2</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--blue); text-align: center;">›</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="background: var(--kraft); color: var(--paper);
+                         font-family: var(--mono); font-size: 0.5rem;
+                         padding: 0.06rem 0.32rem;
+                         letter-spacing: 0.12em;">@</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">YouTube</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">2</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--blue); text-align: center;">›</span>
+          </div>
+
+          <!-- Future tiles -->
+          <div style="background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
+                      border-top: 1px solid var(--paper-3);
+                      padding: 0.55rem 1rem;
+                      font-family: var(--mono); font-size: 0.55rem;
+                      letter-spacing: 0.18em; text-transform: uppercase;
+                      color: var(--kraft);
+                      margin-top: 0.75rem;">
+            ▦ Adjacent tools <span style="color: var(--faded); letter-spacing: 0.12em;">· phase 3</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto;
+                      align-items: center; gap: 0.5rem; min-height: 38px;
+                      opacity: 0.55;">
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 22, 'wght' 500;
+                         font-size: 1.05rem; color: var(--kraft); text-align: center;">▦</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.92rem;">Folio (standalone)</span>
+            <span style="font-family: var(--mono); font-size: 0.55rem;
+                         color: var(--kraft); text-transform: uppercase;
+                         letter-spacing: 0.14em;">phase 3</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      display: grid; grid-template-columns: 1.4rem 1fr auto;
+                      align-items: center; gap: 0.5rem; min-height: 38px;
+                      opacity: 0.55;">
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 22, 'wght' 500;
+                         font-size: 1.05rem; color: var(--kraft); text-align: center;">⊞</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.92rem;">Files (content tree)</span>
+            <span style="font-family: var(--mono); font-size: 0.55rem;
+                         color: var(--kraft); text-transform: uppercase;
+                         letter-spacing: 0.14em;">phase 3</span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Compose chip floats as today (v0.19) -->
+      <div style="position: absolute; bottom: 16px; right: 16px; z-index: 65;
+                  background: var(--red); color: var(--paper);
+                  border: 1px solid var(--red); border-radius: 2px;
+                  padding: 0.5rem 0.75rem;
+                  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+                              0 4px 12px rgba(184, 54, 42, 0.28),
+                              0 1px 3px rgba(0,0,0,0.18);
+                  font-family: var(--mono); font-size: 0.6rem;
+                  font-weight: 500; letter-spacing: 0.16em;
+                  text-transform: uppercase;
+                  display: inline-flex; align-items: center; gap: 0.35rem;
+                  line-height: 1;">
+        <span style="font-family: var(--mono); font-size: 0.85rem; font-weight: 600;">+</span>
+        <span>Compose</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Desk · the hub.</strong><br>
+    No bar at rest. Longform pipeline + Shortform + future tiles in body.<br>
+    Compose floats bottom-right (v0.19 unchanged). Manual via <code style="font-family:var(--mono);font-size:0.65rem;color:var(--paper);">?</code> glyph.
+  </div>
+  </div>
+
+  <!-- DEMO 2: Entry-review review · back-to-Desk in masthead, 5 contextual cells -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div class="top-masthead-grid">
+          <div>
+            <div class="top-mast-kicker">entry · drafting · № 12</div>
+            <div class="top-mast-slug">studio-mobile-first-prd</div>
+          </div>
+          <div class="top-mast-r" style="grid-column: 2;">v3<br><span class="num">2h</span></div>
+          <div class="mast-affordances">
+            <a class="mast-back-phone" href="#"><span class="arrow">←</span> <span class="dest">Desk</span></a>
+            <a class="mast-help-phone" href="#">?</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>Studio mobile-first — PRD.</h1>
+          <p class="dek">Extend the press-check vocabulary across every studio surface.</p>
+          <h2>Problem</h2>
+          <p>The dashboard, shortform desk, and review surfaces all ship desktop-shaped CSS.<span class="pin">3</span></p>
+          <p>The v0.17 + v0.18 entry-review rebuild proved that press-check on mobile reads beautifully.<span class="pin">5</span></p>
+          <h2>Scope</h2>
+          <p>Four sequenced cuts: Dashboard → Shortform → Standalone scrapbook → Help + Index.</p>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(5, 1fr);">
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Entry-review · review mode.</strong><br>
+    Masthead: kicker + slug + version + <code style="font-family:var(--mono);font-size:0.6rem;color:var(--paper);">← Desk</code> + <code style="font-family:var(--mono);font-size:0.6rem;color:var(--paper);">?</code>.<br>
+    Bar: 5 contextual cells, no nav region. Cells at <em>78px each</em>.
+  </div>
+  </div>
+
+  <!-- DEMO 3: Shortform review · same idea -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div class="top-masthead-grid">
+          <div>
+            <div class="top-mast-kicker">
+              <span class="platform">linkedin</span>
+              <span>deskwork-blog</span>
+            </div>
+            <div class="top-mast-slug">v021-mobile-first-shortform</div>
+          </div>
+          <div class="top-mast-r" style="grid-column: 2;">galley<br><span class="num">№ 03</span></div>
+          <div class="mast-affordances">
+            <a class="mast-back-phone" href="#"><span class="arrow">←</span> <span class="dest">Desk</span></a>
+            <a class="mast-help-phone" href="#">?</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>What I learned shipping mobile-first.</h1>
+          <p class="dek">Three iterations on the state-stamp pattern; what finally worked was retiring it on mobile.</p>
+          <p>Press-check vocabulary, take three.</p>
+          <p>The first iterations leaned on rotated rubber stamps.</p>
+          <p>Letterpress tags were no better.</p>
+          <p>The third draft retires state surfacing entirely on mobile.</p>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(5, 1fr);">
+          <button class="bar-cell iterate"><span class="bar-cell-glyph">↻</span><span>Iter.</span></button>
+          <button class="bar-cell approve"><span class="bar-cell-glyph">✓</span><span>Apprv.</span></button>
+          <button class="bar-cell cancel"><span class="bar-cell-glyph">⊘</span><span>Canc.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">№</span><span>Vers.</span><span class="badge kraft">3</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">2</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Shortform · review mode.</strong><br>
+    Masthead: platform · channel · slug · <code style="font-family:var(--mono);font-size:0.6rem;color:var(--paper);">← Desk</code> + <code style="font-family:var(--mono);font-size:0.6rem;color:var(--paper);">?</code>.<br>
+    Bar: 5 contextual cells (Iter · Apprv · Canc · Vers · TOC).
+  </div>
+  </div>
+
+</div>
+
+<div class="callout blue">
+  <strong>The "← Desk" affordance design</strong>
+  Mono "←" + italic display "Desk" + blue underline. Sits in the masthead's upper-right above the <code>?</code> glyph (or alongside it if both fit). Approximate dimensions: 42×16px. The arrow is mono to match the kicker; the destination name is italic display because Desk IS a destination (the word should read as a place, not a label). Underline rule signals "tappable link" — same affordance vocabulary as the existing <code>er-strip-back</code> at <code>shortform-review.ts:308</code>, just standardized and hoisted to universal chrome.
+</div>
+
+<!-- ============================================================
+     SECTION 4: CONTEXTS MATRIX
+============================================================ -->
+<h2 class="section"><span class="num">§ 4</span> Contexts matrix · v4</h2>
+<p class="section-lede">
+  Nine contexts re-rendered with no nav region in the bar. Every surface except the Desk carries the "← Desk" link in its masthead. The Desk has no back-link (you're home) and no bar (Compose floats as today). Manual has no bar at all — the surface IS the docs body.
+</p>
+
+<div class="matrix">
+
+  <!-- 1. Studio index -->
+  <div class="barframe" style="border: 2px dashed rgba(245,241,232,0.18); background: rgba(245,241,232,0.02);">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">1 · studio index <span style="color: var(--kraft); margin-left: 0.4rem;">→ redirect</span></div>
+        <div class="barframe-name">(deprecated)</div>
+      </div>
+      <div class="barframe-route">/dev/ → /dev/editorial-studio</div>
+    </div>
+    <div class="barframe-body" style="color: var(--kraft);">(/dev/ 301-redirects to Desk under v4)</div>
+  </div>
+
+  <!-- 2. Desk -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">2 · desk · the hub</div>
+        <div class="barframe-name">Pipeline + Press.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-studio</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body" style="color: var(--green);">(longform tiles + shortform tiles + Compose floats)</div>
+    <!-- no bar -->
+  </div>
+
+  <!-- 3. Shortform desk -->
+  <div class="barframe">
+    <div class="barframe-head" style="gap: 0.7rem;">
+      <div>
+        <div class="barframe-kicker">3 · shortform desk <span style="color: var(--kraft);">→ may retire</span></div>
+        <div class="barframe-name">By platform.</div>
+      </div>
+      <a class="masthead-back" href="#"><span class="arrow">←</span> <span class="dest">Desk</span></a>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(workflow list)</div>
+    <nav class="split-bar" style="--cols: repeat(1, 1fr);">
+      <button class="bar-cell filter"><span class="bar-cell-glyph">⌕</span><span>Filter</span></button>
+    </nav>
+  </div>
+
+  <!-- 4. Entry-review · review -->
+  <div class="barframe">
+    <div class="barframe-head" style="gap: 0.7rem;">
+      <div>
+        <div class="barframe-kicker">4 · entry · review</div>
+        <div class="barframe-name">Mobile-first.</div>
+      </div>
+      <a class="masthead-back" href="#"><span class="arrow">←</span> <span class="dest">Desk</span></a>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(article + marginalia)</div>
+    <nav class="split-bar" style="--cols: repeat(5, 1fr);">
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+    </nav>
+  </div>
+
+  <!-- 5. Entry-review · edit -->
+  <div class="barframe">
+    <div class="barframe-head" style="gap: 0.7rem;">
+      <div>
+        <div class="barframe-kicker">5 · entry · edit</div>
+        <div class="barframe-name">Editing.</div>
+      </div>
+      <a class="masthead-back" href="#"><span class="arrow">←</span> <span class="dest">Desk</span></a>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(source / split / preview)</div>
+    <nav class="split-bar" style="--cols: repeat(3, 1fr);">
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">¶</span><span>Fmt.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+      <button class="bar-cell save dirty"><span class="bar-cell-glyph">✓</span><span>Save</span><span class="badge green">●</span></button>
+    </nav>
+  </div>
+
+  <!-- 6. Shortform review -->
+  <div class="barframe">
+    <div class="barframe-head" style="gap: 0.7rem;">
+      <div>
+        <div class="barframe-kicker">6 · shortform · review</div>
+        <div class="barframe-name">linkedin · v021</div>
+      </div>
+      <a class="masthead-back" href="#"><span class="arrow">←</span> <span class="dest">Desk</span></a>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(short body)</div>
+    <nav class="split-bar" style="--cols: repeat(5, 1fr);">
+      <button class="bar-cell iterate"><span class="bar-cell-glyph">↻</span><span>Iter.</span></button>
+      <button class="bar-cell approve"><span class="bar-cell-glyph">✓</span><span>Apprv.</span></button>
+      <button class="bar-cell cancel"><span class="bar-cell-glyph">⊘</span><span>Canc.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">№</span><span>Vers.</span><span class="badge kraft">3</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">2</span></button>
+    </nav>
+  </div>
+
+  <!-- 7. Scrapbook viewer -->
+  <div class="barframe">
+    <div class="barframe-head" style="gap: 0.7rem;">
+      <div>
+        <div class="barframe-kicker">7 · scrapbook viewer</div>
+        <div class="barframe-name">Folio.</div>
+      </div>
+      <a class="masthead-back" href="#"><span class="arrow">←</span> <span class="dest">Desk</span></a>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(asset grid)</div>
+    <nav class="split-bar" style="--cols: repeat(2, 1fr);">
+      <button class="bar-cell filter"><span class="bar-cell-glyph">⌕</span><span>Filter</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">↗</span><span>Open</span></button>
+    </nav>
+  </div>
+
+  <!-- 8. Content tree -->
+  <div class="barframe">
+    <div class="barframe-head" style="gap: 0.7rem;">
+      <div>
+        <div class="barframe-kicker">8 · content tree</div>
+        <div class="barframe-name">Files.</div>
+      </div>
+      <a class="masthead-back" href="#"><span class="arrow">←</span> <span class="dest">Desk</span></a>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(file tree)</div>
+    <nav class="split-bar" style="--cols: repeat(1, 1fr);">
+      <button class="bar-cell search"><span class="bar-cell-glyph">⌕</span><span>Search</span></button>
+    </nav>
+  </div>
+
+  <!-- 9. Manual · no bar at all -->
+  <div class="barframe">
+    <div class="barframe-head" style="gap: 0.7rem;">
+      <div>
+        <div class="barframe-kicker" style="color: var(--kraft);">9 · manual · no bar</div>
+        <div class="barframe-name">Compositor's manual.</div>
+      </div>
+      <a class="masthead-back" href="#"><span class="arrow">←</span> <span class="dest">Desk</span></a>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body" style="height: 116px; color: var(--kraft);">(docs body — no bar; TOC + Search are inline page chrome)</div>
+  </div>
+
+</div>
+
+<div class="callout kraft">
+  <strong>Manual + Studio index lose the bar entirely</strong>
+  Manual has no contextual actions worth surfacing in a bar — the surface IS the docs body. TOC and Search live as inline page chrome (sticky-top section nav strip or inline page-search box). Studio index either disappears (301-redirects to Desk) or stays as a thin landing with no bar. <em>The "press-check vocabulary" survives — Manual still uses paper + Newsreader + Mono + paper-noise. What's missing is a bar that has nothing to put in it.</em>
+</div>
+
+<!-- ============================================================
+     SECTION 5: COMPARISON SUMMARY
+============================================================ -->
+<h2 class="section"><span class="num">§ 5</span> v1 → v4 · the simplification arc</h2>
+<p class="section-lede">
+  Four passes through the same problem, simpler each time.
+</p>
+
+<div class="compare-row">
+
+  <div class="compare-cell">
+    <h5>v1 · 3-cell nav</h5>
+    <p>Bar carries Desk · Short · Manual. Each surface highlights its tab. Contextual cap = 3. <em>Scrapbook compresses to Actions sheet on entry-review.</em></p>
+  </div>
+
+  <div class="compare-cell">
+    <h5>v2-A · 2-cell nav</h5>
+    <p>Manual moves to masthead <code>?</code>. Bar has Desk · Short. Contextual cap = 4. <em>Entry-review keeps Scrapbook in bar; TOC only fits on shortform.</em></p>
+  </div>
+
+  <div class="compare-cell">
+    <h5>v3 · 1 picker cell</h5>
+    <p>Single picker cell shows current destination + <code>▾</code> chevron. Tap opens sheet listing destinations. Contextual cap = 5. <em>TOC fits on both review surfaces. Two-tap destination switch.</em></p>
+  </div>
+
+  <div class="compare-cell lead">
+    <h5>v4 · No nav · Desk is hub</h5>
+    <p>Bar has zero nav region; only "← Desk" link in masthead. Desk absorbs every reachable destination as a section/tile. Contextual cap = 6. <em>One mental model. Two-tap destination switch (← Desk → tap target). Desk page grows.</em></p>
+  </div>
+
+</div>
+
+<div class="callout">
+  <strong>The simplification</strong>
+  <ul>
+    <li>v1 → v2: <em>"Manual doesn't deserve 1/3 of nav."</em></li>
+    <li>v2 → v3: <em>"Why enumerate at all when we can collapse to one picker?"</em></li>
+    <li>v3 → v4: <em>"Why have a picker when Desk can be the hub and one back-link suffices?"</em></li>
+  </ul>
+  Each step trades surface-chrome for hub-page complexity, and gains a clearer mental model. v4 is the asymptote — there's nothing left to remove from the bar's nav region (it's gone entirely).
+</div>
+
+<!-- ============================================================
+     SECTION 6: WHAT THIS COMMITS TO + COSTS
+============================================================ -->
+<h2 class="section"><span class="num">§ 6</span> What v4 commits to · what it costs</h2>
+
+<div class="callout green">
+  <strong>Commitments (positive)</strong>
+  <ul>
+    <li>Single mental model: <em>← Desk</em> returns home from anywhere. From Desk, drill into anything.</li>
+    <li>The bar's job is unambiguous: surface contextual work for the current surface.</li>
+    <li>Contextual cap grows to 6 cells. Entry-review longform's 4 v0.18 tabs + TOC + (future) other contextual fits with headroom.</li>
+    <li>Destination namespace lives in the Desk's information architecture, not in chrome — making it the operator's HOME in a real sense.</li>
+    <li>Surfaces with no contextual work (Manual) drop the bar entirely — the chrome budget honestly matches the work.</li>
+  </ul>
+</div>
+
+<div class="callout">
+  <strong>Costs (real)</strong>
+  <ul>
+    <li><em>Every destination switch is 2 taps.</em> Tap ← Desk → tap target. Operator can't switch destinations in 1 tap like v1/v2-A allowed.</li>
+    <li><em>The Desk page grows.</em> Longform pipeline tiles + Shortform section + Files tile + Folio tile + future tiles. Scroll cost increases on a single-screen view of Desk. Mitigated by the structure-over-scrolling principle (sections collapse) but not eliminated.</li>
+    <li><em>The Shortform desk surface may need to retire.</em> If Desk shows shortform workflows by platform, /dev/editorial-review-shortform is duplicated chrome. Decide: retire the route, or keep it as a deep-link that mirrors the Desk section. Either way it stops being a peer destination.</li>
+    <li><em>The "Manual" surface may need a "Search" surface alongside it eventually.</em> Without a global search anywhere in chrome, finding things deep in Manual or content tree requires the operator to navigate first. (Optional refinement: add a search affordance to the masthead alongside <code>?</code>.)</li>
+  </ul>
+</div>
+
+<div class="callout blue">
+  <strong>Alternative worth flagging: "← Desk" in the bar instead of the masthead</strong>
+  This mockup places the back-link in the masthead's upper-right (matching existing <code>er-strip-back</code> precedent). An alternative: put it in the bar's leftmost cell instead. The bar grows by 1 cell (back-link cell), contextual region drops by 1 (cap = 5 instead of 6). Tap target moves to the bottom of the screen for better thumb reach. Worth picking if the operator finds the masthead tap-target too high. Same architecture; different chrome.
+</div>
+
+<!-- ============================================================
+     SECTION 7: WHAT TO DO NEXT
+============================================================ -->
+<h2 class="section"><span class="num">§ 7</span> What v4 implies for implementation</h2>
+
+<div class="callout green">
+  <strong>Server template extraction (Task 2.2.5 under v4)</strong>
+  <code>renderMobileBar(opts)</code> — opts is now just <code>{ contextual: Cell[] }</code>. No navActive parameter. No max-3-contextual constraint. Cap = 6.<br>
+  <code>renderMastheadBack()</code> — universal masthead chrome that renders "← Desk" on every non-Desk page. One-line helper.<br>
+  Phase 2.1 sheet-controller usage unchanged.
+</div>
+
+<div class="callout">
+  <strong>Desk surface refactor (separate task — propose Task 2.2.7)</strong>
+  Adding the Shortform section to the Desk is a new piece of work that v4 commits to. The dashboard's <code>renderDashboardPage</code> in <code>packages/studio/src/pages/dashboard.ts</code> would grow to render: longform pipeline tiles (existing) + shortform-by-platform tiles (new) + future tile reservations. <em>This is a Task 2.2 scope expansion to spec.</em>
+</div>
+
+<div class="callout">
+  <strong>Shortform desk URL disposition</strong>
+  Pick:
+  <ul>
+    <li><strong>Retire</strong> — <code>/dev/editorial-review-shortform</code> 301-redirects to Desk. Cleaner but breaks deep links.</li>
+    <li><strong>Keep as deep-link mirror</strong> — Shortform desk continues to render but is no longer a peer destination. Bar treats it like any other leaf with "← Desk" in masthead.</li>
+  </ul>
+  Recommend: keep as deep-link mirror initially; retire on a future major-version if usage drops to zero.
+</div>
+
+</body>
+</html>

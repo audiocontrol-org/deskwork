@@ -1,0 +1,63 @@
+# Phase 11 acceptance fixture — pattern catalog with the three Phase 11
+# pattern types that SHOULD catch the KeygroupSummary regression. The
+# fixture proves the catalog DOES surface the gap once the Phase 11
+# polymorphic handlers are wired in.
+#
+# Per Phase 11 Task 2 conventions, every entry carries `status:` +
+# `provenance:` Loop metadata. All three entries are `blessed` +
+# `operator-authored` so the inventory layer enforces them; in BEFORE
+# (inventory-only) state, this file is absent and the legacy regex
+# catalog matches none of these shapes.
+
+patterns:
+  - id: editor-component-no-canonical-primitive
+    type: negative-space
+    description: >-
+      Component file matches the expected-adopter glob but consumes ZERO
+      canonical design-system primitives. KeygroupSummary repro shape
+      per audiocontrol issue #315.
+    match_glob: "components/**"
+    must_contain: "@/components/common/[A-Z][A-Za-z0-9_]*"
+    threshold: 5
+    secondary_contains: "\\b(?:flex|grid|inline|absolute|relative|fixed|bg-[a-z0-9-]+|text-[a-z0-9-]+|p-[0-9]+|m-[0-9]+|border|border-[a-z0-9-]+|gap-[0-9]+)\\b"
+    extensions: [".tsx"]
+    status: blessed
+    provenance:
+      source: operator-authored
+      authored_at: "2026-05-26T00:00:00Z"
+      authored_by: phase-11-acceptance-fixture
+      context: keygroup-summary-repro
+
+  - id: canonical-primitive-coverage-ratio
+    type: coverage
+    description: >-
+      Adoption metric: fraction of files in the expected-adopter glob
+      that consume the canonical design-system primitive. Phase 11 G3
+      coverage handler — surfaces low-adoption as a synthesis-layer
+      metric (a 0.0 ratio is the signal in the dogfood-gap scenario).
+    match_glob: "components/**"
+    must_contain: "@/components/common/[A-Z][A-Za-z0-9_]*"
+    extensions: [".tsx"]
+    status: blessed
+    provenance:
+      source: operator-authored
+      authored_at: "2026-05-26T00:00:00Z"
+      authored_by: phase-11-acceptance-fixture
+      context: keygroup-summary-repro
+
+  - id: components-className-outlier
+    type: outlier
+    description: >-
+      Per-directory className-composition outlier. KeygroupSummary's
+      heavy-utility-class signature should diverge from its directory
+      siblings (which consume the canonical primitive instead).
+    match_glob: "components/**"
+    distance_metric: className-composition
+    threshold_sigma: 0.5
+    extensions: [".tsx"]
+    status: blessed
+    provenance:
+      source: operator-authored
+      authored_at: "2026-05-26T00:00:00Z"
+      authored_by: phase-11-acceptance-fixture
+      context: keygroup-summary-repro

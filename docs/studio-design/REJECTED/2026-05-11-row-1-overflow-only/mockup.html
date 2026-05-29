@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Dashboard row 1 · Tap-anywhere + overflow menu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --kraft-2: #D9C8A2;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink); font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.6rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.6rem; text-align: center; }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono);
+             font-size: 0.7rem; letter-spacing: 0.18em;
+             text-transform: uppercase; margin-top: 0.8rem;
+             text-align: center; max-width: 410px; }
+  .phone { width: 410px; height: 880px; background: #050505;
+           border-radius: 50px; padding: 12px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; }
+  .phone::before { content: ''; position: absolute;
+                   top: 22px; left: 50%; transform: translateX(-50%);
+                   width: 110px; height: 30px; background: #000;
+                   border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 38px; overflow: hidden; position: relative;
+            font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.95rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  .strip { position: absolute; top: 0; left: 0; right: 0;
+           height: 56px; padding: 56px 1rem 0;
+           background: var(--paper);
+           border-bottom: 1px solid var(--red);
+           z-index: 50;
+           display: flex; align-items: center; gap: 0.6rem; }
+  .strip-mark { font-family: var(--mono); font-size: 0.6rem;
+                letter-spacing: 0.16em; text-transform: uppercase;
+                color: var(--faded); }
+  .strip-mark .stat { color: var(--ink); }
+
+  .filterbar {
+    position: absolute; top: 56px; left: 0; right: 0;
+    height: 40px; padding: 0.4rem 0.7rem;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 49;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .findbox { background: var(--paper);
+             border: 1px solid var(--paper-3); border-radius: 2px;
+             padding: 0.25rem 0.5rem; flex: 1;
+             font-family: var(--mono); font-size: 0.65rem;
+             letter-spacing: 0.06em; color: var(--faded);
+             display: flex; align-items: center; gap: 0.3rem; }
+  .findbox .icon { color: var(--red); }
+
+  .body { position: absolute; top: 96px; left: 0; right: 0; bottom: 0;
+          overflow-y: auto; }
+
+  .stage-tile {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr auto 1.4rem;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 1rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .stage-tile.expanded {
+    background: var(--paper-2);
+    border-bottom-color: var(--red);
+  }
+  .stage-tile-glyph {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.25rem; line-height: 1; color: var(--red);
+    text-align: center;
+  }
+  .stage-tile-name {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 1rem; line-height: 1.1;
+  }
+  .stage-tile.expanded .stage-tile-name { color: var(--red); }
+  .stage-tile-count {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    text-transform: uppercase; text-align: right;
+  }
+  .stage-tile-count .num { color: var(--ink); font-weight: 500; }
+  .stage-tile-chev {
+    font-family: var(--mono); font-size: 0.95rem;
+    color: var(--red); text-align: center;
+    transition: transform 200ms ease;
+  }
+  .stage-tile.expanded .stage-tile-chev { transform: rotate(90deg); }
+
+  /* ============================================================
+   *  ROW PATTERN — TAP-ANYWHERE + OVERFLOW MENU
+   *
+   *  At-rest: a 3-column grid:
+   *    [num+slug+title+stamp]  [iter-pip]  [⋮ overflow]
+   *  The whole row is the primary tap target → entry-review surface.
+   *  The ⋮ button is a single 32×32 icon button on the right edge.
+   *  Tap ⋮ → action menu appears anchored to the row (frame B).
+   *
+   *  No more chip wrap. Total row height ≈ 60-70px regardless of
+   *  how many actions exist for the entry's state.
+   * ============================================================ */
+  .stage-rows {
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto 32px;
+    column-gap: 0.55rem;
+    align-items: center;
+    padding: 0.65rem 1rem 0.7rem 1.5rem;
+    border-bottom: 1px dashed var(--paper-3);
+    cursor: pointer;
+    background: var(--paper);
+    transition: background 120ms ease;
+  }
+  .row:active { background: var(--paper-2); }
+  .row:last-child { border-bottom: 0; }
+  .row-body {
+    grid-column: 1; grid-row: 1;
+    min-width: 0;
+  }
+  .row-head {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    margin-bottom: 0.18rem;
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .row-head .num { color: var(--faded); }
+  .row-head .iter { color: var(--blue); }
+  .row-slug {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--ink);
+    word-break: break-word; overflow-wrap: anywhere;
+    line-height: 1.2;
+    border-bottom: 1px solid var(--paper-3);
+    display: inline; padding-bottom: 1px;
+  }
+  .row-title {
+    display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.95rem; line-height: 1.2;
+    color: var(--ink);
+    margin-top: 0.18rem;
+  }
+
+  /* The stamp lives next to the iter-pip and overflow on the right */
+  .row-stamp-col {
+    grid-column: 2; grid-row: 1;
+    display: flex; flex-direction: column;
+    align-items: flex-end; gap: 0.18rem;
+    flex-shrink: 0;
+  }
+  .stamp {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 500;
+    background: var(--paper-3); color: var(--ink);
+    padding: 0.14rem 0.55rem 0.14rem 0.45rem;
+    line-height: 1.2; flex-shrink: 0; position: relative;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5px),
+                       calc(100% - 5px) 100%, 0 100%);
+  }
+  .stamp::before {
+    content: ''; position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px; background: currentColor;
+  }
+  .stamp.review { color: var(--red); }
+  .stamp.iterating { color: var(--blue); }
+  .stamp.approved { color: var(--green); }
+
+  .overflow-btn {
+    grid-column: 3; grid-row: 1;
+    width: 32px; height: 32px;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 2px;
+    color: var(--ink);
+    font-family: var(--mono); font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .overflow-btn:hover { background: var(--paper-2); }
+  .overflow-btn.active {
+    background: var(--ink); color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  /* Overflow menu — anchored just below the row, scrim behind */
+  .scrim {
+    position: absolute; inset: 0;
+    background: rgba(26, 22, 20, 0.18);
+    backdrop-filter: blur(1px);
+    z-index: 65;
+  }
+  .menu {
+    position: absolute;
+    z-index: 70;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-left: 3px solid var(--red);
+    border-radius: 2px;
+    box-shadow: 0 8px 24px rgba(26, 22, 20, 0.18);
+    min-width: 180px;
+    overflow: hidden;
+  }
+  .menu-item {
+    display: flex; align-items: baseline; gap: 0.55rem;
+    padding: 0.55rem 0.85rem;
+    border-bottom: 1px dashed var(--paper-3);
+    cursor: pointer;
+    background: var(--paper);
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .menu-item:last-child { border-bottom: 0; }
+  .menu-item:active { background: var(--paper-2); }
+  .menu-item-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.05rem; line-height: 1; width: 1rem; text-align: center;
+  }
+  .menu-item.approve .menu-item-glyph { color: var(--green); }
+  .menu-item.iterate .menu-item-glyph { color: var(--blue); }
+  .menu-item.cancel .menu-item-glyph { color: var(--faded); }
+  .menu-item.scrap .menu-item-glyph { color: var(--kraft); }
+  .menu-item-name {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.95rem; flex: 1;
+  }
+  .menu-item.approve .menu-item-name { color: var(--green); }
+  .menu-item.iterate .menu-item-name { color: var(--blue); }
+  .menu-item.cancel .menu-item-name { color: var(--faded); }
+  .menu-item.scrap .menu-item-name { color: var(--kraft); }
+  .menu-item-cmd {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    text-transform: uppercase;
+  }
+  .menu-item-count {
+    font-family: var(--mono); font-size: 0.62rem;
+    color: var(--kraft);
+  }
+
+  .fab { position: absolute; bottom: 16px; right: 16px;
+         z-index: 65;
+         background: var(--red); color: var(--paper);
+         border: 1px solid var(--red); border-radius: 2px;
+         padding: 0.55rem 0.85rem;
+         box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+                     0 4px 12px rgba(184, 54, 42, 0.28),
+                     0 1px 3px rgba(0,0,0,0.18);
+         font-family: var(--mono); font-size: 0.62rem;
+         font-weight: 500; letter-spacing: 0.16em;
+         text-transform: uppercase;
+         display: inline-flex; align-items: center; gap: 0.35rem;
+         cursor: pointer; line-height: 1; }
+  .fab .glyph { font-family: var(--mono); font-size: 0.95rem;
+                line-height: 1; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Row 1 · Tap-anywhere + overflow menu.</h1>
+<div class="demo-sub">Row IS the primary affordance · ⋮ button surfaces the rest</div>
+
+<div style="max-width: 720px; margin: 0 auto 1.5rem; padding: 0.85rem 1rem; background: rgba(245, 241, 232, 0.08); border-left: 3px solid var(--red); color: #C7BEAE; font-family: var(--display); font-size: 0.92rem; line-height: 1.55;">
+  <span style="font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Mockup updated 2026-05-09</span>
+  Per <a href="../../../../DESIGN-STANDARDS.md" style="color: var(--paper); text-decoration: underline;">Design Standards § Rubber-stamp conceit</a>, mobile rows do not render state-stamp chrome. Filing-tab stamps that were originally part of this mockup have been stripped. Some narrative below may still reference review state — that's stale; review state is RETIRED per DESKWORK-STATE-MACHINE.md and the rows will not show it.
+</div>
+
+<div class="frames">
+
+  <!-- Frame A: rest state — Drafting expanded with rows -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><span class="stat">11</span> on the calendar · <span class="stat">4</span> in review · <span class="stat">1</span> approved</span>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+        </div>
+
+        <div class="body">
+          <div class="stage-tile">
+            <span class="stage-tile-glyph">§</span>
+            <span class="stage-tile-name">Planned</span>
+            <span class="stage-tile-count"><span class="num">1</span></span>
+            <span class="stage-tile-chev">›</span>
+          </div>
+          <div class="stage-tile expanded">
+            <span class="stage-tile-glyph">✎</span>
+            <span class="stage-tile-name">Drafting</span>
+            <span class="stage-tile-count"><span class="num">5</span> · 3 in review</span>
+            <span class="stage-tile-chev">›</span>
+          </div>
+          <div class="stage-rows">
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head"><span class="num">№ 01</span></div>
+                <a class="row-slug" href="#">post-release-acceptance-design</a>
+                <span class="row-title">Post-release customer acceptance playbook</span>
+              </div>
+              <div class="row-stamp-col">
+                <span style="font-family: var(--mono); font-size: 0.5rem; letter-spacing: 0.06em; color: var(--faded); text-transform: uppercase;">it. 02 · ▦ 4</span>
+              </div>
+              <button class="overflow-btn">⋮</button>
+            </div>
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head"><span class="num">№ 02</span></div>
+                <a class="row-slug" href="#">…/v016-verification-walk</a>
+                <span class="row-title">v0.16.0 verification walk</span>
+              </div>
+              <div class="row-stamp-col">
+                <span style="font-family: var(--mono); font-size: 0.5rem; letter-spacing: 0.06em; color: var(--faded); text-transform: uppercase;">it. 01 · ▦ 1</span>
+              </div>
+              <button class="overflow-btn">⋮</button>
+            </div>
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head"><span class="num">№ 03</span></div>
+                <a class="row-slug" href="#">release-skill-design</a>
+                <span class="row-title">Release skill design</span>
+              </div>
+              <div class="row-stamp-col">
+                <span style="font-family: var(--mono); font-size: 0.5rem; letter-spacing: 0.06em; color: var(--faded); text-transform: uppercase;">it. 03 · ▦ 2</span>
+              </div>
+              <button class="overflow-btn">⋮</button>
+            </div>
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head"><span class="num">№ 04</span></div>
+                <a class="row-slug" href="#">deskwork-plugin/open-issue-tranche-proposal</a>
+                <span class="row-title">Open issue tranche proposal</span>
+              </div>
+              <div class="row-stamp-col">
+                <span style="font-family: var(--mono); font-size: 0.5rem; letter-spacing: 0.06em; color: var(--faded); text-transform: uppercase;">it. 01</span>
+              </div>
+              <button class="overflow-btn">⋮</button>
+            </div>
+          </div>
+          <div class="stage-tile">
+            <span class="stage-tile-glyph">⊕</span>
+            <span class="stage-tile-name">Final</span>
+            <span class="stage-tile-count"><span class="num">1</span> · 1 approved</span>
+            <span class="stage-tile-chev">›</span>
+          </div>
+        </div>
+
+        <button class="fab" type="button">
+          <span class="glyph">+</span> Compose
+        </button>
+
+      </div>
+    </div>
+    <div class="caption">A · row at-rest · slug+title=primary tap target → review surface · stamp + iter-pip + ▦ count on right · single ⋮ button · NO action chips · 4 rows fit instead of 2</div>
+  </div>
+
+  <!-- Frame B: overflow menu open for row #01 -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><span class="stat">11</span> on the calendar · <span class="stat">4</span> in review · <span class="stat">1</span> approved</span>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+        </div>
+
+        <div class="body">
+          <div class="stage-tile expanded">
+            <span class="stage-tile-glyph">✎</span>
+            <span class="stage-tile-name">Drafting</span>
+            <span class="stage-tile-count"><span class="num">5</span> · 3 in review</span>
+            <span class="stage-tile-chev">›</span>
+          </div>
+          <div class="stage-rows">
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head"><span class="num">№ 01</span></div>
+                <a class="row-slug" href="#">post-release-acceptance-design</a>
+                <span class="row-title">Post-release customer acceptance playbook</span>
+              </div>
+              <div class="row-stamp-col">
+                <span style="font-family: var(--mono); font-size: 0.5rem; letter-spacing: 0.06em; color: var(--faded); text-transform: uppercase;">it. 02 · ▦ 4</span>
+              </div>
+              <button class="overflow-btn active">⋮</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="scrim"></div>
+
+        <div class="menu" style="top: 240px; right: 16px;">
+          <a class="menu-item" href="#">
+            <span class="menu-item-glyph">→</span>
+            <span class="menu-item-name">Open</span>
+            <span class="menu-item-cmd">review</span>
+          </a>
+          <a class="menu-item approve" href="#">
+            <span class="menu-item-glyph">✓</span>
+            <span class="menu-item-name">Approve</span>
+            <span class="menu-item-cmd">/deskwork:approve</span>
+          </a>
+          <a class="menu-item cancel" href="#">
+            <span class="menu-item-glyph">⊘</span>
+            <span class="menu-item-name">Cancel</span>
+            <span class="menu-item-cmd">/deskwork:cancel</span>
+          </a>
+          <a class="menu-item scrap" href="#">
+            <span class="menu-item-glyph">▦</span>
+            <span class="menu-item-name">Scrapbook</span>
+            <span class="menu-item-count">4 items</span>
+          </a>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · ⋮ tapped on row 01 · contextual menu (Open · Approve · Cancel · Scrapbook) · approve is contextual to In Review state · scrim dims everything else · tap outside or another action to dismiss</div>
+  </div>
+
+</div>
+
+<div style="margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.6;">
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Pattern</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">The row IS the primary affordance.</strong> Tap anywhere on the slug+title → review surface. The slug-link visual cue (underline, ink color) signals it's tappable. A single 32×32 ⋮ button on the right surfaces ALL secondary actions in a contextual menu — approve, iterate, cancel, scrapbook — based on the entry's state. Approve is at the top when reviewState is `in-review`; iterate when `iterating`. Scrapbook always present with item count.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Row height (default state)</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">~64px regardless of how many actions an entry has.</strong> No chip wrap. Compare current implementation: 4-action row at 390px wraps to ~120px (3 lines of chips). On the visible Drafting expansion, this fits 4 rows in the same vertical budget that previously fit 2.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Trade-off</span>Approve / iterate / cancel each become a 2-tap action: tap ⋮, then tap the action. Compared to the current 1-tap chip, that's a tap deeper. For high-frequency approve flows the operator may feel the friction. Open is still 1 tap (tap row body). The tradeoff is row density vs. action speed; the operator approves entries one-at-a-time, not in bulk, so the 2-tap is unlikely to be a bottleneck — but it IS a real cost.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">When it wins</span>Operator browses the dashboard to FIND the entry that needs attention, lands on it, opens the review surface to act. The dashboard's job in this flow is FIND, not act. Compact rows mean more rows visible per scroll. Once on the review surface, decisions live there inline (the entry-review surface already has approve/iterate/cancel buttons on its own chrome).</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">When it doesn't</span>Operator wants to triage from the dashboard without opening each entry — e.g., bulk-cancel three stale ideas. The 2-tap-per-action friction compounds. They could swipe (Direction C) faster.</p>
+</div>
+
+</body>
+</html>

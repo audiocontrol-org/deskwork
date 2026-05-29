@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cross-bar 2 refined v2 · Manual demoted</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+CROSS-BAR 2 (SPLIT BAR) · REFINED v2
+manual demoted from nav · 2-cell nav lead direction
+============================================================
+
+OPERATOR'S NUDGE
+  "we don't need to give that much affordance to the manual.
+  It won't be used very often"
+
+WHAT THIS REFINEMENT EXPLORES
+  Two paths to demote Manual from the bar's nav region:
+
+  Option A (lead) — Drop Manual from nav entirely.
+    Nav region shrinks to 2 cells (Desk · Short). Manual moves
+    to a tiny ? glyph in the upper-right of every folio
+    masthead (same chrome that today carries "← desk" on
+    review surfaces). Contextual region grows: 1-4 cells.
+
+  Option B (softer alt) — Quiet Manual in nav.
+    Manual stays at slot 3 but renders as just a ? glyph
+    (no label, faded color even at rest). Tap target stays
+    1/3 of the nav region. Less aggressive demotion.
+
+THE BIG PAYOFF OF OPTION A
+  Entry-review review-mode's 4-tab bar (Outline · Notes ·
+  Scrapbook · Actions) fits without compression. The
+  Scrapbook → Actions sheet move that v1 refinement forced
+  becomes unnecessary. v0.18's shipped bar shape SURVIVES.
+
+WHY MANUAL'S DEMOTION IS DEFENSIBLE
+  · Manual is documentation about HOW to use the tool — not
+    a content destination. Desk and Short are content
+    destinations: longform entries vs shortform workflows.
+    These are the two pipelines the operator manages. Manual
+    is orthogonal — accessed on discovery and rarely after.
+  · Operator usage frequency: Desk = daily (every review
+    cycle). Short = daily (every shortform decision).
+    Manual = weeks-to-months (looking up a glossary term or
+    a verb reference; thereafter operator carries the
+    knowledge in their head). The bar should reflect the
+    frequency, not equal-billing.
+  · The folio masthead already carries a ? affordance precedent
+    in entry-review (the `?` shortcut overlay button at
+    er-strip-right). Hoisting ? to a universal masthead
+    position is consistent vocabulary.
+
+WHAT THIS REFINEMENT DOES NOT TOUCH
+  · The split-bar pattern itself (kraft divider, 56px tall,
+    accent colors per verb) is unchanged.
+  · The contextual region's max stays at 4. (One more cell
+    than v1's max of 3.)
+  · Other open questions from v1 refinement (Compose route,
+    Shortform desk's cell, Content tree's nav membership)
+    still need picks separately.
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: #C7BEAE; font-family: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+  body { max-width: 1180px; margin: 0 auto; }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.8rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.5rem; text-align: center; }
+
+  .banner {
+    max-width: 880px; margin: 0 auto 2.5rem;
+    padding: 1.05rem 1.3rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--green);
+    font-family: var(--display); font-size: 0.96rem; line-height: 1.6;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--green); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+  .banner blockquote {
+    margin: 0.5rem 0 0.7rem 1rem;
+    padding-left: 0.8rem;
+    border-left: 2px solid var(--red);
+    font-style: italic; color: var(--paper);
+  }
+
+  h2.section {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.5rem;
+    color: var(--paper);
+    margin: 3rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--red);
+    display: flex; align-items: baseline; gap: 1rem;
+  }
+  h2.section .num {
+    font-family: var(--mono); font-style: normal;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    color: var(--red);
+    text-transform: uppercase;
+  }
+
+  .section-lede {
+    color: #C7BEAE; font-size: 0.96rem; line-height: 1.6;
+    margin-bottom: 1.5rem; max-width: 800px;
+  }
+  .section-lede em { color: var(--paper); font-style: italic; }
+  .section-lede code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+
+  /* ============ BAR — shared component ============ */
+  .barframe {
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.3), 0 1px 0 rgba(245,241,232,0.05);
+    width: 390px; max-width: 100%;
+  }
+  .barframe-head {
+    padding: 0.55rem 0.85rem 0.5rem;
+    border-bottom: 1px solid var(--paper-3);
+    display: flex; justify-content: space-between; align-items: baseline;
+    background: var(--paper);
+    background-image: var(--noise);
+    position: relative;
+  }
+  .barframe-kicker {
+    font-family: var(--mono); font-size: 0.52rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+  }
+  .barframe-name {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 0.95rem; color: var(--ink);
+  }
+  .barframe-route {
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--faded);
+  }
+  .barframe-body {
+    height: 56px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--faded);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  /* The ? affordance in the masthead — universal on every page */
+  .masthead-help {
+    position: absolute;
+    top: 0.55rem; right: 0.85rem;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.7rem;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .masthead-help:hover, .masthead-help:focus-visible {
+    color: var(--ink); border-color: var(--ink); outline: none;
+  }
+  .split-bar {
+    height: 56px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    display: grid;
+    grid-template-columns: var(--cols, repeat(6, 1fr));
+    position: relative;
+  }
+  .bar-cell {
+    background: transparent; border: none;
+    border-right: 1px solid var(--paper-3);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    font-weight: 500;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.12rem;
+    line-height: 1;
+    cursor: pointer; text-decoration: none;
+    padding: 0.35rem 0.18rem;
+    position: relative;
+    min-width: 0;
+  }
+  .bar-cell:last-child { border-right: 0; }
+  .bar-cell-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .bar-cell.nav.active {
+    color: var(--ink); background: var(--paper);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  .bar-cell.nav.active .bar-cell-glyph { color: var(--red); }
+  .bar-cell.divider-left {
+    border-left: 1.5px solid var(--kraft);
+    margin-left: -1px;
+  }
+  .bar-cell.iterate .bar-cell-glyph { color: var(--blue); }
+  .bar-cell.approve .bar-cell-glyph { color: var(--green); }
+  .bar-cell.cancel  .bar-cell-glyph { color: var(--red); }
+  .bar-cell.save    .bar-cell-glyph { color: var(--green); }
+  .bar-cell.compose .bar-cell-glyph { color: var(--red); }
+  .bar-cell.filter  .bar-cell-glyph { color: var(--faded); }
+  .bar-cell.search  .bar-cell-glyph { color: var(--faded); }
+  .bar-cell.context-tab .bar-cell-glyph { color: var(--faded); }
+  .bar-cell.context-tab.active .bar-cell-glyph { color: var(--red); }
+  .bar-cell.context-tab.active {
+    color: var(--ink); background: var(--paper);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  .bar-cell.save.dirty .bar-cell-glyph { color: var(--green); }
+  .bar-cell.save.dirty {
+    background: rgba(46, 93, 69, 0.08);
+    color: var(--ink);
+    box-shadow: inset 0 2px 0 var(--green);
+  }
+  /* The quieted Manual cell — for Option B only */
+  .bar-cell.nav-quiet {
+    color: var(--paper-3);
+  }
+  .bar-cell.nav-quiet .bar-cell-glyph {
+    font-family: var(--mono); font-size: 0.95rem;
+    font-style: normal;
+    font-weight: 600;
+    color: var(--paper-3);
+  }
+  .bar-cell.nav-quiet.active {
+    color: var(--ink); background: var(--paper);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  .bar-cell.nav-quiet.active .bar-cell-glyph { color: var(--red); }
+  .bar-cell .badge {
+    position: absolute;
+    top: 0.18rem; right: 0.22rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.45rem;
+    padding: 0 0.16rem;
+    border-radius: 1px; line-height: 1.2;
+    letter-spacing: 0;
+  }
+  .bar-cell .badge.kraft { background: var(--kraft); }
+  .bar-cell .badge.green { background: var(--green); }
+
+  /* ============ CONTEXTS MATRIX ============ */
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+    margin-top: 0.5rem;
+  }
+  @media (max-width: 900px) { .matrix { grid-template-columns: 1fr; } }
+
+  /* ============ COMPARISON STRIP (v1 vs v2) ============ */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  @media (max-width: 900px) { .compare { grid-template-columns: 1fr; } }
+  .compare-side {
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    padding: 1.1rem 1.2rem;
+    border-radius: 4px;
+  }
+  .compare-side h4 {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 0.8rem;
+    color: var(--paper);
+    font-weight: normal;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.15);
+    padding-bottom: 0.5rem;
+  }
+  .compare-side .label {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.05rem; color: var(--paper);
+    margin-bottom: 0.5rem;
+  }
+  .compare-side .barframe { width: 100%; max-width: 100%; }
+  .compare-side .barframe-body { height: 36px; font-size: 0.5rem; }
+  .compare-side .barframe-head { padding: 0.4rem 0.6rem 0.35rem; }
+  .compare-side .barframe-kicker { font-size: 0.48rem; }
+  .compare-side .barframe-name { font-size: 0.85rem; }
+  .compare-side .note {
+    margin-top: 0.7rem; font-family: var(--display);
+    font-size: 0.88rem; line-height: 1.5; color: #C7BEAE;
+  }
+  .compare-side .note em { color: var(--paper); font-style: italic; }
+  .compare-side .note code { font-family: var(--mono); font-size: 0.78rem; color: var(--paper); }
+  .compare-side.winner {
+    border-color: rgba(46, 93, 69, 0.5);
+    background: rgba(46, 93, 69, 0.06);
+  }
+  .compare-side.winner h4 { color: var(--green); }
+
+  /* ============ SPEC TABLE ============ */
+  .spec-table {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--paper-3); line-height: 1.5;
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+  }
+  .spec-table th {
+    text-align: left; color: var(--paper);
+    font-weight: 500;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1.5px solid var(--red);
+    letter-spacing: 0.06em;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    background: rgba(245, 241, 232, 0.05);
+  }
+  .spec-table td {
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.08);
+    vertical-align: top;
+  }
+  .spec-table tr:last-child td { border-bottom: 0; }
+  .spec-table tr:nth-child(even) td { background: rgba(245, 241, 232, 0.02); }
+  .spec-table code {
+    font-family: var(--mono); color: var(--paper);
+    font-size: 0.7rem; background: rgba(245, 241, 232, 0.05);
+    padding: 0.05rem 0.3rem; border-radius: 2px;
+  }
+  .spec-table .delta-keep { color: var(--paper-3); font-style: italic; font-family: var(--display); }
+  .spec-table .delta-gain { color: #6fa080; font-style: italic; font-family: var(--display); }
+  .spec-table .delta-loss { color: #d97a72; font-style: italic; font-family: var(--display); }
+  .spec-table .tag-desk  { color: #B8362A; font-family: var(--display); font-style: italic; font-size: 0.78rem; }
+  .spec-table .tag-short { color: #2A4B7C; font-family: var(--display); font-style: italic; font-size: 0.78rem; }
+  .spec-table .tag-none  { color: var(--faded); font-family: var(--display); font-style: italic; font-size: 0.78rem; }
+  .spec-table .verb-iter   { color: #6e95c5; font-family: var(--display); font-style: italic; }
+  .spec-table .verb-apprv  { color: #6fa080; font-family: var(--display); font-style: italic; }
+  .spec-table .verb-canc   { color: #d97a72; font-family: var(--display); font-style: italic; }
+  .spec-table .verb-other  { color: var(--paper-3); font-family: var(--display); font-style: italic; }
+
+  /* ============ HARD-CASE PHONE FRAMES ============ */
+  .hardcase-row {
+    display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;
+    margin-top: 1.5rem;
+  }
+  .phone { width: 370px; height: 800px; background: #050505;
+           border-radius: 46px; padding: 10px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; flex-shrink: 0; }
+  .phone::before { content: ''; position: absolute;
+                   top: 20px; left: 50%; transform: translateX(-50%);
+                   width: 100px; height: 27px; background: #000;
+                   border-radius: 14px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 36px; overflow: hidden; position: relative;
+            font-size: 15.5px; line-height: 1.5; color: var(--ink); }
+  .ios-clock { position: absolute; top: 26px; left: 30px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 28px; right: 30px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.78rem; letter-spacing: 0.05em; z-index: 110; }
+  .top-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 76px; padding: 52px 1rem 0.5rem;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 50;
+  }
+  .top-masthead-grid {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    column-gap: 0.5rem;
+    align-items: end;
+  }
+  .top-mast-kicker {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); line-height: 1.2; margin-bottom: 0.15rem;
+  }
+  .top-mast-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.06rem 0.32rem;
+    margin-right: 0.32rem;
+    letter-spacing: 0.18em; font-size: 0.5rem;
+  }
+  .top-mast-slug {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .top-mast-r {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded); line-height: 1.2; text-align: right;
+  }
+  .top-mast-r .num {
+    color: var(--ink); font-size: 0.9rem; font-weight: 500;
+    letter-spacing: 0; display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .mast-help {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.78rem;
+    font-weight: 600; line-height: 1;
+    text-decoration: none;
+    align-self: end;
+    margin-bottom: 0.05rem;
+  }
+  .surface-body {
+    position: absolute; top: 76px; left: 0; right: 0; bottom: 56px;
+    overflow-y: auto;
+  }
+  .surface-body .rv-body { padding: 1rem 1.1rem 1.3rem; }
+  .rv-body h1 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 32, "wght" 500;
+    font-size: 1.3rem; line-height: 1.15;
+    margin-bottom: 0.35rem; color: var(--ink);
+  }
+  .rv-body .dek {
+    font-family: var(--display); font-size: 0.86rem;
+    color: var(--faded); margin-bottom: 0.8rem;
+    line-height: 1.4;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.6rem;
+  }
+  .rv-body p {
+    font-family: var(--display); font-size: 0.9rem;
+    line-height: 1.55; margin-bottom: 0.7rem; color: var(--ink);
+  }
+  .rv-body h2 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.02rem; line-height: 1.2;
+    color: var(--red); margin: 1rem 0 0.4rem;
+  }
+  .rv-body em { font-style: italic; color: var(--red); }
+  .rv-body code { font-family: var(--mono); font-size: 0.78rem;
+    background: var(--paper-2); padding: 0.04rem 0.25rem; border-radius: 2px; }
+  .rv-body .pin {
+    display: inline-block; width: 1rem; height: 1rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.55rem;
+    border-radius: 50%; text-align: center; line-height: 1rem;
+    margin-left: 0.2rem; vertical-align: super;
+  }
+  .phone-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    z-index: 60;
+  }
+  .phone .split-bar { box-shadow: 0 -2px 6px rgba(26, 22, 20, 0.05); }
+  .caption {
+    color: #C7BEAE; font-family: var(--mono);
+    font-size: 0.65rem; letter-spacing: 0.16em;
+    text-transform: uppercase; margin-top: 0.8rem;
+    text-align: center; max-width: 370px; line-height: 1.55;
+  }
+  .caption strong { color: var(--paper); }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+
+  /* ============ CALLOUTS ============ */
+  .callout {
+    margin-top: 1rem;
+    padding: 0.95rem 1.2rem;
+    background: rgba(245, 241, 232, 0.05);
+    border-left: 3px solid var(--red);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.95rem; line-height: 1.6;
+  }
+  .callout.green { border-left-color: var(--green); }
+  .callout.kraft { border-left-color: var(--kraft); }
+  .callout strong {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper); display: block; margin-bottom: 0.4rem;
+    font-weight: normal;
+  }
+  .callout em { color: var(--paper); font-style: italic; }
+  .callout code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">Cross-bar 2 · refined v2 · Manual demoted.</h1>
+<div class="demo-sub">2-cell nav lead direction · Manual moves to a masthead ? affordance · contextual region grows to 1–4 cells</div>
+
+<div class="banner">
+  <span class="kicker">Cross-bar 2 refinement v2 · operator's nudge</span>
+  <blockquote>
+    "we don't need to give that much affordance to the manual. It won't be used very often"
+  </blockquote>
+  Right. The bar's frequency budget should match the work's actual rhythm: Desk and Short are <em>daily</em> destinations (every review cycle); Manual is <em>weeks-to-months</em> (lookup-then-forget). v2 reflects that frequency by shrinking nav to 2 cells and surfacing Manual as a small <code>?</code> glyph in the upper-right of every folio masthead. The contextual region's max grows from 3 to <em>4</em> — which gives entry-review review-mode back its full 4-tab bar (no Scrapbook → Actions sheet compression).
+</div>
+
+<!-- ============================================================
+     SECTION 1: THE COMPARISON
+============================================================ -->
+<h2 class="section"><span class="num">§ 1</span> v1 (3-nav) vs v2 (2-nav) — the entry-review payoff</h2>
+
+<p class="section-lede">
+  The biggest delta lands on entry-review's review-mode. v1 refinement compressed Scrapbook into the Actions sheet to fit the 3-contextual cap. v2 keeps all four tabs visible.
+</p>
+
+<div class="compare">
+
+  <div class="compare-side">
+    <h4>v1 · 3-cell nav · Manual @ slot 3</h4>
+    <div class="label">Entry-review (review mode)</div>
+    <div class="barframe">
+      <div class="barframe-head">
+        <div>
+          <div class="barframe-kicker">entry · drafting</div>
+          <div class="barframe-name">Studio mobile-first.</div>
+        </div>
+        <div class="barframe-route">v3 · 2h</div>
+      </div>
+      <div class="barframe-body">(article body)</div>
+      <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+        <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+        <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+        <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">§</span><span>Manual</span></a>
+        <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+      </nav>
+    </div>
+    <div class="note">
+      Scrapbook compressed into Actions sheet (Folio = "context for the decision"). Folio count moves from a bar badge to a sub-section badge inside the sheet. <em>Discoverability cost: one indirection step.</em>
+    </div>
+  </div>
+
+  <div class="compare-side winner">
+    <h4>v2 · 2-cell nav · Manual @ masthead ?</h4>
+    <div class="label">Entry-review (review mode)</div>
+    <div class="barframe">
+      <div class="barframe-head">
+        <div>
+          <div class="barframe-kicker">entry · drafting</div>
+          <div class="barframe-name">Studio mobile-first.</div>
+        </div>
+        <div class="barframe-route" style="margin-right: 1.7rem;">v3 · 2h</div>
+        <a class="masthead-help" href="/dev/editorial-help" title="Manual / help">?</a>
+      </div>
+      <div class="barframe-body">(article body)</div>
+      <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+        <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+        <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+        <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+        <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+      </nav>
+    </div>
+    <div class="note">
+      All four v0.18 tabs survive: Outline · Notes · <em>Scrapbook</em> · Actions. Folio kraft-badge surfaces at a glance. The Manual <code>?</code> button sits in the masthead's upper-right corner. <em>No compression. v0.18's shipped bar shape preserved.</em>
+    </div>
+  </div>
+
+</div>
+
+<div class="callout green">
+  <strong>The verdict</strong>
+  v2 removes the only compression point v1 forced (Scrapbook → Actions sheet) and preserves the v0.18 shipped bar shape for entry-review. The cost is Manual moves from "always-visible nav cell" to "always-visible masthead glyph" — same visibility, lower visual weight. <em>For a destination accessed weeks-to-months, this matches the work's rhythm.</em>
+</div>
+
+<!-- ============================================================
+     SECTION 2: WHERE MANUAL LIVES NOW
+============================================================ -->
+<h2 class="section"><span class="num">§ 2</span> The masthead <code style="font-family:var(--mono);color:var(--paper);">?</code> affordance</h2>
+
+<p class="section-lede">
+  Manual is reached via a small <code>?</code> glyph in the upper-right of every folio masthead. The masthead is shared chrome across every studio surface; the glyph is universal. Tapping opens <code>/dev/editorial-help</code> — same destination as v1's nav tab, with one extra tap removed from the daily-frequent surfaces and one extra step added to the rare lookup. Net win.
+</p>
+
+<div class="hardcase-row">
+
+  <!-- DEMO 1: dashboard with ? glyph in masthead -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:48</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead" style="border-bottom: 1px solid var(--red);">
+        <div class="top-masthead-grid">
+          <div>
+            <div class="top-mast-kicker">The compositor's desk</div>
+            <div style="font-family: var(--display); font-style: italic;
+                        font-variation-settings: 'opsz' 26, 'wght' 500;
+                        font-size: 1.1rem; line-height: 1.1; color: var(--ink);">Pipeline.</div>
+          </div>
+          <div class="top-mast-r">drafting<br><span class="num">№ 5</span></div>
+          <a class="mast-help" href="#" title="Manual / help">?</a>
+        </div>
+      </div>
+
+      <div class="surface-body">
+        <div style="padding: 1rem 0.9rem;">
+          <div style="background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
+                      border-top: 1px solid var(--paper-3);
+                      padding: 0.55rem 1rem;
+                      font-family: var(--mono); font-size: 0.62rem;
+                      letter-spacing: 0.18em; text-transform: uppercase;
+                      color: var(--red);
+                      margin: 0 -1rem 0;">
+            ※ Drafting <span style="color: var(--faded);">· 5</span> <span style="float: right; color: var(--red);">›</span>
+          </div>
+          <div style="background: var(--paper); border-bottom: 1px dashed var(--paper-3);
+                      padding: 0.7rem 0;
+                      margin: 0 -1rem;">
+            <div style="padding: 0 1rem;">
+              <span style="font-family: var(--mono); font-size: 0.7rem; color: var(--ink);
+                           border-bottom: 1px solid var(--paper-3); padding-bottom: 1px;">whats-in-a-name</span>
+              <div style="font-family: var(--display); font-style: italic;
+                          font-variation-settings: 'opsz' 18, 'wght' 500;
+                          font-size: 0.9rem; line-height: 1.2; color: var(--ink);
+                          margin-top: 0.15rem;">What's in a Name?</div>
+            </div>
+          </div>
+          <div style="background: var(--paper); border-bottom: 1px dashed var(--paper-3);
+                      padding: 0.7rem 0; margin: 0 -1rem;">
+            <div style="padding: 0 1rem;">
+              <span style="font-family: var(--mono); font-size: 0.7rem; color: var(--ink);
+                           border-bottom: 1px solid var(--paper-3); padding-bottom: 1px;">on-revising-in-the-open</span>
+              <div style="font-family: var(--display); font-style: italic;
+                          font-variation-settings: 'opsz' 18, 'wght' 500;
+                          font-size: 0.9rem; line-height: 1.2; color: var(--ink);
+                          margin-top: 0.15rem;">On Revising in the Open</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(3, 1fr);">
+          <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+          <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+          <button class="bar-cell compose divider-left"><span class="bar-cell-glyph">+</span><span>Compose</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Dashboard.</strong><br>
+    2 nav + Compose = 3 cells × <em>130px each</em> (luxurious).<br>
+    <code style="font-family:var(--mono);font-size:0.65rem;color:var(--paper);">?</code> glyph in upper-right corner of masthead.
+  </div>
+  </div>
+
+  <!-- DEMO 2: entry-review with ? glyph in masthead + 4-tab bar -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div class="top-masthead-grid">
+          <div>
+            <div class="top-mast-kicker">entry · drafting · № 12</div>
+            <div class="top-mast-slug">studio-mobile-first-prd</div>
+          </div>
+          <div class="top-mast-r">v3<br><span class="num">2h</span></div>
+          <a class="mast-help" href="#" title="Manual / help">?</a>
+        </div>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>Studio mobile-first — PRD.</h1>
+          <p class="dek">Extend the press-check vocabulary across every studio surface.</p>
+          <h2>Problem</h2>
+          <p>The dashboard, shortform desk, and review surfaces all ship desktop-shaped CSS.<span class="pin">3</span></p>
+          <p>The v0.17 + v0.18 entry-review rebuild proved that press-check on mobile reads beautifully.<span class="pin">5</span></p>
+          <h2>Scope</h2>
+          <p>Four sequenced cuts: Dashboard → Shortform → Standalone scrapbook → Help + Index.</p>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+          <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+          <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+          <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Entry-review · review mode.</strong><br>
+    2 nav + 4 sheet-tabs = 6 cells × <em>65px each</em>.<br>
+    Scrapbook stays · kraft folio badge visible at-a-glance.
+  </div>
+  </div>
+
+  <!-- DEMO 3: shortform review with ? glyph -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div class="top-masthead-grid">
+          <div>
+            <div class="top-mast-kicker">
+              <span class="platform">linkedin</span>
+              <span>deskwork-blog</span>
+            </div>
+            <div class="top-mast-slug">v021-mobile-first-shortform</div>
+          </div>
+          <div class="top-mast-r">galley<br><span class="num">№ 03</span></div>
+          <a class="mast-help" href="#" title="Manual / help">?</a>
+        </div>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>What I learned shipping mobile-first.</h1>
+          <p class="dek">Three iterations on the state-stamp pattern; what finally worked was retiring it on mobile.</p>
+          <p>Press-check vocabulary, take three. I keep going back to this question: what should a <em>reviewed</em> draft actually look like on screen?</p>
+          <p>The first iterations leaned on rotated rubber stamps — they read on desktop where stamps spread horizontally, but on mobile they cluster.</p>
+          <p>Letterpress tags were no better — a label on a rectangle is a label on a rectangle.</p>
+          <p>The third draft retires state surfacing entirely on mobile.</p>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+          <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+          <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+          <button class="bar-cell iterate divider-left"><span class="bar-cell-glyph">↻</span><span>Iter.</span></button>
+          <button class="bar-cell approve"><span class="bar-cell-glyph">✓</span><span>Apprv.</span></button>
+          <button class="bar-cell cancel"><span class="bar-cell-glyph">⊘</span><span>Canc.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">2</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Shortform · review mode.</strong><br>
+    2 nav + 4 contextual (Iter · Apprv · Canc · TOC) = 6 cells.<br>
+    Spare slot fills with TOC when the body has &ge;2 headings.
+  </div>
+  </div>
+
+</div>
+
+<div class="callout">
+  <strong>The masthead <code style="font-family:var(--mono);color:var(--paper);">?</code> button spec</strong>
+  26 × 26px circle, 1px paper-3 border, paper bg, faded mono <code>?</code> glyph at 0.78rem. Positioned at the upper-right of every folio masthead — same row as the existing back-link (where applicable), 0.5rem below the iOS status bar. Tap opens <code>/dev/editorial-help</code>. Hover/focus brightens border to ink. WCAG 2.1 AA non-text contrast verified: faded glyph on paper bg = 4.72:1 (passes 3:1 affordance floor with headroom). The <code>?</code> mirrors the existing <code>?</code> shortcut button in entry-review's er-strip-right — same vocabulary, hoisted to universal chrome.
+</div>
+
+<!-- ============================================================
+     SECTION 3: NEW CONTEXTS MATRIX
+============================================================ -->
+<h2 class="section"><span class="num">§ 3</span> Contexts matrix · 2-nav</h2>
+<p class="section-lede">
+  The full nine-context matrix re-rendered with 2-cell nav. Scan to confirm the pattern still holds. The Manual home surface gets its own treatment: bar is bare 2-cell nav; the surface IS the manual content (kicker + sections rendered as page content, not bar chrome).
+</p>
+
+<div class="matrix">
+
+  <!-- 1. Studio index -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">1 · studio index</div>
+        <div class="barframe-name">The studio.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(directory)</div>
+    <nav class="split-bar" style="--cols: repeat(2, 1fr);">
+      <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+    </nav>
+  </div>
+
+  <!-- 2. Dashboard -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">2 · dashboard</div>
+        <div class="barframe-name">Pipeline.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-studio</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(stage tiles)</div>
+    <nav class="split-bar" style="--cols: repeat(3, 1fr);">
+      <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+      <button class="bar-cell compose divider-left"><span class="bar-cell-glyph">+</span><span>Compose</span></button>
+    </nav>
+  </div>
+
+  <!-- 3. Shortform desk -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">3 · shortform desk</div>
+        <div class="barframe-name">In flight.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-review-shortform</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(workflow list)</div>
+    <nav class="split-bar" style="--cols: repeat(3, 1fr);">
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+      <button class="bar-cell filter divider-left"><span class="bar-cell-glyph">⌕</span><span>Filter</span></button>
+    </nav>
+  </div>
+
+  <!-- 4. Entry-review · review -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">4 · entry · review</div>
+        <div class="barframe-name">Mobile-first.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-review/entry/&lt;uuid&gt;</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(article + marginalia)</div>
+    <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+      <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+      <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+    </nav>
+  </div>
+
+  <!-- 5. Entry-review · edit -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">5 · entry · edit</div>
+        <div class="barframe-name">Editing.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">(same; mode=editing)</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(source / split / preview)</div>
+    <nav class="split-bar" style="--cols: repeat(5, 1fr);">
+      <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+      <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">¶</span><span>Fmt.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+      <button class="bar-cell save dirty"><span class="bar-cell-glyph">✓</span><span>Save</span><span class="badge green">●</span></button>
+    </nav>
+  </div>
+
+  <!-- 6. Shortform review -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">6 · shortform · review</div>
+        <div class="barframe-name">linkedin · v021</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-review/&lt;wid&gt;</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(short body)</div>
+    <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+      <button class="bar-cell iterate divider-left"><span class="bar-cell-glyph">↻</span><span>Iter.</span></button>
+      <button class="bar-cell approve"><span class="bar-cell-glyph">✓</span><span>Apprv.</span></button>
+      <button class="bar-cell cancel"><span class="bar-cell-glyph">⊘</span><span>Canc.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">2</span></button>
+    </nav>
+  </div>
+
+  <!-- 7. Scrapbook viewer -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">7 · scrapbook viewer</div>
+        <div class="barframe-name">Folio.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/scrapbook/…</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(asset grid)</div>
+    <nav class="split-bar" style="--cols: repeat(4, 1fr);">
+      <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+      <button class="bar-cell filter divider-left"><span class="bar-cell-glyph">⌕</span><span>Filter</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">↗</span><span>Open</span></button>
+    </nav>
+  </div>
+
+  <!-- 8. Content tree -->
+  <div class="barframe">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">8 · content tree</div>
+        <div class="barframe-name">Browse.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/content/&lt;site&gt;/…</div>
+      <a class="masthead-help" href="#">?</a>
+    </div>
+    <div class="barframe-body">(file tree)</div>
+    <nav class="split-bar" style="--cols: repeat(3, 1fr);">
+      <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+      <button class="bar-cell search divider-left"><span class="bar-cell-glyph">⌕</span><span>Search</span></button>
+    </nav>
+  </div>
+
+  <!-- 9. Manual (now via masthead glyph; surface itself shows the docs) -->
+  <div class="barframe" style="border: 2px dashed rgba(245,241,232,0.18); background: rgba(245,241,232,0.02);">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker" style="color: var(--kraft);">9 · manual</div>
+        <div class="barframe-name">The compositor's manual.</div>
+      </div>
+      <div class="barframe-route" style="margin-right: 1.7rem;">/dev/editorial-help</div>
+      <a class="masthead-help" href="#" style="background: var(--paper-2); color: var(--ink); border-color: var(--ink);">?</a>
+    </div>
+    <div class="barframe-body" style="color: var(--kraft);">(docs body — sections rendered inline as content)</div>
+    <nav class="split-bar" style="--cols: repeat(2, 1fr);">
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+    </nav>
+  </div>
+
+</div>
+
+<div class="callout kraft">
+  <strong>Manual surface (context 9) — what changes</strong>
+  The Manual surface no longer carries a nav-active highlight (there's no Manual tab in nav). Instead, the masthead's <code>?</code> glyph renders <em>active</em> on this surface (filled paper-2 bg, ink border + glyph color). Tap returns to the previous surface (browser back) or to Desk (the default home) as the operator's exit. The contextual region on Manual is empty — the docs surface IS the content; section navigation and search are inline page chrome (TOC list, search box at top of body). Bar is bare 2-cell nav. Per the operator's framing, Manual gets the minimum chrome it deserves at its actual use frequency.
+</div>
+
+<!-- ============================================================
+     SECTION 4: SOFTER ALTERNATIVE (OPTION B)
+============================================================ -->
+<h2 class="section"><span class="num">§ 4</span> Softer alternative · Option B</h2>
+<p class="section-lede">
+  If demoting Manual all the way out of the bar feels too aggressive, the softer alternative keeps Manual at slot 3 of the nav region but renders it quieter. Same tap target, less visual emphasis.
+</p>
+
+<div class="hardcase-row" style="justify-content: flex-start;">
+
+  <div class="barframe" style="width: 480px;">
+    <div class="barframe-head">
+      <div>
+        <div class="barframe-kicker">Option B · quiet Manual at slot 3</div>
+        <div class="barframe-name">Entry-review (review mode)</div>
+      </div>
+      <div class="barframe-route">v0.18 with quieted nav</div>
+    </div>
+    <div class="barframe-body">(article body)</div>
+    <nav class="split-bar" style="--cols: repeat(6, 1fr);">
+      <a class="bar-cell nav active" href="#"><span class="bar-cell-glyph">⌗</span><span>Desk</span></a>
+      <a class="bar-cell nav" href="#"><span class="bar-cell-glyph">⊟</span><span>Short</span></a>
+      <a class="bar-cell nav-quiet" href="#"><span class="bar-cell-glyph">?</span></a>
+      <button class="bar-cell context-tab divider-left"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+      <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+    </nav>
+  </div>
+
+</div>
+
+<div class="callout">
+  <strong>Option B trade-offs</strong>
+  <ul>
+    <li><em>Pro:</em> Manual stays in the bar — operators don't have to learn the masthead <code>?</code> pattern. The <code>?</code> glyph still demotes visual weight (no label, smaller weight, faded color at rest).</li>
+    <li><em>Pro:</em> Bar geometry stays at 3-cell nav, consistent with v1 refinement — no rewire of contextual region math.</li>
+    <li><em>Con:</em> Doesn't recover the 4th contextual slot. Entry-review review-mode <em>still</em> compresses Scrapbook into Actions sheet (the v1 friction point survives).</li>
+    <li><em>Con:</em> Mixing two visual weights for nav cells (Desk/Short with italic glyph + label vs. Manual with quiet ?) reads as "two tab types" rather than "three nav tabs," which is the same conceptual cost as Option A's masthead-? without the contextual-slot payoff.</li>
+  </ul>
+  <em>Recommendation:</em> if you want Manual to stay in the bar, Option B is the cleanest form. But if the operator's framing — <em>"won't be used very often"</em> — generalizes, Option A's full demotion captures the principle more honestly.
+</div>
+
+<!-- ============================================================
+     SECTION 5: WHAT THIS UNLOCKS FOR LATER PHASES
+============================================================ -->
+<h2 class="section"><span class="num">§ 5</span> What 2-cell nav unlocks</h2>
+<p class="section-lede">
+  Other downstream payoffs from the 4-cell contextual max.
+</p>
+
+<div class="callout green">
+  <strong>1 · Shortform review can carry TOC when the body has headings</strong>
+  Today's shortform-3 mockup proposed a 3-tab bar (Actions / Versions / TOC). With 4 contextual cells available, Shortform can carry 3 verb cells (Iter / Apprv / Canc) <em>plus</em> a TOC tab in the 4th slot — conditional on <code>tocEntries.length ≥ 2</code>. Operator gets one-tap to act AND one-tap to navigate sections. Closes #244 inline. The 6-cell upper bound stays.
+</div>
+
+<div class="callout green">
+  <strong>2 · Entry-review review-mode keeps Scrapbook at-a-glance</strong>
+  The folio kraft badge on the Scrapbook tab surfaces the asset count immediately. Operators don't have to open the Actions sheet to learn how rich the entry's scrapbook is. Restores v0.18's shipped affordance that v1 refinement compressed away.
+</div>
+
+<div class="callout green">
+  <strong>3 · Headroom for future contextual cells</strong>
+  Surfaces that don't yet use the 4th slot (Dashboard, Shortform desk, Content tree, Scrapbook viewer, Studio index) have a contextual cell available if Phase 3+ design surfaces a need. The pattern's escape hatch ("More" tab → secondary verbs sheet) is still available beyond the 4th slot if a surface ever needs more than 4 — but no surface today needs it.
+</div>
+
+<!-- ============================================================
+     SECTION 6: OPEN QUESTIONS THAT REMAIN
+============================================================ -->
+<h2 class="section"><span class="num">§ 6</span> Open questions that remain</h2>
+<p class="section-lede">
+  v1 refinement surfaced 6 questions for operator pick. With v2 (2-cell nav), three are answered and three remain.
+</p>
+
+<div class="callout">
+  <strong>Resolved by v2 (no longer open)</strong>
+  <ul>
+    <li><em>Q1 · Scrapbook compression:</em> resolved — Scrapbook stays as a bar tab in v2. No Actions-sheet move needed.</li>
+    <li><em>Q5 · Manual's two contextual cells:</em> resolved — Manual's contextual region is empty in v2 (docs surface IS the content). TOC/Search live inline as page chrome.</li>
+    <li><em>Q6 · Studio index bare or Discover cell:</em> resolved — Studio index is 2-cell nav (no contextual), since the page itself IS the directory.</li>
+  </ul>
+</div>
+
+<div class="callout">
+  <strong>Still need operator picks</strong>
+  <ul>
+    <li><em>Q2 · Compose route:</em> stays as bar cell only on Dashboard (v2 default), or appears on every surface (Compose anywhere)? <em>v2's default is "Dashboard only" but Compose-anywhere is a meaningful operator-pick.</em></li>
+    <li><em>Q3 · Shortform desk's contextual cell:</em> Filter (v2 default) or + New shortform? Both fit in v2's available cells.</li>
+    <li><em>Q4 · Content tree as nav peer or sub-surface:</em> v2 widens the question — with only 2 nav cells, adding a 3rd nav tab for Content tree is cheaper than v1 (where it would have made the nav region 4 cells). Operator may want to reconsider.</li>
+  </ul>
+</div>
+
+</body>
+</html>

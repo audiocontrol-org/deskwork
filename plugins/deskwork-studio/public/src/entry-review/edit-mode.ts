@@ -109,6 +109,12 @@ export function createEditModeController(
     if (saveVersionBtn) saveVersionBtn.disabled = false;
     const changed = draftEdit.value !== state.markdown;
     setHint(changed ? 'Modified' : 'No changes');
+    // Mobile editor (Mockup 2 / editor-2-press-check-tabbar): the
+    // bottom-bar Save tab keys off this attribute to render its
+    // dirty-state glow + colored kicker. Stamp on the strip uses the
+    // same signal to flip from neutral to stamp-green.
+    if (changed) document.body.setAttribute('data-edit-dirty', '');
+    else document.body.removeAttribute('data-edit-dirty');
   }
 
   function hasUnsavedChanges(): boolean {
@@ -231,7 +237,13 @@ export function createEditModeController(
       },
     });
     updateSaveState();
-    setEditView('split');
+    // Phone has no horizontal room for split-pane (#239); default to
+    // source-only and let the strip's mobile mode pill toggle to
+    // preview when the operator wants it. Desktop keeps the legacy
+    // split default.
+    const phone = window.matchMedia('(max-width: 48rem)').matches;
+    setEditView(phone ? 'source' : 'split');
+    document.body.setAttribute('data-edit-mode', 'editing');
     editToolbar.scrollIntoView({ behavior: 'smooth', block: 'start' });
     editorHandle.focus();
     schedulePreview(state.markdown);
@@ -249,6 +261,8 @@ export function createEditModeController(
     if (toggleBtn) toggleBtn.textContent = 'Edit';
     setEditModeLabel('preview');
     editing = false;
+    document.body.removeAttribute('data-edit-mode');
+    document.body.removeAttribute('data-edit-dirty');
     if (editorHandle) {
       editorHandle.destroy();
       editorHandle = null;
@@ -313,6 +327,10 @@ export function createEditModeController(
       draftEdit.value = value;
       showToast('Saved');
       setHint('Saved');
+      // Recompute dirty state — clears `body[data-edit-dirty]` so the
+      // mobile Save tab's stamp-green pulse stops and the dirty signal
+      // accurately reflects on-disk content.
+      updateSaveState();
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       showToast(`Save failed: ${reason}`, true);
@@ -354,6 +372,50 @@ export function createEditModeController(
     ev.preventDefault();
     ev.returnValue = '';
   });
+
+  // Auto-save on visibility-change to hidden — covers iOS app-switch,
+  // tab-switch, and most browser-nav-away cases. The page is still
+  // alive at this point, so the async performSave() chain completes
+  // normally. The save is idempotent against on-disk content; double-
+  // firing on the same buffer is a no-op.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden') return;
+    if (!editing || !hasUnsavedChanges()) return;
+    void performSave();
+  });
+
+  // Auto-save on pagehide — covers full unloads (back-forward cache
+  // eviction, hard reload, memory-pressure reload on iOS Safari).
+  // CRITICAL: by the time pagehide fires the JS event loop is being
+  // torn down — async continuations after `await fetch(...)` are
+  // never reached. We fire a synchronous fetch with `keepalive: true`
+  // so the browser commits the request to the network stack before
+  // tearing the page down. This is the iOS-specific path; on
+  // visibilitychange the regular performSave runs.
+  window.addEventListener('pagehide', () => {
+    if (!editing || !hasUnsavedChanges()) return;
+    const value = editorHandle ? editorHandle.getValue() : draftEdit.value;
+    try {
+      void fetch(`${ENTRY_API}/${encodeURIComponent(state.entryId)}/body`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ markdown: value }),
+        keepalive: true,
+      });
+    } catch {
+      // Last-ditch save; can't surface errors after pagehide. The
+      // adjacent visibilitychange handler usually catches the same
+      // dirty state earlier in the unload sequence.
+    }
+  });
+
+  // Phone-only "✕ Done" exit affordance in the strip. Bound here (not
+  // in the bar's HTML) so we can dispatch through the existing
+  // toggleBtn handler — that path already runs confirmDiscard when
+  // the buffer is dirty and exitEdit when clean.
+  document
+    .querySelector<HTMLButtonElement>('[data-strip-edit-done]')
+    ?.addEventListener('click', () => toggleBtn?.click());
 
   // ---- Focus mode ----
 

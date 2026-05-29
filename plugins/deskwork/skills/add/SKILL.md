@@ -1,6 +1,6 @@
 ---
 name: add
-description: Create a new Ideas-stage entry with sidecar + scaffolded idea.md
+description: Capture a new longform-writing idea — blog post, essay, design spec, ADR, RFC, internal memo, chapter, runbook, or any markdown writeup — and create a fresh Ideas-stage entry with sidecar + scaffolded idea.md.
 ---
 
 ## Add

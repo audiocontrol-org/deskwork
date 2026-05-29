@@ -73,7 +73,25 @@ describe('iterateEntry', () => {
 
     const updated = await readSidecar(projectRoot, uuid);
     expect(updated.iterationByStage.Ideas).toBe(1);
-    expect(updated.reviewState).toBe('in-review');
+    // Per DESKWORK-STATE-MACHINE.md Commandment III, iterate does NOT
+    // write reviewState. Vestigial reviewState (if present from legacy
+    // sidecars) is stripped on the iterate write.
+    expect(updated.reviewState).toBeUndefined();
+  });
+
+  it('strips vestigial reviewState from legacy sidecars on iterate', async () => {
+    const entry = await setupEntry('Drafting');
+    // Simulate a legacy sidecar carrying a reviewState field.
+    const legacySidecar = { ...entry, reviewState: 'in-review' as const };
+    await writeSidecar(projectRoot, legacySidecar);
+    await writeFile(
+      join(projectRoot, 'docs', slug, 'index.md'),
+      `---\ndeskwork:\n  id: ${uuid}\n---\n\n# body\n`,
+    );
+
+    await iterateEntry(projectRoot, { uuid });
+    const updated = await readSidecar(projectRoot, uuid);
+    expect(updated.reviewState).toBeUndefined();
   });
 
   it('produces v(N+1) from existing iteration N', async () => {

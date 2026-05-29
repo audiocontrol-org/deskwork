@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-26T23:09:06.589Z",
+  "entryId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+    "version": 1,
+    "range": {
+      "start": 3761,
+      "end": 3778
+    },
+    "text": "There needs to be a thesis statement that this is all intended to be behind-the-scenes code hygiene, not an operator-led effort. The bulk of this should be encapsulated in the dw-lifecycle:implement cycle, not driven by explicit operator action",
+    "category": "other",
+    "anchor": "Phase 11 extensio",
+    "id": "3694e038-9e2f-4725-b6e5-4955a945219e",
+    "createdAt": "2026-05-26T23:09:06.589Z"
+  }
+}

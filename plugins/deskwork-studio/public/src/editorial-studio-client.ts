@@ -6,6 +6,10 @@
  */
 
 import { copyOrShowFallback } from './clipboard.ts';
+import { initComposeChip } from './dashboard/compose-chip.ts';
+import { initRowActions } from './dashboard/row-actions.ts';
+import { initStageTiles } from './dashboard/stage-tiles.ts';
+import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
   const site = btn.dataset.site;
@@ -197,15 +201,13 @@ function initEnqueueReviewButtons(): void {
 
 function initFilter(): void {
   const searchInput = document.querySelector<HTMLInputElement>('[data-filter-input]');
-  const stageChips = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-stage-chip]'));
   const siteChips = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-site-chip]'));
   const allCalRows = Array.from(document.querySelectorAll<HTMLElement>('.er-calendar-row'));
   const stageSections = Array.from(document.querySelectorAll<HTMLElement>('[data-stage-section]'));
   // Shortform coverage rows carry their own `data-site` and deserve the
   // same site filter. They're not inside a stage section so they stay
-  // visible regardless of the stage chip.
+  // visible regardless of the search query.
   const sfRows = Array.from(document.querySelectorAll<HTMLElement>('.er-sf-matrix tbody tr[data-site]'));
-  let activeStage = 'all';
   let activeSite = 'all';
   let searchQuery = '';
 
@@ -220,12 +222,11 @@ function initFilter(): void {
     const stageCounts = new Map<string, number>();
     for (const row of allCalRows) {
       const stage = row.dataset.stage ?? '';
-      const matchStage = activeStage === 'all' || stage === activeStage;
-      const visible = matchesRow(row) && matchStage;
+      const visible = matchesRow(row);
       row.hidden = !visible;
       if (visible) stageCounts.set(stage, (stageCounts.get(stage) ?? 0) + 1);
     }
-    // Hide entire stage sections when they have no visible rows under a filter,
+    // Hide entire stage sections when they have no visible rows under search,
     // but keep originally-empty sections visible (they show their empty state).
     for (const sec of stageSections) {
       const stage = sec.dataset.stageSection ?? '';
@@ -241,14 +242,6 @@ function initFilter(): void {
   if (searchInput) {
     searchInput.addEventListener('input', () => {
       searchQuery = searchInput.value.toLowerCase().trim();
-      applyFilter();
-    });
-  }
-  for (const chip of stageChips) {
-    chip.addEventListener('click', () => {
-      stageChips.forEach(c => c.setAttribute('aria-pressed', 'false'));
-      chip.setAttribute('aria-pressed', 'true');
-      activeStage = chip.dataset.stageChip ?? 'all';
       applyFilter();
     });
   }
@@ -518,6 +511,10 @@ function init(): void {
   initPolling();
   initIntakeForm();
   initLocaleDates();
+  initComposeChip();
+  initStageTiles();
+  initRowActions();
+  initMastheadPopover();
 }
 
 init();

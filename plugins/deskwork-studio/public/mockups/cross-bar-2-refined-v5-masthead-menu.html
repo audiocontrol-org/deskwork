@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cross-bar 2 refined v5 · masthead back left + menu right</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+CROSS-BAR 2 (SPLIT BAR) · REFINED v5
+masthead chrome refined · back left + menu right
+============================================================
+
+OPERATOR'S FRAMING
+  "I like the star nav approach—we should probably bake that
+  into the design standards, especially for when we do a
+  follow-on desktop UX/UI refinement (in separate feature
+  branch we don't need to worry about now). I do want to
+  iterate a bit on the 'Desk' affordance and the help
+  affordance. I think it would make more sense to have the
+  desk affordance as the leftmost masthead item... I think
+  we should put an expandable menu affordance as the right-
+  most object in the masthead—this will give us room to put
+  other cross-cutting options in the masthead, in addition
+  to 'help' (e.g., configure, feedback/file an issue, about,
+  stuff like that)."
+
+WHAT v5 CHANGES (vs v4)
+  · "← Desk" moves from upper-right of masthead to LEFTMOST
+    masthead position. Conventional back-button placement —
+    "go back to the broader context screen" lives where the
+    eye expects.
+  · The "?" help glyph is REPLACED with an expandable menu
+    glyph at RIGHTMOST masthead position. Tap → slide-up
+    sheet with cross-cutting options: Manual / Help · Keyboard
+    shortcuts · Configure · File an issue · About · (future
+    items).
+  · Star nav is settled. v4's architecture commitment stands;
+    v5 refines only the masthead chrome.
+
+WHAT v5 BAKES INTO STANDARDS
+  Per the operator: bake star nav + masthead chrome into
+  DESIGN-STANDARDS.md so the in-flight desktop UX/UI
+  refinement (separate feature branch, not part of this work)
+  starts from a settled spec. The standards section to add:
+
+    § Studio navigation model
+      The studio uses a STAR navigation model. The Desk
+      (/dev/editorial-studio) is the hub. Every other surface
+      is a leaf reached BY navigating from the Desk.
+      Every non-Desk surface MUST carry a "← Desk" back-link
+      in the leftmost masthead position. Every surface MUST
+      carry an expandable menu glyph in the rightmost
+      masthead position for cross-cutting actions.
+      Apply to mobile (this work) and desktop (later branch).
+
+EVERYTHING ELSE FROM v4 STAYS
+  · Bar has zero nav region. Pure 1-6 contextual cells.
+  · Desk absorbs all reachable destinations as sections.
+  · Manual + Studio index drop the bar entirely.
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: #C7BEAE; font-family: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+  body { max-width: 1180px; margin: 0 auto; }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.8rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.5rem; text-align: center; }
+
+  .banner {
+    max-width: 880px; margin: 0 auto 2.5rem;
+    padding: 1.05rem 1.3rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--green);
+    font-family: var(--display); font-size: 0.96rem; line-height: 1.6;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--green); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+  .banner blockquote {
+    margin: 0.5rem 0 0.7rem 1rem;
+    padding-left: 0.8rem;
+    border-left: 2px solid var(--red);
+    font-style: italic; color: var(--paper);
+  }
+
+  h2.section {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.5rem; color: var(--paper);
+    margin: 3rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--red);
+    display: flex; align-items: baseline; gap: 1rem;
+  }
+  h2.section .num {
+    font-family: var(--mono); font-style: normal;
+    font-size: 0.7rem; letter-spacing: 0.16em;
+    color: var(--red); text-transform: uppercase;
+  }
+
+  .section-lede {
+    color: #C7BEAE; font-size: 0.96rem; line-height: 1.6;
+    margin-bottom: 1.5rem; max-width: 800px;
+  }
+  .section-lede em { color: var(--paper); font-style: italic; }
+  .section-lede code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+
+  /* ============ PHONE FRAME ============ */
+  .phone { width: 410px; height: 800px; background: #050505;
+           border-radius: 50px; padding: 12px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; flex-shrink: 0; }
+  .phone::before { content: ''; position: absolute;
+                   top: 22px; left: 50%; transform: translateX(-50%);
+                   width: 110px; height: 30px; background: #000;
+                   border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 38px; overflow: hidden; position: relative;
+            font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.95rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* ============ NEW MASTHEAD LAYOUT (v5) ============ */
+  .v5-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 82px; padding: 56px 0.9rem 0;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 50;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    column-gap: 0.6rem;
+    align-items: end;
+    padding-bottom: 0.6rem;
+  }
+  .v5-masthead.dashboard {
+    border-bottom: 1px solid var(--red);
+    grid-template-columns: 1fr auto;  /* no back-link on Desk */
+  }
+  .v5-back {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--blue);
+    text-decoration: none;
+    border-bottom: 1px solid var(--blue);
+    padding-bottom: 1px;
+    display: inline-flex; align-items: baseline; gap: 0.25rem;
+    align-self: end;
+    flex-shrink: 0;
+    min-height: 32px;
+  }
+  .v5-back .arrow {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--blue);
+    line-height: 1.1;
+  }
+  .v5-back .dest {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 20, "wght" 500;
+    font-size: 0.9rem;
+    text-transform: none; letter-spacing: 0;
+    color: var(--blue);
+    line-height: 1;
+  }
+  .v5-mast-center {
+    min-width: 0;
+  }
+  .v5-mast-kicker {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    line-height: 1.2;
+    margin-bottom: 0.18rem;
+  }
+  .v5-mast-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.08rem 0.36rem;
+    margin-right: 0.3rem;
+    letter-spacing: 0.18em; font-size: 0.55rem;
+  }
+  .v5-mast-slug {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .v5-mast-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.15rem; line-height: 1.1; color: var(--ink);
+  }
+  .v5-mast-meta {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+    line-height: 1.2; text-align: right;
+    align-self: end;
+    flex-shrink: 0;
+  }
+  .v5-mast-meta .num {
+    color: var(--ink); font-size: 0.9rem; font-weight: 500;
+    letter-spacing: 0; display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+
+  /* The menu button — rightmost masthead */
+  .v5-menu-btn {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px;
+    width: 30px; height: 30px;
+    padding: 6px 6px;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    cursor: pointer;
+    text-decoration: none;
+    align-self: end;
+    flex-shrink: 0;
+  }
+  .v5-menu-btn:hover, .v5-menu-btn:focus-visible {
+    border-color: var(--ink);
+    outline: none;
+  }
+  .v5-menu-btn .rule {
+    height: 1.5px;
+    background: var(--ink);
+    border-radius: 0.5px;
+  }
+  .v5-menu-btn .rule-1 { width: 14px; }
+  .v5-menu-btn .rule-2 { width: 10px; }
+  .v5-menu-btn .rule-3 { width: 14px; }
+  .v5-menu-btn.sheet-open {
+    background: var(--paper-2);
+    border-color: var(--red);
+  }
+  .v5-menu-btn.sheet-open .rule { background: var(--red); }
+
+  /* ============ ENLARGED ANATOMY DIAGRAM ============ */
+  .anatomy-frame {
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    padding: 1.8rem 1.5rem 1.8rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+  }
+  .anatomy-masthead {
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    border-radius: 4px 4px 0 0;
+    height: 110px;
+    padding: 1rem 1.5rem;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    column-gap: 1.2rem;
+    align-items: end;
+    padding-bottom: 1.1rem;
+    max-width: 600px;
+    margin: 0 auto;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.3);
+  }
+  .anatomy-masthead .v5-back .arrow { font-size: 1.2rem; }
+  .anatomy-masthead .v5-back .dest { font-size: 1.3rem; }
+  .anatomy-masthead .v5-mast-kicker { font-size: 0.75rem; }
+  .anatomy-masthead .v5-mast-title { font-size: 1.7rem; }
+  .anatomy-masthead .v5-mast-meta { font-size: 0.7rem; }
+  .anatomy-masthead .v5-mast-meta .num { font-size: 1.25rem; }
+  .anatomy-masthead .v5-menu-btn {
+    width: 44px; height: 44px;
+    gap: 5px;
+    padding: 8px;
+  }
+  .anatomy-masthead .v5-menu-btn .rule { height: 2.5px; }
+  .anatomy-masthead .v5-menu-btn .rule-1,
+  .anatomy-masthead .v5-menu-btn .rule-3 { width: 22px; }
+  .anatomy-masthead .v5-menu-btn .rule-2 { width: 16px; }
+  .anatomy-callouts-large {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1.3rem;
+    max-width: 880px;
+    margin-left: auto; margin-right: auto;
+  }
+  .anatomy-callout {
+    padding: 0.7rem 0.9rem;
+    background: rgba(245, 241, 232, 0.04);
+    border-left: 2px solid var(--red);
+    font-family: var(--display); font-size: 0.92rem; line-height: 1.55;
+    color: #C7BEAE;
+  }
+  .anatomy-callout.blue { border-left-color: var(--blue); }
+  .anatomy-callout.kraft { border-left-color: var(--kraft); }
+  .anatomy-callout strong {
+    color: var(--paper);
+    font-family: var(--mono); font-style: normal;
+    font-variation-settings: "opsz" 16, "wght" 500;
+    font-size: 0.6rem;
+    display: block; margin-bottom: 0.35rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .anatomy-callout em { color: var(--paper); font-style: italic; font-family: var(--display); }
+  .anatomy-callout code { font-family: var(--mono); color: var(--paper); font-size: 0.78rem; }
+
+  /* ============ BAR (carries over from v4 unchanged) ============ */
+  .surface-body {
+    position: absolute; top: 82px; left: 0; right: 0; bottom: 56px;
+    overflow-y: auto;
+  }
+  .surface-body.no-bar { bottom: 0; }
+  .surface-body .rv-body { padding: 1rem 1.1rem 1.3rem; }
+  .rv-body h1 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.5rem; line-height: 1.15;
+    margin-bottom: 0.4rem; color: var(--ink);
+  }
+  .rv-body .dek {
+    font-family: var(--display); font-size: 0.95rem;
+    color: var(--faded); margin-bottom: 1rem;
+    line-height: 1.4;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.7rem;
+  }
+  .rv-body p {
+    font-family: var(--display); font-size: 0.96rem;
+    line-height: 1.55; margin-bottom: 0.8rem; color: var(--ink);
+  }
+  .rv-body h2 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.1rem; line-height: 1.2;
+    color: var(--red); margin: 1.3rem 0 0.5rem;
+  }
+  .rv-body em { font-style: italic; color: var(--red); }
+  .rv-body .pin {
+    display: inline-block; width: 1rem; height: 1rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.55rem;
+    border-radius: 50%; text-align: center; line-height: 1rem;
+    margin-left: 0.2rem; vertical-align: super;
+  }
+  .phone-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    z-index: 60;
+  }
+  .split-bar {
+    height: 56px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    display: grid;
+    grid-template-columns: var(--cols, repeat(6, 1fr));
+    position: relative;
+    box-shadow: 0 -2px 6px rgba(26, 22, 20, 0.05);
+  }
+  .bar-cell {
+    background: transparent; border: none;
+    border-right: 1px solid var(--paper-3);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    font-weight: 500;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.12rem;
+    line-height: 1;
+    cursor: pointer; text-decoration: none;
+    padding: 0.35rem 0.18rem;
+    position: relative;
+    min-width: 0;
+  }
+  .bar-cell:last-child { border-right: 0; }
+  .bar-cell-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .bar-cell.iterate .bar-cell-glyph { color: var(--blue); }
+  .bar-cell.approve .bar-cell-glyph { color: var(--green); }
+  .bar-cell.cancel  .bar-cell-glyph { color: var(--red); }
+  .bar-cell.save    .bar-cell-glyph { color: var(--green); }
+  .bar-cell.context-tab .bar-cell-glyph { color: var(--faded); }
+  .bar-cell .badge {
+    position: absolute;
+    top: 0.18rem; right: 0.22rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.45rem;
+    padding: 0 0.16rem;
+    border-radius: 1px; line-height: 1.2;
+    letter-spacing: 0;
+  }
+  .bar-cell .badge.kraft { background: var(--kraft); }
+
+  /* ============ MENU SHEET ============ */
+  .scrim {
+    position: absolute; inset: 0;
+    background: rgba(26, 22, 20, 0.42);
+    z-index: 70;
+    border-radius: 38px;
+  }
+  .menu-sheet {
+    position: absolute; left: 0; right: 0; bottom: 56px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    box-shadow:
+      0 -10px 30px rgba(26, 22, 20, 0.18),
+      0 -2px 6px rgba(26, 22, 20, 0.08);
+    padding: 0.55rem 0 0;
+    z-index: 80;
+    display: flex; flex-direction: column;
+    max-height: 70%;
+  }
+  .menu-sheet.no-bar { bottom: 0; }
+  .menu-handle {
+    align-self: center;
+    width: 44px; height: 4px;
+    background: var(--paper-3);
+    border-radius: 2px;
+    margin-bottom: 0.55rem;
+    flex-shrink: 0;
+  }
+  .menu-head {
+    padding: 0.35rem 1.1rem 0.7rem;
+    border-bottom: 1px dashed var(--paper-3);
+  }
+  .menu-kicker {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.15rem;
+  }
+  .menu-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.3rem; color: var(--ink); line-height: 1.1;
+  }
+  .menu-title em { color: var(--red); }
+  .menu-list { padding: 0.2rem 0 0.6rem; overflow-y: auto; }
+  .menu-section {
+    padding: 0.2rem 0;
+    border-bottom: 1px dotted var(--paper-3);
+  }
+  .menu-section:last-child { border-bottom: 0; }
+  .menu-section-label {
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--faded);
+    padding: 0.5rem 1.1rem 0.3rem;
+  }
+  .menu-item {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr auto;
+    align-items: center;
+    column-gap: 0.7rem;
+    padding: 0.7rem 1.1rem;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .menu-item:hover, .menu-item:focus-visible {
+    background: var(--paper-2);
+    outline: none;
+  }
+  .menu-item-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.25rem; line-height: 1;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    color: var(--red);
+    text-align: center;
+  }
+  .menu-item-glyph.kraft { color: var(--kraft); }
+  .menu-item-glyph.blue  { color: var(--blue); }
+  .menu-item-glyph.green { color: var(--green); }
+  .menu-item-label {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.05rem; color: var(--ink); line-height: 1.15;
+  }
+  .menu-item-route {
+    display: block;
+    font-family: var(--mono); font-size: 0.58rem;
+    color: var(--faded);
+    letter-spacing: 0.08em;
+    margin-top: 0.18rem;
+  }
+  .menu-item-arrow {
+    font-family: var(--mono); font-size: 0.85rem;
+    color: var(--paper-3);
+    flex-shrink: 0;
+  }
+  .menu-item-arrow.external { color: var(--blue); }
+  .menu-item-future {
+    opacity: 0.5;
+  }
+  .menu-item-future .menu-item-future-tag {
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--kraft);
+  }
+
+  .hardcase-row {
+    display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;
+    margin-top: 1.5rem;
+  }
+  .caption {
+    color: #C7BEAE; font-family: var(--mono);
+    font-size: 0.65rem; letter-spacing: 0.16em;
+    text-transform: uppercase; margin-top: 0.8rem;
+    text-align: center; max-width: 410px; line-height: 1.55;
+  }
+  .caption strong { color: var(--paper); }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+
+  /* ============ STANDARDS-DRAFT BLOCK ============ */
+  .standards-draft {
+    margin-top: 1.5rem;
+    background: rgba(245, 241, 232, 0.05);
+    border: 1px solid rgba(245, 241, 232, 0.18);
+    border-left: 4px solid var(--green);
+    padding: 1.3rem 1.5rem;
+    font-family: var(--display); font-size: 0.96rem; line-height: 1.6;
+    color: #C7BEAE;
+  }
+  .standards-draft h3 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.25rem;
+    color: var(--paper);
+    margin-bottom: 0.55rem;
+  }
+  .standards-draft h4 {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper);
+    margin: 1rem 0 0.4rem;
+    font-weight: 500;
+  }
+  .standards-draft em { color: var(--paper); font-style: italic; }
+  .standards-draft code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); background: rgba(245,241,232,0.05); padding: 0.05rem 0.3rem; border-radius: 2px; }
+  .standards-draft ul { padding-left: 1.2rem; margin: 0.35rem 0 0.5rem; }
+  .standards-draft li { margin-bottom: 0.25rem; }
+  .standards-draft .filepath {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.06em; color: var(--green);
+    margin-top: 0.3rem;
+  }
+
+  /* ============ CALLOUTS ============ */
+  .callout {
+    margin-top: 1rem;
+    padding: 0.95rem 1.2rem;
+    background: rgba(245, 241, 232, 0.05);
+    border-left: 3px solid var(--red);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.95rem; line-height: 1.6;
+  }
+  .callout.green { border-left-color: var(--green); }
+  .callout.kraft { border-left-color: var(--kraft); }
+  .callout.blue  { border-left-color: var(--blue); }
+  .callout strong {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper); display: block; margin-bottom: 0.4rem;
+    font-weight: normal;
+  }
+  .callout em { color: var(--paper); font-style: italic; }
+  .callout code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">Cross-bar 2 · refined v5 · masthead chrome.</h1>
+<div class="demo-sub">Star nav settled · "← Desk" leftmost · expandable menu rightmost · room for cross-cutting actions</div>
+
+<div class="banner">
+  <span class="kicker">Cross-bar 2 refinement v5 · operator's pick</span>
+  <blockquote>
+    "I like the star nav approach—we should probably bake that into the design standards... I think it would make more sense to have the desk affordance as the leftmost masthead item, which seems to be a common practice of putting the 'go back to the broader context screen' affordance where 'back' makes the most sense. I think we should put an expandable menu affordance as the right-most object in the masthead—this will give us room to put other cross-cutting options in the masthead, in addition to 'help' (e.g., configure, feedback/file an issue, about, stuff like that)."
+  </blockquote>
+  v4's star navigation is settled. v5 refines the masthead chrome: <em>"← Desk"</em> moves to the leftmost position (conventional back-button placement); the <code>?</code> help glyph is replaced with a <em>menu affordance</em> at the rightmost position, opening a sheet with Manual / Keyboard shortcuts / Configure / File an issue / About / future items. Desktop UX refinement is deferred to a separate feature branch — but the architecture commitment is recorded in <code>DESIGN-STANDARDS.md</code> so the desktop pass starts from a settled spec.
+</div>
+
+<!-- ============================================================
+     SECTION 1: ANATOMY
+============================================================ -->
+<h2 class="section"><span class="num">§ 1</span> The new masthead layout</h2>
+<p class="section-lede">
+  Four regions, aligned to the masthead's baseline grid: <em>back</em> left · <em>center content</em> (kicker + title/slug) · <em>meta</em> right · <em>menu button</em> rightmost. The back-link is mono-arrow + italic-display-name; the menu button is three CSS-rendered horizontal rules (a press-check editor-mark, not the generic <code>☰</code> unicode). On the Desk itself, the back-link is absent (you're home) and the layout collapses to three columns.
+</p>
+
+<div class="anatomy-frame">
+  <div class="anatomy-masthead">
+    <a class="v5-back" href="#">
+      <span class="arrow">←</span>
+      <span class="dest">Desk</span>
+    </a>
+    <div class="v5-mast-center">
+      <div class="v5-mast-kicker">entry · drafting · № 12</div>
+      <div class="v5-mast-title">Studio mobile-first.</div>
+    </div>
+    <div class="v5-mast-meta">v3<br><span class="num">2h</span></div>
+    <button class="v5-menu-btn" aria-label="Studio menu">
+      <span class="rule rule-1"></span>
+      <span class="rule rule-2"></span>
+      <span class="rule rule-3"></span>
+    </button>
+  </div>
+
+  <div class="anatomy-callouts-large">
+    <div class="anatomy-callout blue">
+      <strong>Back affordance (leftmost)</strong>
+      Mono <code>←</code> + italic-display <em>Desk</em>. Proof-blue. Underline 1px. Touch target ≥44×32px including padding. Tap → <code>/dev/editorial-studio</code>. <em>"Desk" is the destination name rendered in display italic because it IS a place — operators read it as "the Desk," not as "a button labeled Desk."</em>
+    </div>
+    <div class="anatomy-callout">
+      <strong>Center content</strong>
+      Kicker (mono caps, red) + title or slug (italic display or mono). Same composition as today's masthead. Eye lands here second after parsing the back-link.
+    </div>
+    <div class="anatomy-callout kraft">
+      <strong>Meta (right of center)</strong>
+      Version + relative time, mono kicker style. Stays mono so the eye reads it as data, not chrome.
+    </div>
+    <div class="anatomy-callout">
+      <strong>Menu button (rightmost)</strong>
+      Three CSS-rendered horizontal rules (14px / 10px / 14px) — a press-check editor-mark, distinct from the generic web <code>☰</code>. Encased in a 30×30 paper-bordered square. Active (sheet open) state: paper-2 bg + red rules. Tap → menu sheet (Phase 2.1 <code>createSlideUpSheet</code>).
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 2: THE MENU SHEET
+============================================================ -->
+<h2 class="section"><span class="num">§ 2</span> The menu sheet</h2>
+<p class="section-lede">
+  Tap the rightmost menu glyph. Slide-up sheet opens with cross-cutting actions grouped by section. Phase 2.1's <code>createSlideUpSheet()</code> hosts it — same controller as Actions / Outline / Notes / Picker (had v3 picker survived). Sections: <em>Operator help</em> (Manual + keyboard shortcuts), <em>Configure</em> (settings), <em>Connect</em> (issue tracker + about). Future items slot in additional sections.
+</p>
+
+<div class="hardcase-row">
+
+  <!-- Demo 1: at-rest (closed) -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v5-masthead">
+        <a class="v5-back" href="#">
+          <span class="arrow">←</span>
+          <span class="dest">Desk</span>
+        </a>
+        <div class="v5-mast-center">
+          <div class="v5-mast-kicker">entry · drafting · № 12</div>
+          <div class="v5-mast-slug">studio-mobile-first-prd</div>
+        </div>
+        <div class="v5-mast-meta">v3<br><span class="num">2h</span></div>
+        <button class="v5-menu-btn" aria-label="Studio menu">
+          <span class="rule rule-1"></span>
+          <span class="rule rule-2"></span>
+          <span class="rule rule-3"></span>
+        </button>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>Studio mobile-first — PRD.</h1>
+          <p class="dek">Extend the press-check vocabulary across every studio surface.</p>
+          <h2>Problem</h2>
+          <p>The dashboard, shortform desk, and review surfaces all ship desktop-shaped CSS.<span class="pin">3</span></p>
+          <p>The v0.17 + v0.18 entry-review rebuild proved that press-check on mobile reads beautifully.<span class="pin">5</span></p>
+          <h2>Scope</h2>
+          <p>Four sequenced cuts: Dashboard → Shortform → Standalone scrapbook → Help + Index.</p>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(5, 1fr);">
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Entry-review · at rest.</strong><br>
+    Masthead: <code style="font-family:var(--mono);font-size:0.6rem;color:var(--paper);">← Desk</code> left, menu glyph right.<br>
+    Bar: 5 contextual cells (v4 unchanged).
+  </div>
+  </div>
+
+  <!-- Demo 2: menu sheet open -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:55</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v5-masthead">
+        <a class="v5-back" href="#">
+          <span class="arrow">←</span>
+          <span class="dest">Desk</span>
+        </a>
+        <div class="v5-mast-center">
+          <div class="v5-mast-kicker">entry · drafting · № 12</div>
+          <div class="v5-mast-slug">studio-mobile-first-prd</div>
+        </div>
+        <div class="v5-mast-meta">v3<br><span class="num">2h</span></div>
+        <button class="v5-menu-btn sheet-open" aria-label="Studio menu" aria-expanded="true">
+          <span class="rule rule-1"></span>
+          <span class="rule rule-2"></span>
+          <span class="rule rule-3"></span>
+        </button>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>Studio mobile-first — PRD.</h1>
+          <p class="dek">Extend the press-check vocabulary across every studio surface.</p>
+          <p>The dashboard, shortform desk, and review surfaces all ship desktop-shaped CSS.</p>
+        </div>
+      </div>
+
+      <div class="scrim"></div>
+
+      <div class="menu-sheet">
+        <div class="menu-handle"></div>
+        <div class="menu-head">
+          <div class="menu-kicker">Studio menu</div>
+          <div class="menu-title">Configure &amp; <em>support</em></div>
+        </div>
+        <div class="menu-list">
+
+          <div class="menu-section">
+            <div class="menu-section-label">Operator help</div>
+            <a class="menu-item" href="/dev/editorial-help">
+              <span class="menu-item-glyph">§</span>
+              <span>
+                <span class="menu-item-label">Manual</span>
+                <span class="menu-item-route">/dev/editorial-help · glossary &amp; reference</span>
+              </span>
+              <span class="menu-item-arrow">›</span>
+            </a>
+            <a class="menu-item" href="#">
+              <span class="menu-item-glyph blue">⌘</span>
+              <span>
+                <span class="menu-item-label">Keyboard shortcuts</span>
+                <span class="menu-item-route">opens shortcut overlay · press <code style="font-family:var(--mono);font-size:0.6rem;color:var(--paper);">?</code> anytime</span>
+              </span>
+              <span class="menu-item-arrow">›</span>
+            </a>
+          </div>
+
+          <div class="menu-section">
+            <div class="menu-section-label">Configure</div>
+            <a class="menu-item menu-item-future" href="#">
+              <span class="menu-item-glyph kraft">⊞</span>
+              <span>
+                <span class="menu-item-label">Configure studio</span>
+                <span class="menu-item-route">edit <code>.deskwork/config.json</code> <span class="menu-item-future-tag">(phase 4)</span></span>
+              </span>
+              <span class="menu-item-arrow">›</span>
+            </a>
+          </div>
+
+          <div class="menu-section">
+            <div class="menu-section-label">Connect</div>
+            <a class="menu-item" href="https://github.com/audiocontrol-org/deskwork/issues/new">
+              <span class="menu-item-glyph blue">✎</span>
+              <span>
+                <span class="menu-item-label">File an issue</span>
+                <span class="menu-item-route">github.com/audiocontrol-org/deskwork · new tab ↗</span>
+              </span>
+              <span class="menu-item-arrow external">↗</span>
+            </a>
+            <a class="menu-item" href="#">
+              <span class="menu-item-glyph">❡</span>
+              <span>
+                <span class="menu-item-label">About deskwork</span>
+                <span class="menu-item-route">v0.21.0 · GPL-3.0 · thesis &amp; releases</span>
+              </span>
+              <span class="menu-item-arrow">›</span>
+            </a>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(5, 1fr);">
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Menu sheet open.</strong><br>
+    Three sections: Operator help · Configure · Connect.<br>
+    Menu rules rotate to red when sheet open; sheet auto-closes on item-tap.
+  </div>
+  </div>
+
+  <!-- Demo 3: Desk surface with no back-link, menu still on right -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:48</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v5-masthead dashboard">
+        <div class="v5-mast-center">
+          <div class="v5-mast-kicker">The compositor's desk</div>
+          <div class="v5-mast-title">Pipeline + Press.</div>
+        </div>
+        <button class="v5-menu-btn" aria-label="Studio menu">
+          <span class="rule rule-1"></span>
+          <span class="rule rule-2"></span>
+          <span class="rule rule-3"></span>
+        </button>
+      </div>
+
+      <div class="surface-body no-bar">
+        <div style="padding: 0.75rem 0;">
+          <div style="background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
+                      border-top: 1px solid var(--paper-3);
+                      padding: 0.55rem 1rem;
+                      font-family: var(--mono); font-size: 0.6rem;
+                      letter-spacing: 0.18em; text-transform: uppercase;
+                      color: var(--red);">
+            ☰ Longform pipeline <span style="color: var(--faded); letter-spacing: 0.12em;">· 17 entries</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 22, 'wght' 500;
+                         font-size: 1.1rem; color: var(--red); text-align: center;">✎</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">Drafting</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">5</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--red); text-align: center;">›</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 22, 'wght' 500;
+                         font-size: 1.1rem; color: var(--red); text-align: center;">※</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">Final</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">4</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--red); text-align: center;">›</span>
+          </div>
+          <div style="background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
+                      border-top: 1px solid var(--paper-3);
+                      padding: 0.55rem 1rem;
+                      font-family: var(--mono); font-size: 0.6rem;
+                      letter-spacing: 0.18em; text-transform: uppercase;
+                      color: var(--blue);
+                      margin-top: 0.75rem;">
+            ⊟ Shortform · by platform <span style="color: var(--faded); letter-spacing: 0.12em;">· 7 workflows</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="background: var(--red); color: var(--paper);
+                         font-family: var(--mono); font-size: 0.5rem;
+                         padding: 0.06rem 0.32rem;
+                         letter-spacing: 0.12em;">in</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">LinkedIn</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">3</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--blue); text-align: center;">›</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="background: var(--blue); color: var(--paper);
+                         font-family: var(--mono); font-size: 0.5rem;
+                         padding: 0.06rem 0.32rem;
+                         letter-spacing: 0.12em;">r/</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">Reddit</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">2</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--blue); text-align: center;">›</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="position: absolute; bottom: 16px; right: 16px; z-index: 65;
+                  background: var(--red); color: var(--paper);
+                  border: 1px solid var(--red); border-radius: 2px;
+                  padding: 0.5rem 0.75rem;
+                  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+                              0 4px 12px rgba(184, 54, 42, 0.28),
+                              0 1px 3px rgba(0,0,0,0.18);
+                  font-family: var(--mono); font-size: 0.6rem;
+                  font-weight: 500; letter-spacing: 0.16em;
+                  text-transform: uppercase;
+                  display: inline-flex; align-items: center; gap: 0.35rem;
+                  line-height: 1;">
+        <span style="font-family: var(--mono); font-size: 0.85rem; font-weight: 600;">+</span>
+        <span>Compose</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Desk · the hub.</strong><br>
+    No back-link (you're home). Masthead is 3-column: kicker/title · meta · menu.<br>
+    Menu glyph still on the right. Compose floats (v0.19 unchanged).
+  </div>
+  </div>
+
+</div>
+
+<div class="callout blue">
+  <strong>The menu glyph — why three custom rules instead of <code>☰</code></strong>
+  The Unicode <code>☰</code> (TRIGRAM FOR HEAVEN) is the generic web "hamburger." Three CSS-rendered rules at varying widths (14px / 10px / 14px) read as a press-check editor's contents-mark — a subtle bibliographic flourish rather than a stamp-marked generic affordance. Distinct from the row-overflow <code>⋮</code> (used elsewhere) by orientation (horizontal vs vertical) so the two affordances don't conflate. WCAG: rules at 1.5px solid var(--er-ink) on var(--er-paper) = 16.1:1 contrast, well above the 3:1 non-text minimum.
+</div>
+
+<!-- ============================================================
+     SECTION 3: STANDARDS PROPOSAL
+============================================================ -->
+<h2 class="section"><span class="num">§ 3</span> What to bake into DESIGN-STANDARDS.md</h2>
+<p class="section-lede">
+  Per the operator: <em>"we should probably bake that into the design standards, especially for when we do a follow-on desktop UX/UI refinement (in separate feature branch we don't need to worry about now)."</em> The standards section below is the architecture commitment to add as a new top-level section. The desktop refinement starts from this spec instead of relitigating.
+</p>
+
+<div class="standards-draft">
+  <div class="filepath">PROPOSED ADDITION · DESIGN-STANDARDS.md (after § Surfaces, before § Mobile vs desktop deltas)</div>
+
+  <h3>§ Studio navigation model</h3>
+
+  <p>
+    The studio uses a <em>star navigation</em> model. The <em>Desk</em> (<code>/dev/editorial-studio</code>) is the hub. Every other surface (entry-review, shortform review, scrapbook viewer, content tree, manual, future surfaces) is a leaf reached <em>by navigating from the Desk</em>. There is no bar nav region; there is no destination picker; there is no top-level tab bar.
+  </p>
+
+  <h4>The two universal masthead affordances</h4>
+
+  <p>Every studio surface MUST carry these two masthead affordances at the breakpoints they're shipped to (mobile per this work; desktop in a future feature branch):</p>
+
+  <ul>
+    <li><em>"← Desk" back-link</em> — leftmost masthead position. Mono <code>←</code> + italic-display <em>Desk</em>. Proof-blue, 1px underline. Tap navigates to <code>/dev/editorial-studio</code>. <strong>Absent only on the Desk itself</strong> (you're already home).</li>
+    <li><em>Menu glyph</em> — rightmost masthead position. Three CSS-rendered horizontal rules (14px / 10px / 14px) inside a 30×30 paper-bordered square. Tap opens the studio menu sheet (Phase 2.1 <code>createSlideUpSheet</code>) with cross-cutting actions: Manual / Keyboard shortcuts / Configure / File an issue / About / future items. Present on <em>every</em> surface including the Desk.</li>
+  </ul>
+
+  <h4>The Desk's hub role</h4>
+
+  <p>The Desk is the entry-point to every reachable destination. Its information architecture grows to absorb destinations that would otherwise be top-level navigation entries:</p>
+  <ul>
+    <li>Longform pipeline tiles (Ideas → Cancelled) — existing in v0.19</li>
+    <li>Shortform section grouped by platform — new under this spec</li>
+    <li>Folio tile (standalone scrapbook viewer entry-point) — Phase 3</li>
+    <li>Files tile (content tree entry-point) — Phase 3</li>
+    <li>Future destinations slot in as additional sections/tiles</li>
+  </ul>
+
+  <h4>Implications for desktop (separate feature branch)</h4>
+
+  <p>Desktop refinement (future work, not in this feature) inherits this model. The "← Desk" back-link and menu glyph appear in equivalent desktop chrome (likely the editorial-folio header rather than the mobile masthead). The Desk's section-stack pattern becomes a multi-column or wide-grid layout where the IA can spread. The cross-cutting principle — Desk is hub, every leaf carries back + menu — holds at every breakpoint.</p>
+
+  <h4>Why this is settled</h4>
+
+  <p>This model was reached through five mockup passes (cross-bar 2 + four refinements). v1 enumerated 3 nav tabs; v2 demoted Manual; v3 collapsed nav to a picker; v4 dropped the picker entirely (Desk as hub); v5 refined masthead chrome. Each pass added simplification without losing capability. Reconsidering would relitigate decisions the operator has already approved.</p>
+
+  <p>This section is referenced by the <code>.claude/rules/design-standards.md</code> rule (project-wide). Surfaces that contradict it — adding a top-level tab bar, omitting the back-link on a leaf surface, omitting the menu glyph on any surface — are bugs to be fixed.</p>
+</div>
+
+<div class="callout">
+  <strong>Where this lives</strong>
+  Standards addition will go in <code>DESIGN-STANDARDS.md</code>'s <em>Surfaces</em> section as a new <em>§ Studio navigation model</em> subsection (or its own top-level § between Surfaces and Mobile vs desktop deltas). Implementation can begin once the standards update lands as a separate commit on this branch. Per the design-standards rule, the standards file is the canonical spec; mockups must comply.
+</div>
+
+<!-- ============================================================
+     SECTION 4: REMAINING DECISIONS
+============================================================ -->
+<h2 class="section"><span class="num">§ 4</span> Remaining decisions before implementation</h2>
+
+<div class="callout green">
+  <strong>What's settled by v5</strong>
+  <ul>
+    <li>Star nav model: Desk is hub; every leaf has "← Desk" + menu.</li>
+    <li>Masthead chrome: back-link leftmost, menu glyph rightmost, both universal.</li>
+    <li>Bar geometry: zero nav region, 1-6 contextual cells.</li>
+    <li>Compression: Scrapbook stays as a bar tab on entry-review (no Acts.-sheet compression needed at 5+ cell cap).</li>
+    <li>Manual and Studio index: bar absent (no contextual chrome to surface).</li>
+  </ul>
+</div>
+
+<div class="callout">
+  <strong>Still need operator picks (carried forward from earlier refinements)</strong>
+  <ul>
+    <li><em>Q · Compose on every surface or Dashboard-only?</em> v4 default: Dashboard-only (compose stays as floating chip). Alternative: Compose in menu sheet (so it's reachable from any surface). <em>Recommendation: keep Dashboard-only for now; revisit if operators ask.</em></li>
+    <li><em>Q · Shortform desk URL disposition.</em> Retire (<code>/dev/editorial-review-shortform</code> 301-redirects to Desk) OR keep as deep-link mirror? <em>Recommendation: keep as deep-link mirror initially.</em></li>
+    <li><em>Q · Menu sheet item order &amp; sections.</em> v5 proposes 3 sections (Operator help · Configure · Connect). Specific items: Manual · Keyboard shortcuts · Configure (Phase 4) · File an issue · About. Add/remove items? Different section labels?</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     SECTION 5: IMPLEMENTATION PATH UNDER v5
+============================================================ -->
+<h2 class="section"><span class="num">§ 5</span> Implementation under v5</h2>
+
+<div class="callout blue">
+  <strong>Server template changes</strong>
+  <pre style="font-family: var(--mono); font-size: 0.78rem; color: var(--paper-3); line-height: 1.5; margin: 0.55rem 0; white-space: pre-wrap;">// Universal masthead chrome (used on every surface)
+renderMasthead({
+  kicker: string,
+  title: string,                  // italic display
+  slug?: string,                  // mono, replaces title when present
+  meta?: { label: string, value: string },
+  showBackToDesk: boolean,        // false only on Desk
+  // menu is ALWAYS rendered; no opt-out
+})
+
+// Bar chrome (only when surface has &ge;1 contextual cell)
+renderMobileBar({
+  contextual: Cell[]              // 1-6 cells
+})
+
+// Studio menu sheet (universal)
+renderStudioMenuSheet({
+  sections: [
+    { label: 'Operator help', items: [...] },
+    { label: 'Configure',     items: [...] },
+    { label: 'Connect',       items: [...] }
+  ]
+})</pre>
+</div>
+
+<div class="callout">
+  <strong>CSS extraction</strong>
+  Masthead + menu CSS goes in <code>plugins/deskwork-studio/public/css/mobile-shell.css</code> (new file, mentioned in v3 + v4 specs). The compose-chip CSS stays in <code>editorial-studio.css</code> (Dashboard-specific). The menu sheet's CSS lives next to its renderer.
+</div>
+
+<div class="callout">
+  <strong>Phase 2.1 primitive reuse</strong>
+  The menu sheet is a new <code>createSlideUpSheet()</code> consumer — the third (after entry-review's mobile-sheet-bar and dashboard's compose-chip). The picker-sheet body content is markup-only; no new client primitives. The menu button's click handler is two lines: <code>sheet.open(); btn.classList.add('sheet-open')</code> with the reverse on close.
+</div>
+
+<div class="callout green">
+  <strong>Phase shape</strong>
+  Phase 2.2 lands the masthead + menu + Shortform-section-on-Desk in v0.21. Phase 3 picks up the Folio + Files entry-tiles when those surfaces ship. The shortform pick (Shortform-1, Shortform-2, or Shortform-3 from the original shortform mockups) re-frames as "which idiom does the contextual region use on shortform review" — the back-link + menu chrome is the same regardless.
+</div>
+
+</body>
+</html>

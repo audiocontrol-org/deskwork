@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Shortform 1 · Sticky decision bar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+SHORTFORM MOCKUP · DIRECTION A · STICKY DECISION BAR
+============================================================
+
+WHAT
+  A thin sticky bottom bar carries Iterate / Approve / Cancel as
+  three pill buttons. The strip at the top is reduced to a
+  contextual banner showing the slash-command's required
+  context (platform · channel · slug) plus the version mark.
+  The article body owns the middle of the screen and scrolls
+  freely. The decision affordances are always within thumb
+  reach regardless of draft length.
+
+WHY THIS DIRECTION IS IN PLAY
+  · Friction F.2 from the audit (decision affordances scroll
+    out of sight on phone) is solved by anchoring them to the
+    viewport bottom. The operator never scrolls back to the
+    top to act.
+  · Friction F.3 (iterate command missing --platform / --channel)
+    is solved by surfacing those values in the masthead banner
+    so the operator sees the context they're committing to
+    BEFORE they tap.
+  · Tradeoff accepted: ~52px of always-visible bottom chrome.
+    Less viewport space for the article. Worth it because the
+    article is the read-once content and the bar is what the
+    operator returns to after reading.
+
+HOW IT CONSUMES PHASE 2.1 PRIMITIVES
+  · Does NOT use the sheet-controller. Buttons are direct
+    one-tap clipboard-copies; no slide-up surface.
+  · The shortform desk row design is one-tap-into-review with
+    a 2-column stacked layout (no 5-column grid, no stamps).
+
+SPEC COMPLIANCE
+  · DESIGN-STANDARDS § Rubber-stamp conceit (lines 107-145):
+    NO state stamps on mobile — surface compliant.
+  · DESKWORK-STATE-MACHINE Commandment III: NO "IN REVIEW" /
+    "ITERATING" / "APPROVED" labels — surface compliant.
+  · DESKWORK-STATE-MACHINE Commandment II: verbs (iterate,
+    approve, cancel) shown unconditionally; never gated on
+    reviewState — surface compliant. Reject removed.
+  · THESIS Consequence 2: every bar button is a
+    clipboard-copy of the corresponding slash command. No
+    POST mutation on tap.
+  · WCAG 2.1 AA: bar background --er-paper-2 (#ECE6D4) under
+    bar items; pill fills --er-proof-blue / --er-stamp-green /
+    --er-red-pencil with --er-paper text. All ratios verified
+    ≥4.5:1.
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink); font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.7rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.4rem; text-align: center; }
+  .banner {
+    max-width: 760px; margin: 0 auto 1.8rem;
+    padding: 0.85rem 1rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--red);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.92rem; line-height: 1.55;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.8rem; color: var(--paper); }
+
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono);
+             font-size: 0.7rem; letter-spacing: 0.18em;
+             text-transform: uppercase; margin-top: 0.8rem;
+             text-align: center; max-width: 410px; line-height: 1.5; }
+  .caption strong { color: var(--paper); }
+  .caption code { font-family: var(--mono); font-size: 0.62rem; color: var(--paper-3); text-transform: lowercase; letter-spacing: 0; }
+
+  /* ============ PHONE FRAME ============ */
+  .phone { width: 410px; height: 880px; background: #050505;
+           border-radius: 50px; padding: 12px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; }
+  .phone::before { content: ''; position: absolute;
+                   top: 22px; left: 50%; transform: translateX(-50%);
+                   width: 110px; height: 30px; background: #000;
+                   border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 38px; overflow: hidden; position: relative;
+            font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.95rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* ============ REVIEW SURFACE — MASTHEAD ============ */
+  .sf-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 82px; padding: 56px 1.1rem 0;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.6rem;
+    align-items: end;
+    padding-bottom: 0.55rem;
+  }
+  .sf-mast-l { min-width: 0; }
+  .sf-mast-kicker {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    line-height: 1.2;
+    margin-bottom: 0.15rem;
+  }
+  .sf-mast-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.08rem 0.36rem;
+    margin-right: 0.35rem;
+    letter-spacing: 0.18em; font-size: 0.55rem;
+  }
+  .sf-mast-slug {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .sf-mast-r {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+    line-height: 1.2; text-align: right;
+  }
+  .sf-mast-r .num {
+    color: var(--ink); font-size: 0.95rem; font-weight: 500;
+    letter-spacing: 0;
+    display: block;
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .sf-mast-back {
+    position: absolute; top: 58px; right: 1.1rem;
+    font-family: var(--mono); font-size: 0.6rem;
+    color: var(--blue); letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-bottom: 1px solid var(--blue);
+  }
+
+  /* ============ REVIEW SURFACE — BODY ============ */
+  .sf-body {
+    position: absolute; top: 82px; left: 0; right: 0; bottom: 52px;
+    overflow-y: auto;
+    padding: 1.1rem 1.2rem 1.5rem;
+  }
+  .sf-body h1 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.5rem; line-height: 1.15;
+    margin-bottom: 0.4rem; color: var(--ink);
+  }
+  .sf-body .dek {
+    font-family: var(--display);
+    font-size: 0.95rem; color: var(--faded);
+    margin-bottom: 1rem;
+    line-height: 1.4;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.7rem;
+  }
+  .sf-body p {
+    font-family: var(--display);
+    font-size: 0.96rem; line-height: 1.55;
+    margin-bottom: 0.8rem; color: var(--ink);
+  }
+  .sf-body h2 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.1rem; line-height: 1.2;
+    color: var(--red);
+    margin: 1.3rem 0 0.5rem;
+  }
+  .sf-body p em { font-style: italic; color: var(--red); }
+  .sf-body code {
+    font-family: var(--mono); font-size: 0.85rem;
+    background: var(--paper-2);
+    padding: 0.04rem 0.28rem;
+    border-radius: 2px;
+  }
+
+  /* ============ REVIEW SURFACE — STICKY BAR ============ */
+  .sf-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 52px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    box-shadow: 0 -2px 6px rgba(26, 22, 20, 0.05);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    column-gap: 0.45rem;
+    padding: 0.45rem 0.7rem;
+    align-items: center;
+    z-index: 60;
+  }
+  .sf-pill {
+    border: 1px solid transparent;
+    color: var(--paper);
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 500;
+    padding: 0.5rem 0.4rem;
+    border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 0.32rem;
+    line-height: 1;
+    height: 100%;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      0 1px 3px rgba(0,0,0,0.18);
+  }
+  .sf-pill-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.05rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .sf-pill.iterate { background: var(--blue); border-color: var(--blue); }
+  .sf-pill.approve { background: var(--green); border-color: var(--green); }
+  .sf-pill.cancel { background: var(--red); border-color: var(--red); }
+
+  /* ============ EDIT-AFFORDANCE STRIP UNDER BAR ============ */
+  /* tiny chrome above the bar showing 'edit' affordance + version
+     switcher when versions > 1. */
+  .sf-substrip {
+    position: absolute; bottom: 52px; left: 0; right: 0;
+    height: 26px;
+    background: var(--paper);
+    border-top: 1px dotted var(--paper-3);
+    display: flex; align-items: center;
+    padding: 0 0.85rem;
+    gap: 0.6rem;
+    z-index: 55;
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .sf-substrip a { color: var(--blue); text-decoration: none; border-bottom: 1px solid var(--blue); }
+  .sf-substrip .versions { margin-left: auto; display: flex; gap: 0.32rem; }
+  .sf-substrip .versions a {
+    color: var(--faded); border-bottom: 0; padding: 0 0.18rem;
+  }
+  .sf-substrip .versions a.active { color: var(--ink); border-bottom: 1px solid var(--red); }
+
+  /* When the substrip exists, shift the body upward so it's not
+     overlapped: 52 + 26 = 78. */
+  .sf-body.with-substrip { bottom: 78px; }
+
+  /* ============ DESK INDEX — MASTHEAD ============ */
+  .dx-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 92px; padding: 56px 1.1rem 0.8rem;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+  }
+  .dx-mast-kicker {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--red); margin-bottom: 0.2rem;
+  }
+  .dx-mast-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.2rem; line-height: 1.15;
+    color: var(--ink);
+  }
+  .dx-mast-count {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+    margin-top: 0.15rem;
+  }
+  .dx-mast-count .num {
+    color: var(--ink); font-weight: 500;
+  }
+
+  /* ============ DESK INDEX — BODY ============ */
+  .dx-body {
+    position: absolute; top: 92px; left: 0; right: 0; bottom: 0;
+    overflow-y: auto;
+  }
+  .dx-platform {
+    padding: 0.55rem 1rem 0.3rem;
+    background: var(--paper-2);
+    border-top: 1px solid var(--paper-3);
+    border-bottom: 1px dashed var(--paper-3);
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    display: flex; align-items: baseline; gap: 0.55rem;
+  }
+  .dx-platform .count {
+    color: var(--faded); letter-spacing: 0.12em;
+  }
+  .dx-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.6rem;
+    padding: 0.65rem 1rem 0.7rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    align-items: start;
+  }
+  .dx-row-body { min-width: 0; }
+  .dx-row-slug {
+    font-family: var(--mono); font-size: 0.76rem;
+    color: var(--ink);
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: inline-block;
+    max-width: 100%;
+  }
+  .dx-row-title {
+    display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.95rem; line-height: 1.25;
+    color: var(--ink);
+    margin-top: 0.2rem;
+  }
+  .dx-row-meta {
+    font-family: var(--mono); font-size: 0.58rem;
+    color: var(--faded);
+    text-align: right;
+    line-height: 1.4;
+  }
+  .dx-row-meta .ts { display: block; }
+  .dx-row-meta .v {
+    color: var(--ink); font-size: 0.62rem;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 16, "wght" 500;
+    margin-top: 0.05rem;
+  }
+  .dx-channel {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: var(--blue);
+    display: inline-block;
+    margin-top: 0.18rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">Shortform 1 · Sticky decision bar.</h1>
+<div class="demo-sub">Mobile-first · Direction A · always-reachable verbs · no sheet</div>
+
+<div class="banner">
+  <span class="kicker">Mockup direction A · proposed for Task 2.2 shortform pick</span>
+  The strip at the top becomes a banner showing the slash command's required context (<em>platform · channel · slug</em>). The article body owns the middle of the screen. A thin sticky bottom bar carries <em>Iterate</em> / <em>Approve</em> / <em>Cancel</em> as three pills, color-coded per the press-check accent map. Every tap copies <code>/deskwork:&lt;verb&gt; --site &lt;site&gt; --platform &lt;p&gt; --channel &lt;c&gt; &lt;slug&gt;</code> to clipboard (THESIS Consequence 2). No state stamps anywhere on mobile. No reject verb.
+</div>
+
+<div class="frames">
+
+  <!-- ====================== FRAME A: review — LinkedIn (no headings) ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="sf-masthead">
+        <div class="sf-mast-l">
+          <div class="sf-mast-kicker">
+            <span class="platform">linkedin</span>
+            <span>deskwork-blog</span>
+          </div>
+          <div class="sf-mast-slug">v021-mobile-first-shortform</div>
+        </div>
+        <div class="sf-mast-r">
+          galley<br>
+          <span class="num">№ 03</span>
+        </div>
+        <a class="sf-mast-back" href="#">← desk</a>
+      </div>
+
+      <div class="sf-body">
+        <h1>What I learned shipping mobile-first.</h1>
+        <p class="dek">Three iterations on the state-stamp pattern; what finally worked was retiring it on mobile.</p>
+
+        <p>Press-check vocabulary, take three. I keep going back to this question: what should a <em>reviewed</em> draft actually look like on screen?</p>
+        <p>The first iterations leaned on rotated rubber stamps — they read on desktop where stamps spread horizontally, but on mobile they cluster and fight the row's natural composition.</p>
+        <p>Letterpress tags were no better — a label on a rectangle is a label on a rectangle no matter how you draw it.</p>
+        <p>The third draft retires state surfacing entirely on mobile. Where it matters, stage hierarchy and the action affordance itself communicate state. Where it doesn't, absence is information too.</p>
+        <p>I'm calling it: stamps stay on desktop, mobile rows render clean.</p>
+      </div>
+
+      <div class="sf-substrip">
+        <a href="#">double-tap to edit</a>
+        <span class="versions">
+          <a href="#">v1</a>
+          <a href="#">v2</a>
+          <a href="#" class="active">v3</a>
+        </span>
+      </div>
+
+      <div class="sf-bar">
+        <button class="sf-pill iterate">
+          <span class="sf-pill-glyph">↻</span>
+          <span>Iterate</span>
+        </button>
+        <button class="sf-pill approve">
+          <span class="sf-pill-glyph">✓</span>
+          <span>Approve</span>
+        </button>
+        <button class="sf-pill cancel">
+          <span class="sf-pill-glyph">⊘</span>
+          <span>Cancel</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Frame A · Review · LinkedIn (no headings).</strong><br>
+    Banner shows platform · channel · slug. Article body free of decision chrome.<br>
+    Three pills always within thumb reach. Each tap copies <code>/deskwork:&lt;verb&gt;</code>.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME B: review — Reddit (one h2) ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:53</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="sf-masthead">
+        <div class="sf-mast-l">
+          <div class="sf-mast-kicker">
+            <span class="platform" style="background: var(--blue); border-color: var(--blue);">reddit</span>
+            <span>r/programming</span>
+          </div>
+          <div class="sf-mast-slug">why-i-stopped-css-by-hand</div>
+        </div>
+        <div class="sf-mast-r">
+          galley<br>
+          <span class="num">№ 02</span>
+        </div>
+        <a class="sf-mast-back" href="#">← desk</a>
+      </div>
+
+      <div class="sf-body">
+        <h2>Why I stopped writing CSS by hand</h2>
+        <p>I keep two flavors of CSS in my head these days. One is the rules of the game — flexbox alignment, what <code>min-width: 0</code> does to grid items, the cascade. The other is the syntax — every comma, every semicolon, every <code>:hover</code> selector I have to type a thousand times.</p>
+        <p>The first flavor matters. It's the part where you make a decision: this header is sticky, this column shrinks before that one, the gap between siblings is <code>var(--space-3)</code>. The second flavor is just keystroke tax.</p>
+        <p>Tailwind's pitch was the second flavor — let me write <code>flex items-center gap-3</code> instead of authoring a stylesheet. Fine. But what I want now is closer to the first: tell me my decisions are wrong, not retype them for me.</p>
+        <p>The shape that's worked, on this project specifically: token vars in one place, semantic selectors that read like prose (<code>.er-strip-galley</code> not <code>.flex.items-center.gap-2</code>), media queries scoped to a single data-attribute.</p>
+        <p>I can grep my CSS the way I grep code. The decisions are visible.</p>
+        <p>Press-check vocabulary helped. Naming colors after presscheck objects — paper, ink, red-pencil, proof-blue — meant the next decision wasn't <em>what hue</em>, it was <em>what role</em>. That cuts time.</p>
+      </div>
+
+      <div class="sf-bar">
+        <button class="sf-pill iterate">
+          <span class="sf-pill-glyph">↻</span>
+          <span>Iterate</span>
+        </button>
+        <button class="sf-pill approve">
+          <span class="sf-pill-glyph">✓</span>
+          <span>Approve</span>
+        </button>
+        <button class="sf-pill cancel">
+          <span class="sf-pill-glyph">⊘</span>
+          <span>Cancel</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Frame B · Review · Reddit (one h2).</strong><br>
+    No substrip — version 02 only, no version picker needed.<br>
+    Banner platform-chip color swaps for proof-blue per Reddit identity hint.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME C: desk index ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:48</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="dx-masthead">
+        <div class="dx-mast-kicker">Shortform · the compositor's desk</div>
+        <div class="dx-mast-title">In flight.</div>
+        <div class="dx-mast-count"><span class="num">7</span> open across <span class="num">3</span> platforms</div>
+      </div>
+
+      <div class="dx-body">
+
+        <div class="dx-platform">
+          LinkedIn
+          <span class="count">· 3 open</span>
+        </div>
+
+        <a href="#" class="dx-row">
+          <div class="dx-row-body">
+            <span class="dx-row-slug">v021-mobile-first-shortform</span>
+            <span class="dx-row-title">What I learned shipping mobile-first.</span>
+            <span class="dx-channel">deskwork-blog</span>
+          </div>
+          <div class="dx-row-meta">
+            <span class="ts">2h ago</span>
+            <span class="v">v3</span>
+          </div>
+        </a>
+
+        <a href="#" class="dx-row">
+          <div class="dx-row-body">
+            <span class="dx-row-slug">what-deskwork-actually-is</span>
+            <span class="dx-row-title">What deskwork actually is (and isn't).</span>
+            <span class="dx-channel">deskwork-blog</span>
+          </div>
+          <div class="dx-row-meta">
+            <span class="ts">yesterday</span>
+            <span class="v">v1</span>
+          </div>
+        </a>
+
+        <a href="#" class="dx-row">
+          <div class="dx-row-body">
+            <span class="dx-row-slug">press-check-vocabulary</span>
+            <span class="dx-row-title">Press-check vocabulary — a naming pattern.</span>
+            <span class="dx-channel">deskwork-blog</span>
+          </div>
+          <div class="dx-row-meta">
+            <span class="ts">May 09</span>
+            <span class="v">v2</span>
+          </div>
+        </a>
+
+        <div class="dx-platform" style="color: var(--blue);">
+          Reddit
+          <span class="count">· 2 open</span>
+        </div>
+
+        <a href="#" class="dx-row">
+          <div class="dx-row-body">
+            <span class="dx-row-slug">why-i-stopped-css-by-hand</span>
+            <span class="dx-row-title">Why I stopped writing CSS by hand.</span>
+            <span class="dx-channel">r/programming</span>
+          </div>
+          <div class="dx-row-meta">
+            <span class="ts">3h ago</span>
+            <span class="v">v2</span>
+          </div>
+        </a>
+
+        <a href="#" class="dx-row">
+          <div class="dx-row-body">
+            <span class="dx-row-slug">on-revising-in-the-open</span>
+            <span class="dx-row-title">On revising in the open.</span>
+            <span class="dx-channel">r/blogsnark</span>
+          </div>
+          <div class="dx-row-meta">
+            <span class="ts">May 10</span>
+            <span class="v">v1</span>
+          </div>
+        </a>
+
+        <div class="dx-platform" style="color: var(--kraft);">
+          YouTube
+          <span class="count">· 2 open</span>
+        </div>
+
+        <a href="#" class="dx-row">
+          <div class="dx-row-body">
+            <span class="dx-row-slug">two-flavors-of-css</span>
+            <span class="dx-row-title">Two flavors of CSS in 2026.</span>
+            <span class="dx-channel">@deskwork</span>
+          </div>
+          <div class="dx-row-meta">
+            <span class="ts">1h ago</span>
+            <span class="v">v4</span>
+          </div>
+        </a>
+
+      </div>
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Frame C · Desk index.</strong><br>
+    2-column rows: slug · title · channel | timestamp · version.<br>
+    No state stamps. Platform sections are the only structural chrome.
+  </div>
+  </div>
+
+</div>
+
+<!-- ====================== DESKTOP NOTE ====================== -->
+<div style="margin: 3rem auto 0; max-width: 1100px;
+            background: rgba(245, 241, 232, 0.05);
+            border: 1px solid rgba(245, 241, 232, 0.12);
+            color: #C7BEAE;
+            padding: 1.2rem 1.4rem;
+            font-family: var(--display); font-size: 0.92rem; line-height: 1.6;">
+  <div style="font-family: var(--mono); font-size: 0.62rem;
+              letter-spacing: 0.18em; text-transform: uppercase;
+              color: var(--paper); margin-bottom: 0.5rem;">
+    Desktop behavior
+  </div>
+  <p style="margin-bottom: 0.6rem;">
+    Desktop (≥48rem) keeps the existing strip layout — controls stay inline in the top strip, no sticky bottom bar. The mobile pattern is the only delta; the strip's existing longform-scoped flex layout extends to shortform via removing the <code style="font-family:var(--mono);color:var(--paper)">[data-review-ui="longform"]</code> scope.
+  </p>
+  <p>
+    The platform/channel chip pattern (Frame A's red <code style="font-family:var(--mono);color:var(--paper)">linkedin</code> + Reddit's blue swap) carries to desktop too, replacing today's <code style="font-family:var(--mono);color:var(--paper)">.er-shortform-meta</code> stack.
+  </p>
+</div>
+
+</body>
+</html>

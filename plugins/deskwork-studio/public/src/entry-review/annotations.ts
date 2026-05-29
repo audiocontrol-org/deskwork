@@ -16,10 +16,12 @@
 import {
   computeOffsetFromRange,
   extractQuote,
+  plainText,
   rebaseAnchor,
   removeHighlight,
   wrapRange,
 } from './range-utils.ts';
+import { computeMarkPencilPosition } from './pencil-position.ts';
 import { buildSidebarItem } from './sidebar-render.ts';
 import {
   createCommentEditApi,
@@ -222,6 +224,20 @@ export function createAnnotationsController(
       return;
     }
     const anchor = extractQuote(draftBody, pendingRange);
+    // #200 — capture W3C TextQuoteSelector prefix/suffix context for
+    // later-version anchor disambiguation. ~64 chars per side from
+    // the draft body's plain-text projection (same coordinate space
+    // as range/anchor). Truncated at document boundaries.
+    const CONTEXT_CHARS = 64;
+    const bodyText = plainText(draftBody);
+    const anchorPrefix = bodyText.slice(
+      Math.max(0, pendingRange.start - CONTEXT_CHARS),
+      pendingRange.start,
+    );
+    const anchorSuffix = bodyText.slice(
+      pendingRange.end,
+      pendingRange.end + CONTEXT_CHARS,
+    );
     // Phase 34a: entry-keyed annotations reuse entryId as workflowId
     // for type compatibility; field retired in shortform-migration phase.
     const payload = {
@@ -232,6 +248,8 @@ export function createAnnotationsController(
       text,
       category: categorySel.value,
       anchor,
+      anchorPrefix,
+      anchorSuffix,
     };
     try {
       const res = await fetch(annotateUrl(), {
@@ -282,7 +300,15 @@ export function createAnnotationsController(
         if (resolvedIds.has(a.id)) {
           let status: AnnotationStatus = 'current';
           if (a.version !== versionNum) {
-            status = rebaseAnchor(draftBody, a.anchor) ? 'rebased' : 'unresolved';
+            status = rebaseAnchor(
+              draftBody,
+              a.anchor,
+              a.anchorPrefix,
+              a.anchorSuffix,
+              a.range.start,
+            )
+              ? 'rebased'
+              : 'unresolved';
           }
           resolvedHistory.push({ ann: a, status });
           continue;
@@ -291,7 +317,13 @@ export function createAnnotationsController(
           current.push(a);
           continue;
         }
-        const rebasedRange = rebaseAnchor(draftBody, a.anchor);
+        const rebasedRange = rebaseAnchor(
+          draftBody,
+          a.anchor,
+          a.anchorPrefix,
+          a.anchorSuffix,
+          a.range.start,
+        );
         if (rebasedRange) rebased.push({ ann: a, range: rebasedRange });
         else unanchored.push(a);
       }
@@ -336,7 +368,13 @@ export function createAnnotationsController(
     const idx = resolvedHistory.findIndex((r) => r.ann.id === annotation.id);
     if (idx >= 0) resolvedHistory.splice(idx, 1);
     if (status === 'rebased') {
-      const r = rebaseAnchor(draftBody, annotation.anchor);
+      const r = rebaseAnchor(
+        draftBody,
+        annotation.anchor,
+        annotation.anchorPrefix,
+        annotation.anchorSuffix,
+        annotation.range.start,
+      );
       if (r) wrapRange(draftBody, r, annotation.id);
     } else if (status === 'current') {
       wrapRange(draftBody, annotation.range, annotation.id);
@@ -396,9 +434,17 @@ export function createAnnotationsController(
       addBtn.hidden = true;
       return;
     }
-    const PENCIL_GAP = 14;
-    addBtn.style.top = `${rect.top - parent.top - addBtn.offsetHeight - PENCIL_GAP}px`;
-    addBtn.style.left = `${rect.left - parent.left + rect.width / 2}px`;
+    // #236 — coarse-pointer surfaces flip the pencil below the selection
+    // so it doesn't collide with iOS Safari's native selection callout.
+    const isCoarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    const { top, left } = computeMarkPencilPosition({
+      rect,
+      parentRect: parent,
+      btnHeight: addBtn.offsetHeight,
+      isCoarse,
+    });
+    addBtn.style.top = `${top}px`;
+    addBtn.style.left = `${left}px`;
     pendingRange = offsets;
     pendingRangePageTop = rect.top + window.scrollY;
   });

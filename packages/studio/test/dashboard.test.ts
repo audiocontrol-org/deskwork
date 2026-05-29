@@ -107,14 +107,13 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     expect(r.html).toMatch(/data-empty-stage="Cancelled"[^>]*>[\s\S]*?No cancelled entries/);
   });
 
-  it('renders one row per sidecar with iteration count and reviewState badge', async () => {
+  it('renders one row per sidecar tagged with uuid + slug + stage (no reviewState badge per DESKWORK-STATE-MACHINE.md III)', async () => {
     await writeSidecar(root, makeEntry({
       uuid: UUID_DRAFTING,
       slug: 'sample-draft',
       title: 'Sample Draft',
       currentStage: 'Drafting',
       iterationByStage: { Ideas: 1, Planned: 1, Outlining: 1, Drafting: 4 },
-      reviewState: 'in-review',
     }));
 
     const r = await getHtml(app, '/dev/editorial-studio');
@@ -124,13 +123,16 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     expect(r.html).toMatch(
       new RegExp(`data-stage="Drafting"[^>]*data-uuid="${UUID_DRAFTING}"[^>]*data-slug="sample-draft"`),
     );
-    // Iteration count surfaces inline.
-    expect(r.html).toMatch(/data-iteration="4"[^>]*>iteration: 4/);
-    // ReviewState badge renders with the canonical label.
-    expect(r.html).toMatch(/data-review-state="in-review"[^>]*>in review/);
+    // Per DESKWORK-STATE-MACHINE.md Commandment III, reviewState is
+    // RETIRED and iterationByStage is bookkeeping (not user-facing).
+    // Neither surfaces on the row.
+    expect(r.html).not.toMatch(/data-iteration="4"/);
+    expect(r.html).not.toMatch(/iteration: 4/);
+    expect(r.html).not.toMatch(/data-review-state=/);
+    expect(r.html).not.toMatch(/er-stamp-in-review/);
   });
 
-  it('renders an em-dash placeholder for entries with no reviewState', async () => {
+  it('renders an empty status cell (no em-dash, no link) for entries with no reviewState (#243)', async () => {
     await writeSidecar(root, makeEntry({
       uuid: UUID_IDEA,
       slug: 'fresh-idea',
@@ -141,7 +143,13 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
 
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.html).toMatch(/data-review-state="none"/);
+    // Pre-#243 the status column rendered a stamp box with an em-dash;
+    // operators read it as a button. The cell is now empty when there's
+    // no reviewState to communicate. Grid alignment is preserved by the
+    // empty-but-present <span class="er-calendar-status">.
+    expect(r.html).not.toMatch(/data-review-state="none"/);
+    expect(r.html).not.toMatch(/er-stamp-none/);
+    expect(r.html).toMatch(/<span class="er-calendar-status" aria-hidden="true">/);
   });
 
   it('approved entry surfaces an "approve →" affordance', async () => {
@@ -358,24 +366,28 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     );
   });
 
-  // #117: status badges are wrapped in an anchor pointing at the
-  // entry's review surface — clicking the dashed-border stamp now
-  // navigates instead of being inert decoration.
-  it('wraps the reviewState badge in a link to the review surface (#117)', async () => {
+  // #117 was the reviewState badge → review-surface link. The badge is
+  // retired per DESKWORK-STATE-MACHINE.md Commandment III; the review
+  // surface is now reached via the per-row slug link, not via a stamp.
+  it('row slug links to the entry-keyed review surface (post-#117 / post-v0.19)', async () => {
     await writeSidecar(
       root,
       makeEntry({
         uuid: UUID_DRAFTING,
+        slug: 'sample-draft',
         currentStage: 'Drafting',
-        reviewState: 'in-review',
       }),
     );
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
+    // Row's slug span carries an anchor to the entry-keyed review URL.
     expect(r.html).toMatch(
       new RegExp(
-        `<a href="/dev/editorial-review/entry/${UUID_DRAFTING}"[^>]*class="er-stamp-link"[^>]*><span class="er-stamp er-stamp-in-review"`,
+        `<a href="/dev/editorial-review/entry/${UUID_DRAFTING}"[^>]*>sample-draft</a>`,
       ),
     );
+    // The retired stamp-link pattern must not return.
+    expect(r.html).not.toMatch(/er-stamp-link/);
+    expect(r.html).not.toMatch(/er-stamp er-stamp-in-review/);
   });
 });

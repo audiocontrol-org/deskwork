@@ -2,6 +2,96 @@
 
 Project-scoped rules for how an agent should behave when working on deskwork. These are durable: anyone working on this codebase, from any worktree or machine, should follow them. New lessons learned in conversation that would otherwise go to auto-memory belong here instead — auto-memory is keyed to the working-directory path and does not survive worktree switches or fresh clones.
 
+## Use /frontend-design for all design tasks
+
+When the work requires a design decision — a new UI surface, a redesign of an existing surface, a placement decision for a new affordance, a visual language choice, anything that asks *"what should this look like / how should this work"* — invoke the **`/frontend-design`** skill (the `frontend-design:frontend-design` plugin skill). The skill produces opinionated mockups (typically 2–3 directions) the operator picks from before any implementation begins.
+
+**Why:** the 2026-05-08 review-surface rebuild and 2026-05-09 mobile-editor rebuild both succeeded because the agent produced HTML mockups first; the operator picked a direction; implementation was a translation problem instead of an exploration problem. The 5 hours of focused implementation in those sessions could have been 15 hours of incremental patching that never converged. Conversely, when the agent jumped straight to implementation on a design question (the multiple iterations of the marginalia toggle pre-affordance-placement-rule), three commits were needed to converge on the right shape.
+
+**How to apply:**
+- Whenever the task involves *"add an affordance,"* *"design X,"* *"how should Y look,"* *"the operator can't find Z" → /frontend-design first.
+- Skip /frontend-design only when the design is fully determined upstream (a workplan task that names exact CSS / markup, an operator instruction that names "use pattern X exactly," etc.). When in doubt, run it.
+- /frontend-design produces self-contained HTML+CSS mockup files (typically 2–3 directions), an updated `mockups/index.html` with a card per direction, and waits for the operator to pick before any implementation.
+- The directive applies to in-thread agent work AND to dispatch prompts: if delegating design work to a sub-agent, instruct them to use /frontend-design.
+
+## Use /dw-lifecycle:review after every implementation step
+
+After every implementation step — every commit that adds production code or modifies behavior — invoke **`/dw-lifecycle:review`** (in-tree at `plugins/dw-lifecycle/skills/review/SKILL.md`; if not loaded as a marketplace skill, follow the procedure manually). The skill dispatches parallel code reviewers (typically 2 — correctness/security + architecture/conventions) and returns categorized findings.
+
+**The implementer (you) is required to push back on any finding that's wrong or inappropriate.** Reviewers are not authoritative; their findings are testable claims. Apply the `superpowers:receiving-code-review` discipline: technical rigor, no performative agreement. When a finding is wrong, push back with code or measurements that disprove it. When a finding is right but the fix is wrong, propose the correct fix. The agent's job is not to apply every review comment — it's to integrate the *correct* findings.
+
+**Any fix that is NOT made immediately MUST have BOTH:** (a) a scoped task in the relevant workplan with the issue link, AND (b) a GitHub issue with the deferral rationale. *"Code comment + future-dispatch promise"* is not a disposition (per the existing `Just for now is bullshit` rule). The two-track recording — workplan + GitHub — is intentional redundancy: the workplan ties the deferral to the active feature's tracking; the GitHub issue makes it visible to anyone walking the open-issues list. A deferral with only one of the two is incomplete and must be promoted to both before moving on.
+
+**Why:** the v0.18.0 cycle proved the value: parallel reviewers caught 7 findings on the editor + scrapbook cut, 6 applied immediately, 1 deferred to [#245](https://github.com/audiocontrol-org/deskwork/issues/245) with both a workplan entry under T5 and a GitHub issue body that's specific enough for a future contributor to act on. The cycle compounds: every commit lands with verified findings or explicit deferrals, never with code-comment IOUs.
+
+**How to apply:**
+- After every commit that adds production code (new feature, bug fix, refactor): invoke `/dw-lifecycle:review`. The skill itself decides whether to dispatch one reviewer or several based on scope.
+- Pure-docs commits, vendored-asset commits, and version-bump commits don't need review.
+- Verify each finding before applying. Don't blanket-accept; don't blanket-reject.
+- If a finding requires deferral: create a GitHub issue (with reproduction, root cause, options, recommendation), update the relevant workplan with the issue link, and only then proceed.
+- The agent's response to reviewer findings is its own paper trail: report which findings were applied, which were pushed back on (with reasoning), which were deferred (with issue link). The operator reads this as the closure narrative.
+
+This rule is paired with the `/frontend-design` rule above. Together they bracket the implementation cycle: **design via /frontend-design → implement → review via /dw-lifecycle:review → integrate or defer**. Skipping either side breaks the loop the operator-validated v0.18 cycle codified.
+
+## scope-discovery v1 — dogfood feedback via tooling-feedback.md
+
+For features that exercise scope-discovery (any feature whose `/dw-lifecycle:setup` invokes `/scope-inventory`), the implementation team logs friction surfaces in `docs/<v>/001-IN-PROGRESS/<slug>/tooling-feedback.md` as they go. The log is the v1 ship-gate signal in place of the original ~80% paper-test coverage gate (reframed by operator decision 2026-05-25 when Phase 10 measured 60.9%).
+
+The log mirrors the audiocontrol pilot's pattern (categories A/AM/CL/GATE/DSC/MISC; severity high/medium/low; Repro / Workaround used / Suggested fix per entry; append-only — closed entries get a `Status` line + closing-commit SHA but are never deleted). The starter template ships at `plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md`; `/dw-lifecycle:setup` copies it into the new feature's docs directory.
+
+**How to apply:**
+
+- File a TF entry the moment friction surfaces — don't batch them at feature-end. The cumulative set teaches more than a single "audit" pass would.
+- Each entry is **one observable friction** with Repro / Workaround / Suggested-fix — the suggested-fix names an operator-recognizable shape (often Light / Medium / Heavy options), not a vague "make it better."
+- When a friction entry needs explicit operator triage (architecture-level concern, recurring pattern across audit cycles, design decision), promote it to a GH issue with the deferral rationale + acknowledge in the workplan, per the existing "Just for now is bullshit" rule. *"Code comment + TF entry"* is not a disposition when the issue is architectural.
+- Closure: when the feature ships, the tooling-feedback.md's final TF entry summarizes what worked / what didn't / what needs follow-up. The deskwork team imports the closure into the scope-discovery feature's audit-log as `AUDIT-<date>-<NN>` entries — mirror of how we imported audiocontrol pilot TF-001..TF-016 into AUDIT-20260525-05..09.
+
+**Cross-references:**
+- Audit log: [`docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md`](../../docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md)
+- Dogfood handoff template (graphical-entries canary): [`docs/1.0/001-IN-PROGRESS/graphical-entries/dogfood-handoff.md`](../../docs/1.0/001-IN-PROGRESS/graphical-entries/dogfood-handoff.md)
+- Starter template (adopters): [`plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md`](../../plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md)
+
+## Inventory vs discovery — how to read scope-discovery reports
+
+A green `scope-inventory` (or `check-anti-patterns` / `check-adopters` / `check-editor-symmetry` / `check-deprecations`) run is NOT the same as "no novel anti-patterns / no novel adopter-gaps / no novel deprecation candidates." It is evidence of no source-tree match against the things ALREADY in the registered catalog. Treating the two as equivalent is the operator-trust failure mode the first dogfood-cycle finding ([#315](https://github.com/audiocontrol-org/deskwork/issues/315)) named — a component with ZERO canonical-primitive consumers + ≥14 utility-class hits passed every scanner and every audit because no catalog entry described its shape.
+
+Phase 11 Task 12 closed the gap via the hybrid option: the operator-facing entry-point keeps the name `scope-inventory` (it IS an inventory action); the manifest's per-finding `provenance` field + the `discovered_candidates:` section + the per-skill prose distinguish registered-pattern matches from novel candidates. The rule below is the operator-discipline cue that pairs with the code-side surfacing.
+
+### How to apply when READING a scope-discovery report
+
+When you (the agent or the operator) read a scope-manifest.yaml, a `scope-inventory` stderr summary, a `check-anti-patterns` output, or a `synthesis.md` digest, parse the finding shape into three operator-visible categories:
+
+1. **Registered-pattern matches (inventory).** Findings where `status_provenance.provenance_source ∈ {operator-authored, install-seed}` AND `source_status ∈ {blessed, cursed}`. The catalog said to look for these shapes; the scanner found them. Action: fix in-place, OR add the file to `exceptions:`, OR demote the catalog entry. A green count here is a green INVENTORY result.
+
+2. **Discovered candidates (architectural).** Entries under the manifest's `discovered_candidates:` section. Surfaced by the orchestrator-agent mediation layer (Phase 11 Task 3). Architectural-scale clusters of raw findings the catalog doesn't currently cover. Action: triage architecture-scale; let the orchestrator-agent translate to line-level catalog edits.
+
+3. **Novel-shape candidates (per-handler).** Findings whose `status_provenance.provenance_source ∈ {orchestrator-agent, llm-judge-proposed, promoted-from-candidate}`, OR whose `source_status: pending`, OR whose per-handler provenance is `negative-space` / `coverage-gap` / `outlier` / `semantic` / `discovered-candidate`. Per-handler novel-shape signals. Action: triage into the relevant catalog (status: `blessed` / `cursed` / `ignore`) via `/dw-lifecycle:implement`'s mediation flow.
+
+The `scope-inventory` stderr surfaces a one-line summary in this format:
+
+```
+scope-inventory: categories: registered-pattern=N, discovered-candidate=N, novel-shape-candidate=N
+```
+
+The `synthesis.md` evidence-trail file leads with a `## Inventory vs. discovery — finding categories` section that breaks the per-category counts down with the operator-action advisory + the per-bucket split. **Read both before treating a run as "all clear."**
+
+### Why this matters
+
+Reading a green discovery report as "no novel anti-patterns" is the failure mode that lets KeygroupSummary-shape regressions ship to release. The catalog ages out as the codebase evolves; the per-handler novel-shape signals + the architectural-scale `discovered_candidates:` are the mechanism that surfaces what the catalog doesn't yet know. Ignoring those signals on the grounds that the registered-pattern count is zero re-creates the operator-trust failure mode.
+
+### The single hard test
+
+When you finish a `scope-inventory` (or any check-* verb) run, before you tell the operator "no findings": **read the stderr `categories:` line AND look at `synthesis.md`'s category-report section.** If `novel-shape-candidate > 0` OR `discovered-candidate > 0` OR `pendingMetaCount > 0`, the run is NOT all-clear. The operator action is to triage those candidates BEFORE moving on.
+
+If you (the agent) catch yourself writing "no anti-patterns found" or "scope-inventory came back clean" without naming the category split, STOP — that's the failure mode this rule names. The categories distinguish registered-pattern matches from novel candidates; the report distinguishes them; your prose must distinguish them too.
+
+### Cross-references
+
+- Agent fleet split (inventory agents vs. discovery agents): [`plugins/dw-lifecycle/src/scope-discovery/discovery-agents/README.md`](../../plugins/dw-lifecycle/src/scope-discovery/discovery-agents/README.md)
+- Report rendering code: [`plugins/dw-lifecycle/src/scope-discovery/synthesis-report.ts`](../../plugins/dw-lifecycle/src/scope-discovery/synthesis-report.ts)
+- Phase 11 Task 12 (origin of this rule): [`docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md`](../../docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md) § Phase 11 Task 12.
+- KeygroupSummary canonical repro (the failure mode this rule prevents): [#315](https://github.com/audiocontrol-org/deskwork/issues/315).
+
 ## Read documentation before quoting commands
 
 Before writing or speaking any install/setup command for a tool, plugin, library, or service: **read the tool's own documentation first**. Quote the documented command verbatim. Do not quote commands from memory or compose plausible-sounding CLI syntax.
@@ -27,6 +117,110 @@ The operator decides what's in scope. Never pre-decide for them.
 - Hedged user responses (*"probably,"* *"maybe later,"* *"we'll see"*) default to ASKING what to do next, not interpreting the hedge as a deferral.
 - Distinguish: items the user actively rejected (don't revive) vs. items I unilaterally deferred (do, by surfacing them).
 - Sub-agent dispatch reports get treated as action lists, not disclosures: each *"flag for triage"* becomes either a fix-in-this-PR or a filed issue, with the link in my next response.
+
+## Capture mode vs scope mode: specs capture everything we know; scoping is a later, explicit pass
+
+A design spec / PRD / definition is a **capture artifact**. Its job is to record every aspect of the problem space that's known or knowably-implied so the operator (and future agents) have a complete picture to scope, plan, and build from. Scoping — deciding what ships in v1, what defers, what gets a follow-up feature — is a **separate, explicit pass** that happens AFTER capture, with operator approval at each cut.
+
+The agent does NOT scope-cut during capture. Phrases like *"YAGNI until concrete use"*, *"deferred to a follow-up"*, *"not in v1"*, *"out of scope for now"*, *"keeps things simple"*, *"smaller commitment"* — when inserted by the agent into a spec without the operator having said so in the conversation — are scope-pushback dressed up as discipline. They are the same shape as the *"just for now"* failure mode codified below: they make the operator (and future readers) believe the issue is handled when it isn't.
+
+The operator's framing, verbatim: *"I don't need you to push back on scope. I need you to help me find the hidden areas where undiscovered scope is implied but not specified. Your obsession with limiting scope added to your propensity to hallucinate and forget is wildly counterproductive. We MUST capture everything we know into the documentation. THEN, we can worry about how to scope it. But, pushing back on scope is a version of 'just for now' which, per project guidelines, you know to be bullshit."*
+
+### The failure modes this rule names
+
+1. **Reflexive scope-narrowing during spec writing.** The agent encounters a question like *"can a group be a member of another group?"* and answers *"recursive groups deferred to v2 — YAGNI until a concrete use surfaces."* No operator said so. The agent invented the deferral. The information that *"recursive groups are a real concept the operator may or may not want"* is now hidden behind a YAGNI label and won't get surfaced when the operator does their own scoping pass.
+
+2. **Spec hedges that disclaim instead of capture.** Phrases like *"Per-project iteration handlers ... are a future extension hook — not in v1, but the architecture leaves room"* sound disciplined but they hide the actual concept under a "not in v1" disclaimer. The operator can't scope something they can't see clearly.
+
+3. **Scope-pushback as commentary.** Tables, sidebar callouts, or paragraphs in the agent's reply that read *"each revision has added scope, not subtracted. Worth noting if you want to consider splitting the feature."* The operator did not ask for scope advisory. They asked for capture. Scope advisory becomes a wedge — every iteration round becomes an opportunity for the agent to argue for cutting, instead of for completeness.
+
+4. **The compound failure with hallucination and forgetting.** The agent has two well-documented tendencies: hallucinating facts (Socratic-prompt-engineering thesis) and forgetting context across turns. Scope-narrowing AMPLIFIES both: forgetting means knowledge is already at risk; narrowing the capture means even less of what's known reaches the documentation. The operator's verbatim phrase: *"Your obsession with limiting scope added to your propensity to hallucinate and forget is wildly counterproductive."* Comprehensive capture is the antidote to forgetting; scope-cuts disable the antidote.
+
+### What to capture during capture mode
+
+When writing or iterating a spec / PRD / definition:
+
+- **State everything the design implies, even when not explicitly raised.** If lanes can be archived, address what happens to their entries (still flow? frozen? hidden?). If groups have lifecycle independence, address every edge case (group approved while members in Drafting; group cancelled with active members; member added to an archived group). If a new annotation field is added, address legacy migration. If new files appear on disk, address their lifecycle, deletion semantics, backup story, conflict resolution.
+- **Surface known UX concerns even if the implementation seems obvious.** Search, filtering, bulk operations, multi-select, keyboard navigation, default values on new screens, error states, empty states, loading states. Operators have opinions on all of these and they belong in the captured doc.
+- **Enumerate edge cases.** "What happens when ____" for every named operation. Empty inputs, maximum inputs, concurrent operations, partial failures, network unavailability (where relevant), file-system race conditions.
+- **Cross-cut impacts.** When a new concept touches the existing model, write out every existing concept it affects. New annotations affect comments, journals, doctor, studio rendering, schema migration — all of those land in the spec.
+- **Open questions and unknowns.** When the agent doesn't know the answer to an implied question, write the question into the spec as a flagged open question — don't omit it. *"Should a member be allowed in multiple groups? — unresolved; needs operator decision."* The capture surfaces the unknown so it can be answered, not deferred via silence.
+
+### What NOT to do during capture mode
+
+- Don't write phrases that pre-scope: *"deferred"*, *"YAGNI"*, *"out of scope"*, *"v1 ships only X"*, *"future extension"*, *"not in v1"*, *"keep simple"*, *"smaller commitment"*, *"this could grow later"*. (Exception: if the operator explicitly said so in the conversation, quote them and link to the message.)
+- Don't add scope-advisory tables or commentary to spec-iteration responses. Each iteration's response reports what was captured + asks if anything else surfaces — it doesn't editorialize about feature size.
+- Don't compress related concepts into a single bullet to "keep things tidy" when each concept has its own behaviors. Tidiness is not the goal; completeness is.
+- Don't decline to capture a concern because *"the operator hasn't asked yet"* — if the design implies it, the design implies it. Capture, then let the operator decide whether to keep, cut, or defer.
+
+### When scoping IS appropriate
+
+After capture, when the operator says *"now let's scope this for v1"* or *"what's the minimum viable cut"* or *"split this into shippable phases"*, the agent helps with that work explicitly. Scope-cuts are operator-driven and documented as the operator's decisions (not as agent recommendations baked into the spec quietly).
+
+### Why this rule exists
+
+The 2026-05-16 `graphical-entries` brainstorm produced four iteration rounds in which the agent inserted scope-pushback at every round — "each revision has added scope", "smaller commitment", "phase 1 ships X only", "consider splitting", "not in v1". The operator's correction made the cost explicit: the agent's scope-narrowing tendency compounds with hallucination + forgetting to actively erode the documentation. The rule exists so future spec passes default to comprehensive capture and treat scoping as a separate operator-driven activity.
+
+This rule is a direct sibling of *"'Just for now' is bullshit"* (below). Both name a pattern where the agent's "discipline" hides real work behind a labeled deferral. The Just-for-now rule is about implementation IOUs; this rule is about spec-time IOUs.
+
+## Empty revisions beat missed changes — never skip a capture/snapshot because it might be a no-op
+
+When the operator invokes a capture or snapshot operation (`/deskwork:iterate`, `/deskwork:approve`, `/dw-lifecycle:review`, similar journal-append flows), the agent runs the operation as asked. The agent does NOT pre-decide "this would be a no-op, so I'll skip it." Doing so risks missing real changes — disk state the agent didn't notice, edits made outside the studio between the prior capture and now, or operator-side state the agent can't see.
+
+The operator's framing, verbatim: *"I'd rather have empty revisions than miss changes."*
+
+**Why:** capture operations are append-only and disk-cheap. An empty revision is journal noise (one extra file, one sidecar counter bump) — bounded, recoverable, easy to ignore on read. A missed change is unbounded: the agent's working assumption about disk state diverges from reality, and every subsequent operation builds on the wrong baseline until the operator catches the drift.
+
+**How to apply:**
+
+- When the operator says "run iterate" / "run approve" / "snapshot this", run it. Don't precondition on "but there's nothing pending."
+- When the agent's *own* judgment would skip a capture ("disk hasn't changed since last iterate; no point"), run it anyway. Cheap insurance.
+- The reverse failure mode — running captures the operator didn't ask for — still applies. The agent doesn't volunteer extra captures; but when asked, it doesn't second-guess.
+- If a capture flow ITSELF should warn / refuse on no-op state, that's a tool-design concern (file as a friction issue if the operator wants), not an agent-side filter.
+
+**What this rule does NOT mean:**
+
+- The agent doesn't run captures continuously just to be safe. Captures are operator-triggered; this rule governs how to respond when one is triggered, not how often to trigger.
+- The agent still surfaces what happened (e.g. "revision 6 — 0 addressed comments, no disk delta") so the operator sees the empty revision and understands why.
+
+## The orchestrator session is separate from the implementation session
+
+The agent's role across the dw-lifecycle skills splits across **two distinct Claude Code sessions**, not one session with a sub-agent dispatch:
+
+- **Orchestrator session** — runs in the **main repo working tree** (`/Users/orion/work/deskwork`). Drives `/dw-lifecycle:define`, `/dw-lifecycle:setup`, the PRD iterate/approve loop via deskwork, `/dw-lifecycle:issues`, friction-issue filing, related CLI helpers, scaffolding the feature's PRD / workplan / README content from the design spec, moving worktrees. This is **infrastructure preparation**. The orchestrator session's terminal output is "infrastructure ready; feature worktree at `<path>`; implementation happens in a separate session."
+- **Implementation session** — runs in the **feature worktree** (`~/work/deskwork-work/<slug>/`). The operator opens a new Claude Code session pointed at the worktree directory, invokes `/dw-lifecycle:implement`, and that session does the actual feature work — new TypeScript files, new SKILL.md prose, new tests, commits, `/dw-lifecycle:review` cycles, PR delivery via `/dw-lifecycle:ship`.
+
+The orchestrator session **does NOT invoke `/dw-lifecycle:implement`**. The boundary is the session, not a sub-agent dispatch. Two-session isolation keeps the orchestrator session focused on cross-feature workflow and the implementation session focused on one feature's code without context pollution in either direction.
+
+The operator's framing, verbatim: *"you are the orchestrator, not the implementer"* — clarified with *"As the orchestrator, you define and prepare feature infrastructure. You don't implement the feature."* and tightened further: *"implementation must be done in a different worktree which implies a different claude session."*
+
+**Why:** the 2026-05-11 `command-shortcuts` setup session generated this rule. The orchestrator session correctly handled define → setup → PRD iter → issues — all infrastructure preparation in the main repo. The line that would have been crossed (and wasn't, because the operator interrupted) is running `/dw-lifecycle:implement` from the orchestrator session, even via a `feature-orchestrator` sub-agent dispatch. Two earlier drafts of this rule placed the boundary at "delegate content authoring to specialists" and then at "dispatch `feature-orchestrator` at implement-time." Both were too lax. The operator's actual boundary: implementation happens in a **separate session**, opened by the operator in the **feature worktree**, and the orchestrator session is over once the infrastructure is staged for that handoff.
+
+**Failure modes this rule names (forward-looking):**
+
+| The pattern | What it actually means |
+|---|---|
+| Orchestrator session runs `/dw-lifecycle:implement` after filing issues | Wrong session for that work; close out the orchestrator session instead |
+| Orchestrator session dispatches `feature-orchestrator` as a sub-agent to implement the feature | Still wrong session — dispatch pollutes the main session with implementation context |
+| Orchestrator session opens `packages/<pkg>/src/<file>.ts` and starts writing TypeScript | Wrong session AND wrong working tree (main, not worktree) |
+| Orchestrator session "just fixes one small thing" in the worktree's source after issues are filed | Same — the implementation session is responsible for everything inside the worktree |
+
+**How to apply (orchestrator session):**
+
+- Run `/dw-lifecycle:define`, `/dw-lifecycle:setup`, `/deskwork:ingest`, `/deskwork:approve` (PRD), `/dw-lifecycle:issues`, file friction. Author PRD/workplan/README/issue-body content in-thread as the natural deliverable of this prep work.
+- Surface the worktree path + the GitHub issue tree.
+- Close out with `/session-end` (or equivalent journal/wrap-up). Operator opens the new session against the worktree to continue.
+- Do NOT run `/dw-lifecycle:implement` in the orchestrator session.
+
+**How to apply (implementation session — separate Claude Code session):**
+
+- Opens against the feature worktree (`~/work/deskwork-work/<slug>/`), NOT the main repo.
+- Runs `/dw-lifecycle:implement` to pick up the workplan.
+- Dispatches in-session specialists (`typescript-pro`, `documentation-engineer`) for the substantive content. The implement-session can do sub-agent dispatch internally; the boundary that matters is the SESSION + worktree, not in-thread vs sub-agent.
+- Runs `/dw-lifecycle:review` after each commit; iterates on findings.
+- Ships via `/dw-lifecycle:ship` → `/dw-lifecycle:complete`.
+
+**Practical handoff:** the orchestrator session's final report names the worktree path explicitly so the operator can `cd` there and start a new Claude Code session against it. Operator's command pattern: `claude` from inside the worktree directory (loads the same plugin set; CWD is the worktree).
 
 ## "Just for now" is bullshit — no temporary fallbacks, no IOU comments, no will-fix-later deferrals
 
@@ -238,3 +432,43 @@ Once a script at `~/.claude/plugins/marketplaces/deskwork/scripts/<name>.sh` is 
 - The same discipline applies to the `deskwork` / `deskwork-studio` / `dw-lifecycle` CLI subcommands more broadly, but the marketplace-clone scripts have a special exposure because they get wired directly into session-start hooks rather than invoked via the bin shim. Friction in the bin shim is recoverable; friction in the script is invisible until the operator notices their session-start hook stopped working.
 
 The repair-install.sh script (post-#131) prints a one-line version banner when not `--quiet`. Operators triaging "did the fix land?" can see the version without reading the file. That banner format is now also part of the contract — keep it stable enough that adopters can grep for it if they ever build automation around it.
+
+## Closure is a structural step, not aspirational
+
+A feature's lifecycle has two halves: shipping the work and closing it. Across cycles, the shipping half wins structurally — there are gates that refuse to let work ship without tests / review / verification, and natural rewards (PR merged, version bumped, tag pushed) at every shipping waypoint. The closure half has historically had no equivalent. Issues stayed open across releases because nothing structurally walked them. Workplan TBD markers shipped to merge because nothing structurally refused them. Parked branches accumulated in the branch-list noise because nothing structurally surfaced them.
+
+The hygiene-skill family closes that asymmetry. Each skill is structural — invokable on demand by the operator, and tied into the natural shipping waypoints so closure-work fires at the same cadence as ship-work:
+
+| Closure step | Structural waypoint it fires from |
+|---|---|
+| `/dw-lifecycle:close-shipped` | Post-release (operator runs immediately after `gh release create`) — labels every issue whose fix lands between the two tags with `pending-verification`, comments with the evidence trail, leaves closure to the operator's install-and-walk verification. Does NOT close. |
+| `/dw-lifecycle:complete` no-bare-TBDs gate | Pre-merge — refuses to graduate the feature from `001-IN-PROGRESS/` to `003-COMPLETE/` if the workplan still carries bare TBD / defer / follow-up / out-of-scope markers that lack either a `[debt: #NNN]` back-link OR an inline `(wontfix: <substantive reason>)` annotation. Operator override is `--skip-tbd-gate --reason "<≥40-char substantive reason>"`; the reason logs to the journal. |
+| `/dw-lifecycle:session-end` hygiene capture | End-of-session — writes a structured hygiene-observations + next-session-recommendation block into `DEVELOPMENT-NOTES.md`. The block always emits (even on the "no signals" branch) so session-start always sees a written record from the prior session. |
+| `/dw-lifecycle:session-start` recommendation display | Start-of-session — displays the prior session's recommendation verbatim. No fresh scan; display-only. Re-entry stays cheap. |
+| `/dw-lifecycle:debt-report` | On-demand operator invocation — cross-source snapshot of all three debt streams. The read-only baseline the mutating verbs operate on. |
+| `/dw-lifecycle:triage-issues`, `:promote-deferrals`, `:archive-branch` | On-demand operator-triggered mutations against the snapshot. Batched-proposal contract (`propose` writes a JSON file; operator fills in dispositions; `apply` validates all-or-nothing then dispatches) keeps the closure work auditable. |
+
+### The load-bearing contract: agent posts evidence, operator decides
+
+The hygiene family rests on the same contract as the existing `Issue closure requires verification in a formally-installed release` rule (above). The agent's role at every closure step is to **post evidence** — the four-source evidence trail in `close-shipped`'s per-issue comment, the markdown table of proposed dispositions in `triage-issues propose`, the bare-TBD location list in `complete-gate`'s refusal output. The operator's role is to **decide** — clicking close on the labeled issue after walking the install, picking the subset of triage proposals to apply, supplying a substantive reason on the `--skip-tbd-gate --reason "<text>"` override.
+
+This asymmetry is intentional. The agent that shipped the fix is structurally the wrong party to judge whether the fix matches the operator's lived experience of the bug. The agent that wrote the TBD marker is structurally the wrong party to judge whether the deferral represents a real disposition or an IOU dressed up as discipline. Every hygiene verb is built to surface the evidence with maximum legibility (provenance trails per issue, sample line numbers per TBD marker, ahead/behind counts per parked branch) precisely so the operator can decide quickly without re-deriving the underlying state.
+
+### The structural asymmetry the family closes
+
+Pre-hygiene, the closure half of the lifecycle relied on operator vigilance. After every release: did anyone walk the merged PRs to find issues whose fixes landed? After every feature-complete: did anyone grep the workplan for residual TBDs? After every "this branch is parked" reckoning: did anyone preserve the work before deleting? The answer was usually no, because there was no structural reason to do so. Shipping work has its own momentum; closing work doesn't unless something demands it.
+
+The hygiene verbs invert that. `close-shipped` becomes the post-publish reflex that turns a release into a labeled queue of pending-verification candidates. `complete-gate` becomes the pre-merge refusal that turns "I'll deal with the TBDs later" into "I deal with the TBDs now or I supply a substantive reason." `archive-branch` becomes the structural alternative to the false choice between "leave the parked branch sitting forever" and "delete and lose the work." None of these verbs introduce new policy — they mechanize policy that already lived in this rules file. The mechanization is what makes closure unavoidable.
+
+### How to apply
+
+- After tagging and pushing a release: run `/dw-lifecycle:close-shipped --from-tag <prior> --to-tag <current>`. Don't close the labeled issues; let the operator walk the install.
+- Before invoking `/dw-lifecycle:complete` on a closing feature: confirm the workplan is clean (every TBD either has a `[debt: #NNN]` back-link or an inline `(wontfix: <reason>)` annotation). If `complete-gate` refuses, run `/dw-lifecycle:promote-deferrals propose --workplan <path>` to triage the residual markers; don't reach for `--skip-tbd-gate` unless the operator explicitly authorizes the override AND supplies the substantive reason.
+- After every session: run `/dw-lifecycle:session-end` (it writes the hygiene-observations + next-session-recommendation block automatically). On re-entry, `/dw-lifecycle:session-start` surfaces the block verbatim — the closure thread carries forward across session boundaries without requiring re-derivation.
+- When a parked branch surfaces in `/dw-lifecycle:debt-report`'s parked-branch section: pick one of the three dispositions (revive, discard, archive). Use `/dw-lifecycle:archive-branch` for the preserve-then-delete path; the annotated tag keeps the work reachable + named even after the branch is gone.
+
+### Cross-references
+
+- Design spec the family was built from: [`docs/superpowers/specs/2026-05-28-hygiene-design.md`](../../docs/superpowers/specs/2026-05-28-hygiene-design.md).
+- The rule the family mechanizes for the implementation half: § "Just for now is bullshit" above.
+- The rule the family honors for the post-release half: § "Issue closure requires verification in a formally-installed release" above.

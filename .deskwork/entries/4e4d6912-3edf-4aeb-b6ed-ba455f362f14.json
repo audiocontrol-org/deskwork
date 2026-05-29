@@ -1,0 +1,15 @@
+{
+  "uuid": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+  "slug": "scope-discovery/prd",
+  "title": "Scope discovery — canonize audiocontrol pilot into dw-lifecycle",
+  "keywords": [],
+  "source": "manual",
+  "currentStage": "Published",
+  "iterationByStage": {
+    "Final": 2
+  },
+  "artifactPath": "docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md",
+  "createdAt": "2026-05-25T01:05:11.731Z",
+  "updatedAt": "2026-05-26T23:38:36.086Z",
+  "datePublished": "2026-05-26T00:00:00.000Z"
+}

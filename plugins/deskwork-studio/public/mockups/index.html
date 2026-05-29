@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobile design directions · review surface + editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 17px;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  body {
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(184, 54, 42, 0.05), transparent 60%),
+      radial-gradient(circle at 80% 90%, rgba(42, 75, 124, 0.04), transparent 60%);
+    padding: 3rem 1.4rem 4rem;
+    max-width: 60rem;
+    margin: 0 auto;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--red);
+    border-bottom: 1px solid var(--red);
+    padding-bottom: 0.45rem;
+    margin-bottom: 1.2rem;
+    display: inline-block;
+  }
+  h1 {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 48, "wght" 500;
+    font-size: 2.4rem;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+    color: var(--ink);
+  }
+  .lede {
+    font-family: var(--display);
+    font-size: 1.15rem;
+    line-height: 1.5;
+    color: var(--ink);
+    margin-bottom: 2.5rem;
+    max-width: 42rem;
+  }
+  .lede em { color: var(--red); font-style: italic; }
+  h2 {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--faded);
+    margin: 2.2rem 0 0.8rem;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.4rem;
+  }
+  p { margin-bottom: 0.8rem; max-width: 42rem; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1.2rem;
+    margin-top: 0.5rem;
+  }
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-left: 3px solid var(--red);
+    padding: 1.4rem 1.4rem 1.6rem;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(26, 22, 20, 0.04), 0 8px 24px -10px rgba(26, 22, 20, 0.10);
+    transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 1px 0 rgba(26, 22, 20, 0.04), 0 14px 32px -10px rgba(26, 22, 20, 0.16);
+  }
+  .card .num {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.22em;
+    color: var(--red);
+    margin-bottom: 0.4rem;
+    display: block;
+  }
+  .card h3 {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 32, "wght" 500;
+    font-size: 1.45rem;
+    line-height: 1.15;
+    margin-bottom: 0.7rem;
+  }
+  .card .summary {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--ink);
+    margin-bottom: 1rem;
+  }
+  .card .pros, .card .cons {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    margin-bottom: 0.5rem;
+    color: var(--ink);
+  }
+  .card .label {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--faded);
+    margin-right: 0.5rem;
+  }
+  .card a.open {
+    display: inline-block;
+    margin-top: 0.8rem;
+    padding: 0.55rem 0.9rem;
+    border: 1.5px solid var(--ink);
+    color: var(--ink);
+    text-decoration: none;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .card a.open:hover { background: var(--ink); color: var(--paper); }
+  .principles { background: var(--paper-2); padding: 1.2rem 1.4rem; border-left: 3px solid var(--blue); }
+  .principles ul { list-style: none; padding-left: 0; }
+  .principles li { padding-left: 1.4rem; position: relative; margin-bottom: 0.5rem; font-size: 0.95rem; }
+  .principles li::before { content: '§'; position: absolute; left: 0; color: var(--red); font-family: var(--display); font-style: italic; }
+  .footnote {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--paper-3);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+  }
+  .footnote em { color: var(--red); font-style: italic; font-family: var(--display); }
+</style>
+</head>
+<body>
+
+<span class="kicker">Mobile design exploration</span>
+
+<h1>Mobile-first design directions for the studio's two&nbsp;surfaces.</h1>
+
+<p class="lede">
+Two phone-shaped surfaces, two design problems. The <em>review surface</em> shipped a mobile-first rebuild from these mockups (Mockup 1 was picked); it now reads cleanly on phone and the operator can review press-check style with thumb-reach chrome. The <em>editor</em> is the next surface to redesign — currently a compressed desktop layout (split-pane crushed, action row wraps to two lines, mode tabs invisible to the thumb). The three editor directions below honor the same press-check vocabulary already established and explore three different relationships between chrome and the writing surface.
+</p>
+
+<h2>Shared design principles</h2>
+
+<div class="principles">
+  <ul>
+    <li><strong>Content first.</strong> Article (or editor) fills the viewport. Chrome is bottom-anchored, sheet-based, or content-inline — never a side-rail.</li>
+    <li><strong>Thumb reach.</strong> Frequent actions (decisions, save, format) sit in the lower half where the thumb naturally lands.</li>
+    <li><strong>One sheet at a time.</strong> Outline, notes, format are peers; opening one closes the others. No competing overlays.</li>
+    <li><strong>Native idioms.</strong> Drag-handles to dismiss, swipe-down to close, tap-outside-to-close. Keyboard-accessory bar above the iOS keyboard for editor markdown shortcuts.</li>
+    <li><strong>Editorial language preserved.</strong> Cream paper, red-pencil accents, JetBrains Mono kicker labels, Newsreader italic display, stage stamps with a hint of rotation — expressed as mobile-native components.</li>
+    <li><strong>Per-action color accents.</strong> Approve / Save = stamp-green. Iterate / Source-Preview toggle = proof-blue. Reject = red-pencil. Cancel / Discard = faded. Same vocabulary across review surface and editor.</li>
+  </ul>
+</div>
+
+<h2>Dashboard mobile-first · per-row affordance <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--green); border: 1px solid var(--green); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Row 4 picked · shipping in v0.20.0</span></h2>
+
+<p>The dashboard's per-row affordance shape was approved by the operator on 2026-05-11. The picked direction is the <strong>Row 4 hybrid — overflow menu + swipe drawer + stage-aware verb vocabulary</strong> (including <code>iterate</code>, <code>block</code>, and <code>induct…</code> alongside the existing <code>approve</code> / <code>cancel</code> / <code>scrapbook</code>). See the <a href="../../../../docs/studio-design/ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/" style="color: var(--green);">ACCEPTED archive entry</a> for the full rationale; the mockup file is at <a href="./dashboard-row-4-overflow-plus-swipe.html" style="color: var(--green);">dashboard-row-4-overflow-plus-swipe.html</a>.</p>
+
+<p>The three superseded direction mockups (Row 1 overflow-only, Row 2 contextual-primary, Row 3 swipe-only) have been retired into REJECTED archive entries — each with a brief explaining what was rejected and why the Row 4 hybrid supersedes them. See <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-1-overflow-only/" style="color: var(--red);">REJECTED/2026-05-11-row-1-overflow-only/</a>, <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-2-contextual-primary/" style="color: var(--red);">REJECTED/2026-05-11-row-2-contextual-primary/</a>, and <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-3-swipe-only/" style="color: var(--red);">REJECTED/2026-05-11-row-3-swipe-only/</a>.</p>
+
+<div class="grid">
+
+  <article class="card" style="border-left-color: var(--green);">
+    <span class="num" style="color: var(--green);">Dashboard row 4 (picked)</span>
+    <h3>Overflow menu + swipe drawer (hybrid)</h3>
+    <p class="summary">Clean at-rest row (slug + title + date + trailing ⋮). Tap row → review surface. Swipe left → action drawer with top-N stage-aware verbs (iterate / approve / cancel / scrapbook chips). Tap ⋮ → menu popover with the full stage-aware verb set (adds block / induct… as secondary verbs). Desktop renders inline iterate / approve / scrapbook chips + ⋮ menu for the rest.</p>
+    <p class="pros"><span class="label">Strong</span> Cleanest at-rest composition AND discoverable for new operators AND fast for power users. Adds block + induct verbs the v0.19 dashboard didn't surface.</p>
+    <a class="open" href="./dashboard-row-4-overflow-plus-swipe.html">Open mockup →</a>
+  </article>
+
+  <article class="card" style="border-left-color: var(--green);">
+    <span class="num" style="color: var(--green);">Direction B picked · accessibility</span>
+    <h3>Row ⋮ contrast directions</h3>
+    <p class="summary">Operator caught the v0.20 ⋮ overflow button at 1.21:1 contrast (fails every WCAG criterion). Mockup proposed an Accessibility section for <code>DESIGN-STANDARDS.md</code> + three ⋮ treatments. <strong>Direction B picked</strong> — ink-soft glyph at <strong>11.06:1</strong> (comfortably AAA). Companion standard landed in <a href="../../../../DESIGN-STANDARDS.md" style="color: var(--green);">DESIGN-STANDARDS.md § Accessibility / Contrast</a>. Archive: <a href="../../../../docs/studio-design/ACCEPTED/2026-05-11-row-overflow-contrast-B-ink-soft/" style="color: var(--green);">ACCEPTED/2026-05-11-row-overflow-contrast-B-ink-soft/</a>; <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-overflow-contrast-A-faded/" style="color: var(--red);">A rejected</a> (no headroom), <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-overflow-contrast-C-press-mark-ring/" style="color: var(--red);">C rejected</a> (ring motif not used elsewhere on dashboard).</p>
+    <p class="pros"><span class="label">Shipped</span> CSS landed in <code>dashboard-row-affordances.css</code> + <code>editorial-studio.css</code>; spec-compliance probe extended with WCAG contrast assertions per affordance — 139/139 pass at iPhone 14 viewport.</p>
+    <a class="open" href="./row-overflow-contrast.html">Open mockup →</a>
+  </article>
+
+</div>
+
+<h2>Design proposal archive <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--faded); border: 1px solid var(--faded); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Archive</span></h2>
+
+<p>Durable history of design decisions for <code style="font-family:var(--mono);font-size:0.85em">@deskwork/studio</code> — both accepted picks and rejected directions, with rationale and visual references — lives at <a href="../../../../docs/studio-design/" style="color: var(--red);">docs/studio-design/</a>. The earlier <em>nine</em> retired dashboard mockups have been migrated into archive entries (one per decision) under <a href="../../../../docs/studio-design/REJECTED/" style="color: var(--red);">REJECTED/</a>; the picked compact-1 collapsible-tile direction is filed under <a href="../../../../docs/studio-design/ACCEPTED/" style="color: var(--red);">ACCEPTED/</a>. Read the archive's <a href="../../../../docs/studio-design/README.md" style="color: var(--red);">README.md</a> for the contract; <strong>scan REJECTED before drafting new mockups</strong> to avoid relitigating settled decisions.</p>
+
+<h2>Review surface · scrapbook follow-up <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--blue); border: 1px solid var(--blue); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active</span></h2>
+
+<p>The shipped mobile review surface (Mockup 1, the bottom tab bar) has no affordance to open the scrapbook — the desktop drawer is hidden behind the fixed 64px bar on phone widths. Three directions for placement, each honoring the press-check vocabulary already shipped. Edit mode is unaffected (operator is writing, not browsing assets).</p>
+
+<div class="grid">
+
+  <article class="card">
+    <span class="num">Scrapbook 1</span>
+    <h3>Fourth tab</h3>
+    <p class="summary">Bar grows to 4 tabs in review mode (Outline / Notes / Scrapbook / Actions). Tapping Scrapbook opens a sheet with a 2-column card grid; each card uses a format-specific abstract thumbnail (red↘blue gradient for images, paper-rule pattern for text, waveform for audio). Standalone viewer link in the sheet head.</p>
+    <p class="pros"><span class="label">Strong</span> Predictable. Same idiom as existing tabs. Item count surfaces at-a-glance via badge.</p>
+    <p class="cons"><span class="label">Weak</span> 97.5px per tab is denser than the 130px 3-tab layout. Dilutes the "thumb-reach for decisions" framing of the original Mockup 1.</p>
+    <a class="open" href="./scrapbook-1-fourth-tab.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Scrapbook 2</span>
+    <h3>Folio peek strip</h3>
+    <p class="summary">A ~36px kraft-warm strip wedges between the top chrome and the article body — notched left edge cut like a hanging-file folder tab, italic <em>"Folio"</em> label, item count, chip-thumbs previewing format diversity, and a viewer link. Tap expands the same sheet pattern. Bar stays 3 tabs.</p>
+    <p class="pros"><span class="label">Strong</span> Most distinctive — a new visual artifact rather than another tab. The metaphor (article inside a folio with materials) is structurally true and reads instantly. Format chips give at-a-glance content diversity.</p>
+    <p class="cons"><span class="label">Weak</span> +36px chrome above article. Notch + clip-path needs careful CSS. Empty-folio state needs handling.</p>
+    <a class="open" href="./scrapbook-2-folio-peek.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Scrapbook 3</span>
+    <h3>Actions sheet section</h3>
+    <p class="summary">Zero new chrome. Existing Actions sheet gains a third section between Document and Decisions: <em>Folio</em>. Each item renders as a compact one-line row (swatch + filename + format chip + size). Standalone viewer link in the section header. Sheet grows to 70% height to accommodate.</p>
+    <p class="pros"><span class="label">Strong</span> Most minimal — no new tab, no new strip, no new visual artifact. Semantic: folio is "context for the decision" and lives next to the decisions.</p>
+    <p class="cons"><span class="label">Weak</span> Discoverability cost — the operator has to know Actions holds folio. Item count requires opening the sheet (Notes count badges at-a-glance; Folio doesn't, unless we add a second indicator).</p>
+    <a class="open" href="./scrapbook-3-actions-section.html">Open mockup →</a>
+  </article>
+
+</div>
+
+<h2>Editor · three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--green); border: 1px solid var(--green); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Mockup 2 shipped</span></h2>
+
+<p>The mobile editor rebuild is shipped (operator picked Mockup 2 / press-check tab bar; commits <code style="font-family:var(--mono);font-size:0.85em">cdc184a</code> + <code style="font-family:var(--mono);font-size:0.85em">5baa042</code>). The original three editor options stay below for reference.</p>
+
+<div class="grid">
+
+  <article class="card">
+    <span class="num">Editor 1</span>
+    <h3>Keyboard accessory</h3>
+    <p class="summary">Chrome surrenders to the editor. At rest: only a back glyph and a Save state pill (stamp-green when dirty, faded when clean). When typing, a 48px accessory bar of markdown shortcuts (H1 / <strong>B</strong> / <em>I</em> / <code>code</code> / link / list / quote) rides directly above the iOS keyboard. The page becomes a writing surface.</p>
+    <p class="pros"><span class="label">Strong</span> Maximum viewport for the editor. Markdown shortcuts at the thumb. Save state visible at all times via a single colored pill.</p>
+    <p class="cons"><span class="label">Weak</span> Less continuity with the review surface's bottom tab bar. Mode toggle (Source / Preview) hidden in the bottom strip when keyboard is down.</p>
+    <a class="open" href="./editor-1-keyboard-accessory.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Editor 2</span>
+    <h3>Press-check tab bar</h3>
+    <p class="summary">Same 64px bottom-tab-bar idiom as the review surface — three tabs with editor verbs (Format / Notes / Save). The Format tab opens a sheet of press-check markdown keys grouped by function. The Save tab glows stamp-green when the document is dirty. Mode (Source / Preview) is a strip segment in the top chrome. Stage stamp shifts to green to signal editing.</p>
+    <p class="pros"><span class="label">Strong</span> Direct continuity with the review surface — operator's muscle memory transfers without recalibration. Notes sheet pattern is reused unchanged. Save state is loud and obvious.</p>
+    <p class="cons"><span class="label">Weak</span> 96px top + 64px bottom = 160px of chrome at rest, less than Mockup 1. No keyboard accessory by default — markdown helpers are one tap deeper (Format sheet).</p>
+    <a class="open" href="./editor-2-press-check-tabbar.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Editor 3</span>
+    <h3>Writing room</h3>
+    <p class="summary">Distraction-free. No top strip, no bottom tab bar, no sheets at rest. Two thin pull-tabs sit on the top and bottom edges; pulling reveals trays that auto-hide after ~2s of typing. The keyboard accessory bar is the ONLY persistent UI when typing. A faded mono word count sits in the top-right corner. The most opinionated direction — closest to a Medium / iA Writer feel.</p>
+    <p class="pros"><span class="label">Strong</span> The editor IS the page. Sustained writing sessions get nothing but text and shortcuts. Word count + persistent accessory honor editorial language without competing for attention.</p>
+    <p class="cons"><span class="label">Weak</span> Discoverability — operators have to learn the pull-tab gesture. Save state is implicit unless the top tray is pulled. The trade-off: focus over familiarity.</p>
+    <a class="open" href="./editor-3-writing-room.html">Open mockup →</a>
+  </article>
+
+</div>
+
+<h2>Review surface · the three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--green); border: 1px solid var(--green); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Mockup 1 shipped</span></h2>
+
+<p>The review surface rebuild is shipped (operator picked Mockup 1 on 2026-05-08; full implementation in commits <code style="font-family:var(--mono);font-size:0.85em">3e33ceb</code> → <code style="font-family:var(--mono);font-size:0.85em">d2fed62</code>). The original three options stay available below for reference and for combining into the editor mockups.</p>
+
+<div class="grid">
+
+  <article class="card">
+    <span class="num">Review 1</span>
+    <h3>Bottom tab bar &amp; sheets</h3>
+    <p class="summary">A persistent 3-tab bar pinned to the bottom of the viewport. Tapping a tab reveals a sheet that slides up over the content. Outline, Notes, and Actions are peers, each in their own sheet. The "Apple Maps" pattern — predictable, native, always one tap away.</p>
+    <p class="pros"><span class="label">Strong</span> Discoverability is permanent. Thumb-reach is excellent. Counts on tabs surface state at a glance.</p>
+    <p class="cons"><span class="label">Weak</span> Permanent ~56px bottom chrome eats viewport. Three buttons may feel like clutter on the simplest entries.</p>
+    <a class="open" href="./mobile-1-bottom-sheet.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Review 2</span>
+    <h3>Single FAB &amp; radial menu</h3>
+    <p class="summary">No permanent bottom bar. A single floating action button sits bottom-right; tapping it reveals a vertical stack of secondary actions (Outline, Notes, Approve, Iterate, Reject). Each opens its own sheet. A <em>quieter</em> chrome — one round button instead of a strip.</p>
+    <p class="pros"><span class="label">Strong</span> Maximum content space. The button is a single, obvious entry point. The FAB itself is a recognizable pattern (Material, Twitter, Gmail).</p>
+    <p class="cons"><span class="label">Weak</span> One-tap-deeper for everything. Counts (note count, etc.) need to surface inside the menu, not at-a-glance.</p>
+    <a class="open" href="./mobile-2-fab-cluster.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Review 3</span>
+    <h3>Inline reveal</h3>
+    <p class="summary">No drawers. No FAB. The outline is a collapsible <code style="font-family:var(--mono);font-size:0.85em">&lt;details&gt;</code> at the top of the article; margin notes appear <em>inline</em> next to the paragraph they reference, behind a small per-paragraph chip; decision buttons live in a thin always-visible bottom bar. The most opinionated direction — content and notes are spatially related, not sheet-separated.</p>
+    <p class="pros"><span class="label">Strong</span> Notes-near-text matches how operators actually read margin notes. No mode-switching, no stacked chrome, no ceremony. Each surface is "just there."</p>
+    <p class="cons"><span class="label">Weak</span> Outline-at-top adds vertical preamble before the article begins. Inline note chips need careful design to not overpower the prose.</p>
+    <a class="open" href="./mobile-3-inline-reveal.html">Open mockup →</a>
+  </article>
+
+</div>
+
+<h2>Cross-cutting bottom bar · three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--red); border: 1px solid var(--red); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active · prerequisite to shortform pick</span></h2>
+
+<p>The bottom-bar question is a <em>cross-cutting</em> design decision — its answer determines how every studio surface (dashboard, shortform review, entry-review longform, scrapbook viewer, manual) anchors its chrome. Today the studio already ships two different bottom patterns: dashboard's floating Compose chip (v0.19) and entry-review's 4-tab mobile-bar (v0.18). Shortform adding a third pattern would lock in "convention canon" by accident. <strong>This pick precedes the shortform pick</strong> — the cross-bar shape determines how the shortform direction docks. Each mockup shows the same bar treatment across dashboard + shortform review + entry-review longform side-by-side so the cross-surface implications are visible at a glance.</p>
+
+<div class="grid">
+
+  <article class="card">
+    <span class="num">Cross-bar 1</span>
+    <h3>Nav strip + per-surface action</h3>
+    <p class="summary">Two stacked bars. A 44px universal nav strip at the bottom carrying three top-level destinations (Desk · Shortform · Manual). Above it, each surface stacks its own action region — the dashboard's floating Compose chip, the shortform review's 3 colored pills, the entry-review's 4 chip-tabs. Total: 96px of bottom chrome on heavy surfaces; 44px on light ones.</p>
+    <p class="pros"><span class="label">Strong</span> Hard separation of concerns — nav is global and fixed; action is surface-shaped. Operators never wonder what a tab means in context. Manual / scrapbook can be lightest (44px only).</p>
+    <p class="cons"><span class="label">Weak</span> Heaviest bottom chrome of the three directions on review surfaces. Two visual artifacts to learn instead of one.</p>
+    <a class="open" href="./cross-bar-1-nav-strip-plus-action.html">Open mockup →</a>
+  </article>
+
+  <article class="card" style="border-left-color: var(--green);">
+    <span class="num" style="color: var(--green);">Cross-bar 2 · picked</span>
+    <h3>Split bar (nav | contextual)</h3>
+    <p class="summary">A single 56px bar with two regions split by a kraft hairline rule. Left half: three universal nav tabs (Desk · Shortform · Manual). Right half: 1-3 contextual cells per surface. Total: 4-6 cells across one bar. The most chrome-economical direction — saves 40px on every surface that has both nav and action.</p>
+    <p class="pros"><span class="label">Strong</span> Single bar, single height — one visual artifact for operators to learn. Maximum article real estate. Reads as an editor's ruler with a structural punctuation rule.</p>
+    <p class="cons"><span class="label">Weak</span> Cells get small (~65px) when carrying 6 verbs; labels truncate ("Iter.", "Apprv."). Mixing nav (low-frequency) with action (high-frequency) in the same bar can confuse the tap target.</p>
+    <a class="open" href="./cross-bar-2-split-bar.html">Open original →</a>
+    <a class="open" href="./cross-bar-2-refined.html" style="border-color: var(--green); color: var(--green); margin-left: 0.4rem;">v1 refinement →</a>
+    <a class="open" href="./cross-bar-2-refined-v2-manual-demoted.html" style="border-color: var(--red); color: var(--red); margin-left: 0.4rem;">v2 · Manual demoted →</a>
+    <a class="open" href="./cross-bar-2-refined-v3-collapsed-picker.html" style="border-color: var(--blue); color: var(--blue); margin-left: 0.4rem;">v3 · collapsed picker →</a>
+    <a class="open" href="./cross-bar-2-refined-v4-desk-as-hub.html" style="border-color: var(--kraft); color: var(--kraft); margin-left: 0.4rem;">v4 · Desk as hub →</a>
+    <a class="open" href="./cross-bar-2-refined-v5-masthead-menu.html" style="border-color: var(--green); color: var(--green); margin-left: 0.4rem;">v5 · masthead menu →</a>
+    <a class="open" href="./cross-bar-2-refined-v6-streamlined-masthead.html" style="border-color: var(--green); color: var(--green); margin-left: 0.4rem;">v6 · streamlined →</a>
+    <a class="open" href="./cross-bar-2-refined-v7-masthead-fixes.html" style="border-color: var(--green); color: var(--green); margin-left: 0.4rem;">v7 · masthead fixes →</a>
+    <a class="open" href="./desk-states-v7.html" style="border-color: var(--green); color: var(--green); margin-left: 0.4rem; background: rgba(46,93,69,0.06);">Desk states →</a>
+  </article>
+
+  <article class="card" style="border-left-color: var(--kraft);">
+    <span class="num" style="color: var(--kraft);">Cross-bar 3</span>
+    <h3>No cross-bar — vocabulary is the consistency</h3>
+    <p class="summary">The null hypothesis. Each surface keeps the idiom shaped to its job: dashboard ships v0.19's floating Compose chip, entry-review ships v0.18's 4-tab mobile-bar, shortform picks one of 1/2/3, scrapbook viewer + manual design when their phases land. The cross-cutting consistency lives in the press-check vocabulary — cream paper, paper-noise, Newsreader italic, JetBrains Mono kickers, red-pencil accents — not in any chrome shape.</p>
+    <p class="pros"><span class="label">Strong</span> Doesn't break what works (operator already approved v0.19 + v0.18 on iPhone). Each surface's chrome is shaped to its own job. The vocabulary callout makes the unifying thread visible.</p>
+    <p class="cons"><span class="label">Weak</span> No permanent global nav — operators travel via the folio's back-link, one extra tap per surface switch. Forces every future surface's design pass to make its own bar decision.</p>
+    <a class="open" href="./cross-bar-3-press-vocabulary-only.html">Open mockup →</a>
+  </article>
+
+</div>
+
+<h2>Shortform mobile-first · superseded by v7 universal-bar contract <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--ink-soft, #555); border: 1px solid var(--ink-soft, #555); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Retired · archived</span></h2>
+
+<p>The three shortform direction mockups (sticky-decision-bar, floating-action-sheet, bottom-tab-bar) were drafted 2026-05-12 in Step 2.2.2 of <code style="font-family:var(--mono);font-size:0.85em">studio-mobile-first</code>. They were superseded the same week by the v1→v7 cross-bar arc, which settled the contextual bar as a <strong>universal</strong> primitive: <code style="font-family:var(--mono);font-size:0.85em">renderMobileBar</code> is the same chrome on every non-Desk mobile surface, with a 1–6 cell <code style="font-family:var(--mono);font-size:0.85em">Cell[]</code> as the per-surface design variable. Surface-bespoke bar idioms (sticky decision bar, floating action sheet, bottom tab bar) are retired in favor of the universal contract.</p>
+
+<p>The three mockup files have been moved into <code style="font-family:var(--mono);font-size:0.85em">docs/studio-design/REJECTED/</code> as archive entries, each with a <code style="font-family:var(--mono);font-size:0.85em">brief.md</code> explaining the supersession. See <a href="../../../../DESIGN-STANDARDS.md" style="color: var(--red);">DESIGN-STANDARDS.md § Universal bar contract</a> for the settled standard.</p>
+
+<ul style="font-family: var(--mono); font-size: 0.85rem; line-height: 1.7; margin: 0.8rem 0 0 0; padding-left: 1.2rem; list-style-type: '— ';">
+  <li>Shortform 1 (sticky decision bar) → <a href="../../../../docs/studio-design/REJECTED/2026-05-12-shortform-1-sticky-decision-bar/brief.md" style="color: var(--ink-soft, #555);">brief</a></li>
+  <li>Shortform 2 (floating action sheet) → <a href="../../../../docs/studio-design/REJECTED/2026-05-12-shortform-2-floating-action-sheet/brief.md" style="color: var(--ink-soft, #555);">brief</a></li>
+  <li>Shortform 3 (bottom tab bar) → <a href="../../../../docs/studio-design/REJECTED/2026-05-12-shortform-3-bottom-tab-bar/brief.md" style="color: var(--ink-soft, #555);">brief</a></li>
+</ul>
+
+<p class="footnote">
+mockups served from <em>/static/mockups/</em> · self-contained HTML+CSS · no live data
+</p>
+
+</body>
+</html>

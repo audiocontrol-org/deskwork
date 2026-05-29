@@ -1,0 +1,20 @@
+{
+  "id": "04629697-716e-4203-acd1-c4b1f79c0c04",
+  "timestamp": "2026-05-10T04:20:56.333Z",
+  "event": "ingest",
+  "slug": "design-archive-contract",
+  "entryId": "04629697-716e-4203-acd1-c4b1f79c0c04",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/studio-design/README.md",
+  "frontmatterSnapshot": {
+    "title": "Studio Design Proposal Archive — Contract",
+    "status": "load-bearing",
+    "last-updated": "2026-05-09"
+  },
+  "derivation": {
+    "slug": "explicit",
+    "state": "explicit",
+    "date": "mtime"
+  }
+}

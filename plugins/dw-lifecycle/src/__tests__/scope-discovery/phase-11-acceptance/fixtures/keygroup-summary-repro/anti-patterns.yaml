@@ -1,0 +1,11 @@
+# Phase 11 acceptance fixture — anti-patterns catalog.
+#
+# Intentionally EMPTY. The Phase 1-10 inventory-only loop relied on
+# hand-authored anti-pattern entries to surface known-bad shapes; the
+# dogfood-cycle finding was that nobody had authored an anti-pattern
+# entry describing the canonical-primitive-absence shape, so the
+# scanner returned green. The Phase 11 loop's escape hatch is the
+# polymorphic pattern-handler catalog (negative-space + outlier +
+# coverage), NOT an anti-pattern entry.
+
+anti_patterns: []

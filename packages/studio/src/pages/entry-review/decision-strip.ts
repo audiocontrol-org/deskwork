@@ -147,6 +147,13 @@ function renderMutableButtons({ entry, historical }: MutableButtons): string {
     ),
   );
 
+  // Cancel (#242) — pull the entry off-pipeline. Routes through
+  // `/deskwork:cancel <slug>` like Approve/Iterate (THESIS Consequence 2);
+  // the skill mutates sidecar + journal. Same gravity / styling as Reject.
+  buttons.push(
+    html`<button class="er-btn er-btn-small er-btn-reject" data-action="cancel" data-entry-uuid="${entry.uuid}" data-entry-slug="${entry.slug}" type="button"${unsafe(histDisabled)}${unsafe(histTitle || ' title="Pull this entry off-pipeline (Cancelled). Reversible via /deskwork:induct."')}>Cancel ⊘</button>`,
+  );
+
   // Historical-stage dropdown — only useful when more than one stage
   // has recorded iterations for this entry. The renderer returns an
   // empty string when there are none; keep it conditional here so the

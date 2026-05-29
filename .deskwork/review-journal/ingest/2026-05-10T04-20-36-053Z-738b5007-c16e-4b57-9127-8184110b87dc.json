@@ -1,0 +1,16 @@
+{
+  "id": "738b5007-c16e-4b57-9127-8184110b87dc",
+  "timestamp": "2026-05-10T04:20:36.053Z",
+  "event": "ingest",
+  "slug": "design-standards-rule",
+  "entryId": "738b5007-c16e-4b57-9127-8184110b87dc",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": ".claude/rules/design-standards.md",
+  "frontmatterSnapshot": {},
+  "derivation": {
+    "slug": "explicit",
+    "state": "explicit",
+    "date": "mtime"
+  }
+}

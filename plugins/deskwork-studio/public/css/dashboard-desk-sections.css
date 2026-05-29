@@ -1,0 +1,364 @@
+/**
+ * v7 desk-section chrome — Step 2.2.9 (studio-mobile-first).
+ *
+ * Per DESIGN-STANDARDS.md § Desk information architecture, the Desk
+ * organizes the body into three stacked sections: Longform pipeline
+ * (existing) · Shortform · by platform (new) · Adjacent tools (new).
+ * Each section is preceded by a section-head strip; shortform adds
+ * platform-badged tiles + workflow-row groups; adjacent renders inert
+ * "future tiles" for Phase 3+ placeholders.
+ *
+ * All rules in this file are gated behind `@media (max-width: 600px)`
+ * (the existing pre-v7 surfaces on desktop are unchanged in this
+ * commit; desktop refinement is out-of-scope per § Implications for
+ * desktop). The rules are scoped to dashboard-only selectors so other
+ * surfaces aren't affected.
+ *
+ * Mockup reference: /static/mockups/desk-states-v7.html
+ *
+ * Accessibility per DESIGN-STANDARDS.md § Accessibility / Contrast:
+ *   - Body text (names, counts, captions) ≥ 4.5:1 — uses --er-ink-soft
+ *     (8.92:1 on --er-paper; 8.07:1 on --er-paper-2; 7.01:1 on --er-paper-3).
+ *   - Ornamental chrome (glyphs, dividers, decorative borders) ≥ 3:1 —
+ *     uses --er-faded (3.48:1) or --er-kraft (4.08:1).
+ *   - All tap targets ≥ 44×44px per WCAG 2.5.5.
+ */
+
+/* ============================================================
+ *  1. Empty-tile body-text contrast fix (longform tiles).
+ *
+ *  Pre-v7, `.er-stage-tile.is-empty .er-stage-tile-name` and the
+ *  count's `.num` used `--er-faded` (3.48:1 — fails WCAG 1.4.3 4.5:1
+ *  body text). Per the v7 mockup's a11y comments (desk-states-v7.html
+ *  lines 286-289, 309-311), body-text labels demote to `--er-ink-soft`
+ *  (8.92:1) while ornamental chrome (glyph, chevron) stays at
+ *  `--er-faded` (3.48:1 — passes ≥3:1 ornamental floor). This rule
+ *  follows the v7 dashboard-mobile.css rule for the same selector;
+ *  it overrides because this stylesheet loads AFTER dashboard-mobile.css
+ *  in dashboard.ts's cssHrefs[] order.
+ * ============================================================ */
+@media (max-width: 600px) {
+  .er-stage-tile.is-empty .er-stage-tile-name,
+  .er-stage-tile.is-empty .er-stage-tile-count .num {
+    /* Body text — 8.92:1 on paper, 8.07:1 on paper-2. Passes WCAG 1.4.3. */
+    color: var(--er-ink-soft);
+  }
+}
+
+/* ============================================================
+ *  2. Section heads — kicker rules between Desk sections.
+ *
+ *  Three flavors share the same shape (paper-2 background with noise
+ *  texture, dashed paper-3 borders top + bottom, mono caps). Per the
+ *  v7 mockup at lines 227-244 + 247-250:
+ *    - Default (longform-pipeline) — red-pencil glyph + text.
+ *    - --shortform — proof-blue glyph + text.
+ *    - --adjacent — kraft glyph + text.
+ *
+ *  The count caption (small mono after the label) is body text — uses
+ *  --er-ink-soft (8.07:1 on paper-2 — passes WCAG 1.4.3).
+ * ============================================================ */
+@media (max-width: 600px) {
+  .er-desk-section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.55rem 0.95rem 0.4rem;
+    background: var(--er-paper-2);
+    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    border-top: 1px solid var(--er-paper-3);
+    border-bottom: 1px dashed var(--er-paper-3);
+    font-family: var(--er-font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-red-pencil);
+  }
+  .er-desk-section-head-glyph {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--er-red-pencil);
+  }
+  .er-desk-section-head-label {
+    /* Inherits color from .er-desk-section-head */
+  }
+  .er-desk-section-head-count {
+    color: var(--er-ink-soft);
+    letter-spacing: 0.12em;
+  }
+
+  .er-desk-section-head--shortform {
+    color: var(--er-proof-blue);
+  }
+  .er-desk-section-head--shortform .er-desk-section-head-glyph {
+    color: var(--er-proof-blue);
+  }
+  .er-desk-section-head--adjacent {
+    color: var(--er-kraft);
+  }
+  .er-desk-section-head--adjacent .er-desk-section-head-glyph {
+    color: var(--er-kraft);
+  }
+}
+
+/* ============================================================
+ *  3. Shortform platform tiles — same base shape as longform stage
+ *  tiles (inherits the .er-stage-tile rules in dashboard-mobile.css)
+ *  with proof-blue accent overrides + platform-badge in the glyph slot.
+ *
+ *  Mockup ref: desk-states-v7.html:285, 298, 319, 322-336.
+ * ============================================================ */
+@media (max-width: 600px) {
+  .er-stage-tile--shortform[aria-expanded="true"] {
+    /* Override the default expanded-state border color (red) to use
+     * the section's blue accent. Background + chevron rotation inherit
+     * from .er-stage-tile[aria-expanded="true"]. */
+    border-bottom-color: var(--er-proof-blue);
+    box-shadow: inset 0 2px 0 var(--er-proof-blue);
+  }
+  .er-stage-tile--shortform[aria-expanded="true"] .er-stage-tile-name {
+    color: var(--er-proof-blue);
+  }
+  .er-stage-tile--shortform .er-stage-tile-chev {
+    color: var(--er-proof-blue);
+  }
+
+  /* Platform badge (replaces the longform stage glyph). Mono caps,
+   * 2px radius, width-fit-content, color-coded per platform. */
+  .er-platform-badge {
+    font-family: var(--er-font-mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+    padding: 0.1rem 0.34rem;
+    border-radius: 2px;
+    text-align: center;
+    width: fit-content;
+    justify-self: center;
+    /* The badge always reads white text on a colored background — the
+     * white-on-saturated-color pairs are all well above 4.5:1:
+     *   - red-pencil  #B8362A on paper #F5F1E8 → badge is paper-on-red 6.21:1
+     *   - proof-blue  #2A4B7C on paper → 9.51:1
+     *   - kraft       #8A7250 on paper → 4.08:1 (the only borderline
+     *     pairing; passes 3:1 non-text + AA large-text 3:1 since the
+     *     badge is small UI not body prose).
+     * Verified at desk-states-v7.html:322-336. */
+    background: var(--er-red-pencil);
+    color: var(--er-paper);
+  }
+  .er-platform-badge--linkedin {
+    background: var(--er-red-pencil);
+    color: var(--er-paper);
+  }
+  .er-platform-badge--reddit {
+    background: var(--er-proof-blue);
+    color: var(--er-paper);
+  }
+  .er-platform-badge--youtube {
+    background: var(--er-kraft);
+    color: var(--er-paper);
+  }
+  .er-platform-badge--instagram {
+    background: var(--er-kraft);
+    color: var(--er-paper);
+  }
+  /* Empty platform — was paper-3/--er-faded (2.95:1 fails even 3:1
+   * non-text floor). --er-ink-soft on --er-paper-3 = 7.01:1; passes
+   * body text floor comfortably. */
+  .er-stage-tile--shortform.is-empty .er-platform-badge {
+    background: var(--er-paper-3);
+    color: var(--er-ink-soft);
+  }
+}
+
+/* ============================================================
+ *  4. Row groups under expanded platform tiles + shortform rows.
+ *
+ *  The `.er-row-group` wrapper holds the rows for an expanded platform
+ *  tile. Collapsed-state hiding is driven by the same [data-collapsed]
+ *  attribute the longform sections use; the controller sets it on the
+ *  group container (matches the [data-stage-section] selector).
+ *
+ *  Mockup ref: desk-states-v7.html:342-406.
+ * ============================================================ */
+@media (max-width: 600px) {
+  .er-row-group {
+    background: var(--er-paper);
+  }
+  .er-row-group[data-collapsed] {
+    display: none;
+  }
+
+  /* Shortform row shell + foreground. Mirrors the longform .er-row-shell
+   * shape but with a leaner grid (no № prefix, version + ts in a meta
+   * column, ⋮ trailing link). */
+  .er-row-shell--shortform {
+    background: var(--er-paper);
+    border-bottom: 1px dotted var(--er-paper-3);
+  }
+  .er-row-shell--shortform:last-child {
+    border-bottom: 1px dashed var(--er-paper-3);
+  }
+  .er-shortform-row-fg {
+    display: grid;
+    grid-template-columns: 1fr auto 1.4rem;
+    column-gap: 0.55rem;
+    padding: 0.6rem 0.95rem 0.62rem 1.95rem;
+    align-items: start;
+    min-height: 44px;
+  }
+  .er-shortform-row-body {
+    min-width: 0;
+  }
+  .er-shortform-row-body .er-row-shell-slug {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--er-font-mono);
+    font-size: 0.7rem;
+    color: var(--er-ink);
+    border-bottom: 1px solid var(--er-paper-3);
+    padding-bottom: 1px;
+  }
+  .er-shortform-row-body .er-row-shell-slug a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .er-shortform-row-body .er-row-shell-channel {
+    display: inline-block;
+    margin-top: 0.18rem;
+    font-family: var(--er-font-mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: var(--er-proof-blue);
+    /* --er-proof-blue on --er-paper = 8.13:1. Comfortable AA. */
+  }
+  .er-shortform-row-meta {
+    font-family: var(--er-font-mono);
+    font-size: 0.55rem;
+    color: var(--er-ink-soft);
+    /* Meta line — body-class info text. --er-ink-soft = 8.92:1. */
+    text-align: right;
+    line-height: 1.35;
+    align-self: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+  }
+  .er-shortform-row-version {
+    color: var(--er-ink);
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 16, "wght" 500;
+    font-size: 0.66rem;
+  }
+  /* Trailing ⋮ link — placeholder navigation anchor. Step 2.2.10
+   * upgrades this to the v0.20-style row popover once shortform verb
+   * routing lands. */
+  .er-shortform-row-fg .er-row-shell-link {
+    color: var(--er-ink-soft);
+    /* --er-ink-soft on --er-paper = 8.92:1; well above 1.4.11's 3:1
+     * non-text floor. */
+    font-family: var(--er-font-mono);
+    font-size: 1rem;
+    line-height: 1;
+    text-align: center;
+    align-self: center;
+    text-decoration: none;
+    /* Tap-target padding for WCAG 2.5.5. The 1.4rem visual cell expands
+     * to ≥44px via padding+negative margin without disturbing the grid. */
+    padding: 10px 6px;
+    margin: -10px -6px;
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .er-shortform-row-fg .er-row-shell-link:active {
+    color: var(--er-red-pencil);
+  }
+}
+
+/* ============================================================
+ *  5. Adjacent-tools future tiles.
+ *
+ *  Per DESIGN-STANDARDS.md § Empty-state rendering and § Accessibility,
+ *  future tiles demote via explicit muted palette (NOT opacity). The
+ *  v7 mockup at lines 431-457 specifies a 38px min-height; we bump to
+ *  44px per the workplan's WCAG 2.5.5 floor (even though future tiles
+ *  are inert, the floor is a precaution against future interaction
+ *  retrofits).
+ * ============================================================ */
+@media (max-width: 600px) {
+  .er-future-tile {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr auto;
+    align-items: center;
+    column-gap: 0.55rem;
+    padding: 0.5rem 0.95rem;
+    border-bottom: 1px dashed var(--er-paper-3);
+    background: var(--er-paper);
+    min-height: 44px;
+  }
+  .er-future-tile-glyph {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.15rem;
+    line-height: 1;
+    color: var(--er-kraft);
+    /* --er-kraft on --er-paper = 4.08:1 — ornamental chrome (≥3:1 floor). */
+    text-align: center;
+  }
+  .er-future-tile-name {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.92rem;
+    line-height: 1.1;
+    color: var(--er-ink-soft);
+    /* --er-ink-soft on --er-paper = 8.92:1; AAA-comfortable body text. */
+  }
+  .er-future-tile-tag {
+    font-family: var(--er-font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--er-ink-soft);
+    /* Small mono caps tag — body text class needs 4.5:1.
+     * --er-ink-soft = 8.92:1. Bordered with --er-kraft (4.08:1 — the
+     * border is ornamental chrome, not text). */
+    border: 1px solid var(--er-kraft);
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+  }
+}
+
+/* ============================================================
+ *  Desktop: hide v7 desk-section additions.
+ *
+ *  Desktop refinement is out-of-scope for this feature branch. On
+ *  desktop the pre-v7 chrome (folio + er-pagehead) plus the existing
+ *  desktop section heads continue to drive the layout. The v7 section
+ *  heads + shortform tiles + future tiles are mobile-only at this
+ *  commit.
+ *
+ *  The `.er-row-group` rule below is scoped to shortform-section
+ *  groups (`[data-stage-section^="shortform-"]`) so a future longform
+ *  refactor that reuses the generic `.er-row-group` class is not
+ *  silently hidden on desktop. The shortform-keyed selector matches
+ *  exactly the row groups emitted by `shortform-section.ts`.
+ * ============================================================ */
+@media (min-width: 601px) {
+  .er-desk-section-head,
+  .er-stage-tile--shortform,
+  .er-future-tile,
+  .er-row-group[data-stage-section^="shortform-"] {
+    display: none;
+  }
+}

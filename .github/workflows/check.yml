@@ -16,6 +16,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The refactor-preconditions test preflight runs
+          # `git rev-parse --verify <REAL_SHA>^{commit}` against a pinned
+          # commit reachable from `main`. Default shallow checkout
+          # (fetch-depth: 1) excludes that commit; fetch full history so
+          # the preflight resolves.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

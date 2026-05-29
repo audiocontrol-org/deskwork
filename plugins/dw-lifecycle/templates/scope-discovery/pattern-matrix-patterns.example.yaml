@@ -1,0 +1,199 @@
+# .dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml — example
+#
+# Project-supplied override of the built-in pattern catalog for the
+# pattern-matrix discovery agent. When this file is present at
+# `<repoRoot>/.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml`,
+# the `patterns:` list REPLACES the agent's built-in catalog
+# (does NOT merge — your project owns its catalog).
+#
+# Schema reference:
+#   plugins/dw-lifecycle/src/scope-discovery/schema/pattern-matrix-patterns.yaml.schema.json
+#
+# the polymorphic dispatcher extends the catalog to a discriminated
+# union. Each entry declares a `type` discriminator selecting the
+# handler. Entries WITHOUT a `type` field default to `regex` for
+# backward compatibility with pre-Phase-11 registries.
+#
+# Supported types (v1.1 Task 1):
+#   - regex          (legacy default; pre-Phase-11 backward-compat)
+#   - negative-space (file matches the expected-adopter glob but does
+#                     NOT consume the canonical primitive — the
+#                     audiocontrol #315 KeygroupSummary repro)
+#   - coverage       (emits an adoption-ratio metric; not a finding)
+#   - outlier        (statistical outlier vs directory siblings)
+#   - semantic       (LLM-augmented; STUB in v1.1 Task 1)
+
+patterns:
+  # ───────── 1. regex (legacy / default)  ─────────
+  - type: regex
+    id: as-type-cast
+    description: '`as <TypeName>` cast (banned per CLAUDE.md)'
+    regex: '\bas\s+(?!const\b|unknown\b)[A-Z][A-Za-z0-9_]*'
+    # extensions: ['.ts', '.tsx']   # optional file-extension filter
+
+  # ───────── 2. negative-space (the #315 KeygroupSummary repro) ─────────
+  - type: negative-space
+    id: editor-summary-without-canonical-primitive
+    description: |
+      Editor summary components that consume ZERO canonical design-
+      system primitives while exhibiting high utility-class usage —
+      the shape that shipped to audiocontrol production unnoticed
+      (issue #315 / KeygroupSummary). Fires when the file matches
+      the expected-adopter glob, contains zero `\.ac-*` consumers,
+      and has at least `threshold` utility-class hits.
+    match_glob: 'modules/*-editor/src/**/*Summary.tsx'
+    must_contain: '\bac-[a-z]+'
+    threshold: 5
+    secondary_contains: '\b(?:flex|grid|inline|absolute|relative|fixed|bg-[a-z0-9-]+|text-[a-z0-9-]+|p-[0-9]+|m-[0-9]+)\b'
+
+  # ───────── 3. coverage (adoption metric) ─────────
+  - type: coverage
+    id: editor-canonical-adoption
+    description: |
+      Fraction of editor-summary files consuming the canonical
+      primitive. Feeds the codebase-state metrics
+      (not a finding generator).
+    match_glob: 'modules/*-editor/src/**/*Summary.tsx'
+    must_contain: '\bac-[a-z]+'
+
+  # ───────── 4. outlier (statistical anomaly) ─────────
+  - type: outlier
+    id: classname-composition-outlier
+    description: |
+      Files whose className composition diverges from directory
+      siblings by more than `threshold_sigma` (default 2σ). Surfaces
+      "lone defector" files within an otherwise-uniform module.
+    match_glob: 'modules/*-editor/src/**/*.tsx'
+    distance_metric: className-composition
+    threshold_sigma: 2.0
+
+  # ───────── 5. semantic (LLM-augmented; STUB) ─────────
+  - type: semantic
+    id: editor-design-discipline
+    description: |
+      LLM-augmented check for design-discipline compliance in editor
+      components. STUB in v1.1 Task 1 — emits zero findings + a
+      `stub: 1` metric until the LLM wiring lands (the LLM judge + external auditor).
+    match_glob: 'modules/*-editor/src/**/*Summary.tsx'
+    prompt_template: |
+      You are auditing an editor-summary component for design-system
+      compliance. Does this file consume the canonical primitives, or
+      does it bypass them with utility classes / hand-rolled markup?
+      Answer with a confidence score 0.0–1.0 (1.0 = full compliance).
+    confidence_threshold: 0.7
+    # model: 'claude-3-5-sonnet-20241022'   # optional model override
+
+  # ─────────────────────────────────────────────────────────────────
+  # Multi-content-type examples
+  #
+  # The scan engine is content-agnostic. Every primitive above works
+  # uniformly on .ts/.tsx, .md/.markdown, .css/.scss, .html/.htm,
+  # .yaml/.yml, .json. Adopters route per-content-type behavior via
+  # the `extensions:` filter + the outlier primitive's `content_type:`
+  # discriminator (defaults to `auto` — infers from file extension).
+  # ─────────────────────────────────────────────────────────────────
+
+  # ───── 6. markdown — regex on retired Setext-style headings ─────
+  - type: regex
+    id: markdown-setext-heading-retired
+    description: |
+      Setext-style H1 headings (lines of `=`) — retired per project
+      style guide in favor of ATX `#` headings.
+    regex: '^={3,}\s*$'
+    extensions: ['.md', '.markdown']
+
+  # ───── 7. markdown — negative-space on missing frontmatter UUID ─
+  - type: negative-space
+    id: post-without-deskwork-id
+    description: |
+      Markdown posts under docs/ that lack the canonical
+      `deskwork.id` frontmatter UUID binding (per deskwork's
+      collection conventions).
+    match_glob: 'docs/**/*.md'
+    must_contain: 'deskwork:\s*\n\s*id:\s*[0-9a-fA-F-]+'
+    threshold: 1
+    extensions: ['.md', '.markdown']
+
+  # ───── 8. css — negative-space on missing canonical namespace ───
+  - type: negative-space
+    id: css-without-canonical-namespace
+    description: |
+      CSS files declaring class selectors without the canonical
+      `.ac-*` namespace prefix.
+    match_glob: 'src/**/*.css'
+    must_contain: '\.ac-[a-z][a-z0-9-]*\s*[\{,]'
+    threshold: 1
+    secondary_contains: '\.[a-z][a-z0-9-]*\s*\{'
+    extensions: ['.css']
+
+  # ───── 9. html — regex on banned inline-style attributes ────────
+  - type: regex
+    id: html-inline-style-attribute
+    description: |
+      Inline `style="..."` attributes — banned per design system
+      (every visual choice belongs in a stylesheet, not inline).
+    regex: '\sstyle\s*=\s*"'
+    extensions: ['.html', '.htm']
+
+  # ───── 10. yaml — coverage metric on schemaVersion adoption ─────
+  - type: coverage
+    id: yaml-schema-version-adoption
+    description: |
+      Fraction of YAML configs under .dw-lifecycle/ that carry the
+      canonical `schemaVersion:` field. Feeds the codebase-state metrics
+      controller; not a finding generator.
+    match_glob: '.dw-lifecycle/**/*.yaml'
+    must_contain: '^schemaVersion:'
+    extensions: ['.yaml', '.yml']
+
+  # ───── 11. json — negative-space on missing license field ──────
+  - type: negative-space
+    id: package-json-missing-license
+    description: |
+      package.json files lacking the `license` field. The negative-
+      space detector fires when the file matches the glob but the
+      canonical key is absent.
+    match_glob: 'packages/**/package.json'
+    must_contain: '"license"\s*:\s*"'
+    threshold: 1
+    extensions: ['.json']
+
+  # ───── 12. outlier — content_type='markdown' tokenizer ──────────
+  - type: outlier
+    id: markdown-vocabulary-outlier
+    description: |
+      Markdown posts whose word composition diverges from
+      directory siblings — surfaces topical drift / accidentally-
+      placed posts. `content_type: 'markdown'` selects the
+      word-tokenizer (alphanumeric tokens with case-folding).
+    match_glob: 'docs/posts/**/*.md'
+    distance_metric: token-composition
+    content_type: markdown
+    threshold_sigma: 1.5
+    extensions: ['.md', '.markdown']
+
+  # ───── 13. outlier — content_type='css' tokenizer ───────────────
+  - type: outlier
+    id: css-property-outlier
+    description: |
+      CSS files whose property + selector composition diverges from
+      directory siblings. `content_type: 'css'` selects the CSS
+      tokenizer (property names + class/id selectors).
+    match_glob: 'src/styles/**/*.css'
+    distance_metric: token-composition
+    content_type: css
+    threshold_sigma: 2.0
+    extensions: ['.css', '.scss']
+
+  # ───── 14. outlier — content_type='auto' (extension-inferred) ───
+  - type: outlier
+    id: config-key-outlier-auto
+    description: |
+      Configuration files whose top-level keys diverge from directory
+      siblings. `content_type: 'auto'` (default) infers the tokenizer
+      from the file extension (.yaml/.yml → yaml; .json → json).
+    match_glob: 'config/**/*'
+    distance_metric: token-composition
+    # content_type omitted → defaults to 'auto'
+    threshold_sigma: 1.8
+    extensions: ['.yaml', '.yml', '.json']

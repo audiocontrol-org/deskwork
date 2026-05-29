@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T14:25:27.618Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "version": 1,
+    "range": {
+      "start": 9742,
+      "end": 9777
+    },
+    "text": "This is an artificial restriction that we should remove—see companion note",
+    "category": "other",
+    "anchor": " iterate is refused at the CLI leve",
+    "id": "fb3a8a92-a3af-4976-b5bd-e1208dd8502c",
+    "createdAt": "2026-05-16T14:25:27.618Z"
+  }
+}

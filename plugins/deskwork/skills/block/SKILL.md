@@ -16,17 +16,15 @@ Set an entry to Blocked. Entry leaves the active pipeline; can be resumed via /d
 
 ### Steps
 
-1. Resolve `<slug>` → uuid.
-2. Read sidecar.
-3. Validate: currentStage must be a pipeline stage (Ideas/Planned/Outlining/Drafting/Final/Published). If already Blocked or Cancelled, refuse.
-4. Update sidecar:
-   - priorStage: <currentStage>
-   - currentStage: "Blocked"
-   - reviewState: undefined
-   - updatedAt: <now>
-5. Append journal event: { kind: "stage-transition", from: <prior>, to: "Blocked", reason: <reason if given> }.
-6. Run `deskwork doctor` to validate.
+1. Resolve `<slug>` → entry uuid via `.deskwork/entries/`.
+2. Run `deskwork block <uuid> [--reason "<reason>"]` (the underlying CLI helper). Block is now an atomic operation that:
+   - Validates currentStage is a linear-pipeline stage (not Published / Blocked / Cancelled).
+   - Updates the sidecar (`currentStage` → `Blocked`; `priorStage` set to the previous stage so a later `/deskwork:induct` can restore the entry without operator input).
+   - Appends a `stage-transition` journal event (with `reason` when supplied).
+   - Regenerates `calendar.md` to stay in sync.
+3. Run `deskwork doctor` to validate. If doctor fails, surface failures to operator.
 
 ### Error handling
 
-- **Already Blocked or Cancelled.** Refuse with the entry's current state.
+- **Already Blocked or Cancelled.** CLI refuses with `Cannot block: entry is already <stage>`.
+- **Currently Published.** CLI refuses with `Cannot block: Published is terminal.` (Published entries are frozen; the post-1.0 fork-on-edit model is deferred.)

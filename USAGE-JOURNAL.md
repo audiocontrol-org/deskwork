@@ -27,6 +27,202 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 The design conversation itself is captured canonically in `DEVELOPMENT-NOTES.md`; nothing else to add in the usage-journal sense.
 
+## 2026-05-12 (Task 2.2 v7 architecture): driving the studio against the live workspace to walk 7 cross-bar mockup iterations + 4 implementation cycles — agent ran phone-viewport Playwright probes while operator viewed mockups; one HMR regression caught only by operator-side browser fall-back
+
+**Arc:** Session was a mix of design-time mockup review (where the operator drove the studio in browser as the picking surface) and implementation-time live probing (where the agent ran headless Playwright against the workspace dev studio at phone viewport, 390×844). The picking phase was operator-led: 7 cross-bar mockup iterations + 2 desk-states a11y-audit revisions, all served from `/static/mockups/` on the workspace dev studio. The implementing phase was agent-led: each step's commit verified via Playwright at the magic-DNS Tailscale URL, with operator screenshots arriving when the agent's probe missed something.
+
+Critical lesson from one screenshot: the polling indicator (`auto-refresh · 10s` chrome at bottom-right) was being occluded by the Compose FAB on mobile. **The agent's headless probe never asked "is anything visually behind anything else?"** — and wouldn't have, because the probe targets named elements, not visual layering. The operator's *"not sure what's lurking behind the 'Compose' button"* was the entire bug report; the screenshot was the entire evidence.
+
+### Friction the operator drove out by using the studio
+
+#### "all of the links pathologically refresh as fast as possible"
+
+- **friction** — Agent had reported Step 2.2.6 (renderMasthead refactor) as "verified live" after a curl read of the HTML. Operator opened the workspace dev studio in browser and every link triggered an immediate page reload, cascading. Root cause: the Vite middleware mode's default HMR WebSocket port (24678) was held by a sibling worktree's tsx process. Vite couldn't bind, the browser fell into "polling for restart" mode, and every visit re-triggered the reload loop. **fix**: added `findFreePort(base, max)` that walks forward from 24678; passed the picked port to Vite via `server.hmr.port`. Wrote `scripts/probe-no-reload-storm.mjs` regression probe (opens dashboard + shortform desk, waits 4 seconds, asserts exactly 1 navigation) so this class of bug fails fast next time. **insight**: cross-worktree dev-server port collisions are a recurring failure class on this machine (multiple worktrees of the same package running concurrently). A "claim a free port deterministically" helper is now in the dev server; any future Vite-served middleware in the same repo should reuse it.
+
+#### "masthead and menu are good. Not sure what's lurking behind the 'Compose' button"
+
+- **friction** — Operator's screenshot showed the auto-refresh polling indicator (`auto-refresh · 10s`, small kraft text) sitting BEHIND the Compose FAB at the bottom-right corner. Both elements were `position: fixed; bottom; right`; the indicator at `z-index: 10`, the FAB at `z-index: 65`. The FAB had been the bottom-right occupant since v0.19's Compose redesign; the indicator predated it. **fix**: hide the polling indicator on mobile (`@media (max-width: 600px) { .er-poll-indicator { display: none } }`). Polling itself keeps running; only the visible chrome is suppressed. **insight**: stacking-context conflicts are invisible to assertion-based probes — the agent's probe queried `.er-poll-indicator` and `.er-compose-fab` independently, found both present + visible, and reported "no issues." Visual overlap detection (e.g. `elementsFromPoint` at the indicator's center) would have caught it. Worth adding to the v7 multi-surface probe in Task 2.3.
+
+#### "the hamburger menu doesn't fit the design language"
+
+- **friction** — During cross-bar refinement v5, agent introduced a `≡` hamburger glyph for the masthead menu. Operator caught it on the next mockup viewing: the codebase had already established `⋮` (overflow glyph) on v0.20 row menus; reusing it on the masthead keeps the vocabulary consistent. v6 swapped in `⋮`. **insight**: the project's `.claude/rules/affordance-placement.md` rule names "find the existing pattern in this list that matches and mirror it" — but only for placement, not for glyph vocabulary. Worth expanding the rule (or a sibling rule) to make glyph reuse explicit: *"if the codebase already has a glyph for this affordance class, use that glyph."*
+
+#### "the red horizontal line reads as a strikethrough — especially where it literally strikes through the stacked dots affordance"
+
+- **friction** — v6 masthead used `align-items: end` on the grid, placing the `⋮` menu glyph at the same y-coordinate as the masthead's border-bottom rule. The horizontal red line crossed the middle of the glyph. Operator immediately read it as a strikethrough (i.e., a disabled control), not as a divider rule beneath the chrome. **fix**: v7 switched to `align-items: center` so the glyph sits above the rule's vertical midline. **insight**: a horizontal rule crossing the middle of a chrome element reads as a strikethrough regardless of intent. The CSS press-check vocabulary already establishes the border-bottom rule as a divider primitive; chrome elements must clear it vertically.
+
+#### "v7 looks great. I assume this is just an error on this one mockup" [with screenshot of truncated Desk title]
+
+- **friction** — v7 mockup-pre-fix showed the Desk's title as "TH..." / "P..." because the masthead's universal 3-column grid was applied to the hub-state Desk too. Hub-state should be 2-column (no back-link). **fix**: restore the 2-column override on the `.dashboard` variant in `754778d`. **insight**: variant overrides on a parameterized component are easy to forget when the parameterization is recent. The `renderMasthead({ isHub: true })` API is correct; the CSS variant rule needed to land alongside. Spec-derived test added: "Desk masthead renders 2-column grid (no back-link area)."
+
+### Studio used as the design-pick surface
+
+The 7 cross-bar mockup iterations were served from the workspace dev studio at `/static/mockups/cross-bar-2-refined-v{1..7}.html` + `/static/mockups/cross-bar-2-refined-v7-masthead-fixes.html`. Operator opened the mockups directly in browser at the iPhone-viewport-matched window size. This is the third session running where the dev studio's static asset serving has been the operator's design-review surface — distinct from claude.ai or a separate mockup-hosting service. **insight**: the dev studio's `/static/` mount is doing double duty as a design-review tool. Worth surfacing in the README or skill index that mockups can be authored adjacent to the studio and served from the same dev server.
+
+### Operator-side dev studio access pattern
+
+The agent ran Playwright probes against `http://localhost:47322` (the tsx --watch-served studio in this worktree); the operator opened the same studio via the Tailscale magic-DNS URL (`orion-m4.tail8254f4.ts.net:47330`, which is the compiled `deskwork-studio` binary). One side effect: the compiled binary doesn't watch source changes, so when the agent landed Step 2.2.9 the operator's port-47330 view didn't auto-refresh until the binary was restarted (or until the tsc --watch process recompiled to dist/). **friction**: the agent attempted to restart the compiled-binary studio via `kill PID` and was correctly denied by the permission gate (the operator may have been actively using the port-47330 studio for browsing). Workaround: directed operator visual checks at the tsx-served port-47322. **insight**: when the workspace has both a tsx-watch studio AND a compiled-binary studio running concurrently, the agent should always direct the operator to the tsx-watch one for live preview of in-flight code. The compiled binary is for "stable snapshot" use cases, not "watch-the-fix-land" use cases.
+
+### Two GitHub issues filed for deferred work — both surfaced by reviewer dispatches catching deferrals
+
+- **#262** (Step 2.2.7 About modal deferral): reviewer flagged that the About item linked to the manual instead of opening a small in-studio modal with version + license + thesis link, as specified in the workplan brief. Per "Just for now is bullshit" rule, deferrals need both workplan entry AND GitHub issue. Issue body specifies the modal's contents + acceptance criteria + integration with existing `renderShortcutsOverlay` pattern.
+- **#263** (Step 2.2.9 ⋮ row popover deferral): reviewer flagged that the shortform row's `⋮` was rendered as a plain navigation anchor (links to entry-review) instead of the v0.20-style popover with stage-aware verbs. Deferral is intentional — Step 2.2.10's G.1–G.5 verb-routing fixes need to land first — but the rule requires the issue regardless. Both filed within the same session-end commit cycle.
+
+### Cumulative friction count from this session
+
+5 distinct friction items the operator surfaced this session, all from using the live studio. None caught by the agent's headless probes alone. The pattern matches prior sessions: probe-based verification catches structural correctness; operator-side visual / interaction walking catches everything else.
+
+---
+
+## 2026-05-11 (v0.20.0 row affordance redesign): live phone dogfood throughout — every fix surfaced by the operator walking the studio on their actual iPhone, including a 1.21:1-contrast control that "shipped" past the agent's own probe
+
+**Arc:** Second consecutive session where the operator drove every fix by opening the workspace dev studio on their iPhone via the Tailscale magic-DNS URL (`orion-m4.tail8254f4.ts.net:47330`) and reporting what was broken. The agent claimed "implementation complete" three times during the session; each claim was followed by an operator catch within one or two messages. The pattern is now well-documented: the agent's headless probe is a precondition, not evidence — only the operator's phone walk is evidence.
+
+The session arc: *fix one phone bug → operator walks → operator surfaces next → fix → walk → next* — seven rounds, plus one mid-session reframe (*"Don't we have accessibility standards in the design standards?"*) that turned into a written standard + a contrast direction mockup + a code fix, all in the same v0.20.0 release.
+
+### Friction the operator found by using the actual phone
+
+#### "did u actually try the implementation. its extremely broken"
+
+- **friction** — Agent had reported the v0.20 row-affordance work as "implementation complete, probe + tests green." Operator opened it on phone and the ⋮ overflow button was rendering as tiny centered dots BELOW the row body — not at the row's trailing edge as the brief specified. Root cause: my refactor renamed the wrapper class on the row foreground; the mobile CSS grid-template-areas still targeted the old class, so the action cell got dropped to a new grid row instead of staying inline. **insight**: this exact failure mode (CSS class rename + adjacent layout breaks) is the load-bearing one for "probe passes but operator catches" in this codebase. The probe asserts the DOM shape; the visual rendering depends on the CSS resolving against the DOM shape. Decoupling those two surfaces of truth is what creates the gap.
+
+#### "did you try clicking on an item?"
+
+- **friction** — The slug link in each row was navigable; the rest of the row body (title text, date, anywhere outside the slug link) was a dead click. Operator's question was leading — *did you try clicking on an item* — implying the answer was already known to be no. The probe asserted ⋮ menu open/close + chip clicks but didn't drive a row body click. **fix**: added a row-body click handler that navigates to entry-review on tap (skipping if shell.is-menu-open / is-swiped). **insight**: when the spec says *"tap the row body → opens the entry-review surface"*, "the row body" is a verbatim spec clause that needs its own assertion. Anything-the-operator-can-tap is the probe's responsibility.
+
+#### "touching an item causes the actions meant to be activated by a slide gesture to appear"
+
+- **friction** — Natural finger drift during a tap (10-20px of horizontal movement) was crossing my touchmove handler's axis-lock threshold (8px) and revealing the swipe drawer. The drawer briefly slid out, then snapped back on touchend. From the operator's perspective: tap an item to navigate, see a brief flash of green/red chips, then the page navigates. Disorienting and ugly. **fix**: raised axis-lock threshold (8 → 16px), added a separate commit threshold (24px) before any visible translate, added touchcancel handler. **insight**: synthetic touch events in headless probes don't model finger drift accurately. The probe was firing touchmove(-50, 0) cleanly; real fingers fire touchmove(-12, 4), touchmove(-15, 7), touchmove(-18, 9)... and natural drift dominates the early movement until intent becomes clear. The fix is to require both AXIS_LOCK_PX (committing to horizontal) AND SWIPE_COMMIT_PX (committing to translating) before showing any visual change.
+
+#### "is there a reason you don't use the ios simulator to test?"
+
+- **insight** — Agent had been running Playwright Chromium with iPhone device emulation. Operator named the gap directly. iOS Simulator (full Xcode) isn't installed on this Mac, but Playwright WebKit (the same engine iOS Safari uses) is — a strictly better substitute than Chromium-emulating-iPhone. After the switch, three subsequent bugs (iOS sticky-hover bleed, native swipe behavior, hover-state persistence) were reproducible in the probe. **insight**: the rules already say *"Chromium-at-iPhone-viewport is NOT a substitute for WebKit"* (`.claude/rules/ui-verification.md` § Dual-viewport). The agent had been ignoring that rule for the entire prior session and the first half of this one. Operator-prompted pivots to a documented standard practice are a signal that the standard practice isn't being checked at session start.
+
+#### "why did you tell me you had implemented the feature according to the spec when clearly you hadn't?"
+
+- **friction** — This was the load-bearing operator catch of the session. Agent had reported "17/17 spec assertions pass" with a probe that asserted CSS computed-style values — `transform === matrix(1, 0, 0, 1, -192, 0)`, `shell has is-swiped class`, etc. Operator opened the screenshot and counted chips. The spec says Final stage renders 3 drawer chips (approve / cancel / SCRPBK); the screenshot showed 2 (the FAB was occluding SCRPBK). The probe's name was a claim it couldn't underwrite — every assertion tested mechanism, none tested the spec's literal visible promise. **fix**: rewrote the probe to derive every assertion from a literal spec clause expressed as an operator-perceivable measurement (chip count, chip identity + order, chip visibility within viewport, chip background opacity, chip not occluded via `elementsFromPoint`). 17 assertions became 139 by the end of the session. **insight**: a passing probe with the wrong assertions is worse than no probe — it underwrites false confidence with computed-style evidence. Codified the lesson in `.claude/rules/ui-verification.md` § Spec-compliance probes: assertions derived from the spec, not from the implementation.
+
+#### "I can't slide the item closed after sliding it open. did you check that behavior?"
+
+- **friction** — One commit AFTER the "assertions from the spec" rule landed, operator caught another instance of the same failure mode. Spec brief says *"Tap the row body, swipe right, or scroll away closes."* My implementation honored none of the three. The probe had been extended with chip-count and chip-visibility assertions but didn't test any of the three close behaviors — because I'd read the spec sentence as a single behavior to assert (and asserted none of them). **fix**: implemented swipe-right-to-close (track `startedLatched` at touchstart, animate fg back to 0 when dx past latch), tap-row-to-close (close drawer instead of navigating when shell.is-swiped), and a `data-just-swiped` flag to suppress the click-after-touchend that browsers synthesize after touch gestures. Added 6 close-behavior assertions per stage. **insight**: multi-behavior spec clauses with coordinating conjunctions (*"X, Y, or Z closes"*) need one probe assertion per behavior. The rule needs that addendum. Recorded as a follow-up in the journal entry.
+
+#### "the three dots affordance is so low contrast, I can barely see it. Don't we have accessibility standards in the design standards?"
+
+- **friction** — ⋮ overflow button shipped at `color: var(--er-paper-3)` (#DFD7BF) against `var(--er-paper)` (#F5F1E8). Contrast ratio: 1.21:1. Fails every WCAG 2.1 criterion. The token used was the same value as the row's dashed border rule — passed every internal review because no contrast assertion existed and no human had walked the surface on a real display. Operator's question landed two pieces of work in the same release: a written Accessibility / Contrast section for `DESIGN-STANDARDS.md` (codifying WCAG 2.1 AA — 4.5:1 body, 3:1 large, 3:1 non-text UI, 3:1 ornamental chrome) AND Direction B (ink-soft, 11.06:1) for the ⋮ itself. **insight**: standards questions from the operator are often the highest-leverage moments in a session. The standard generalizes; the fix is local. Both landed in the same commit because the standard codified the trade-off that justified the fix.
+
+#### "you should take action on my previous prompt with the frontend-design plugin"
+
+- **friction** — Agent was about to skip /frontend-design for the contrast decision because *"it's just changing one color."* The rule (`.claude/rules/agent-discipline.md` § Use /frontend-design for all design tasks) is unconditional; the agent was rationalizing around it. **fix**: produced a mockup with three contrast directions (A faded 3.53:1, B ink-soft 11.06:1, C press-mark ring 3.53:1) + proposed standards text. Operator picked B in one prompt; the artifacts (mockup, ACCEPTED/REJECTED archive entries, change-log entry) make the decision auditable. **insight**: the rule pays off most exactly when the design feels small. The artifact discipline is what makes the decision durable — without the mockup, the same operator question two months from now produces *"didn't we already pick something for this?"* and a re-litigation. With the mockup + archive entry, the answer is *"yes, Direction B, here's why A and C were rejected."*
+
+#### Marketplace install fix-up after v0.20.0 release
+
+- **friction** — After `/release` succeeded and the operator ran `/plugin marketplace update deskwork`, the output reported *"Updated 1 marketplace (2 plugins bumped)"* — 2, not 3. The cache showed `deskwork` and `deskwork-studio` had fetched v0.20.0 directories, but `dw-lifecycle` was stuck at v0.17.1. Root cause: dw-lifecycle was never explicitly installed on this machine after v0.17.1 (had drifted forward to nothing on its own through prior marketplace updates). `/plugin install dw-lifecycle@deskwork` followed by a Claude Code restart resolved it. **friction**: the *"2 plugins bumped"* message was informative but didn't explain WHICH 2 of the 3 advertised plugins moved, or what to do about the third. An adopter would have to walk the cache directory to learn what the agent walked to find out. **insight**: plugin install state has several stages (marketplace pointer, cache fetch, `.in_use` marker activation) that can diverge silently. A diagnostic — *"plugin status"* — that shows expected-vs-actual per plugin would close this gap. File as follow-up.
+
+### What worked
+
+- **The Tailscale magic-DNS workflow stayed friction-free.** Operator could open `orion-m4.tail8254f4.ts.net:47330/dev/editorial-studio` on their phone without VPN configuration, without exposing the dev studio to the LAN, without copying URLs. The studio's default behavior (auto-detect Tailscale interface + magic-DNS hostname in the banner) is doing exactly what the deskwork-studio skill prose promised.
+- **The `/release` skill held the line.** Pause 1 (preconditions) caught an untracked `tmp/probe-webkit/` directory the agent had been writing screenshots into and refused to proceed until it was gitignored. Pause 3 (pre-publish) caught zero issues (the version was fresh on npm). Pause 4 (smoke against published packages) caught zero issues. The hard-gated procedure means the only operator interruption was: pick version, ✓ commit, run `make publish` in own terminal, ✓ confirm, accept tag message, ✓ push. Clean.
+- **The /dw-lifecycle:review parallel dispatch produced 5 applied findings + 1 deferred to a filed issue (#246).** This had run earlier in the session series; the deferred item was tracked properly per the agent-discipline rule. The cycle (design → implement → review → integrate or defer) compounded cleanly.
+
+### Themes the operator named
+
+The session-level themes the operator surfaced explicitly:
+
+- *"why did you tell me you had implemented the feature according to the spec when clearly you hadn't?"* — assertions tested mechanism, not spec promises. New rule landed (`ui-verification.md` § Spec-compliance probes).
+- *"Don't we have accessibility standards in the design standards?"* — we didn't. New section landed (`DESIGN-STANDARDS.md` § Accessibility / Contrast).
+- *"you should take action on my previous prompt with the frontend-design plugin"* — agent was rationalizing around an unconditional rule. /frontend-design produced a mockup + archive entries that make the contrast pick durable.
+
+The pattern across all three: the agent's instinct was to "just fix the thing" without writing the standard, the assertion, or the mockup. The operator's questions reframed each one into "fix the thing AND codify the lesson so the next regression can't ship." Every codification paid off within the same session — the contrast standard caught one sibling regression (empty-stage-tile chevron) the agent wouldn't have audited otherwise; the spec-assertion rule was test-driven by the close-gesture failure that followed it; the /frontend-design mockup produced operator-readable artifacts that survive the conversation buffer.
+
+---
+
+## 2026-05-08 (T5 mobile review-surface rebuild): live phone dogfood throughout — 12 commits, every fix surfaced by the operator using the studio on their actual iPhone
+
+**Arc:** The most direct hands-on phone usage session this project has had. The operator drove every fix this session by opening the studio's review surface on their iPhone via the Tailscale magic-DNS URL (`orion-m4.tail8254f4.ts.net:47323`) and reporting what was broken in real time. No simulator, no Playwright proxy — actual iOS Safari on actual hardware. Every commit closed a friction the operator had named in the prior message.
+
+The session arc was: *fix one specific phone bug → operator surfaces the next → fix → operator surfaces the next* — five rounds, then a hard reframe (*"this is whack-a-mole, you never properly designed a mobile-first UX"*), then three mockups, then a full mobile rebuild, then four post-rebuild fixes that ALL came from the operator clicking things and finding them broken.
+
+### Friction the operator found by using the actual phone
+
+#### Side-rail-with-pull-tabs is not a mobile pattern
+
+- **friction** — *"The way the outline and marginalia drawers work on mobile is very weird and unpleasant. It's a crappy repurposing of what's clearly meant for a desktop interface, half-assed onto a mobile UI. We never properly designed a mobile-first UX/UI for the review surface."* The pre-rebuild state — vertical pull-tabs on the left and right edges, marginalia stacked at the bottom of the article column, outline-drawer competing with the strip for the top of the viewport — was a desktop layout compressed onto a phone, not mobile-native. Adopters who came to the surface on mobile would have hit the same pattern. **insight**: if the chrome's primary affordances are vertical edge-tabs, the surface was designed for a mouse, not a thumb. Mobile-native idioms are bottom-anchored (thumb reach), modal sheets that slide up from below, content-first space allocation. The Mockup 1 rebuild followed those idioms; the operator's positive reaction (*"It looks great"*) came on the first pass.
+
+#### Mockups before code is a force multiplier
+
+- **insight** — Three opinionated HTML mockups under `/static/mockups/` (bottom-sheet, FAB, inline-reveal), each at 390×844 with the editorial language preserved (cream paper, red-pencil accents, Newsreader italic, JetBrains Mono labels), let the operator pick a direction in <5 minutes of review. The implementation became a translation problem (this mockup → real surface) instead of an exploration problem. Operator framing: *"It's probably worth actually mocking up some designs in html to review them instead of just hacking on one problem at a time."* The 5 hours of focused implementation time were possible because the destination was concrete. Without mockups, the same time would have produced 15+ hours of incremental drift.
+
+#### Adding a note didn't work
+
+- **friction** — *"did you try adding a note? I can't get it to work. I click the 'add mark' affordance, and nothing happens."* The composer's parent element (`.er-marginalia`) was hidden via `display: none` in the mobile rebuild because the marginalia rail was replaced by the bottom-sheet pattern. Toggling `composer.hidden = false` on a child of a `display: none` parent has no visible effect. The whole add-a-note path was dead from the rebuild's first commit until the operator typed "I can't get it to work." **fix**: relocate the composer into the Notes sheet's slot at boot on phone (gated on `matchMedia('(max-width: 48rem)')`); leave it in `.er-marginalia` on desktop where the inline absolute positioning still works. **insight**: visual smoke ≠ interactive smoke. The dual-viewport regression smoke (added the same day) verified the page rendered correctly at both viewports but didn't drive a single tap. Every fix-landed claim that doesn't drive at least one interaction per affected surface is a candidate for this same blind spot.
+
+#### Edit / Resolve / Delete on existing notes were dead
+
+- **friction** — *"edit, resolve, and delete on existing notes doesn't seem to work."* The Notes sheet rendered the action buttons correctly because the cloning preserved them visually. But `cloneNode(true)` doesn't copy `addEventListener`-attached handlers. Every button was a dead button — the operator's finger pressed something that looked clickable and did nothing. **fix**: refactored to MOVE the actual `[data-sidebar-list]` element into the sheet rather than cloning it. Single source of truth — the desktop renderer attaches handlers at render time to the actual rendered `<li>` children, regardless of where the parent list lives. **insight**: cloning DOM trees feels lightweight but creates a "what's missing?" puzzle for every cloned interactive element. The cleanest pattern for "show this content in a different place at a different breakpoint" is to MOVE the element. The desktop renderer becomes the single renderer; mobile is a view, not a separate render path.
+
+#### The page zooms when you tap into anything
+
+- **friction** — *"clicking edit works, but it appears to zoom in a bit on iOS, which then makes the app slosh around in horizontal scrolling."* Then: *"The same thing happens in the editor."* iOS Safari's auto-zoom-on-input-focus triggered on every tap into a textarea, the inline edit form, the CodeMirror surface. The page-level zoom then exposed any sub-pixel horizontal overflow as a touch-pan gesture, fighting the operator's vertical scroll.
+- **insight** — *"The problem isn't that a single textarea is zooming... it's the *entire* page that zooms. This has to be a well-known issue with a well-known fix."* The operator was right on both counts. The well-known fix is one line: `maximum-scale=1` on the viewport meta tag. iOS Safari respects this attribute to suppress auto-zoom on input focus while still honoring user pinch-to-zoom (in iOS 13+). The two prior commits (font-size:16px sweep on form inputs, then on `.cm-content`) addressed symptoms element-by-element. The viewport meta closes the entire class of bug in one line. **insight applicable to future agents**: when the operator says "this is a well-known issue with a well-known fix," that's a strong signal to web-search the canonical solution rather than continue patching symptoms.
+
+#### Cross-device clipboard-paste workflow
+
+- **insight** — The Actions sheet's design preserves a cross-device workflow specific to mobile use: the operator hits "Approve" on their phone, the skill command (`/deskwork:approve <slug>`) gets copied to the clipboard, iCloud syncs the clipboard to the laptop, and the operator pastes into a Claude Code chat there. This is per the THESIS Consequence-2 routing (UI buttons clipboard-copy skill commands, agent runs the work). It works because the Apple clipboard sync is universal across the operator's devices. The mobile design didn't have to invent a separate decision-flow for phone — it inherited the same flow as desktop, just routed through clipboard. **friction-not-encountered-but-watch-for**: if the operator is on Android (no iCloud), this workflow doesn't transfer. Worth flagging for any future cross-device decision flow.
+
+### What the dual-viewport regression smoke caught and didn't catch
+
+- **fix** — *"i suspect the desktop fixes trampled the fixes for ios. which, if true, means we have a serious problem with testing and regressions. we can't play whack-a-mole between mobile and desktop ux/ui."* The session opened with this framing; the response was a documented rule (`.claude/rules/ui-verification.md` Dual-viewport verification subsection) plus an enforcement smoke (`scripts/smoke-er-viewport-regressions.mjs`). For the rest of the session, every commit verified at both viewports as a precondition. Five subsequent commits would have introduced silent cross-viewport regressions without it.
+- **friction** — But the smoke is structural-only. It probes pages at scrollY=0 with no interactions, asserts no html-overflow + strip-height invariant + no fixed-position offenders. It doesn't drive Edit / Resolve / Delete / composer / scroll-collapse. Four of this session's 12 commits fixed bugs the smoke didn't catch. **insight**: a regression smoke that doesn't drive interactions has a sharp limit. The follow-up rule (mentioned in DEVELOPMENT-NOTES.md): drive at least one interactive flow per surface that a CSS or markup change affects. Could be encoded as an "interaction smoke" alongside the structural smoke; could just be a discipline checkbox in the verification protocol.
+
+### Operator-framing quotes worth preserving
+
+These quotes shaped the session's direction:
+
+- *"we can't play whack-a-mole between mobile and desktop ux/ui"* — drove the dual-viewport rule.
+- *"crappy repurposing of what's clearly meant for a desktop interface, half-assed onto a mobile UI"* — drove the mockups + Mockup 1 rebuild.
+- *"It's probably worth actually mocking up some designs in html to review them instead of just hacking on one problem at a time"* — direct prescription for the mockups-before-code workflow.
+- *"This has to be a well-known issue with a well-known fix"* — stopped the symptom-patching and led to the viewport meta canonical fix.
+- *"Whenever you don't use the frontend design skill on UI work, it always comes out garbage"* — operator's reminder to invoke `/frontend-design` deliberately. The mockups + Mockup 1 implementation both used the skill discipline; the post-rebuild fixes that needed correction (composer, edit handlers, iOS zoom) were ALL non-frontend-design changes where I jumped straight to code without the skill's design-thinking step. Pattern-match: skill discipline correlates with first-pass-correct UI.
+
+### What didn't get exercised but should have
+
+- **No actual iPhone Safari verification ran from the agent side.** Every commit was Chromium-verified at 390×844; the operator did the iPhone verification themselves. Xcode isn't installed on this machine (only CLT, no `simctl`), and Playwright WebKit installs aren't a substitute. The operator-on-iPhone flow worked because they were available to test live; for sessions where the operator isn't online, an iPhone simulator path needs to exist. **friction**: deferred (Xcode install is a 12GB user-decision).
+
+### Tagged summary
+
+| Tag | Item |
+|---|---|
+| **friction** | Side-rail-with-pull-tabs was the wrong pattern; operator named it directly. |
+| **friction** | Composer trapped in hidden parent — first-tap dead. |
+| **friction** | Cloned action buttons had no listeners — every tap dead. |
+| **friction** | iOS auto-zoom on every input — page-level slosh. |
+| **friction** | Dual-viewport smoke is structural-only, blind to interaction bugs. |
+| **fix** | Mockups-before-code converted abstract dissatisfaction into concrete direction. |
+| **fix** | Move-don't-clone for mobile relocation. |
+| **fix** | `maximum-scale=1` viewport meta as the universal iOS auto-zoom suppressor. |
+| **fix** | Dual-viewport rule + smoke as the cross-cut regression check. |
+| **insight** | Skill discipline (`/frontend-design`) correlates with first-pass-correct UI work. |
+| **insight** | "Well-known issue with a well-known fix" is a search-the-canonical-answer signal. |
+| **insight** | Cross-device clipboard-paste preserves the desktop decision flow on phone via iCloud sync. |
+
+---
+
+## 2026-05-06 (T2 burn-down): infrastructure-only session — no plugin exercise, by design
+
+**Arc:** Pure source-side work fixing the dw-lifecycle plugin UX cluster (T2: #185, #196, #209, #210, #211, #212, #213, #214, #215). 8-of-9 issues fix-landed across 6 commits. The work is reactive: every fix is a response to friction the operator already documented in those issues. No new dogfood walks happened; we didn't exercise the plugin against real content.
+
+**What should have been exercised but wasn't:** post-release verification via `/plugin marketplace update deskwork`. The fixes can't be verified against a real install until v0.18.0 ships. The agent-discipline rule *"issue closure requires verification in a formally-installed release"* is the gate here — nothing closes until a fresh marketplace install demonstrates the original symptoms are gone. That walk is pending the next release.
+
+**Adopter-friction signal still surfaces from the fix work itself:**
+
+- **insight** — **The 9 T2 issues map almost exactly to the seam between SKILL prose and helper code.** #196, #209, #210, #212 all came from the SKILL.md telling the operator one thing and the helper expecting another — pre-create a worktree and the helper aborts; pre-author a workplan and the helper renders a stub anyway; run setup without `/dw-lifecycle:install` first and get a confusing error. Whenever a SKILL describes a step the helper doesn't actually support (or the helper expects a precondition the SKILL doesn't surface), that's friction the adopter hits in their first attempt. Treating the SKILL as the operator-facing API and the helper as its implementation — and gating PR review on the two staying in sync — would catch these before they ship.
+
+- **insight** — **#185 is the canonical "packaging is UX" defect.** The plugin shipped 16 working SKILLs that no adopter could invoke via slash command, because shipped Claude Code requires `commands/<name>.md` shims to register the user-typeable form. SKILL.md alone isn't enough. The bug was invisible during in-monorepo dogfood (the project-local `.claude/skills/feature-*` shims worked) but every external adopter hit it. The `agent-discipline` rule *"Use the deskwork plugin only through the publicly-advertised distribution channel"* exists specifically to prevent this — when the dev path differs from the adopter path, friction hides until a real install surfaces it.
+
+- **insight** — **Splitting #215 into #232 preserved the architectural conversation.** Issue 1 (journal-sidecar drift after approve) was a clean code fix. Issue 2 (calendar regen writes to hardcoded `.deskwork/calendar.md` not per-site `calendarPath`) needs operator design input — entry-centric calendar vs. per-site legacy is a load-bearing architectural call. Cramming both into a single commit would have either shipped a fix to the wrong shape OR left issue 1's clean fix waiting on issue 2's design discussion. Per the *"file every UX friction immediately; let scoping happen later"* principle, splitting is the right move whenever a single issue contains two different *kinds* of work.
+
+**No `/plugin marketplace add` / install commands ran this session. No studio routes were navigated. No content was ingested or iterated against.** Next release (v0.18.0+) opens the post-install walk; that's where the next USAGE-JOURNAL entry should land.
+
 ---
 
 ## 2026-05-04 / 05 (Phase 35 + UX polish + v0.15.0 release): hands-on review-surface dogfood; multi-issue triage; tranche-cleanup feature bootstrap
@@ -2178,3 +2374,43 @@ Each round followed the same pattern: third-party (operator-driven) audit doc la
 ### Closing thought
 
 This session is the longest end-to-end release arc to date — 5 sub-phases shipped + 3 audit-remediation rounds + ship-pass + release + marketplace-update + post-release SessionStart-hook verification, all in one continuous arc. The agent-discipline rules + the audit-driven remediation pattern + the `/release` skill's pause structure carried it without operator framing beyond the standard ones (`do it`, `commit and push`, `accept`, `yes, run the push`). The 3 audit-remediation rounds caught 5 real bugs that would otherwise have shipped silently. **The ship bar concept is worth keeping** — articulating a falsifiable post-fix condition (audit returns clean) makes "is the work done" a yes/no question rather than a vibe.
+
+---
+
+## 2026-05-22: shipping v0.22.2 against my own iPhone — release pipeline correct, post-install rebuild silent-fails
+
+**Arc:** Final pass on the `graphical-entries` design spec via iPhone (operator's primary review device) blocked by `Failed to load annotations: Pattern too long for this browser.` Traced, fixed via TDD, released v0.22.2 via the hard-gated `/release` skill. Verified against the released artifact — same banner on iPhone. Dug in, found `.runtime-cache` was serving the May-16 client bundle despite the marketplace clone having today's source. Manually nuked the cache; rebuild succeeded; fix took effect.
+
+This session is the closest end-to-end dogfood of `/release` we've run: ship a real bug fix, install via the public path, hit a post-install bug that the release pipeline didn't catch, file an issue, work around manually, verify final state.
+
+### Friction the operator drove out by reviewing on iPhone
+
+#### "Failed to load annotations: Pattern too long for this browser."
+
+- **friction** — iPhone-only error banner on the marginalia review surface for `graphical-entries-design`. The graphical-entries spec had grown long enough through 5 iteration rounds (8 comments total, three with anchors >32 chars: `" iterate is refused at the CLI leve"` (34), `"Per-stage columns are template-aware."` (37), `"renders the artifact in an iframe"` (33)) that the fuzzy anchor fallback added in v0.22.1 (`bca51ba`, #271) hit `diff-match-patch`'s `Match_MaxBits` (32) and threw. **insight**: this is exactly the kind of bug only real-content review surfaces. Earlier 1-2 marginalia per entry never triggered it; 5 iteration rounds on the graphical-entries spec produced anchors of arbitrary length and one of them eventually crossed the line. The previously-shipped W3C completion (`bca51ba`) passed every gate including the 597-test studio suite, but no test had a >32-char anchor.
+- **fix** — v0.22.2 (commits `a5b2fa4` + `5cd4846`). Guard at the boundary: `anchor.length > 32` → null (refuse to guess), matching the function's existing tuning rationale. Five regression tests cover the >32-char boundary explicitly.
+
+#### "the make publish command doesn't work in this worktree. There's a naked tsc command and tsc is not in the path; my guess is we need to run npm install everywhere."
+
+- **friction** — Operator ran `make publish` from `/Users/orion/work/deskwork` (main repo, on stale v0.22.0 manifests) instead of `/Users/orion/work/deskwork-studio-mobile-first` (the worktree carrying the v0.22.2 bump commit). prepack ran `tsc -b tsconfig.build.json` from `packages/core/` against v0.22.0 source; the workspace root's `node_modules/.bin/tsc` was absent because main hadn't been npm-installed recently. **insight**: the `/release` skill's preconditions check is FEATURE-worktree-side — it didn't catch that the operator's terminal was in a different tree. A `make publish` invocation that's silently in the wrong tree looks the same as a tooling problem. Worth documenting in Pause 3's prompt that the publish command must run from the same tree that just ran the bump.
+- **fix** — operator cd'd to the right worktree; publish succeeded with three OTPs.
+
+#### "still broken. i suspect a stale code cache"
+
+- **friction** — Verified v0.22.2 was on npm, marketplace clone bumped, `/plugin marketplace update deskwork` brought the new manifest in, bin shim auto-reinstalled `@deskwork/studio@0.22.2`. Restarted the studio. Tried iPhone. Same error banner. The fix-on-disk + correct-shipped-artifact + correct-installed-version + correct-running-process all checked out, but the client bundle was the May-16 build (pre-fix). The studio's startup banner — `built 0 client assets (12 cached)` — reads as success but encoded the failure.
+- **fix** — `rm -rf <pluginRoot>/.runtime-cache` then restart. The bundle rebuilt from current source. Fix took effect. Operator confirmed iOS works.
+- **filed** — #272: `.runtime-cache` freshness check misses transitively-imported source changes. The cache's per-bundle `.meta.json` lists entrypoint inputs only; transitively-imported files like `range-utils.ts` aren't in the list, so changes to them don't invalidate the cached bundle. Multiple fix options surfaced in the issue body — preferred: tie cache invalidation to the same signal (`@deskwork/studio` version) that drives the bin-shim's reinstall.
+- **insight** — this is the second post-release bug in this project family where the pipeline shipped a correct artifact but a post-install step lost the change before the adopter saw it. The first was #88 (marketplace `source.ref` not pinned correctly; v0.9.0 went out with empty vendor symlinks). The structural shape is the same: every gate passes, the published artifact is correct, but adopter-side install state diverges from what the release pipeline thought it was producing. The `/release` skill's smoke test runs against the published packages (correct) but inside its tmpdir — it never exercises the marketplace-clone + `.runtime-cache` path that real adopters hit on update.
+
+#### "the fix works"
+
+- **fix** — Operator confirmed v0.22.2 + manual cache-nuke verifies the iOS marginalia load path. Closure-eligible per `agent-discipline.md` *"issue closure requires verification in a formally-installed release."*
+- **insight** — Between the released artifact and the operator's iPhone there were FIVE layers: npm tarball → marketplace clone → plugin shell → `@deskwork/studio` install → `.runtime-cache` bundle. Each layer can independently diverge from "what was released." This session caught one of them (the bundle); the cache-nuke workaround is the recipe until #272 lands a structural fix.
+
+### Out-of-band: agent fabrication caught by TDD
+
+- **insight** — Mid-fix the agent proposed `dmp.Match_MaxBits = 0` confidently — recall about dmp's library internals presented as ground truth ("the documented escape hatch for long patterns"). dmp's docs don't say that; dmp's source doesn't support that interpretation (the throw guard is unconditional, not gated on `Match_MaxBits != 0`). The TDD tests written *before* applying the fix turned that fabrication into a 10-second test-failure feedback loop — 7 fuzzy tests failed with the same error string. Without the tests, the wrong fix could have shipped to v0.22.2 and been caught only on iPhone post-release. **The "Read documentation before quoting commands" rule applies to library internals too**; recall isn't safe even for "well-known" libraries.
+
+### Closing thought
+
+The release pipeline's design is correct — preconditions, version validate, bump, publish-with-OTPs, smoke against the registry, tag, atomic push, GitHub release. Every step worked. The bug surfaced ONE layer past the release pipeline's reach: the marketplace clone's `.runtime-cache/`, a post-install rebuild step the release flow doesn't simulate. **#272 names the structural fix** (extend freshness checking to transitive inputs, or invalidate-on-version-bump). Until it lands, the workaround is "delete `.runtime-cache` after `/plugin marketplace update deskwork`" — worth surfacing in the deskwork-studio plugin README as a known issue with a one-line repair recipe.

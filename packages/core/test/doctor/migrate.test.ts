@@ -195,7 +195,7 @@ describe('migrateCalendar', () => {
     } finally { await rm(projectRoot, { recursive: true, force: true }); }
   });
 
-  it('reads legacy pipeline workflow records into iterationByStage + reviewState (#141)', async () => {
+  it('reads legacy pipeline workflow records into iterationByStage (#141; reviewState retired per Commandment III)', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
     try {
       await mkdir(join(projectRoot, '.deskwork', 'review-journal', 'pipeline'), { recursive: true });
@@ -231,7 +231,11 @@ describe('migrateCalendar', () => {
       const sidecar: { iterationByStage: Record<string, number>; reviewState?: string } =
         JSON.parse(sidecarBody);
       expect(sidecar.iterationByStage.Drafting).toBe(3);
-      expect(sidecar.reviewState).toBe('approved');
+      // reviewState is RETIRED — the migration tool no longer derives
+      // it from legacy pipeline records. Existing journals with
+      // `review-state-change` events still parse for historical reads
+      // but no field is populated on the sidecar.
+      expect(sidecar.reviewState).toBeUndefined();
     } finally { await rm(projectRoot, { recursive: true, force: true }); }
   });
 

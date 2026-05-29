@@ -289,6 +289,12 @@ function applyEdits(
   let range = comment.range;
   let category = comment.category;
   let anchor = comment.anchor;
+  // #200 — preserve prefix/suffix through edits. Edits don't currently
+  // mutate them (the operator can edit text/category/range/anchor via
+  // the existing edit-comment fields), but they must survive a
+  // text/category edit unchanged.
+  const anchorPrefix = comment.anchorPrefix;
+  const anchorSuffix = comment.anchorSuffix;
   for (const e of edits) {
     if (e.type !== 'edit-comment') continue;
     if (e.text !== undefined) text = e.text;
@@ -306,6 +312,8 @@ function applyEdits(
     text,
     ...(category !== undefined ? { category } : {}),
     ...(anchor !== undefined ? { anchor } : {}),
+    ...(anchorPrefix !== undefined ? { anchorPrefix } : {}),
+    ...(anchorSuffix !== undefined ? { anchorSuffix } : {}),
   };
   return out;
 }

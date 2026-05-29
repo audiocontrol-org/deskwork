@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deskwork.dev/schemas/dw-lifecycle/scope-discovery/controller-config.yaml",
+  "title": "scope-discovery the self-correcting controller controller configuration",
+  "description": "Configuration for the self-correcting controller (the self-correcting controller). Every field is OPTIONAL and falls through to the documented default (see DEFAULT_CONTROLLER_CONFIG in controller-config.ts). Cross-field invariants are enforced at parse time: cold_start_* must lie within the corresponding [min, max] band; low_drift_threshold <= high_drift_threshold. The controller is a pure computation (state lives in `.dw-lifecycle/scope-discovery/orchestrator-runtime/controller-state.json`).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cold_start_frequency": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Cold-start frequency value (turns-per-loop-invocation; 1.0 = every turn). Default 1.0 — max frequency. Must lie within [frequency_min, frequency_max]."
+    },
+    "cold_start_intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Cold-start intensity value (confidence threshold for auto-disposition; 1.0 = strictest). Default 1.0 — max intensity. Must lie within [intensity_min, intensity_max]."
+    },
+    "cold_start_escalation_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Cold-start escalation threshold (proposals below this confidence escalate to the operator). Default 0.9 — most proposals escalate until the controller earns confidence. Must lie within [escalation_min, escalation_max]."
+    },
+    "ratchet_down_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Fractional decrease per ratchet-down step (multiplied by current value). Default 0.1 — 10% per low-drift window."
+    },
+    "ratchet_down_window": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of consecutive low-drift turns before ratchet-down fires. Default 5 (operator decision 2026-05-26)."
+    },
+    "low_drift_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Drift signal below this counts as `low` for ratchet-down accounting. Default 0.1. MUST be <= high_drift_threshold."
+    },
+    "high_drift_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Drift signal above this triggers immediate intensification (jump to max frequency; raise intensity). Default 0.4."
+    },
+    "anti_thrashing_window": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "How many prior decisions the oscillation detector looks back over. Default 3 (the K in the pre-made decision)."
+    },
+    "anti_thrashing_damping_factor": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Multiplier applied to the proposed adjustment when oscillation is detected. Default 0.5 (50% damping per the pre-made decision)."
+    },
+    "auditor_correction_high_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Auditor-correction-rate above this triggers intensification on frequency + intensity AND raises the escalation threshold. Default 0.5."
+    },
+    "frequency_min": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Floor for frequency. Default 0.1 — even fully-relaxed, the controller still runs the loop once every ten turns."
+    },
+    "frequency_max": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Ceiling for frequency. Default 1.0 (every turn)."
+    },
+    "intensity_min": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Floor for intensity. Default 0.2 — even fully-relaxed, low-confidence proposals are still gated."
+    },
+    "intensity_max": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Ceiling for intensity. Default 1.0 (LLM-judge on every action)."
+    },
+    "escalation_min": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Floor for escalation threshold. Default 0.3."
+    },
+    "escalation_max": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Ceiling for escalation threshold. Default 1.0."
+    }
+  }
+}

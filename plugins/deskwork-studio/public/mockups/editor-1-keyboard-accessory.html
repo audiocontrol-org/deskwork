@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Editor mockup 1 · Keyboard accessory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --red-soft: rgba(184, 54, 42, 0.08);
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .meta a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+  }
+  h1.demo-title {
+    color: var(--paper);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.6rem;
+    margin-bottom: 0.4rem;
+    text-align: center;
+  }
+  .demo-sub {
+    color: var(--faded-2);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 1.6rem;
+    text-align: center;
+  }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+    text-align: center;
+    max-width: 410px;
+  }
+  .phone {
+    width: 410px;
+    height: 880px;
+    background: #050505;
+    border-radius: 50px;
+    padding: 12px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+  .screen {
+    width: 100%; height: 100%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+
+  /* ============================================================
+   *  Editor · keyboard-accessory minimalist
+   *  Direction: chrome surrenders to the editor; only two
+   *  pieces of UI exist at rest — a back glyph and a Save state pill.
+   *  Markdown shortcuts ride above the iOS keyboard when typing.
+   * ============================================================ */
+
+  /* Top strip — barely there */
+  .topbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 78px; /* status bar 56px + 22px chrome */
+    padding: 56px 1rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 50;
+    background: linear-gradient(to bottom, rgba(245,241,232,1), rgba(245,241,232,0.92) 60%, rgba(245,241,232,0));
+  }
+  .back-glyph {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 1.3rem;
+    color: var(--ink);
+    background: var(--paper);
+    text-decoration: none;
+  }
+  .save-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.42rem 0.85rem 0.42rem 0.65rem;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    color: var(--faded);
+  }
+  .save-pill .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--paper-3);
+  }
+  .save-pill.dirty {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(46, 93, 69, 0.04);
+  }
+  .save-pill.dirty .dot {
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(46, 93, 69, 0.15);
+  }
+
+  /* Editor area */
+  .editor {
+    position: absolute;
+    top: 78px; left: 0; right: 0; bottom: 50px;
+    overflow-y: auto;
+    padding: 0.4rem 1.4rem 1.6rem;
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--ink);
+    background: var(--paper);
+  }
+  .editor.with-keyboard { bottom: calc(48px + 290px); }
+  .editor .line { white-space: pre-wrap; }
+  .editor .ln-h1 { color: var(--red); font-weight: 600; }
+  .editor .ln-h2 { color: var(--blue); }
+  .editor .ln-comment { color: var(--faded); }
+  .editor .ln-bold { font-weight: 600; color: var(--ink); }
+  .editor .ln-em { font-style: italic; color: var(--ink); }
+  .editor .ln-code { background: var(--paper-2); padding: 0.05rem 0.3rem; border-radius: 2px; }
+  .editor .caret {
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    background: var(--red);
+    margin-left: -1px;
+    vertical-align: text-bottom;
+    animation: blink 1s steps(2, jump-none) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Bottom strip (keyboard down) */
+  .bottombar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 50px;
+    padding: 0 0.75rem;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    z-index: 60;
+  }
+  .mode-toggle {
+    display: inline-flex;
+    border: 1px solid var(--paper-3);
+    border-radius: 999px;
+    padding: 2px;
+    background: var(--paper-2);
+  }
+  .mode-toggle button {
+    border: none;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faded);
+    padding: 0.32rem 0.65rem;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .mode-toggle button.active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .bottom-aux {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .notes-link {
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .notes-link .count {
+    color: var(--red);
+    margin-left: 0.2rem;
+  }
+  .discard-link {
+    color: var(--faded);
+    text-decoration: none;
+  }
+
+  /* Keyboard accessory bar (above iOS keyboard) */
+  .accessory {
+    position: absolute;
+    bottom: 290px; left: 0; right: 0;
+    height: 48px;
+    background: var(--paper-2);
+    border-top: 1px solid var(--paper-3);
+    border-bottom: 1px solid var(--paper-3);
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    z-index: 70;
+    box-shadow: 0 -2px 8px rgba(26,22,20,0.04);
+  }
+  .accessory button {
+    flex-shrink: 0;
+    border: none;
+    border-right: 1px solid var(--paper-3);
+    background: transparent;
+    padding: 0 0.95rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 56px;
+    justify-content: center;
+  }
+  .accessory button .glyph {
+    font-family: var(--display);
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--red);
+  }
+  .accessory button.heading { font-weight: 600; }
+  .accessory button.bold strong { font-weight: 700; }
+  .accessory button.em em { font-style: italic; font-family: var(--display); }
+  .accessory button.code code { font-family: var(--mono); background: var(--paper); padding: 0.04rem 0.25rem; border-radius: 2px; font-size: 0.72rem; }
+  .accessory .spacer { flex: 1; border-right: 0; }
+  .accessory button.undo { border-right: 0; }
+
+  /* Mock iOS keyboard */
+  .keyboard {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 290px;
+    background: #C8CCD2;
+    background-image: linear-gradient(to bottom, #CDD1D7, #C0C5CC);
+    z-index: 60;
+    padding: 0.5rem 0.4rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .keyboard .row {
+    display: flex;
+    gap: 0.32rem;
+    flex: 1;
+  }
+  .keyboard .key {
+    flex: 1;
+    background: linear-gradient(to bottom, #FCFCFD, #E5E8EC);
+    border-radius: 5px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 1.1rem;
+    color: #1A1614;
+  }
+  .keyboard .key.wide { flex: 1.4; font-size: 0.85rem; color: #4A4F55; }
+  .keyboard .key.space { flex: 5.2; font-size: 0.85rem; color: #4A4F55; }
+  .keyboard .key.shift { background: #ABB0B6; }
+  .keyboard .indicator {
+    width: 110px; height: 4px; background: #1A1614;
+    border-radius: 4px; margin: 0.4rem auto 0;
+    opacity: 0.4;
+  }
+
+  /* Status bar accents on phone */
+  .ios-clock {
+    position: absolute;
+    top: 28px; left: 32px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+    z-index: 110;
+  }
+  .ios-icons {
+    position: absolute;
+    top: 30px; right: 32px;
+    color: var(--ink);
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    z-index: 110;
+  }
+
+  .narrative {
+    margin-top: 2.5rem;
+    max-width: 720px;
+    padding: 0 1rem;
+    color: #C7BEAE;
+    font-family: var(--display);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+  .narrative strong {
+    color: var(--paper);
+    font-style: italic;
+    font-weight: 500;
+  }
+  .narrative em { color: var(--paper); font-style: italic; }
+  .narrative p { margin-bottom: 0.8rem; }
+  .narrative .label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Editor 1 · Keyboard accessory.</h1>
+<div class="demo-sub">Chrome surrenders to the editor</div>
+
+<div class="frames">
+
+  <!-- Frame A: keyboard down, preview-like resting state -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="topbar">
+          <a href="#" class="back-glyph">←</a>
+          <span class="save-pill"><span class="dot"></span>Saved · 9:38</span>
+        </div>
+
+        <div class="editor">
+<div class="line ln-h1"># Deskwork architectural thesis</div>
+<div class="line">&nbsp;</div>
+<div class="line ln-comment">Read this before touching any deskwork code.</div>
+<div class="line">&nbsp;</div>
+<div class="line">This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable, which let the wrong architecture creep into <span class="ln-em">the studio's review surface</span> and waste an angry session correcting it.</div>
+<div class="line">&nbsp;</div>
+<div class="line ln-h2">## The canonical source</div>
+<div class="line">&nbsp;</div>
+<div class="line">&gt; <span class="ln-em">"You never leave the agent for a static tool. You talk to it. It does the work."</span></div>
+<div class="line">&nbsp;</div>
+<div class="line">The agent's toolkit isn't a static configuration you set up once; it evolves, under your direction, in response to <span class="ln-bold">what the work actually needs</span>.</div>
+<div class="line">&nbsp;</div>
+<div class="line ln-h2">## What the thesis means</div>
+<div class="line">&nbsp;</div>
+<div class="line">The agent (Claude, in a Claude Code session) is the primary tool. Every other piece of deskwork — CLI verbs, the studio, doctor rules, sidecars, the calendar — exists to be <span class="ln-bold">read, edited, and orchestrated by that agent</span>.<span class="caret"></span></div>
+        </div>
+
+        <div class="bottombar">
+          <div class="mode-toggle">
+            <button class="active">Source</button>
+            <button>Preview</button>
+          </div>
+          <div class="bottom-aux">
+            <a href="#" class="notes-link">Notes<span class="count">3</span></a>
+            <a href="#" class="discard-link">Discard</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · resting state · 78px top, 50px bottom · editor takes ~92% of viewport</div>
+  </div>
+
+  <!-- Frame B: keyboard up, accessory bar visible, document is dirty -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="topbar">
+          <a href="#" class="back-glyph">←</a>
+          <span class="save-pill dirty"><span class="dot"></span>Save</span>
+        </div>
+
+        <div class="editor with-keyboard">
+<div class="line ln-h1"># Deskwork architectural thesis</div>
+<div class="line">&nbsp;</div>
+<div class="line ln-comment">Read this before touching any deskwork code.</div>
+<div class="line">&nbsp;</div>
+<div class="line">This file exists because the thesis was <span class="ln-bold">implicit in the project's design</span> but not written down anywhere discoverable<span class="caret"></span>, which let the wrong architecture creep into <span class="ln-em">the studio's review surface</span> and waste an angry session correcting it.</div>
+<div class="line">&nbsp;</div>
+<div class="line ln-h2">## The canonical source</div>
+<div class="line">&nbsp;</div>
+<div class="line">&gt; <span class="ln-em">"You never leave the agent for a static tool. You talk to it. It does the work."</span></div>
+        </div>
+
+        <div class="accessory">
+          <button class="heading" title="Heading">H<span style="font-size:0.7rem;color:var(--faded);">1</span></button>
+          <button class="heading" title="Subhead">H<span style="font-size:0.7rem;color:var(--faded);">2</span></button>
+          <button class="bold" title="Bold"><strong>B</strong></button>
+          <button class="em" title="Italic"><em>I</em></button>
+          <button class="code" title="Code"><code>` `</code></button>
+          <button title="Link"><span class="glyph">¶</span>link</button>
+          <button title="List"><span class="glyph">§</span>list</button>
+          <button title="Quote"><span class="glyph">"</span>quote</button>
+          <span class="spacer"></span>
+          <button class="undo" title="Undo">↶</button>
+        </div>
+
+        <div class="keyboard">
+          <div class="row">
+            <div class="key">q</div><div class="key">w</div><div class="key">e</div><div class="key">r</div><div class="key">t</div><div class="key">y</div><div class="key">u</div><div class="key">i</div><div class="key">o</div><div class="key">p</div>
+          </div>
+          <div class="row" style="padding: 0 1.4rem;">
+            <div class="key">a</div><div class="key">s</div><div class="key">d</div><div class="key">f</div><div class="key">g</div><div class="key">h</div><div class="key">j</div><div class="key">k</div><div class="key">l</div>
+          </div>
+          <div class="row">
+            <div class="key shift">⇧</div><div class="key">z</div><div class="key">x</div><div class="key">c</div><div class="key">v</div><div class="key">b</div><div class="key">n</div><div class="key">m</div><div class="key shift">⌫</div>
+          </div>
+          <div class="row">
+            <div class="key wide">123</div><div class="key wide">🌐</div><div class="key space">space</div><div class="key wide">return</div>
+          </div>
+          <div class="indicator"></div>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · typing · accessory bar above keyboard · save pill turns green</div>
+  </div>
+
+</div>
+
+<div class="narrative">
+  <p><span class="label">Pattern</span><strong>Two pieces of UI exist at rest</strong> — a circular back glyph and a Save state pill. The pill is faded gray ("Saved · 9:38") when clean and stamp-green with a glowing dot ("Save") when dirty. Tapping it writes to disk. The whole document is 92% of the visible canvas.</p>
+  <p><span class="label">When typing</span>The iOS keyboard rises. A 48px <em>keyboard accessory bar</em> rides directly above it — H1 / H2 / <strong>B</strong> / <em>I</em> / <code>code</code> / link / list / quote — markdown shortcuts at thumb reach. Tapping a shortcut wraps the selection or inserts at the caret without leaving the editor. The undo button sits at the right edge.</p>
+  <p><span class="label">Mode toggle</span>Source / Preview as a two-state pill on the bottom strip (when keyboard is down). No Split — split-pane is a desktop luxury that crushes on phone (#239). Preview swaps the entire pane in place; the operator scrubs Source ↔ Preview as a binary, never a tri-state.</p>
+  <p><span class="label">Notes &amp; Discard</span>The bottom strip's right side has two text-affordances: <em>Notes (3)</em> opens the same Notes sheet pattern from the review surface (continuity), and <em>Discard</em> exits edit mode. No "Cancel" button competing with Save — Discard is the explicit verb for "throw away this work."</p>
+  <p><span class="label">Why this is right</span>The current edit toolbar (#239) crams 9 chrome elements into a single mobile row that wraps to two lines. This direction goes the other way: chrome shrinks to two affordances. Markdown helpers (the actual editing power) move to where the thumb is — above the keyboard. The press-check editorial language is <em>under-stated</em>, not absent: paper texture, mono labels, italic display in the back glyph, red caret, stamp-green save state. The page becomes a writing surface.</p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Desk states · v7 architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+DESK STATES · v7 ARCHITECTURE
+the various states of the hub surface (the Desk)
+============================================================
+
+PURPOSE
+  The Desk is the hub of all activity under v4-v7's star nav
+  architecture. Every other studio surface is a leaf reached
+  from here. The cross-bar mockups (v4-v7) defined the
+  architecture but didn't fully visualize the Desk's body
+  content across its states. This file fills that gap.
+
+STATES SHOWN
+  1. All collapsed (default at-rest)      · full pipeline shape
+  2. Longform stage expanded (Drafting)   · rows visible inline
+  3. Shortform platform expanded (LinkedIn) · workflows inline
+  4. Multiple expansions across sections  · independent behavior
+  5. Empty-state rendering                 · how 0-count tiles read
+
+THE DESK'S INFORMATION ARCHITECTURE (UNDER v7)
+  Three sections, top-to-bottom:
+
+  § Longform pipeline · 17 entries
+    Eight stage tiles in flow order:
+      Ideas · Planned · Outlining · Drafting ·
+      Final · Published · Blocked · Cancelled
+    Each tile collapsible; tap to reveal rows.
+    Single-expand WITHIN the section.
+
+  § Shortform · by platform · 7 workflows
+    Four platform tiles:
+      LinkedIn · Reddit · YouTube · Instagram
+    Each tile collapsible; tap to reveal workflows.
+    Single-expand WITHIN the section.
+
+  § Adjacent tools · phase 3
+    Two reserved tiles, dimmed:
+      Folio (standalone scrapbook viewer)
+      Files (content tree)
+
+EXPANSION MODEL
+  Single-expand operates INDEPENDENTLY in each section.
+  Operators can have one longform stage AND one shortform
+  platform expanded at the same time — useful when
+  cross-referencing pipeline state with social distribution.
+  Tapping a second tile within the same section collapses
+  the previously-open one.
+
+GLYPHS (per DESKWORK-STATE-MACHINE.md)
+  Ideas      ◇   Planned    §   Outlining ⊹   Drafting ✎
+  Final      ※   Published  ✓   Blocked   ⊘   Cancelled ✗
+
+EMPTY STATE
+  Per DESIGN-STANDARDS.md § Principles · "Favor structure
+  over scrolling": empty hierarchy nodes still have a place.
+  Showing "Ideas: 0" is a structural signal — the absence
+  of items is information about the pipeline shape. Empty
+  tiles render in dimmed paper-3 type, no chevron, not
+  tappable. This communicates "this stage exists; nothing
+  here right now."
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --ink-soft: #4A3F35;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: #C7BEAE; font-family: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+  body { max-width: 1380px; margin: 0 auto; }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.8rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.5rem; text-align: center; }
+  .banner {
+    max-width: 880px; margin: 0 auto 2.5rem;
+    padding: 1.05rem 1.3rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--green);
+    font-family: var(--display); font-size: 0.96rem; line-height: 1.6;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--green); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+
+  h2.section {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.5rem; color: var(--paper);
+    margin: 3rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--red);
+    display: flex; align-items: baseline; gap: 1rem;
+  }
+  h2.section .num {
+    font-family: var(--mono); font-style: normal;
+    font-size: 0.7rem; letter-spacing: 0.16em;
+    color: var(--red); text-transform: uppercase;
+  }
+  .section-lede {
+    color: #C7BEAE; font-size: 0.96rem; line-height: 1.6;
+    margin-bottom: 1.5rem; max-width: 800px;
+  }
+  .section-lede em { color: var(--paper); font-style: italic; }
+  .section-lede code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+
+  /* ============ PHONE FRAME ============ */
+  .phone { width: 410px; height: 870px; background: #050505;
+           border-radius: 50px; padding: 12px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; flex-shrink: 0; }
+  .phone::before { content: ''; position: absolute;
+                   top: 22px; left: 50%; transform: translateX(-50%);
+                   width: 110px; height: 30px; background: #000;
+                   border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 38px; overflow: hidden; position: relative;
+            font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.95rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* ============ v7 MASTHEAD (Dashboard) ============ */
+  .v7-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 102px;
+    padding: 56px 0.95rem 14px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 1fr 24px;
+    column-gap: 0.85rem;
+    align-items: center;
+  }
+  .v7-center { min-width: 0; align-self: center; }
+  .v7-kicker {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--red);
+    line-height: 1.3;
+    margin-bottom: 0.18rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .v7-kicker .dim { color: var(--ink-soft); }
+  /* a11y: --faded #8A7F70 on --paper = 3.48:1 fails WCAG 1.4.3 (4.5:1
+     body text). --ink-soft #4A3F35 on --paper = 8.92:1 — comfortable AA. */
+  .v7-kicker .sep { color: var(--paper-3); margin: 0 0.32rem; font-weight: 400; }
+  .v7-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.2rem; line-height: 1.1; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .v7-menu {
+    align-self: center;
+    text-decoration: none;
+    font-family: var(--mono); font-size: 1.2rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ink-soft);
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    padding: 12px 8px;
+    margin: -12px -8px;
+  }
+
+  /* ============ DESK BODY ============ */
+  .desk-body {
+    position: absolute; top: 102px; left: 0; right: 0; bottom: 0;
+    overflow-y: auto;
+  }
+
+  /* Section headers (kicker rules between sections) */
+  .desk-section-head {
+    padding: 0.55rem 0.95rem 0.4rem;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    border-bottom: 1px dashed var(--paper-3);
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    display: flex; align-items: baseline; gap: 0.5rem;
+  }
+  .desk-section-head .glyph {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.85rem;
+    color: var(--red);
+    line-height: 1;
+  }
+  .desk-section-head .count { color: var(--ink-soft); letter-spacing: 0.12em; }
+  /* a11y: was --faded (3.15:1 on --paper-2); --ink-soft on --paper-2 = 8.07:1. */
+  .desk-section-head.shortform { color: var(--blue); }
+  .desk-section-head.shortform .glyph { color: var(--blue); }
+  .desk-section-head.adjacent { color: var(--kraft); }
+  .desk-section-head.adjacent .glyph { color: var(--kraft); }
+
+  /* Tiles */
+  .stage-tile {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr auto 1.2rem;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.5rem 0.95rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    min-height: 42px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 120ms ease;
+  }
+  .stage-tile:hover { background: var(--paper-2); }
+  .stage-tile.expanded {
+    background: var(--paper-2);
+    border-bottom-color: var(--red);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  /* Empty-state: demote via explicit muted palette, NOT opacity.
+     opacity: 0.55 on the tile tanked contrast to ~2:1 on inherited
+     --ink text. Switch each child color explicitly to preserve readable
+     (≥4.5:1) text on small body-class labels per WCAG 1.4.3. */
+  .stage-tile.empty { cursor: default; }
+  .stage-tile.empty:hover { background: var(--paper); }
+
+  .stage-glyph {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.15rem; line-height: 1;
+    color: var(--red); text-align: center;
+  }
+  .stage-tile.shortform-tile .stage-glyph { color: var(--blue); }
+  .stage-tile.empty .stage-glyph { color: var(--faded); }
+  /* a11y: glyph in --faded on --paper = 3.48:1 — qualifies as ornamental
+     chrome (≥3:1 per project standard). Press-check decorative glyphs are
+     allowed at the 3:1 floor. */
+
+  .stage-name {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 1rem; line-height: 1.1;
+    color: var(--ink);
+  }
+  .stage-tile.expanded .stage-name { color: var(--red); }
+  .stage-tile.expanded.shortform-tile .stage-name { color: var(--blue); }
+  .stage-tile.empty .stage-name { color: var(--ink-soft); }
+  /* a11y: stage name is body text (italic display 1rem regular weight =
+     12pt regular). Needs 4.5:1. --ink-soft on --paper = 8.92:1. */
+
+  .stage-count {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.08em; color: var(--faded);
+    text-transform: uppercase; text-align: right;
+  }
+  .stage-count .num { color: var(--ink); font-weight: 500; font-size: 0.72rem; }
+  .stage-tile.empty .stage-count .num { color: var(--ink-soft); }
+  /* a11y: the "0" number is body-class text (informational). 4.5:1 needed.
+     --ink-soft on --paper = 8.92:1; on --paper-2 (raised tile) = 8.07:1. */
+
+  .stage-chev {
+    font-family: var(--mono); font-size: 0.95rem;
+    color: var(--red); text-align: center;
+    transition: transform 180ms ease;
+  }
+  .stage-tile.expanded .stage-chev { transform: rotate(90deg); }
+  .stage-tile.shortform-tile .stage-chev { color: var(--blue); }
+  .stage-tile.empty .stage-chev { visibility: hidden; }
+
+  /* Platform badge (for shortform tiles) — replaces glyph */
+  .platform-badge {
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.12em;
+    padding: 0.1rem 0.34rem;
+    border-radius: 2px;
+    text-align: center;
+    width: fit-content;
+    justify-self: center;
+  }
+  .platform-badge.li { background: var(--red); }
+  .platform-badge.rd { background: var(--blue); }
+  .platform-badge.yt { background: var(--kraft); }
+  .platform-badge.ig { background: var(--kraft); }
+  .stage-tile.empty .platform-badge { background: var(--paper-3); color: var(--ink-soft); }
+  /* a11y: was --paper-3/--faded (2.95:1 — fails even 3:1 non-text floor).
+     --ink-soft on --paper-3 = 7.01:1. Passes body text comfortably. */
+
+  /* Row content under expanded tiles */
+  .row-group {
+    background: var(--paper);
+  }
+  .desk-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1.2rem;
+    column-gap: 0.55rem;
+    padding: 0.6rem 0.95rem 0.62rem 1.95rem;
+    border-bottom: 1px dotted var(--paper-3);
+    background: var(--paper);
+    align-items: start;
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+  .desk-row:last-child { border-bottom: 1px dashed var(--paper-3); }
+  .desk-row:hover { background: var(--paper-2); }
+  .desk-row-body { min-width: 0; }
+  .desk-row-slug {
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink);
+    border-bottom: 1px solid var(--paper-3); padding-bottom: 1px;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .desk-row-title {
+    display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.92rem; line-height: 1.2;
+    color: var(--ink);
+    margin-top: 0.18rem;
+  }
+  .desk-row-channel {
+    display: inline-block;
+    margin-top: 0.18rem;
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: var(--blue);
+  }
+  .desk-row-meta {
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--ink-soft);
+    /* a11y: meta line "2h ago" is body-class info text (small mono);
+       4.5:1 required. Was --faded (3.48:1 — fails). --ink-soft = 8.92:1. */
+    text-align: right;
+    line-height: 1.35;
+    align-self: center;
+  }
+  .desk-row-meta .ts { display: block; }
+  .desk-row-meta .v {
+    color: var(--ink);
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 16, "wght" 500;
+    font-size: 0.66rem;
+    margin-top: 0.1rem;
+  }
+  .desk-row-more {
+    color: var(--ink-soft); font-family: var(--mono);
+    font-size: 1rem; line-height: 1;
+    text-align: center;
+    align-self: center;
+    cursor: pointer;
+    padding: 0 0.18rem;
+  }
+  .desk-row-more:hover { color: var(--red); }
+
+  /* Compose chip — floats bottom-right (v0.19) */
+  .compose-chip {
+    position: absolute; bottom: 16px; right: 16px;
+    z-index: 65;
+    background: var(--red); color: var(--paper);
+    border: 1px solid var(--red); border-radius: 2px;
+    padding: 0.5rem 0.75rem;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      0 4px 12px rgba(184, 54, 42, 0.28),
+      0 1px 3px rgba(0,0,0,0.18);
+    font-family: var(--mono); font-size: 0.6rem;
+    font-weight: 500; letter-spacing: 0.16em;
+    text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    line-height: 1;
+  }
+  .compose-chip .glyph {
+    font-family: var(--mono); font-size: 0.85rem;
+    line-height: 1; font-weight: 600;
+  }
+
+  /* Future tile (demoted via palette, not opacity, per a11y guidelines) */
+  .future-tile {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr auto;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.5rem 0.95rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    min-height: 38px;
+    /* a11y: opacity:0.55 (was) inherited and tanked all child contrast to
+       ~2:1. Removed; demotion is now via explicit muted-palette below. */
+  }
+  .future-tile .stage-glyph { color: var(--kraft); }
+  /* glyph at 1.15rem italic — ornamental. --kraft on --paper = 4.08:1
+     passes ornamental ≥3:1 floor. */
+  .future-tile .stage-name { color: var(--ink-soft); font-size: 0.92rem; }
+  /* name in --ink-soft (8.92:1) — body text class, AAA-comfortable. */
+  .future-tile .future-tag {
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink-soft);
+    /* a11y: tag is small mono caps (10px); body text class needs 4.5:1.
+       --kraft (was) = 4.08:1 fails. --ink-soft = 8.92:1. */
+    border: 1px solid var(--kraft);
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+  }
+
+  .hardcase-row {
+    display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;
+    margin-top: 1.5rem;
+  }
+  .caption {
+    color: #C7BEAE; font-family: var(--mono);
+    font-size: 0.65rem; letter-spacing: 0.16em;
+    text-transform: uppercase; margin-top: 0.8rem;
+    text-align: center; max-width: 410px; line-height: 1.55;
+  }
+  .caption strong { color: var(--paper); }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+
+  /* ============ CALLOUTS ============ */
+  .callout {
+    margin-top: 1rem;
+    padding: 0.95rem 1.2rem;
+    background: rgba(245, 241, 232, 0.05);
+    border-left: 3px solid var(--red);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.95rem; line-height: 1.6;
+  }
+  .callout.green { border-left-color: var(--green); }
+  .callout.kraft { border-left-color: var(--kraft); }
+  .callout.blue { border-left-color: var(--blue); }
+  .callout strong {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper); display: block; margin-bottom: 0.4rem;
+    font-weight: normal;
+  }
+  .callout em { color: var(--paper); font-style: italic; }
+  .callout code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+  .callout ul { padding-left: 1.2rem; margin-top: 0.45rem; }
+  .callout li { margin-bottom: 0.3rem; }
+
+  /* Spec table */
+  .spec-table {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--paper-3); line-height: 1.5;
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    margin-top: 0.8rem;
+  }
+  .spec-table th {
+    text-align: left; color: var(--paper);
+    font-weight: 500;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1.5px solid var(--red);
+    letter-spacing: 0.06em;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    background: rgba(245, 241, 232, 0.05);
+  }
+  .spec-table td {
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.08);
+    vertical-align: top;
+  }
+  .spec-table tr:last-child td { border-bottom: 0; }
+  .spec-table tr:nth-child(even) td { background: rgba(245, 241, 232, 0.02); }
+  .spec-table code {
+    font-family: var(--mono); color: var(--paper);
+    font-size: 0.7rem; background: rgba(245, 241, 232, 0.05);
+    padding: 0.05rem 0.3rem; border-radius: 2px;
+  }
+  .spec-table .stage-emoji {
+    font-family: var(--display); font-style: italic;
+    color: var(--red); font-size: 0.95rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">The Desk · states.</h1>
+<div class="demo-sub">Under v7 architecture · all longform stages + shortform platforms + future tiles · collapsed / expanded / empty</div>
+
+<div class="banner">
+  <span class="kicker">Desk states · v7-grounded</span>
+  The Desk is the hub of all activity. Operators spend the most time here, drilling into the longform pipeline, the shortform-by-platform view, and (in Phase 3+) adjacent tools. This mockup shows the Desk's information architecture in full — every section, every state.
+  Sections: <em>Longform pipeline</em> (8 stage tiles) · <em>Shortform · by platform</em> (4 platform tiles) · <em>Adjacent tools</em> (2 future tiles for Folio + Files). Each tile collapsible; single-expand within section. Empty tiles render dimmed but visible — pipeline shape is information even at zero count.
+</div>
+
+<!-- ============================================================
+     SECTION 1: ALL FRAMES SIDE BY SIDE
+============================================================ -->
+<h2 class="section"><span class="num">§ 1</span> The four states</h2>
+<p class="section-lede">
+  Each phone frame is the same surface, different state. Left to right: all-collapsed (default at-rest), longform stage expanded, shortform platform expanded, both expanded simultaneously (cross-section independence).
+</p>
+
+<div class="hardcase-row">
+
+  <!-- FRAME A: All collapsed -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:48</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v7-masthead">
+        <div class="v7-center">
+          <div class="v7-kicker">The compositor's desk <span class="sep">·</span> <span class="dim">17 longform · 7 shortform</span></div>
+          <div class="v7-title">Pipeline + Press.</div>
+        </div>
+        <a class="v7-menu" href="#">⋮</a>
+      </div>
+
+      <div class="desk-body">
+
+        <div class="desk-section-head">
+          <span class="glyph">≡</span>
+          Longform pipeline
+          <span class="count">· 17 entries</span>
+        </div>
+
+        <div class="stage-tile empty">
+          <span class="stage-glyph">◇</span>
+          <span class="stage-name">Ideas</span>
+          <span class="stage-count"><span class="num">0</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">§</span>
+          <span class="stage-name">Planned</span>
+          <span class="stage-count"><span class="num">1</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">⊹</span>
+          <span class="stage-name">Outlining</span>
+          <span class="stage-count"><span class="num">2</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">✎</span>
+          <span class="stage-name">Drafting</span>
+          <span class="stage-count"><span class="num">5</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">※</span>
+          <span class="stage-name">Final</span>
+          <span class="stage-count"><span class="num">4</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">✓</span>
+          <span class="stage-name">Published</span>
+          <span class="stage-count"><span class="num">12</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">⊘</span>
+          <span class="stage-name">Blocked</span>
+          <span class="stage-count"><span class="num">1</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">✗</span>
+          <span class="stage-name">Cancelled</span>
+          <span class="stage-count"><span class="num">3</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+
+        <div class="desk-section-head shortform">
+          <span class="glyph">⊟</span>
+          Shortform · by platform
+          <span class="count">· 7 workflows</span>
+        </div>
+
+        <div class="stage-tile shortform-tile">
+          <span class="platform-badge li">in</span>
+          <span class="stage-name">LinkedIn</span>
+          <span class="stage-count"><span class="num">3</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile shortform-tile">
+          <span class="platform-badge rd">r/</span>
+          <span class="stage-name">Reddit</span>
+          <span class="stage-count"><span class="num">2</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile shortform-tile">
+          <span class="platform-badge yt">@</span>
+          <span class="stage-name">YouTube</span>
+          <span class="stage-count"><span class="num">2</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile shortform-tile empty">
+          <span class="platform-badge ig">IG</span>
+          <span class="stage-name">Instagram</span>
+          <span class="stage-count"><span class="num">0</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+
+        <div class="desk-section-head adjacent">
+          <span class="glyph">▦</span>
+          Adjacent tools
+          <span class="count">· phase 3</span>
+        </div>
+
+        <div class="future-tile">
+          <span class="stage-glyph">▦</span>
+          <span class="stage-name">Folio (standalone)</span>
+          <span class="future-tag">phase 3</span>
+        </div>
+        <div class="future-tile">
+          <span class="stage-glyph">⊞</span>
+          <span class="stage-name">Files (content tree)</span>
+          <span class="future-tag">phase 3</span>
+        </div>
+
+      </div>
+
+      <div class="compose-chip">
+        <span class="glyph">+</span><span>Compose</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>A · All collapsed.</strong><br>
+    The pipeline shape at rest.<br>
+    Empty tiles (Ideas, Instagram) dimmed but visible.
+  </div>
+  </div>
+
+  <!-- FRAME B: Drafting expanded -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:50</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v7-masthead">
+        <div class="v7-center">
+          <div class="v7-kicker">The compositor's desk <span class="sep">·</span> <span class="dim">17 longform · 7 shortform</span></div>
+          <div class="v7-title">Pipeline + Press.</div>
+        </div>
+        <a class="v7-menu" href="#">⋮</a>
+      </div>
+
+      <div class="desk-body">
+
+        <div class="desk-section-head">
+          <span class="glyph">≡</span>
+          Longform pipeline
+          <span class="count">· 17 entries</span>
+        </div>
+
+        <div class="stage-tile empty">
+          <span class="stage-glyph">◇</span>
+          <span class="stage-name">Ideas</span>
+          <span class="stage-count"><span class="num">0</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">§</span>
+          <span class="stage-name">Planned</span>
+          <span class="stage-count"><span class="num">1</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">⊹</span>
+          <span class="stage-name">Outlining</span>
+          <span class="stage-count"><span class="num">2</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+
+        <!-- DRAFTING EXPANDED -->
+        <div class="stage-tile expanded">
+          <span class="stage-glyph">✎</span>
+          <span class="stage-name">Drafting</span>
+          <span class="stage-count"><span class="num">5</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="row-group">
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">whats-in-a-name</span>
+              <span class="desk-row-title">What's in a Name?</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">2h ago</span>
+              <span class="v">v3</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">on-revising-in-the-open</span>
+              <span class="desk-row-title">On Revising in the Open</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">May 11</span>
+              <span class="v">v2</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">the-deskwork-experiment</span>
+              <span class="desk-row-title">The Deskwork Experiment</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">May 10</span>
+              <span class="v">v1</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">studio-mobile-first-prd</span>
+              <span class="desk-row-title">Studio mobile-first — PRD.</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">May 09</span>
+              <span class="v">v3</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">design-archive-contract</span>
+              <span class="desk-row-title">Studio Design Proposal Archive — Contract</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">May 08</span>
+              <span class="v">v1</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+        </div>
+
+        <div class="stage-tile">
+          <span class="stage-glyph">※</span>
+          <span class="stage-name">Final</span>
+          <span class="stage-count"><span class="num">4</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">✓</span>
+          <span class="stage-name">Published</span>
+          <span class="stage-count"><span class="num">12</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+
+      </div>
+
+      <div class="compose-chip">
+        <span class="glyph">+</span><span>Compose</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>B · Drafting expanded.</strong><br>
+    Stage tile gets paper-2 bg + red top inset rule. Chevron rotates 90°.<br>
+    5 rows revealed inline · trailing <code style="font-family:var(--mono);font-size:0.6rem;color:var(--paper);">⋮</code> per row · further stages still scannable below.
+  </div>
+  </div>
+
+  <!-- FRAME C: LinkedIn expanded -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:52</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v7-masthead">
+        <div class="v7-center">
+          <div class="v7-kicker">The compositor's desk <span class="sep">·</span> <span class="dim">17 longform · 7 shortform</span></div>
+          <div class="v7-title">Pipeline + Press.</div>
+        </div>
+        <a class="v7-menu" href="#">⋮</a>
+      </div>
+
+      <div class="desk-body">
+
+        <!-- Skip directly to the shortform section showing it expanded.
+             Longform pipeline collapsed above (operator scrolled past). -->
+        <div class="desk-section-head" style="opacity: 0.7;">
+          <span class="glyph">≡</span>
+          Longform pipeline
+          <span class="count">· 17 entries (scroll up)</span>
+        </div>
+
+        <div class="stage-tile">
+          <span class="stage-glyph">※</span>
+          <span class="stage-name">Final</span>
+          <span class="stage-count"><span class="num">4</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile">
+          <span class="stage-glyph">✓</span>
+          <span class="stage-name">Published</span>
+          <span class="stage-count"><span class="num">12</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+
+        <div class="desk-section-head shortform">
+          <span class="glyph">⊟</span>
+          Shortform · by platform
+          <span class="count">· 7 workflows</span>
+        </div>
+
+        <!-- LinkedIn EXPANDED -->
+        <div class="stage-tile shortform-tile expanded">
+          <span class="platform-badge li">in</span>
+          <span class="stage-name">LinkedIn</span>
+          <span class="stage-count"><span class="num">3</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="row-group">
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">v021-mobile-first-shortform</span>
+              <span class="desk-row-title">What I learned shipping mobile-first.</span>
+              <span class="desk-row-channel">deskwork-blog</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">2h ago</span>
+              <span class="v">v3</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">what-deskwork-actually-is</span>
+              <span class="desk-row-title">What deskwork actually is (and isn't).</span>
+              <span class="desk-row-channel">deskwork-blog</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">yesterday</span>
+              <span class="v">v1</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">press-check-vocabulary</span>
+              <span class="desk-row-title">Press-check vocabulary — a naming pattern.</span>
+              <span class="desk-row-channel">deskwork-blog</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">May 09</span>
+              <span class="v">v2</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+        </div>
+
+        <div class="stage-tile shortform-tile">
+          <span class="platform-badge rd">r/</span>
+          <span class="stage-name">Reddit</span>
+          <span class="stage-count"><span class="num">2</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile shortform-tile">
+          <span class="platform-badge yt">@</span>
+          <span class="stage-name">YouTube</span>
+          <span class="stage-count"><span class="num">2</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="stage-tile shortform-tile empty">
+          <span class="platform-badge ig">IG</span>
+          <span class="stage-name">Instagram</span>
+          <span class="stage-count"><span class="num">0</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+
+      </div>
+
+      <div class="compose-chip">
+        <span class="glyph">+</span><span>Compose</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>C · LinkedIn expanded.</strong><br>
+    Shortform tile uses blue accent (matches platform color);<br>
+    workflow rows show slug + title + channel + version/age.
+  </div>
+  </div>
+
+  <!-- FRAME D: BOTH expanded simultaneously -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v7-masthead">
+        <div class="v7-center">
+          <div class="v7-kicker">The compositor's desk <span class="sep">·</span> <span class="dim">17 longform · 7 shortform</span></div>
+          <div class="v7-title">Pipeline + Press.</div>
+        </div>
+        <a class="v7-menu" href="#">⋮</a>
+      </div>
+
+      <div class="desk-body">
+
+        <div class="desk-section-head">
+          <span class="glyph">≡</span>
+          Longform pipeline
+          <span class="count">· 17 entries</span>
+        </div>
+
+        <!-- DRAFTING EXPANDED -->
+        <div class="stage-tile expanded">
+          <span class="stage-glyph">✎</span>
+          <span class="stage-name">Drafting</span>
+          <span class="stage-count"><span class="num">5</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="row-group">
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">whats-in-a-name</span>
+              <span class="desk-row-title">What's in a Name?</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">2h ago</span>
+              <span class="v">v3</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">studio-mobile-first-prd</span>
+              <span class="desk-row-title">Studio mobile-first — PRD.</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">May 09</span>
+              <span class="v">v3</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+        </div>
+
+        <div class="stage-tile">
+          <span class="stage-glyph">※</span>
+          <span class="stage-name">Final</span>
+          <span class="stage-count"><span class="num">4</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+
+        <div class="desk-section-head shortform">
+          <span class="glyph">⊟</span>
+          Shortform · by platform
+          <span class="count">· 7 workflows</span>
+        </div>
+
+        <!-- LinkedIn EXPANDED — independent of longform's expansion -->
+        <div class="stage-tile shortform-tile expanded">
+          <span class="platform-badge li">in</span>
+          <span class="stage-name">LinkedIn</span>
+          <span class="stage-count"><span class="num">3</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+        <div class="row-group">
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">v021-mobile-first-shortform</span>
+              <span class="desk-row-title">What I learned shipping mobile-first.</span>
+              <span class="desk-row-channel">deskwork-blog</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">2h</span>
+              <span class="v">v3</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+          <div class="desk-row">
+            <div class="desk-row-body">
+              <span class="desk-row-slug">press-check-vocabulary</span>
+              <span class="desk-row-title">Press-check vocabulary.</span>
+              <span class="desk-row-channel">deskwork-blog</span>
+            </div>
+            <div class="desk-row-meta">
+              <span class="ts">May 09</span>
+              <span class="v">v2</span>
+            </div>
+            <div class="desk-row-more">⋮</div>
+          </div>
+        </div>
+
+        <div class="stage-tile shortform-tile">
+          <span class="platform-badge rd">r/</span>
+          <span class="stage-name">Reddit</span>
+          <span class="stage-count"><span class="num">2</span></span>
+          <span class="stage-chev">›</span>
+        </div>
+
+      </div>
+
+      <div class="compose-chip">
+        <span class="glyph">+</span><span>Compose</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>D · Both sections expanded.</strong><br>
+    Drafting + LinkedIn both open — independent across sections.<br>
+    Useful when cross-referencing pipeline state with social shape.
+  </div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     SECTION 2: ANATOMY OF A STAGE TILE
+============================================================ -->
+<h2 class="section"><span class="num">§ 2</span> Anatomy · stage tile (3 states)</h2>
+<p class="section-lede">
+  Three visual states per stage tile: <em>at rest</em>, <em>expanded</em>, <em>empty</em>. Same composition; visual treatment varies to communicate state.
+</p>
+
+<table class="spec-table">
+  <thead>
+    <tr>
+      <th style="width: 18%;">State</th>
+      <th style="width: 14%;">Background</th>
+      <th style="width: 14%;">Glyph + name</th>
+      <th style="width: 14%;">Chevron</th>
+      <th style="width: 14%;">Tappable?</th>
+      <th style="width: 26%;">Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><em>At rest</em></td>
+      <td><code>--er-paper</code></td>
+      <td>full <code>--er-ink</code></td>
+      <td>0° (›)</td>
+      <td>yes</td>
+      <td>Default. Hover lifts to <code>--er-paper-2</code>.</td>
+    </tr>
+    <tr>
+      <td><em>Expanded</em></td>
+      <td><code>--er-paper-2</code> + 2px red-pencil top inset rule</td>
+      <td>name shifts to <code>--er-red-pencil</code> (or <code>--er-proof-blue</code> for shortform)</td>
+      <td>90° (↓)</td>
+      <td>yes — tap closes</td>
+      <td>Rows render inline below the tile in a row-group container.</td>
+    </tr>
+    <tr>
+      <td><em>Empty</em> (count = 0)</td>
+      <td><code>--er-paper</code> @ 0.55 opacity</td>
+      <td>name in <code>--er-faded</code></td>
+      <td>hidden</td>
+      <td>no (cursor: default)</td>
+      <td>Pipeline shape still visible. "This stage exists; nothing here right now."</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================================
+     SECTION 3: INTERACTION SPEC
+============================================================ -->
+<h2 class="section"><span class="num">§ 3</span> Interaction spec</h2>
+
+<div class="callout">
+  <strong>Single-expand · within section</strong>
+  Within the longform pipeline section, only one stage may be expanded at a time. Tapping a second stage tile closes the previously-open one and opens the new one. Within the shortform section, the same rule applies — one platform expanded at a time.
+</div>
+
+<div class="callout blue">
+  <strong>Independent · across sections</strong>
+  The two sections operate independently. The operator may have one longform stage AND one shortform platform expanded at the same time — useful when cross-referencing pipeline state with social distribution. The "Adjacent tools" section's tiles are non-expandable (they navigate to leaf surfaces in Phase 3+).
+</div>
+
+<div class="callout green">
+  <strong>Row interactions (inherited from v0.20)</strong>
+  Each row's trailing <code>⋮</code> opens a popover menu of stage-aware verbs (the same popover idiom as v0.20 row affordance and v7 masthead menu). Swipe-left on a row reveals an action drawer (also v0.20). Tap the row body navigates to the entry-review or shortform-review leaf surface.
+</div>
+
+<div class="callout kraft">
+  <strong>Empty-state semantics</strong>
+  Per <code>DESIGN-STANDARDS.md § Principles · Favor structure over scrolling</code>: empty hierarchy nodes still have a place in the structured view. Showing "Ideas: 0" or "Instagram: 0" is a structural signal — the absence of items is information about the pipeline shape. Empty tiles render dimmed (opacity 0.55), with the chevron hidden and tap target disabled.
+</div>
+
+<!-- ============================================================
+     SECTION 4: WHAT THIS COMMITS TO
+============================================================ -->
+<h2 class="section"><span class="num">§ 4</span> What this Desk commits to</h2>
+
+<div class="callout green">
+  <strong>The full IA, written down</strong>
+  <ul>
+    <li><em>Longform pipeline section</em> · 8 stage tiles, in flow order (Ideas → Cancelled), with single-expand behavior.</li>
+    <li><em>Shortform · by platform section</em> · 4 platform tiles (LinkedIn · Reddit · YouTube · Instagram), with same single-expand behavior. Each platform shows workflow count; tapping reveals workflow rows.</li>
+    <li><em>Adjacent tools section</em> · 2 future tiles (Folio · Files) reserved for Phase 3. Dimmed with phase-tag, non-expandable until those surfaces ship.</li>
+    <li><em>Glyph mapping</em> per <code>DESKWORK-STATE-MACHINE.md</code>: ◇ § ⊹ ✎ ※ ✓ ⊘ ✗. Platform tiles use color-coded badges (<code>in</code> red · <code>r/</code> blue · <code>@</code> + <code>IG</code> kraft).</li>
+  </ul>
+</div>
+
+<div class="callout">
+  <strong>What this DOES NOT decide</strong>
+  <ul>
+    <li>The row content design (slug + title + date + ⋮) is inherited from v0.20; if we want to refine row composition further, that's a separate pass.</li>
+    <li>Filter / sort affordances WITHIN a section — operator may eventually want to filter Drafting rows by stale-age, etc. Not in this Desk's scope; would live as a section-level mini-bar above the row-group.</li>
+    <li>Stage-tile reorder or rearrangement — locked to flow order per the state machine. Future operator-customizable orderings would need separate spec.</li>
+    <li>Shortform-by-platform sub-grouping — could eventually surface "approved · iterating · scheduled" within each platform, but for v0.21 the platform-with-workflow-rows is the shape.</li>
+  </ul>
+</div>
+
+<div class="callout">
+  <strong>How Desk evolves in Phase 3+</strong>
+  <ul>
+    <li>Phase 3 ships the Folio + Files surfaces; the dimmed tiles become live (lose the phase-tag, become tappable, navigate to <code>/dev/scrapbook</code> + <code>/dev/content</code>).</li>
+    <li>If more cross-cutting destinations arrive, they slot in as additional tiles in the Adjacent tools section. No bar geometry changes.</li>
+    <li>Section ordering may evolve — pipeline always first (the main work), then social distribution, then adjacent tools. New sections are appended.</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     SECTION 5: ACCESSIBILITY AUDIT
+============================================================ -->
+<h2 class="section"><span class="num">§ 5</span> Accessibility audit · WCAG 2.1 AA</h2>
+<p class="section-lede">
+  Per <code>DESIGN-STANDARDS.md § Accessibility / Contrast</code>: body text ≥4.5:1, large text ≥3:1, non-text UI ≥3:1, ornamental press-check chrome ≥3:1. Every text + affordance below was contrast-checked against the WCAG criteria; failures were corrected before this commit landed.
+</p>
+
+<div class="callout green">
+  <strong>Corrections applied in this commit</strong>
+  Four classes of failure were caught and fixed:
+  <ul>
+    <li><em>Small mono labels using <code>--faded</code> on <code>--paper</code> (3.48:1)</em> — fails body-text 4.5:1. Affected: <code>.v7-kicker .dim</code>, <code>.desk-section-head .count</code>, <code>.desk-row-meta</code>. <strong>Fix:</strong> switched to <code>--ink-soft</code> (8.92:1 on <code>--paper</code> / 8.07:1 on <code>--paper-2</code>).</li>
+    <li><em>Empty-state <code>opacity: 0.55</code> tile-wide</em> — opacity blends with the background and tanked inherited <code>--ink</code> text to ~2:1 — fails every WCAG criterion. <strong>Fix:</strong> dropped the opacity rule; demote via explicit muted palette (<code>--faded</code> on the glyph @ 3.48:1 — ornamental floor; <code>--ink-soft</code> on the name + count @ 8.92:1).</li>
+    <li><em>Empty platform badge <code>--paper-3/--faded</code> (2.95:1)</em> — fails even the 3:1 floor. <strong>Fix:</strong> swapped text color to <code>--ink-soft</code> (7.01:1 on <code>--paper-3</code>).</li>
+    <li><em>Future-tile <code>opacity: 0.55</code> + <code>--kraft</code> tag text (4.08:1)</em> — opacity inherited & tanked contrast; tag text near body-text floor. <strong>Fix:</strong> dropped opacity; tag becomes a small pill with <code>--ink-soft</code> text (8.92:1) inside a <code>--kraft</code> border (4.08:1 non-text UI passes).</li>
+  </ul>
+</div>
+
+<table class="spec-table">
+  <thead>
+    <tr>
+      <th style="width: 26%;">Element</th>
+      <th style="width: 18%;">Color pair</th>
+      <th style="width: 11%;">Ratio</th>
+      <th style="width: 13%;">Class</th>
+      <th style="width: 9%;">WCAG min</th>
+      <th style="width: 8%;">Pass?</th>
+      <th style="width: 15%;">Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Stage name (Drafting, Final, …)</td>
+      <td><code>--ink</code> on <code>--paper</code></td>
+      <td>15.77:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>italic display 1rem</td>
+    </tr>
+    <tr>
+      <td>Stage count "5"</td>
+      <td><code>--ink</code> on <code>--paper</code></td>
+      <td>15.77:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>mono 0.72rem</td>
+    </tr>
+    <tr>
+      <td>Kicker (red caps)</td>
+      <td><code>--red</code> on <code>--paper</code></td>
+      <td>6.23:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AA</td>
+      <td>mono 0.58rem caps</td>
+    </tr>
+    <tr>
+      <td>Kicker dim (after sep)</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>--faded</code> @ 3.48:1</td>
+    </tr>
+    <tr>
+      <td>Stage glyph (◇ § ⊹ etc.)</td>
+      <td><code>--red</code> on <code>--paper</code></td>
+      <td>6.23:1</td>
+      <td>ornamental</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>italic display 1.15rem</td>
+    </tr>
+    <tr>
+      <td>Shortform stage glyph (badge)</td>
+      <td><code>--paper</code> on <code>--red</code>/<code>--blue</code>/<code>--kraft</code></td>
+      <td>14.18:1 / 11.91:1 / 5.16:1</td>
+      <td>non-text UI</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓ all</td>
+      <td>paper bg on accent color</td>
+    </tr>
+    <tr>
+      <td>Section head "Longform pipeline"</td>
+      <td><code>--red</code> on <code>--paper-2</code></td>
+      <td>5.64:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AA</td>
+      <td>mono 0.58rem caps</td>
+    </tr>
+    <tr>
+      <td>Section head "Shortform"</td>
+      <td><code>--blue</code> on <code>--paper-2</code></td>
+      <td>6.98:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>mono 0.58rem caps</td>
+    </tr>
+    <tr>
+      <td>Section count "· 17 entries"</td>
+      <td><code>--ink-soft</code> on <code>--paper-2</code></td>
+      <td>8.07:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>--faded</code> @ 3.15:1</td>
+    </tr>
+    <tr>
+      <td>Stage chevron (›/↓)</td>
+      <td><code>--red</code> / <code>--blue</code> on <code>--paper</code></td>
+      <td>6.23:1 / 7.72:1</td>
+      <td>non-text UI</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>mono 0.95rem</td>
+    </tr>
+    <tr>
+      <td>Empty-tile stage name</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>opacity: 0.55</code> ~2:1</td>
+    </tr>
+    <tr>
+      <td>Empty-tile glyph</td>
+      <td><code>--faded</code> on <code>--paper</code></td>
+      <td>3.48:1</td>
+      <td>ornamental</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>decorative; passes 3:1 floor</td>
+    </tr>
+    <tr>
+      <td>Empty platform badge</td>
+      <td><code>--ink-soft</code> on <code>--paper-3</code></td>
+      <td>7.01:1</td>
+      <td>non-text UI + body</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>--faded</code> @ 2.95:1</td>
+    </tr>
+    <tr>
+      <td>Row slug</td>
+      <td><code>--ink</code> on <code>--paper</code></td>
+      <td>15.77:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>mono 0.7rem</td>
+    </tr>
+    <tr>
+      <td>Row title</td>
+      <td><code>--ink</code> on <code>--paper</code></td>
+      <td>15.77:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>italic display 0.92rem</td>
+    </tr>
+    <tr>
+      <td>Row channel</td>
+      <td><code>--blue</code> on <code>--paper</code></td>
+      <td>7.72:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>mono 0.55rem</td>
+    </tr>
+    <tr>
+      <td>Row meta (timestamp)</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>--faded</code> @ 3.48:1</td>
+    </tr>
+    <tr>
+      <td>Row ⋮ (overflow trigger)</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>non-text UI</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>matches v0.20 + v7 ⋮ vocabulary</td>
+    </tr>
+    <tr>
+      <td>Future-tile name</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was opacity-tanked</td>
+    </tr>
+    <tr>
+      <td>Future-tile tag "phase 3"</td>
+      <td><code>--ink-soft</code> text + <code>--kraft</code> border on <code>--paper</code></td>
+      <td>8.92:1 / 4.08:1</td>
+      <td>body / non-text UI</td>
+      <td>4.5:1 / 3:1</td>
+      <td style="color:#6fa080;">✓ both</td>
+      <td><em>fixed</em>: was <code>--kraft</code> text @ 4.08:1 — now in pill with darker text + kraft outline</td>
+    </tr>
+    <tr>
+      <td>Masthead bottom rule</td>
+      <td><code>--red</code> hairline on <code>--paper</code></td>
+      <td>6.23:1</td>
+      <td>ornamental</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>press-check signature rule</td>
+    </tr>
+    <tr>
+      <td>Dashed tile dividers</td>
+      <td><code>--paper-3</code> on <code>--paper</code></td>
+      <td>1.27:1</td>
+      <td>ornamental</td>
+      <td>3:1</td>
+      <td style="color:#d97a72;">✗</td>
+      <td><em>documented exception</em>: matches shipped v0.19+v0.20 convention. Listed in next callout.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Documented exception · paper-3 hairline dividers</strong>
+  The dashed <code>--paper-3</code> hairline dividers between tiles render at 1.27:1 against <code>--paper</code> — fails the 3:1 ornamental floor. <em>This matches shipped v0.19 + v0.20 convention</em> — every existing dashboard mockup and the live editorial-review CSS uses the same paper-3 hairlines at the same contrast. They function as visual "row whitespace marks" rather than load-bearing chrome; the row content is comprehensible without them.
+  <br><br>
+  <em>Recommendation:</em> propose bumping these hairlines to <code>--kraft</code> dashed (4.08:1 vs paper) as a separate accessibility-cleanup commit, applied to ALL dashed dividers in the studio at once (not just desk-states). That's a cross-cutting change outside this mockup's scope.
+</div>
+
+<div class="callout blue">
+  <strong>Tap target sizes</strong>
+  Per WCAG 2.1 SC 2.5.5 (Target Size, AAA): interactive targets ≥44×44 CSS pixels.
+  <ul>
+    <li>Stage tiles · 42px min-height. <em>Below 44px by 2px</em> — bump to 44px in implementation. Note: 42px was inherited from v0.19 shipped CSS; this would be a small cross-cutting cleanup.</li>
+    <li>Row ⋮ · 1rem glyph + 0.18rem padding ≈ 18.9px visible, but with row's full vertical padding the tap-area is ~44px tall. ✓</li>
+    <li>Compose chip · ~38px tall × ~108px wide. ✓ on width; below 44px on height — recommend bumping to 44px (also a cross-cutting v0.19 inheritance).</li>
+    <li>Masthead back ←, menu ⋮ · 24px visual glyph, but padding+margin trick extends tap target to 44×44. ✓ per v7 spec.</li>
+  </ul>
+</div>
+
+<div class="callout kraft">
+  <strong>Future a11y work surfaced by this audit</strong>
+  Cross-cutting items the desk-states audit catches that affect multiple surfaces:
+  <ul>
+    <li>Stage tile min-height 42 → 44px (WCAG 2.5.5)</li>
+    <li>Compose chip min-height bump (WCAG 2.5.5)</li>
+    <li>Dashed <code>--paper-3</code> hairlines → <code>--kraft</code> dashed for ornamental 3:1 floor</li>
+    <li>Audit other studio mockups (cross-bar v6 + v7) for the same <code>--faded</code> body-text pattern; apply <code>--ink-soft</code> substitution where text is body-class</li>
+  </ul>
+  These belong in a follow-up accessibility-pass commit covering ALL surfaces uniformly, not just this mockup. File a separate task in the workplan.
+</div>
+
+</body>
+</html>

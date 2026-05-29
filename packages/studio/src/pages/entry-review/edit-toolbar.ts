@@ -17,7 +17,10 @@
 
 import { html, unsafe, type RawHtml } from '../html.ts';
 
-export function renderEditToolbar(outlineHasContent: boolean): RawHtml {
+export function renderEditToolbar(
+  outlineHasContent: boolean,
+  entryLabel: string,
+): RawHtml {
   const outlineBtnAttrs = outlineHasContent ? '' : ' hidden';
   // #175 Phase 34b — every button carries a tooltip naming what it
   // does + the keyboard shortcut where one exists. The mode tabs
@@ -25,8 +28,16 @@ export function renderEditToolbar(outlineHasContent: boolean): RawHtml {
   // operator who hadn't memorized them got nothing on hover. The
   // trailing `?` button opens the existing shortcuts overlay so the
   // full keyboard reference is one click away from the toolbar.
+  //
+  // #241 — `entryLabel` is the entry's slug or title; rendered inside
+  // a dedicated `.er-edit-entry-label` span. Hidden on desktop (the
+  // surrounding strip + folio already convey what's being edited);
+  // shown on phone where the rest of the page chrome is hidden in
+  // edit mode and the operator needs an in-toolbar reminder of which
+  // document the editor is bound to.
   return unsafe(html`
     <div class="er-edit-toolbar" data-edit-toolbar hidden>
+      <span class="er-edit-entry-label" data-edit-entry-label title="${entryLabel}">${entryLabel}</span>
       <div class="er-edit-modes" role="tablist" aria-label="Editor mode">
         <button class="er-edit-mode-btn" data-edit-view="source" type="button" aria-pressed="true" title="Edit markdown source only">Source</button>
         <button class="er-edit-mode-btn" data-edit-view="split" type="button" aria-pressed="false" title="Source on the left, rendered preview on the right">Split</button>

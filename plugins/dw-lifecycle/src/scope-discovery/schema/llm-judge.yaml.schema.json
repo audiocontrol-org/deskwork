@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deskwork.dev/schemas/dw-lifecycle/scope-discovery/llm-judge.yaml",
+  "title": "scope-discovery LLM judge + auditor configuration",
+  "description": "Configuration for the multi-source LLM ensemble (the LLM judge + external auditor). Defines the internal LLM-judge (in-band, every turn) + external LLM auditor (out-of-band, fired by orchestrator every turn, results materialize in audit log for next turn). Both sections are required; orchestrator_runtime_dir is optional with documented default. The model + agent_type values are tokens the orchestrator's DispatchFn interprets (per the LLM judge + external auditor pre-made decision: actual LLM API integration is OUT OF SCOPE for the library; the library defines the SHAPE of the call, the orchestrator-agent performs the dispatch).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["judge", "auditor"],
+  "properties": {
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "agent_type", "confidence_floor"],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Model identifier the orchestrator dispatches the judge through. Free-form; the orchestrator's DispatchFn maps the value to a real model endpoint."
+        },
+        "agent_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Agent-type token passed to wrap()'s DispatchFn. The orchestrator routes this to the configured judge model + system prompt scaffold."
+        },
+        "confidence_floor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum proposal confidence for auto-disposition. Proposals BELOW this floor are still surfaced; the the self-correcting controller controller treats them as escalation candidates."
+        }
+      }
+    },
+    "auditor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "pending_audits_dir"],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Model identifier the external auditor process runs. MUST be a different model class from judge.model — the auditor cannot self-grade the judge's work (the LLM judge + external auditor independence rule)."
+        },
+        "pending_audits_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repo-relative directory where audit-request artifacts land. The external auditor process polls this directory; results materialize back as AUDIT-<date>-<NN> entries in the feature's audit-log."
+        }
+      }
+    },
+    "orchestrator_runtime_dir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Repo-relative directory for orchestrator runtime scratch (audit-log watermark, in-flight turn state). Default `.dw-lifecycle/scope-discovery/orchestrator-runtime`. Gitignored."
+    }
+  }
+}

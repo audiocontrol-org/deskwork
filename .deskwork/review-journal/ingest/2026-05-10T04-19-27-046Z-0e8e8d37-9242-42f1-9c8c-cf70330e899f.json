@@ -1,0 +1,20 @@
+{
+  "id": "0e8e8d37-9242-42f1-9c8c-cf70330e899f",
+  "timestamp": "2026-05-10T04:19:27.046Z",
+  "event": "ingest",
+  "slug": "design-standards",
+  "entryId": "0e8e8d37-9242-42f1-9c8c-cf70330e899f",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "DESIGN-STANDARDS.md",
+  "frontmatterSnapshot": {
+    "title": "Deskwork Studio Design Standards",
+    "status": "load-bearing",
+    "last-updated": "2026-05-09"
+  },
+  "derivation": {
+    "slug": "explicit",
+    "state": "explicit",
+    "date": "mtime"
+  }
+}

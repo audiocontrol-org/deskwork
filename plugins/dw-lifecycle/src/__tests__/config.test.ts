@@ -32,4 +32,17 @@ describe('config', () => {
   it('throws on invalid version field', () => {
     expect(() => validateConfig({ version: 'banana' })).toThrow();
   });
+
+  it('defaults branches.archive.compareRef to origin/main', () => {
+    const cfg = validateConfig({ version: 1 });
+    expect(cfg.branches.archive.compareRef).toBe('origin/main');
+  });
+
+  it('respects branches.archive.compareRef override', () => {
+    const cfg = validateConfig({
+      version: 1,
+      branches: { prefix: 'feature/', archive: { compareRef: 'upstream/master' } },
+    });
+    expect(cfg.branches.archive.compareRef).toBe('upstream/master');
+  });
 });

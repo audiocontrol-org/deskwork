@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/cli",
-  "version": "0.17.1",
+  "version": "0.26.5",
   "type": "module",
   "description": "Editorial calendar + review CLI for the deskwork plugin",
   "homepage": "https://github.com/audiocontrol-org/deskwork#readme",
@@ -12,7 +12,8 @@
     "directory": "packages/cli"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=20"
@@ -34,7 +35,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@deskwork/core": "0.17.1"
+    "@deskwork/core": "0.26.5"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

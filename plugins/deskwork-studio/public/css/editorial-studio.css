@@ -14,7 +14,16 @@
   border-bottom: var(--er-rule-thin);
 }
 .er-calendar-row:first-of-type { border-top: var(--er-rule-thin); }
-.er-calendar-row:hover { background: rgba(26,22,20,0.03); }
+/* Hover tint applies only on hover-capable input devices (mouse / trackpad).
+ * Touch-only devices (iOS Safari, Android Chrome) get persistent :hover
+ * after a tap — and the semi-transparent dark tint here makes the row's
+ * foreground translucent, letting the swipe drawer's chips bleed through
+ * the foreground until the operator taps somewhere else. Gating with
+ * `@media (hover: hover)` keeps the desktop affordance and removes the
+ * touch-device cross-talk that violated the spec's at-rest-clean rule. */
+@media (hover: hover) {
+  .er-calendar-row:hover { background: rgba(26,22,20,0.03); }
+}
 .er-calendar-row[hidden] { display: none !important; }
 
 /*
@@ -23,11 +32,13 @@
  * rule on the left so a tree of nested chapters reads as belonging to
  * the same parent, without trying to imitate a real tree-view widget.
  */
-.er-calendar-row-wrap[data-depth] {
+.er-calendar-row-wrap[data-depth],
+.er-row-shell[data-depth] {
   position: relative;
   padding-left: calc(var(--er-row-depth, 0) * 1.4rem);
 }
-.er-calendar-row-wrap[data-depth]::before {
+.er-calendar-row-wrap[data-depth]::before,
+.er-row-shell[data-depth]::before {
   content: "";
   position: absolute;
   left: calc((var(--er-row-depth, 0) - 0.5) * 1.4rem);
@@ -36,6 +47,165 @@
   width: 1px;
   background: var(--er-rule-mid, currentColor);
   opacity: 0.18;
+}
+
+/* ---------------------------------------------------------------------
+ * Row-affordance chrome (v0.20 redesign) — desktop variant.
+ *
+ * Mobile rules live in dashboard-mobile.css under the @media (max-width:
+ * 600px) block. On desktop, the row chrome keeps high-frequency verbs
+ * (iterate / approve / view / induct as applicable) as inline outlined
+ * chips next to the row content; the same `⋮` overflow button + menu
+ * popover hold the secondary verbs (block / cancel / scrapbook).
+ *
+ * Shell stays position:relative on desktop so the menu popover anchors
+ * cleanly. No swipe gesture on desktop (matchMedia-gated in the client
+ * controller).
+ * --------------------------------------------------------------------- */
+
+.er-row-shell {
+  position: relative;
+}
+
+/* Drawer renders in DOM but is hidden on desktop — swipe is mobile-only. */
+.er-row-drawer {
+  display: none;
+}
+
+/* Inline desktop chips — high-frequency verbs as outlined press-check
+ * pills. Each chip uses its accent color (iterate=proof-blue,
+ * approve=stamp-green, induct=proof-blue, view=kraft). */
+.er-row-affordances {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.er-btn-chip {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  padding: 0.35rem 0.7rem;
+  border-radius: 1px;
+  border: 1px solid var(--er-paper-3);
+  background: transparent;
+  cursor: pointer;
+  text-transform: lowercase;
+  line-height: 1.1;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.er-btn-chip.is-copied {
+  background: rgba(46, 93, 69, 0.1);
+}
+.er-btn-chip-iterate { border-color: var(--er-proof-blue); color: var(--er-proof-blue); }
+.er-btn-chip-approve { border-color: var(--er-stamp-green); color: var(--er-stamp-green); }
+.er-btn-chip-cancel  { border-color: var(--er-red-pencil); color: var(--er-red-pencil); }
+.er-btn-chip-block   { border-color: var(--er-kraft); color: var(--er-kraft); }
+.er-btn-chip-induct  { border-color: var(--er-proof-blue); color: var(--er-proof-blue); }
+.er-btn-chip-view    { border-color: var(--er-kraft); color: var(--er-kraft); }
+.er-btn-chip-scrapbook { border-color: var(--er-kraft); color: var(--er-kraft); }
+
+/* Overflow button — same shape as mobile, slightly smaller hit area.
+ * Color matches Direction B per
+ * docs/studio-design/ACCEPTED/2026-05-11-row-overflow-contrast-B-ink-soft/
+ * (ink-soft, 11.06:1 against paper). Desktop previously used --er-faded
+ * at 3.53:1 — bare WCAG floor with no headroom; ink-soft brings desktop
+ * up to AAA and keeps the affordance treatment consistent across
+ * viewports. */
+.er-row-overflow {
+  background: transparent;
+  border: 0;
+  color: var(--er-ink-soft);
+  font-family: var(--er-font-mono);
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+}
+.er-row-overflow:hover,
+.er-row-overflow:focus-visible {
+  color: var(--er-ink);
+  outline: none;
+}
+.er-row-overflow[aria-expanded="true"] {
+  color: var(--er-red-pencil);
+}
+
+/* Menu popover — desktop reuses the mobile shape; anchored bottom-right
+ * of the row, drops downward. */
+.er-row-menu {
+  position: absolute;
+  z-index: 200;
+  top: 100%;
+  right: 0.2rem;
+  margin-top: 0.4rem;
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  min-width: 240px;
+  padding: 0.3rem 0;
+  box-shadow:
+    0 10px 24px rgba(26, 22, 20, 0.18),
+    0 2px 4px rgba(26, 22, 20, 0.08);
+}
+.er-row-menu[hidden] {
+  display: none;
+}
+.er-row-menu-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.5rem 0.85rem;
+  border: 0;
+  border-bottom: 1px dotted var(--er-paper-3);
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.er-row-menu-item:last-child { border-bottom: 0; }
+.er-row-menu-item:hover,
+.er-row-menu-item:focus-visible {
+  background: var(--er-paper-2);
+  outline: none;
+}
+.er-row-menu-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.er-row-menu-glyph-iterate { color: var(--er-proof-blue); }
+.er-row-menu-glyph-approve { color: var(--er-stamp-green); }
+.er-row-menu-glyph-cancel  { color: var(--er-red-pencil); }
+.er-row-menu-glyph-block   { color: var(--er-kraft); }
+.er-row-menu-glyph-induct  { color: var(--er-proof-blue); }
+.er-row-menu-glyph-scrapbook,
+.er-row-menu-glyph-view    { color: var(--er-kraft); }
+.er-row-menu-label {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  color: var(--er-ink);
+}
+.er-row-menu-cmd {
+  font-family: var(--er-font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  color: var(--er-faded);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.er-row-menu-divider {
+  border: 0;
+  border-top: 1px solid var(--er-paper-3);
+  margin: 0.25rem 0.7rem;
 }
 .er-row-slug-ancestors {
   font-variation-settings: "opsz" 28, "wght" 350;
@@ -209,197 +379,131 @@ a.er-calendar-meta-link:focus-visible {
 }
 
 /* ---------------------------------------------------------------------
- * Press queue — dashboard right column.
+ * Phone preamble compression (#238) — dashboard masthead + filter strip.
  *
- * Fills the long-empty second column of `.er-layout` (the dashboard's
- * `2fr 1fr` grid). Surfaces every entry currently in active review so
- * "press-check" gravity matches "what needs my eyes right now."
- * Editorial chrome pulled from the existing `--er-*` tokens — no new
- * colors, fonts, or spacing scales introduced.
- * ------------------------------------------------------------------- */
+ * Desktop reads as a magazine masthead: kicker + huge Press-Check title +
+ * project path deck + counts strip + labelled search + labelled chips.
+ * Operator likes it on desktop; on phone (~1500px of preamble before any
+ * content) it's throat-clearing. We hide the decorative chrome and the
+ * redundant labels at narrow widths, keeping only the counts row + search
+ * input + chip row — ~250px of preamble, first content row at the fold.
+ *
+ * Scoped tight to the dashboard via the .er-pagehead--dashboard modifier
+ * the renderer sets on its <header>. Other surfaces using `er-pagehead`
+ * (review surfaces, content tree, manual) are untouched.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  .er-pagehead--dashboard {
+    padding: var(--er-space-3) var(--er-space-3) var(--er-space-2);
+    border-bottom: var(--er-rule-thin);
+  }
+  .er-pagehead--dashboard .er-pagehead__kicker,
+  .er-pagehead--dashboard .er-pagehead__title,
+  .er-pagehead--dashboard .er-pagehead__deck {
+    display: none;
+  }
+  .er-pagehead--dashboard .er-pagehead__meta {
+    font-size: 0.62rem;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    line-height: 1.5;
+  }
 
-.er-press-queue {
-  position: sticky;
-  top: calc(var(--er-folio-h, 2.4rem) + var(--er-space-3));
-  align-self: start;            /* don't stretch in the parent grid */
-  padding: var(--er-space-3) var(--er-space-3) var(--er-space-4);
-  background:
-    linear-gradient(180deg, rgba(245, 241, 232, 0.92), rgba(245, 241, 232, 0.6)),
-    var(--er-paper);
-  border: var(--er-rule-thin);
-  border-radius: 2px;
-  box-shadow: 0 1px 0 rgba(26, 22, 20, 0.04);
-  font-family: var(--er-font-body);
-  color: var(--er-ink);
-  max-height: calc(100vh - var(--er-folio-h, 2.4rem) - var(--er-space-5));
-  overflow-y: auto;
-}
-
-.er-press-queue__head {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas:
-    "kicker count"
-    "title  count";
-  align-items: baseline;
-  column-gap: var(--er-space-2);
-  padding-bottom: var(--er-space-2);
-  border-bottom: var(--er-rule-thin);
-  margin-bottom: var(--er-space-3);
-}
-.er-press-queue__kicker {
-  grid-area: kicker;
-  margin: 0;
-  font-family: var(--er-font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--er-faded);
-}
-.er-press-queue__title {
-  grid-area: title;
-  margin: 0;
-  font-family: var(--er-font-display, 'Fraunces'), 'Newsreader', Georgia, serif;
-  font-weight: 500;
-  font-size: 1.4rem;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  color: var(--er-ink);
-}
-.er-press-queue__title em {
-  font-style: italic;
-  color: var(--er-red-pencil);
-}
-.er-press-queue__count {
-  grid-area: count;
-  margin: 0;
-  align-self: center;
-  font-family: var(--er-font-mono);
-  font-size: 0.78rem;
-  color: var(--er-faded);
-  letter-spacing: 0.04em;
+  /* Filter strip (search input + stage chips). Desktop has labels for
+   * each; on phone the placeholder + chip-row shape carry the meaning,
+   * so labels are pure noise. */
+  .er-filter {
+    padding: var(--er-space-2) 0;
+    gap: var(--er-space-2);
+    margin-bottom: var(--er-space-2);
+  }
+  .er-filter > .er-filter-label {
+    display: none;
+  }
+  .er-filter input[type="search"] {
+    min-width: 0;
+    width: 100%;
+    font-size: 0.95rem;
+  }
+  .er-chips {
+    gap: 0.3rem;
+    width: 100%;
+  }
+  .er-chip {
+    font-size: 0.62rem;
+    padding: 0.22rem 0.55rem;
+    letter-spacing: 0.06em;
+  }
 }
 
-.er-press-queue__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--er-space-1);
-}
-.er-press-queue__item + .er-press-queue__item {
-  border-top: 1px dotted var(--er-paper-3);
-  padding-top: var(--er-space-1);
-}
-
-.er-press-queue__link {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: baseline;
-  column-gap: var(--er-space-2);
-  padding: var(--er-space-1) calc(var(--er-space-1) / 2);
-  border-radius: 2px;
-  color: inherit;
-  text-decoration: none;
-  transition: background-color 120ms ease, transform 120ms ease;
-}
-.er-press-queue__link:hover {
-  background: rgba(184, 54, 42, 0.05);
-}
-.er-press-queue__link:focus-visible {
-  outline: 2px solid var(--er-red-pencil);
-  outline-offset: 2px;
-}
-
-.er-press-queue__ornament {
-  font-family: var(--er-font-display, 'Fraunces'), serif;
-  font-size: 1.05rem;
-  line-height: 1;
-  color: var(--er-red-pencil);
-  width: 1.25rem;
-  text-align: center;
-}
-
-.er-press-queue__body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
-}
-
-.er-press-queue__slug {
-  font-family: var(--er-font-mono);
-  font-size: 0.85rem;
-  color: var(--er-ink);
-  overflow-wrap: anywhere;
-  line-height: 1.3;
-}
-.er-press-queue__link:hover .er-press-queue__slug {
-  text-decoration: underline;
-  text-decoration-color: var(--er-red-pencil);
-  text-underline-offset: 2px;
-}
-
-.er-press-queue__meta {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  font-family: var(--er-font-mono);
-  font-size: 0.7rem;
-  color: var(--er-faded);
-  letter-spacing: 0.04em;
-}
-.er-press-queue__stage {
-  text-transform: uppercase;
-}
-.er-press-queue__sep {
-  color: var(--er-faded-2);
-}
-
-/* Empty state — quiet, deliberate. The press IS the metaphor; lean in. */
-.er-press-queue--empty {
-  /* slightly fainter background so the "quiet" state reads as quiet */
-  background: var(--er-paper);
-}
-.er-press-queue__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: var(--er-space-3) var(--er-space-2);
-  gap: 0.4rem;
-}
-.er-press-queue__empty-mark {
-  font-family: var(--er-font-display, 'Fraunces'), serif;
-  font-size: 1.5rem;
-  color: var(--er-red-pencil);
-  opacity: 0.55;
-  line-height: 1;
-  margin-bottom: var(--er-space-1);
-}
-.er-press-queue__empty-line {
-  margin: 0;
-  font-family: var(--er-font-display, 'Fraunces'), serif;
-  font-style: italic;
-  font-size: 1rem;
-  color: var(--er-ink-soft);
-}
-.er-press-queue__empty-hint {
-  margin: 0;
-  font-family: var(--er-font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--er-faded);
-}
-
-/* When the layout collapses to single column on small screens, the
- * sidebar stacks below — drop the sticky behavior and the max-height. */
-@media (max-width: 60rem) {
-  .er-press-queue {
-    position: static;
-    max-height: none;
+/* ---------------------------------------------------------------------
+ * Phone reshape (#237) — dashboard rows at narrow widths.
+ *
+ * Desktop uses a 4-column grid `[num] [body] [status] [actions]` that
+ * reads as a horizontal record. At <= 600px the two `auto` end columns
+ * (status + actions) eat enough horizontal budget that `body` collapses
+ * to ~120px, and every word in slug/title/meta wraps onto its own line.
+ *
+ * Reshape to a 3-row stacked layout:
+ *
+ *   [num]  [status]
+ *   [body            ]   (full width)
+ *   [actions         ]   (full width; buttons remain horizontal)
+ *
+ * Desktop layout untouched — the rule is gated behind the media query.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  /* v0.20 row layout — collapse to a single row with ⋮ at the trailing
+   * edge. Status cell is empty (reviewState retired); drop from mobile to
+   * recover horizontal budget. Row num pins left; body fills middle;
+   * action area (containing only the ⋮ button on mobile, since inline
+   * chips are `display: none`) pins right.
+   *
+   * Pre-v0.20 used a 3-row layout (`num/status | body | action`) because
+   * the action area carried 3-4 stacked outlined buttons that wrapped
+   * unpredictably. With v0.20's single ⋮, that wrap is gone — the row
+   * fits on one line. */
+  .er-calendar-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "num body action";
+    column-gap: var(--er-space-2);
+    align-items: center;
+  }
+  .er-calendar-row > .er-row-num {
+    grid-area: num;
+    align-self: center;
+  }
+  .er-calendar-row > .er-calendar-status {
+    display: none;
+  }
+  .er-calendar-row > .er-calendar-body {
+    grid-area: body;
+  }
+  .er-calendar-row > .er-calendar-action {
+    grid-area: action;
+    align-self: center;
+    display: flex;
+    align-items: center;
+  }
+  /* Long slugs (e.g. `deskwork-plugin/issue-158-ux-audit`) must break
+   * at any character so they can't ever overflow the body column. The
+   * display font has natural break opportunities at `/` and `-`; this
+   * rule guarantees a clean break even when those don't help. */
+  .er-row-slug,
+  .er-row-slug a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  /* Hierarchical-row indent at narrow widths is cosmetic noise — the
+   * left rail and slug shape already convey the relationship. Drop the
+   * left padding so child rows recover horizontal budget. */
+  .er-calendar-row-wrap[data-depth],
+  .er-row-shell[data-depth] {
+    padding-left: 0;
+  }
+  .er-calendar-row-wrap[data-depth]::before {
+    display: none;
   }
 }
 

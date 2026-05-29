@@ -10,6 +10,8 @@ deskwork:
 
 # Issue #158 UX-consistency audit — 2026-05-03
 
+this is just a test
+
 **Operator framing (issue body):** "The general layout of the different pages of the studio is inconsistent and kind of jarring when switching from one to the other. They don't seem like they were designed together with coherent design principles."
 
 **Operator's most recent comment (2026-05-04):** *"None of the complaints in this issue have been addressed."*

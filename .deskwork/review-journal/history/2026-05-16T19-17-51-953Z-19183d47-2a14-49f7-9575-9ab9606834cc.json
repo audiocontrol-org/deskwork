@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T19:17:51.953Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "address",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "commentId": "d101d18b-5615-464d-8e2d-1178c75df128",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": "Studio rendering section gained a 'Multi-lane composed views' bullet — operator-pinned subsets of lanes can be tiled side-by-side on the desk. The Group rendering bullet also gained a 'Group multi-lane review' entry: a group's review surface renders its members in a coordinated multi-lane composition (one column per lane the group spans). Phase 4 in Tasks now lists 'multi-lane composed views' as part of the studio render scope; Phase 6 lists 'group multi-lane composition'.",
+    "id": "94aea283-c1f1-4703-af55-a2095fe4fdd7",
+    "createdAt": "2026-05-16T19:17:51.953Z"
+  }
+}

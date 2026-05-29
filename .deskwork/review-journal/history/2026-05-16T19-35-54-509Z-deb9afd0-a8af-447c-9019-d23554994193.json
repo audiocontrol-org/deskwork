@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T19:35:54.509Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "address",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "commentId": "f58d9f32-9fa1-4caa-a572-f8db8e261b94",
+    "version": 3,
+    "disposition": "addressed",
+    "reason": "Added a § 'Prior art — reuse before build' section enumerating candidate OSS projects (Annotorious, Recogito, Hypothes.is, W3C Web Annotation Data Model, Penpot, Storybook, html2canvas, getDisplayMedia, with Marker.io/Pastel/BugHerd flagged as inform-only since they're closed-source). Defined six concrete research deliverables (annotation data model decision, image annotation UI decision, HTML mockup annotation UI decision, threaded comments decision, screenshot capture decision, combined recommendation document at docs/studio-design/ACCEPTED/<date>-graphical-review-prior-art/brief.md). Inserted a new Phase 1 in Tasks ('Prior art research + build-vs-reuse decision') — time-boxed, no production implementation, output is the decision doc that informs Phase 8 (annotation model) and Phase 9 (frontend-design pass). Renumbered all subsequent phases; Phase 8, 9, 10, 11 reference the Phase 1 decision explicitly so the research feeds forward.",
+    "id": "acaf7c70-803b-4d54-9f91-73cccd83622f",
+    "createdAt": "2026-05-16T19:35:54.509Z"
+  }
+}

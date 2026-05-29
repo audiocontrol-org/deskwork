@@ -231,6 +231,61 @@ describe('discoverIngestCandidates — slug derivation', () => {
     expect(r.skips).toHaveLength(1);
     expect(r.skips[0].reason).toMatch(/not valid kebab-case/);
   });
+
+  // #221: filenames carrying version numbers or dotted dates are common —
+  // sanitize dots in path-derived slugs so they pass the kebab-case
+  // validator. The explicit `--slug` path keeps strict validation.
+  it('sanitizes dots in path-derived slug (Jekyll filename with version)', () => {
+    write(
+      '_posts/2026-05-05-v0.16.0-verification-walk.md',
+      '---\ntitle: Walk\n---\n',
+    );
+    const r = discoverIngestCandidates(
+      [join(project, '_posts/2026-05-05-v0.16.0-verification-walk.md')],
+      baseOpts(),
+    );
+    expect(r.skips).toEqual([]);
+    expect(r.candidates).toHaveLength(1);
+    expect(r.candidates[0].derivedSlug).toBe('v0-16-0-verification-walk');
+    expect(r.candidates[0].slugSource).toBe('path');
+  });
+
+  it('sanitizes dots in flat path-derived filename (no Jekyll prefix)', () => {
+    write('posts/v1.2.3-release-notes.md', '---\ntitle: Notes\n---\n');
+    const r = discoverIngestCandidates(
+      [join(project, 'posts/v1.2.3-release-notes.md')],
+      baseOpts(),
+    );
+    expect(r.skips).toEqual([]);
+    expect(r.candidates[0].derivedSlug).toBe('v1-2-3-release-notes');
+    expect(r.candidates[0].slugSource).toBe('path');
+  });
+
+  it('does not sanitize a path-derived filename that has no dots', () => {
+    write('posts/plain-filename.md', '---\ntitle: P\n---\n');
+    const r = discoverIngestCandidates(
+      [join(project, 'posts/plain-filename.md')],
+      baseOpts(),
+    );
+    expect(r.candidates[0].derivedSlug).toBe('plain-filename');
+  });
+
+  it('--slug explicit path is NOT sanitized — operator-supplied dots still get rejected', () => {
+    write('p.md', '---\ntitle: P\n---\n');
+    const r = discoverIngestCandidates(
+      [join(project, 'p.md')],
+      baseOpts({ explicitSlug: 'v0.16.0-foo' }),
+    );
+    // Explicit slug bypasses path derivation, so dot-sanitization does
+    // NOT apply. The kebab-case validator (in ingest.ts) rejects the
+    // dotted value as a skip with the canonical "not valid kebab-case"
+    // reason — operator-supplied dots are surfaced as the typo the
+    // operator probably wants to know about.
+    expect(r.candidates).toEqual([]);
+    expect(r.skips).toHaveLength(1);
+    expect(r.skips[0].slug).toBe('v0.16.0-foo');
+    expect(r.skips[0].reason).toMatch(/not valid kebab-case/);
+  });
 });
 
 describe('discoverIngestCandidates — state derivation', () => {

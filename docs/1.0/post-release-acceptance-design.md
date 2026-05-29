@@ -1,4 +1,4 @@
----
+****bold********bold********bold********bold********bold********bold******bold****bold**---
 title: Post-release customer acceptance playbook
 description: A pair of skills that codify how to evaluate the freshly-installed deskwork marketplace plugin, surface friction, and file issues — using the deskwork pipeline itself as the triage surface.
 targetKeywords:

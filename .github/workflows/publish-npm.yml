@@ -1,0 +1,82 @@
+name: Publish to npm
+
+# Auto-publishes @deskwork/{core,cli,studio} to npm when a v* tag lands on
+# origin. Uses npm's Trusted Publisher (OIDC) flow — no NPM_TOKEN secret.
+# Each @deskwork/* package on npmjs.com has a Trusted Publisher entry
+# pointing at this workflow file's path; that entry plus the
+# `id-token: write` permission below is what authorizes the publish.
+#
+# The /release skill's atomic-push step is the operator's approval moment
+# (the tag IS the trigger). `make publish` stays as a documented manual
+# fallback for outages or one-off out-of-band publishes; see RELEASING.md
+# § "Recovery — CI is broken".
+#
+# SCOPE: this workflow does the ONE thing that only CI can do — publish
+# via OIDC (token-less, provenance-attested). Everything else — npm-side
+# visibility assertion, marketplace clone+install smoke, per-package
+# vitest suite — runs LOCALLY as part of /release. Reason: GH Actions
+# minutes are not free; CI smoke takes 5-10 minutes per run; iterating
+# on a workflow bug with 5-10 min turnaround is too slow vs the same
+# step running locally in ~30s.
+#
+# The /release skill polls `npm view` via the assert-published helper
+# (retry-with-backoff for CDN propagation) AFTER atomic-push and BEFORE
+# running scripts/smoke-marketplace.sh locally. Workflow success means
+# "publish succeeded"; adopter-reachability is the operator's local
+# verification responsibility.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Node 20 ships with npm 10.x; npm Trusted Publishing (OIDC) requires
+      # npm 11.5.1+ — the feature shipped late 2024 / early 2025. Without
+      # this upgrade, the publish step fails with a 404-Not-Found PUT to
+      # the package endpoint (npm returns 404 instead of 403 when OIDC
+      # validation rejects the token; misleading but documented). Surfaced
+      # by the v0.26.2 release attempt (workflow run 26613403248) on
+      # 2026-05-29 — the publish step failed AFTER the provenance
+      # attestation succeeded, confirming provenance + trusted-publishing
+      # are separate OIDC flows with separate minimum npm versions.
+      - name: Upgrade npm to support trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Install workspaces
+        run: npm ci
+
+      # No standalone build step here on purpose. `npm publish` invokes
+      # each package's `prepack` script automatically (per-package: tsc
+      # build + auxiliary file copies + chmod on bin entries), and the
+      # `prepack` script in every packages/<pkg>/package.json is the
+      # authoritative build for that package. A separate `npm run build`
+      # step would duplicate that work AND create a drift surface — if
+      # build and prepack diverge, the published artifact is ambiguous.
+      # The root build also runs scripts/link-workspace-bins.sh, which is
+      # for local test spawn of node_modules/.bin/deskwork; npm publish
+      # does not read those symlinks (it consumes each package's own
+      # `bin` field), so the symlink side effect is not needed pre-publish.
+      - name: Publish all @deskwork packages (OIDC, dep-ordered)
+        run: make publish-ci
+        env:
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # No assert-published / marketplace-smoke step here. The /release
+      # skill runs both LOCALLY after this workflow's publish step
+      # completes — much faster turnaround than waiting on GH Actions
+      # minutes. See RELEASING.md § "Workflow scope" for the rationale.

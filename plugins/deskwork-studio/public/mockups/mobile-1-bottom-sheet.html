@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup 1 · Bottom tab bar + sheets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .meta a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+  }
+  h1.demo-title {
+    color: var(--paper);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.6rem;
+    margin-bottom: 1.4rem;
+    text-align: center;
+  }
+  .frames {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+    text-align: center;
+  }
+  /* iPhone-ish frame */
+  .phone {
+    width: 410px;
+    height: 880px;
+    background: #050505;
+    border-radius: 50px;
+    padding: 12px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before {
+    /* Dynamic island */
+    content: '';
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 110px;
+    height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+  .screen {
+    width: 100%;
+    height: 100%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+
+  /* ============================================================
+   *  Mobile review surface — bottom tab bar + sheets pattern
+   * ============================================================ */
+
+  /* Top strip — minimal (back link + stage stamp only) */
+  .strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 84px; /* room for status bar + actual chrome */
+    padding: 60px var(--p4) 8px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .strip-back {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+  .stamp {
+    margin-left: auto;
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    padding: 0.18rem 0.55rem;
+    transform: rotate(-1.5deg);
+    background: var(--paper);
+  }
+
+  /* Article body */
+  .article {
+    position: absolute;
+    top: 84px;
+    left: 0;
+    right: 0;
+    bottom: 64px; /* leaves room for bottom tab bar */
+    overflow-y: auto;
+    padding: 1.4rem 1.4rem 2rem;
+  }
+  .article-kicker {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.5rem;
+  }
+  .article-title {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 48, "wght" 500;
+    font-size: 2rem;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+    color: var(--ink);
+  }
+  .article p {
+    font-family: var(--display);
+    font-size: 1.04rem;
+    line-height: 1.5;
+    margin-bottom: 0.9rem;
+    color: var(--ink);
+  }
+  .article p mark {
+    background: var(--highlight);
+    color: var(--ink);
+    padding: 0 0.1em;
+    border-radius: 1px;
+    box-decoration-break: clone;
+  }
+  .article h2 {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin: 1.5rem 0 0.6rem;
+    border-bottom: 1px solid var(--red);
+    padding-bottom: 0.3rem;
+  }
+
+  /* Bottom tab bar (always visible) */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -2px 16px rgba(26,22,20,0.06);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    z-index: 60;
+  }
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.18rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0.4rem 0.4rem 0.6rem;
+    color: var(--faded);
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    position: relative;
+  }
+  .tab .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--faded);
+  }
+  .tab.active { color: var(--red); }
+  .tab.active .glyph { color: var(--red); }
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 30px; height: 2px;
+    background: var(--red);
+  }
+  .tab .count {
+    position: absolute;
+    top: 8px; right: 30%;
+    background: var(--red);
+    color: var(--paper);
+    font-size: 0.55rem;
+    line-height: 1;
+    padding: 0.18rem 0.32rem;
+    border-radius: 8px;
+    letter-spacing: 0.04em;
+    min-width: 1rem;
+    text-align: center;
+  }
+
+  /* Sheet (slides up from bottom) */
+  .sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 64px;
+    height: 60%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -16px 40px rgba(26,22,20,0.18);
+    border-radius: 24px 24px 0 0;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet-handle {
+    align-self: center;
+    width: 44px;
+    height: 5px;
+    background: var(--paper-3);
+    border-radius: 4px;
+    margin: 0.55rem 0 0.7rem;
+  }
+  .sheet-head {
+    padding: 0 1.4rem 0.7rem;
+    border-bottom: 1px solid var(--red);
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+  .sheet-kicker {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .sheet-count {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    margin-left: auto;
+  }
+  .sheet-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.6rem 1.4rem 1.4rem;
+  }
+  .note {
+    padding: 0.85rem 0;
+    border-bottom: 1px dashed var(--paper-3);
+    display: grid;
+    grid-template-columns: 1.6rem 1fr;
+    gap: 0.4rem;
+  }
+  .note:last-child { border-bottom: 0; }
+  .note-num {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--red);
+    font-weight: 600;
+    padding-top: 0.15rem;
+  }
+  .note-quote {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.92rem;
+    color: var(--faded);
+    border-left: 2px solid var(--paper-3);
+    padding-left: 0.55rem;
+    margin-bottom: 0.45rem;
+  }
+  .note-text {
+    font-family: var(--display);
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+  .note-meta {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    color: var(--faded);
+    margin-top: 0.4rem;
+    text-transform: uppercase;
+  }
+
+  /* The article peeks behind the sheet (slightly dimmed) */
+  .scrim {
+    position: absolute;
+    top: 84px; left: 0; right: 0;
+    bottom: calc(64px + 60%);
+    background: linear-gradient(to bottom, transparent, rgba(245,241,232,0.85));
+    pointer-events: none;
+    z-index: 65;
+  }
+
+  --p4: 1rem;
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Mockup 1 · Bottom tab bar + sheets</h1>
+
+<div class="frames">
+
+  <!-- Frame 1: Default reading state -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+
+      <div class="strip">
+        <a class="strip-back" href="#">← Studio</a>
+        <span class="stamp">Drafting</span>
+      </div>
+
+      <div class="article">
+        <div class="article-kicker">Architecture · v0.16</div>
+        <h1 class="article-title">Deskwork architectural thesis.</h1>
+        <p>Read this before touching any deskwork code. This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable, which let the wrong architecture creep into <mark>the studio's review surface</mark> and waste an angry session correcting it.</p>
+        <h2>The canonical source</h2>
+        <p>"You never leave the agent for a static tool. You talk to it. It does the work." The agent's toolkit isn't a static configuration you set up once; it evolves, under your direction, in response to what the work actually needs.</p>
+        <p>The blog post is the canonical source. Everything below derives from it.</p>
+        <h2>What the thesis means</h2>
+        <p>The agent (Claude, in a Claude Code session) is the primary tool. Every other piece of deskwork — CLI verbs, the studio, doctor rules, sidecars, the calendar — exists to be <mark>read, edited, and orchestrated by that agent</mark>. Static tools (opaque code the agent can't see or evolve, server endpoints that hide multi-step logic, UI that takes business-logic actions without surfacing what it's doing) are what the thesis rejects.</p>
+      </div>
+
+      <div class="tabbar">
+        <button class="tab">
+          <span class="glyph">§</span>
+          <span>Outline</span>
+        </button>
+        <button class="tab">
+          <span class="glyph">✎</span>
+          <span>Notes</span>
+          <span class="count">3</span>
+        </button>
+        <button class="tab">
+          <span class="glyph">⊕</span>
+          <span>Actions</span>
+        </button>
+      </div>
+
+    </div></div>
+    <div class="caption">A · default reading state</div>
+  </div>
+
+  <!-- Frame 2: Notes sheet open -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+
+      <div class="strip">
+        <a class="strip-back" href="#">← Studio</a>
+        <span class="stamp">Drafting</span>
+      </div>
+
+      <div class="article">
+        <div class="article-kicker">Architecture · v0.16</div>
+        <h1 class="article-title">Deskwork architectural thesis.</h1>
+        <p>Read this before touching any deskwork code. This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable, which let the wrong architecture creep into <mark>the studio's review surface</mark> and waste an angry session correcting it.</p>
+      </div>
+
+      <div class="scrim"></div>
+
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <span class="sheet-kicker">Margin notes</span>
+          <span class="sheet-count">3 open</span>
+        </div>
+        <div class="sheet-body">
+          <article class="note">
+            <span class="note-num">1</span>
+            <div>
+              <div class="note-quote">"the studio's review surface"</div>
+              <div class="note-text">This whole arc starts with the studio's mobile chrome being mis-shaped. Worth saying that explicitly here.</div>
+              <div class="note-meta">Suggest · 2 min ago</div>
+            </div>
+          </article>
+          <article class="note">
+            <span class="note-num">2</span>
+            <div>
+              <div class="note-quote">"by that agent"</div>
+              <div class="note-text">Strong. The "by that agent" framing is exactly what makes this an architectural thesis instead of a style guide.</div>
+              <div class="note-meta">Praise · 5 min ago</div>
+            </div>
+          </article>
+          <article class="note">
+            <span class="note-num">3</span>
+            <div>
+              <div class="note-quote">"what the thesis rejects"</div>
+              <div class="note-text">Could enumerate the rejected patterns more concretely below — right now it's gestural.</div>
+              <div class="note-meta">Question · 9 min ago</div>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <button class="tab">
+          <span class="glyph">§</span>
+          <span>Outline</span>
+        </button>
+        <button class="tab active">
+          <span class="glyph">✎</span>
+          <span>Notes</span>
+          <span class="count">3</span>
+        </button>
+        <button class="tab">
+          <span class="glyph">⊕</span>
+          <span>Actions</span>
+        </button>
+      </div>
+
+    </div></div>
+    <div class="caption">B · notes sheet open (60% height)</div>
+  </div>
+
+</div>
+
+<div style="margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.55;">
+  <p style="margin-bottom: 0.8rem;"><strong style="color: var(--paper); font-style: italic;">Notes on the pattern.</strong> The bottom tab bar (~64px) is permanent — three tabs, glyph + label, with a count badge on Notes. The sheet snaps to 60% by default; drag handle pulls to 90% (full-content) or down to dismiss. Article body remains visible (and dimly readable) above the sheet — the operator can always see what they're reading. Decision actions (Approve / Iterate / Reject / Cancel) live in the Actions sheet and copy the skill command to the clipboard, same as desktop.</p>
+  <p>The strip is reduced to its absolute minimum: back-link + stage stamp. No decision buttons inline, no induct picker, no shortcut chips. Stage stamp gets a hint of rotation as a press-check signature.</p>
+</div>
+
+</body>
+</html>

@@ -346,7 +346,7 @@ Use these descriptions (from design.md):
 - `setup`: "Create branch + worktree + version-aware docs/<v>/<status>/<slug>/ + populate PRD/workplan/README"
 - `issues`: "Create parent + per-phase GitHub issues from workplan; back-fill issue links"
 - `implement`: "Walk workplan tasks; delegate to subagents; commit at task boundaries"
-- `review`: "Delegate code review of recent changes; collate findings"
+- `review`: "Run the three-track audit/review protocol on recent changes; update the durable audit log"
 - `ship`: "Verify acceptance criteria; open PR; stop at PR creation (operator owns merge)"
 - `complete`: "Move docs to <complete-dir>; update ROADMAP; close issues"
 - `pickup`: "Read workplan + check issue status + report next-action"
@@ -2506,10 +2506,12 @@ Delegate review of recent changes to feature-dev's `code-reviewer` agent. Replac
 ## Steps
 
 1. Determine review scope: defaults to commits since branching from `main`; operator may override with `--since <ref>`.
-2. Invoke `superpowers:requesting-code-review` to frame the request. Include the workplan reference and any architectural decisions for context.
-3. Dispatch `code-reviewer` (from `feature-dev`) with the scope. For substantial changes, dispatch 2–3 reviewers in parallel with different focuses (security, correctness, conventions) via `superpowers:dispatching-parallel-agents`.
-4. Apply `superpowers:receiving-code-review` discipline when integrating findings: technical rigor, no performative agreement.
-5. Report: findings grouped by severity; what was applied vs. deferred.
+2. Re-run the load-bearing verification gate independently before dispatching reviewers. For UI-touching changes, include the relevant browser/probe/Playwright or smoke verification, not just unit tests.
+3. Invoke `superpowers:requesting-code-review` to frame the request. Include the workplan reference, architectural decisions, and the independent verification evidence.
+4. Dispatch a spec-compliance review pass.
+5. Dispatch a separate code-quality review pass. For substantial changes, run the two passes in parallel via `superpowers:dispatching-parallel-agents`.
+6. Apply `superpowers:receiving-code-review` discipline when integrating findings: technical rigor, no performative agreement.
+7. Report: findings grouped by severity; the verification gate re-run; what was applied vs. deferred.
 
 ## Error handling
 
@@ -2935,7 +2937,7 @@ Show the lifecycle diagram and current state. Read-only; does not start any work
 /dw-lifecycle:implement Walk workplan tasks via subagents
         |
         v
-/dw-lifecycle:review    Delegate code review (feature-dev's reviewer)
+/dw-lifecycle:review    Three-track audit/review + durable audit-log updates
         |
         v
 /dw-lifecycle:ship      Verify + open PR (stop at PR; operator merges)

@@ -60,8 +60,18 @@ describe('approveEntryStage', () => {
     expect(result.toStage).toBe('Final');
     const sidecar = await readSidecar(projectRoot, uuid);
     expect(sidecar.currentStage).toBe('Final');
-    // reviewState clears on stage transition.
+    // Per DESKWORK-STATE-MACHINE.md Commandment III, reviewState is
+    // RETIRED — the schema field is gone, so it's necessarily absent
+    // from any read sidecar.
     expect(sidecar.reviewState).toBeUndefined();
+  });
+
+  it('does NOT emit a review-state-change journal event on approve (Commandment III — reviewState is retired)', async () => {
+    await setupEntry({ currentStage: 'Drafting' });
+    await approveEntryStage(projectRoot, { uuid });
+    const events = await readJournalEvents(projectRoot, { entryId: uuid });
+    const reviewChanges = events.filter((e) => e.kind === 'review-state-change');
+    expect(reviewChanges.length).toBe(0);
   });
 
   it('emits a stage-transition journal event', async () => {

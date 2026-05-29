@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Dashboard mockup 2 · Card stream</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --kraft-2: #D9C8A2;
+    --kraft-paper: #EDE0C2;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .meta a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+  }
+  h1.demo-title {
+    color: var(--paper);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.6rem;
+    margin-bottom: 0.4rem;
+    text-align: center;
+  }
+  .demo-sub {
+    color: var(--faded-2);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 1.6rem;
+    text-align: center;
+  }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+    text-align: center;
+    max-width: 410px;
+  }
+  .phone {
+    width: 410px;
+    height: 880px;
+    background: #050505;
+    border-radius: 50px;
+    padding: 12px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+  .screen {
+    width: 100%; height: 100%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .ios-clock {
+    position: absolute; top: 28px; left: 32px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.95rem; font-weight: 600;
+    color: var(--ink); z-index: 110;
+  }
+  .ios-icons {
+    position: absolute; top: 30px; right: 32px;
+    color: var(--ink);
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110;
+  }
+
+  /* ============================================================
+   *  Dashboard · card stream
+   *  No bottom tab bar. The dashboard IS a list page; we treat
+   *  it like a magazine table-of-contents. 56px masthead + 40px
+   *  sticky filter strip + one continuous scroll of cards.
+   *  Order: needs-attention first → in-flight → shipped → blocked.
+   *  Pipeline-stage information lives on the card itself as
+   *  a stage stamp + kicker, NOT as a section gutter.
+   * ============================================================ */
+
+  .strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    padding: 56px 1rem 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .strip-mark {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 1rem;
+    color: var(--ink);
+    transform: rotate(-1.5deg);
+    border: 2px solid var(--ink);
+    padding: 0.05rem 0.45rem;
+    background: var(--paper);
+  }
+  .strip-mark em { color: var(--red); font-style: italic; }
+  .strip-vol {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faded);
+  }
+  .strip-help {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+
+  .filterbar {
+    position: absolute;
+    top: 56px; left: 0; right: 0;
+    height: 40px;
+    padding: 0.4rem 0.7rem;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 49;
+    display: flex; align-items: center; gap: 0.4rem;
+    overflow-x: auto;
+  }
+  .filterbar::-webkit-scrollbar { display: none; }
+  .findbox {
+    flex-shrink: 0;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    padding: 0.25rem 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    min-width: 7.5rem;
+    display: flex; align-items: center; gap: 0.3rem;
+  }
+  .findbox .icon { color: var(--red); }
+  .chip {
+    flex-shrink: 0;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faded);
+    cursor: pointer;
+  }
+  .chip.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  /* Stream — no bottom tabbar, so body fills bottom edge. */
+  .stream {
+    position: absolute;
+    top: 96px; left: 0; right: 0; bottom: 0;
+    overflow-y: auto;
+    padding: 0.7rem 0.85rem 2rem;
+  }
+
+  /* Section dividers — minimal, magazine-style with display italic */
+  .stream-divider {
+    display: flex; align-items: baseline;
+    gap: 0.5rem;
+    margin: 1.1rem 0 0.55rem;
+  }
+  .stream-divider:first-child { margin-top: 0.2rem; }
+  .stream-divider .label {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.1rem;
+    color: var(--ink);
+  }
+  .stream-divider .meta {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faded);
+  }
+  .stream-divider .rule {
+    flex: 1;
+    border-bottom: 1px solid var(--red);
+    margin-bottom: 0.35rem;
+  }
+
+  /* Cards — each is a self-contained editorial unit */
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    margin-bottom: 0.65rem;
+    padding: 0.7rem 0.85rem 0.7rem 0.95rem;
+    box-shadow: 0 1px 0 rgba(26,22,20,0.04), 0 6px 18px -8px rgba(26,22,20,0.10);
+    position: relative;
+  }
+  .card.in-review  { border-left: 3px solid var(--red); }
+  .card.iterating  { border-left: 3px solid var(--blue); }
+  .card.approved   { border-left: 3px solid var(--green); }
+  .card.shipped    {
+    background: rgba(46, 93, 69, 0.04);
+    border-color: var(--paper-3);
+  }
+  .card.blocked    {
+    background: var(--paper-2);
+    border-style: dashed;
+    opacity: 0.85;
+  }
+
+  .card-kicker {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    display: flex; align-items: baseline; gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+  .card-kicker .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--red);
+    line-height: 1;
+  }
+  .card-kicker .at {
+    color: var(--faded);
+    margin-left: auto;
+    letter-spacing: 0.06em;
+  }
+
+  .card-slug {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+  .card-slug a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--paper-3); }
+  .card-title {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.05rem;
+    line-height: 1.2;
+    margin: 0.18rem 0 0.45rem;
+  }
+  .card-meta {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-bottom: 0.55rem;
+    flex-wrap: wrap;
+  }
+  .stamp {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 14, "wght" 600;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 2px solid currentColor;
+    padding: 0.04rem 0.4rem;
+    transform: rotate(-1.2deg);
+    background: var(--paper);
+    line-height: 1.2;
+    flex-shrink: 0;
+  }
+  .stamp.review { color: var(--red); }
+  .stamp.iterating { color: var(--blue); }
+  .stamp.approved { color: var(--green); }
+  .stamp.published { color: var(--green); border-color: var(--green); transform: rotate(-1deg); }
+  .stamp.blocked { color: var(--faded); }
+
+  .iter-pip {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    text-transform: uppercase;
+  }
+
+  .card-foot {
+    display: flex; gap: 0.35rem;
+    flex-wrap: wrap;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--paper-3);
+  }
+  .act {
+    flex-shrink: 0;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 2px;
+    padding: 0.22rem 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .act.approve { color: var(--green); border-color: var(--green); }
+  .act.iterate { color: var(--blue); border-color: var(--blue); }
+  .act.cancel  { color: var(--faded); }
+  .act.scrap   {
+    color: var(--kraft);
+    border-color: var(--kraft-2);
+    background: var(--kraft-paper);
+    margin-left: auto;
+  }
+  .act.induct  { color: var(--red); border-color: var(--red); }
+
+  /* Press-queue cards — kraft-toned background to differentiate */
+  .card.press-cue {
+    background: var(--kraft-paper);
+    background-image:
+      linear-gradient(135deg, rgba(217, 200, 162, 0.15), transparent 60%);
+  }
+  .card.press-cue .card-kicker { color: var(--kraft); }
+  .card.press-cue .card-kicker .glyph { color: var(--kraft); }
+
+  /* "Channel chip" for press-cue cards */
+  .channel {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--kraft);
+    background: var(--paper);
+    border: 1px solid var(--kraft-2);
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+  }
+  .channel.posted { color: var(--green); border-color: var(--green); }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Dashboard 2 · Card stream.</h1>
+<div class="demo-sub">No tabs · pipeline rows are the primary affordance</div>
+
+<div class="frames">
+
+  <!-- Frame A: top of stream (needs-attention first) -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><em>Press-</em>Check</span>
+          <span class="strip-vol">Vol. 01 · № 12</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+          <button class="chip active">All</button>
+          <button class="chip">Drafting</button>
+          <button class="chip">Final</button>
+          <button class="chip">Published</button>
+        </div>
+
+        <div class="stream">
+
+          <div class="stream-divider">
+            <span class="label">Needs your attention.</span>
+            <span class="meta">3</span>
+            <span class="rule"></span>
+          </div>
+
+          <article class="card in-review">
+            <div class="card-kicker">
+              <span class="glyph">✎</span>
+              <span>Drafting</span>
+              <span class="at">5m ago</span>
+            </div>
+            <div class="card-slug"><a href="#">post-release-acceptance-design</a></div>
+            <div class="card-title">Post-release customer acceptance playbook.</div>
+            <div class="card-meta">
+              <span class="stamp review">In review</span>
+              <span class="iter-pip">it. 02</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <button class="act cancel">cancel ⊘</button>
+              <a class="act scrap" href="#">▦ 4</a>
+            </div>
+          </article>
+
+          <article class="card iterating">
+            <div class="card-kicker">
+              <span class="glyph">✎</span>
+              <span>Drafting</span>
+              <span class="at">12m ago</span>
+            </div>
+            <div class="card-slug"><a href="#">release-skill-design</a></div>
+            <div class="card-title">Release skill design.</div>
+            <div class="card-meta">
+              <span class="stamp iterating">Iterating</span>
+              <span class="iter-pip">it. 03</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <button class="act iterate">iterate →</button>
+              <a class="act scrap" href="#">▦ 2</a>
+            </div>
+          </article>
+
+          <article class="card in-review">
+            <div class="card-kicker">
+              <span class="glyph">✎</span>
+              <span>Drafting · sub</span>
+              <span class="at">42m ago</span>
+            </div>
+            <div class="card-slug"><a href="#">deskwork-plugin/open-issue-tranche-proposal</a></div>
+            <div class="card-title">Open issue tranche proposal.</div>
+            <div class="card-meta">
+              <span class="stamp review">In review</span>
+              <span class="iter-pip">it. 01</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <a class="act scrap" href="#">▦ 0</a>
+            </div>
+          </article>
+
+          <div class="stream-divider">
+            <span class="label">In flight.</span>
+            <span class="meta">5</span>
+            <span class="rule"></span>
+          </div>
+
+          <article class="card">
+            <div class="card-kicker">
+              <span class="glyph">§</span>
+              <span>Planned</span>
+              <span class="at">3d ago</span>
+            </div>
+            <div class="card-slug"><a href="#">deskwork-plugin/issue-158-ux-audit</a></div>
+            <div class="card-title">Issue 158 · UX audit.</div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <button class="act cancel">cancel ⊘</button>
+              <a class="act scrap" href="#">▦ 0</a>
+            </div>
+          </article>
+
+          <article class="card press-cue">
+            <div class="card-kicker">
+              <span class="glyph">▦</span>
+              <span>Press queue · LinkedIn</span>
+              <span class="at">queued</span>
+            </div>
+            <div class="card-slug">v018-mobile-editor</div>
+            <div class="card-title">v0.18 mobile editor — short post.</div>
+            <div class="card-meta">
+              <span class="channel">LinkedIn</span>
+              <span class="channel posted">Reddit · posted</span>
+            </div>
+          </article>
+
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · stream top · "Needs your attention" stamps cards · in-review / iterating left rails · press-queue cards inline (kraft) — no separate sidebar</div>
+  </div>
+
+  <!-- Frame B: scrolled deeper, showing shipped + blocked sections -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><em>Press-</em>Check</span>
+          <span class="strip-vol">Vol. 01 · № 12</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+          <button class="chip">All</button>
+          <button class="chip active">Final</button>
+          <button class="chip">Published</button>
+          <button class="chip">Blocked</button>
+        </div>
+
+        <div class="stream">
+
+          <div class="stream-divider">
+            <span class="label">Final.</span>
+            <span class="meta">1</span>
+            <span class="rule"></span>
+          </div>
+
+          <article class="card approved">
+            <div class="card-kicker">
+              <span class="glyph">⊕</span>
+              <span>Final</span>
+              <span class="at">just now</span>
+            </div>
+            <div class="card-slug"><a href="#">studio-mobile-first</a></div>
+            <div class="card-title">Studio mobile-first.</div>
+            <div class="card-meta">
+              <span class="stamp approved">Approved</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <a class="act scrap" href="#">▦ 1</a>
+            </div>
+          </article>
+
+          <div class="stream-divider">
+            <span class="label">Shipped.</span>
+            <span class="meta">3</span>
+            <span class="rule"></span>
+          </div>
+
+          <article class="card shipped">
+            <div class="card-kicker">
+              <span class="glyph">✦</span>
+              <span>Published</span>
+              <span class="at">2d ago</span>
+            </div>
+            <div class="card-slug"><a href="#">deskwork-plugin/v018-release</a></div>
+            <div class="card-title">deskwork v0.18 — mobile editor.</div>
+            <div class="card-meta">
+              <span class="stamp published">Published</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">view →</a>
+              <a class="act scrap" href="#">▦ 6</a>
+            </div>
+          </article>
+
+          <article class="card shipped">
+            <div class="card-kicker">
+              <span class="glyph">✦</span>
+              <span>Published</span>
+              <span class="at">5d ago</span>
+            </div>
+            <div class="card-slug"><a href="#">deskwork-plugin/v017-mobile-review</a></div>
+            <div class="card-title">deskwork v0.17 — mobile review surface.</div>
+            <div class="card-meta">
+              <span class="stamp published">Published</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">view →</a>
+              <a class="act scrap" href="#">▦ 12</a>
+            </div>
+          </article>
+
+          <div class="stream-divider">
+            <span class="label">Blocked.</span>
+            <span class="meta">1</span>
+            <span class="rule"></span>
+          </div>
+
+          <article class="card blocked">
+            <div class="card-kicker">
+              <span class="glyph">⊘</span>
+              <span>Blocked</span>
+              <span class="at">11d ago</span>
+            </div>
+            <div class="card-slug"><a href="#">analytics-plugin-spike</a></div>
+            <div class="card-title">Analytics plugin · spike.</div>
+            <div class="card-meta">
+              <span class="stamp blocked">Blocked</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <button class="act induct">induct →</button>
+              <a class="act scrap" href="#">▦ 0</a>
+            </div>
+          </article>
+
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · scrolled view · final / shipped / blocked sections · shipped cards greyed (subtle green tint) · blocked card dashed border</div>
+  </div>
+
+</div>
+
+<div style="margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.6;">
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Pattern</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">No bottom-tab-bar at all.</strong> The dashboard's job is to surface a list of editorial units and let the operator act on them. A tab bar that swaps slices of THE SAME underlying list adds chrome that earns no signal — the operator can already see the list. So this direction commits to one continuous magazine-style stream: needs-attention first → in-flight → final → shipped → blocked. <strong style="color: var(--paper); font-style: italic; font-weight: 500;">Each card carries its own stage information</strong> (kicker glyph + label + relative time), so the operator never asks "what stage is this in" — the kicker tells them in 1.5 line-heights.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Order is the affordance</span>"Needs your attention" comes first because that's the work-shape: the operator opens the dashboard to find what they owe a decision on, not to admire the shape of the pipeline. <em style="color: var(--paper);">In flight</em> is everything else still moving through stages. <em style="color: var(--paper);">Shipped</em> and <em style="color: var(--paper);">Blocked</em> are recoverable side-tracks. The stream-divider <em style="color: var(--paper);">"Needs your attention. · 3"</em> reads like a magazine standfirst — Newsreader italic, count-as-meta, red rule under it.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Press queue interleaved</span>The desktop's sidebar press-queue isn't a peer surface here — it's a kind of card. Press-queue cards interleave into the stream where they belong (next to the entry whose channels are queued), with a kraft-toned background and "▦ Press queue · LinkedIn" kicker so the operator knows which kind of card they're looking at. The Channel chips ("LinkedIn" / "Reddit · posted") render the per-channel state without leaving the home page.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">#237 / #238 / #243 fixes</span>56px masthead + 40px filter strip = 96px chrome. Cards are 1-column, all interior text wraps via <em style="color: var(--paper);">overflow-wrap: anywhere</em>; no <em style="color: var(--paper);">auto minmax(0, 1fr) auto auto</em> grid. Pre-review cards simply omit the stamp — no em-dash placeholder.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Strong</span>Direct manipulation. The operator's eyes hit the dashboard, find the three cards under "Needs your attention", tap the first one. No tab-swap, no scrolled stage section. The stream order encodes priority directly. The full bottom of the screen is content — no chrome to dodge with the thumb.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Weak</span>Less continuity with the entry-review surface — the operator's muscle memory expects a bottom tab bar at the dashboard level too. Filter-by-stage now requires the chip strip to do work that tab swap did before; if the chip strip becomes the primary stage filter, it deserves a <em style="color: var(--paper);">multi-select</em> mode (currently single-select) which adds complexity. Card height on long titles can push 4-card screens to 3 cards — the density of the existing pipeline-row layout is harder to match.</p>
+</div>
+
+</body>
+</html>

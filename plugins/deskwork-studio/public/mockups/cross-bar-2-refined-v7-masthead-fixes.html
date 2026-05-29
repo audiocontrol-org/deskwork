@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cross-bar 2 refined v7 · masthead fixes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+CROSS-BAR 2 (SPLIT BAR) · REFINED v7
+fix strikethrough · popover menu (anchored under ⋮)
+============================================================
+
+OPERATOR'S CATCHES (about v6)
+  1. The red horizontal rule reads as a strikethrough —
+     literally cutting through the ⋮ stacked-dots glyph.
+     Cause: align-items: end on the grid + align-self: end
+     on the glyphs put them at the SAME vertical position as
+     the border-bottom rule.
+  2. The ⋮ sits LOWER than the rest of the masthead items.
+     Same cause — bottom-aligned.
+  3. The menu sheet rises from the bottom of the screen but
+     the ⋮ trigger is at the top. Visually disconnected and
+     jarring. Top-anchored affordances should reveal
+     popovers anchored UNDER the trigger (Apple HIG, Material
+     Design, every native iOS app's nav-bar More menu).
+
+WHAT v7 FIXES
+  Fix A · Vertical alignment
+    Switch align-items + align-self from `end` to `center`.
+    Glyphs vertically center in the masthead's content area,
+    flanking the text stack from baseline-to-baseline rather
+    than from bottom edge.
+
+  Fix B · Border-bottom clearance
+    Increase masthead bottom padding so the border-bottom
+    rule (where it exists) is drawn safely below ALL content.
+    No element overlaps any rule.
+
+  Fix C · Popover menu (replaces slide-up sheet)
+    The masthead's ⋮ opens a dropdown popover anchored UNDER
+    the glyph, not a sheet sliding up from the bottom. The
+    popover has an up-pointing arrow registered to the ⋮'s
+    horizontal position. Same dismiss patterns as the v0.20
+    row ⋮ popover: scrim tap, ⋮ tap-again, Escape.
+
+  This is the SAME popover idiom already used by the v0.20
+  dashboard-row ⋮. The masthead and row affordances now
+  share BOTH the glyph AND the reveal mechanism — fully
+  consistent vocabulary. Phase 2.1's createSlideUpSheet
+  primitive is still used for bar-triggered sheets (Actions,
+  Outline, Notes); the masthead menu does not use it.
+
+WHAT STAYS FROM v6
+  · Streamlined 3-column masthead (back · center · menu)
+  · Single-glyph back (←) + menu (⋮)
+  · Paper-flat glyphs (no borders, no backgrounds)
+  · Meta data inline in kicker
+  · Star nav, bar geometry, all settled architecture
+
+WHY THE POPOVER PATTERN MATTERS
+  Top-anchored sheets that emerge from the bottom violate the
+  user's spatial model: "I tapped here, why is the menu over
+  there?" Bottom-anchored sheets work because they emerge
+  from the trigger (compose chip → compose sheet; entry-review
+  mobile-bar tab → action sheet). The menu trigger lives at
+  the top, so its reveal must emerge from the top.
+
+  This is iOS HIG's "menus and popovers" pattern:
+  https://developer.apple.com/design/human-interface-guidelines/menus
+
+  Apple's native "More options" affordance in Mail / Safari /
+  any nav-bar uses exactly this pattern: a popover with an
+  arrow pointing up at the trigger glyph. We mirror it.
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --ink-soft: #4A3F35;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: #C7BEAE; font-family: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+  body { max-width: 1180px; margin: 0 auto; }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.8rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.5rem; text-align: center; }
+  .banner {
+    max-width: 880px; margin: 0 auto 2.5rem;
+    padding: 1.05rem 1.3rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--green);
+    font-family: var(--display); font-size: 0.96rem; line-height: 1.6;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--green); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+  .banner blockquote {
+    margin: 0.5rem 0 0.7rem 1rem;
+    padding-left: 0.8rem;
+    border-left: 2px solid var(--red);
+    font-style: italic; color: var(--paper);
+  }
+
+  h2.section {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.5rem; color: var(--paper);
+    margin: 3rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--red);
+    display: flex; align-items: baseline; gap: 1rem;
+  }
+  h2.section .num {
+    font-family: var(--mono); font-style: normal;
+    font-size: 0.7rem; letter-spacing: 0.16em;
+    color: var(--red); text-transform: uppercase;
+  }
+  .section-lede {
+    color: #C7BEAE; font-size: 0.96rem; line-height: 1.6;
+    margin-bottom: 1.5rem; max-width: 800px;
+  }
+  .section-lede em { color: var(--paper); font-style: italic; }
+  .section-lede code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+
+  /* ============ PHONE FRAME ============ */
+  .phone { width: 410px; height: 820px; background: #050505;
+           border-radius: 50px; padding: 12px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; flex-shrink: 0; }
+  .phone::before { content: ''; position: absolute;
+                   top: 22px; left: 50%; transform: translateX(-50%);
+                   width: 110px; height: 30px; background: #000;
+                   border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 38px; overflow: hidden; position: relative;
+            font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.95rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* ============ v7 MASTHEAD ============ */
+  .v7-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 102px;                    /* +20px from v6 — content area gets breathing room */
+    padding: 56px 0.95rem 14px;       /* 14px bottom clearance (was 9px in v6) */
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 24px 1fr 24px;
+    column-gap: 0.85rem;
+    align-items: center;              /* CHANGED from 'end' */
+  }
+  .v7-masthead.dashboard {
+    border-bottom: 1px solid var(--red);
+    /* Desk has no back-link — collapse to 2-column grid so the
+       center stack gets the full width (v6 had this; v7 lost it
+       in the rewrite, which caused severe truncation on Desk
+       where .v7-center was being crammed into a 24px back-glyph
+       column instead of the 1fr center column). */
+    grid-template-columns: 1fr 24px;
+  }
+  .v7-back {
+    align-self: center;               /* CHANGED from 'end' */
+    text-decoration: none;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 32, "wght" 500;
+    font-size: 1.35rem; line-height: 1;
+    color: var(--blue);
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 12px 8px;
+    margin: -12px -8px;               /* expanded tap target */
+  }
+  .v7-back:hover, .v7-back:focus-visible {
+    color: var(--ink); outline: none;
+  }
+  .v7-center { min-width: 0; align-self: center; }
+  .v7-kicker {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--red);
+    line-height: 1.3;
+    margin-bottom: 0.18rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .v7-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.06rem 0.32rem;
+    margin-right: 0.32rem;
+    letter-spacing: 0.18em; font-size: 0.5rem;
+  }
+  .v7-kicker .dim { color: var(--faded); }
+  .v7-kicker .sep { color: var(--paper-3); margin: 0 0.32rem; font-weight: 400; }
+  .v7-slug {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    line-height: 1.1;
+  }
+  .v7-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.2rem; line-height: 1.1; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .v7-menu {
+    align-self: center;               /* CHANGED from 'end' */
+    text-decoration: none;
+    font-family: var(--mono); font-size: 1.2rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ink-soft);
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    padding: 12px 8px;
+    margin: -12px -8px;
+    position: relative;               /* anchor for popover */
+  }
+  .v7-menu:hover, .v7-menu:focus-visible {
+    color: var(--red); outline: none;
+  }
+  .v7-menu.popover-open {
+    color: var(--red);
+  }
+
+  /* ============ POPOVER MENU (replaces slide-up sheet) ============ */
+  .popover-scrim {
+    position: absolute; inset: 0;
+    background: rgba(26, 22, 20, 0.22);   /* lighter than slide-up sheet scrim */
+    z-index: 70;
+    border-radius: 38px;
+  }
+  .v7-popover {
+    position: absolute;
+    top: 92px;                            /* anchored just under masthead, near ⋮ */
+    right: 0.7rem;
+    width: 270px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border: 1px solid var(--paper-3);
+    border-radius: 3px;
+    box-shadow:
+      0 12px 30px rgba(26, 22, 20, 0.22),
+      0 3px 8px rgba(26, 22, 20, 0.12);
+    z-index: 80;
+    display: flex; flex-direction: column;
+  }
+  .v7-popover::before {
+    content: '';
+    position: absolute;
+    top: -7px;
+    right: 16px;                          /* registered to the ⋮ glyph's x-coord */
+    width: 12px; height: 12px;
+    background: var(--paper);
+    border-top: 1px solid var(--paper-3);
+    border-left: 1px solid var(--paper-3);
+    transform: rotate(45deg);
+  }
+  .v7-popover .popover-section {
+    padding: 0.2rem 0;
+    border-bottom: 1px dotted var(--paper-3);
+  }
+  .v7-popover .popover-section:last-child { border-bottom: 0; }
+  .v7-popover .popover-section-label {
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--faded);
+    padding: 0.5rem 0.85rem 0.25rem;
+  }
+  .v7-popover .popover-item {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr auto;
+    align-items: center;
+    column-gap: 0.65rem;
+    padding: 0.55rem 0.85rem;
+    text-decoration: none; cursor: pointer;
+  }
+  .v7-popover .popover-item:hover, .v7-popover .popover-item:focus-visible {
+    background: var(--paper-2); outline: none;
+  }
+  .v7-popover .popover-item-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.05rem; line-height: 1;
+    font-variation-settings: "opsz" 20, "wght" 500;
+    color: var(--red); text-align: center;
+  }
+  .v7-popover .popover-item-glyph.kraft { color: var(--kraft); }
+  .v7-popover .popover-item-glyph.blue { color: var(--blue); }
+  .v7-popover .popover-item-label {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 20, "wght" 500;
+    font-size: 0.92rem; color: var(--ink); line-height: 1.15;
+  }
+  .v7-popover .popover-item-route {
+    display: block;
+    font-family: var(--mono); font-size: 0.52rem;
+    color: var(--faded); letter-spacing: 0.06em;
+    margin-top: 0.1rem;
+  }
+  .v7-popover .popover-item-arrow {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--paper-3); flex-shrink: 0;
+  }
+  .v7-popover .popover-item-arrow.external { color: var(--blue); }
+  .v7-popover .popover-item-future { opacity: 0.5; }
+  .v7-popover .popover-item-future-tag {
+    font-family: var(--mono); font-size: 0.48rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--kraft);
+  }
+
+  /* ============ BEFORE/AFTER ============ */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  @media (max-width: 900px) { .compare { grid-template-columns: 1fr; } }
+  .compare-side {
+    background: rgba(245, 241, 232, 0.04);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    padding: 1.1rem 1.2rem;
+    border-radius: 4px;
+  }
+  .compare-side h4 {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    color: var(--paper); font-weight: normal;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.15);
+    padding-bottom: 0.5rem;
+  }
+  .compare-side.winner {
+    border-color: rgba(46, 93, 69, 0.5);
+    background: rgba(46, 93, 69, 0.06);
+  }
+  .compare-side.winner h4 { color: var(--green); }
+  .compare-side.loser {
+    border-color: rgba(184, 54, 42, 0.4);
+    background: rgba(184, 54, 42, 0.04);
+  }
+  .compare-side.loser h4 { color: var(--red); }
+  .compare-side .demo {
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 4px;
+    overflow: visible;
+    margin-bottom: 0.8rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    position: relative;
+  }
+  .compare-side .demo-body {
+    height: 60px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--faded);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .compare-side .note {
+    font-family: var(--display); font-size: 0.88rem; line-height: 1.5;
+    color: #C7BEAE;
+  }
+  .compare-side .note em { color: var(--paper); font-style: italic; }
+  .compare-side .note code { font-family: var(--mono); font-size: 0.78rem; color: var(--paper); }
+  .compare-side .note strong {
+    font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--paper); font-weight: 500;
+    display: block; margin-bottom: 0.3rem;
+  }
+
+  /* v6 replica (broken) for comparison */
+  .v6-replica {
+    height: 76px; padding: 0.5rem 0.9rem;
+    display: grid;
+    grid-template-columns: 22px 1fr 22px;
+    column-gap: 0.7rem;
+    align-items: end;                 /* THE BUG */
+    border-bottom: 1px solid var(--red);
+  }
+  .v6-replica .back-glyph,
+  .v6-replica .menu-glyph {
+    align-self: end;                  /* THE BUG */
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+  }
+  .v6-replica .back-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.2rem; color: var(--blue);
+  }
+  .v6-replica .menu-glyph {
+    font-family: var(--mono); font-size: 1.1rem;
+    color: var(--ink-soft); font-weight: 600;
+  }
+  .v6-replica .center { min-width: 0; }
+  .v6-replica .kicker {
+    font-family: var(--mono); font-size: 0.52rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--red);
+    line-height: 1.3; margin-bottom: 0.1rem;
+  }
+  .v6-replica .slug {
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink);
+    line-height: 1.1;
+  }
+
+  /* v7 replica (fixed) */
+  .v7-replica {
+    height: 86px; padding: 0.7rem 0.9rem 0.9rem;
+    display: grid;
+    grid-template-columns: 24px 1fr 24px;
+    column-gap: 0.85rem;
+    align-items: center;              /* FIXED */
+    border-bottom: 1px solid var(--red);
+  }
+  .v7-replica .back-glyph,
+  .v7-replica .menu-glyph {
+    align-self: center;               /* FIXED */
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+  }
+  .v7-replica .back-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.3rem; color: var(--blue);
+  }
+  .v7-replica .menu-glyph {
+    font-family: var(--mono); font-size: 1.2rem;
+    color: var(--ink-soft); font-weight: 600;
+  }
+  .v7-replica .center { min-width: 0; align-self: center; }
+  .v7-replica .kicker {
+    font-family: var(--mono); font-size: 0.54rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--red);
+    line-height: 1.3; margin-bottom: 0.12rem;
+  }
+  .v7-replica .slug {
+    font-family: var(--mono); font-size: 0.74rem; color: var(--ink);
+    line-height: 1.1;
+  }
+
+  /* ============ BAR ============ */
+  .surface-body {
+    position: absolute; top: 102px; left: 0; right: 0; bottom: 56px;
+    overflow-y: auto;
+  }
+  .surface-body.no-bar { bottom: 0; }
+  .surface-body .rv-body { padding: 1rem 1.1rem 1.3rem; }
+  .rv-body h1 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.5rem; line-height: 1.15;
+    margin-bottom: 0.4rem; color: var(--ink);
+  }
+  .rv-body .dek {
+    font-family: var(--display); font-size: 0.95rem;
+    color: var(--faded); margin-bottom: 1rem;
+    line-height: 1.4;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.7rem;
+  }
+  .rv-body p {
+    font-family: var(--display); font-size: 0.96rem;
+    line-height: 1.55; margin-bottom: 0.8rem; color: var(--ink);
+  }
+  .rv-body h2 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.1rem; line-height: 1.2;
+    color: var(--red); margin: 1.3rem 0 0.5rem;
+  }
+  .rv-body em { font-style: italic; color: var(--red); }
+  .rv-body .pin {
+    display: inline-block; width: 1rem; height: 1rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.55rem;
+    border-radius: 50%; text-align: center; line-height: 1rem;
+    margin-left: 0.2rem; vertical-align: super;
+  }
+  .phone-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 60;
+  }
+  .split-bar {
+    height: 56px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    display: grid;
+    grid-template-columns: var(--cols, repeat(5, 1fr));
+    box-shadow: 0 -2px 6px rgba(26, 22, 20, 0.05);
+  }
+  .bar-cell {
+    background: transparent; border: none;
+    border-right: 1px solid var(--paper-3);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    font-weight: 500;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.12rem;
+    line-height: 1;
+    cursor: pointer; text-decoration: none;
+    padding: 0.35rem 0.18rem;
+    position: relative;
+    min-width: 0;
+  }
+  .bar-cell:last-child { border-right: 0; }
+  .bar-cell-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .bar-cell.iterate .bar-cell-glyph { color: var(--blue); }
+  .bar-cell.approve .bar-cell-glyph { color: var(--green); }
+  .bar-cell.cancel  .bar-cell-glyph { color: var(--red); }
+  .bar-cell.context-tab .bar-cell-glyph { color: var(--faded); }
+  .bar-cell .badge {
+    position: absolute;
+    top: 0.18rem; right: 0.22rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.45rem;
+    padding: 0 0.16rem;
+    border-radius: 1px; line-height: 1.2;
+    letter-spacing: 0;
+  }
+  .bar-cell .badge.kraft { background: var(--kraft); }
+
+  .hardcase-row {
+    display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;
+    margin-top: 1.5rem;
+  }
+  .caption {
+    color: #C7BEAE; font-family: var(--mono);
+    font-size: 0.65rem; letter-spacing: 0.16em;
+    text-transform: uppercase; margin-top: 0.8rem;
+    text-align: center; max-width: 410px; line-height: 1.55;
+  }
+  .caption strong { color: var(--paper); }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+
+  /* ============ CALLOUTS ============ */
+  .callout {
+    margin-top: 1rem;
+    padding: 0.95rem 1.2rem;
+    background: rgba(245, 241, 232, 0.05);
+    border-left: 3px solid var(--red);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.95rem; line-height: 1.6;
+  }
+  .callout.green { border-left-color: var(--green); }
+  .callout.kraft { border-left-color: var(--kraft); }
+  .callout.blue  { border-left-color: var(--blue); }
+  .callout strong {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper); display: block; margin-bottom: 0.4rem;
+    font-weight: normal;
+  }
+  .callout em { color: var(--paper); font-style: italic; }
+  .callout code { font-family: var(--mono); font-size: 0.82rem; color: var(--paper); }
+  .callout ul { padding-left: 1.2rem; margin-top: 0.45rem; }
+  .callout li { margin-bottom: 0.3rem; }
+
+  /* highlight overlay to point at the issue in v6 replica */
+  .annotation {
+    position: absolute;
+    pointer-events: none;
+    font-family: var(--mono); font-size: 0.52rem;
+    color: var(--red);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    background: rgba(184, 54, 42, 0.12);
+    border: 1px dashed var(--red);
+    border-radius: 2px;
+    padding: 0.18rem 0.4rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">Cross-bar 2 · refined v7 · masthead fixes.</h1>
+<div class="demo-sub">Center-align glyphs · border clears all content · popover menu anchored under ⋮ (not slide-up sheet)</div>
+
+<div class="banner">
+  <span class="kicker">Cross-bar 2 refinement v7 · operator's catches</span>
+  <blockquote>
+    "The red horizontal line reads as a strikethrough — especially where it literally strikes through the stacked dots affordance. I don't understand why the stacked dots affordance is lower than the rest of the items on the masthead. And, if we keep the red horizontal line, we need to make sure it doesn't pass through any other elements. And re the menu sheet: it's weird that the menu sheet affordance is at the top of the screen but it rises from the bottom of the screen."
+  </blockquote>
+  Both right. v6 used <code>align-items: end</code> on the masthead grid, which dropped the side glyphs to the SAME vertical position as the border-bottom rule — strikethrough. And v6 used <code>createSlideUpSheet</code> for the masthead menu, which violates the spatial model (top-anchored trigger, bottom-anchored reveal). v7 fixes both: glyphs vertically center in the masthead's content area, with the border-bottom safely below all content; the menu becomes a <em>dropdown popover anchored under the ⋮</em> — the same idiom already used by the v0.20 dashboard-row ⋮ overflow menu.
+</div>
+
+<!-- ============================================================
+     SECTION 1: ALIGNMENT FIX
+============================================================ -->
+<h2 class="section"><span class="num">§ 1</span> Fix · glyph alignment + border clearance</h2>
+<p class="section-lede">
+  v6's <code>align-items: end</code> dropped glyphs to the bottom of the masthead grid track — right where the border-bottom is drawn. v7 switches to <code>align-items: center</code> with increased bottom padding so the border has clearance below all content.
+</p>
+
+<div class="compare">
+
+  <div class="compare-side loser">
+    <h4>v6 (broken) · align-items: end</h4>
+    <div class="demo">
+      <div class="v6-replica">
+        <div class="back-glyph" style="color: var(--blue);">←</div>
+        <div class="center">
+          <div class="kicker">entry · drafting · № 12 · v3 · 2h</div>
+          <div class="slug">studio-mobile-first-prd</div>
+        </div>
+        <div class="menu-glyph">⋮</div>
+      </div>
+      <div class="annotation" style="bottom: 22px; right: 50px;">⋮ struck through</div>
+      <div class="demo-body">(article body)</div>
+    </div>
+    <div class="note">
+      <strong>The bug</strong>
+      Glyphs aligned to bottom of grid track → SAME y-coord as the red border-bottom rule → border strikes through them. The center stack (kicker + slug) is bottom-aligned too, so the slug butts up against the rule.
+    </div>
+  </div>
+
+  <div class="compare-side winner">
+    <h4>v7 (fixed) · align-items: center</h4>
+    <div class="demo">
+      <div class="v7-replica">
+        <div class="back-glyph">←</div>
+        <div class="center">
+          <div class="kicker">entry · drafting · № 12 · v3 · 2h</div>
+          <div class="slug">studio-mobile-first-prd</div>
+        </div>
+        <div class="menu-glyph">⋮</div>
+      </div>
+      <div class="demo-body">(article body)</div>
+    </div>
+    <div class="note">
+      <strong>The fix</strong>
+      Glyphs vertically center with the text stack. Masthead bottom padding increased to 14px (was 9px) so the border-bottom is drawn well below ALL content. No element overlaps the rule.
+    </div>
+  </div>
+
+</div>
+
+<div class="callout green">
+  <strong>What changed in CSS</strong>
+  <ul>
+    <li><code>.v7-masthead</code> · <code>align-items: end → center</code></li>
+    <li><code>.v7-back</code>, <code>.v7-menu</code>, <code>.v7-center</code> · <code>align-self: end → center</code></li>
+    <li><code>.v7-masthead</code> · height <code>82px → 102px</code> (more content breathing room) and <code>padding-bottom 0.55rem → 14px</code> (clearance for border)</li>
+    <li>Both glyphs grow slightly: <code>22px → 24px</code> tap base; back <code>1.25rem → 1.35rem</code>, menu <code>1.15rem → 1.2rem</code></li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     SECTION 2: POPOVER MENU
+============================================================ -->
+<h2 class="section"><span class="num">§ 2</span> Fix · popover anchored under ⋮ (not slide-up sheet)</h2>
+<p class="section-lede">
+  v6 used the Phase 2.1 slide-up sheet for the masthead menu. That violates the user's spatial model: trigger at the top, reveal from the bottom. v7 uses a <em>dropdown popover anchored UNDER the ⋮</em> with an up-pointing arrow registered to the glyph's x-position. Same idiom as the v0.20 dashboard-row ⋮ — fully consistent vocabulary.
+</p>
+
+<div class="callout blue">
+  <strong>The Apple HIG pattern we're matching</strong>
+  iOS / macOS: any nav-bar "More options" affordance opens a popover with an arrow pointing at the trigger. Examples: Mail's More menu, Safari's tab actions, every native iOS app's nav-bar overflow. The popover emerges <em>from</em> the trigger spatially. Slide-up sheets are for bottom-toolbar affordances or modal-style content. The two patterns are not interchangeable.
+  <br><br>
+  Phase 2.1's <code>createSlideUpSheet</code> stays in use for bar-triggered sheets (Actions / Outline / Notes / Format / Compose). The masthead menu doesn't use it — it uses a positioned-absolute popover with the same dismiss patterns (scrim tap, ESC, trigger tap-again).
+</div>
+
+<!-- ============================================================
+     SECTION 3: THREE PHONE FRAMES
+============================================================ -->
+<h2 class="section"><span class="num">§ 3</span> Three surfaces · the fixed masthead</h2>
+<p class="section-lede">
+  Desk · entry-review · shortform review with menu popover open. Look for: (a) no strikethrough; (b) glyphs aligned with the text stack; (c) popover anchored UNDER the ⋮ with the arrow pointing up at it.
+</p>
+
+<div class="hardcase-row">
+
+  <!-- Desk -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:48</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v7-masthead dashboard">
+        <div class="v7-center">
+          <div class="v7-kicker">The compositor's desk <span class="sep">·</span> <span class="dim">17 longform · 7 shortform</span></div>
+          <div class="v7-title">Pipeline + Press.</div>
+        </div>
+        <a class="v7-menu" href="#" title="Studio menu">⋮</a>
+      </div>
+
+      <div class="surface-body no-bar">
+        <div style="padding: 0.5rem 0;">
+          <div style="background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
+                      border-top: 1px solid var(--paper-3);
+                      padding: 0.55rem 1rem;
+                      font-family: var(--mono); font-size: 0.6rem;
+                      letter-spacing: 0.18em; text-transform: uppercase;
+                      color: var(--red);">
+            ☰ Longform pipeline <span style="color: var(--faded); letter-spacing: 0.12em;">· 17 entries</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 22, 'wght' 500;
+                         font-size: 1.1rem; color: var(--red); text-align: center;">✎</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">Drafting</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">5</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--red); text-align: center;">›</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      border-bottom: 1px dashed var(--paper-3);
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 22, 'wght' 500;
+                         font-size: 1.1rem; color: var(--red); text-align: center;">※</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">Final</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">4</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--red); text-align: center;">›</span>
+          </div>
+          <div style="background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
+                      border-top: 1px solid var(--paper-3);
+                      padding: 0.55rem 1rem;
+                      font-family: var(--mono); font-size: 0.6rem;
+                      letter-spacing: 0.18em; text-transform: uppercase;
+                      color: var(--blue);
+                      margin-top: 0.75rem;">
+            ⊟ Shortform · by platform <span style="color: var(--faded); letter-spacing: 0.12em;">· 7 workflows</span>
+          </div>
+          <div style="background: var(--paper); padding: 0.5rem 1rem;
+                      display: grid; grid-template-columns: 1.4rem 1fr auto 1.2rem;
+                      align-items: center; gap: 0.5rem; min-height: 42px;">
+            <span style="background: var(--red); color: var(--paper);
+                         font-family: var(--mono); font-size: 0.5rem;
+                         padding: 0.06rem 0.32rem;
+                         letter-spacing: 0.12em;">in</span>
+            <span style="font-family: var(--display); font-style: italic;
+                         font-variation-settings: 'opsz' 18, 'wght' 500;
+                         font-size: 0.95rem;">LinkedIn</span>
+            <span style="font-family: var(--mono); font-size: 0.58rem;
+                         color: var(--faded); text-transform: uppercase;"><span style="color: var(--ink); font-weight: 500;">3</span></span>
+            <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--blue); text-align: center;">›</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="position: absolute; bottom: 16px; right: 16px; z-index: 65;
+                  background: var(--red); color: var(--paper);
+                  border: 1px solid var(--red); border-radius: 2px;
+                  padding: 0.5rem 0.75rem;
+                  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+                              0 4px 12px rgba(184, 54, 42, 0.28),
+                              0 1px 3px rgba(0,0,0,0.18);
+                  font-family: var(--mono); font-size: 0.6rem;
+                  font-weight: 500; letter-spacing: 0.16em;
+                  text-transform: uppercase;
+                  display: inline-flex; align-items: center; gap: 0.35rem;
+                  line-height: 1;">
+        <span style="font-family: var(--mono); font-size: 0.85rem; font-weight: 600;">+</span>
+        <span>Compose</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Desk · masthead at rest.</strong><br>
+    Red rule clears below the italic title.<br>
+    ⋮ vertically centered. Compose floats (v0.19 unchanged).
+  </div>
+  </div>
+
+  <!-- Entry-review with popover OPEN -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v7-masthead">
+        <a class="v7-back" href="#" title="Back to Desk">←</a>
+        <div class="v7-center">
+          <div class="v7-kicker">entry · drafting · № 12 <span class="sep">·</span> <span class="dim">v3 · 2h</span></div>
+          <div class="v7-slug">studio-mobile-first-prd</div>
+        </div>
+        <a class="v7-menu popover-open" href="#" title="Studio menu">⋮</a>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>Studio mobile-first — PRD.</h1>
+          <p class="dek">Extend the press-check vocabulary across every studio surface.</p>
+          <h2>Problem</h2>
+          <p>The dashboard, shortform desk, and review surfaces all ship desktop-shaped CSS.<span class="pin">3</span></p>
+          <p>The v0.17 + v0.18 entry-review rebuild proved that press-check on mobile reads beautifully.<span class="pin">5</span></p>
+        </div>
+      </div>
+
+      <div class="popover-scrim"></div>
+
+      <div class="v7-popover">
+        <div class="popover-section">
+          <div class="popover-section-label">Operator help</div>
+          <a class="popover-item" href="/dev/editorial-help">
+            <span class="popover-item-glyph">§</span>
+            <span>
+              <span class="popover-item-label">Manual</span>
+              <span class="popover-item-route">/dev/editorial-help</span>
+            </span>
+            <span class="popover-item-arrow">›</span>
+          </a>
+          <a class="popover-item" href="#">
+            <span class="popover-item-glyph blue">⌘</span>
+            <span>
+              <span class="popover-item-label">Keyboard shortcuts</span>
+              <span class="popover-item-route">opens overlay</span>
+            </span>
+            <span class="popover-item-arrow">›</span>
+          </a>
+        </div>
+        <div class="popover-section">
+          <div class="popover-section-label">Configure</div>
+          <a class="popover-item popover-item-future" href="#">
+            <span class="popover-item-glyph kraft">⊞</span>
+            <span>
+              <span class="popover-item-label">Configure studio</span>
+              <span class="popover-item-route">.deskwork/config.json <span class="popover-item-future-tag">phase 4</span></span>
+            </span>
+            <span class="popover-item-arrow">›</span>
+          </a>
+        </div>
+        <div class="popover-section">
+          <div class="popover-section-label">Connect</div>
+          <a class="popover-item" href="https://github.com/audiocontrol-org/deskwork/issues/new">
+            <span class="popover-item-glyph blue">✎</span>
+            <span>
+              <span class="popover-item-label">File an issue</span>
+              <span class="popover-item-route">github · new tab ↗</span>
+            </span>
+            <span class="popover-item-arrow external">↗</span>
+          </a>
+          <a class="popover-item" href="#">
+            <span class="popover-item-glyph">❡</span>
+            <span>
+              <span class="popover-item-label">About deskwork</span>
+              <span class="popover-item-route">v0.21.0 · GPL-3.0 · thesis</span>
+            </span>
+            <span class="popover-item-arrow">›</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(5, 1fr);">
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">§</span><span>Outl.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">✎</span><span>Notes</span><span class="badge">5</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">▦</span><span>Scrap</span><span class="badge kraft">3</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊕</span><span>Acts.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">5</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Entry-review · popover OPEN.</strong><br>
+    Popover emerges from the ⋮; up-arrow registered to glyph's x-coord.<br>
+    Light scrim dims body. Tap outside or ⋮ again to close.
+  </div>
+  </div>
+
+  <!-- Shortform review at rest -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="v7-masthead">
+        <a class="v7-back" href="#" title="Back to Desk">←</a>
+        <div class="v7-center">
+          <div class="v7-kicker">
+            <span class="platform">linkedin</span>deskwork-blog <span class="sep">·</span> <span class="dim">№ 03</span>
+          </div>
+          <div class="v7-slug">v021-mobile-first-shortform</div>
+        </div>
+        <a class="v7-menu" href="#" title="Studio menu">⋮</a>
+      </div>
+
+      <div class="surface-body">
+        <div class="rv-body">
+          <h1>What I learned shipping mobile-first.</h1>
+          <p class="dek">Three iterations on the state-stamp pattern; what finally worked was retiring it on mobile.</p>
+          <p>Press-check vocabulary, take three.</p>
+          <p>The first iterations leaned on rotated rubber stamps — they read on desktop where stamps spread horizontally, but on mobile they cluster.</p>
+          <p>Letterpress tags were no better.</p>
+        </div>
+      </div>
+
+      <div class="phone-bar">
+        <nav class="split-bar" style="--cols: repeat(5, 1fr);">
+          <button class="bar-cell iterate"><span class="bar-cell-glyph">↻</span><span>Iter.</span></button>
+          <button class="bar-cell approve"><span class="bar-cell-glyph">✓</span><span>Apprv.</span></button>
+          <button class="bar-cell cancel"><span class="bar-cell-glyph">⊘</span><span>Canc.</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">№</span><span>Vers.</span><span class="badge kraft">3</span></button>
+          <button class="bar-cell context-tab"><span class="bar-cell-glyph">⊟</span><span>TOC</span><span class="badge">2</span></button>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Shortform · at rest.</strong><br>
+    No strikethrough. Both glyphs centered with the text stack.<br>
+    Border-bottom rule clear of all content.
+  </div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     SECTION 4: WHAT v7 SETTLES
+============================================================ -->
+<h2 class="section"><span class="num">§ 4</span> What v7 settles</h2>
+
+<div class="callout green">
+  <strong>v7 specs (revisions to v5/v6 standards draft)</strong>
+  <ul>
+    <li><em>Masthead alignment:</em> <code>align-items: center</code> on the masthead grid + <code>align-self: center</code> on side glyphs and center stack. No element overlaps any border rule.</li>
+    <li><em>Masthead height:</em> 102px on mobile (was 82px), giving content area more breathing room.</li>
+    <li><em>Masthead bottom padding:</em> 14px clearance between content and border-bottom.</li>
+    <li><em>Menu reveal:</em> dropdown popover anchored UNDER the ⋮, with up-arrow registered to glyph's x-coord. Position: <code>top: 92px; right: 0.7rem; width: 270px;</code> The popover does NOT use Phase 2.1's <code>createSlideUpSheet</code> — it's a simple positioned-absolute element with scrim + dismiss handlers.</li>
+    <li><em>⋮ vocabulary unified:</em> Both the v0.20 row ⋮ and the v7 masthead ⋮ use the same glyph AND the same reveal pattern (popover, not sheet). One vocabulary across the studio.</li>
+  </ul>
+</div>
+
+<div class="callout">
+  <strong>Carried unchanged from earlier refinements</strong>
+  Star navigation architecture (v4); zero nav region in bar (v4); contextual cells cap at 6 (v4); Desk absorbs shortform-by-platform + future Folio/Files tiles (v4); back-link is single italic-display ← in proof-blue (v6); meta data folds into kicker inline (v6); compose stays as Dashboard floating chip (v0.19); Manual + Studio index drop the bar entirely (v4); menu sections — Operator help / Configure / Connect (v5).
+</div>
+
+<div class="callout">
+  <strong>Remaining picks (carried forward)</strong>
+  <ul>
+    <li>Shortform desk URL disposition (retire or deep-link mirror).</li>
+    <li>Menu section/item order tweaks.</li>
+    <li>Shortform review's contextual region — pick Shortform-1, Shortform-2, or Shortform-3 idiom.</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     SECTION 5: STANDARDS UPDATE (revised from v5/v6)
+============================================================ -->
+<h2 class="section"><span class="num">§ 5</span> Standards update · revised from v5+v6</h2>
+
+<div class="callout green">
+  <strong>The "§ Studio navigation model" section gets three more edits</strong>
+  <ul>
+    <li><em>Glyph alignment</em>: <em>"Both the back and menu glyphs vertically center with the masthead's content stack. The masthead's bottom-border rule, where present, is drawn with clearance below all content — no element overlaps any rule."</em></li>
+    <li><em>Menu reveal pattern</em>: <em>"The masthead's ⋮ opens a dropdown popover anchored under the glyph, with an up-pointing arrow registered to the glyph's x-position. The popover is dismissed by scrim tap, ⋮ tap-again, or Escape. The masthead menu does NOT use Phase 2.1's <code>createSlideUpSheet</code> — that primitive is reserved for bottom-anchored affordances (bar-triggered sheets, Compose chip)."</em></li>
+    <li><em>⋮ vocabulary</em>: <em>"⋮ is the studio's universal overflow affordance. It appears in two scopes: dashboard-row level (row options popover, v0.20) and masthead level (studio menu popover, v7). Both use the same glyph AND the same reveal pattern. Operators parse the scope by location."</em></li>
+  </ul>
+</div>
+
+</body>
+</html>
