@@ -320,10 +320,10 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 > **Phase 2 follow-up (from code-quality review 2026-05-27, I-1):** `listAvailablePipelineTemplates` returns id strings without pre-validating each template. The picker UI in this task surfaces ids that may fail to load when selected (e.g. an operator-authored `.deskwork/pipelines/<id>.json` with malformed JSON). Add an acceptance criterion that selection-time load errors surface as an inline error message naming the offending file path + the specific failure (parse / Zod / id-mismatch). Do NOT silently filter the picker; the operator should see "this id exists but won't load — fix it" rather than "this id is missing." See `packages/core/src/pipelines/loader.ts` for the thrown error shapes the UI should render.
 
-- [ ] Step 6.4.1: Server-render page at `/dev/pipelines/` listing every template with view / edit / create / delete buttons.
-- [ ] Step 6.4.2: Pipeline-editor form: visualize linearStages as a horizontal flow with `lockedStages` and `offPipelineStages` distinguished by chrome; operator can add / rename / remove / reorder stages.
-- [ ] Step 6.4.3: Each save action clipboard-copies the equivalent `/deskwork:pipeline` invocation.
-- [ ] Step 6.4.4: Delete refused when any lane references the template; surfaces the dependent lanes.
+- [x] Step 6.4.1: Server-render page at `/dev/pipelines/` listing every template with view / edit / create / delete buttons. (Plugin-preset vs project-override source chip; per-row View/Edit/Delete; disabled-Delete when lanes reference; "Customize first" CTA for plugin presets.)
+- [x] Step 6.4.2: Pipeline-editor form: visualize linearStages as a horizontal flow with `lockedStages` and `offPipelineStages` distinguished by chrome; operator can add / rename / remove / reorder stages. (5 mutually-exclusive update operations in single-open accordion: add/rename/remove/set-locked/set-off-pipeline. Set-locked + set-off-pipeline panels disable Copy when no boxes ticked.)
+- [x] Step 6.4.3: Each save action clipboard-copies the equivalent `/deskwork:pipeline` invocation. (All operator-supplied values quoted via shared `quoteValue`; empty required fields disable Copy with inline notice.)
+- [x] Step 6.4.4: Delete refused when any lane references the template; surfaces the dependent lanes. (Disabled-looking button with title naming dependents + `--reassign-lanes-to` suggestion. Phase 2 follow-up shipped: malformed templates render as error rows with parse/Zod/id-mismatch error verbatim, NOT silently filtered. O(M) inverse-index Map build for lane-reference counts.)
 
 ### Task 6.5: Doctor rule: orphan-pipeline-reference
 

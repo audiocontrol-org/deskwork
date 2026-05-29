@@ -1802,3 +1802,185 @@ audit trail; not blocking.
 - Builds: `@deskwork/{core, studio, cli}` all exit 0.
 - Pre-existing CLI failures persist; zero diff in `packages/cli/` across `0f9fc65` and `92267b2`.
 - Strongest design call: AUDIT-64 (reorder handle visual mismatch) — the workplan named the column as a per-row field but didn't address the inert-yet-draggable-looking affordance. Resolving via passive icon + title preserves the column while making the affordance honest. Matches `.claude/rules/affordance-placement.md` "an affordance whose label/glyph doesn't relate spatially to the action" anti-pattern.
+
+## Phase 6 Task 6.4 — Studio pipeline-editor page — audit cycle (2026-05-29)
+
+Audit scope: current `feature/graphical-entries` worktree, including the
+dirty Phase 6 Task 6.4 `/dev/pipelines` surface:
+
+- `packages/studio/src/pages/pipelines.ts`
+- `packages/studio/src/pages/pipelines/*.ts`
+- `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts`
+- `plugins/deskwork-studio/public/css/pipelines-page.css`
+- `plugins/deskwork-studio/public/css/pipelines-stage-flow.css`
+- `packages/studio/test/pipelines/*.test.ts`
+
+Track 1 controller verification:
+
+- `npm --workspace @deskwork/core test` — passed (711 tests).
+- `npm --workspace @deskwork/studio test` — passed earlier in the
+  session before the latest dirty pipeline-page edits.
+- `npm --workspace @deskwork/studio test -- test/pipelines/data.test.ts`
+  — passed (8 tests).
+- `npm --workspace @deskwork/studio test -- test/pipelines` — failed
+  (4 failing client-controller tests in `pipelines-page-client.test.ts`).
+- `npm --workspace @deskwork/studio run build` — passed.
+- `npm pack --dry-run --workspace @deskwork/studio` — passed in the
+  current worktree. Earlier failure for missing
+  `src/pages/pipelines/edit-form.ts` no longer reproduces after that
+  file appeared in the dirty tree.
+- `npm --workspace @deskwork/cli test -- test/publish-entry-centric.test.ts test/approve-entry-centric.test.ts test/customize-skill.test.ts`
+  — failed: 2 assertion-copy failures in `approve` / `publish`, plus
+  sandbox-only npm-cache failures for customize packaging.
+- `npm --workspace @deskwork/cli test -- test/customize-skill.test.ts`
+  with approved escalation — passed (12 tests), confirming the
+  customize pack failures are sandbox cache artifacts rather than
+  product packaging failures.
+- `npm run build --workspaces --if-present`,
+  `tsx scripts/smoke-phase4-issues.mjs`, and
+  `tsx scripts/smoke-phase4-migration.mjs` passed earlier in this
+  audit session.
+
+Track 2 spec-compliance review: two medium findings.
+Track 3 code-quality review: one medium finding, one low finding.
+
+### AUDIT-20260529-01 — Pipeline-page client test slice is red
+
+Finding-ID: AUDIT-20260529-01
+Status:     open
+Severity:   blocking (verification)
+Surface:    `packages/studio/test/pipelines/pipelines-page-client.test.ts`,
+            `packages/studio/test/pipelines/test-helpers.ts`
+
+`npm --workspace @deskwork/studio test -- test/pipelines` fails 4 of 50
+tests. The failing cases are all in the client-controller slice:
+
+- New form copy test records zero clipboard calls after setting required
+  field values without dispatching input/change events.
+- Quote symmetry test records zero clipboard calls for the same reason.
+- Rename validation test expects the initial notice to mention both
+  `from` and `to`, but the fixture select starts on the first real stage
+  instead of matching the server-rendered disabled placeholder option.
+- Remove validation test expects Copy disabled initially, but the fixture
+  select starts on the first real stage instead of matching the
+  server-rendered disabled placeholder option.
+
+The controller behavior and tests need reconciling before the Phase 6.4
+pipeline-editor page can close with a green targeted verification gate.
+Likely fix: make the DOM helpers mirror the rendered markup exactly
+(including disabled selected placeholder options), and update copy tests
+to either dispatch the same events a user would trigger or assert the
+new disabled-until-preview-rebuilt contract explicitly.
+
+### AUDIT-20260529-02 — Referencing lanes hidden in delete tooltip
+
+Finding-ID: AUDIT-20260529-02
+Status:     open
+Severity:   medium
+Surface:    `packages/studio/src/pages/pipelines/table.ts:124-134`
+
+Task 6.4 says template delete is refused when lanes reference the
+template and the surface must show the dependent lanes. The current
+disabled delete button visibly renders only `Delete — N lanes`; the
+actual dependent lane ids are only present in the button `title`.
+
+That leaves keyboard and touch users without a reliable visible path to
+the dependent ids, and makes the gate easier to miss. Render the lane ids
+inline in the row or adjacent disabled-state explanation, not only in a
+hover tooltip.
+
+### AUDIT-20260529-03 — Preset edit actions copy known-refused update commands
+
+Finding-ID: AUDIT-20260529-03
+Status:     open
+Severity:   medium
+Surface:    `packages/studio/src/pages/pipelines/edit-form.ts:34-43`,
+            `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:377-384`
+
+Plugin-preset templates correctly render a "customize first" notice, but
+the five update operation Copy buttons remain active. The client can copy
+`/deskwork:pipeline update "editorial" ...` for a plugin preset even
+though the CLI refuses preset mutation.
+
+Expected: preset edit actions should be disabled with the customize
+command surfaced, or should copy the customize-first command path.
+Actual: the page can emit commands it already knows will fail.
+
+### AUDIT-20260529-04 — Copy-builder validation allows CLI-invalid values
+
+Finding-ID: AUDIT-20260529-04
+Status:     open
+Severity:   medium
+Surface:    `packages/studio/src/pages/pipelines/new-form.ts:42`,
+            `packages/studio/src/pages/pipelines/edit-form.ts:78-81`,
+            `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:117-145`
+
+The client copy-builder blocks missing required fields but does not
+enforce the same value constraints advertised by the form and enforced
+by the CLI. Examples that can still be copied:
+
+- invalid template ids such as `Bad Id`
+- invalid positions such as `1.5`
+- comma-list values with blank entries such as `Idea,,Final`
+
+The CLI rejects these later, but the Studio page's stated job is to
+produce paste-ready `/deskwork:pipeline` commands. The client-side
+validation should reject known-invalid values before clipboard copy, with
+the same inline notice pattern used for missing fields.
+
+### AUDIT-20260529-05 — Clear-locks disabled-state guidance is inaccurate
+
+Finding-ID: AUDIT-20260529-05
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:191-195`
+
+When no locked-stage boxes are selected, the disabled-state message says:
+"To remove individual locks, use Rename / Remove operations on the lane
+configs, or edit .deskwork/pipelines/<id>.json directly."
+
+This is inaccurate. The controls are pipeline-stage operations, not
+lane-config operations, and rename/remove do not directly remove locks
+except as a side effect of changing or deleting the stage itself. The
+guidance should point to editing `.deskwork/pipelines/<id>.json` or a
+future explicit CLI clear-locks capability.
+
+### AUDIT-20260529-06 — CLI approve/publish tests assert stale message copy
+
+Finding-ID: AUDIT-20260529-06
+Status:     open
+Severity:   medium (verification)
+Surface:    `packages/cli/test/approve-entry-centric.test.ts:129`,
+            `packages/cli/test/publish-entry-centric.test.ts:139`
+
+The focused CLI gate still fails two assertion-copy tests:
+
+- `approve-entry-centric.test.ts` expects stderr to contain
+  `uses \`publish\``, while current behavior says
+  `Use \`publish\`, not \`approve\`, to graduate to the terminal stage.`
+- `publish-entry-centric.test.ts` expects `/already Published/i`, while
+  current behavior says
+  `entry is already at terminal stage "Published" of pipeline "editorial".`
+
+The command behavior appears correct and arguably clearer than the
+legacy assertions, but the red tests keep `@deskwork/cli` verification
+from going green. Either update the assertions to match the current
+diagnostics or intentionally restore the older message contract.
+
+### AUDIT-20260529-07 — Customize packaging failures are sandbox artifacts
+
+Finding-ID: AUDIT-20260529-07
+Status:     observation (no action)
+Severity:   observation
+Surface:    `packages/cli/test/customize-skill.test.ts`
+
+The non-escalated focused CLI run reported two customize-skill packaging
+failures from `npm pack` exit 255. Direct pack verification passed for
+`@deskwork/studio` and `@deskwork/core`, and the customize test passed
+with approved escalation:
+
+`npm --workspace @deskwork/cli test -- test/customize-skill.test.ts`
+→ 12 passed.
+
+Disposition: no product finding. The failure shape is the local sandbox
+npm-cache permission issue already isolated by the escalated run.
