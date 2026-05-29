@@ -9,6 +9,8 @@ A pure-observation surface — the "what's the state right now" snapshot of thre
 
 This skill is the read-only baseline of the hygiene-skill family. Subsequent skills in the family (`:triage-issues`, `:promote-deferrals`, `:archive-branch`, `:close-shipped`) mutate based on what this surface reports.
 
+**Sibling read for the fourth debt stream:** worktree staleness ships as a separate read verb at [`/dw-lifecycle:worktree-report`](../worktree-report/SKILL.md). Its mutation sibling `:dismantle-worktrees propose|apply` mirrors `:triage-issues`'s shape.
+
 ## Steps
 
 1. Confirm the project root has a `.dw-lifecycle/config.json` (otherwise run `/dw-lifecycle:install` first).

@@ -337,12 +337,12 @@ Operator decisions (locked in during definition):
 
 ### Task 1: Worktree-discovery surface
 
-- [ ] Step 1: Implement `plugins/dw-lifecycle/src/worktree-report/scan.ts` — walks `git worktree list --porcelain` + the configured worktree-base directory; cross-references each entry against `gh pr list` (branch state) + filesystem (feature-doc location); produces a `WorktreeEntry[]` with per-criterion check results.
-- [ ] Step 2: Implement `plugins/dw-lifecycle/src/worktree-report/staleness.ts` — pure function `evaluateStaleness(entry, config)` returns `{ verdict: 'keep' | 'stale' | 'orphan' | 'divergent' | 'corrupt', rationale: string[], recommendedDisposition }`. The N-of-criteria threshold is configurable; default is captured as an open question.
-- [ ] Step 3: Implement markdown + JSON renderers. Markdown: one table per verdict bucket. JSON: `{ generated_at, worktrees: WorktreeEntry[] }`.
-- [ ] Step 4: Wire the CLI subcommand `dw-lifecycle worktree-report` with flags `--json`, `--days N` (default 30), `--threshold-count N` (default 3), `--worktree-base <path>` (default auto-detect from `git worktree list --porcelain` prefix), `--allow-external`.
-- [ ] Step 5: Author `plugins/dw-lifecycle/skills/worktree-report/SKILL.md` mirroring `:debt-report` SKILL.md structure; cross-reference from `debt-report/SKILL.md`.
-- [ ] Step 6: Vitest unit coverage for `evaluateStaleness` across all criteria + verdict combinations. Integration tests against fixture worktree layouts under tmp dirs.
+- [x] Step 1: Implement `plugins/dw-lifecycle/src/worktree-report/scan.ts` — walks `git worktree list --porcelain` + the configured worktree-base directory; cross-references each entry against `gh pr list` (branch state) + filesystem (feature-doc location); produces a `WorktreeEntry[]` with per-criterion check results.
+- [x] Step 2: Implement `plugins/dw-lifecycle/src/worktree-report/staleness.ts` — pure function `evaluateStaleness(entry, config)` returns `{ verdict: 'keep' | 'stale' | 'orphan' | 'divergent' | 'corrupt' | 'current' | 'main', recommendedDisposition }`. Threshold configurable (default 3).
+- [x] Step 3: Implement markdown + JSON renderers. Markdown: summary table + one bucket-table per verdict + per-criterion check per entry. JSON: `{ generated_at, days_threshold, threshold_count, worktree_base, entries[] }`.
+- [x] Step 4: Wire the CLI subcommand `dw-lifecycle worktree-report` with flags `--json`, `--days N` (default 30), `--threshold-count N` (default 3), `--worktree-base <path>` (default auto-detect from `git worktree list --porcelain` prefix), `--allow-external`.
+- [x] Step 5: Author `plugins/dw-lifecycle/skills/worktree-report/SKILL.md` mirroring `:debt-report` SKILL.md structure; cross-reference from `debt-report/SKILL.md`.
+- [x] Step 6: Vitest unit coverage (32 new tests: 19 staleness + 13 scan); full plugin suite 1928 tests pass with no regressions; live smoke against `/Users/orion/work/deskwork-work/` surfaces 4 stale + 38 orphan dirs correctly.
 
 ### Task 2: Dismantle verb — batched proposal + apply
 
