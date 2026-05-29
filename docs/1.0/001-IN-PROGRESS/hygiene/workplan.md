@@ -320,3 +320,62 @@ Operator decisions (locked in during definition):
 - [x] `/release` skill SKILL.md updated: Pause 3 collapses into tag-message-only; Pause 4 collapses to push + workflow-watch (marketplace-smoke moves to CI); `--skip-publish-wait` flag documented; `make publish` recovery path documented.
 - [x] `RELEASING.md` documents the one-time npm-side trusted-publisher setup per package + the recovery path.
 - [ ] First real release uses the new workflow and succeeds end-to-end. Verification step closes [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project rule.
+
+## Phase 11: Stale worktree discovery + dismantle  ·  *(issue pending PRD re-approval)*
+
+**Deliverable:** mechanism to find stale worktrees in the operator's worktree-base directory and dismantle them under operator approval. Closes the fourth structural-closure asymmetry (matches GH-issue / workplan-TBD / parked-branch streams). Sibling of [#347](https://github.com/audiocontrol-org/deskwork/issues/347) — the stale-branch-sessions failure mode that motivates this phase.
+
+**Verb shape and several defaults left open for operator iteration** (see PRD Phase 11 § "Open questions captured"). The task breakdown below assumes Option A for concreteness; if the operator picks B or C during iteration, Task 1 + Task 2 collapse / re-organize accordingly.
+
+### Task 1: Worktree-discovery surface
+
+- [ ] Step 1: Implement `plugins/dw-lifecycle/src/worktree-report/scan.ts` — walks `git worktree list --porcelain` + the configured worktree-base directory; cross-references each entry against `gh pr list` (branch state) + filesystem (feature-doc location); produces a `WorktreeEntry[]` with per-criterion check results.
+- [ ] Step 2: Implement `plugins/dw-lifecycle/src/worktree-report/staleness.ts` — pure function `evaluateStaleness(entry, config)` returns `{ verdict: 'keep' | 'stale' | 'orphan' | 'divergent' | 'corrupt', rationale: string[], recommendedDisposition }`. The N-of-criteria threshold is configurable; default is captured as an open question.
+- [ ] Step 3: Implement markdown + JSON renderers. Markdown: one table per verdict bucket. JSON: `{ generated_at, worktrees: WorktreeEntry[] }`.
+- [ ] Step 4: Wire the CLI subcommand. Either `dw-lifecycle worktree-report` (Option A) or extend `dw-lifecycle debt-report` to surface a fourth section (Option B). Decision land during PRD iteration.
+- [ ] Step 5: Author `plugins/dw-lifecycle/skills/worktree-report/SKILL.md` (Option A) OR extend `plugins/dw-lifecycle/skills/debt-report/SKILL.md` (Option B).
+- [ ] Step 6: Vitest unit coverage for `evaluateStaleness` across all criteria + verdict combinations. Integration tests against fixture worktree layouts under tmp dirs.
+
+### Task 2: Dismantle verb — batched proposal + apply
+
+- [ ] Step 1: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/propose.ts`. Reads the scan output (or re-scans); for each `stale` / `orphan` entry, emits a proposal JSON file at `.dw-lifecycle/dismantle-worktrees-proposal-<ts>.json` with one entry per worktree carrying the recommended disposition + a blank operator-decision field.
+- [ ] Step 2: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/apply.ts`. Reads the proposal file; validates every entry has a `decision` field set; all-or-nothing on validation; per-worktree dismantle is best-effort (records per-entry success/failure; continues with the rest).
+- [ ] Step 3: Implement the dismantle primitive `dismantleWorktree(path, opts)`. Pre-condition checks (current-worktree / main-worktree / dirty / local-only-commits / force-push / external-path / multi-worktree-same-branch). On all-clear, runs `git worktree remove <path>` + (optionally) `git branch -d <branch>`. With `--archive-first`, composes with `:archive-branch` to tag + push first.
+- [ ] Step 4: Wire CLI subcommands `dw-lifecycle dismantle-worktrees propose|apply`.
+- [ ] Step 5: Author `plugins/dw-lifecycle/skills/dismantle-worktrees/SKILL.md`. Mirrors `:triage-issues` SKILL.md structure (propose / fill-in / apply).
+- [ ] Step 6: Substantive-reason validator hookup. Reuse `plugins/dw-lifecycle/src/lib/substantive-reason.ts` for `--allow-dirty --reason` and `--force-discard --reason` overrides.
+- [ ] Step 7: Vitest unit + integration tests. Cover every safety-rail refusal path. Integration tests use isolated tmp git repos with realistic worktree state.
+
+### Task 3: Lifecycle integration
+
+- [ ] Step 1: Extend `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts` to include a worktree-staleness count + recommendation block. Mirror the existing GH/workplan/branches structure.
+- [ ] Step 2: Extend `plugins/dw-lifecycle/src/lifecycle-integration/session-start-recommendation.ts` to display the worktree recommendation when present.
+- [ ] Step 3: Extend `plugins/dw-lifecycle/src/lifecycle-integration/complete-gate.ts` (or sibling) to surface a "your worktree at `<path>` can be dismantled now" line at feature graduation.
+- [ ] Step 4: Update `.claude/rules/agent-discipline.md` § "Closure is a structural step, not aspirational" — name worktrees as the fourth structural-closure stream documented in that rule.
+
+### Task 4: Documentation
+
+- [ ] Step 1: Update `plugins/dw-lifecycle/README.md` hygiene-family section to include the worktree verb(s) + their operational pattern.
+- [ ] Step 2: Per-skill SKILL.md content (Task 1 Step 5 + Task 2 Step 5 land the skill files; this step is the audit-pass to make sure each is adopter-clear).
+- [ ] Step 3: Update the project's `docs/1.0/burndown/dw-lifecycle.md` marching-orders sheet — fold any worktree-related items into the lane.
+
+### Task 5: Tests + smoke
+
+- [ ] Step 1: Extend `scripts/smoke-hygiene.sh` to exercise the worktree verb(s) end-to-end. Sets up a tmp project tree with several fixture worktrees in varying states; runs report; runs propose; runs apply; verifies expected end state.
+- [ ] Step 2: Full `npm test --workspaces` pass with new vitest cases. No CI bloat (per project rule).
+
+### Task 6: Dogfood
+
+- [ ] Step 1: Run the worktree verb(s) against the operator's actual worktree-base directory (`~/work/deskwork-work/`). Report current state. File any friction surfaces against `tooling-feedback.md` per the scope-discovery dogfood pattern.
+- [ ] Step 2: Operator-driven dismantle pass (batched propose → review → apply) against shipped features (open-issue-tranche-cleanup, deskwork-plugin remnants, etc.). At least one full batched-proposal cycle.
+
+**Acceptance Criteria:**
+
+- [ ] Worktree-discovery surface ships per the operator's iteration-picked Option A / B / C.
+- [ ] `/dw-lifecycle:dismantle-worktrees propose|apply` ships under the batched-proposal pattern matching `:triage-issues` and `:promote-deferrals`.
+- [ ] All safety rails enforced (current-worktree / main-worktree / dirty / local-only-commits / force-push / external-path / multi-worktree).
+- [ ] Optional `--archive-first` composes with `:archive-branch` to preserve branch contents.
+- [ ] Lifecycle integration: session-end hygiene block carries worktree-staleness; session-start displays recommendation; complete suggests dismantle on feature merge.
+- [ ] Vitest unit + integration tests against fixture worktree layouts. Smoke test in `scripts/smoke-hygiene.sh`.
+- [ ] Adopter docs: README + per-skill SKILL.md + agent-discipline.md § Closure extension.
+- [ ] Dogfood pass against the operator's actual worktree-base ran one full batched-proposal cycle.
