@@ -28,6 +28,7 @@ import { installAgentPrompts } from './subcommands/install-agent-prompts.js';
 import { migrateFromPilot } from './subcommands/migrate-from-pilot.js';
 import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-discovery-hooks.js';
 import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
+import { auditBarrage } from './subcommands/audit-barrage.js';
 import { wrapPrompt } from './subcommands/wrap-prompt.js';
 import { validateReturn } from './subcommands/validate-return.js';
 import { debtReport } from './subcommands/debt-report.js';
@@ -81,6 +82,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'migrate-from-pilot': migrateFromPilot,
   'uninstall-scope-discovery-hooks': uninstallScopeDiscoveryHooks,
   'orchestrator-turn': orchestratorTurn,
+  'audit-barrage': auditBarrage,
   'wrap-prompt': wrapPrompt,
   'validate-return': validateReturn,
   'debt-report': debtReport,

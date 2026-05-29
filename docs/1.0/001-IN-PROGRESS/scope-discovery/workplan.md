@@ -620,19 +620,19 @@ Confirm the three CLIs are installed + authenticated on the operator's machine. 
 
 ### Task 2: CLI verb + subprocess orchestration library
 
-- [ ] Step 1: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/types.ts` — `ModelConfig`, `BarrageInput`, `BarrageRun`, `BarrageResult` interfaces.
-- [ ] Step 2: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/run-artifacts.ts` — directory layout helpers (`INDEX.md`, `PROMPT.md`, `<model>.md`, `stderr/<model>.txt`); deterministic timestamp encoding; safe-filename derivation from model name.
-- [ ] Step 3: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts` — wraps `child_process.spawn` with: timeout enforcement, exit-code capture, stdout/stderr capture to separate files, kill-on-timeout, prompt template substitution.
-- [ ] Step 4: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-barrage.ts` — composes spawn-cli into parallel `Promise.all`; per-model success/failure tracking; per-model exit-code recording; run-dir creation + INDEX assembly.
-- [ ] Step 5: NEW CLI subcommand `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts` — flag parsing (`--feature <slug>`, `--range <vA>..<vB>`, `--models <list>`, `--prompt-file <path>`, `--quiet`, `--help`); calls orchestrate-barrage; reports run-dir + per-model summary. Register `'audit-barrage'` in `cli.ts`.
-- [ ] Step 6: Tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/` against fake-CLI subprocess fixtures.
+- [x] Step 1: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/types.ts` (122 lines) — `ModelConfig`, `BarrageInput`, `ModelRunResult`, `BarrageRun`, `BarrageResult` interfaces.
+- [x] Step 2: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/run-artifacts.ts` (147 lines) — `generateRunDirName`, `safeModelName`, `createRunDir`, `writePromptFile`, `writeIndexFile`. ISO basic timestamp; non-alphanumeric/non-hyphen replaced with `_` in model names.
+- [x] Step 3: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts` (180 lines) — `spawnCliAgainstModel`. `{{prompt}}` substitution in args_template via split-before-substitute. `stdin: 'ignore'`; stdout/stderr piped to per-model paths via `fs.createWriteStream`; byte counters via stream listeners. SIGTERM on timeout with 5s SIGKILL grace; spawn errors captured as `spawnError`.
+- [x] Step 4: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-barrage.ts` (85 lines) — `orchestrateBarrage`. Per-model `Promise.all` parallel fire; no early termination; INDEX.md write after all settle.
+- [x] Step 5: NEW CLI subcommand `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts` (315 lines) — `parseFlags` + `auditBarrage` main. Hard-coded 3 default models (claude/codex/gemini) with code-comment cite to Task 3 for the YAML loader. `--feature`/`--prompt-file` (REQUIRED); `--models <comma-list>` selects from hardcoded set; `--repo-root`/`--quiet`/`--help`. Exit 0 if ≥1 model produced stdout; 1 if all failed; 2 on usage. Registered `'audit-barrage': auditBarrage` in `cli.ts`.
+- [x] Step 6: Tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/` — 43 new tests across 4 files (run-artifacts / spawn-cli / orchestrate-barrage / audit-barrage-cli). Fake-CLI subprocesses via `node -e` shims cover happy path, timeout, missing-binary, exit-nonzero, malformed-config-rejection.
 
 **Acceptance Criteria:**
-- [ ] `dw-lifecycle audit-barrage --feature <slug>` fires three CLI subprocesses in parallel.
-- [ ] Each subprocess output captured to a per-model markdown file under `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/<model>.md`.
-- [ ] `INDEX.md` + `PROMPT.md` + `stderr/<model>.txt` written per run.
-- [ ] Tests cover: happy path, missing-binary, timeout, prompt template substitution.
-- [ ] Exit code: 0 if ≥1 model produced output; 1 if all models failed; 2 on usage error.
+- [x] `dw-lifecycle audit-barrage --feature <slug>` fires three CLI subprocesses in parallel — live verified end-to-end against the real installed claude/codex/gemini; all three returned PROBE-OK; 11.5s wall-time (parallel; dominated by slowest).
+- [x] Each subprocess output captured to per-model markdown file under `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/<model>.md` — confirmed in live run dir at `20260529T050950Z-scope-discovery/`.
+- [x] `INDEX.md` + `PROMPT.md` + `stderr/<model>.txt` written per run — confirmed; INDEX includes timestamp/feature/per-model exit code/duration/byte counts.
+- [x] Tests cover: happy path (3 models all succeed), missing-binary (spawn error captured + others still fire), timeout (SIGTERM + grace), exit-nonzero, prompt template substitution.
+- [x] Exit code contract: 0 if ≥1 model produced output; 1 if all failed; 2 on usage error — covered by tests.
 
 ### Task 3: Prompt template + model config
 

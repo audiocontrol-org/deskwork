@@ -1,4 +1,4 @@
-generated_at: 2026-05-28T23:33:10.111Z
+generated_at: 2026-05-29T05:11:26.202Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1076,6 +1076,27 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
+  - id: 378d8c2122e7
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:129:136
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:81:88
+    disposition: keep-with-reason
+    reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
+  - id: 0e254d29d83a
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:146:153
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:100:107
+    disposition: keep-with-reason
+    reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
+  - id: ec4640c729a3
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:257:263
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:155:161
+    disposition: keep-with-reason
+    reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
   - id: 13b12da5062e
     lines: 28
     members:
