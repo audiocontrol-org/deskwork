@@ -228,6 +228,62 @@ export function verifyNpmStatus(
   return { version, published, unpublished };
 }
 
+export interface VerifyNpmStatusUntilPublishedOptions {
+  /** Total attempts including the first immediate probe. Default 6. */
+  readonly maxAttempts?: number;
+  /** Initial backoff delay in ms (doubled each attempt, capped). Default 5000. */
+  readonly initialBackoffMs?: number;
+  /** Backoff cap in ms. Default 30000. */
+  readonly maxBackoffMs?: number;
+  /** Sleep function (await on it). Tests inject a no-op; default uses setTimeout. */
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** Viewer callback. Default `realNpmViewer`. */
+  readonly viewer?: NpmViewer;
+}
+
+/**
+ * Retry-with-backoff wrapper around `verifyNpmStatus`. Polls the npm
+ * registry until every `@deskwork/*` package is visible at `version`, OR
+ * the attempts budget runs out.
+ *
+ * Existence-of-publishes only — exists because npm's read API (registry +
+ * CDN) lags the write API by seconds. The v0.26.4 release surfaced this:
+ * the publish step accepted PUTs for all three packages in <5 seconds,
+ * but `npm view` returned "not published" for `@deskwork/studio` for
+ * another ~10 seconds after the publish completed. Without retry, the
+ * post-publish gate fails on a transient and the workflow halts before
+ * the marketplace smoke step.
+ *
+ * Sleep is parameterized so tests inject a no-op; production uses
+ * setTimeout via the default sleep.
+ *
+ * Returns the final `NpmStatusReport`. Caller decides exit code from
+ * `report.unpublished.length === 0`.
+ */
+export async function verifyNpmStatusUntilPublished(
+  version: string,
+  opts: VerifyNpmStatusUntilPublishedOptions = {},
+): Promise<NpmStatusReport> {
+  const maxAttempts = opts.maxAttempts ?? 6;
+  const initialBackoffMs = opts.initialBackoffMs ?? 5000;
+  const maxBackoffMs = opts.maxBackoffMs ?? 30000;
+  const viewer = opts.viewer ?? realNpmViewer;
+  const sleep =
+    opts.sleep ??
+    ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+  let lastReport = verifyNpmStatus(version, viewer);
+  let attempt = 1;
+  let backoff = initialBackoffMs;
+  while (lastReport.unpublished.length > 0 && attempt < maxAttempts) {
+    await sleep(backoff);
+    lastReport = verifyNpmStatus(version, viewer);
+    backoff = Math.min(backoff * 2, maxBackoffMs);
+    attempt += 1;
+  }
+  return lastReport;
+}
+
 export interface AtomicPushOptions {
   readonly tag: string;
   readonly branch: string;
@@ -372,12 +428,18 @@ async function dispatch(argv: readonly string[]): Promise<number> {
         process.stderr.write('usage: assert-published <version>\n');
         return 2;
       }
-      const report = verifyNpmStatus(version);
+      // Retry-with-backoff: npm's read API (registry + CDN) lags the
+      // write API by seconds. The v0.26.4 release surfaced this when
+      // the publish step completed in 5s but @deskwork/studio took
+      // another 10s to become visible to `npm view`. Without retry, the
+      // post-publish gate failed on a transient and the workflow halted
+      // before the marketplace smoke step.
+      const report = await verifyNpmStatusUntilPublished(version);
       if (report.unpublished.length > 0) {
         process.stderr.write(
           `Version ${version} is NOT yet published on npm for: ${report.unpublished.join(', ')}.\n` +
             `Either the publish step did not complete (re-run \`make publish\` in your terminal),\n` +
-            `or registry propagation is still pending (try again in a few seconds).\n`,
+            `or registry propagation is still pending after the maximum backoff window (~2 minutes).\n`,
         );
         return 1;
       }
