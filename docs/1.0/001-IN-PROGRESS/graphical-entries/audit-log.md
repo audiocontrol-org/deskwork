@@ -397,7 +397,7 @@ client test for clicking `All` from the already-all-focused state.
 ### AUDIT-20260528-10
 
 Finding-ID: AUDIT-20260528-10
-Status:     open
+Status:     fixed-e228e26
 Severity:   medium
 Surface:    mobile dashboard lane stack
 
@@ -480,7 +480,7 @@ on).
 ### AUDIT-20260528-12
 
 Finding-ID: AUDIT-20260528-12
-Status:     open
+Status:     wontfix-observation (no production polyfill exhibits the shape; revisit only if one surfaces)
 Severity:   low
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts
 
@@ -498,7 +498,7 @@ observation; no fix needed unless a polyfill case surfaces.
 ### AUDIT-20260528-13
 
 Finding-ID: AUDIT-20260528-13
-Status:     open
+Status:     wontfix-observation (test infrastructure heuristic; no flake observed in CI; switch to vi.spyOn shape if one surfaces)
 Severity:   low
 Surface:    packages/studio/test/dashboard-swimlane-compose-client.test.ts
 
@@ -625,7 +625,7 @@ already; only Space needed the explicit guard.
 ### AUDIT-20260528-19
 
 Finding-ID: AUDIT-20260528-19
-Status:     open
+Status:     closed-as-documented (inline doc-comment at affordances.ts:118-126 IS the disposition; no behavior change)
 Severity:   low
 Surface:    packages/studio/src/pages/dashboard/affordances.ts
 
@@ -650,7 +650,7 @@ worth re-evaluating when a real adopter hits the case.
 ### AUDIT-20260528-20
 
 Finding-ID: AUDIT-20260528-20
-Status:     open
+Status:     wontfix-observation (swimlane-card.ts at 494 lines, under 500-line cap; trajectory note revisits if exceeded)
 Severity:   informational
 Surface:    packages/studio/src/pages/dashboard/swimlane-card.ts
 
@@ -748,7 +748,7 @@ width and the strip scrolls instead of crushing the labels.
 ### AUDIT-20260528-24
 
 Finding-ID: AUDIT-20260528-24
-Status:     open
+Status:     wontfix-observation (disclosure-widget convention prefers return-to-trigger; defensible default)
 Severity:   low
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts
 
@@ -777,7 +777,7 @@ Observation only; no immediate action.
 ### AUDIT-20260528-26
 
 Finding-ID: AUDIT-20260528-26
-Status:     open
+Status:     wontfix-observation (swimlane.ts at 491 lines, under 500-line cap; trajectory note revisits if exceeded)
 Severity:   informational
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane.ts
 
@@ -896,7 +896,7 @@ disposition.
 ### AUDIT-20260528-32
 
 Finding-ID: AUDIT-20260528-32
-Status:     open
+Status:     addressed-by-3aeea2e (AUDIT-31 split swimlane-drag.ts into swimlane-drag.ts 246 + swimlane-reorder.ts 393; both under cap; trajectory note resolved structurally)
 Severity:   informational
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
 
@@ -1211,7 +1211,7 @@ when localStorage carries the hidden lane.
 ### AUDIT-20260528-39
 
 Finding-ID: AUDIT-20260528-39
-Status:     open
+Status:     wontfix-observation (inherited as-cast pattern across 4 test files; not net-new debt; separate project-wide cleanup pass appropriate)
 Severity:   informational
 Surface:    packages/studio/test/dashboard-swimlane-integration-client.test.ts:83-84 + ~3 other test files
 
@@ -1407,7 +1407,7 @@ deliberate orchestrator choice for the audit trail.
 ### AUDIT-20260528-48 — LaneMigrationEvent shape variation from new Lane*Event variants
 
 Finding-ID: AUDIT-20260528-48
-Status:     open (pre-existing; out of scope for Task 6.1)
+Status:     wontfix-observation (pre-existing LaneMigrationEvent shape; not introduced by Phase 6; harmonization would touch unrelated migration path)
 Severity:   observation
 Surface:    `packages/core/src/schema/journal-events.ts:104-117` (pre-existing) vs `journal-events.ts:148-203` (new)
 
