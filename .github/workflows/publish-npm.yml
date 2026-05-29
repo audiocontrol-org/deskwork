@@ -37,6 +37,18 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      # Node 20 ships with npm 10.x; npm Trusted Publishing (OIDC) requires
+      # npm 11.5.1+ — the feature shipped late 2024 / early 2025. Without
+      # this upgrade, the publish step fails with a 404-Not-Found PUT to
+      # the package endpoint (npm returns 404 instead of 403 when OIDC
+      # validation rejects the token; misleading but documented). Surfaced
+      # by the v0.26.2 release attempt (workflow run 26613403248) on
+      # 2026-05-29 — the publish step failed AFTER the provenance
+      # attestation succeeded, confirming provenance + trusted-publishing
+      # are separate OIDC flows with separate minimum npm versions.
+      - name: Upgrade npm to support trusted publishing
+        run: npm install -g npm@latest
+
       - name: Install workspaces
         run: npm ci
 
