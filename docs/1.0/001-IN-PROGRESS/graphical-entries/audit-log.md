@@ -1984,3 +1984,15 @@ with approved escalation:
 
 Disposition: no product finding. The failure shape is the local sandbox
 npm-cache permission issue already isolated by the escalated run.
+
+### Task 6.4 closing summary
+
+- Spec-compliance review (on `2cdde80`): SPEC-COMPLIANT WITH NON-BLOCKING OBSERVATIONS. All 4 workplan steps + Phase 2 follow-up + 12 architecture decisions delivered. Phase 2 follow-up verified end-to-end: malformed pipeline JSON renders as error rows with parse/Zod/id-mismatch error verbatim, NOT silently filtered; dependents on broken templates computed via direct JSON read bypassing cross-validating loader.
+- Code-quality review (on `2cdde80`): QUALITY-APPROVED WITH NON-BLOCKING OBSERVATIONS — 1 CRITICAL + 4 WARNING + 5 INFO.
+- Triage outcome: 1 CRITICAL + 6 NON-BLOCKING applied at `af1e91a`; 5 INFO observations accepted without action.
+- Highest-value finding: the CRITICAL — set-locked / set-off-pipeline panels emitted CLI-rejected empty-list paste when the operator unchecked every box. Quality reviewer caught it AND noted the test was asserting the broken output as expected. Updated tests + disabled Copy + inline notice + per-panel error message — operator now sees the gate visibly.
+- Other applied fixes: shared `quoteValue` helper, O(N*M) → O(M) inverse-index data layer, long-stage-name wrapping, empty-field Copy gating across all CRUD panels, dropped speculative scaffolding, XSS regression test for the Phase 2 follow-up error rendering.
+- Worktree hygiene per [#347](https://github.com/audiocontrol-org/deskwork/issues/347): detected and removed re-derivation of v0.24.0 dw-lifecycle work that an earlier agent in this session inadvertently re-created on this stale branch base. The dw-lifecycle `detect-clones → check-clones` rename + `deprecation-scan` feature already shipped on main; cleanup via the issue's recommended `git restore` + `rm` plan brought the worktree back to graphical-entries-only diffs.
+- Test deltas: studio suite 880 → 888 (+8 new tests for validation gates + XSS regression); core 711 throughout; CLI tests unchanged.
+- Builds: `@deskwork/{core, studio, cli}` all exit 0.
+- New clone disposition: `9e3f04426ee7` disposed `keep-with-reason` for the set-locked / set-off-pipeline panel symmetry (parallel pipeline-schema operations; collapsing would obscure per-panel error-message identity).
