@@ -1,13 +1,15 @@
 ---
 name: release
-description: Release the deskwork monorepo (bump → tag → push → CI publishes). Hard-gated procedure with operator pauses at version, post-bump diff, tag message, and final push. CI handles publish + smoke via npm Trusted Publisher (OIDC). Pass `--skip-publish-wait` to bypass the workflow-watch step when the operator already published manually via `make publish`. Project-internal — for monorepo maintainers, not adopters.
+description: Release the deskwork monorepo (bump → tag → push → CI publishes → local assert + smoke). Hard-gated procedure with operator pauses at version, post-bump diff, tag message, and final push. CI publishes via npm Trusted Publisher (OIDC); the skill runs assert-published + marketplace smoke LOCALLY after publish completes (faster turnaround than waiting on GH Actions minutes). Pass `--skip-publish-wait` to bypass local assert + smoke when the operator already published manually via `make publish`. Project-internal — for monorepo maintainers, not adopters.
 ---
 
 # Release
 
-Ship a new version of the deskwork monorepo. Hard-gated. The skill runs preconditions, prompts for version, bumps + commits, drafts the tag message, and atomic-pushes the commit + branch + tag in one operation. The tag push triggers `.github/workflows/publish-npm.yml`, which publishes `@deskwork/{core,cli,studio}@<version>` via OIDC, asserts they're on the registry, and runs the marketplace smoke gate. The skill waits for the workflow to complete (`gh run watch`) and reports the release URL.
+Ship a new version of the deskwork monorepo. Hard-gated. The skill runs preconditions, prompts for version, bumps + commits, drafts the tag message, and atomic-pushes the commit + branch + tag in one operation. The tag push triggers `.github/workflows/publish-npm.yml`, which publishes `@deskwork/{core,cli,studio}@<version>` via OIDC and exits. The skill then runs `assert-published` (with retry-with-backoff for npm CDN propagation) and the marketplace smoke LOCALLY, then reports the release URL.
 
-Pass `--skip-publish-wait` when the operator handled publish manually via `make publish` (the documented fallback when CI is broken) — the skill skips the workflow-watch step.
+The CI workflow does the one thing that only CI can do — publish via OIDC. Everything else (assert-published, marketplace smoke) runs locally where iteration is fast (~30s vs 5-10 min waiting on GH Actions). The local steps are the same scripts that ran in CI pre-v0.26.6; they just live in the operator's terminal now.
+
+Pass `--skip-publish-wait` when the operator handled publish manually via `make publish` (the documented fallback when CI is broken) — the skill skips substeps 5a (assert-published) and 5b (smoke) since the operator just handled publish out-of-band.
 
 ## Pre-1.0 maturity stance
 
@@ -101,19 +103,32 @@ Publish is no longer a Pause-3 manual step. `.github/workflows/publish-npm.yml` 
    ```
 
 4. On `y`: `tsx .claude/skills/release/lib/release-helpers.ts atomic-push v<version> <current-branch>`.
-5. On push success: watch the publish workflow (skip when `--skip-publish-wait` was passed at skill invocation):
+
+5. On push success: wait for npm visibility, then smoke locally (skip both when `--skip-publish-wait` was passed):
+
+   **5a. Assert all three packages reach npm:**
 
    ```
-   gh run list --workflow=publish-npm.yml --limit=5 --json databaseId,headSha,event,status,conclusion,createdAt
+   tsx .claude/skills/release/lib/release-helpers.ts assert-published <version>
    ```
 
-   - Match the just-pushed run by `headSha == <pushed-HEAD-SHA>` AND `event == "push"`. If multiple, take the most recent.
-   - `gh run watch <run-id>` with a 15-minute timeout.
-   - On `conclusion == success`: proceed to release-view step.
-   - On `conclusion == failure`: surface the workflow logs URL (`gh run view <run-id> --web`) and advise the operator to investigate. Do NOT auto-retry. Do NOT delete the tag. See § "Recovery — CI is broken" for next steps.
-   - On timeout: surface the workflow URL; advise the operator to watch it themselves and re-run `/release --skip-publish-wait` once the workflow finishes.
+   The helper polls `npm view @deskwork/<pkg>@<version>` with retry-with-backoff (initial 5s, exponential to 30s cap, 6 attempts, ~2-min total). This rides out npm's CDN propagation lag between the workflow's publish step accepting the PUT and the read API seeing the new version. The skill does NOT poll the GH Action — npm visibility is the ground truth for "publish succeeded."
 
-6. On workflow success (or when `--skip-publish-wait`): run `gh release view v<version>` and report the release URL.
+   - On exit 0: continue to 5b.
+   - On exit 1 (after retry budget exhausts): surface the missing packages + the workflow URL (`gh run list --workflow=publish-npm.yml --limit=1`). Likely causes: workflow publish step failed (check logs), trusted-publisher misconfiguration on npmjs.com, or genuinely-slow CDN propagation beyond 2 min. See § "Recovery — CI is broken."
+
+   **5b. Marketplace smoke (local):**
+
+   ```
+   bash scripts/smoke-marketplace.sh
+   ```
+
+   Clones the marketplace, npm-installs `@deskwork/<pkg>@<version>` from the public registry, boots the studio against a fixture project, checks every route + asset returns 200. The smoke is the adopter-perspective verification — if it passes locally, adopters running `/plugin marketplace update deskwork` will get a working install.
+
+   - On exit 0: continue to 6.
+   - On exit non-zero: surface the smoke log tail + the workflow URL. The packages are on npm (5a passed) but something in the marketplace-clone or studio-boot path broke. See § "Recovery — CI is broken."
+
+6. On 5a + 5b both success (or when `--skip-publish-wait`): run `gh release view v<version>` and report the release URL.
 7. On push fail: abort. Surface git's stderr. Local commit + tag intact. Operator can fix (e.g. fetch + rebase if origin/main moved) and re-run; the skill will detect the existing local tag.
 8. On `n` at push prompt: abort. Local state preserved.
 
@@ -129,7 +144,7 @@ When the `publish-npm.yml` workflow fails (npm outage, OIDC misconfiguration, tr
    ```
 2. **Nothing published yet** (workflow failed before publish step): the chore-release commit + tag are still local-only IF you haven't pushed yet. If you HAVE pushed, the tag is on origin but no npm artifacts ship. Revert the bump commit (`git reset --soft HEAD~1`), fix the underlying issue, re-run `/release`.
 3. **Partial publish** (e.g. core succeeded, cli failed mid-flight): the safest path is to bump to v<next-patch> + re-run `/release`. The half-published version stays orphaned on npm (npm forbids republishing the same version anyway). Document the orphaned version in the release notes.
-4. **All three published, but workflow failed at smoke or assert-published**: the artifacts are reachable by adopters; what failed was the post-publish gate. Investigate the workflow logs; re-run the smoke locally (`bash scripts/smoke-marketplace.sh`); if smoke passes locally, the gap is CI-side and the release is salvageable.
+4. **All three published, but assert-published or smoke failed locally** (substeps 5a/5b): the workflow's publish step succeeded; the gate that failed is the operator's local verification. If assert-published failed: re-run it manually (`tsx .claude/skills/release/lib/release-helpers.ts assert-published <ver>`); CDN propagation usually resolves within 1-2 minutes of publish. If smoke failed: read the smoke log tail, identify the broken route/asset, file an issue. The artifacts are on npm and adopters will get them — only the gate behind a known-good ship blocked.
 5. **Manual publish flow** (used during recovery OR for one-off out-of-band publishes):
    ```
    make publish      # token-auth, prompts for 2FA OTP per package
@@ -137,11 +152,13 @@ When the `publish-npm.yml` workflow fails (npm outage, OIDC misconfiguration, tr
    `make publish` reads `~/.config/deskwork/npm-credentials.txt`. It publishes WITHOUT provenance (the manual path uses token auth; provenance requires the OIDC env that only the workflow has). The artifacts ship; adopters get them; the npm-side trusted-publisher attestation is the only thing missing for that release.
 6. **Resume `/release` after manual publish**: invoke `/release --skip-publish-wait`. The skill skips Pause 4's workflow-watch step (since the operator already handled publish out-of-band).
 
-### Flow shape after Phase 10
+### Flow shape evolution
 
-The release flow used to walk five pauses (precondition → diff → manual publish → local smoke → push). Phase 10 of `feature/hygiene` (npm Trusted Publisher CI workflow) collapsed the manual-publish + local-smoke pauses into CI-owned steps. The agent now walks four pauses: precondition (Pause 1) → diff (Pause 2) → tag message (Pause 3) → push + workflow-watch (Pause 4).
+- **Pre-Phase-10:** 5 pauses — precondition → diff → manual publish → local smoke → push. Publish step required 3 OTPs.
+- **Phase 10 (v0.26.1):** 4 pauses — precondition → diff → tag message → push + workflow-watch. The CI workflow ran publish + assert-published + smoke; the skill watched it.
+- **Current (post-v0.26.5):** still 4 pauses, but Pause 4 splits into substeps run LOCALLY (5a assert-published, 5b smoke). The CI workflow only publishes. Rationale: CI minutes are not free, smoke takes 5-10 min in CI vs ~1 min locally, and iterating on a workflow bug at 10-min turnarounds is too slow vs the same step at 30s locally. The single thing CI uniquely does — publish via OIDC (token-less, provenance-attested) — stays in CI. Everything else stays local where the operator gets results immediately.
 
-The `--skip-publish-wait` flag is the recovery escape hatch: pass it when the operator handled publish manually via `make publish` and the workflow-watch step is therefore moot.
+The `--skip-publish-wait` flag is the recovery escape hatch: pass it when the operator handled publish manually via `make publish` and substeps 5a + 5b are therefore moot.
 
 ## Helper subcommands
 

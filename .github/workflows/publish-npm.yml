@@ -11,11 +11,19 @@ name: Publish to npm
 # fallback for outages or one-off out-of-band publishes; see RELEASING.md
 # § "Recovery — CI is broken".
 #
-# Per the project rule (.claude/rules/agent-discipline.md § "No test
-# infrastructure in CI"), this workflow ONLY runs the release-blocking
-# gates (publish → assert-published → marketplace smoke). It is NOT a
-# stand-in for the per-package vitest suite, which the operator runs
-# locally as part of /release.
+# SCOPE: this workflow does the ONE thing that only CI can do — publish
+# via OIDC (token-less, provenance-attested). Everything else — npm-side
+# visibility assertion, marketplace clone+install smoke, per-package
+# vitest suite — runs LOCALLY as part of /release. Reason: GH Actions
+# minutes are not free; CI smoke takes 5-10 minutes per run; iterating
+# on a workflow bug with 5-10 min turnaround is too slow vs the same
+# step running locally in ~30s.
+#
+# The /release skill polls `npm view` via the assert-published helper
+# (retry-with-backoff for CDN propagation) AFTER atomic-push and BEFORE
+# running scripts/smoke-marketplace.sh locally. Workflow success means
+# "publish succeeded"; adopter-reachability is the operator's local
+# verification responsibility.
 
 on:
   push:
@@ -68,12 +76,7 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: 'true'
 
-      - name: Extract version from tag
-        id: ver
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Assert all three packages published
-        run: npx tsx .claude/skills/release/lib/release-helpers.ts assert-published "${{ steps.ver.outputs.version }}"
-
-      - name: Marketplace smoke
-        run: bash scripts/smoke-marketplace.sh
+      # No assert-published / marketplace-smoke step here. The /release
+      # skill runs both LOCALLY after this workflow's publish step
+      # completes — much faster turnaround than waiting on GH Actions
+      # minutes. See RELEASING.md § "Workflow scope" for the rationale.

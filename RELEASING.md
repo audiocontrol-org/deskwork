@@ -4,14 +4,14 @@ The deskwork marketplace tracks the default branch of `audiocontrol-org/deskwork
 
 ### To release: `/release`
 
-The release ceremony is enshrined as the `/release` skill at `.claude/skills/release/`. Run that — it handles version validation, tagging, and the atomic push. The publish + smoke gates run inside `.github/workflows/publish-npm.yml` (triggered by the tag push). The skill is hard-gated: no `--force`, no `--skip-smoke`. If a gate refuses, fix the underlying state.
+The release ceremony is enshrined as the `/release` skill at `.claude/skills/release/`. Run that — it handles version validation, tagging, and the atomic push. The publish step runs inside `.github/workflows/publish-npm.yml` (triggered by the tag push). Everything else (assert-published, marketplace smoke) runs LOCALLY in the skill — much faster turnaround than waiting on GH Actions minutes. The skill is hard-gated: no `--force`, no `--skip-smoke`. If a gate refuses, fix the underlying state.
 
 The skill walks four operator decision points:
 
 1. **Precondition + version** — clean tree, FF over origin/main, branch up-to-date. Operator types the new version; skill validates it as strictly greater than the last tag.
 2. **Post-bump diff review** — operator confirms the manifest bump diff before commit.
 3. **Tag message** — skill verifies `@deskwork/{core,cli,studio}@<version>` are NOT yet published on npm (catches "version already published" before the tag goes out); operator confirms the tag message; skill creates the annotated tag.
-4. **Push + workflow watch** — skill prints the exact push command; operator confirms; skill atomic-pushes commit + branch + tag in one `git push --follow-tags` RPC. The tag push fires `publish-npm.yml`, which publishes all three packages via OIDC, asserts they're on the registry, and runs `scripts/smoke-marketplace.sh`. The skill watches the workflow via `gh run watch` and reports the release URL on success.
+4. **Push + local verification** — skill prints the exact push command; operator confirms; skill atomic-pushes commit + branch + tag in one `git push --follow-tags` RPC. The tag push fires `publish-npm.yml`, which publishes all three packages via OIDC and exits. The skill then runs `assert-published` LOCALLY (with retry-with-backoff to ride out npm CDN propagation) followed by `scripts/smoke-marketplace.sh` LOCALLY, then reports the release URL.
 
 The skill refuses to re-tag a published version. Recovery from a botched release is to bump-patch (e.g. `v0.9.0` broken → ship `v0.9.1`).
 
@@ -90,13 +90,14 @@ Plugin runtime code ships as published npm packages under the `@deskwork/*` scop
 
 The plugin shell's `plugin.json` `version` field is kept in lockstep with the published npm package version. `scripts/bump-version.ts` bumps both atomically, plus the per-plugin shell `package.json#dependencies` pin (e.g. `"@deskwork/cli": "0.9.5"`), so the entire repo moves to the same version in one commit.
 
-**Publish path (CI-driven via npm Trusted Publisher / OIDC):** `.github/workflows/publish-npm.yml` is triggered by every `v*` tag push and runs the publish + post-publish gates in CI. The workflow is the publish authority; the `/release` skill's atomic tag push is the operator's approval moment.
+**Publish path (CI-driven via npm Trusted Publisher / OIDC; verification runs locally):** `.github/workflows/publish-npm.yml` is triggered by every `v*` tag push. The workflow does ONE thing — `npm publish` via OIDC — because that's the only step that requires CI (OIDC token-less, provenance-attested publishing only works from a workflow with `id-token: write`). The post-publish verification (assert-published + marketplace smoke) runs LOCALLY in the `/release` skill, because waiting 5-10 minutes on GH Actions minutes for the same scripts that run in ~1-2 minutes locally is poor turnaround for iteration on release-process bugs.
 
 1. The `/release` skill verifies the version is not yet on npm (`assert-not-published`) BEFORE the tag goes out, so the workflow doesn't fail mid-publish on a duplicate version.
 2. The operator confirms the push prompt; the skill runs `git push --follow-tags`, which lands the tag on origin and fires `publish-npm.yml`.
 3. The workflow checks out the tagged commit, runs `npm ci`, then `make publish-ci` — which calls `npm publish --workspace @deskwork/<pkg>` for each of core / cli / studio under OIDC. Each `npm publish` invokes the package's own `prepack` script automatically (tsc build + auxiliary file copies + chmod on bin entries), so no separate build step is needed. `NPM_CONFIG_PROVENANCE=true` is set on the workflow env, so the publish emits provenance attestation tied to the workflow run.
-4. The workflow then runs `assert-published` (verifies the registry has all three at the new version) and `scripts/smoke-marketplace.sh` (clones the marketplace, npm-installs from the registry, boots studio, asserts routes). Both are release-blocking — workflow failure leaves the artifacts published but signals the release isn't healthy.
-5. The skill watches the workflow via `gh run watch` and reports the release URL on success.
+4. After atomic-push returns success, the `/release` skill runs (locally) `tsx .claude/skills/release/lib/release-helpers.ts assert-published <version>` to confirm all three packages reached the registry. The helper polls `npm view` with retry-with-backoff (initial 5s, exponential to 30s cap, 6 attempts) to ride out CDN propagation lag between the workflow accepting the PUT and the read API serving the new version.
+5. After assert-published succeeds, the skill runs `bash scripts/smoke-marketplace.sh` LOCALLY — clones the marketplace, npm-installs from the registry, boots studio, asserts routes return 200. This is the adopter-perspective verification.
+6. On both succeeding, the skill reports the release URL via `gh release view`.
 
 Each `@deskwork/*` package on npmjs.com has a Trusted Publisher entry registered against this exact workflow filename (`publish-npm.yml`). That registration plus the workflow's `id-token: write` permission is what authorizes the publish — there is no `NPM_TOKEN` secret. See § "Trusted Publisher setup" above for the one-time-per-package registration steps and § "Recovery — CI is broken" for the `make publish` manual-fallback procedure when the workflow itself is broken.
 
