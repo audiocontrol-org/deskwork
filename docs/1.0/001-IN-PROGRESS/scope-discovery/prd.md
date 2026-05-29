@@ -40,6 +40,10 @@ Move the audiocontrol-piloted Scope Discovery Protocol's CODE (scanners, validat
 
 Phase 11 captures exhaustively per the capture-mode rule. Scoping — which sub-tasks ship in which release — is operator-driven.
 
+**Phase 12 extension (2026-05-29).** Triggered by the canary [#349](https://github.com/audiocontrol-org/deskwork/issues/349) §2 framing of the manually-run codex audit as an operator-attention cost the protocol can't absorb at scale. The audit posture today has three layers: in-band self-audit (orchestrator-loop, same model + same context — blind to its own failure modes), the SDD two-reviewer cycle (spec + quality sub-agent dispatches — catches real BLOCKING bugs per canary §1a), and the manually-run codex audit (operator pastes work into a separate Codex session — demonstrably finds what Claude misses but requires manual invocation + paste + finding-by-finding triage). The third layer's audit quality is currently a function of the operator's intermittent capacity to run the audit by hand; manual discipline doesn't scale and isn't durable. Phase 12 ships a third automated audit surface — a multi-model audit barrage — that fires installed CLI tools (`claude`, `codex`, `gemini`) in parallel against a uniform prompt, persists raw per-model output, and surfaces a structured triage step. **CLI-based, not API-based** — usage-based pricing means the barrage can fire freely without per-call cost arithmetic; per-CLI auth is already configured in the operator's environment; subprocess orchestration is a well-trodden plugin pattern (already in use for `gh` / `git` / `npx tsx` / `jscpd`). The phase is ADDITIVE — not a replacement for the in-band self-audit or the SDD review cycle; all three audit surfaces stay active. This phase implements Design A from `ROADMAP.md` § "Audit-barrage feature shape". Design B (auto-fire at lifecycle waypoints + meta-audit synthesizer) and Design C (continuous background daemon) are deferred to follow-up cycles after Design A is stable + the operator has accumulated cross-model finding patterns. Workplan § Phase 12 captures all 7 sub-tasks exhaustively per the capture-mode rule.
+
+Phase 12 captures exhaustively. Scoping is operator-driven; the agent does not pre-cut.
+
 ## Acceptance Criteria
 
 - [ ] All ~18 new `/dw-lifecycle:*` slash commands exist and are discoverable via the Claude Code slash-command picker
@@ -76,6 +80,20 @@ Phase 11 captures exhaustively per the capture-mode rule. Scoping — which sub-
 - [ ] Tooling-feedback closure import workflow: TF-closure entries auto-promote to scope-discovery audit-log AUDIT-`<date>`-`<NN>` entries with cross-reference; doctor rule surfaces stale TF entries (configurable threshold); `/dw-lifecycle:tooling-feedback-import` skill walks closure-marked TF entries + transitions them.
 - [ ] **KeygroupSummary-shape repro fixture (anonymized) commits to test suite + passes** — synthetic component with ZERO `.ac-*` consumers + ≥5 utility-class hits → the negative-space pattern fires. The audiocontrol incident's canonical repro becomes the regression-defense fixture.
 - [ ] **First dogfood cycle (graphical-entries team) reports the inventory-vs-discovery gap is closed** via the v1.X tooling-feedback log. The auditor-correction-rate on that team's commits decreases over time as the catalog matures.
+
+**Phase 12 acceptance criteria (added 2026-05-29; extension proposed after canary [#349](https://github.com/audiocontrol-org/deskwork/issues/349) §2 operator-discipline framing):**
+
+- [ ] NEW `/dw-lifecycle:audit-barrage` skill exists and is discoverable. NEW `dw-lifecycle audit-barrage` CLI verb takes `--feature <slug>` (REQUIRED) + optional `--range <vA>..<vB>`, `--models <list>`, `--prompt-file <path>`, `--quiet` flags. Fires N parallel CLI subprocesses (default: `claude`, `codex`, `gemini`) against a uniform prompt; captures per-model output to `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/{INDEX.md, PROMPT.md, <model>.md, stderr/<model>.txt}`.
+- [ ] Project-shipped prompt template at `plugins/dw-lifecycle/templates/audit-barrage-prompt.md`. Project-overridable at `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` per the existing scope-discovery override pattern.
+- [ ] Project-shipped model config at `plugins/dw-lifecycle/templates/audit-barrage-config.yaml` with default model list (claude / codex / gemini). Project-overridable at `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml`. JSON Schema for editor autocomplete shipped at `plugins/dw-lifecycle/src/scope-discovery/schema/audit-barrage-config.yaml.schema.json`.
+- [ ] CLI exit code contract: 0 if ≥1 model produced output; 1 if all models failed; 2 on usage error.
+- [ ] Tests cover: happy path (all models fire + capture), missing-binary (one CLI absent → loud error + others still fire), timeout enforcement (CLI exceeds configured timeout → killed + recorded), prompt template substitution, override resolution.
+- [ ] Local smoke script `scripts/smoke-audit-barrage.sh` passes against fake CLIs (test-only fixtures).
+- [ ] `install-scope-discovery` seeds the project-override files (commented-out defaults) so adopters know they can override.
+- [ ] **Live acceptance signal** — one barrage run against an in-flight feature surfaces ≥1 finding that the in-band self-audit + SDD review cycle didn't catch, confirmed by operator-side triage and lifted into the canonical audit-log. This is the genetic-diversity payoff measure per ROADMAP § "Audit-barrage feature shape".
+- [ ] Agent-discipline rule documents the audit-barrage surface as the third independent audit layer (additive to in-band self-audit + SDD review cycle); cites the operator-triage workflow + the override paths.
+- [ ] ROADMAP.md updated to mark Design A delivered + Design B framed as next.
+- [ ] Adopter-facing docs: `plugins/dw-lifecycle/README.md` carries an audit-barrage section + the operator triage workflow.
 
 ## Out of Scope
 

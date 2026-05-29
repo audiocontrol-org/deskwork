@@ -590,3 +590,133 @@ The graphical-entries canary surfaced four follow-up items from the Phase 6 dogf
 - [ ] **#318 validation milestone — cross-feature, owned by graphical-entries.** Run `scope-widen` against graphical-entries Phase 7 Tasks 7.1 (members[] schema delta) AND 7.3 (group review surface) — features with genuinely novel shapes the registered pattern catalog can't yet cover. If `scope-widen` surfaces `discovered_candidate` clusters, #318's clustering pass is validated end-to-end against real-world novel input. If still `0 additions`, there's still a gap to close. Per #349 §2. Tracked at graphical-entries' Phase 7 acceptance criteria; this entry is the scope-discovery side of the cross-reference.
 
 These items are filed for tracking but don't block any scope-discovery acceptance criterion. They feed into the next scope-discovery release cycle (likely a v0.25.1 patch covering #350 + #351 + #352, with #318 validation pending Phase 7 graphical-entries work).
+
+## Phase 12: Multi-model audit barrage
+
+**Parent issue:** (TBD — file via `/dw-lifecycle:issues` after this phase iterates through deskwork)
+**Source:** ROADMAP.md § "Audit-barrage feature shape"; operator design conversation 2026-05-29; canary [#349](https://github.com/audiocontrol-org/deskwork/issues/349) §2 "operator-discipline cost" framing.
+
+**Problem the phase addresses (captured exhaustively per capture-mode rule; scoping is a separate pass):**
+
+The current scope-discovery audit posture has three layers — in-band self-audit (orchestrator-loop, same model + same context), the SDD two-reviewer cycle (spec + quality sub-agent dispatches), and the manually-run codex audit (operator pastes work into a separate Codex session). The codex audit demonstrably finds what Claude misses — different training corpus = independent failure modes — but it requires manual invocation, manual copy-paste, manual finding-by-finding triage. Manual discipline doesn't scale and isn't durable. The audit quality is currently a function of the operator's intermittent capacity to run the audit by hand. This phase ships a third audit surface — automated multi-model audit barrage — that fires installed CLI tools (`claude`, `codex`, `gemini`) in parallel, persists raw per-model output, and surfaces a structured triage step over uniform run artifacts.
+
+The phase is additive — not a replacement for the in-band self-audit or the SDD review cycle. All three surfaces stay active; the barrage adds genetic diversity in audit failure modes.
+
+The phase implements Design A from `ROADMAP.md` § "Audit-barrage feature shape". Design B (auto-fire at lifecycle waypoints + meta-audit synthesizer) and Design C (continuous background daemon) are out-of-scope here; they're tracked in the roadmap for follow-up work after Design A is stable + the operator has accumulated cross-model finding patterns.
+
+**Implementation posture: CLI-based, not API-based.** Three reasons documented in ROADMAP.md: (1) CLIs are usage-based — no per-call cost arithmetic; (2) auth is already configured per-CLI in the operator's environment — no key handling in the plugin; (3) subprocess orchestration is a well-trodden plugin pattern (already in use for `gh`, `git`, `npx tsx`, `jscpd`).
+
+### Task 1: Infrastructure verification
+
+Confirm the three CLIs are installed + authenticated on the operator's machine. Baseline the invocation contracts before designing around them.
+
+- [ ] Step 1: Confirm `claude`, `codex`, `gemini` are on PATH on the operator's machine. Document the invocation pattern for each (flags, prompt-as-arg vs prompt-via-stdin vs prompt-via-file).
+- [ ] Step 2: Probe per-CLI behaviors: long prompts (multi-KB), structured output, error reporting (stderr separation), timeouts.
+- [ ] Step 3: Document findings inline in this workplan (`Task 1 evidence:` block) — operator-readable contract per CLI.
+
+**Acceptance Criteria:**
+- [ ] Per-CLI invocation pattern documented + verified live against the installed binaries.
+- [ ] At least one full prompt-fire-capture round-trip per CLI verified working end-to-end.
+
+### Task 2: CLI verb + subprocess orchestration library
+
+- [ ] Step 1: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/types.ts` — `ModelConfig`, `BarrageInput`, `BarrageRun`, `BarrageResult` interfaces.
+- [ ] Step 2: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/run-artifacts.ts` — directory layout helpers (`INDEX.md`, `PROMPT.md`, `<model>.md`, `stderr/<model>.txt`); deterministic timestamp encoding; safe-filename derivation from model name.
+- [ ] Step 3: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts` — wraps `child_process.spawn` with: timeout enforcement, exit-code capture, stdout/stderr capture to separate files, kill-on-timeout, prompt template substitution.
+- [ ] Step 4: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-barrage.ts` — composes spawn-cli into parallel `Promise.all`; per-model success/failure tracking; per-model exit-code recording; run-dir creation + INDEX assembly.
+- [ ] Step 5: NEW CLI subcommand `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts` — flag parsing (`--feature <slug>`, `--range <vA>..<vB>`, `--models <list>`, `--prompt-file <path>`, `--quiet`, `--help`); calls orchestrate-barrage; reports run-dir + per-model summary. Register `'audit-barrage'` in `cli.ts`.
+- [ ] Step 6: Tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/` against fake-CLI subprocess fixtures.
+
+**Acceptance Criteria:**
+- [ ] `dw-lifecycle audit-barrage --feature <slug>` fires three CLI subprocesses in parallel.
+- [ ] Each subprocess output captured to a per-model markdown file under `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/<model>.md`.
+- [ ] `INDEX.md` + `PROMPT.md` + `stderr/<model>.txt` written per run.
+- [ ] Tests cover: happy path, missing-binary, timeout, prompt template substitution.
+- [ ] Exit code: 0 if ≥1 model produced output; 1 if all models failed; 2 on usage error.
+
+### Task 3: Prompt template + model config
+
+- [ ] Step 1: NEW `plugins/dw-lifecycle/templates/audit-barrage-prompt.md` — uniform audit prompt with `{{var}}` substitutions for `feature_slug`, `workplan_summary`, `diff`, `audit_log_excerpt`, `commit_subjects`. Asks each model for findings in the canonical audit-log entry format (`Finding-ID`, `Status: open`, `Severity`, `Surface`, body). Explicit instruction: "if you find nothing, say so explicitly with reasoning — don't pad with weak findings."
+- [ ] Step 2: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/prompt-renderer.ts` — reads the template (project-override at `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` takes precedence); substitutes vars; surfaces unsubstituted-var errors loud.
+- [ ] Step 3: NEW `plugins/dw-lifecycle/templates/audit-barrage-config.yaml` — default models block with `claude` / `codex` / `gemini` entries; each entry: `name`, `binary`, `args_template` (with `{{prompt}}` placeholder), `timeout_seconds`.
+- [ ] Step 4: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/config-loader.ts` — reads the YAML (project-override takes precedence); validates per-entry shape.
+- [ ] Step 5: NEW `plugins/dw-lifecycle/src/scope-discovery/schema/audit-barrage-config.yaml.schema.json` — JSON Schema for editor autocomplete.
+- [ ] Step 6: Extend `install-scope-discovery` to seed the project-override files (commented-out defaults) at `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` and `audit-barrage-config.yaml`.
+
+**Acceptance Criteria:**
+- [ ] Prompt template + config land in `plugins/dw-lifecycle/templates/`.
+- [ ] Project-override pattern works end-to-end.
+- [ ] Schema enables editor autocomplete on the config YAML.
+- [ ] `install-scope-discovery` seeds the override files as commented-out scaffolds.
+
+### Task 4: Skill prose
+
+- [ ] Step 1: NEW `plugins/dw-lifecycle/skills/audit-barrage/SKILL.md`. Describes operator workflow: invoke → wait for parallel barrage → walk the run dir → triage findings into the canonical audit-log via the existing closure workflow. Covers: when to run, how to invoke, what to expect in the run dir, how to lift findings.
+- [ ] Step 2: SKILL.md cross-references `ROADMAP.md` § Audit-barrage so operators see the long-term plan.
+- [ ] Step 3: Add `/dwab` (audit-barrage) shortcut to `dw-lifecycle:install-shortcuts`.
+
+**Acceptance Criteria:**
+- [ ] `/dw-lifecycle:audit-barrage` discoverable via slash-command picker.
+- [ ] `/dwab` shortcut works.
+- [ ] SKILL.md documents invocation + triage workflow + override paths.
+
+### Task 5: Tests + smoke
+
+- [ ] Step 1: Verify per-task tests landed across Tasks 2–4; backfill gaps.
+- [ ] Step 2: Cross-cutting tests: full barrage against fake-CLI fixtures; failure modes (missing binary, timeout, malformed prompt substitution, override-file-not-readable, run-dir-creation-failure).
+- [ ] Step 3: NEW `scripts/smoke-audit-barrage.sh` — exercises end-to-end against fake CLIs that emit predictable findings; asserts run-dir layout, INDEX content, per-model stdout/stderr separation. Local-only; not wired into CI.
+
+**Acceptance Criteria:**
+- [ ] Full plugin suite passes with audit-barrage tests added.
+- [ ] `scripts/smoke-audit-barrage.sh` passes end-to-end against fake CLIs.
+
+### Task 6: Live verification + dogfood
+
+- [ ] Step 1: Pick a dogfood target — graphical-entries Phase 7 work OR audit-barrage feature itself (self-dogfood).
+- [ ] Step 2: Invoke `/dw-lifecycle:audit-barrage --feature <slug>` against the target.
+- [ ] Step 3: Walk the run dir; cross-reference findings across models.
+- [ ] Step 4: Lift high-signal findings into the canonical audit-log.
+- [ ] Step 5: Friction-feedback for the tooling itself lands at `tooling-feedback.md` per the existing canary pattern.
+
+**Acceptance Criteria:**
+- [ ] One live barrage run completes against an in-flight feature.
+- [ ] At least one finding the in-band self-audit + SDD review cycle didn't catch lifted into the canonical audit-log (the genetic-diversity acceptance signal per ROADMAP).
+- [ ] Tooling-feedback friction items filed if any surfaced.
+
+### Task 7: Cross-references + ROADMAP update
+
+- [ ] Step 1: Add a section to `.claude/rules/agent-discipline.md` titled "Audit-barrage: structured cross-model audit". Names the new surface + the operator's triage workflow + how it composes with the in-band self-audit + the SDD review cycle (three independent surfaces, additive not replacement).
+- [ ] Step 2: Update `ROADMAP.md` § "Audit-barrage feature shape" — move Design A from "active in-flight" to "shipped"; tighten Design B's framing now that A's primitives exist.
+- [ ] Step 3: Move audit-barrage from "Active in-flight" to "Recently shipped" in ROADMAP.
+- [ ] Step 4: Add audit-barrage section to `plugins/dw-lifecycle/README.md`.
+
+**Acceptance Criteria:**
+- [ ] Agent-discipline rule documents the audit-barrage surface.
+- [ ] ROADMAP.md reflects Design A shipped + Design B as next.
+- [ ] Adopter-facing docs: README + skill prose + agent-discipline rule update.
+
+### Phase 12 — Out of Scope (deferred to Design B / Design C per ROADMAP)
+
+- Auto-fire at lifecycle waypoints (`/dw-lifecycle:session-end`, `/dw-lifecycle:complete`, `/release` Pause 5). Design B.
+- Meta-audit synthesizer — single LLM call that synthesizes the N raw runs into a ranked-findings block. Design B.
+- High-confidence auto-promote to audit-log — findings with M-of-N model agreement auto-lifted as `Status: pending-operator-review`. Design B.
+- Continuous background audit daemon — long-running process watching for new commits. Design C.
+- Per-model auth handling — by design; the CLIs are expected to be already-authenticated in the operator's environment. The verb fails loud if a configured CLI binary is missing or unauthenticated.
+- Replacing the in-band self-audit or SDD review cycle — audit-barrage is ADDITIVE.
+- Token-cost optimization — CLIs are usage-based; no per-call budgeting.
+
+### Phase 12 — Open scoping questions (operator decides during PRD iterate)
+
+1. **Should `claude` be one of the three default models?** Cross-context comparison vs correlated failure-modes tradeoff. Including Claude gives a baseline against the in-band self-audit; excluding maximizes diversity from the in-band layer.
+2. **Range default behavior for greenfield features (no audit-log watermark).** Fall back to `<base-branch>..<HEAD>`, or require explicit `--range`?
+3. **Triage UX for v1 — CLI-only or thin studio surface?** CLI-only is consistent with hygiene's UNIX philosophy; studio surface would be richer but introduces new ground.
+4. **Prompt's "what to look for" section — generic ("find bugs, design issues, missed edge cases") vs scope-discovery-specific ("find shapes that should have been caught by registered patterns but weren't")?** Different prompts produce different signal.
+5. **Timeout default — 300s (5 min) starting point; needs calibration against real CLI invocation cost.** Live verification (Task 6) will inform.
+
+### Phase 12 — Existing primitives this composes over
+
+- `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/` — the existing external auditor fire pattern (`fireExternalAudit` in `llm/auditor.ts`) is the closest analog; audit-barrage extends to N parallel CLI fires.
+- Hygiene's `close-shipped` 4-source walker — the operator's lifted audit-log findings flow naturally through close-shipped at release time.
+- Project override resolution pattern at `.dw-lifecycle/scope-discovery/<file>` — already in use by anti-patterns / adopter-manifests / pattern-matrix overrides.
+- `child_process.spawn` subprocess orchestration — already in use for `gh`, `git`, `npx tsx`, `jscpd` invocations across the plugin.
+- The audit-log entry format — the canonical `Finding-ID` / `Status` / `Severity` / `Surface` shape every audit-barrage finding maps into.
