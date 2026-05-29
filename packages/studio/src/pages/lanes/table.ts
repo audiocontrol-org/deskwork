@@ -60,14 +60,22 @@ function renderTableRow(
   // Purge is gated to archived + zero-entry rows. The CLI enforces
   // the gate too; the page surfaces it visually to reduce the chance
   // the operator runs a refused command.
-  const purgeButton =
-    row.archived && row.entryCount === 0
-      ? renderCopyButton({
-          label: COPY_BTN_PURGE_LABEL,
-          copy: `/deskwork:lane purge ${row.id}`,
-          variant: 'purge',
-        })
-      : '';
+  //
+  // When the lane is archived but still has entries, render a
+  // visibly-disabled Purge button that names the gate ("N entries")
+  // and explains the next step in its title. The disabled state
+  // makes the gate discoverable — without it, the operator sees no
+  // affordance at all and stalls.
+  let purgeButton: RawHtml | '' = '';
+  if (row.archived && row.entryCount === 0) {
+    purgeButton = renderCopyButton({
+      label: COPY_BTN_PURGE_LABEL,
+      copy: `/deskwork:lane purge ${row.id}`,
+      variant: 'purge',
+    });
+  } else if (row.archived && row.entryCount > 0) {
+    purgeButton = renderDisabledPurgeButton(row.entryCount);
+  }
 
   return unsafe(html`
     <tr class="lanes-row" data-lane-row data-lane-id="${row.id}"${unsafe(row.archived ? ' data-archived' : '')}>
@@ -76,7 +84,7 @@ function renderTableRow(
           class="lanes-reorder-handle"
           aria-hidden="true"
           title="Reorder via the dashboard lane rail"
-        >⋮⋮</span>
+        >⋮</span>
       </td>
       <td class="lanes-cell lanes-cell--id"><code>${row.id}</code></td>
       <td class="lanes-cell lanes-cell--name">${row.name}</td>
@@ -125,6 +133,26 @@ function renderCopyButton(input: CopyButtonInput): RawHtml {
       data-copy="${input.copy}"
       title="Copy ${input.copy} to clipboard"
     >${input.label}</button>`);
+}
+
+/**
+ * Render a visibly-disabled Purge button for an archived lane that
+ * still has entries bound to it. The disabled state makes the gate
+ * (move entries first) discoverable; the title explains the next
+ * step. Carries no `data-copy` and no `data-lane-copy` — the client
+ * controller never wires it for clipboard copy. The CLI also gates
+ * purge on zero entries; this is the visual mirror of the CLI gate.
+ */
+function renderDisabledPurgeButton(entryCount: number): RawHtml {
+  const noun = entryCount === 1 ? 'entry' : 'entries';
+  return unsafe(html`
+    <button
+      class="lanes-btn lanes-btn--purge-disabled"
+      type="button"
+      disabled
+      aria-disabled="true"
+      title="Cannot purge: ${entryCount} ${noun} still reference this lane. Move them to another lane first via the per-entry surface."
+    >${COPY_BTN_PURGE_LABEL} — ${entryCount} ${noun}</button>`);
 }
 
 /**

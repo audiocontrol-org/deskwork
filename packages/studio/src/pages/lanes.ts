@@ -135,8 +135,15 @@ function renderHeader(data: LanesPageData): RawHtml {
 /**
  * Empty-state for the active table — no lanes configured at all.
  * Renders a prominent "Create your first lane" CTA pointed at the
- * New Lane form (which is rendered above in the page body). The CTA
- * scrolls to the form via a hash anchor.
+ * New Lane form (which is rendered above in the page body).
+ *
+ * The CTA carries both a `href="#lanes-new-form-heading"` anchor
+ * (no-JS fallback that scrolls to the form heading) AND a
+ * `data-lanes-cta-focus` attribute the client controller hooks. On
+ * click with JS available, the client intercepts the anchor and
+ * focuses the first field of the New Lane form instead — the
+ * operator's intent on click is "let me start typing," not "scroll
+ * me there."
  */
 function renderEmptyActiveState(): RawHtml {
   return unsafe(html`
@@ -145,7 +152,11 @@ function renderEmptyActiveState(): RawHtml {
         No lanes configured. A project needs at least one lane to
         track entries.
       </p>
-      <a class="lanes-btn lanes-btn--primary" href="#lanes-new-form-heading">
+      <a
+        class="lanes-btn lanes-btn--primary"
+        href="#lanes-new-form-heading"
+        data-lanes-cta-focus
+      >
         Create your first lane
       </a>
     </div>`);

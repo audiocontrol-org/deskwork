@@ -322,6 +322,25 @@
   color: var(--er-paper, #F5F1E8);
 }
 
+/*
+ * Visibly-disabled Purge button (archived lane with entries still
+ * bound). The disabled state makes the gate discoverable; the title
+ * attribute explains the next step ("move entries first"). Carries no
+ * click handler — the CLI gate matches this visual gate.
+ */
+.lanes-btn--purge-disabled {
+  border-color: var(--er-faded-2, #B5AC9B);
+  color: var(--er-faded, #8A7F70);
+  background: var(--er-paper-2, #ECE6D4);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.lanes-btn--purge-disabled:hover {
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-faded, #8A7F70);
+}
+
 .lanes-btn.is-copied {
   background: var(--er-stamp-green, #2E5D45) !important;
   color: var(--er-paper, #F5F1E8) !important;
@@ -383,7 +402,7 @@
 .lanes-reorder-handle {
   display: inline-block;
   color: var(--er-faded-2, #B5AC9B);
-  cursor: grab;
+  cursor: help;
   user-select: none;
   font-family: var(--er-font-mono, ui-monospace, monospace);
 }

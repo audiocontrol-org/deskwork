@@ -217,20 +217,23 @@ describe('lanes-page client controller', () => {
     // Initial preview is the placeholder shape (no values yet)
     expect(preview.textContent).toMatch(/^\/deskwork:lane create <id>/);
 
+    // Every operator-supplied value is JSON-stringified into the
+    // command (quoted symmetrically across id / name / template /
+    // contentDir). Placeholders stay un-quoted angle-brackets.
     const idInput = container.querySelector<HTMLInputElement>('[data-lanes-field="id"]')!;
     idInput.value = 'mockups';
     idInput.dispatchEvent(inputEvent());
-    expect(preview.textContent).toContain('/deskwork:lane create mockups');
+    expect(preview.textContent).toContain('/deskwork:lane create "mockups"');
 
     const select = container.querySelector<HTMLSelectElement>('[data-lanes-field="template"]')!;
     select.value = 'visual';
     select.dispatchEvent(changeEvent());
-    expect(preview.textContent).toContain('--template visual');
+    expect(preview.textContent).toContain('--template "visual"');
 
     const contentDir = container.querySelector<HTMLInputElement>('[data-lanes-field="contentDir"]')!;
     contentDir.value = 'mockups';
     contentDir.dispatchEvent(inputEvent());
-    expect(preview.textContent).toContain('--content-dir mockups');
+    expect(preview.textContent).toContain('--content-dir "mockups"');
 
     // Optional name appears only when filled
     expect(preview.textContent).not.toContain('--name');
@@ -257,7 +260,9 @@ describe('lanes-page client controller', () => {
     await Promise.resolve();
 
     expect(calls.length).toBe(1);
-    expect(calls[0]).toContain('/deskwork:lane create mockups --template visual --content-dir mockups');
+    expect(calls[0]).toContain(
+      '/deskwork:lane create "mockups" --template "visual" --content-dir "mockups"',
+    );
   });
 
   it('Edit form: only changed fields appear in the update command', () => {
@@ -273,17 +278,19 @@ describe('lanes-page client controller', () => {
     const preview = container.querySelector<HTMLElement>(
       '[data-lanes-preview][data-lane-id="editorial-lane"]',
     )!;
-    // No changes yet → bare update shape
-    expect(preview.textContent).toBe('/deskwork:lane update editorial-lane');
+    // No changes yet → bare update shape. Lane id is JSON-stringified
+    // for symmetry with the value flags.
+    expect(preview.textContent).toBe('/deskwork:lane update "editorial-lane"');
 
-    // Change contentDir only
+    // Change contentDir only — its flag value is quoted symmetrically
+    // with name (per the slash-command quoting convention).
     const contentDir = container.querySelector<HTMLInputElement>(
       '[data-lanes-edit-form][data-lane-id="editorial-lane"] [data-lanes-field="contentDir"]',
     )!;
     contentDir.value = 'docs-new';
     contentDir.dispatchEvent(inputEvent());
     expect(preview.textContent).toBe(
-      '/deskwork:lane update editorial-lane --content-dir docs-new',
+      '/deskwork:lane update "editorial-lane" --content-dir "docs-new"',
     );
 
     // Also change name
@@ -293,7 +300,7 @@ describe('lanes-page client controller', () => {
     name.value = 'Edit Lane';
     name.dispatchEvent(inputEvent());
     expect(preview.textContent).toContain('--name "Edit Lane"');
-    expect(preview.textContent).toContain('--content-dir docs-new');
+    expect(preview.textContent).toContain('--content-dir "docs-new"');
   });
 
   it('Edit toggle reveals + hides the hidden edit row + flips aria-expanded', () => {
@@ -337,6 +344,68 @@ describe('lanes-page client controller', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('Edit form: cleared fields are NOT emitted as --flag "" (blank-clear is a no-op for diff emit)', () => {
+    const container = buildContainer();
+    buildEditFormRow(
+      container,
+      'editorial-lane',
+      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      ['editorial', 'visual'],
+    );
+    initLanesPage();
+    const preview = container.querySelector<HTMLElement>(
+      '[data-lanes-preview][data-lane-id="editorial-lane"]',
+    )!;
+
+    // Clear the name — should NOT emit `--name ""`.
+    const name = container.querySelector<HTMLInputElement>(
+      '[data-lanes-edit-form][data-lane-id="editorial-lane"] [data-lanes-field="name"]',
+    )!;
+    name.value = '';
+    name.dispatchEvent(inputEvent());
+    expect(preview.textContent).toBe('/deskwork:lane update "editorial-lane"');
+    expect(preview.textContent).not.toContain('--name');
+
+    // Clear the contentDir — same, no `--content-dir ""`.
+    const contentDir = container.querySelector<HTMLInputElement>(
+      '[data-lanes-edit-form][data-lane-id="editorial-lane"] [data-lanes-field="contentDir"]',
+    )!;
+    contentDir.value = '';
+    contentDir.dispatchEvent(inputEvent());
+    expect(preview.textContent).toBe('/deskwork:lane update "editorial-lane"');
+    expect(preview.textContent).not.toContain('--content-dir');
+  });
+
+  it('Edit toggle: single-open accordion — opening row B closes row A', () => {
+    const container = buildContainer();
+    const a = buildEditFormRow(
+      container,
+      'lane-a',
+      { name: 'A', template: 'editorial', contentDir: 'docs-a' },
+      ['editorial'],
+    );
+    const b = buildEditFormRow(
+      container,
+      'lane-b',
+      { name: 'B', template: 'editorial', contentDir: 'docs-b' },
+      ['editorial'],
+    );
+    initLanesPage();
+
+    // Open A
+    a.toggle.click();
+    expect(a.editRow.hidden).toBe(false);
+    expect(a.toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(b.editRow.hidden).toBe(true);
+
+    // Open B — A should close automatically
+    b.toggle.click();
+    expect(b.editRow.hidden).toBe(false);
+    expect(b.toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(a.editRow.hidden).toBe(true);
+    expect(a.toggle.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('row Archive button clipboards the slash command from data-copy', async () => {
     const container = buildContainer();
     buildEditFormRow(
@@ -355,5 +424,84 @@ describe('lanes-page client controller', () => {
 
     expect(calls.length).toBe(1);
     expect(calls[0]).toBe('/deskwork:lane archive editorial-lane');
+  });
+
+  it('archived section: toggle event persists open state to localStorage (project-scoped)', () => {
+    const container = buildContainer();
+    container.dataset.projectKey = 'test-proj';
+
+    // Build a <details> archived section
+    const section = document.createElement('section');
+    const details = document.createElement('details');
+    details.dataset.lanesArchivedDetails = '';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Archived lanes';
+    details.appendChild(summary);
+    section.appendChild(details);
+    container.appendChild(section);
+
+    window.localStorage.clear();
+    initLanesPage();
+
+    // Open the details (which fires `toggle`)
+    details.open = true;
+    details.dispatchEvent(new Event('toggle'));
+    expect(window.localStorage.getItem('deskwork:lanes:test-proj:archived-open')).toBe('true');
+
+    // Close again
+    details.open = false;
+    details.dispatchEvent(new Event('toggle'));
+    expect(window.localStorage.getItem('deskwork:lanes:test-proj:archived-open')).toBe('false');
+  });
+
+  it('archived section: stored open=true is restored on init', () => {
+    const container = buildContainer();
+    container.dataset.projectKey = 'test-proj';
+
+    const section = document.createElement('section');
+    const details = document.createElement('details');
+    details.dataset.lanesArchivedDetails = '';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Archived lanes';
+    details.appendChild(summary);
+    section.appendChild(details);
+    container.appendChild(section);
+
+    // Section was server-rendered closed; storage says it should
+    // be open from a previous session.
+    expect(details.open).toBe(false);
+    window.localStorage.setItem('deskwork:lanes:test-proj:archived-open', 'true');
+
+    initLanesPage();
+    expect(details.open).toBe(true);
+  });
+
+  it('empty-state CTA: click focuses the New Lane id field (overrides anchor scroll)', () => {
+    const container = buildContainer();
+
+    // Build the New Lane form (so the focus target exists)
+    buildNewForm(container, ['editorial']);
+
+    // Build the empty-state CTA
+    const empty = document.createElement('div');
+    empty.dataset.lanesEmpty = '';
+    const cta = document.createElement('a');
+    cta.href = '#lanes-new-form-heading';
+    cta.dataset.lanesCtaFocus = '';
+    cta.textContent = 'Create your first lane';
+    empty.appendChild(cta);
+    container.appendChild(empty);
+
+    initLanesPage();
+
+    // Click the CTA: default should be prevented + focus should
+    // move to the id field
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    cta.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    const idInput = container.querySelector<HTMLInputElement>(
+      '[data-lanes-new-form] [data-lanes-field="id"]',
+    )!;
+    expect(document.activeElement).toBe(idInput);
   });
 });

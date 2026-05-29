@@ -2,7 +2,7 @@
  * Client controller for the `/dev/lanes` studio page (Phase 6 Task
  * 6.3).
  *
- * Three responsibilities:
+ * Responsibilities:
  *
  *   1. **Live command preview.** Each form (New + per-row Edit)
  *      carries a `<code data-lanes-preview>` element. On every
@@ -14,9 +14,31 @@
  *      payload through `copyOrShowFallback` and flashes a "Copied"
  *      affirmation on the button.
  *
- *   3. **Per-row Edit toggle.** Each row's Edit button toggles the
- *      sibling `tr[data-lane-edit-row]` between visible / hidden +
- *      flips `aria-expanded` on the toggle button.
+ *   3. **Per-row Edit toggle (single-open accordion).** Each row's
+ *      Edit button toggles the sibling `tr[data-lane-edit-row]`
+ *      between visible / hidden + flips `aria-expanded` on the
+ *      toggle button. Opening one row's edit form auto-closes any
+ *      previously-open row — at most one edit form is visible at a
+ *      time.
+ *
+ *   4. **Archived-section open-state persistence.** A `toggle` event
+ *      handler on `[data-lanes-archived-details]` writes the open
+ *      state to `localStorage` (project-scoped); on init the page
+ *      reads it back and restores the previous state.
+ *
+ *   5. **Empty-state CTA focus.** The "Create your first lane" CTA
+ *      overrides its anchor scroll to focus the first field of the
+ *      New Lane form — the operator's intent on click is "let me
+ *      start typing," not "scroll me there." The anchor `href`
+ *      stays as a no-JS fallback.
+ *
+ * Slash-command quoting convention: every operator-supplied value
+ * routed through `quoteValue()` (JSON.stringify). This handles
+ * embedded quotes, backslashes, and whitespace symmetrically across
+ * every flag — name, template, contentDir, id. Cleared fields in
+ * the Edit form are NOT emitted as `--flag ""`; to clear a field's
+ * value, manually edit the slash-command after pasting (the Edit
+ * form is a copy-builder, not a destructive editor).
  *
  * THESIS Consequence 2: the controller never mutates state on the
  * server. There are no fetch / POST paths; every operator action
@@ -28,8 +50,11 @@
  */
 
 import { copyOrShowFallback } from '../clipboard.ts';
+import { resolveProjectKey } from '../dashboard/swimlane-storage.ts';
 
 const COPIED_FLASH_MS = 1500;
+const ARCHIVED_OPEN_STORAGE_PREFIX = 'deskwork:lanes:';
+const ARCHIVED_OPEN_STORAGE_SUFFIX = ':archived-open';
 
 interface NewFormValues {
   readonly id: string;
@@ -47,6 +72,27 @@ interface EditFormValues {
   readonly contentDirCurrent: string;
 }
 
+/**
+ * Quote an operator-supplied value for inclusion in a slash command.
+ *
+ * Uses `JSON.stringify` to wrap the value in double quotes and escape
+ * embedded quotes, backslashes, and control characters. Applied
+ * uniformly to every value routed into the slash-command builder so
+ * the output parses identically across shells and Claude Code's slash
+ * parser (and so a value with spaces or quotes can't slip through as
+ * an injection surface if pasted into a shell).
+ */
+function quoteValue(value: string): string {
+  return JSON.stringify(value);
+}
+
+/**
+ * Module-level tracker for the currently-open Edit form row. Used to
+ * implement the single-open accordion: opening a new row's Edit form
+ * automatically closes the previously-open one.
+ */
+let openLaneId: string | null = null;
+
 function readFieldValue(form: HTMLElement, name: string): string {
   const el = form.querySelector<HTMLInputElement | HTMLSelectElement>(
     `[data-lanes-field="${name}"]`,
@@ -62,29 +108,47 @@ function readFieldCurrent(form: HTMLElement, name: string): string {
 }
 
 function buildCreateCommand(values: NewFormValues): string {
-  const id = values.id.length > 0 ? values.id : '<id>';
-  const template = values.template.length > 0 ? values.template : '<template>';
-  const contentDir = values.contentDir.length > 0 ? values.contentDir : '<path>';
-  const nameFragment = values.name.length > 0 ? ` --name ${JSON.stringify(values.name)}` : '';
+  const id = values.id.length > 0 ? quoteValue(values.id) : '<id>';
+  const template =
+    values.template.length > 0 ? quoteValue(values.template) : '<template>';
+  const contentDir =
+    values.contentDir.length > 0 ? quoteValue(values.contentDir) : '<path>';
+  const nameFragment =
+    values.name.length > 0 ? ` --name ${quoteValue(values.name)}` : '';
   return `/deskwork:lane create ${id} --template ${template} --content-dir ${contentDir}${nameFragment}`;
 }
 
+/**
+ * Build the `/deskwork:lane update` command from edit-form values.
+ *
+ * Cleared fields are NOT emitted as `--flag ""`. Every diff-emit
+ * branch requires the new value to be non-empty AND different from
+ * the current value — the Edit form is a copy-builder, not a
+ * destructive editor. An operator who wants to clear a value
+ * manually edits the resulting slash-command after pasting.
+ *
+ * Operator-supplied values flow through `quoteValue()` to keep
+ * quoting symmetric across name / template / contentDir.
+ */
 function buildUpdateCommand(
   laneId: string,
   values: EditFormValues,
 ): string {
   const flags: string[] = [];
-  if (values.name !== values.nameCurrent) {
-    flags.push(`--name ${JSON.stringify(values.name)}`);
+  if (values.name !== values.nameCurrent && values.name.length > 0) {
+    flags.push(`--name ${quoteValue(values.name)}`);
   }
   if (values.template !== values.templateCurrent && values.template.length > 0) {
-    flags.push(`--template ${values.template}`);
+    flags.push(`--template ${quoteValue(values.template)}`);
   }
-  if (values.contentDir !== values.contentDirCurrent && values.contentDir.length > 0) {
-    flags.push(`--content-dir ${values.contentDir}`);
+  if (
+    values.contentDir !== values.contentDirCurrent &&
+    values.contentDir.length > 0
+  ) {
+    flags.push(`--content-dir ${quoteValue(values.contentDir)}`);
   }
   const flagFragment = flags.length === 0 ? '' : ` ${flags.join(' ')}`;
-  return `/deskwork:lane update ${laneId}${flagFragment}`;
+  return `/deskwork:lane update ${quoteValue(laneId)}${flagFragment}`;
 }
 
 function rebuildNewFormPreview(form: HTMLElement): string {
@@ -193,6 +257,22 @@ function initEditForms(container: HTMLElement): void {
   }
 }
 
+/**
+ * Close the edit-form row for `laneId` and reset its toggle button's
+ * `aria-expanded` to `false`. Used by the single-open accordion logic
+ * to close the previously-open row when a different row opens.
+ */
+function closeEditRow(container: HTMLElement, laneId: string): void {
+  const row = container.querySelector<HTMLElement>(
+    `[data-lane-edit-row][data-lane-id="${laneId}"]`,
+  );
+  const toggle = container.querySelector<HTMLButtonElement>(
+    `[data-lane-edit-toggle][data-lane-id="${laneId}"]`,
+  );
+  if (row) row.hidden = true;
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
 function initEditToggles(container: HTMLElement): void {
   const toggles = Array.from(
     container.querySelectorAll<HTMLButtonElement>('[data-lane-edit-toggle]'),
@@ -206,8 +286,14 @@ function initEditToggles(container: HTMLElement): void {
       );
       if (!target) return;
       const willOpen = target.hidden;
+      // Single-open accordion: when opening, close any other row's
+      // edit form first. When closing, just drop the tracker.
+      if (willOpen && openLaneId !== null && openLaneId !== laneId) {
+        closeEditRow(container, openLaneId);
+      }
       target.hidden = !willOpen;
       toggle.setAttribute('aria-expanded', String(willOpen));
+      openLaneId = willOpen ? laneId : null;
     });
   }
 
@@ -218,14 +304,8 @@ function initEditToggles(container: HTMLElement): void {
     const laneId = cancel.dataset.laneId;
     if (!laneId) continue;
     cancel.addEventListener('click', () => {
-      const row = container.querySelector<HTMLElement>(
-        `[data-lane-edit-row][data-lane-id="${laneId}"]`,
-      );
-      const toggle = container.querySelector<HTMLButtonElement>(
-        `[data-lane-edit-toggle][data-lane-id="${laneId}"]`,
-      );
-      if (row) row.hidden = true;
-      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      closeEditRow(container, laneId);
+      if (openLaneId === laneId) openLaneId = null;
     });
   }
 }
@@ -246,15 +326,75 @@ function initRowCopyButtons(container: HTMLElement): void {
 }
 
 /**
+ * Resolve the localStorage key for the archived-section open state.
+ * Namespaces by project key (same convention as the dashboard's
+ * swimlane storage) so two operators sharing a machine but working on
+ * different projects don't see each other's collapse state.
+ */
+function archivedOpenKey(container: HTMLElement): string {
+  const projectKey = resolveProjectKey(container);
+  return `${ARCHIVED_OPEN_STORAGE_PREFIX}${projectKey}${ARCHIVED_OPEN_STORAGE_SUFFIX}`;
+}
+
+function initArchivedSection(container: HTMLElement): void {
+  const details = container.querySelector<HTMLDetailsElement>(
+    '[data-lanes-archived-details]',
+  );
+  if (!details) return;
+  const key = archivedOpenKey(container);
+
+  // Restore previous open state on init.
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (stored !== null) {
+      details.open = stored === 'true';
+    }
+  } catch {
+    // localStorage unavailable (private mode, quota, etc.) — fall
+    // through to the server-rendered default (closed). Persistence
+    // is best-effort; the page still works without it.
+  }
+
+  details.addEventListener('toggle', () => {
+    try {
+      window.localStorage.setItem(key, String(details.open));
+    } catch {
+      // Same posture as the read path: best-effort. A failed write
+      // doesn't prevent the operator from toggling the section.
+    }
+  });
+}
+
+function initEmptyStateCta(container: HTMLElement): void {
+  const cta = container.querySelector<HTMLAnchorElement>(
+    '[data-lanes-cta-focus]',
+  );
+  if (!cta) return;
+  cta.addEventListener('click', (event) => {
+    const first = container.querySelector<HTMLInputElement | HTMLSelectElement>(
+      '[data-lanes-new-form] [data-lanes-field="id"]',
+    );
+    if (!first) return;
+    event.preventDefault();
+    first.focus();
+  });
+}
+
+/**
  * Wire every interactive control on the lanes page. Idempotent —
  * a missing `[data-lanes-container]` short-circuits, so importing
  * this from a shared bundle on other surfaces is harmless.
  */
 export function initLanesPage(): void {
+  // Reset module-level state so repeat init calls (e.g. in tests)
+  // don't carry an open-row tracker across mounts.
+  openLaneId = null;
   const container = document.querySelector<HTMLElement>('[data-lanes-container]');
   if (!container) return;
   initNewForm(container);
   initEditForms(container);
   initEditToggles(container);
   initRowCopyButtons(container);
+  initArchivedSection(container);
+  initEmptyStateCta(container);
 }

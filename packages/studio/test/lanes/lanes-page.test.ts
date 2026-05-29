@@ -199,6 +199,51 @@ describe('lanes-page — `/dev/lanes`', () => {
     expect(r.html).not.toContain('data-copy="/deskwork:lane purge editorial-lane"');
   });
 
+  it('archived lane with entries shows a DISABLED Purge button (gate is visible, next step is named)', async () => {
+    // Create a fresh fixture: one archived lane that still has an
+    // entry bound to it. The page must render a visibly-disabled
+    // Purge button (no data-copy) so the operator sees the gate and
+    // the title explains the next step ("move entries first").
+    const root2 = mkdtempSync(join(tmpdir(), 'deskwork-lanes-purge-disabled-'));
+    mkdirSync(join(root2, '.deskwork', 'entries'), { recursive: true });
+    mkdirSync(join(root2, '.deskwork', 'lanes'), { recursive: true });
+    writeLane(
+      root2,
+      'archived-with-entries',
+      'Archived w/ Entries',
+      'editorial',
+      'docs-archived',
+      '2026-04-01T10:00:00.000Z',
+    );
+    await writeSidecar(
+      root2,
+      makeEntry({
+        uuid: UUID_A,
+        slug: 'still-here',
+        title: 'Still Here',
+        currentStage: 'Drafting',
+        iterationByStage: { Drafting: 1 },
+        lane: 'archived-with-entries',
+      }),
+    );
+    const app2 = createApp({ projectRoot: root2, config: makeConfig() });
+    try {
+      const r = await getHtml(app2, '/dev/lanes');
+      // The disabled Purge button is rendered.
+      expect(r.html).toContain('lanes-btn--purge-disabled');
+      expect(r.html).toMatch(/disabled[^>]*aria-disabled="true"/);
+      // It carries no data-copy / data-lane-copy (the client never
+      // clipboards a disabled gate).
+      expect(r.html).not.toContain('data-copy="/deskwork:lane purge archived-with-entries"');
+      // The label names the entry count so the gate is concrete.
+      expect(r.html).toMatch(/Purge — 1 entry/);
+      // The title explains the next step.
+      expect(r.html).toContain('Move them to another lane first');
+    } finally {
+      rmSync(root2, { recursive: true, force: true });
+    }
+  });
+
   it('per-row Edit toggle button is present with aria-controls', async () => {
     const r = await getHtml(app, '/dev/lanes');
     expect(r.html).toMatch(/data-lane-edit-toggle[^>]*data-lane-id="editorial-lane"/);
@@ -214,6 +259,18 @@ describe('lanes-page — `/dev/lanes`', () => {
     // diff between current and live values).
     expect(r.html).toContain('id="lanes-edit-form-editorial-lane"');
     expect(r.html).toMatch(/data-lanes-field="template"[^>]*data-current="editorial"/);
+  });
+
+  it('reorder handle is a passive single-glyph indicator (no drag affordance)', async () => {
+    const r = await getHtml(app, '/dev/lanes');
+    // Single-character glyph (not the double-character grab affordance)
+    expect(r.html).toContain('<span\n          class="lanes-reorder-handle"');
+    expect(r.html).toMatch(/lanes-reorder-handle[^>]*>⋮<\/span>/);
+    expect(r.html).not.toMatch(/lanes-reorder-handle[^>]*>⋮⋮/);
+    // aria-hidden so AT skip the decorative glyph
+    expect(r.html).toMatch(/lanes-reorder-handle"[^>]*aria-hidden="true"/);
+    // Title discloses where reorder happens
+    expect(r.html).toContain('title="Reorder via the dashboard lane rail"');
   });
 
   it('renders per-lane entry counts', async () => {
