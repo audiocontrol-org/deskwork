@@ -10,6 +10,18 @@
  *     a real focusable `<button>` with `aria-label`; the visible /
  *     hidden glyphs render as `aria-hidden` siblings whose display
  *     is driven by the parent `.rail-lane[data-lane-visible]` CSS)
+ *   - a pair of move-up / move-down buttons (`.r-move-up-btn` /
+ *     `.r-move-down-btn`) for keyboard-accessible lane reordering per
+ *     AUDIT-20260528-31. Native mouse drag-and-drop via `.rail-drag`
+ *     (below) is the high-bandwidth path for sighted mouse users;
+ *     these buttons are the keyboard-accessible equivalent. Per
+ *     WCAG 2.2 SC 2.5.8 the hit target is ≥24×24 CSS px; per WCAG
+ *     2.1 SC 2.4.7 the focus ring mirrors `.r-eye-btn`. Top row's
+ *     `▲` and bottom row's `▼` are server-rendered as disabled
+ *     placeholders; the client controller's first init pass
+ *     reconciles the disabled state against any restored localStorage
+ *     order. Per `.claude/rules/affordance-placement.md` the buttons
+ *     live ON the row, not in a generic toolbar.
  *   - a drag handle (`.rail-drag`). Task 5.4 wires the rail-level
  *     HTML5 native drag-and-drop handler — the whole row carries
  *     `draggable="true"` per the HTML5 DnD contract (the browser only
@@ -20,7 +32,10 @@
  * The rail row itself remains a `role="button"` div (the whole row
  * is the focus toggle). Keyboard activation (Enter / Space) is wired
  * in the client at `plugins/deskwork-studio/public/src/dashboard/
- * swimlane.ts:bindRailEyeToggles`.
+ * swimlane.ts:bindRailEyeToggles`. The row's keydown handler skips
+ * events whose target is an interactive descendant (AUDIT-20260528-06
+ * fix), which is what keeps Enter / Space on the move buttons from
+ * also toggling row focus.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
@@ -40,7 +55,11 @@ export interface LaneRailRow {
   readonly templateId: string;
 }
 
-function renderRailRow(row: LaneRailRow): RawHtml {
+function renderRailRow(
+  row: LaneRailRow,
+  isFirst: boolean,
+  isLast: boolean,
+): RawHtml {
   const classes = row.inFocus ? 'rail-lane focused' : 'rail-lane';
   // F6 a11y: the visibility toggle is a real `<button>` with an
   // accessible name. The inner `<span class="r-eye-visible">` /
@@ -48,6 +67,16 @@ function renderRailRow(row: LaneRailRow): RawHtml {
   // which one shows based on the parent `.rail-lane
   // [data-lane-visible]` attribute the client controller updates on
   // click.
+  //
+  // AUDIT-20260528-31 keyboard reorder buttons: the `▲` / `▼`
+  // affordance pair is per-row, alongside the eye and drag handle.
+  // The buttons share the row-level keyboard-bubble guard via the
+  // interactive-descendant escape in `swimlane.ts:bindRailEyeToggles`
+  // (AUDIT-06 fix). Top row's up button + bottom row's down button
+  // are server-rendered as `disabled` to give keyboard users
+  // immediate disabled-state feedback without waiting for client JS.
+  // The client controller's `refreshReorderButtonDisabledState` keeps
+  // them in sync after every reorder.
   //
   // Task 5.4 drag handle: HTML5 native DnD requires the source root
   // to carry `draggable="true"`; the visible `.rail-drag` glyph is
@@ -57,6 +86,10 @@ function renderRailRow(row: LaneRailRow): RawHtml {
   // reorder controller lives in
   // `plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts`.
   const eyeLabel = `Toggle visibility for ${row.name} lane`;
+  const moveUpLabel = `Move lane ${row.name} up`;
+  const moveDownLabel = `Move lane ${row.name} down`;
+  const upDisabled = isFirst ? 'disabled aria-disabled="true"' : 'aria-disabled="false"';
+  const downDisabled = isLast ? 'disabled aria-disabled="true"' : 'aria-disabled="false"';
   return unsafe(html`
     <div class="${classes}" role="button" tabindex="0"
       draggable="true"
@@ -69,6 +102,14 @@ function renderRailRow(row: LaneRailRow): RawHtml {
       <span class="r-glyph" aria-hidden="true">${laneGlyph(row.templateId)}</span>
       <span class="r-name">${row.name}</span>
       <span class="r-count">${row.entryCount}</span>
+      <button class="r-move-up-btn" type="button"
+        data-rail-move-up="${row.id}" aria-label="${moveUpLabel}"
+        ${unsafe(upDisabled)}
+        ><span aria-hidden="true">▲</span></button>
+      <button class="r-move-down-btn" type="button"
+        data-rail-move-down="${row.id}" aria-label="${moveDownLabel}"
+        ${unsafe(downDisabled)}
+        ><span aria-hidden="true">▼</span></button>
       <span class="rail-drag" aria-hidden="true">⋮⋮</span>
     </div>`);
 }
@@ -106,7 +147,15 @@ export function renderRail(
   laneRows: readonly LaneRailRow[],
   laneCount: number,
 ): RawHtml {
-  const rowsRaw = laneRows.map((r) => renderRailRow(r).__raw).join('');
+  // Pass each row's position so the move-up / move-down buttons can
+  // be rendered as `disabled` on the boundary rows. The client
+  // controller's `refreshReorderButtonDisabledState` re-syncs the
+  // disabled state after any reorder driven by either mouse drag or
+  // the keyboard up/down buttons.
+  const lastIdx = laneRows.length - 1;
+  const rowsRaw = laneRows
+    .map((r, idx) => renderRailRow(r, idx === 0, idx === lastIdx).__raw)
+    .join('');
   const presetSurfaceRaw = renderPresetSurface().__raw;
   return unsafe(html`
     <aside class="lane-rail" data-lane-rail>

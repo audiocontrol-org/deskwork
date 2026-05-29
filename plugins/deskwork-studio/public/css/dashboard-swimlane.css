@@ -323,6 +323,66 @@
   user-select: none;
 }
 
+/* AUDIT-20260528-31 — keyboard-accessible reorder affordance.
+ *
+ * Two `<button>` siblings (`▲` / `▼`) per row, rendered between the
+ * entry count and the drag handle. Mouse drag remains the high-
+ * bandwidth path; these buttons are what keyboard-only operators use.
+ * Per WCAG 2.2 SC 2.5.8 (Target Size — minimum AA), the hit area is
+ * ≥24×24 CSS px; per WCAG 2.1 SC 2.4.7 (Focus Visible), the focus
+ * ring mirrors `.r-eye-btn` (same `--er-proof-blue` outline). The
+ * visible glyph stays small (0.7rem) — the hit area expands via
+ * `min-width` / `min-height` + flex centering so the visual chrome
+ * doesn't bloat. Disabled state (top row's `▲`, bottom row's `▼`)
+ * dims the glyph and switches the cursor to `not-allowed`. Buttons
+ * have `background: transparent` to integrate visually with the rail
+ * row (no boxed chrome). */
+.rail-lane .r-move-up-btn,
+.rail-lane .r-move-down-btn {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-faded-2);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  /* WCAG 2.2 SC 2.5.8 hit-target floor — ≥24×24 CSS px. */
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+  user-select: none;
+}
+
+.rail-lane .r-move-up-btn:hover:not(:disabled),
+.rail-lane .r-move-down-btn:hover:not(:disabled) {
+  color: var(--er-ink);
+}
+
+.rail-lane .r-move-up-btn:focus-visible,
+.rail-lane .r-move-down-btn:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 1px;
+}
+
+.rail-lane .r-move-up-btn:disabled,
+.rail-lane .r-move-down-btn:disabled {
+  color: var(--er-faded);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Disabled state in hidden lanes — keep the disabled affordance
+ * legible even when the row is rendered in the dimmed
+ * `--er-faded` color. */
+.rail-lane[data-lane-visible="false"] .r-move-up-btn,
+.rail-lane[data-lane-visible="false"] .r-move-down-btn {
+  color: var(--er-faded);
+}
+
 /* Task 5.4 drag-and-drop feedback. While a row is being dragged the
  * source dims; the row whose midpoint the cursor is above gets a
  * red-pencil insertion hairline on the appropriate edge ("above" or
