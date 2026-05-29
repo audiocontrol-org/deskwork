@@ -294,3 +294,46 @@ skips), and `tsc --noEmit` on both (clean) in the controller's own environment
 — not the implementer's reported output. Clone-check skipped (detector ran this
 session via pre-commit gate + refresh-clones-baseline; net -4 groups, all
 pending, no curated dispositions lost).
+
+## 2026-05-29 — Phase 38 sub-phase 38c (#267 `deskwork annotations` verb implemented + reviewed)
+
+Finding-ID: AUDIT-20260529-11
+Status:     informational
+Severity:   informational
+Surface:    packages/cli/src/commands/annotations.ts (commit 90e5d82)
+
+Track-2 (spec-compliance) review of #267: PASS, no findings. The new
+`deskwork annotations <project-root> <slug-or-uuid> [--all] [--json]` verb
+matches the operator-approved design exactly — default lists only pending,
+`--all` adds dispositioned, `--json` is `{entryId, annotations:[...]}` with
+pending rendered as the literal `"pending"`, exit 0/2/non-zero map correctly
+(not-found is a descriptive error, never silent-empty). Thin verb over the
+existing `listEntryAnnotations` reader — no reimplementation. Scope clean.
+
+Finding-ID: AUDIT-20260529-12
+Status:     fixed-e515fa4
+Severity:   high
+Surface:    packages/cli/test/annotations.test.ts
+
+Track-3 (code-quality) review of 90e5d82: production code verified CORRECT
+(the disposition fold delegates the structural fold to listEntryAnnotations and
+layers the address-disposition fold — latest-createdAt-wins, mirroring the
+studio's latestAddressByCommentId; `resolve`/`address` not conflated;
+archived/deleted handled). Two TEST-COVERAGE gaps, both legitimate (the code is
+right but its correctness wasn't pinned — a reversed/absent disposition sort OR
+a dropped unknown-flag guard would have passed every existing test):
+  (HIGH) no test pinned the multiple-address / latest-wins invariant — the whole
+  correctness guarantee for disposition;
+  (MEDIUM) no test for unknown-flag → exit 2 (the BOOLEAN_FLAGS contract).
+Both fixed in e515fa4 (two regression tests; annotations.test.ts 10→12). The
+`seedAddress` filename-overwrite concern the reviewer flagged is mitigated —
+writeEvent prefixes the filename with the event timestamp, so distinct
+`atMsAgo` values yield distinct files. Stays `fixed-` until release-verification.
+
+Track-1 (controller independent gate): re-ran cli typecheck (clean),
+annotations.test.ts (12/12), full cli suite (220 passed + 29 pre-existing
+skips), and a live smoke against this project's `.deskwork` (empty entry → "no
+pending annotations" exit 0; populated entry 2dbe2326 via `--all` → 8
+annotations with per-comment `[disposition] id {category} (version, range)`;
+`--json` empty shape; unknown uuid → `sidecar not found` non-zero). Clone-check:
+pre-commit gate ran on each commit, 0 NEW (additive new files).
