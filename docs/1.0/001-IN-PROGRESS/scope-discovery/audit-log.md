@@ -547,11 +547,13 @@ Fix scoping into Phase 14 — Friction-fix sweep (`workplan.md`).
 ### AUDIT-20260529-12 — orchestrator-turn 3/6 catalog NOTE is constant per-turn noise
 
 Finding-ID: AUDIT-20260529-12
-Status:     open
+Status:     fixed-245f8ae
 Severity:   low
-Surface:    `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/` (the summary printer that emits the NOTE; likely `runOrchestratorTurn` in `runner.ts` or a sibling)
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/orchestrator-turn.ts` (the assembler's `decorateSummaryWithCatalogPresence` decoration site)
 
 Imported from deskwork-plugin TF-002 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`).
+
+Fix note (commit `245f8ae`, 2026-05-29; Phase 14 Task 1): the assembler now threads the prior turn's `catalogPresentCount` (NEW optional field on `TurnHistoryEntry`) into `decorateSummaryWithCatalogPresence`. The NOTE is emitted only when the count is undefined (first turn / legacy state), changed from the prior turn, OR a new `--verbose` flag forces it. The WARNING case (count === 0) stays always-on. Tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/orchestrator-loop/catalog-note-noise.test.ts` cover the 8 scenarios (first-turn, steady-state, count-rise, count-fall, verbose-override, zero-WARNING, full-6/6-no-NOTE, count-persistence). Awaiting `verified-<date>` after a few real dogfood turns confirm the NOTE actually goes quiet on steady state.
 
 Every `dw-lifecycle orchestrator-turn --feature <slug> --skip-judge --skip-auditor` invocation emits the identical stderr summary: `NOTE: only 3/6 catalog files present (anti-patterns.yaml, adopter-manifests.yaml, clones.yaml). 0 new audit entries; 0 wrong-decisions; ...`. The NOTE never changes between turns when the project has a steady-state catalog count and carries no actionable signal — it dilutes the genuinely-variable parts of the summary.
 
