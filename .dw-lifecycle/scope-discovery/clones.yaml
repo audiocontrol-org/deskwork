@@ -1,4 +1,4 @@
-generated_at: 2026-05-28T20:31:30.832Z
+generated_at: 2026-05-28T23:33:10.111Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -533,27 +533,29 @@ clones:
       - plugins/dw-lifecycle/src/triage-issues/propose.ts:104:114
     disposition: keep-with-reason
     reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
-  - id: 67a3d7148839
+  - id: 63873993cf35
     lines: 8
     members:
       - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:34:41
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:126:133
       - plugins/dw-lifecycle/src/triage-issues/propose.ts:53:60
     disposition: keep-with-reason
-    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
-  - id: c028a8035019
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 2bf48b77082a
     lines: 16
     members:
       - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:60:75
-      - plugins/dw-lifecycle/src/triage-issues/propose.ts:73:88
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/walk.ts:39:88
     disposition: keep-with-reason
-    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
-  - id: 9a0dbd3d1c3e
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 8e44fec9764f
     lines: 13
     members:
       - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:75:87
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/walk.ts:52:64
       - plugins/dw-lifecycle/src/triage-issues/propose.ts:88:100
     disposition: keep-with-reason
-    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 229bcde0591f
     lines: 15
     members:
@@ -561,25 +563,109 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:153:167
     disposition: keep-with-reason
     reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
-  - id: b5c1ce0a0d88
+  - id: a0d4744c1099
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:143:151
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:120:128
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: fd3e76f83293
+    lines: 32
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:153:184
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:129:160
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 5a78fd87f5c7
+    lines: 15
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:162:176
+      - plugins/dw-lifecycle/src/promote-deferrals/gate.ts:136:150
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 55a1adb6494f
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:327:335
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:160:168
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 84b87ec70da9
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:332:339
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:287:295
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 7de84f24c2a8
     lines: 16
     members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:332:355
       - plugins/dw-lifecycle/src/promote-deferrals/apply.ts:273:288
-      - plugins/dw-lifecycle/src/triage-issues/apply.ts:287:305
     disposition: keep-with-reason
-    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape on purpose. The apply-step entry sequence (readProposalFile → repo resolution → parseApproval → none-token shortcut → selectedIndexes → validateAllApproved gate) is canonical batched-proposal protocol surface; identical behavior is the contract. Shared-extraction tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: c70a300dafe9
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:343:355
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:293:305
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 4e2276e008b4
+    lines: 6
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:356:361
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:319:324
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: c11fd4ed33d9
+    lines: 19
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:363:385
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:337:355
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 33c5abbf3e20
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:69:81
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:74:86
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: c872a50ea8e6
+    lines: 14
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:81:94
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:86:99
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 57e90e663d75
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/index.ts:1:17
+      - plugins/dw-lifecycle/src/triage-issues/index.ts:1:16
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 5a0bbad85e47
+    lines: 17
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/propose.ts:224:240
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:207:223
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: fb32574eacbd
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/walk.ts:39:45
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:73:80
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 8659d4bad581
     lines: 9
     members:
       - plugins/dw-lifecycle/src/promote-deferrals/apply.ts:342:350
       - plugins/dw-lifecycle/src/triage-issues/apply.ts:366:375
-    disposition: keep-with-reason
-    reason: "Cross-skill duplication between promote-deferrals and triage-issues batched-proposal infra; operator-known similarity tracked at #335 alongside other cross-skill primitives"
-  - id: cc6040c50c9b
-    lines: 15
-    members:
-      - plugins/dw-lifecycle/src/promote-deferrals/gate.ts:136:150
-      - plugins/dw-lifecycle/src/triage-issues/apply.ts:138:152
     disposition: keep-with-reason
     reason: "Cross-skill duplication between promote-deferrals and triage-issues batched-proposal infra; operator-known similarity tracked at #335 alongside other cross-skill primitives"
   - id: 637fe5f9da59
@@ -990,13 +1076,69 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
-  - id: 17db7d8fff6f
+  - id: 13b12da5062e
+    lines: 28
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:108:135
+      - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:156:183
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: d200b954f2ef
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:437:445
+      - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:426:434
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: bc9978106312
+    lines: 42
+    members:
+      - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:103:144
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:89:130
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: b2488178b829
     lines: 10
     members:
-      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:118:127
+      - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:166:175
       - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:146:155
     disposition: keep-with-reason
-    reason: "Hygiene Phase 5 intentional parallelism: detectRepoFromGit + RunGh boundary callback shapes intentionally mirrored across the hygiene-skill libraries (debt-report, triage-issues, promote-deferrals, close-shipped) to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 6 lifecycle integration reveals the durable abstraction shape."
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 17910c70e661
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:334:340
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:192:198
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 462b9a9ecf0d
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:383:394
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:221:231
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 913d6ef9c4da
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:57:64
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:38:54
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 31ae172c82fa
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:63:78
+      - plugins/dw-lifecycle/src/subcommands/session-end-hygiene.ts:34:49
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
+  - id: 390d5dd6111d
+    lines: 23
+    members:
+      - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:75:97
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:48:82
+    disposition: keep-with-reason
+    reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 9cfccf0a8979
     lines: 11
     members:

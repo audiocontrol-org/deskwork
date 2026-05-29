@@ -3031,3 +3031,74 @@ Phase 4 (dogfood) is manual validation work the user should drive: install the p
 - **Multi-worktree state is brittle.** Local main (stale), feature/studio-mobile-first (active fix), and origin/main (current) all diverged. The operator hit this when publishing from the wrong tree. The /release skill's preconditions caught it on the feature-worktree side but operator-side terminal commands have no such guardrail.
 - **TDD reflexively turns library-recall fabrication into a 10-second feedback loop.** Without the tests, the wrong fix could have shipped to v0.22.2 and been caught only by a post-release iOS check. With the tests, the wrong fix surfaced as 7 failures in <5 seconds.
 - **The studio's cache-validity story is structurally weak.** mtime-based freshness on entrypoint-only inputs cannot survive transitive-import changes. Worth fixing for adopters even if no fixer is currently touching it.
+
+## 2026-05-28: hygiene Phases 1–9 shipped — six new /dw-lifecycle skills + lifecycle integration + dogfood
+
+### Feature: hygiene
+### Worktree: hygiene
+
+**Goal:** Ship a family of UNIX-style `/dw-lifecycle:*` skills that surface and burn down three classes of permanent debt — stale GitHub issues, workplan TBD/defer markers, parked branches — then dogfood them against this project's own backlog (Phase 9). Mechanize the project's "Just for now is bullshit" rule + the "Issue closure requires verification in a formally-installed release" rule.
+
+**Accomplished (Phases 0–9):**
+
+- Phase 0 — `feature/deskwork-open-issue-tranche-cleanup` torn down during feature setup.
+- Phase 1 — `/dw-lifecycle:debt-report` shipped (read-only cross-source snapshot; 42 tests). Commits 734008d + d0c2a37 + 965501c.
+- Phase 2 — `/dw-lifecycle:triage-issues` shipped (two-verb batched-proposal cycle; 4 disposition shapes; pre-validation gate with exit code 2; `--force` on propose; YAML override loader; 74 tests). Commits b2e5178 + 025a1dc + ed1ac26.
+- Phase 3 — `/dw-lifecycle:promote-deferrals` shipped (workplan-TBD → tracked issue OR inline-wontfix; substantive-reason validator widened to match the canonical grep list; atomic writes via tmp+rename; 83 tests). Commits 62d3965 + 53eec56.
+- Phase 4 — `/dw-lifecycle:archive-branch` shipped (preserve as `archived/<branch>-<date>` tag, delete local+remote; all-or-nothing pre-flight gate; configurable `--compare-ref`; 34 tests). Commits 3a2fd5e + a8bb69d.
+- Phase 5 — `/dw-lifecycle:close-shipped` shipped (4-source evidence walker: commit-log + audit-log + tooling-feedback + workplan-checkbox; cross-source merge with orphan-source detection; `--release-notes-body` flag for `gh release edit`; 110 tests). Commits 8b3a8de + 15877d2.
+- Phase 6 (Tasks 1–3) — lifecycle integration shipped: `session-end-hygiene`, `session-start-recommendation`, `complete-gate` subcommands; SKILL.md procedures updated for `session-end`, `session-start`, `complete`. 24 new tests. Commit 6d2ed1a. Task 4 deferred to [#336](https://github.com/audiocontrol-org/deskwork/issues/336).
+- Phase 7 — adopter-facing README hygiene section + per-skill SKILL.md audit. Commit 4c98d77.
+- Phase 8 — `scripts/smoke-hygiene.sh` ships (local-only; NOT wired to CI per project rule). Commit 4c98d77.
+- Phase 9 — Dogfood pass executed against the project's own backlog (see below).
+- PR #338 merged. Release v0.26.0 published to npm + tagged + pushed; marketplace smoke passed.
+- Post-release fix landed at 9086894 on main (#339 workplan-TBD scanner false-positives).
+
+**Dogfood findings (Phase 9):**
+
+- **`:debt-report` baseline:** 190 open issues (92 enhancement, 53 bug, 46 unlabeled), 3 stale > 30d, **139 stale-since-last-comment > 7d**; 62 workplan TBDs across 8 in-progress features; 1 parked branch (`origin/feature/deskwork-triage`, 1 ahead / 746 behind, last commit 2026-04-26).
+- **`:triage-issues --bucket stale-30d --limit 10`:** 3 issues triaged + closed end-to-end. [#33](https://github.com/audiocontrol-org/deskwork/issues/33) wontfix (superseded — Phase 19 fully shipped: `content-index.ts`, 7 doctor rules, `paths.ts`+`content-tree.ts` wired via content-index, `workflow-paths.ts` keyed by `entryId`). [#30](https://github.com/audiocontrol-org/deskwork/issues/30) wontfix (hyperventilation — premature optimization, no perf signal). [#18](https://github.com/audiocontrol-org/deskwork/issues/18) duplicate of [#301](https://github.com/audiocontrol-org/deskwork/issues/301) (graphical-entries supersedes).
+- **`:promote-deferrals` against hygiene workplan:** 20 proposals, **100% false positives.** All matched either `- [x]`-checked acceptance criteria describing the marker vocabulary OR descriptive prose where the marker keyword was a substring inside file paths (`workplan-tbd.ts`), CLI flags (`--skip-tbd-gate`), or quoted lists. Aborted. Filed as [#339](https://github.com/audiocontrol-org/deskwork/issues/339) and fixed in `9086894`: (A) skip `- [x]` lines; (B-1) tighten `\bTBD\b` → `\bTBD:` (require colon per spec); (B-2) strip backtick code-spans before pattern dispatch. Post-fix verification: 20 → 0. 1829 / 1829 tests pass.
+- **Same scanner bug reproduced inside `session-end-hygiene`** when running the SKILL.md step 6 — the v0.26.0 plugin cache predates the #339 fix, so the observations block surfaced ~20 false positives from the very workplan it scanned. **v0.26.1 should ship.** This journal entry is the operator-edited override per the SKILL.md "Append the captured block ... after the operator reviews and optionally edits it" line.
+
+**Course Corrections:**
+
+- [PROCESS] Direct-pushed the #339 fix to main instead of opening a PR from this worktree's pinned branch. Operator: "we fix in the hygiene branch and pr→merge from here. We're in a worktree with a pinned branch. there's no reason to create a bunch of other branches." Lesson saved as `feedback_worktree_pinned_branch_for_fixes.md`. Fix stays on main (operator decided not to revert); this session-end commit lands on `feature/hygiene` properly.
+- [COMPLEXITY] Initially proposed Fix A only for #339, deferring Fix B "as a follow-on if real-world false positives persist." Operator: "DONT DEFER SCOPE!!!" Per `.claude/CLAUDE.md` § Capture-mode vs scope-mode: scope decisions are operator-owned. Applied A + B-1 + B-2 together.
+- [PROCESS] Phase 5 dispatch went out against an out-of-date spec brief — the operator extended Phase 5 to a 4-source evidence walker while the implementer was running. Caught it by re-reading the workplan post-dispatch; landed the extension in 15877d2. Re-read the workplan before sign-off when phase scope is fluid mid-session.
+
+**Friction filed:**
+
+- [#335](https://github.com/audiocontrol-org/deskwork/issues/335) — shared `gh-runtime/` extraction (4-skill parallel-shape duplication; ~20 keep-with-reason clone-group entries).
+- [#336](https://github.com/audiocontrol-org/deskwork/issues/336) — Phase 6 Task 4 phase-parent closure gate.
+- [#339](https://github.com/audiocontrol-org/deskwork/issues/339) — promote-deferrals + complete-gate scanner false-positives. Fixed in 9086894; needs v0.26.1 ship for adopters.
+- TF-001 at `docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md` — `dw-lifecycle validate-return`'s refactor-precondition cue triggers on substring matches in cited file paths in the Excluded block. Sanitized response cite-lists as the workaround.
+
+**Quantitative:**
+
+- Messages: ~120
+- Commits on `feature/hygiene` this session: 18
+- Release commits on main: 1 (`33349cc chore: release v0.26.0`)
+- Direct-push fix on main: 1 (`9086894` — process violation, see correction above)
+- Test count: 1804 baseline → 1829 final (+25 across review-fix cycles)
+- Issues filed this session: 5 (#335, #336, #339, #338 PR, + 11 phase-issue creations earlier in setup)
+- Issues closed via dogfood triage: 3 (#18, #30, #33)
+
+**Insights:**
+
+- The batched-proposal pattern (Phase 2's two-verb shape with the JSON file as hand-editable contract) is the load-bearing infrastructure. Phase 3 reused it cleanly; the 4-disposition shape carried over; hand-editing during dogfood was trivial.
+- Dogfooding the scanner against its OWN workplan was the maximum-stress test — the workplan literally describes the marker vocabulary the scanner enforces. False positives surfaced immediately. This is the pattern Phase 9 was designed for: real items found a bug synthetic tests would not have predicted.
+- The `complete-gate` (Phase 6 Task 3) inherits the same scanner bug as `promote-deferrals`. If `complete-gate` had fired on hygiene pre-#339, it would have refused completion *because hygiene's workplan describes the marker vocabulary*. Catch-22 averted by Phase 9 timing.
+- The dual-reviewer pattern (spec-review then quality-review per `superpowers:subagent-driven-development`) caught real bugs at every phase: Phase 2's pre-validation gate (items 1+2 mutated before item 3's malformed disposition surfaced), Phase 3's write-ordering bug (workplan written before proposal file → recovery state desync), Phase 4's hardcoded `origin/main` comparison ref, Phase 5's drift-check semantics. Without dual review, several would have shipped.
+
+### Hygiene observations (raw helper output preserved below)
+
+The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 scanner bug present in the installed v0.26.0 plugin cache. The non-noisy signal it captured: the `9086894` fix commit, the 5 issues filed this session (#335, #336, #339, +2 of the v0.26.0 release-commits referenced inline), and the unchecked Phase 6 Task 4 step that's already tracked at #336. The "Address TBD markers" section is entirely false-positive noise and is not reproduced here.
+
+### Next session recommendation (hygiene)
+
+- **Ship v0.26.1** with the #339 fix so adopters (including this project's own studio + the `session-end-hygiene` helper next time it runs) pick up the scanner fix.
+- **Triage [#336](https://github.com/audiocontrol-org/deskwork/issues/336)** (Phase 6 Task 4 phase-parent closure gate) — decide fix-in-hygiene-PR-2 vs separate feature.
+- **Triage [#335](https://github.com/audiocontrol-org/deskwork/issues/335)** (gh-runtime extraction) — cheaper to extract now than after a 5th consumer arrives.
+- **Run `/dw-lifecycle:complete hygiene`** to move docs to `003-COMPLETE/` and close the parent + remaining phase issues. Note: `complete-gate`'s scanner is the same one #339 fixed. Either wait for v0.26.1 install OR pass `--skip-tbd-gate --reason "<substantive>"` pointing at the #339 root cause.
+- **Watch for the next batched-proposal dogfood opportunity** — the `studio-mobile-first` workplan has 15 TBDs per the baseline; promoting those is the next natural Phase-3 cycle once v0.26.1 is installed.

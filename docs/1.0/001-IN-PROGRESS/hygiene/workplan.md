@@ -189,15 +189,26 @@ date: 2026-05-28
 
 Closes a separate concern from the no-bare-TBDs gate: the 17 stale phase parent issues across the repo (e.g. #273 scope-discovery parent, #301 graphical-entries parent, the per-Phase issues #274–#283) have no closure gate. They stay open across releases because no skill walks them.
 
-- [ ] Step 1: Edit the complete helper to walk the closing feature's GitHub issue tree: `gh issue list --search "<slug>"` (or via the feature's stored `parentIssue` frontmatter + `gh api repos/<owner>/<repo>/issues/<parent>/timeline`).
-- [ ] Step 2: For each parent issue: test (a) all child phase issues are closed OR (b) the feature reaches feature-complete via this skill's invocation. If either holds, propose closure with a closure comment citing the feature-complete commit + the closed children.
-- [ ] Step 3: Operator gate (mirror the batched-proposal pattern from Phase 2). Apply via `gh issue close --comment` on confirmed candidates.
+- [x] Step 1: Edit the complete helper to walk the closing feature's GitHub issue tree: `gh issue list --search "<slug>"` (or via the feature's stored `parentIssue` frontmatter + `gh api repos/<owner>/<repo>/issues/<parent>/timeline`).
+- [x] Step 2: For each parent issue: test (a) all child phase issues are closed OR (b) the feature reaches feature-complete via this skill's invocation. If either holds, propose closure with a closure comment citing the feature-complete commit + the closed children.
+- [x] Step 3: Operator gate (mirror the batched-proposal pattern from Phase 2). Apply via `gh issue close --comment` on confirmed candidates.
+
+### Task 5: session-end-hygiene semantic + rendering fixes  ·  [#340](https://github.com/audiocontrol-org/deskwork/issues/340)
+
+Closes three semantic + rendering bugs in `session-end-hygiene` surfaced during the Phase 9 dogfood. Land alongside the v0.26.1 ship that carries the #339 scanner fix.
+
+- [x] Step 1: Switch the "issues filed this session" filter from `created:<today>` to a session-scope filter. When `--session-start-sha` is supplied, translate the SHA to an ISO timestamp via `git show -s --format=%cI <sha>` and pass `created:>=<iso>` to `gh issue list`. Document the no-SHA fallback (e.g. "since the last git fetch"); the fallback MUST NOT be "today."
+- [x] Step 2: Filter CLOSED issues from the `### Next session recommendation` block's `Triage:` line. The observations block can still cite closed issues (they're relevant signal for the just-completed session); the recommendation line is forward-looking and must list OPEN issues only.
+- [x] Step 3: Coalesce per-line workplan-TBD observations. Group samples by `lineNumber` so a multi-marker line emits ONE entry naming all matched markers, not one entry per marker keyword.
+- [x] Step 4: Vitest coverage — session-scope-filter test (given `--session-start-sha <sha>`, gh query string contains `created:>=<iso>`, not `created:<today>`); closed-filter test (gh response with 1 open + 1 closed issue → recommendation lists only the open one); per-line-coalescing test (fixture with one line matching 4 markers → exactly one observation entry naming all 4).
+- [ ] Step 5: Post-v0.26.1 install, re-run `/dw-lifecycle:session-end` against this same hygiene workplan and confirm the observations block is signal-only.
 
 **Acceptance Criteria:**
 - [x] `/dw-lifecycle:session-end` carries the hygiene-observations + next-session-recommendation block; lands in `DEVELOPMENT-NOTES.md`. (Landed via the `session-end-hygiene` subcommand + updated SKILL.md.)
 - [x] `/dw-lifecycle:session-start` displays the prior session's recommendation without re-scanning. (Landed via the `session-start-recommendation` subcommand + updated SKILL.md — display-only, zero git/gh/workplan calls.)
 - [x] `/dw-lifecycle:complete` carries the pre-merge TBD gate; supports `--skip-tbd-gate --reason "<substantive>"` override with logged reason. (Landed via the `complete-gate` subcommand + updated SKILL.md.)
-- [ ] `/dw-lifecycle:complete` walks the closing feature's phase-parent issue tree; closes parents whose children are all closed (operator-gated batched proposal).
+- [x] `/dw-lifecycle:complete` walks the closing feature's phase-parent issue tree; closes parents whose children are all closed (operator-gated batched proposal). · #336
+- [x] `session-end-hygiene` filters by session boundary (not calendar date) AND filters closed issues from the recommendation list AND coalesces multi-marker workplan lines into one observation entry. · #340
 
 **Implementation notes (operator decisions captured during dispatch):**
 
@@ -208,7 +219,7 @@ Closes a separate concern from the no-bare-TBDs gate: the 17 stale phase parent 
 - session-start's reader does ZERO git / gh / workplan calls. It opens `DEVELOPMENT-NOTES.md` once, locates the latest entry for the slug, extracts the `### Hygiene observations` + `### Next session recommendation (hygiene)` block, and prints it verbatim. When no prior block exists, it surfaces `No prior hygiene recommendation (first session or session-end skipped).`
 - complete-gate's bare-TBD test classifies each scanner hit: any line carrying `[debt: #NNN]` OR an inline `(wontfix: <reason>)` clause is CLEAN; everything else is BARE. The override path requires both `--skip-tbd-gate` AND `--reason "<text>"`; the reason flows through `validateSubstantiveReason` (≥40 chars, banned-phrase scan). When the override fires AND `--journal-override-file <path>` is set, a markdown `### Hygiene override` entry is written to the supplied path for the SKILL.md to append via `journal-append`.
 - 24 new vitest tests across three files: `lifecycle-session-end-hygiene.test.ts` (7), `lifecycle-session-start-recommendation.test.ts` (5), `lifecycle-complete-tbd-gate.test.ts` (12). All 1804 plugin tests pass.
-- Task 4 (phase-parent closure gate) is NOT addressed in this commit; it remains unchecked under Phase 6 for a separate cycle.
+- Task 4 (phase-parent closure gate) shipped in a follow-on commit. One new CLI verb `complete-parent-closure` registered in `src/cli.ts` with two sub-verbs (`propose` / `apply`) mirroring the Phase 2 triage-issues batched-proposal pattern. Library under `src/lifecycle-integration/parent-closure/` (types.ts, walk.ts, propose.ts, apply.ts, index.ts) — each file well under the 300-line cap. The walker unions THREE evidence sources (gh title-search, parent timeline via `gh api .../timeline`, workplan-anchored per-phase issue numbers from `## Phase N: ... · [#NNN](...)` headings), dedupes by issue number, and classifies each candidate as `close-all-children-closed` / `close-with-open-children` / `skip-already-closed` / `skip-not-this-feature`. The propose step filters skip-* rows from the JSON file (operator can't act on them) but reports them in the stdout summary so the operator sees what was filtered. close-* rows carry an auto-drafted closure_comment citing the feature-complete commit SHA + closed children + feature-dir paths; operator may edit before approving. Apply mirrors triage-issues' pre-validation gate (close-* requires non-empty closure_comment) + partial-success recording + exit codes 0/1/2. `close-with-open-children` emits a per-row stderr warning naming the open children left behind. The skill is RECOMMENDED-not-blocking — the `/dw-lifecycle:complete` SKILL.md runs the gate as a step between the TBD gate and the doc-move step; if the operator skips apply, the skill continues. 56 new vitest tests across four files (`parent-closure-walk.test.ts` (22), `parent-closure-propose.test.ts` (5), `parent-closure-apply.test.ts` (13), `parent-closure-subcommand.test.ts` (16)). All 1891 plugin tests pass.
 
 ## Phase 7: Documentation  ·  [#331](https://github.com/audiocontrol-org/deskwork/issues/331)
 
@@ -244,11 +255,20 @@ Closes a separate concern from the no-bare-TBDs gate: the 17 stale phase parent 
 
 ### Task 1: Dogfood the new skills
 
-- [ ] Step 1: Run `/dw-lifecycle:debt-report` to baseline the current state.
-- [ ] Step 2: Run `/dw-lifecycle:triage-issues --bucket stale-30d --limit 10` end-to-end (propose → approve → apply). At least one full cycle.
-- [ ] Step 3: Run `/dw-lifecycle:promote-deferrals` against one in-progress feature's workplan end-to-end. At least one full cycle.
-- [ ] Step 4: Capture friction in `DEVELOPMENT-NOTES.md` as a session-end entry; file follow-up issues for any sharp edges.
+- [x] Step 1: Run `/dw-lifecycle:debt-report` to baseline the current state.
+- [x] Step 2: Run `/dw-lifecycle:triage-issues --bucket stale-30d --limit 10` end-to-end (propose → approve → apply). At least one full cycle.
+- [x] Step 3: Run `/dw-lifecycle:promote-deferrals` against one in-progress feature's workplan end-to-end. At least one full cycle.
+- [x] Step 4: Capture friction in `DEVELOPMENT-NOTES.md` as a session-end entry; file follow-up issues for any sharp edges.
 
 **Acceptance Criteria:**
-- [ ] Dogfood round against the existing backlog runs at least one full batched-proposal cycle for each of `:triage-issues` and `:promote-deferrals`.
-- [ ] Friction captured in `DEVELOPMENT-NOTES.md`; follow-up issues filed for sharp edges.
+- [x] Dogfood round against the existing backlog runs at least one full batched-proposal cycle for each of `:triage-issues` and `:promote-deferrals`.
+- [x] Friction captured in `DEVELOPMENT-NOTES.md`; follow-up issues filed for sharp edges.
+
+**Implementation notes (dogfood findings — 2026-05-28, run from v0.26.0):**
+
+- `:debt-report` baseline: 190 open issues (92 enhancement, 53 bug, 46 unlabeled, 3 stale > 30d, 139 stale-since-last-comment > 7d); 62 workplan TBDs across 8 in-progress features; 1 parked branch (`origin/feature/deskwork-triage`, 1 ahead / 746 behind, last commit 2026-04-26) + 29 other-branches.
+- `:triage-issues --bucket stale-30d --limit 10` cycle: 3 issues in the bucket. All three dispositioned + applied. [#33](https://github.com/audiocontrol-org/deskwork/issues/33) closed as wontfix (superseded — verified every Phase 19 deliverable shipped: content-index.ts, 7 doctor rules, paths.ts + content-tree.ts wired via content-index, workflow-paths.ts keyed by entryId). [#30](https://github.com/audiocontrol-org/deskwork/issues/30) closed as wontfix (hyperventilation — premature optimization with no perf signal). [#18](https://github.com/audiocontrol-org/deskwork/issues/18) closed as duplicate of [#301](https://github.com/audiocontrol-org/deskwork/issues/301) (graphical-entries).
+- `:promote-deferrals propose --workplan docs/1.0/001-IN-PROGRESS/hygiene/workplan.md` cycle: produced 20 proposals, 100% false positives. ALL on `- [x]`-checked acceptance criteria + descriptive prose referring to the marker keywords themselves (TBD inside `workplan-tbd.ts`, `--skip-tbd-gate`, banned-phrase lists). Aborted (`approval: n`). Friction filed at [#339](https://github.com/audiocontrol-org/deskwork/issues/339).
+- Fix landed in `9086894` on main: Fix A (skip `- [x]` lines), Fix B-1 (tighten TBD regex to require `TBD:` colon-suffix per spec), Fix B-2 (strip backtick code-spans before pattern dispatch). Re-ran propose against hygiene workplan post-fix: 0 false positives. 1829 / 1829 tests pass. The fix is reachable in any v0.26.x build past `9086894`.
+- Lesson saved: the worktree's pinned branch is the fix target — never direct-push to main, never create a sibling fix branch (per `feedback_worktree_pinned_branch_for_fixes.md`).
+- TF-001 (dispatch-wrapper false-positive on cue substring matches in cited file paths) at `docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md` stays open; not surfaced again in Phase 9 but still tracked.
