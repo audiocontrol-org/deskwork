@@ -873,7 +873,7 @@ browser quirk. Regression test added.
 ### AUDIT-20260528-31
 
 Finding-ID: AUDIT-20260528-31
-Status:     open
+Status:     fixed-3aeea2e
 Severity:   medium
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
 
@@ -1005,7 +1005,7 @@ implementation primitives against the no-native-prompts test.
 ### AUDIT-20260528-37
 
 Finding-ID: AUDIT-20260528-37
-Status:     open
+Status:     fixed-3ed2532
 Severity:   low
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts
 
@@ -1098,7 +1098,7 @@ integration.
 ### AUDIT-20260528-38
 
 Finding-ID: AUDIT-20260528-38
-Status:     open
+Status:     fixed-a5ba0b8
 Severity:   medium
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts
 
