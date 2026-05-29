@@ -2599,7 +2599,7 @@ one exists.
 ### AUDIT-20260529-27 — Step 7.2.8 shipped: `metadata.cascadeFrom` on cascade `stage-transition` events (feature; closes #359)
 
 Finding-ID: AUDIT-20260529-27
-Status:     fixed-pending-commit
+Status:     fixed-e311698
 Severity:   medium (audit-trail enhancement)
 Surface:    `packages/core/src/schema/journal-events.ts:65-94`,
             `packages/core/src/entry/cancel.ts:99-260`
