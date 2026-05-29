@@ -325,15 +325,23 @@ Operator decisions (locked in during definition):
 
 **Deliverable:** mechanism to find stale worktrees in the operator's worktree-base directory and dismantle them under operator approval. Closes the fourth structural-closure asymmetry (matches GH-issue / workplan-TBD / parked-branch streams). Sibling of [#347](https://github.com/audiocontrol-org/deskwork/issues/347) — the stale-branch-sessions failure mode that motivates this phase.
 
-**Verb shape and several defaults left open for operator iteration** (see PRD Phase 11 § "Open questions captured"). The task breakdown below assumes Option A for concreteness; if the operator picks B or C during iteration, Task 1 + Task 2 collapse / re-organize accordingly.
+**Operator-decided shape and defaults (iteration 2 — 2026-05-29):**
+
+- **Verb shape:** Option A — new `/dw-lifecycle:worktree-report` (read) + `/dw-lifecycle:dismantle-worktrees propose|apply` (mutation).
+- **Staleness threshold:** 30 days (matches parked-branches).
+- **`--threshold-count` default:** 3 (must satisfy ≥3 of the 9 staleness signals).
+- **`--archive-first` default:** opt-in (`false`).
+- **Worktree-base path:** auto-detect from `git worktree list --porcelain` prefix; `--worktree-base` overrides.
+- **No `:dismantle-all-shipped` shortcut** (rejected per PRD Out of Scope).
+- **No cross-machine cleanup** (out of scope per PRD Out of Scope).
 
 ### Task 1: Worktree-discovery surface
 
 - [ ] Step 1: Implement `plugins/dw-lifecycle/src/worktree-report/scan.ts` — walks `git worktree list --porcelain` + the configured worktree-base directory; cross-references each entry against `gh pr list` (branch state) + filesystem (feature-doc location); produces a `WorktreeEntry[]` with per-criterion check results.
 - [ ] Step 2: Implement `plugins/dw-lifecycle/src/worktree-report/staleness.ts` — pure function `evaluateStaleness(entry, config)` returns `{ verdict: 'keep' | 'stale' | 'orphan' | 'divergent' | 'corrupt', rationale: string[], recommendedDisposition }`. The N-of-criteria threshold is configurable; default is captured as an open question.
 - [ ] Step 3: Implement markdown + JSON renderers. Markdown: one table per verdict bucket. JSON: `{ generated_at, worktrees: WorktreeEntry[] }`.
-- [ ] Step 4: Wire the CLI subcommand. Either `dw-lifecycle worktree-report` (Option A) or extend `dw-lifecycle debt-report` to surface a fourth section (Option B). Decision land during PRD iteration.
-- [ ] Step 5: Author `plugins/dw-lifecycle/skills/worktree-report/SKILL.md` (Option A) OR extend `plugins/dw-lifecycle/skills/debt-report/SKILL.md` (Option B).
+- [ ] Step 4: Wire the CLI subcommand `dw-lifecycle worktree-report` with flags `--json`, `--days N` (default 30), `--threshold-count N` (default 3), `--worktree-base <path>` (default auto-detect from `git worktree list --porcelain` prefix), `--allow-external`.
+- [ ] Step 5: Author `plugins/dw-lifecycle/skills/worktree-report/SKILL.md` mirroring `:debt-report` SKILL.md structure; cross-reference from `debt-report/SKILL.md`.
 - [ ] Step 6: Vitest unit coverage for `evaluateStaleness` across all criteria + verdict combinations. Integration tests against fixture worktree layouts under tmp dirs.
 
 ### Task 2: Dismantle verb — batched proposal + apply
@@ -371,7 +379,7 @@ Operator decisions (locked in during definition):
 
 **Acceptance Criteria:**
 
-- [ ] Worktree-discovery surface ships per the operator's iteration-picked Option A / B / C.
+- [ ] `/dw-lifecycle:worktree-report` ships as a new pure-read sibling skill; emits markdown + JSON; defaults: `--days 30`, `--threshold-count 3`, auto-detected worktree-base.
 - [ ] `/dw-lifecycle:dismantle-worktrees propose|apply` ships under the batched-proposal pattern matching `:triage-issues` and `:promote-deferrals`.
 - [ ] All safety rails enforced (current-worktree / main-worktree / dirty / local-only-commits / force-push / external-path / multi-worktree).
 - [ ] Optional `--archive-first` composes with `:archive-branch` to preserve branch contents.

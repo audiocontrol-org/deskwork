@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:38:57.600Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "address",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "commentId": "32b2a198-24a1-4bab-b643-2f36d4e38c96",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": "--archive-first default locked to opt-in (false). PRD Composition section + Configuration rewritten to commit.",
+    "id": "5833b237-e11f-4dc3-acd5-d2fae7002e0c",
+    "createdAt": "2026-05-29T08:38:57.600Z"
+  }
+}

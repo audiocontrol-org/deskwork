@@ -66,19 +66,15 @@ Worktrees are NOT covered by `:archive-branch` (that verb addresses the underlyi
 
 **Composition with `:archive-branch`:**
 
-`:dismantle-worktrees` can compose with the existing `:archive-branch` verb when `--archive-first` is passed: the branch gets an annotated `archived/<branch>-<date>` tag before the worktree is removed; the branch is also deleted from local (matching `:archive-branch`'s existing behavior). This preserves the branch's contents for recovery even after the worktree is gone. The operator picks during iteration whether `--archive-first` should be the default or opt-in.
+`:dismantle-worktrees` composes with the existing `:archive-branch` verb when `--archive-first` is passed: the branch gets an annotated `archived/<branch>-<date>` tag before the worktree is removed; the branch is also deleted from local (matching `:archive-branch`'s existing behavior). This preserves the branch's contents for recovery even after the worktree is gone. `--archive-first` is **opt-in** (default `false`) — the operator explicitly opts into the archive-then-dismantle composition when they want the branch preserved.
 
 **Report fields per worktree:**
 
 Path · pinned branch · ahead/behind main counts · last commit (SHA + ISO date) · working-tree state (`clean` / `dirty:N files`) · PR state (`open` / `merged` / `closed` / `no-pr`) · feature-doc location (`001-IN-PROGRESS/<slug>` / `003-COMPLETE/<slug>` / `none`) · per-criterion check results · staleness verdict · recommended disposition (`keep` / `dismantle` / `archive-then-dismantle` / `operator-triage`).
 
-**Verb shape — open question for operator iteration (three viable directions captured):**
+**Verb shape — UNIX-style mirror of Phase 1 + Phase 4 (operator-decided 2026-05-29):**
 
-- **Option A — UNIX-style mirror of Phase 1 + Phase 4.** New `/dw-lifecycle:worktree-report` (pure read; sibling of `:debt-report`) + `/dw-lifecycle:dismantle-worktrees propose|apply` (batched mutation; sibling of `:triage-issues` and `:promote-deferrals`). Three skills total.
-- **Option B — fold the read into `:debt-report`.** Add a fourth section to `:debt-report` (worktrees) parallel to the existing GH issues / workplan TBDs / parked-branches sections. Add `/dw-lifecycle:dismantle-worktrees propose|apply` for the mutation. Two skills total; one new.
-- **Option C — single-target mirror of `:archive-branch`.** `/dw-lifecycle:dismantle-worktree <path>` operates on one worktree at a time. Mirrors `:archive-branch <branch>`'s shape. One new skill; no batched-proposal layer. Operator runs the verb N times for N worktrees.
-
-The operator picks A / B / C during PRD iteration. Captured trade-offs: A matches the family's UNIX-style strictest; B is the smallest user-surface delta (one new skill instead of three); C is the shape closest to the existing `:archive-branch` verb (operator already mental-models from there).
+New `/dw-lifecycle:worktree-report` (pure read; sibling of `:debt-report`) + `/dw-lifecycle:dismantle-worktrees propose|apply` (batched mutation; sibling of `:triage-issues` and `:promote-deferrals`). Three skill files total — `worktree-report/SKILL.md`, `dismantle-worktrees/SKILL.md` (covers both propose + apply per the existing pattern), and an updated `debt-report/SKILL.md` cross-reference. The shape was chosen over (a) folding the read into `:debt-report` and (b) a single-target `:dismantle-worktree <path>` mirror of `:archive-branch` because it matches the family's strictest UNIX-style consistency — one verb per action, read-and-mutate split cleanly.
 
 **Lifecycle integration — additional touchpoints beyond the verbs:**
 
@@ -97,39 +93,31 @@ The operator picks A / B / C during PRD iteration. Captured trade-offs: A matche
 - Worktrees on shared/remote filesystems — surface in report as `remote-filesystem`; operator decides whether dismantle is safe.
 - Worktrees outside the project-convention path — surface with `--allow-external` gate; default is to skip them.
 
-**Configuration:**
+**Configuration (operator-decided 2026-05-29):**
 
-- `--days N` staleness threshold (default candidate: 30; mirrors parked-branches).
-- `--worktree-base <path>` override for non-standard project layouts (default candidate: `~/work/<project>-work/`).
-- `--allow-external` to include worktrees outside the convention path.
+- `--days N` staleness threshold (**default: 30** — mirrors parked-branches).
+- `--worktree-base <path>` override for non-standard project layouts. Default: **auto-detect from `git worktree list --porcelain` prefix** — the common parent directory of all registered worktrees. No hardcoded path; no project-config-file coupling.
+- `--allow-external` to include worktrees outside the auto-detected base path.
 - `--allow-dirty --reason "<text>"` substantive-reason gate.
 - `--force-discard --reason "<text>"` substantive-reason gate for local-only commits.
 - `--accept-divergence` for force-push detection.
 - `--prune-submodules` for worktrees with submodules.
-- `--archive-first` to compose with `:archive-branch` (default behavior: operator triage during iteration).
-- `--threshold-count N` — minimum number of staleness criteria that must hold for an entry to flag as `stale` (default candidate: 3; surfaces all signals individually so operator sees the per-criterion check).
+- `--archive-first` to compose with `:archive-branch`. **Default: opt-in** (`false`). Operator passes `--archive-first` when they want the branch contents preserved via annotated tag before worktree removal.
+- `--threshold-count N` — minimum number of staleness criteria that must hold for an entry to flag as `stale`. **Default: 3** (must satisfy ≥3 criteria). Surfaces all signals individually in the report so operator sees the per-criterion check regardless of the verdict.
 
 **Acceptance criteria:**
 
-- [ ] Worktree-discovery surface ships (either `:worktree-report` per Option A or `:debt-report` extension per Option B; operator picks during iteration).
+- [ ] `/dw-lifecycle:worktree-report` ships as a new pure-read sibling of `:debt-report`; emits markdown (default) and JSON (`--json`).
 - [ ] `/dw-lifecycle:dismantle-worktrees propose|apply` ships under the batched-proposal pattern matching `:triage-issues` and `:promote-deferrals`. All-or-nothing apply on validation failure; partial success on per-worktree dismantle errors (records failures + continues with the rest). Substantive-reason validator on the `--allow-dirty` + `--force-discard` overrides.
 - [ ] Safety rails enforced as captured above: current-worktree refuse; main-worktree refuse; dirty without reason refuse; local-only commits without reason refuse; force-push detection refuse; external path refuse without flag; multi-worktree-same-branch refuse.
-- [ ] Optional `--archive-first` composes with `:archive-branch` to preserve branch contents (annotated tag) before worktree removal.
+- [ ] `--archive-first` (opt-in, default `false`) composes with `:archive-branch` to preserve branch contents (annotated tag) before worktree removal.
+- [ ] Default staleness threshold is 30 days; default `--threshold-count` is 3.
+- [ ] Worktree-base path auto-detected from `git worktree list --porcelain` prefix; `--worktree-base <path>` overrides.
 - [ ] `:session-end-hygiene` surfaces worktree-staleness in its block; `:session-start` displays the next-session-recommendation if present; `:complete` suggests worktree dismantle on feature merge.
 - [ ] Vitest unit + integration tests against fixture worktree layouts (tmp dirs with realistic git state).
-- [ ] Local smoke script (`scripts/smoke-hygiene.sh`) exercises the worktree verb(s) end-to-end against a fixture project tree.
+- [ ] Local smoke script (`scripts/smoke-hygiene.sh`) exercises the worktree verbs end-to-end against a fixture project tree.
 - [ ] Adopter-facing docs (README + per-skill SKILL.md) explain the worktree verbs + the operational pattern.
 - [ ] `agent-discipline.md` § "Closure is a structural step" extended to name worktrees as the fourth closure stream.
-
-**Open questions captured for operator iteration (to resolve before issue filing):**
-
-1. Verb shape: A (sibling) / B (fold-into) / C (single-target)?
-2. Default staleness threshold in days: 30 (mirrors parked-branches), 14, 60, other?
-3. Default `--threshold-count`: 3 (must satisfy ≥3 criteria), all-criteria (most conservative), any-criterion (most aggressive)?
-4. `--archive-first` default: opt-in (`false` by default), opt-out (`true` by default), or required (no flag — always archive)?
-5. Worktree-base path: hardcoded `~/work/<project>-work/`, configurable via `.dw-lifecycle/config.json`, or auto-detected from `git worktree list` prefix?
-6. Should the verb offer a `:dismantle-all-shipped` shortcut that auto-proposes every worktree whose feature is in `003-COMPLETE/`?
-7. Cross-machine concern: if the worktree lives on a different machine (via a synced FS), should the verb surface it or skip? Capture the question; defer the implementation if the answer is "skip."
 
 ## Out of Scope
 
@@ -140,6 +128,8 @@ The operator picks A / B / C during PRD iteration. Captured trade-offs: A matche
 - Doctor / scope-discovery findings burndown as a distinct skill. Those flows already exist in their respective subsystems; hygiene doesn't subsume them.
 - Pixel-diff visual-regression burndown. Out of scope; sibling concern to the in-flight `visual-verification-gate` feature.
 - Pushing the existing studio-bridge branch through `:archive-branch`. The operator's earlier decision was to leave studio-bridge parked until a security gap closes. This feature ships the tool; the operator decides when to apply it.
+- Cross-machine worktree cleanup. The Phase 11 worktree verbs operate against locally-registered worktrees only (`git worktree list`). Worktrees on a remote/synced filesystem reachable from this machine MAY be surfaced incidentally if `git worktree list` knows about them, but cross-machine cleanup (reaching out over SSH / a synced FS to enumerate or remove worktrees on another host) is explicitly out of purview. Operator's framing 2026-05-29: *"don't care about cross-machine cleanup. that's outside the purview of this tool."*
+- A `:dismantle-all-shipped` shortcut. Considered during Phase 11 capture; operator rejected 2026-05-29 in favor of the batched-proposal pattern with operator review for every entry — bulk-dismantle would defeat the per-worktree disposition review the family is built around.
 
 ## Technical Approach
 

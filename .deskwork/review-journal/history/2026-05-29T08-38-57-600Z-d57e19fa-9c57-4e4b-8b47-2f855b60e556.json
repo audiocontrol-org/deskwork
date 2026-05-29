@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:38:57.600Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "address",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "commentId": "da644278-14d1-4d1d-bf0d-4ab9a365d1b5",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": ":dismantle-all-shipped shortcut rejected. Added to PRD Out-of-Scope with rationale: bulk-dismantle would defeat the per-worktree disposition review the family is built around.",
+    "id": "27f15435-274b-4a0e-ad1f-6c19547bf7b1",
+    "createdAt": "2026-05-29T08:38:57.600Z"
+  }
+}
