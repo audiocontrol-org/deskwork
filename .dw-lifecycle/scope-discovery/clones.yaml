@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T07:15:23.069Z
+generated_at: 2026-05-29T07:51:49.509Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -569,6 +569,20 @@ clones:
       - packages/studio/src/server.ts:415:424
     disposition: pending
     reason: null
+  - id: db7bf2f695f3
+    lines: 8
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-drag-fixture.ts:25:32
+      - packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts:23:37
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: the drag-fixture and presets-fixture both install the same CSS.escape shim (jsdom gap) and emit a shared bay-shell + lane-rail scaffolding. The duplication is the minimum-viable jsdom prelude every dashboard-swimlane client test surface needs; collapsing it would re-couple the drag and presets test surfaces around a generic fixture none of them own."
+  - id: 726a988335d2
+    lines: 9
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-drag-fixture.ts:96:104
+      - packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts:86:94
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: the drag-fixture and presets-fixture both install the same CSS.escape shim (jsdom gap) and emit a shared bay-shell + lane-rail scaffolding. The duplication is the minimum-viable jsdom prelude every dashboard-swimlane client test surface needs; collapsing it would re-couple the drag and presets test surfaces around a generic fixture none of them own."
   - id: 6c6c2b4096e5
     lines: 18
     members:
