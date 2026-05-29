@@ -363,7 +363,7 @@ export function discoverIngestCandidates(
         : {}),
       ...(options.now !== undefined ? { now: options.now } : {}),
     });
-    const title = deriveTitle(parsed.data, fields.title, slug.value);
+    const title = deriveTitle(parsed.data, fields.title, slug.value, parsed.body);
     const description = deriveDescription(parsed.data, fields.description);
 
     candidates.push({

@@ -349,9 +349,17 @@ export function deriveTitle(
   frontmatter: FrontmatterData,
   fieldName: string,
   slug: string,
+  body?: string,
 ): string {
   const raw = readStringField(frontmatter, fieldName);
   if (raw !== undefined && raw.length > 0) return raw;
+  // #64: a real markdown heading beats a slug-derived guess. When the
+  // frontmatter carries no title, fall back to the first ATX heading in
+  // the body before humanizing the slug.
+  if (body !== undefined) {
+    const heading = firstMarkdownHeading(body);
+    if (heading !== undefined) return heading;
+  }
   // Humanize the slug as a last resort. Strip leading hierarchy
   // segments — title for `the-outbound/characters/strivers` should
   // be "Strivers", not "The Outbound Characters Strivers".
@@ -360,6 +368,30 @@ export function deriveTitle(
     .split('-')
     .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
     .join(' ');
+}
+
+/**
+ * The first ATX markdown heading's text in `body` (e.g. `## PRD: x` →
+ * `PRD: x`), or undefined when there is none. Strips the leading `#`s and
+ * any closing `#`s. Fenced code blocks are skipped so a `# comment` inside
+ * ``` ``` ``` isn't mistaken for a heading.
+ */
+function firstMarkdownHeading(body: string): string | undefined {
+  let inFence = false;
+  for (const line of body.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const m = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(trimmed);
+    if (m) {
+      const text = m[2].trim();
+      if (text.length > 0) return text;
+    }
+  }
+  return undefined;
 }
 
 export function deriveDescription(
