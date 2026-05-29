@@ -201,7 +201,7 @@ Closes three semantic + rendering bugs in `session-end-hygiene` surfaced during 
 - [x] Step 2: Filter CLOSED issues from the `### Next session recommendation` block's `Triage:` line. The observations block can still cite closed issues (they're relevant signal for the just-completed session); the recommendation line is forward-looking and must list OPEN issues only.
 - [x] Step 3: Coalesce per-line workplan-TBD observations. Group samples by `lineNumber` so a multi-marker line emits ONE entry naming all matched markers, not one entry per marker keyword.
 - [x] Step 4: Vitest coverage — session-scope-filter test (given `--session-start-sha <sha>`, gh query string contains `created:>=<iso>`, not `created:<today>`); closed-filter test (gh response with 1 open + 1 closed issue → recommendation lists only the open one); per-line-coalescing test (fixture with one line matching 4 markers → exactly one observation entry naming all 4).
-- [ ] Step 5: Post-v0.26.1 install, re-run `/dw-lifecycle:session-end` against this same hygiene workplan and confirm the observations block is signal-only.
+- [x] Step 5: Post-v0.26.1 install, re-run `/dw-lifecycle:session-end` against this same hygiene workplan and confirm the observations block is signal-only. (Verified against installed **v0.27.0** 2026-05-29: ran `dw-lifecycle session-end-hygiene --slug hygiene --session-start-sha 2dcda6a`. The "issues filed this session" block reported only issues REFERENCED in this session's commits — same-user-time-window noise is gone. Signal-only per Phase 6 § contract.)
 
 **Acceptance Criteria:**
 - [x] `/dw-lifecycle:session-end` carries the hygiene-observations + next-session-recommendation block; lands in `DEVELOPMENT-NOTES.md`. (Landed via the `session-end-hygiene` subcommand + updated SKILL.md.)
@@ -311,7 +311,7 @@ Operator decisions (locked in during definition):
 
 ### Task 5: Tests + verification
 
-- [ ] Step 1: First real release (v0.26.2 carrying #342 fix + Phase 10 ship) uses the new workflow. Verify the workflow run succeeds end-to-end.
+- [x] Step 1: First real release (v0.26.2 carrying #342 fix + Phase 10 ship) uses the new workflow. Verify the workflow run succeeds end-to-end. (v0.26.2 shipped successfully via the workflow per recent release-tag log. v0.27.0 re-validated the workflow end-to-end on 2026-05-29: ran 46s, OIDC publish + assert-published + marketplace smoke all clean.)
 - [ ] Step 2: Post-verification: if any glitches surface, file follow-up issues + close [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project's "Issue closure requires verification in a formally-installed release" rule.
 
 **Acceptance Criteria:**
@@ -319,7 +319,7 @@ Operator decisions (locked in during definition):
 - [x] `publishConfig: { access: public, provenance: true }` added to `packages/core`, `packages/cli`, `packages/studio` package.json files.
 - [x] `/release` skill SKILL.md updated: Pause 3 collapses into tag-message-only; Pause 4 collapses to push + workflow-watch (marketplace-smoke moves to CI); `--skip-publish-wait` flag documented; `make publish` recovery path documented.
 - [x] `RELEASING.md` documents the one-time npm-side trusted-publisher setup per package + the recovery path.
-- [ ] First real release uses the new workflow and succeeds end-to-end. Verification step closes [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project rule.
+- [x] First real release uses the new workflow and succeeds end-to-end. (v0.26.2 + v0.27.0 both shipped via the workflow without glitches.) Verification step closes [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project rule. *(Closure step deferred to the operator's call.)*
 
 ## Phase 11: Stale worktree discovery + dismantle  ·  [#356](https://github.com/audiocontrol-org/deskwork/issues/356)
 
@@ -421,7 +421,7 @@ Operator decisions (locked in during definition):
 - [x] `dw-lifecycle session-end-hygiene --slug <s> --session-start-sha <sha>` reports only issues referenced (`#NNN`) by a commit in `<sha>..HEAD`, not every same-user issue in the time window.
 - [x] "Address TBD markers" reports markers introduced by the session diff, not pre-existing whole-file prose.
 - [x] Vitest coverage for the four cases above passes; full plugin suite remains green. (1952 / 1952 tests pass; 5 new commit-range / session-diff acceptance cases land in `lifecycle-session-end-hygiene.test.ts`.)
-- [ ] Re-running `dw-lifecycle session-end-hygiene` against this hygiene session at the time of #361's fix produces a signal-only block (no merge-range / same-user noise). *(Verification deferred until the rebuilt helper ships in a release the operator installs — per the project's "issue closure requires verification in a formally-installed release" rule.)*
+- [x] Re-running `dw-lifecycle session-end-hygiene` against this hygiene session at the time of #361's fix produces a signal-only block (no merge-range / same-user noise). (Verified against installed **v0.27.0** 2026-05-29.)
 
 **Implementation notes:**
 

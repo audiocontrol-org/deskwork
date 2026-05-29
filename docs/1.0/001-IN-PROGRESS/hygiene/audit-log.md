@@ -150,9 +150,11 @@ Verification: Track 1 was running the smoke script end-to-end (exits `OK`, all t
 ## AUDIT-20260529-07 — Phase 11 Task 6 dogfood: archive-branch preflight runGit-contract bug
 
 Finding-ID: AUDIT-20260529-07
-Status:     fixed-pending-verification
+Status:     verified-2026-05-29
 Severity:   high
 Surface:    plugins/dw-lifecycle/src/archive-branch/preflight.ts (`assertTagDoesNotExist`)
+
+**Verified 2026-05-29 against installed v0.27.0** — created a tmp worktree (`feature/v0270-verify` with one ahead-commit), ran `dw-lifecycle dismantle-worktrees propose --worktree-base <tmp> --threshold-count 1`, set `decision=archive-then-dismantle` + substantive reason, ran `apply`. Result: `Applied 1, skipped 0, failed 0. applied: <path> [archive-then-dismantle] (tag: archived/feature-v0270-verify-2026-05-29)`. Pre-fix this would have reported `Tag already exists` and aborted the archive step; post-fix the preflight passes through correctly. Test artifacts cleaned up (tag deleted locally + on origin; tmp worktree-base removed).
 
 Phase 11 Task 6 dogfood surfaced a real runGit-contract bug in `archive-branch`'s preflight: `assertTagDoesNotExist` ran `runGit(['rev-parse', '--verify', 'refs/tags/<tag>'])` and assumed THROW-on-failure semantics (exception fires when the tag doesn't exist → tag absent → preflight passes). The standalone `archive-branch` subcommand wires that throwing contract. But `dismantle-worktrees apply` calls `applyArchive` with `runGitStdout` from `subcommands/lib/process-probes.ts` — a SWALLOWING runner that catches `execFileSync` failures and returns `''`. Under that runner, the `try` block always completes silently, `exists = true` is set unconditionally, and every `archive-then-dismantle` decision false-fails before any archive tag is created.
 
