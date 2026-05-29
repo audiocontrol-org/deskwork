@@ -1651,3 +1651,154 @@ deliberate orchestrator choice.
 - Pre-existing CLI test failures (`publish-entry-centric:139`, `approve-entry-centric:129`) remain pre-existing — zero diff in `ae0549d` or `0a9ca59`.
 - AUDIT-49 + AUDIT-50 + AUDIT-51 (all BLOCKING) were the highest-value findings. AUDIT-49 was a real "pipeline list permanently breaks after rename" data-integrity bug; AUDIT-50 was a path-traversal regression of the Task 6.1 hardening; AUDIT-51 compounded the orphan-sidecar problem with AUDIT-49. All three closed before merge.
 - Quality-review pushback (REJECTED verdict) validated the value of the review pass — three production-quality bugs caught at review time rather than post-release.
+
+## Phase 6 Task 6.3 — Studio lane-management page — review cycle (2026-05-28)
+
+Task 6.3 shipped at `0f9fc65` (feat) + `92267b2` (review followups). Spec
+review came back SPEC-COMPLIANT WITH NON-BLOCKING OBSERVATIONS (32
+positive/audit-trail observations, no findings to act on). Quality review
+came back QUALITY-APPROVED WITH NON-BLOCKING OBSERVATIONS (9 findings + 4
+observations); orchestrator triaged: applied 7 NON-BLOCKING, accepted 6
+observations.
+
+### AUDIT-20260528-61 — Edit-form blank-clear asymmetry
+
+Finding-ID: AUDIT-20260528-61
+Status:     fixed-92267b2
+Severity:   non-blocking (UX consistency)
+Surface:    `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:77-85`
+
+The diff-emit logic emitted `--name ""` when the operator cleared the
+name field but silently dropped `--template`/`--content-dir` when those
+were cleared. Inconsistent — and the CLI's interpretation of `--name ""`
+is unclear (set to empty vs reset to id?).
+
+Fix: added the `length > 0` guard for `name` to match the symmetry.
+Cleared fields are NOT emitted as flags; convention documented at the
+top of the diff-emit function.
+
+### AUDIT-20260528-62 — Slash-command builder quoting asymmetry
+
+Finding-ID: AUDIT-20260528-62
+Status:     fixed-92267b2
+Severity:   non-blocking (paste-into-shell risk)
+Surface:    `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:68,78,81,84`
+
+`name` was wrapped with `JSON.stringify` while `template` and
+`contentDir` were interpolated raw. If an operator pasted the output
+into a shell instead of Claude Code, raw interpolation is a
+shell-injection surface; even within Claude Code, values with spaces
+parse incorrectly.
+
+Fix: extracted `quoteValue(s: string): string` helper using
+`JSON.stringify` (handles double-quotes, backslashes, control chars).
+Applied uniformly to `name`, `template`, `contentDir`, and `id`.
+Existing clipboard-content test updated to assert all values are
+quoted.
+
+### AUDIT-20260528-63 — Single-open accordion for Edit forms
+
+Finding-ID: AUDIT-20260528-63
+Status:     fixed-92267b2
+Severity:   non-blocking (UX bounded-state)
+Surface:    `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:196-231`
+
+Opening Edit on multiple rows left them all open simultaneously. For
+50 lanes the operator could pile up 50 visible forms.
+
+Fix: tracks the currently-open row via module-level `openLaneId`. On
+Edit click: if a different row is open, close it; then toggle the
+clicked row. Test verifies the close-sibling behavior.
+
+### AUDIT-20260528-64 — Reorder handle passive icon
+
+Finding-ID: AUDIT-20260528-64
+Status:     fixed-92267b2
+Severity:   non-blocking (affordance-placement)
+Surface:    `packages/studio/src/pages/lanes/table.ts:75-79`,
+            `plugins/deskwork-studio/public/css/lanes-page.css:383-389`
+
+The handle had `cursor: grab` and `⋮⋮` glyph — every visual signal said
+draggable. But the column is inert (dashboard rail per Phase 5 Task 5.4
+is the canonical reorder surface). Operator who tries to drag gets
+nothing — affordance mismatch.
+
+Fix: glyph reduced to single `⋮`; cursor changed to `cursor: help`;
+title clarifies "Reorder via the dashboard lane rail." aria-hidden
+remains true (decorative for AT).
+
+### AUDIT-20260528-65 — Archived-section open state persistence
+
+Finding-ID: AUDIT-20260528-65
+Status:     fixed-92267b2
+Severity:   non-blocking (UX continuity)
+Surface:    `packages/studio/src/pages/lanes/archived-section.ts:48-67`,
+            `plugins/deskwork-studio/public/src/lanes/lanes-page.ts`
+
+The archived section's `<details>` open state reset on every page
+reload — friction for an operator triaging archived lanes.
+
+Fix: client-side `toggle` event listener writes the open state to
+`deskwork:lanes:<projectKey>:archived-open` localStorage. On init,
+state is read and applied. Mirrors Phase 5 swimlane-collapse pattern.
+
+### AUDIT-20260528-66 — Purge button discoverability gap
+
+Finding-ID: AUDIT-20260528-66
+Status:     fixed-92267b2
+Severity:   non-blocking (UX gate visibility)
+Surface:    `packages/studio/src/pages/lanes/table.ts:63-70`
+
+When `row.archived && row.entryCount > 0`, no Purge button rendered —
+but no other affordance suggested the next-step workflow ("move entries
+first"). Operator stalled.
+
+Fix: renders a DISABLED-LOOKING Purge button with title naming the
+prerequisite ("Cannot purge: N entries still reference this lane. Move
+them to another lane first via the per-entry surface."). Gate is now
+visible; next step is discoverable. Test asserts the disabled button
+appears.
+
+### AUDIT-20260528-67 — Empty-state CTA focuses first field
+
+Finding-ID: AUDIT-20260528-67
+Status:     fixed-92267b2
+Severity:   non-blocking (UX action discoverability)
+Surface:    `packages/studio/src/pages/lanes.ts:148`,
+            `plugins/deskwork-studio/public/src/lanes/lanes-page.ts`
+
+The empty-state CTA `href="#lanes-new-form-heading"` anchored to a
+heading. The operator's actual intent on click is "let me start
+typing." Anchor scroll is essentially a no-op when the form is
+right below the empty state.
+
+Fix: CTA carries `data-lanes-cta-focus`. Click handler calls
+`preventDefault` and focuses the first field
+(`document.querySelector('[data-lanes-field="id"]')?.focus()`). Anchor
+href remains as no-JS fallback. Test simulates click and asserts
+focus moves.
+
+### AUDIT-20260528-68 — Test coverage gaps captured as observation
+
+Finding-ID: AUDIT-20260528-68
+Status:     observation (no action)
+Severity:   observation
+Surface:    `packages/studio/test/lanes/lanes-page-client.test.ts`
+
+Quality reviewer noted untested scenarios: concurrent multi-row Edit
+open (fixed via Fix 3 single-open accordion, now testable but not
+covered by an explicit "two rows" test), keyboard navigation (Tab +
+Enter on Copy), browser back/forward bfcache, slash-command builder
+with special characters in name (newline, backtick, quote).
+
+Quoting test was added as part of Fix 2. Other gaps recorded for the
+audit trail; not blocking.
+
+### Task 6.3 closing summary
+
+- Spec-compliance review: SPEC-COMPLIANT WITH NON-BLOCKING OBSERVATIONS (32 observations, all positive/audit-trail).
+- Code-quality review: QUALITY-APPROVED WITH NON-BLOCKING OBSERVATIONS (9 findings + 4 observations). Triage: 7 NON-BLOCKING applied at 92267b2; 6 observations accepted without action.
+- Test deltas: studio suite 831 → 838 (+7); core 711 throughout; CLI tests unchanged.
+- Builds: `@deskwork/{core, studio, cli}` all exit 0.
+- Pre-existing CLI failures persist; zero diff in `packages/cli/` across `0f9fc65` and `92267b2`.
+- Strongest design call: AUDIT-64 (reorder handle visual mismatch) — the workplan named the column as a per-row field but didn't address the inert-yet-draggable-looking affordance. Resolving via passive icon + title preserves the column while making the affordance honest. Matches `.claude/rules/affordance-placement.md` "an affordance whose label/glyph doesn't relate spatially to the action" anti-pattern.

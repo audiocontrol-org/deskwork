@@ -311,10 +311,10 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 6.3: Studio lane-management page
 
-- [ ] Step 6.3.1: Server-render page at `/dev/lanes/` listing every lane with create / archive / restore buttons; each row shows lane ID, name, bound template, content-dir, entry count, visibility toggle, reorder handle.
-- [ ] Step 6.3.2: "New lane" form: prompts for id, name, template (dropdown of available templates from `listAvailablePipelineTemplates`), contentDir.
-- [ ] Step 6.3.3: Edit form: same fields, editable; clipboard-copies the equivalent `/deskwork:lane update` invocation per THESIS Consequence 2.
-- [ ] Step 6.3.4: Archive / restore actions: clipboard-copy `/deskwork:lane archive <id>` or `/deskwork:lane restore <id>` — studio never mutates sidecar state.
+- [x] Step 6.3.1: Server-render page at `/dev/lanes/` listing every lane with create / archive / restore buttons; each row shows lane ID, name, bound template, content-dir, entry count, visibility toggle, reorder handle. (Reorder handle ships as a passive visual indicator — dashboard rail at Phase 5 Task 5.4 is the canonical reorder surface; the per-row glyph is `⋮` with `cursor: help` + a title pointing at the rail.)
+- [x] Step 6.3.2: "New lane" form: prompts for id, name, template (dropdown of available templates from `listAvailablePipelineTemplates`), contentDir. (Copy-builder pattern: change events live-update a slash-command preview; copy button writes to clipboard. No server-side mutation per THESIS Consequence 2.)
+- [x] Step 6.3.3: Edit form: same fields, editable; clipboard-copies the equivalent `/deskwork:lane update` invocation per THESIS Consequence 2. (Diff-emit: only diverged fields produce flags; cleared fields are silently skipped; convention documented inline. Single-open accordion across rows.)
+- [x] Step 6.3.4: Archive / restore actions: clipboard-copy `/deskwork:lane archive <id>` or `/deskwork:lane restore <id>` — studio never mutates sidecar state. (Plus disabled-looking Purge button when archived + entries remain, surfacing the gate visibly with a title pointing at the next-step workflow.)
 
 ### Task 6.4: Studio pipeline-editor page
 
