@@ -21,14 +21,28 @@ import {
 import type { BarrageRun } from '../../../scope-discovery/audit-barrage/types.js';
 
 describe('encodeTimestamp', () => {
-  it('renders ISO basic format with no separators', () => {
+  it('renders ISO basic format with millisecond resolution', () => {
     const stamp = encodeTimestamp(new Date('2026-05-28T12:34:56.789Z'));
-    expect(stamp).toBe('20260528T123456Z');
+    expect(stamp).toBe('20260528T123456789Z');
   });
 
-  it('is stable across millisecond drift', () => {
+  it('zero-pads the millisecond component', () => {
+    const stamp = encodeTimestamp(new Date('2026-05-28T12:34:56.001Z'));
+    expect(stamp).toBe('20260528T123456001Z');
+  });
+
+  it('emits 000 ms for whole-second Dates', () => {
     const stamp = encodeTimestamp(new Date('2026-05-28T12:34:56.000Z'));
-    expect(stamp).toBe('20260528T123456Z');
+    expect(stamp).toBe('20260528T123456000Z');
+  });
+
+  // AUDIT-20260529-07 — millisecond resolution prevents the collision
+  // shape where two runs in the same wall-clock second produced the
+  // same run-dir name + silently overwrote each other.
+  it('distinguishes Dates that differ only in their millisecond field', () => {
+    const a = encodeTimestamp(new Date('2026-05-28T12:34:56.001Z'));
+    const b = encodeTimestamp(new Date('2026-05-28T12:34:56.002Z'));
+    expect(a).not.toBe(b);
   });
 });
 
@@ -51,12 +65,12 @@ describe('safeModelName', () => {
 });
 
 describe('generateRunDirName', () => {
-  it('combines timestamp and sanitized slug with a hyphen', () => {
+  it('combines millisecond-resolution timestamp and sanitized slug with a hyphen', () => {
     const name = generateRunDirName(
-      new Date('2026-05-28T12:34:56.000Z'),
+      new Date('2026-05-28T12:34:56.789Z'),
       'scope-discovery',
     );
-    expect(name).toBe('20260528T123456Z-scope-discovery');
+    expect(name).toBe('20260528T123456789Z-scope-discovery');
   });
 
   it('sanitizes operator-supplied slug', () => {
@@ -64,7 +78,7 @@ describe('generateRunDirName', () => {
       new Date('2026-05-28T12:34:56.000Z'),
       'feature/with-slash',
     );
-    expect(name).toBe('20260528T123456Z-feature_with-slash');
+    expect(name).toBe('20260528T123456000Z-feature_with-slash');
   });
 });
 

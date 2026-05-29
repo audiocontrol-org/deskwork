@@ -58,8 +58,8 @@ describe('orchestrateBarrage', () => {
 
     expect(run.results.length).toBe(2);
     expect(run.runDir.startsWith(tmp)).toBe(true);
-    // Names + timestamp shape.
-    expect(run.timestamp).toMatch(/^\d{8}T\d{6}Z$/);
+    // Names + timestamp shape (millisecond resolution, sss suffix).
+    expect(run.timestamp).toMatch(/^\d{8}T\d{9}Z$/);
     expect(run.featureSlug).toBe('sample');
 
     // PROMPT.md verbatim.

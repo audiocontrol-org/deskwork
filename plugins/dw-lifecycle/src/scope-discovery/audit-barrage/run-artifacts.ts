@@ -6,13 +6,22 @@
  * A barrage run lands at:
  *
  *   <repoRoot>/.dw-lifecycle/scope-discovery/audit-runs/
- *     <YYYYMMDDTHHMMSSZ>-<safe-feature-slug>/
+ *     <YYYYMMDDTHHMMSSsssZ>-<safe-feature-slug>/
  *       PROMPT.md            -- the rendered audit prompt (verbatim)
  *       INDEX.md             -- per-run manifest (timestamp, models,
  *                               per-model exit code / duration / bytes)
  *       <model>.md           -- captured stdout for each model
  *       stderr/
  *         <model>.txt        -- captured stderr for each model
+ *
+ * Timestamp resolution is millisecond — `sss` is the 3-digit
+ * fractional-second component. Second-resolution timestamps would
+ * collide if two barrages for the same feature kicked off within the
+ * same wall-clock second; `mkdir({recursive:true})` doesn't error on
+ * an existing dir, so the second run would silently overwrite the
+ * first. Millisecond resolution moves that collision window into
+ * "operationally impossible" territory without introducing the
+ * complexity of a separate "does this dir already exist?" probe.
  *
  * Functions here own the path-derivation + directory creation + manifest
  * writes. The orchestrator composes them; tests exercise them directly
@@ -25,16 +34,20 @@ import type { BarrageRun, ModelRunResult } from './types.js';
 
 /**
  * Encode a Date as the basic-format UTC stamp embedded in the run-dir
- * name: `YYYYMMDDTHHMMSSZ` with no separators. Basic format keeps the
- * stamp filesystem-safe across every OS we target without escaping.
+ * name: `YYYYMMDDTHHMMSSsssZ` with no separators. `sss` is the 3-digit
+ * millisecond component. Basic format keeps the stamp filesystem-safe
+ * across every OS we target without escaping; millisecond resolution
+ * removes the per-second collision risk described in the file header.
  */
 export function encodeTimestamp(timestamp: Date): string {
   const iso = timestamp.toISOString(); // 2026-05-28T12:34:56.789Z
   // Strip dashes from the date, colons from the time, and the
-  // fractional-second portion. Result: 20260528T123456Z.
+  // decimal point in the fractional-second portion.
+  // Result: 20260528T123456789Z.
   const datePart = iso.slice(0, 10).replace(/-/g, '');
   const timePart = iso.slice(11, 19).replace(/:/g, '');
-  return `${datePart}T${timePart}Z`;
+  const msPart = iso.slice(20, 23); // 'sss' (3-digit ms)
+  return `${datePart}T${timePart}${msPart}Z`;
 }
 
 /**

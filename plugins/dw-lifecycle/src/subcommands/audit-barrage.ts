@@ -216,19 +216,34 @@ export function resolveModels(
 /**
  * Map a BarrageRun's per-model results onto the verb's exit code.
  * Exported for tests; the shim also calls it before exit.
+ *
+ * Contract (aligned with PRD):
+ *   - `0` if AT LEAST ONE model produced positive-byte stdout AND
+ *     wasn't a spawn failure.
+ *   - `1` if every model failed (spawn error or zero stdout bytes).
+ *
+ * Non-zero CLI exit + timeout are recorded in INDEX.md as triage
+ * metadata; neither precludes the captured stdout from being valuable
+ * to the operator's review. A model that emits a complete useful
+ * audit response but exits non-zero (rate-limit warnings, partial-
+ * completion conventions, lint-style non-zero-on-findings) IS healthy
+ * for the purposes of the verb's exit code — the operator gets to see
+ * the captured findings either way.
  */
 export function deriveBarrageExitCode(run: BarrageRun): 0 | 1 {
   const anyHealthy = run.results.some(isHealthyModelRun);
   return anyHealthy ? 0 : 1;
 }
 
+/**
+ * "Produced output" for the verb's exit-code contract: positive
+ * stdout bytes AND no spawn failure. Non-zero CLI exits + timeouts
+ * fall on the healthy side — the captured content is still triagable.
+ * A spawn error has nothing to capture by definition, so it stays
+ * unhealthy regardless of byte counts.
+ */
 function isHealthyModelRun(result: ModelRunResult): boolean {
-  return (
-    result.exitCode === 0 &&
-    !result.timedOut &&
-    result.spawnError === undefined &&
-    result.stdoutBytes > 0
-  );
+  return result.stdoutBytes > 0 && result.spawnError === undefined;
 }
 
 /**
@@ -302,6 +317,14 @@ export async function auditBarrage(args: string[]): Promise<void> {
   process.exit(result.exitCode);
 }
 
+/**
+ * Read the operator-supplied prompt file. A missing / unreadable
+ * `--prompt-file` is operator-input error of the same class as
+ * malformed `--models` or bad config: usage error, exit 2. Aligning
+ * this with the config-loader's exit 2 avoids the wrapper-script
+ * mis-signal where "you invoked me wrong" gets the same code as "the
+ * audit ran and every model failed."
+ */
 async function loadPromptText(promptFilePath: string): Promise<string> {
   try {
     return await readFile(promptFilePath, 'utf8');
@@ -309,6 +332,6 @@ async function loadPromptText(promptFilePath: string): Promise<string> {
     process.stderr.write(
       `audit-barrage: failed to read --prompt-file ${promptFilePath}: ${errorMessage(err)}\n`,
     );
-    process.exit(1);
+    process.exit(2);
   }
 }

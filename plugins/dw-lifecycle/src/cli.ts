@@ -29,6 +29,7 @@ import { migrateFromPilot } from './subcommands/migrate-from-pilot.js';
 import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-discovery-hooks.js';
 import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
 import { auditBarrage } from './subcommands/audit-barrage.js';
+import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
 import { wrapPrompt } from './subcommands/wrap-prompt.js';
 import { validateReturn } from './subcommands/validate-return.js';
 import { debtReport } from './subcommands/debt-report.js';
@@ -83,6 +84,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'uninstall-scope-discovery-hooks': uninstallScopeDiscoveryHooks,
   'orchestrator-turn': orchestratorTurn,
   'audit-barrage': auditBarrage,
+  'audit-barrage-render': auditBarrageRender,
   'wrap-prompt': wrapPrompt,
   'validate-return': validateReturn,
   'debt-report': debtReport,

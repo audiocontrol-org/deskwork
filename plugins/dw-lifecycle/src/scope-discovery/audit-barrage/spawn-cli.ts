@@ -19,11 +19,25 @@
  * Argument substitution: `argsTemplate` is split on whitespace BEFORE
  * `{{prompt}}` is replaced. Splitting after would mangle prompts that
  * contain whitespace; splitting before keeps the prompt as a single
- * argv element regardless of its content.
+ * argv element regardless of its content. Tokens that EQUAL
+ * `{{prompt}}` become the prompt verbatim; tokens that CONTAIN
+ * `{{prompt}}` as a substring (e.g. `--prompt={{prompt}}`) get
+ * intra-token literal replacement.
  *
  * Stream-write failures (disk full, permission, etc.) propagate as
  * thrown errors — filesystem corruption is fatal and the orchestrator
- * is allowed to crash.
+ * is allowed to crash. Stream `'error'` handlers are attached at
+ * stream-creation time so the process never crashes mid-run with an
+ * unattended event.
+ *
+ * Settle event: completion logic fires on `child.on('close', ...)`
+ * (not `'exit'`). `'exit'` fires when the process terminates but
+ * stdio pipes may still have undelivered buffered data; `'close'`
+ * fires only after all stdio streams have closed — which is the
+ * event we need to be sure no in-flight stdout chunk is dropped.
+ * Every settle path (timeout, signal, spawn-error, normal exit)
+ * clears both timers via `finish()` so no timer leaks past the
+ * resolution of the returned Promise.
  */
 
 import { spawn } from 'node:child_process';
@@ -65,7 +79,22 @@ export async function spawnCliAgainstModel(
     let stderrBytes = 0;
     let timedOut = false;
     let sigkillTimer: NodeJS.Timeout | null = null;
+    let timeoutTimer: NodeJS.Timeout | null = null;
     let settled = false;
+
+    // Attach stream `'error'` handlers immediately after stream
+    // creation — write errors mid-run (disk full, permission denied,
+    // EPIPE on early consumer close) must reject the run instead of
+    // crashing the process via an uncaught event.
+    const onStreamError = (err: Error): void => {
+      if (settled) return;
+      settled = true;
+      if (sigkillTimer !== null) clearTimeout(sigkillTimer);
+      if (timeoutTimer !== null) clearTimeout(timeoutTimer);
+      rejectResult(err);
+    };
+    stdoutStream.on('error', onStreamError);
+    stderrStream.on('error', onStreamError);
 
     const finish = (partial: Omit<ModelRunResult, 'name'>) => {
       if (settled) return;
@@ -73,6 +102,10 @@ export async function spawnCliAgainstModel(
       if (sigkillTimer !== null) {
         clearTimeout(sigkillTimer);
         sigkillTimer = null;
+      }
+      if (timeoutTimer !== null) {
+        clearTimeout(timeoutTimer);
+        timeoutTimer = null;
       }
       void closeStreams(stdoutStream, stderrStream)
         .then(() => {
@@ -89,7 +122,10 @@ export async function spawnCliAgainstModel(
     });
 
     // ENOENT / permission denied / etc. — record as spawn error and
-    // return without aborting siblings.
+    // return without aborting siblings. `finish()` clears every timer
+    // on this path; without it, a timeout timer scheduled ~300s out
+    // would survive past the result resolution (silent dangling
+    // handle).
     child.on('error', (err) => {
       finish({
         exitCode: -2,
@@ -112,7 +148,7 @@ export async function spawnCliAgainstModel(
       stderrStream.write(chunk);
     });
 
-    const timeoutTimer = setTimeout(() => {
+    timeoutTimer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
       sigkillTimer = setTimeout(() => {
@@ -120,8 +156,12 @@ export async function spawnCliAgainstModel(
       }, SIGKILL_GRACE_MS);
     }, input.model.timeoutSeconds * 1000);
 
-    child.on('exit', (code, signal) => {
-      clearTimeout(timeoutTimer);
+    // Settle on `'close'` (not `'exit'`) so the child's stdio pipes
+    // have fully drained before we snapshot byte counters / close
+    // capture streams. `'exit'` fires when the process terminates but
+    // can leave in-flight buffered chunks unaccounted for; `'close'`
+    // fires only after every stdio pipe has closed.
+    child.on('close', (code, signal) => {
       const exitCode = code !== null ? code : -1;
       finish({
         exitCode,
@@ -137,11 +177,27 @@ export async function spawnCliAgainstModel(
 }
 
 /**
- * Split `argsTemplate` on whitespace, then substitute `{{prompt}}` in
- * each token. Token equality is exact: a token that EQUALS
- * `{{prompt}}` becomes the prompt; tokens that merely contain the
- * placeholder substring (which today doesn't happen in any of our
- * default templates) are pass-through.
+ * Split `argsTemplate` on whitespace, then substitute `{{prompt}}`
+ * inside each token via literal `split().join()` replacement.
+ *
+ * Substitution rules:
+ *   - Token equals `{{prompt}}` (bare-token form): replaced wholesale
+ *     by the prompt string; a prompt with embedded whitespace lands
+ *     as a single argv element because the split happens before the
+ *     substitution.
+ *   - Token contains `{{prompt}}` as a substring (embedded form,
+ *     e.g. `--prompt={{prompt}}`): every occurrence within the token
+ *     is replaced literally. Multiple `{{prompt}}` substrings in one
+ *     token are all replaced (idempotent literal replace).
+ *   - Token does not contain `{{prompt}}`: passed through verbatim.
+ *
+ * The intra-token form is the back-compatible fix for adopter configs
+ * that pass `args_template: "--prompt={{prompt}}"` through the
+ * config-loader's substring-tolerant validation (`args_template`
+ * needs only to contain `{{prompt}}` somewhere). Before this change,
+ * such a config would survive validation, fail at spawn time (the
+ * CLI receives the literal `--prompt={{prompt}}` token, never the
+ * rendered prompt), and silently produce an empty-output run.
  *
  * Exported for tests; the orchestrator only calls `spawnCliAgainstModel`.
  */
@@ -150,7 +206,7 @@ export function buildArgs(
   prompt: string,
 ): ReadonlyArray<string> {
   const tokens = argsTemplate.trim().split(/\s+/).filter((t) => t.length > 0);
-  return tokens.map((tok) => (tok === '{{prompt}}' ? prompt : tok));
+  return tokens.map((tok) => tok.split('{{prompt}}').join(prompt));
 }
 
 async function closeStreams(

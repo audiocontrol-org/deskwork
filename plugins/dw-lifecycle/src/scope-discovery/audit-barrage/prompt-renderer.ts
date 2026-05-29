@@ -185,27 +185,30 @@ function splitAndJoin(input: string, marker: string, value: string): string {
 }
 
 /**
- * Scan the substituted body for any surviving `{{name}}` token. If the
- * template references a var name not in `EXPECTED_VARS`, the
- * substitution loop won't touch it and this guard fires. Surfaces the
- * offending names so the caller can fix the template (or the var list)
- * with one round-trip.
+ * Scan the substituted body for surviving `{{name}}` markers that
+ * correspond to declared `EXPECTED_VARS`. If `{{feature_slug}}` (a
+ * declared var) remains after substitution, that's a real error —
+ * the substitution loop should have replaced it. If `{{var_name}}`
+ * (NOT a declared var) remains, leave it: it's instructional prose
+ * in the template explaining the substitution mechanism, not a missing
+ * var. Pre-fix, ANY `{{xxx}}` substring would fire this guard, which
+ * meant the template's own "use `{{var}}` markers" documentation
+ * rejected itself.
+ *
+ * Operator-impact framing: rejecting only declared-var markers makes
+ * the renderer compose cleanly with templates that contain literal
+ * `{{...}}` strings in their instructional prose. Drift between the
+ * template's reference list and `EXPECTED_VARS` still surfaces — the
+ * declared-vars set is the contract.
  */
 function rejectUnsubstitutedTokens(rendered: string): void {
-  const pattern = /\{\{([a-zA-Z0-9_]+)\}\}/g;
-  const seen = new Set<string>();
-  let match: RegExpExecArray | null = pattern.exec(rendered);
-  while (match !== null) {
-    const name = match[1];
-    if (typeof name === 'string') seen.add(name);
-    match = pattern.exec(rendered);
-  }
-  if (seen.size > 0) {
-    const names = Array.from(seen).sort().join(', ');
+  const remaining = EXPECTED_VARS.filter((v) => rendered.includes(`{{${v}}}`));
+  if (remaining.length > 0) {
     throw new Error(
-      `audit-barrage prompt-renderer: unsubstituted token(s) remain in ` +
-        `rendered output: ${names} (template references vars not in ` +
-        `EXPECTED_VARS, or vars list is out of sync with template)`,
+      `audit-barrage prompt-renderer: declared var(s) not substituted ` +
+        `in rendered output: ${remaining.join(', ')} (the template ` +
+        `references these EXPECTED_VARS markers but the substitution ` +
+        `pass left them in place — vars list and template are out of sync)`,
     );
   }
 }

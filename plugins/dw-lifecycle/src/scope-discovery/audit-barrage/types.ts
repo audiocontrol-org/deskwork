@@ -111,10 +111,15 @@ export interface BarrageRun {
  * Result returned by the CLI shim. `exitCode` maps the run outcome
  * onto the verb's overall exit code:
  *
- *   - `0` — at least one model produced stdout AND exited cleanly.
- *   - `1` — every model failed (zero produced usable output).
- *   - `2` — usage error (caller's flag parsing rejected; the shim
- *     guards on this before invoking the orchestrator).
+ *   - `0` — at least one model produced positive-byte stdout AND was
+ *     not a spawn failure. Non-zero CLI exit codes and timeouts fall
+ *     on this side of the boundary because the captured stdout is
+ *     still triagable content; the operator sees the metadata in
+ *     INDEX.md and walks the per-model `.md` files either way.
+ *   - `1` — every model failed (spawn error OR zero stdout bytes).
+ *   - `2` — usage error (caller's flag parsing rejected, `--prompt-file`
+ *     unreadable, malformed config). The shim guards on these before
+ *     invoking the orchestrator.
  */
 export interface BarrageResult {
   readonly run: BarrageRun;

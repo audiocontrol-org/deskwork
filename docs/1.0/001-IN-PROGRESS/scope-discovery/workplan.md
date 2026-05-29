@@ -653,24 +653,24 @@ Confirm the three CLIs are installed + authenticated on the operator's machine. 
 
 ### Task 4: Skill prose
 
-- [ ] Step 1: NEW `plugins/dw-lifecycle/skills/audit-barrage/SKILL.md`. Describes operator workflow: invoke → wait for parallel barrage → walk the run dir → triage findings into the canonical audit-log via the existing closure workflow. Covers: when to run, how to invoke, what to expect in the run dir, how to lift findings.
-- [ ] Step 2: SKILL.md cross-references `ROADMAP.md` § Audit-barrage so operators see the long-term plan.
-- [ ] Step 3: Add `/dwab` (audit-barrage) shortcut to `dw-lifecycle:install-shortcuts`.
+- [x] Step 1: NEW `plugins/dw-lifecycle/skills/audit-barrage/SKILL.md`. Describes operator workflow end-to-end: when to run, the two-step render-then-fire CLI workflow, override paths, run-dir layout, triage steps.
+- [x] Step 2: SKILL.md cross-references `ROADMAP.md` § Audit-barrage so operators see the long-term plan + the discipline rule + the smoke + the CLI invocation notes.
+- [x] Step 3: Added `/dwab` (audit-barrage) shortcut to `dw-lifecycle:install-shortcuts` — `audit-barrage` is now in the COMMANDS list with Scheme A mapping `dwab`, Scheme B mapping `dw-ab`, Scheme C algorithmic `dw-audit-barrage`. Command file at `plugins/dw-lifecycle/commands/audit-barrage.md` invokes the skill.
 
 **Acceptance Criteria:**
-- [ ] `/dw-lifecycle:audit-barrage` discoverable via slash-command picker.
-- [ ] `/dwab` shortcut works.
-- [ ] SKILL.md documents invocation + triage workflow + override paths.
+- [x] `/dw-lifecycle:audit-barrage` discoverable via slash-command picker (command file shipped at `commands/audit-barrage.md`).
+- [x] `/dwab` shortcut works (Scheme A entry in `shortcuts/schemes.ts`).
+- [x] SKILL.md documents invocation + triage workflow + override paths.
 
 ### Task 5: Tests + smoke
 
-- [ ] Step 1: Verify per-task tests landed across Tasks 2–4; backfill gaps.
-- [ ] Step 2: Cross-cutting tests: full barrage against fake-CLI fixtures; failure modes (missing binary, timeout, malformed prompt substitution, override-file-not-readable, run-dir-creation-failure).
-- [ ] Step 3: NEW `scripts/smoke-audit-barrage.sh` — exercises end-to-end against fake CLIs that emit predictable findings; asserts run-dir layout, INDEX content, per-model stdout/stderr separation. Local-only; not wired into CI.
+- [x] Step 1: Verified per-task tests landed across Tasks 2–4; backfilled gaps — added 23 new tests across audit-barrage surface (intra-token substitution, close-vs-exit byte preservation, timer-leak on spawn-error, healthy-with-nonzero-exit, healthy-with-timeout, spawn-error-unhealthy, single-substitution count, instructional-prose pass-through, EXPECTED_VARS guard, render verb flag-parse + payload-validate).
+- [x] Step 2: Cross-cutting tests pass against fake-CLI fixtures; failure modes covered (missing binary, timeout, malformed substitution, override-file-not-readable, run-dir-creation-failure). Full plugin suite at 1995/1995.
+- [x] Step 3: NEW `scripts/smoke-audit-barrage.sh` — exercises both verbs end-to-end against fake-CLI shims (deterministic `node` scripts emitting canned finding blocks). Asserts run-dir layout, INDEX content, per-model stdout/stderr separation, render substitution + EXPECTED_VARS marker absence. Local-only; NOT wired into CI per project rule.
 
 **Acceptance Criteria:**
-- [ ] Full plugin suite passes with audit-barrage tests added.
-- [ ] `scripts/smoke-audit-barrage.sh` passes end-to-end against fake CLIs.
+- [x] Full plugin suite passes with audit-barrage tests added (1995/1995).
+- [x] `scripts/smoke-audit-barrage.sh` passes end-to-end against fake CLIs (runs locally; emits `OK` on full success).
 
 ### Task 6: Live verification + dogfood
 
@@ -687,15 +687,15 @@ Confirm the three CLIs are installed + authenticated on the operator's machine. 
 
 ### Task 7: Cross-references + ROADMAP update
 
-- [ ] Step 1: Add a section to `.claude/rules/agent-discipline.md` titled "Audit-barrage: structured cross-model audit". Names the new surface + the operator's triage workflow + how it composes with the in-band self-audit + the SDD review cycle (three independent surfaces, additive not replacement).
-- [ ] Step 2: Update `ROADMAP.md` § "Audit-barrage feature shape" — move Design A from "active in-flight" to "shipped"; tighten Design B's framing now that A's primitives exist.
-- [ ] Step 3: Move audit-barrage from "Active in-flight" to "Recently shipped" in ROADMAP.
-- [ ] Step 4: Add audit-barrage section to `plugins/dw-lifecycle/README.md`.
+- [x] Step 1: Added "Audit-barrage: structured cross-model audit" section to `.claude/rules/agent-discipline.md` — names the new surface + the operator's triage workflow + how it composes with the in-band self-audit + the SDD review cycle (three independent surfaces, additive not replacement) + the Phase 12 self-dogfood data as evidence the surface earns its keep.
+- [x] Step 2: Updated `ROADMAP.md` § "Audit-barrage feature shape" — Design A moved to "Recently shipped" with primitives + acceptance-signal evidence; Design B's framing tightened to compose over the v1 primitives.
+- [x] Step 3: Audit-barrage moved out of "Active initiatives (in-flight)" and into the "Recently shipped" section of `ROADMAP.md`.
+- [x] Step 4: Added audit-barrage section + slash-commands table entry to `plugins/dw-lifecycle/README.md`; updated "Twenty commands total" prose.
 
 **Acceptance Criteria:**
-- [ ] Agent-discipline rule documents the audit-barrage surface.
-- [ ] ROADMAP.md reflects Design A shipped + Design B as next.
-- [ ] Adopter-facing docs: README + skill prose + agent-discipline rule update.
+- [x] Agent-discipline rule documents the audit-barrage surface.
+- [x] ROADMAP.md reflects Design A shipped + Design B as next.
+- [x] Adopter-facing docs: README + skill prose + agent-discipline rule update.
 
 ### Phase 12 — Out of Scope (deferred to Design B / Design C per ROADMAP)
 

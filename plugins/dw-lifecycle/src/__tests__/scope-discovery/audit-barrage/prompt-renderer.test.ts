@@ -48,7 +48,32 @@ describe('renderAuditBarragePrompt — happy path against shipped default', () =
       if (value === undefined) throw new Error('test bug: missing value');
       expect(rendered).toContain(value);
     }
-    expect(rendered).not.toMatch(/\{\{[a-zA-Z0-9_]+\}\}/);
+    // AUDIT-20260529-10 — the guard now rejects ONLY unsubstituted
+    // EXPECTED_VARS, not arbitrary `{{...}}` strings. No declared var
+    // marker should remain after a full-render pass against the
+    // shipped default.
+    for (const key of EXPECTED_VARS) {
+      expect(rendered).not.toContain(`{{${key}}}`);
+    }
+  });
+
+  // AUDIT-20260529-11 — the redesigned template uses single-substitution
+  // sites (no marker triplets), so each value appears exactly once.
+  // Pre-fix, `<!-- {{var}} -->\n{{var}}\n<!-- {{var}} -->` tripled
+  // every value: a 60 KB diff became 180 KB in the rendered output.
+  it('substitutes each declared var exactly once (no marker triplets)', async () => {
+    const rendered = await renderAuditBarragePrompt({
+      repoRoot: tmp,
+      vars: FULL_VARS,
+    });
+    // The values chosen for FULL_VARS are unique sentinels; each must
+    // appear exactly once in the rendered output.
+    for (const key of EXPECTED_VARS) {
+      const value = FULL_VARS[key];
+      if (value === undefined) throw new Error('test bug: missing value');
+      const occurrences = rendered.split(value).length - 1;
+      expect(occurrences).toBe(1);
+    }
   });
 
   it('rejects render when a required var is missing', async () => {
@@ -110,21 +135,50 @@ describe('renderAuditBarragePrompt — project override resolution', () => {
     expect(rendered).not.toMatch(/\{\{[a-zA-Z0-9_]+\}\}/);
   });
 
-  it('rejects an override referencing an unknown var', async () => {
+  // AUDIT-20260529-10 — the guard now permits `{{name}}` strings that
+  // are NOT declared in `EXPECTED_VARS`; they're treated as
+  // instructional prose (the template's own documentation explaining
+  // the substitution mechanism). An override that mentions
+  // `{{not_in_expected_list}}` renders through with the marker left
+  // intact — the renderer doesn't pretend it's a missing var.
+  it('passes through {{...}} strings whose names are not in EXPECTED_VARS', async () => {
     await seedOverride(
       [
-        '# OVERRIDE WITH BAD VAR',
+        '# OVERRIDE WITH INSTRUCTIONAL PROSE',
         'feature: {{feature_slug}}',
         'plan: {{workplan_summary}}',
         'diff: {{diff}}',
         'audit: {{audit_log_excerpt}}',
         'commits: {{commit_subjects}}',
-        'mystery: {{not_in_expected_list}}',
+        'instructional: write a {{var_name}} marker in the body',
       ].join('\n'),
     );
+    const rendered = await renderAuditBarragePrompt({
+      repoRoot: tmp,
+      vars: FULL_VARS,
+    });
+    expect(rendered).toContain('instructional: write a {{var_name}} marker');
+    expect(rendered).toContain('feature: sample-feature');
+  });
+
+  // AUDIT-20260529-10 — an EXPECTED_VARS marker that somehow survives
+  // substitution IS still a real error. We can't easily reproduce a
+  // surviving-marker case via normal use (the substituter handles
+  // every declared var), but we exercise the failure path via a
+  // template that explicitly contains a marker the renderer's loop
+  // skipped... which it cannot under the current implementation, so
+  // we exercise the validateVars side: pass an unknown var key in the
+  // payload and assert the existing "unknown vars" guard still
+  // catches it (this contract did not change).
+  it('rejects an unknown var key in the supplied vars payload via the override path', async () => {
+    await seedOverride('# minimal override that references no vars\n');
+    const withExtra: Record<string, string> = {
+      ...FULL_VARS,
+      not_a_real_var: 'oops',
+    };
     await expect(
-      renderAuditBarragePrompt({ repoRoot: tmp, vars: FULL_VARS }),
-    ).rejects.toThrow(/unsubstituted token\(s\) remain.*not_in_expected_list/);
+      renderAuditBarragePrompt({ repoRoot: tmp, vars: withExtra }),
+    ).rejects.toThrow(/unknown vars: not_a_real_var/);
   });
 
   it('reads the default when the override is absent', async () => {

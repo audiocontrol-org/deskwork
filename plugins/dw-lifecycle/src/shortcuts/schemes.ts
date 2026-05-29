@@ -21,14 +21,21 @@ export interface SchemeMapping {
   entries(): ReadonlyArray<readonly [string, string]>;
 }
 
-// The 17 lifecycle commands that get shortcut shims. The plugin also
+// The 18 lifecycle commands that get shortcut shims. The plugin also
 // ships `install-shortcuts` and `uninstall-shortcuts` as meta-commands;
 // those are intentionally excluded here — they bootstrap and roll back
 // the shim install itself, so giving them shims would be a chicken-and-
 // egg shape. The on-disk parity test in __tests__/shortcuts.test.ts
 // accounts for the exclusion explicitly.
+//
+// `audit-barrage` is the multi-model audit barrage skill (the third
+// independent audit surface alongside the in-band self-audit and the
+// SDD two-reviewer cycle). It's an operator-triggered skill the
+// implementation team invokes during a feature's lifecycle, so it
+// earns a shim slot — same posture as `audit` and `review`.
 export const COMMANDS = [
   'audit',
+  'audit-barrage',
   'complete',
   'customize',
   'define',
@@ -63,6 +70,7 @@ function assertKnownCommand(command: string): asserts command is Command {
 
 const SCHEME_A_ENTRIES = [
   ['audit', 'dwa'],
+  ['audit-barrage', 'dwab'],
   ['implement', 'dwi'],
   ['setup', 'dws'],
   ['ship', 'dwsh'],
@@ -83,6 +91,7 @@ const SCHEME_A_ENTRIES = [
 
 const SCHEME_B_ENTRIES = [
   ['audit', 'dw-au'],
+  ['audit-barrage', 'dw-ab'],
   ['implement', 'dw-im'],
   ['setup', 'dw-se'],
   ['define', 'dw-de'],

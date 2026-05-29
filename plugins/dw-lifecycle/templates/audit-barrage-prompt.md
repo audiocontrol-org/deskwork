@@ -6,37 +6,27 @@ You are NOT collaborating with the other models. You write what you see. The cro
 
 ## Feature under audit
 
-<!-- {{feature_slug}} -->
 {{feature_slug}}
-<!-- {{feature_slug}} -->
 
 ## Feature scope (workplan / PRD summary)
 
-<!-- {{workplan_summary}} -->
 {{workplan_summary}}
-<!-- {{workplan_summary}} -->
 
 ## Commit subjects in the audited range
 
-<!-- {{commit_subjects}} -->
 {{commit_subjects}}
-<!-- {{commit_subjects}} -->
 
 ## Recent audit-log excerpt (prior findings on this feature)
 
 Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
 
-<!-- {{audit_log_excerpt}} -->
 {{audit_log_excerpt}}
-<!-- {{audit_log_excerpt}} -->
 
 ## Diff under audit
 
 The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
 
-<!-- {{diff}} -->
 {{diff}}
-<!-- {{diff}} -->
 
 ## What to look for
 
@@ -46,7 +36,7 @@ The actual code under review. Read it carefully. The findings you emit must be a
 - **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
 - **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
 - **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
-- **Operator-discipline traps** — `// TODO`, `// for now`, `// FIXME`, `// XXX`, `// HACK`, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
 
 ## Output format
 
@@ -77,14 +67,14 @@ Status:     open
 Severity:   informational
 Surface:    (the entire diff)
 
-I walked the diff for {{feature_slug}} and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
 ```
 
 **Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
 
 ## Hard constraints
 
-- **No deferral phrases.** Don't write "TODO", "for now", "we'll fix later", "address in a follow-up". The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
 - **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
 - **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
 - **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.

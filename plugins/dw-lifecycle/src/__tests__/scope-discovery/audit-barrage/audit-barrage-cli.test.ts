@@ -221,17 +221,49 @@ describe('deriveBarrageExitCode', () => {
     ).toBe(1);
   });
 
-  it('does not consider a timed-out model healthy', () => {
+  // AUDIT-20260529-03 — model with non-zero exit + positive stdout is
+  // healthy. The captured stdout is the operator's audit material;
+  // non-zero exit is metadata (rate-limit, lint-style nonzero-on-
+  // findings). Exit-code computation aligns with PRD's "produced
+  // output" wording, not the stricter pre-fix "exit 0 + bytes" check.
+  it('treats a non-zero-exit model with positive stdout as healthy', () => {
+    expect(
+      deriveBarrageExitCode(
+        makeRun([makeResult({ exitCode: 7, stdoutBytes: 1024 })]),
+      ),
+    ).toBe(0);
+  });
+
+  // AUDIT-20260529-03 — a timed-out model that managed to emit some
+  // findings before SIGTERM is still triagable; capture is valuable.
+  it('treats a timed-out model with positive stdout as healthy', () => {
     expect(
       deriveBarrageExitCode(
         makeRun([makeResult({ exitCode: -1, timedOut: true, stdoutBytes: 5 })]),
       ),
-    ).toBe(1);
+    ).toBe(0);
   });
 
   it('does not consider a zero-byte stdout healthy even on exit 0', () => {
     expect(
       deriveBarrageExitCode(makeRun([makeResult({ exitCode: 0, stdoutBytes: 0 })])),
+    ).toBe(1);
+  });
+
+  // AUDIT-20260529-03 — a spawn failure is unhealthy regardless of
+  // byte counts (no content could have been captured by definition;
+  // any positive bytes there would indicate a different bug).
+  it('treats a spawn error as unhealthy regardless of byte count', () => {
+    expect(
+      deriveBarrageExitCode(
+        makeRun([
+          makeResult({
+            exitCode: -2,
+            stdoutBytes: 0,
+            spawnError: 'ENOENT: no such file or directory',
+          }),
+        ]),
+      ),
     ).toBe(1);
   });
 });

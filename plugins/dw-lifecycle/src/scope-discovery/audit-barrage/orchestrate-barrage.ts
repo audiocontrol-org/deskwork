@@ -68,11 +68,17 @@ export async function orchestrateBarrage(
     spawnInputs.map(spawnCliAgainstModel),
   );
 
-  // INDEX.md write requires the BarrageRun shape; assemble it without
-  // the indexPath first, then patch it on after the write so the
-  // record we return matches what landed on disk.
+  // Assemble the BarrageRun, write INDEX.md, return the same record.
+  // `indexPath` is derived from `runDir` up front (same derivation
+  // `writeIndexFile` performs internally) so the BarrageRun shape is
+  // complete at the time of the write — and the returned record
+  // matches the on-disk INDEX.md path byte-for-byte. The deliberate
+  // duplication (caller + writeIndexFile both derive `<runDir>/INDEX.md`)
+  // keeps the helper composable: `writeIndexFile` can be called
+  // standalone from tests + tools without taking a path argument the
+  // caller already knows.
   const indexPath = join(runDir, 'INDEX.md');
-  const provisionalRun: BarrageRun = {
+  const run: BarrageRun = {
     runDir,
     timestamp,
     featureSlug: input.featureSlug,
@@ -80,6 +86,6 @@ export async function orchestrateBarrage(
     indexPath,
     results,
   };
-  await writeIndexFile(runDir, provisionalRun);
-  return provisionalRun;
+  await writeIndexFile(runDir, run);
+  return run;
 }
