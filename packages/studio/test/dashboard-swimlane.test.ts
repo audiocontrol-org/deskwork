@@ -14,138 +14,34 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import type { DeskworkConfig } from '@deskwork/core/config';
 import { writeSidecar } from '@deskwork/core/sidecar';
-import type { Entry } from '@deskwork/core/schema/entry';
+import {
+  setupDashboardFixture,
+  getHtml,
+  makeEntry,
+  extractLaneSection,
+  extractStageCols,
+  UUID_EDITORIAL_DRAFTING,
+  UUID_VISUAL_SKETCHED,
+  UUID_VISUAL_APPROVED,
+  UUID_QA_DRAFTED,
+} from './__helpers/dashboard-swimlane-fixture.ts';
 import { createApp } from '../src/server.ts';
-
-const UUID_EDITORIAL_DRAFTING = '11111111-1111-4111-8111-111111111111';
-const UUID_VISUAL_SKETCHED = '22222222-2222-4222-8222-222222222222';
-const UUID_VISUAL_APPROVED = '33333333-3333-4333-8333-333333333333';
-const UUID_QA_DRAFTED = '44444444-4444-4444-8444-444444444444';
-
-function makeConfig(): DeskworkConfig {
-  return {
-    version: 1,
-    sites: {
-      d: {
-        contentDir: 'docs',
-        calendarPath: '.deskwork/calendar.md',
-      },
-    },
-    defaultSite: 'd',
-  };
-}
-
-function makeEntry(overrides: Partial<Entry>): Entry {
-  return {
-    uuid: UUID_EDITORIAL_DRAFTING,
-    slug: 'placeholder',
-    title: 'Placeholder',
-    keywords: [],
-    source: 'manual',
-    currentStage: 'Ideas',
-    iterationByStage: { Ideas: 0 },
-    createdAt: '2026-05-27T10:00:00.000Z',
-    updatedAt: '2026-05-27T10:00:00.000Z',
-    ...overrides,
-  };
-}
-
-function writeLane(
-  root: string,
-  id: string,
-  name: string,
-  pipelineTemplate: string,
-  contentDir: string,
-): void {
-  writeFileSync(
-    join(root, '.deskwork', 'lanes', `${id}.json`),
-    JSON.stringify({ id, name, pipelineTemplate, contentDir }, null, 2),
-    'utf8',
-  );
-}
-
-async function getHtml(
-  app: ReturnType<typeof createApp>,
-  path: string,
-): Promise<{ status: number; html: string }> {
-  const res = await app.fetch(new Request(`http://x${path}`));
-  return { status: res.status, html: await res.text() };
-}
 
 describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
   let root: string;
   let app: ReturnType<typeof createApp>;
+  let cleanup: () => void;
 
   beforeEach(async () => {
-    root = mkdtempSync(join(tmpdir(), 'deskwork-dash-swimlane-'));
-    mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
-    mkdirSync(join(root, '.deskwork', 'lanes'), { recursive: true });
-
-    // Three lanes on disk: editorial (default) + visual (mockups) +
-    // qa-plan (qa). The bootstrap helper sees default.json on disk
-    // and short-circuits without writing — that's the legitimate
-    // multi-lane configuration.
-    writeLane(root, 'default', 'Editorial', 'editorial', 'docs');
-    writeLane(root, 'mockups', 'Mockups', 'visual', 'mockups');
-    writeLane(root, 'qa', 'QA', 'qa-plan', 'qa');
-
-    app = createApp({ projectRoot: root, config: makeConfig() });
-
-    // One entry per lane in different stages so we can verify the
-    // template-driven stage columns show up correctly.
-    await writeSidecar(
-      root,
-      makeEntry({
-        uuid: UUID_EDITORIAL_DRAFTING,
-        slug: 'a-draft',
-        title: 'A Draft',
-        currentStage: 'Drafting',
-        iterationByStage: { Drafting: 1 },
-        lane: 'default',
-      }),
-    );
-    await writeSidecar(
-      root,
-      makeEntry({
-        uuid: UUID_VISUAL_SKETCHED,
-        slug: 'logo-rough',
-        title: 'Logo rough',
-        currentStage: 'Sketched',
-        iterationByStage: { Sketched: 0 },
-        lane: 'mockups',
-      }),
-    );
-    await writeSidecar(
-      root,
-      makeEntry({
-        uuid: UUID_VISUAL_APPROVED,
-        slug: 'icon-set',
-        title: 'Icon set',
-        currentStage: 'Approved',
-        iterationByStage: { Approved: 0 },
-        lane: 'mockups',
-      }),
-    );
-    await writeSidecar(
-      root,
-      makeEntry({
-        uuid: UUID_QA_DRAFTED,
-        slug: 'release-qa',
-        title: 'Release QA',
-        currentStage: 'Drafted',
-        iterationByStage: { Drafted: 0 },
-        lane: 'qa',
-      }),
-    );
+    const fixture = await setupDashboardFixture();
+    root = fixture.root;
+    app = fixture.app;
+    cleanup = fixture.cleanup;
   });
 
   afterEach(() => {
-    rmSync(root, { recursive: true, force: true });
+    cleanup();
   });
 
   it('renders one <article class="swim ..."> per lane configured on disk', async () => {
@@ -603,240 +499,18 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(editorialBlock).toContain('data-slug="legacy-no-lane"');
   });
 
-  // AUDIT-20260528-02 acceptance: server renders BOTH the swim and
-  // stub for every visibility-on lane, with exactly one carrying
-  // is-focus-hidden based on initial focus state.
-  it('AUDIT-02: every visibility-on lane emits BOTH <article class="swim"> AND <button class="swim-stub">', async () => {
-    const r = await getHtml(app, '/dev/editorial-studio');
-    expect(r.status).toBe(200);
-    // Default render — all lanes focused.
-    const swims = r.html.match(/<article class="swim(?:\s[^"]*)?"/g) ?? [];
-    const stubs = r.html.match(/<button class="swim-stub(?:\s[^"]*)?"/g) ?? [];
-    expect(swims.length).toBe(3);
-    expect(stubs.length).toBe(3);
-    // With nothing in `?focus=`, all 3 swims show and all 3 stubs hide.
-    // Task 5.1B added the `view-kanban` server-default class token; the
-    // regex tolerates additional class tokens after `swim--<id>`.
-    for (const id of ['default', 'mockups', 'qa']) {
-      // swim is NOT focus-hidden
-      const swimRe = new RegExp(
-        `<article class="swim swim--[a-z0-9-]+[^"]*"[^>]*data-lane-id="${id}"`,
-      );
-      expect(r.html).toMatch(swimRe);
-      // stub IS focus-hidden
-      const stubRe = new RegExp(
-        `<button class="swim-stub is-focus-hidden"[^>]*data-swim-stub="${id}"`,
-      );
-      expect(r.html).toMatch(stubRe);
-    }
-  });
-
-  it('AUDIT-02: with ?focus= narrowing, exactly one of {swim, stub} per lane carries is-focus-hidden', async () => {
-    // Focus only default + mockups; qa is focus-off.
-    const r = await getHtml(app, '/dev/editorial-studio?focus=default,mockups');
-    expect(r.status).toBe(200);
-    // Focused lanes — swim visible, stub hidden.
-    for (const id of ['default', 'mockups']) {
-      const swimRe = new RegExp(
-        `<article class="swim swim--[a-z0-9-]+[^"]*"[^>]*data-lane-id="${id}"`,
-      );
-      expect(r.html).toMatch(swimRe);
-      const stubRe = new RegExp(
-        `<button class="swim-stub is-focus-hidden"[^>]*data-swim-stub="${id}"`,
-      );
-      expect(r.html).toMatch(stubRe);
-    }
-    // Non-focused — swim hidden, stub visible.
-    expect(r.html).toMatch(
-      /<article class="swim swim--qa-plan[^"]*\bis-focus-hidden\b[^"]*"[^>]*data-lane-id="qa"/,
-    );
-    expect(r.html).toMatch(
-      /<button class="swim-stub"[^>]*data-swim-stub="qa"/,
-    );
-  });
-
-  // AUDIT-20260528-04 acceptance: rail eye renders BOTH glyphs as
-  // siblings; CSS picks one based on data-lane-visible. Focus-chip
-  // CSS class `.focus-chip.is-visibility-hidden` is the surface the
-  // client toggles on visibility-off lanes. F6 a11y fix promoted
-  // the eye container from `<span class="r-eye">` to `<button
-  // class="r-eye-btn">` so the regex matches the new shape.
-  it('AUDIT-04: rail row emits both `.r-eye-visible` (●) and `.r-eye-hidden` (○) glyphs inside the eye-button', async () => {
-    const r = await getHtml(app, '/dev/editorial-studio');
-    expect(r.status).toBe(200);
-    for (const id of ['default', 'mockups', 'qa']) {
-      const re = new RegExp(
-        `data-rail-lane="${id}"[\\s\\S]*?<button class="r-eye-btn"[\\s\\S]*?` +
-          `<span class="r-eye-visible" aria-hidden="true">●</span>` +
-          `<span class="r-eye-hidden" aria-hidden="true">○</span>` +
-          `[\\s\\S]*?</button>`,
-      );
-      expect(r.html).toMatch(re);
-    }
-  });
-
-  it('F6 a11y: the eye-toggle is a focusable <button class="r-eye-btn"> with a non-empty aria-label', async () => {
-    const r = await getHtml(app, '/dev/editorial-studio');
-    expect(r.status).toBe(200);
-    for (const id of ['default', 'mockups', 'qa']) {
-      const re = new RegExp(
-        `data-rail-lane="${id}"[\\s\\S]*?<button class="r-eye-btn"[^>]*` +
-          `data-rail-eye="${id}"[^>]*aria-label="[^"]+"`,
-      );
-      expect(r.html).toMatch(re);
-    }
-  });
-
-  it('AUDIT-04: dashboard-swimlane-{shell,rail}.css ship the visibility-hide + eye-glyph swap rules', async () => {
-    // Per AUDIT-20260528-14: visibility/focus-hide rules ship in
-    // `dashboard-swimlane-shell.css` because they affect the swim +
-    // swim-stub + focus-chip set in a single selector list (cross-
-    // cutting). The eye-glyph swap rules (F6 fix selectors targeting
-    // `.r-eye-btn`) live with the rail row primitives in
-    // `dashboard-swimlane-rail.css`.
-    const shellRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane-shell.css'),
-    );
-    expect(shellRes.status).toBe(200);
-    const shellCss = await shellRes.text();
-    // Rule body has display: none; matched via the selector list
-    // including .focus-chip.is-visibility-hidden.
-    expect(shellCss).toMatch(
-      /\.focus-chip\.is-visibility-hidden[\s\S]*?display:\s*none/,
-    );
-
-    const railRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane-rail.css'),
-    );
-    expect(railRes.status).toBe(200);
-    const railCss = await railRes.text();
-    // Eye-glyph swap rules — selector + display:inline (F6 fix
-    // selectors target `.r-eye-btn`).
-    expect(railCss).toMatch(
-      /\.rail-lane\[data-lane-visible="true"\] \.r-eye-btn \.r-eye-visible/,
-    );
-    expect(railCss).toMatch(
-      /\.rail-lane\[data-lane-visible="false"\] \.r-eye-btn \.r-eye-hidden/,
-    );
-  });
-
-  // AUDIT-20260528-05 acceptance: stage IDs are lane-scoped + unique;
-  // legacy `id="stage-<slug>"` survives ONLY for the default lane.
-  it('AUDIT-05: multi-lane stage columns carry unique `id="lane-<laneId>-stage-<slug>"` IDs', async () => {
-    const r = await getHtml(app, '/dev/editorial-studio');
-    expect(r.status).toBe(200);
-    // Both visual and qa-plan templates contain an "Approved" stage.
-    // Each lane's Approved column must carry a unique lane-scoped ID.
-    expect(r.html).toContain('id="lane-mockups-stage-approved"');
-    expect(r.html).toContain('id="lane-qa-stage-approved"');
-    // Default lane's Drafting column carries the lane-scoped ID too.
-    expect(r.html).toContain('id="lane-default-stage-drafting"');
-    // No duplicate `id="..."` attributes anywhere in the rendered
-    // dashboard output — gather every id value and assert uniqueness.
-    // Match `id="..."` preceded by whitespace (not by `-`, which
-    // would also match `data-lane-id` / `data-stage-id` etc.).
-    const idMatches = r.html.match(/\sid="([^"]+)"/g) ?? [];
-    const idValues = idMatches.map((m) => m.replace(/^\sid="(.+)"$/, '$1'));
-    const dedup = new Set(idValues);
-    expect(dedup.size).toBe(idValues.length);
-  });
-
-  it('AUDIT-05: legacy `id="stage-<slug>"` anchor is preserved ONLY for the default editorial lane', async () => {
-    const r = await getHtml(app, '/dev/editorial-studio');
-    expect(r.status).toBe(200);
-    // Default lane Drafting column carries the back-compat anchor
-    // (used by `/dev/editorial-studio#stage-drafting` deep links).
-    expect(r.html).toContain('id="stage-drafting"');
-    expect(r.html).toContain('id="stage-ideas"');
-    // Non-default lanes do NOT emit the bare-anchor form for stages
-    // that exist only in their template. `Sketched` is unique to the
-    // visual template, so no `id="stage-sketched"` should appear.
-    expect(r.html).not.toContain('id="stage-sketched"');
-    expect(r.html).not.toContain('id="stage-drafted"');
-    expect(r.html).not.toContain('id="stage-tested"');
-  });
-
   // ============================================================
-  //  Task 5.1A — lane + per-stage collapse-chev primitive.
-  //
-  //  Tests moved to dashboard-swimlane-collapse-render.test.ts per
-  //  AUDIT-20260528-14 (file-size cap split).
-  // ============================================================
-
-  // ============================================================
-  //  Task 5.1B — per-lane kanban ↔ list view toggle.
-  //
-  //  Tests moved to dashboard-swimlane-list-render.test.ts per
-  //  AUDIT-20260528-14 (file-size cap split).
-  // ============================================================
-
-  // ============================================================
-  //  Task 5.2 — template-aware stage rendering + empty-lane CTA.
-  //
-  //  Tests moved to dashboard-swimlane-cta-render.test.ts per
-  //  AUDIT-20260528-14 (file-size cap split).
-  // ============================================================
-
-  // ============================================================
-  //  Task 5.3 — Many-lane overflow + mobile lane sheet.
-  //
-  //  Tests (including the AUDIT-22 followup) moved to
-  //  dashboard-swimlane-overflow-sheet-render.test.ts per
-  //  AUDIT-20260528-14 (file-size cap split).
+  //  Tests for the following surfaces moved to sibling files per
+  //  AUDIT-20260528-14 (file-size cap split):
+  //    - AUDIT-02 / -04 / -05 acceptance → dashboard-swimlane-
+  //      audits-render.test.ts
+  //    - Task 5.1A collapse → dashboard-swimlane-collapse-render
+  //      .test.ts
+  //    - Task 5.1B view-toggle + list-body → dashboard-swimlane-
+  //      list-render.test.ts
+  //    - Task 5.2 empty-state copy + empty-lane CTA →
+  //      dashboard-swimlane-cta-render.test.ts
+  //    - Task 5.3 overflow + mobile lane-sheet (incl. AUDIT-22) →
+  //      dashboard-swimlane-overflow-sheet-render.test.ts
   // ============================================================
 });
-
-/**
- * Extract the substring of HTML from a `<article class="swim"
- * data-lane-id="<id>"` to its closing `</article>`. Used to scope
- * per-lane assertions so a Drafting column in editorial doesn't
- * leak into mockups-lane assertions.
- */
-function extractLaneSection(html: string, laneId: string): string {
-  // Matches `<article class="swim"` or `<article class="swim swim--<id>"`
-  // — Finding 3 added the template-id modifier so the regex tolerates
-  // additional class tokens before the `data-lane-id` attribute.
-  const openPattern = new RegExp(
-    `<article class="swim(?:\\s[^"]*)?"[^>]*data-lane-id="${laneId}"`,
-  );
-  const openMatch = openPattern.exec(html);
-  if (openMatch === null) return '';
-  const startIdx = openMatch.index;
-  const closeIdx = html.indexOf('</article>', startIdx);
-  if (closeIdx === -1) return html.slice(startIdx);
-  return html.slice(startIdx, closeIdx + '</article>'.length);
-}
-
-function extractStageCols(htmlSection: string): readonly string[] {
-  return htmlSection.match(/data-stage-col="[^"]+"/g) ?? [];
-}
-
-/**
- * Extract the substring of HTML between a swim's `<div class="stage-
- * grid">` opening and its closing tag. Task 5.1B added a sibling
- * `<div class="list-body">` — when callers want to assert kanban-
- * specific markup without leaking into list-body matches, slice the
- * stage-grid section first.
- */
-function extractStageGridSection(htmlSection: string): string {
-  const openIdx = htmlSection.indexOf('<div class="stage-grid"');
-  if (openIdx === -1) return '';
-  const sentinel = '<div class="list-body"';
-  const closeIdx = htmlSection.indexOf(sentinel, openIdx);
-  if (closeIdx === -1) return htmlSection.slice(openIdx);
-  return htmlSection.slice(openIdx, closeIdx);
-}
-
-/**
- * Extract the substring of HTML between a swim's `<div class="list-
- * body">` opening and its closing tag (the swim's closing
- * `</article>` is the boundary). Used to scope assertions inside the
- * list-body without bleeding into the kanban stage-grid above.
- */
-function extractListBodySection(htmlSection: string): string {
-  const openIdx = htmlSection.indexOf('<div class="list-body"');
-  if (openIdx === -1) return '';
-  const closeIdx = htmlSection.indexOf('</article>', openIdx);
-  if (closeIdx === -1) return htmlSection.slice(openIdx);
-  return htmlSection.slice(openIdx, closeIdx);
-}
