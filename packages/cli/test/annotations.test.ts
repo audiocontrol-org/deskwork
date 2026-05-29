@@ -300,4 +300,32 @@ describe('deskwork annotations (#267)', () => {
     expect(all.stdout).toContain(C_ADDRESSED);
     expect(all.stdout).toContain('wontfix');
   });
+
+  it('multiple address events on one comment — latest createdAt wins', () => {
+    // The latest-wins fold is the whole correctness guarantee for
+    // disposition; a reversed/absent sort would pass every other test.
+    // Seed an OLDER `deferred` then a NEWER `addressed` for the same
+    // comment; the surfaced disposition must be the newer one.
+    writeSidecar(UUID, SLUG);
+    seedComment(UUID, C_ADDRESSED, 'Fix the typo', 90_000);
+    seedAddress(UUID, C_ADDRESSED, 'deferred', 60_000); // older
+    seedAddress(UUID, C_ADDRESSED, 'addressed', 20_000); // newer → wins
+
+    const res = run(['annotations', project, SLUG, '--all', '--json']);
+    expect(res.code).toBe(0);
+    const out = JSON.parse(res.stdout) as {
+      annotations: Array<{ commentId: string; disposition: string }>;
+    };
+    const ann = out.annotations.find((a) => a.commentId === C_ADDRESSED);
+    expect(ann?.disposition).toBe('addressed'); // newer wins, not 'deferred'
+  });
+
+  it('unknown flag → exit 2', () => {
+    // Locks the BOOLEAN_FLAGS contract: an unrecognized flag is a usage
+    // error, not silently ignored.
+    writeSidecar(UUID, SLUG);
+    const res = run(['annotations', project, SLUG, '--not-a-real-flag']);
+    expect(res.code).toBe(2);
+    expect(res.stderr).toMatch(/[Uu]nknown flag|[Uu]sage/);
+  });
 });
