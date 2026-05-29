@@ -53,7 +53,7 @@ Verification: Track 1 verification was the full plugin test suite (1953/1953 pas
 ## AUDIT-20260529-02 — readCommits crashed on dangling sessionStartSha
 
 Finding-ID: AUDIT-20260529-02
-Status:     fixed-bf4a0b9
+Status:     fixed-d8e08f0
 Severity:   medium
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts:90
 
@@ -65,14 +65,14 @@ Fix: wrap `readCommits`' `runGit` call in try/catch; on failure, retry with the 
 
 Regression test added at `lifecycle-session-end-hygiene.test.ts` — "degrades gracefully when the supplied sessionStartSha is dangling (F1 review fix)". Stubs `runGit` so the requested range throws and the HEAD~10 fallback returns clean; asserts no exception bubbles up and both invocations were made.
 
-Resolution: fix commit (this commit; SHA to be filled at commit time → `bf4a0b9` placeholder, actual SHA below).
+Resolution: fix commit `d8e08f0`.
 
 ---
 
 ## AUDIT-20260529-03 — Stale reference to deleted resolveSessionBoundaryIso in walk.ts
 
 Finding-ID: AUDIT-20260529-03
-Status:     fixed-bf4a0b9
+Status:     fixed-d8e08f0
 Severity:   low
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/walk.ts:162
 
@@ -87,7 +87,7 @@ Fix: updated the comment to reference `session-range.ts`'s `tryGit` failure-reas
 ## AUDIT-20260529-04 — Stale workplan reference to deleted resolveSessionBoundaryIso
 
 Finding-ID: AUDIT-20260529-04
-Status:     fixed-bf4a0b9
+Status:     fixed-d8e08f0
 Severity:   low
 Surface:    docs/1.0/001-IN-PROGRESS/hygiene/workplan.md:424
 
