@@ -939,17 +939,47 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(r.status).toBe(200);
     // The editorial Drafting entry has slug=a-draft, title=A Draft.
     const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
-    // The row carries data attributes + the three spans + a role=
-    // "button" overflow span (nested `<button>` would be invalid
-    // inside a wrapping `<a>` — interactive inside interactive).
+    // Per AUDIT-20260528-08: the overflow span is decorative chrome
+    // (`aria-hidden="true"`, no role, no tabindex, no aria-label) —
+    // it carries the data-uuid hook for future wiring but does not
+    // present itself as a focusable affordance. Nesting a real
+    // `<button>` inside the wrapping `<a>` would be invalid HTML;
+    // the span shape stays, but the inert/decorative attributes
+    // replace the prior would-be-interactive shape.
     const rowRe = new RegExp(
       `<a class="lb-row"[^>]*data-stage="Drafting"[^>]*data-uuid="${UUID_EDITORIAL_DRAFTING}"[^>]*data-slug="a-draft"[^>]*>[\\s\\S]*?` +
         `<span class="lb-title">A Draft</span>[\\s\\S]*?` +
         `<span class="lb-version">a-draft</span>[\\s\\S]*?` +
         `<span class="lb-state"></span>[\\s\\S]*?` +
-        `<span class="lb-overflow"[^>]*role="button"[^>]*aria-label="Actions for A Draft"`,
+        `<span class="lb-overflow"[^>]*aria-hidden="true"[^>]*data-lb-overflow="${UUID_EDITORIAL_DRAFTING}"`,
     );
     expect(editorialListBody).toMatch(rowRe);
+  });
+
+  it('AUDIT-08: lb-overflow span is NOT in the keyboard tab order (no role, no tabindex, no aria-label)', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+    // Pull the lb-overflow span markup for the editorial Drafting
+    // entry and inspect every attribute that would land it in the
+    // tab order. The prior shape carried role="button" + tabindex="0"
+    // + aria-label="Actions for ..." (a focusable, screen-reader-
+    // announced control with no wired handler — a dead key trap).
+    // The fix removes all three; the data-uuid hook stays for the
+    // future overflow-menu wiring.
+    const overflowMatch = editorialListBody.match(
+      /<span class="lb-overflow"[^>]*>/,
+    );
+    expect(overflowMatch).not.toBeNull();
+    const overflowTag = overflowMatch?.[0] ?? '';
+    // No role attribute at all (in particular no role="button").
+    expect(overflowTag).not.toMatch(/\srole=/);
+    // No tabindex attribute at all (in particular no tabindex="0").
+    expect(overflowTag).not.toMatch(/\stabindex=/);
+    // No aria-label (the span is aria-hidden; no accessible name).
+    expect(overflowTag).not.toMatch(/\saria-label=/);
+    // Aria-hidden="true" — assistive tech skips the decorative glyph.
+    expect(overflowTag).toMatch(/aria-hidden="true"/);
   });
 
   it('Task 5.1B: locked stages in list-body get `.lb-group.locked`', async () => {

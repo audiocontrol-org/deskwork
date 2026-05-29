@@ -69,13 +69,19 @@ function renderListRow(entry: Entry, defaultSite: string): RawHtml {
   void defaultSite;
   const { reviewLink, search } = entryRowLinkMeta(entry);
   // The row is a single `<a>` linking to the entry-review surface.
-  // Per the mockup at line 1240, the overflow affordance is a
-  // `role="button"` span (NOT a nested `<button>`, which would be
-  // invalid HTML — interactive inside interactive). Task 5.1C / 5.2
-  // wires a click handler to the affordance; the markup ships with
-  // `role="button"` + `tabindex="0"` + `aria-label` so the
-  // semantics are correct at the affordance level even when no
-  // handler is bound.
+  // The overflow glyph is decorative chrome — it is NOT an active
+  // affordance at this rendering layer. Per AUDIT-20260528-08: the
+  // prior `role="button" tabindex="0" aria-label="..."` shape made
+  // the span a focusable keyboard target that did nothing (no handler
+  // wired here; wiring is intentionally separate work). Keyboard users
+  // could tab to it and get nothing back — worse than no affordance.
+  // The fix removes the focusable+button semantics so the span is
+  // pure decoration; when a real overflow menu is wired in a later
+  // pass, the markup can be promoted back to `<button>` (which would
+  // require lifting the row out of `<a>` to avoid interactive-inside-
+  // interactive — that's the proper restructuring, not a band-aid).
+  // `data-lb-overflow` and `data-uuid` are preserved so the future
+  // wiring has its data target ready.
   return unsafe(html`
     <a class="lb-row" href="${reviewLink}"
       data-row-shell data-search="${search}"
@@ -85,8 +91,7 @@ function renderListRow(entry: Entry, defaultSite: string): RawHtml {
       <span class="lb-title">${entry.title}</span>
       <span class="lb-version">${entry.slug}</span>
       <span class="lb-state"></span>
-      <span class="lb-overflow" role="button" tabindex="0"
-        aria-label="Actions for ${entry.title}"
+      <span class="lb-overflow" aria-hidden="true"
         data-lb-overflow="${entry.uuid}">⋮</span>
     </a>`);
 }
