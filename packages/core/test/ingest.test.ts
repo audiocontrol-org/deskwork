@@ -866,4 +866,22 @@ describe('discoverIngestCandidates — title derivation (#64)', () => {
     const r = discoverIngestCandidates([join(project, 'posts/no-heading.md')], baseOpts());
     expect(r.candidates[0].title).toBe('No Heading');
   });
+
+  it('ignores headings inside fenced code blocks', () => {
+    write('posts/fenced.md', '```\n# Fake Heading\n```\n\n## Real Heading\n\nbody.\n');
+    const r = discoverIngestCandidates([join(project, 'posts/fenced.md')], baseOpts());
+    expect(r.candidates[0].title).toBe('Real Heading');
+  });
+
+  it('does not treat a 4-space-indented #-line (indented code) as a heading', () => {
+    write('posts/indented.md', '    # Indented Not A Heading\n\nbody.\n');
+    const r = discoverIngestCandidates([join(project, 'posts/indented.md')], baseOpts());
+    expect(r.candidates[0].title).toBe('Indented');
+  });
+
+  it('does not handle Setext headings (ATX only) — falls back to the slug', () => {
+    write('posts/setext.md', 'My Setext Title\n===============\n\nbody.\n');
+    const r = discoverIngestCandidates([join(project, 'posts/setext.md')], baseOpts());
+    expect(r.candidates[0].title).toBe('Setext');
+  });
 });

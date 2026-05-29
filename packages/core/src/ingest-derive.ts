@@ -373,8 +373,17 @@ export function deriveTitle(
 /**
  * The first ATX markdown heading's text in `body` (e.g. `## PRD: x` →
  * `PRD: x`), or undefined when there is none. Strips the leading `#`s and
- * any closing `#`s. Fenced code blocks are skipped so a `# comment` inside
- * ``` ``` ``` isn't mistaken for a heading.
+ * any closing `#`s.
+ *
+ * Per CommonMark an ATX heading is indented at most 3 spaces — a line
+ * indented 4+ spaces is an indented code block. So the regex runs against
+ * the UNTRIMMED line with a 0–3 space allowance; matching a trimmed line
+ * would mis-read `    # x` (indented code) as a heading.
+ *
+ * Fenced code blocks are skipped so a `# comment` inside a fence isn't
+ * mistaken for a heading. Setext headings (underline style,
+ * `Title` over `=====`) are intentionally NOT handled — ATX only; a
+ * Setext-only document falls through to the slug-humanize fallback.
  */
 function firstMarkdownHeading(body: string): string | undefined {
   let inFence = false;
@@ -385,7 +394,7 @@ function firstMarkdownHeading(body: string): string | undefined {
       continue;
     }
     if (inFence) continue;
-    const m = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(trimmed);
+    const m = /^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
     if (m) {
       const text = m[2].trim();
       if (text.length > 0) return text;
