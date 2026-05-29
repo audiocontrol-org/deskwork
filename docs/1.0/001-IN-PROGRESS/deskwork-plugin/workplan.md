@@ -1877,14 +1877,11 @@ GitHub tracking issues:
 - [x] LOW-overlap unblocked work set confirmed (20 core + 18 studio); see report. Safe starting point for 38b/38c (+ the non-dashboard studio quick-fixes #71/#233/#229).
 - [x] **38a verdict CONFIRMED by operator (2026-05-28): #246/#230 reassigned to #301; removed from Phase 38 scope.** graphical-entries' `approveEntryStage` is a complete on-branch rewrite using `preTerminalLinearStage(template)`; the #246 fix belongs at `graphical-entries/packages/core/src/entry/approve.ts:109-115`. A Phase-38 edit would be throwaway.
 
-**Sub-phase 38a — REMOVED from Phase 38 (reassigned to #301 per 38·0).** The verb-model unification (#246) + studio Publish affordance (#230) land on `feature/graphical-entries` as part of its template-aware verb rewrite. Tracked there, not here.
+**Sub-phase 38a — REMOVED from Phase 38 (reassigned to #301 per 38·0).** The verb-model unification (#246) + studio Publish affordance (#230) land on `feature/graphical-entries` as part of its template-aware verb rewrite (graphical-entries already rewrote `approveEntryStage` to use `preTerminalLinearStage(template)`; a Phase-38 edit to the hardcoded stage map would be throwaway). The original 38a task breakdown is preserved in [`docs/superpowers/plans/2026-05-28-deskwork-core-studio-burndown.md`](../../../superpowers/plans/2026-05-28-deskwork-core-studio-burndown.md) for whoever picks up #246 on the graphical-entries branch. Tracked there, not here.
 
-- [ ] `nextStage('Final')` returns `'Published'` (`packages/core/src/schema/entry.ts`); update `entry.test.ts` assertions.
-- [ ] `approveEntryStage` handles `Final → Published` with uniform mechanics + `datePublished` + artifact check; extend `ApproveResult` ([#246](https://github.com/audiocontrol-org/deskwork/issues/246)).
-- [ ] `publishEntry` keeps Final-only guards/messages; delegates the mutation to `approveEntryStage`.
-- [ ] Canonical contract docs updated (`DESKWORK-STATE-MACHINE.md`, approve + publish `SKILL.md`).
-- [ ] Studio: Final-stage `publish` affordance in `stage-affordances.ts`; stage-aware Publish button in `decision-strip.ts` (clipboard-copies `/deskwork:publish <slug>`) ([#230](https://github.com/audiocontrol-org/deskwork/issues/230)). Live dual-viewport UI verification.
-- [ ] Full workspace suite green; `/dw-lifecycle:review` on the diff; fix-landed comments on #246 + #230.
+**Sub-phase 38·1 — Clone-gate hygiene ([#354](https://github.com/audiocontrol-org/deskwork/issues/354)) [infra; do early]:**
+
+- [ ] Set `"gitignore": true` in both `.jscpd.json` files (repo root + `.dw-lifecycle/scope-discovery/`) so the clone gate stops scanning gitignored dirs; add a regression check for the "gitignored sandbox present" case. Surfaced this session when a gitignored sandbox (`.audiocontrol.org`) blocked the merge commit. Scope-discovery-lane (home ledger: [`docs/1.0/burndown/scope-discovery.md`](../../burndown/scope-discovery.md)); pulled into Phase 38 because it blocks the tranche's commit flow — every 38b+ commit hits the clone gate. ~5 LOC + 1 regression.
 
 **Sub-phase 38b — Core quick fixes:** #256, #221, #232, #198.
 
