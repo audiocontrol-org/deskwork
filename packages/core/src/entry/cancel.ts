@@ -195,6 +195,10 @@ async function cancelEntryWithoutCalendarRegen(
           });
           continue;
         }
+        // The recursive walker call unconditionally forces `cascade: true`:
+        // top-level opt-in propagates through the entire subtree (doctor's
+        // `group-recursive` rule normally refuses recursive groups, but
+        // the cancel path still has to behave correctly when one exists).
         const memberResult = await cancelEntryWithoutCalendarRegen(projectRoot, {
           uuid: memberUuid,
           cascade: true,

@@ -2496,3 +2496,102 @@ against both populated and declared-empty groups; refuses against
 entries without the `members` field at all (regular entries)." The
 header was also expanded to document the empty-vs-absent semantic
 distinction.
+
+### AUDIT-20260529-22 — cancel-cascade test docblock named `vi.mock` but code uses `vi.spyOn` (low)
+
+Finding-ID: AUDIT-20260529-22
+Status:     fixed-pending-sha
+Severity:   low
+Surface:    `packages/core/test/entry/cancel-cascade.test.ts:15`
+
+The header docblock of the new cascade-regenerate-count test
+described the seam as `vi.mock('@/calendar/regenerate', ...)`, but
+the implementation at line 102 uses `vi.spyOn(regenerateModule,
+'regenerateCalendar')` — different vitest APIs producing the same
+observable outcome here, but a misleading doc/code drift for a
+future reader.
+
+Resolution: docblock rewritten to describe the actual
+`vi.spyOn(regenerateModule, ...)` mechanism + the namespace-import
+requirement that makes the spy attach to the same binding `cancel.ts`
+consumes (a destructured import would bypass the spy).
+
+### AUDIT-20260529-23 — recursive-cascade not exercised by Step 7.2.7 tests (medium; deferred to #363)
+
+Finding-ID: AUDIT-20260529-23
+Status:     acknowledged-2026-05-29-issue-#363
+Severity:   medium
+Surface:    `packages/core/test/entry/cancel-cascade.test.ts:95`
+
+The walker recursively invokes itself when a cascaded member is
+itself a group (`cancel.ts:198-205`), and the result-flattening
+logic on lines 212-217 handles nested `cascadedMembers` /
+`skippedMembers` arrays. None of the four cascade tests exercise
+this path — they only test flat 3-member groups. Doctor's
+`group-recursive` rule (Task 7.5.1, not yet shipped) will refuse
+recursive groups at lint time, but the cancel code path still has
+to behave correctly when one exists.
+
+Disposition: medium. Test-coverage shortfall, not an active bug
+(walker's recursive behavior is correct by code reading). Filed at
+[#363](https://github.com/audiocontrol-org/deskwork/issues/363)
+with the regression-test shape spelled out.
+
+### AUDIT-20260529-24 — `priorStage` not asserted for cascaded members (low; deferred to #363)
+
+Finding-ID: AUDIT-20260529-24
+Status:     acknowledged-2026-05-29-issue-#363
+Severity:   low
+Surface:    `packages/core/test/entry/cancel-cascade.test.ts:119`
+
+The cascade test asserts `currentStage === 'Cancelled'` for the
+head + cascaded members but does NOT assert `priorStage` is
+preserved on the cascaded members. The legacy single-entry test
+(`cancel.test.ts:31`) covers `priorStage` for the head entry only.
+A regression that dropped `priorStage` writing in the walker (or
+wrote it incorrectly) would not be caught.
+
+Disposition: low. Test-coverage shortfall folded into the same
+[#363](https://github.com/audiocontrol-org/deskwork/issues/363)
+follow-up as AUDIT-20260529-23 since both extend the same test
+file.
+
+### AUDIT-20260529-25 — wider concurrent-read window during cascade (informational)
+
+Finding-ID: AUDIT-20260529-25
+Status:     informational
+Severity:   informational
+Surface:    `packages/core/src/entry/cancel.ts:138-274`
+
+Pre-fix: cascade produced N "narrow" inconsistency windows —
+between member-K's sidecar write and its individual regenerate, a
+concurrent reader could see member-K's sidecar but stale
+`calendar.md`. Post-fix: there is ONE inconsistency window that's
+WIDER — between the head's sidecar write and the final regenerate
+at line 274, a concurrent reader can see up to N+1 newly-written
+sidecars + a stale `calendar.md`. Window count is net-better (1 vs
+N), but per-window scope is larger.
+
+Disposition: informational only. For this project's deployment
+model (single-operator, batch operations) this is a non-issue.
+Recording so the trade-off is explicit and not an unstated
+regression.
+
+### AUDIT-20260529-26 — recursive walker call's forced `cascade: true` undocumented (low)
+
+Finding-ID: AUDIT-20260529-26
+Status:     fixed-pending-sha
+Severity:   low
+Surface:    `packages/core/src/entry/cancel.ts:198-205`
+
+When a cascaded member is itself a group, the recursive walker
+call passed `cascade: true` unconditionally — so once cascade is
+opted into at the top, the entire subtree is cascaded. The
+docblock mentioned the recursive behavior in passing but didn't
+explicitly call out the forced-cascade-on-the-call invariant.
+
+Resolution: three-line code comment added directly above the
+recursive walker call documenting the forced cascade and the
+`group-recursive` rule that normally prevents the shape but
+doesn't relieve the cancel code path from behaving correctly when
+one exists.

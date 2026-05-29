@@ -12,10 +12,13 @@
  * calls `regenerateCalendar` exactly once at the cascade boundary,
  * for both single-entry and cascade invocations.
  *
- * The seam: `vi.mock('@/calendar/regenerate', ...)` replaces the
- * regenerate export with a counter-wrapped spy whose factory still
- * executes the real implementation so calendar.md gets written and
- * downstream code that observes calendar.md continues to function.
+ * The seam: `vi.spyOn(regenerateModule, 'regenerateCalendar')` wraps
+ * the live export with a counter without replacing the implementation,
+ * so calendar.md still gets written and downstream code that observes
+ * calendar.md continues to function. We import the module as a
+ * namespace (`import * as regenerateModule from ...`) so the spy
+ * attaches to the same binding cancel.ts consumes — a destructured
+ * import would bypass the spy.
  */
 
 import {
