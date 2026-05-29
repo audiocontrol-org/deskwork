@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T23:21:41.793Z
+generated_at: 2026-05-29T23:29:36.717Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1140,15 +1140,16 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:290
     disposition: pending
     reason: null
-  - id: aea3153f38ae
+  - id: b32250765cb8
     lines: 19
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:376:394
+      - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:144:162
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
     disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every subcommand by convention.
   - id: 69c3cc2125ab
     lines: 17
     members:
@@ -1193,13 +1194,14 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:162:168
     disposition: keep-with-reason
     reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
-  - id: 5efe053e28a1
+  - id: a430638c6638
     lines: 9
     members:
+      - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:75:83
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:57:65
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:88:96
     disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every subcommand by convention.
   - id: d641fc42624b
     lines: 7
     members:

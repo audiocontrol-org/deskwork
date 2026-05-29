@@ -40,6 +40,7 @@ import { checkOpenFindingsCli } from './subcommands/check-open-findings.js';
 import { applyAuditFlipsCli } from './subcommands/apply-audit-flips.js';
 import { closeShippedAuditFindingsCli } from './subcommands/close-shipped-audit-findings.js';
 import { reAuditFixedFindingsCli } from './subcommands/re-audit-fixed-findings.js';
+import { checkFixTaskTddCli } from './subcommands/check-fix-task-tdd.js';
 import { archiveBranch } from './subcommands/archive-branch.js';
 import { closeShipped } from './subcommands/close-shipped.js';
 import { sessionEndHygiene } from './subcommands/session-end-hygiene.js';
@@ -100,6 +101,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'apply-audit-flips': applyAuditFlipsCli,
   'close-shipped-audit-findings': closeShippedAuditFindingsCli,
   're-audit-fixed-findings': reAuditFixedFindingsCli,
+  'check-fix-task-tdd': checkFixTaskTddCli,
   'archive-branch': archiveBranch,
   'close-shipped': closeShipped,
   'session-end-hygiene': sessionEndHygiene,
