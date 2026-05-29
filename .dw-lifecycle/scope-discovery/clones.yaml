@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T18:07:49.549Z
+generated_at: 2026-05-29T21:34:47.944Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -961,7 +961,7 @@ clones:
     lines: 17
     members:
       - plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-queue.ts:134:150
-      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:213
+      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:223
     disposition: pending
     reason: null
   - id: b55096bc507f
@@ -1038,7 +1038,7 @@ clones:
     lines: 10
     members:
       - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:111:120
-      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:202:211
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:212:221
     disposition: pending
     reason: null
   - id: 8f81364fec2d
@@ -1104,11 +1104,32 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
+  - id: 3be9ce9afc71
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:113:121
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:78:84
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE block + parseFlags loop + run-helper + top-level shim) recurs across every dw-lifecycle subcommand; each verb owns its own entry point per the established convention; ~12-line per-section duplication is below the abstraction threshold.
+  - id: 2926ac95bced
+    lines: 19
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:376:394
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:144:389
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE block + parseFlags loop + run-helper + top-level shim) recurs across every dw-lifecycle subcommand; each verb owns its own entry point per the established convention; ~12-line per-section duplication is below the abstraction threshold.
+  - id: e895cc0d0d14
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:88:96
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:57:65
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE block + parseFlags loop + run-helper + top-level shim) recurs across every dw-lifecycle subcommand; each verb owns its own entry point per the established convention; ~12-line per-section duplication is below the abstraction threshold.
   - id: 4295f8a2a16b
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:100:108
-      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:81:88
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:86:93
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + readFile-then-parse-then-validate). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 352c9e64fad0
@@ -1116,7 +1137,7 @@ clones:
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:112:119
       - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:124:131
-      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:100:107
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:106:113
       - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:122:129
     disposition: pending
     reason: null
@@ -1131,14 +1152,14 @@ clones:
     lines: 8
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:107:114
-      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:81:88
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:86:93
     disposition: keep-with-reason
     reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
   - id: ec4640c729a3
     lines: 7
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:262:268
-      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:155:161
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:162:168
     disposition: keep-with-reason
     reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
   - id: 0cfcd1c934fd
