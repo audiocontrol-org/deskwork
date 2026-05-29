@@ -9,7 +9,7 @@ kind: issue-closure-audit
 Systematic verification of open issues against shipped code. Operator decision: "Don't trust that the feature documentation is up to date. look into the unfinished tasks to see if they are actually complete. Documentation discipline is spotty, so we should verify." — meaning each closure decision below is grounded in code inspection / empirical run, NOT in trusting the issue body's age or the feature README's status table.
 
 **Starting state:** 178 open issues (post-hygiene-PR-merges).
-**Closed in this audit:** 61 (cumulative; live `gh issue list --state open` shows 117 remaining).
+**Closed in this audit:** 68 (cumulative; live `gh issue list --state open` shows 110 remaining).
 **Methodology:** for each candidate, verify against actual code or run the failing command; close only with concrete evidence.
 
 ## Hygiene phase issues (10 closed)
@@ -131,18 +131,25 @@ Verified against the hygiene feature's own end-to-end use of these helpers + aga
 | #212 | setup missing --workplan flag | `setup.ts:62` parses `--workplan <path>`; usage string at line 71 documents it |
 | #213 | issues silently skips back-fill when placeholder doesn't match | `issues.ts:113-122` source comment cites #213; matches any `parentIssue:` form; warns at line 144 |
 
-## Studio + content cluster (11 closed)
+## Studio + content cluster (18 closed)
 
 | # | Bug | Evidence |
 |---|---|---|
 | #74 | Approve button — command not copied to clipboard | `entry-review/decision.ts:85` `copyOrShowFallback(command, {...})` in approve handler; same helper that fixed #99 |
 | #99 | intake form silent on copy click | `editorial-studio-client.ts` cites *"#99 fix"* + uses `copyOrShowFallback` + `.copied` button class |
 | #115 | `/dw-lifecycle:help` silent without config | SKILL.md adds Error handling section: *"No config. Suggest `/dw-lifecycle:install`"* |
+| #152 | entry-review unstyled (no er-entry-* CSS) | `entry-review.css` 456 LOC with `er-entry-shell` + missing-state rules at 22, 31, 44, 54, 63 |
 | #175 | edit-toolbar Source/Split/Preview tooltips | `entry-review/edit-toolbar.ts` ships `title=` attrs on all three mode buttons |
 | #176 | initLightbox dead bootstrap | Renamed to `initScrapbookLightbox`; called from 4 client surfaces |
 | #178 | index + dashboard both render "Editorial Studio" | Distinct h1: Index renders "Editorial Studio", Dashboard renders "Press-Check" |
+| #181 | outline-approve semantics TODO | TODO no longer at `editorial-review-client.ts:1692`; entry-keyed approve handles outline transitions |
+| #182 | doctor backfill artifactPath | `doctor/repair.ts:50` source comment "#182 Phase 34 ship-pass — backfill artifactPath" + repair logic at line 102 |
+| #185 | dw-lifecycle skills unreachable | v0.14.1 was the bug-cited version; current v0.26.5 ships 47 SKILL files and this session used `/dw-lifecycle:*` commands throughout |
+| #192 | collapse dual scrapbook resolvers | `scrapbook/paths.ts:22` *"The legacy public name `scrapbookDir` was removed"*; `scrapbookDirForEntry` is the only public entry point |
+| #195 | pin marketplace.json source.ref to release tag | `marketplace.json` `"ref": "v0.26.5"` for every plugin; bumped per release |
 | #199 | marginalia can't be edited | client UI ships (`sidebar-render.ts` edit/delete buttons + `comment-edit-delete.ts` module); server PATCH/DELETE at api.ts:285-293 cite Phase 35 / issue #199 |
 | #201 | `/deskwork:approve` documents retired reviewState gate | SKILL.md no longer documents the gate; describes stage-only gating per Commandment III |
+| #206 | ingest defaults to Ideas | `ingest-derive.ts:260-265` defaults to Drafting with operator-rationale source comment |
 | #214 | self-description over-narrows to literary content | README enumerates "blog posts, essays, design specs, ADRs, RFCs, internal memos, books, manuscripts, runbooks, post-mortems, knowledge bases" |
 | #225 | approve skill prose scaffolds artifact for non-pipeline content | SKILL.md:45 *"Approve preserves the prior stage's content... it does NOT scaffold a fresh artifact"* |
 | #247 | ingest regen drops Final/Cancelled | `calendar/render.ts:3-4` `STAGE_ORDER` is canonical 8-stage list; `bucketize()` iterates all 8 |
@@ -162,6 +169,11 @@ Verified against the hygiene feature's own end-to-end use of these helpers + aga
 - **#98** — dashboard scaffold button 404. Client at `editorial-studio-client.ts:88` posts to `/api/dev/editorial-calendar/draft` which has no server route. Confirmed still bug.
 - **#84** — iterate Step 2 "read the comments" has no documented agent path. SKILL.md still says "Read the studio's pending comments" without specifying how. Coupled to #267 (no CLI subcommand to enumerate pending annotations).
 - **#198** — iterate rejects `--dispositions` for longform/outline. `iterate/iterate.ts:12` comment says *"Future: --dispositions <path>"* — still TODO. Confirmed still open.
+- **#193** — induct-to picker on Final + pipeline stages, not just Blocked/Cancelled. `lib/stage-affordances.ts` only returns `controls: ['induct-to']` for Blocked/Cancelled; pipeline stages get `['save', 'iterate', 'approve', 'reject', 'historical-stage-dropdown']` without induct-to. Confirmed still open.
+- **#229** — review surface stacks chrome divider on top of host `<hr>`. CSS check inconclusive from code alone. Stays open pending operator browser-test.
+- **#231** — runtime-cache key for client assets doesn't include @deskwork/studio version. Couldn't confirm fix from `build-client-assets.ts` head; bug shape (cache-busting on version bump) requires explicit version-in-cache-key wiring. Stays open.
+- **#234** — ingest writes per-site `calendarPath`, approve writes unified `.deskwork/calendar.md`. Same root as #232 (`regenerate.ts:45` hardcodes the unified path). Stays open.
+- **#246** — core/approve refuses Final → Published; SKILL.md says approve should be universal per Commandment II. `entry/approve.ts` throws *"Final → Published uses `publish`, not `approve`"* — semantic divergence between skill prose + spec on one side and core helper on the other. Operator triage needed (already in burn-down). |
 
 ## NOT closed — still open by design or genuinely unfixed
 
