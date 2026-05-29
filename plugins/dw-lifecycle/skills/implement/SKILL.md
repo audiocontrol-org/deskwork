@@ -102,10 +102,12 @@ If `.dw-lifecycle/scope-discovery/` is not present in the project, the verbs sti
 When `.dw-lifecycle/scope-discovery/` is present in the project, this skill runs an orchestrator-loop per-turn audit/judge stack. Invoke the loop via Bash:
 
 ```bash
-dw-lifecycle orchestrator-turn --feature <slug> [--skip-judge] [--skip-auditor]
+dw-lifecycle orchestrator-turn --feature <slug> [--skip-judge] [--skip-auditor] [--verbose]
 ```
 
 The CLI verb assembles `TurnInput` from on-disk state (catalog entries, audit-log, fresh codebase-state metrics, discovery-agent findings) and calls the orchestrator-loop library. It emits a machine-readable `TurnReport` (JSON) to stdout and a one-line human summary to stderr. Pass `--json` to suppress the stderr summary.
+
+`--verbose` forces the `NOTE: only N/6 catalog files present (...)` summary decoration even when the catalog count is unchanged from the prior turn (Phase 14 Task 1 — AUDIT-20260529-12). Default behavior: emit the NOTE on the first turn or whenever the count changes (file added or removed); suppress on steady-state turns to keep the per-turn summary signal-dense. The `WARNING: no scope-discovery catalog files` line (count === 0) is NOT subject to gating; it always fires.
 
 Per-turn the loop composes the following libraries into a deterministic cycle:
 

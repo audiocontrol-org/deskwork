@@ -92,7 +92,7 @@ function parseHistoryEntry(raw: unknown, ctx: string): TurnHistoryEntry {
   if (!isPlainObject(raw)) {
     throw new Error(`loop-state: ${ctx} must be an object`);
   }
-  return {
+  const base: TurnHistoryEntry = {
     turnId: requireNonEmptyString(raw, 'turnId', ctx),
     turnAt: requireNonEmptyString(raw, 'turnAt', ctx),
     newAuditEntries: requireNonNegativeInt(raw, 'newAuditEntries', ctx),
@@ -102,6 +102,16 @@ function parseHistoryEntry(raw: unknown, ctx: string): TurnHistoryEntry {
     judgeRan: requireBoolean(raw, 'judgeRan', ctx),
     auditorFired: requireBoolean(raw, 'auditorFired', ctx),
   };
+  // catalogPresentCount is optional (added by Phase 14 Task 1 for the
+  // 3/6-NOTE noise gate; legacy state files predate it).
+  const catRaw = raw.catalogPresentCount;
+  if (catRaw === undefined) return base;
+  if (typeof catRaw !== 'number' || !Number.isInteger(catRaw) || catRaw < 0) {
+    throw new Error(
+      `loop-state: ${ctx} \`catalogPresentCount\` must be a non-negative integer when present`,
+    );
+  }
+  return { ...base, catalogPresentCount: catRaw };
 }
 
 function parseStateFile(text: string, ctx: string): LoopState {

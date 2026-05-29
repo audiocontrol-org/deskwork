@@ -142,6 +142,16 @@ export interface TurnHistoryEntry {
   readonly judgeRan: boolean;
   /** Whether the external auditor was fired this turn. */
   readonly auditorFired: boolean;
+  /**
+   * Count of scope-discovery catalog files present in
+   * `.dw-lifecycle/scope-discovery/` at the time of this turn. Optional
+   * for back-compat with legacy state files written before Phase 14
+   * Task 1 (AUDIT-20260529-12). The orchestrator-turn assembler stamps
+   * this onto the new history entry and uses the prior turn's value to
+   * gate the noisy "NOTE: only N/6 catalog files present" summary
+   * decoration — emit only when the count CHANGES.
+   */
+  readonly catalogPresentCount?: number;
 }
 
 /**

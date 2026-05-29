@@ -42,6 +42,10 @@ const USAGE = [
   '--allow-missing-feature   Skip the "feature directory must exist" pre-flight',
   '                          check. Use only for test fixtures or adopter',
   '                          projects that do not use the standard layout.',
+  '--verbose                 Force the "NOTE: only N/6 catalog files present"',
+  '                          summary decoration even when the count is unchanged',
+  '                          from the prior turn. Default false (quiet on steady',
+  '                          state; emit on first turn or when count changes).',
   '',
   'Runs one orchestrator turn (audit-log read + wrong-decision detection',
   '+ mediation clustering + controller decision + escalation visibility).',
@@ -79,6 +83,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
   let runtimeDirOverride: string | undefined;
   let allowMissingFeature = false;
   let jsonOnly = false;
+  let verbose = false;
 
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -89,6 +94,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
     if (flag === '--skip-auditor') { skipAuditor = true; continue; }
     if (flag === '--allow-missing-feature') { allowMissingFeature = true; continue; }
     if (flag === '--json') { jsonOnly = true; continue; }
+    if (flag === '--verbose') { verbose = true; continue; }
     if (
       flag === '--feature' ||
       flag === '--slug' ||
@@ -145,6 +151,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
     ...(auditorInputPath !== undefined ? { auditorInputPath } : {}),
     ...(runtimeDirOverride !== undefined ? { runtimeDirOverride } : {}),
     allowMissingFeature,
+    verbose,
   };
   return {
     ok: true,

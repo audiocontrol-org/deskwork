@@ -905,16 +905,20 @@ Phase 14 is operational (apply the discipline Phase 13 builds) and pre-dates Pha
 
 The orchestrator-turn summary printer emits the `NOTE: only 3/6 catalog files present (...)` line on every invocation regardless of state, diluting the genuinely-variable parts of the summary. Light fix: gate the NOTE behind a count-changed-from-last-turn check (state already in `controller-state.json`) OR a `--verbose` flag.
 
-- [ ] Step 1: Write failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/orchestrator-loop/catalog-note-noise.test.ts` — asserts (a) the NOTE is emitted on first invocation when count is non-6, (b) the NOTE is NOT emitted on subsequent invocations when the count is unchanged, (c) the NOTE IS emitted when the count changes (catalog file added or removed), (d) `--verbose` forces the NOTE regardless. Run; confirm red.
-- [ ] Step 2: Locate the emit site in `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/` (likely `runner.ts` summary block). Thread the prior turn's catalog-file-count from `controller-state.json`; gate the NOTE on `(current !== prior) || verbose`.
-- [ ] Step 3: Re-run the test; confirm green. Run the existing orchestrator-loop suite; confirm no regressions.
-- [ ] Step 4: Update the `orchestrator-turn` skill prose (or the verb's `--help` text) to document the steady-state quiet behavior + the `--verbose` escape hatch.
+- [x] Step 1: Wrote failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/orchestrator-loop/catalog-note-noise.test.ts` — 8 scenarios: first-turn-no-prior-state, second-turn-same-count-suppressed, count-rises-NOTE-re-emitted, count-falls-NOTE-re-emitted, verbose-forces-NOTE, zero-catalogs-always-WARNING, full-6-of-6-no-NOTE, catalogPresentCount-persisted-on-history. Red confirmed before impl.
+- [x] Step 2: Threaded prior catalog count from `LoopState.turnHistory[0].catalogPresentCount` (NEW optional field on `TurnHistoryEntry`) into `decorateSummaryWithCatalogPresence` at `plugins/dw-lifecycle/src/scope-discovery/orchestrator-turn.ts`. Gate: `(priorPresentCount === undefined || priorPresentCount !== presence.presentCount || verbose) && 0 < presentCount < totalCount`. The WARNING case (count === 0) stays always-on. After the loop library returns its `nextLoopState`, the assembler stamps the current count onto the new history entry via `stampCatalogPresentCount`. NEW `--verbose` flag on `OrchestratorTurnCliArgs` + the subcommand parser.
+- [x] Step 3: All 8 noise-gate tests green. Plugin suite at 2123/2123 (2115 baseline + 8 new). `tsc --noEmit` clean. `loop-state.ts:parseHistoryEntry` accepts the new optional field with strict validation (non-negative integer).
+- [x] Step 4: Updated `plugins/dw-lifecycle/skills/implement/SKILL.md` (orchestrator-loop section) — `--verbose` documented; default quiet-on-steady-state behavior explained; WARNING gating exemption called out. CLI `--help` (`orchestrator-turn` subcommand) also updated with the flag.
 
 **Acceptance Criteria:**
-- [ ] Test file exists and passes at the cited path.
-- [ ] Catalog NOTE is suppressed when the count is unchanged from the last persisted turn.
-- [ ] `--verbose` (or equivalent) restores the NOTE for debugging.
-- [ ] `Closes AUDIT-20260529-12` in the commit subject.
+- [x] Test file exists and passes at the cited path.
+- [x] Catalog NOTE is suppressed when the count is unchanged from the last persisted turn.
+- [x] `--verbose` (or equivalent) restores the NOTE for debugging.
+- [x] `Closes AUDIT-20260529-12` in the commit subject.
+
+**Notes:**
+- The library (`runOrchestratorTurn`) already loads its own copy of `LoopState` per-turn; the assembler now loads it independently as well so it has the prior count BEFORE the library mutates state. Tiny perf hit (one extra JSON read); the alternative (plumbing prior count into `TurnInput`) would have widened the library's surface for a UI-side concern.
+- Status flip from `open` → `fixed-<sha>` on AUDIT-20260529-12 follows in a separate commit (Phase 13 Task 4's automated `Closes-AUDIT` hook isn't built yet; manual flip until then).
 
 ### Task 2: Relax validate-return grammar false-positives (fix-finding-AUDIT-20260529-13)
 
