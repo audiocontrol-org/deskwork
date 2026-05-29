@@ -274,7 +274,7 @@ dashboard client/server code, storage, IDs, accessibility, and tests.
 ### AUDIT-20260528-06
 
 Finding-ID: AUDIT-20260528-06
-Status:     open
+Status:     fixed-653bc2b
 Severity:   high
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane.ts
 
@@ -306,7 +306,7 @@ target is an interactive descendant, or stop `keydown` propagation on
 ### AUDIT-20260528-07
 
 Finding-ID: AUDIT-20260528-07
-Status:     open
+Status:     fixed-a281ea7
 Severity:   medium
 Surface:    packages/studio/src/pages/dashboard/swimlane-card.ts
 
@@ -335,7 +335,7 @@ validation and tests.
 ### AUDIT-20260528-08
 
 Finding-ID: AUDIT-20260528-08
-Status:     open
+Status:     fixed-e309f00
 Severity:   medium
 Surface:    packages/studio/src/pages/dashboard/swimlane-list-body.ts
 
@@ -364,7 +364,7 @@ click / keyboard handlers and tests.
 ### AUDIT-20260528-09
 
 Finding-ID: AUDIT-20260528-09
-Status:     open
+Status:     fixed-9eff7af
 Severity:   medium
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane.ts
 
@@ -762,7 +762,7 @@ an observation; revisit if operator feedback shows confusion.
 ### AUDIT-20260528-25
 
 Finding-ID: AUDIT-20260528-25
-Status:     open
+Status:     fixed-73c8359
 Severity:   low
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane.ts
 
@@ -2042,7 +2042,7 @@ repair-choice correctness gap.
 ### AUDIT-20260529-08 — Doctor repair prompt can offer malformed template ids
 
 Finding-ID: AUDIT-20260529-08
-Status:     open
+Status:     fixed-a031183
 Severity:   medium
 Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:214-220`,
             `packages/core/src/pipelines/loader.ts:267-280`,
