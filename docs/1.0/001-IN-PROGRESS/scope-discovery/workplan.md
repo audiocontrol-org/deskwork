@@ -889,3 +889,80 @@ Run Phase 13's tooling against the audit-barrage's own AUDIT-20260529-01..11 ent
 - `/dw-lifecycle:check-disposition-survivor` commit-msg gate pattern — Phase 13 Task 3 mirrors the shape for `Closes AUDIT-<id>` commits.
 - The orchestrator-loop's external-auditor fire pattern — Phase 13 Task 4's re-audit cycle uses it.
 - The `audit-log.md` preservation rule (never delete entries) — Phase 13's status flips are status-only, body preserved.
+
+## Phase 14: Friction-fix sweep — `feature/deskwork-plugin` TF log imports
+
+Scope-discovery-related TF entries from `docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` (on `feature/deskwork-plugin`) imported into `audit-log.md` as AUDIT-20260529-12..15. Per operator decision 2026-05-29, hygiene-related TF entries are claimed by `feature/hygiene` and are NOT in scope here. Per Phase 13 anti-deferral discipline, the GH issues #362 (TF-003 + TF-004) and #361 (TF-001, hygiene-owned) are not dispositions on their own — the scope-discovery fixes are scoped into this phase as TDD-first tasks.
+
+Phase 14 is operational (apply the discipline Phase 13 builds) and pre-dates Phase 13 Task 2 landing (the implement-loop refusal gate). Per Phase 13 Open scoping question #4 ("Phase 13 against itself" — bootstrap by running promote-findings manually until Task 2 ships), these tasks are picked up manually for now; once the implement-loop gate exists, future imports flow through it automatically.
+
+### Task 1: Quiet the orchestrator-turn 3/6 catalog NOTE (fix-finding-AUDIT-20260529-12)
+
+The orchestrator-turn summary printer emits the `NOTE: only 3/6 catalog files present (...)` line on every invocation regardless of state, diluting the genuinely-variable parts of the summary. Light fix: gate the NOTE behind a count-changed-from-last-turn check (state already in `controller-state.json`) OR a `--verbose` flag.
+
+- [ ] Step 1: Write failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/orchestrator-loop/catalog-note-noise.test.ts` — asserts (a) the NOTE is emitted on first invocation when count is non-6, (b) the NOTE is NOT emitted on subsequent invocations when the count is unchanged, (c) the NOTE IS emitted when the count changes (catalog file added or removed), (d) `--verbose` forces the NOTE regardless. Run; confirm red.
+- [ ] Step 2: Locate the emit site in `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/` (likely `runner.ts` summary block). Thread the prior turn's catalog-file-count from `controller-state.json`; gate the NOTE on `(current !== prior) || verbose`.
+- [ ] Step 3: Re-run the test; confirm green. Run the existing orchestrator-loop suite; confirm no regressions.
+- [ ] Step 4: Update the `orchestrator-turn` skill prose (or the verb's `--help` text) to document the steady-state quiet behavior + the `--verbose` escape hatch.
+
+**Acceptance Criteria:**
+- [ ] Test file exists and passes at the cited path.
+- [ ] Catalog NOTE is suppressed when the count is unchanged from the last persisted turn.
+- [ ] `--verbose` (or equivalent) restores the NOTE for debugging.
+- [ ] `Closes AUDIT-20260529-12` in the commit subject.
+
+### Task 2: Relax validate-return grammar false-positives (fix-finding-AUDIT-20260529-13)
+
+`validate-return`'s wrapped-return grammar has three sharp edges that recur per reviewer dispatch: Searched-count noun whitelist too narrow; mandatory `path:LINE` on every Excluded entry; forbidden-substring list collides with descriptive prose. Medium fix per [#362](https://github.com/audiocontrol-org/deskwork/issues/362): word-boundary + context-aware match on forbidden substrings; widen Searched-count noun whitelist.
+
+- [ ] Step 1: Write failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/dispatch-wrapper-grammar.test.ts` — asserts (a) `5 issues found` is now accepted in the Searched count (was rejected), (b) descriptive prose containing `the placeholder tile` in an Excluded reason passes (was tripping the deferral detector), (c) deliberate deferral language (`for now`, `TODO: address later`) still trips the detector, (d) Searched-count nouns `issues`/`files`/`instances` are accepted alongside the existing whitelist. Run; confirm red.
+- [ ] Step 2: Widen the Searched-count noun whitelist in `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts` (or wherever the grammar lives). Add `issues`, `files`, `instances`, and any other operator-vetted nouns; document the rationale in a comment.
+- [ ] Step 3: Replace the bare substring scan for forbidden phrases (`stub`, `placeholder`, `pending`) with a word-boundary + context-aware matcher. Heuristic: trip only when the word appears as a verb / disposition phrase (`stub for now`, `placeholder until`, `pending fix`), not as a descriptive noun (`the placeholder tile`, `stub function`).
+- [ ] Step 4: Re-run all dispatch-wrapper tests; confirm green. Verify the existing forbidden-phrase coverage (real deferrals) still trips.
+- [ ] Step 5: Update `validate-return` skill prose / `--help` to document the relaxed grammar.
+
+**Acceptance Criteria:**
+- [ ] Test file exists and passes; new positive + negative cases covered.
+- [ ] Existing deferral-detection tests still pass (no false-negatives introduced).
+- [ ] `Closes AUDIT-20260529-13` in the commit subject.
+
+### Task 3: Accept `--response-file -` (stdin) on validate-return (fix-finding-AUDIT-20260529-14)
+
+`validate-return` currently requires a temp-file round-trip for the agent's response block. Light fix per [#362](https://github.com/audiocontrol-org/deskwork/issues/362): accept `--response-file -` (read from stdin). Mirrors the `gh issue create --body-file -` convention used elsewhere.
+
+- [ ] Step 1: Write failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/validate-return-stdin.test.ts` — asserts (a) `--response-file -` reads from stdin and validates the same as a file path; (b) the existing file-path mode still works; (c) supplying `--response-file -` with empty stdin emits a clear error (not a silent empty-input pass). Run; confirm red.
+- [ ] Step 2: Add the stdin branch to `plugins/dw-lifecycle/src/subcommands/validate-return.ts`. When the arg is `-`, read stdin to EOF before invoking the validator. Mirror the file-path read path's encoding (UTF-8) and error-message shape.
+- [ ] Step 3: Re-run the test; confirm green. Run the full subcommand suite; confirm no regressions.
+- [ ] Step 4: Update the `validate-return` skill prose + `--help` to document the stdin path.
+
+**Acceptance Criteria:**
+- [ ] Test file exists and passes; stdin + file-path + empty-stdin cases covered.
+- [ ] `--response-file -` works end-to-end via a piped invocation.
+- [ ] `Closes AUDIT-20260529-14` in the commit subject.
+
+### Task 4: Verify TF-005 clone-gate gitignore fix lands on merge (fix-finding-AUDIT-20260529-15)
+
+TF-005's fix landed on `feature/deskwork-plugin` at commit `37683c8` (Closes [#354](https://github.com/audiocontrol-org/deskwork/issues/354)). It's not on `feature/scope-discovery` yet; we inherit it when `feature/deskwork-plugin` merges to main and this branch syncs from main. This task is verification-only — no re-implementation.
+
+- [ ] Step 1: After `feature/deskwork-plugin` merges to main, rebase / fast-forward `feature/scope-discovery` from main. Confirm `git merge-base --is-ancestor 37683c8 HEAD` returns success.
+- [ ] Step 2: Run `npm --workspace @deskwork/plugin-dw-lifecycle run test -- clone-detector.gitignore` from this worktree; confirm the regression test that lands with `37683c8` passes here too.
+- [ ] Step 3: Smoke `dw-lifecycle check-clones` in a sandbox project with a gitignored sibling dir; confirm the dir is skipped (no false positives).
+- [ ] Step 4: Flip AUDIT-20260529-15 to `Status: verified-<YYYY-MM-DD>` in the audit-log per Phase 13's `re-audit-fixed-findings` pattern (manually until Task 4 ships).
+
+**Acceptance Criteria:**
+- [ ] `feature/scope-discovery` carries `37683c8`.
+- [ ] `clone-detector.gitignore.test.ts` passes on this branch.
+- [ ] AUDIT-20260529-15 flipped to `verified-<date>`.
+
+### Phase 14 — Out of Scope
+
+- **Hygiene-feature TF entries** (deskwork-plugin TF-001 `session-end-hygiene` → #361; hygiene-feature TF-001 `validate-return` refactor-cue substring). Claimed by `feature/hygiene` per operator decision 2026-05-29. Fixes land on that branch; this phase does not duplicate the work.
+- **#362 Heavy fix** (`dispatch-review` verb that collapses the wrap-prompt + validate-return round-trip into one CLI call). Architectural — operator decision required before this lands. Light + Medium (Tasks 2 + 3 above) are independently shippable stepping stones.
+- **Per-finding GH issue closure.** Per `Issue closure requires verification in a formally-installed release` rule, #354 / #361 / #362 stay open until verified post-release. This phase posts evidence; closure is the operator's call.
+
+### Phase 14 — Existing primitives this composes over
+
+- `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/controller-state.json` writer — Task 1 reads the prior turn's catalog-file-count from this persisted state.
+- `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts` grammar definitions — Task 2 widens the existing rules in place.
+- `plugins/dw-lifecycle/src/subcommands/validate-return.ts` argument parsing — Task 3 adds the `--response-file -` branch.
+- `clone-detector.gitignore.test.ts` (lands with `37683c8`) — Task 4 confirms green on this branch post-merge.

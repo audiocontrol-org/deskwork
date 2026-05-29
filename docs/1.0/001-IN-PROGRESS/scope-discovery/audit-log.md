@@ -531,3 +531,76 @@ Next steps (out of scope for Task 6 itself; track separately):
 All 11 findings now carry `Status: fixed-08971e4` (or `informational` for AUDIT-20260529-09). The follow-up task referenced above ran in the same session as Phase 12 Tasks 4/5/7 — one coherent commit covers every fix + the remaining Phase 12 deliverables.
 
 Awaiting `verified-<date>` on a post-release dogfood re-run (`/dw-lifecycle:audit-barrage` against the post-fix diff to confirm the fixed shapes don't regress and that the new prompt-renderer wiring produces a usable prompt end-to-end).
+
+## 2026-05-29 — deskwork-plugin TF log import (scope-discovery items)
+
+Source: `docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`. Per project rule `.claude/rules/agent-discipline.md` § "scope-discovery v1 — dogfood feedback via tooling-feedback.md", scope-discovery-related TF entries from sibling features import into this audit-log as `AUDIT-YYYYMMDD-NN`. Hygiene-related TF entries (deskwork-plugin TF-001 `session-end-hygiene` scoping bug → [#361](https://github.com/audiocontrol-org/deskwork/issues/361); hygiene-feature TF-001 `validate-return` refactor-cue substring) are claimed by `feature/hygiene` per operator decision 2026-05-29 and are intentionally NOT imported here.
+
+Mapping:
+- TF-002 (DSC · low) → AUDIT-20260529-12
+- TF-003 (MISC · medium) → AUDIT-20260529-13
+- TF-004 (MISC · low) → AUDIT-20260529-14
+- TF-005 (CL · low) → AUDIT-20260529-15
+
+Fix scoping into Phase 14 — Friction-fix sweep (`workplan.md`).
+
+#### AUDIT-20260529-12 — orchestrator-turn 3/6 catalog NOTE is constant per-turn noise
+
+Finding-ID: AUDIT-20260529-12 (imported from deskwork-plugin TF-002)
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/` (the summary printer that emits the NOTE; likely `runOrchestratorTurn` in `runner.ts` or a sibling)
+
+Every `dw-lifecycle orchestrator-turn --feature <slug> --skip-judge --skip-auditor` invocation emits the identical stderr summary: `NOTE: only 3/6 catalog files present (anti-patterns.yaml, adopter-manifests.yaml, clones.yaml). 0 new audit entries; 0 wrong-decisions; ...`. The NOTE never changes between turns when the project has a steady-state catalog count and carries no actionable signal — it dilutes the genuinely-variable parts of the summary.
+
+Suggested fix (from TF-002):
+- *Light:* emit the "N/6 catalog files present" NOTE only when the count CHANGES from the last persisted turn (state already lives in `controller-state.json`), or gate behind `--verbose`.
+- *Medium:* if 3/6 is the steady state for a project without the optional catalogs, downgrade from per-turn NOTE to a one-time install-time hint.
+
+Scoped into workplan: Phase 14 Task 1 (fix-finding-AUDIT-20260529-12).
+
+#### AUDIT-20260529-13 — dispatch-wrapper wrap-prompt round-trip + grammar false-positives
+
+Finding-ID: AUDIT-20260529-13 (imported from deskwork-plugin TF-003; co-tracked with AUDIT-20260529-14 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362))
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts`, `plugins/dw-lifecycle/src/subcommands/wrap-prompt.ts`, `plugins/dw-lifecycle/src/subcommands/validate-return.ts`
+
+Every `/dw-lifecycle:review` reviewer dispatch requires a hand-managed round-trip: `mktemp` a prompt file → Write the prompt body into it → `dw-lifecycle wrap-prompt --prompt-file <path>` → paste the (120+ line) wrapped stdout into the Agent tool. The wrapped suffix's return grammar has three sharp edges that recur per session: the Searched-count noun whitelist (`5 issues found` rejected; must end in `matches`/`hits`/...), mandatory `path:LINE` on every Excluded entry (`:1` sentinel for whole-file), and a forbidden-substring list that collides with ordinary descriptive prose (`stub` / `placeholder` / `pending` in a reason trips the deferral detector even in non-deferral usage).
+
+GH issue: [#362](https://github.com/audiocontrol-org/deskwork/issues/362) (co-files TF-003 + TF-004 with Light / Medium / Heavy fix ladder). Per Phase 13 anti-deferral discipline, the GH issue alone is not a disposition — scoped into workplan below.
+
+Suggested fix (from TF-003 / #362):
+- *Light (companion to AUDIT-20260529-14):* `dispatch-review --prompt-file <p> --agent-type <type>` verb that wraps both legs of the round-trip in one CLI call.
+- *Medium:* word-boundary + context-aware match on forbidden substrings; widen Searched-count noun whitelist (`issues`, `files`, `instances`, ...).
+- *Heavy:* the architectural collapse — operator decision required.
+
+Scoped into workplan: Phase 14 Task 2 (fix-finding-AUDIT-20260529-13) — covers Medium grammar relaxation; Light stdin fix lives in Task 3 below.
+
+#### AUDIT-20260529-14 — validate-return has no stdin path
+
+Finding-ID: AUDIT-20260529-14 (imported from deskwork-plugin TF-004; co-tracked with AUDIT-20260529-13 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362))
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/validate-return.ts`
+
+Validating each reviewer return requires writing the agent's Searched / Included / Excluded block to a temp file, then `dw-lifecycle validate-return --response-file <path> --json`. There's no stdin path (`--response-file -`), so the response can't be piped; it must round-trip through a temp file the orchestrator hand-creates.
+
+GH issue: [#362](https://github.com/audiocontrol-org/deskwork/issues/362) (Light fix in the issue's ladder; one-line patch). Per Phase 13 anti-deferral discipline, the GH issue alone is not a disposition — scoped into workplan below.
+
+Suggested fix (from TF-004): accept `--response-file -` (read from stdin). Mirrors the `gh issue create --body-file -` convention already used elsewhere in this project.
+
+Scoped into workplan: Phase 14 Task 3 (fix-finding-AUDIT-20260529-14).
+
+#### AUDIT-20260529-15 — clone gate scanned gitignored directories until `gitignore: true` set
+
+Finding-ID: AUDIT-20260529-15 (imported from deskwork-plugin TF-005)
+Status:     fixed-37683c8
+Severity:   low
+Surface:    `plugins/dw-lifecycle/templates/scope-discovery/.jscpd.json`, scope-discovery's own `.jscpd.json`
+
+Fix landed on `feature/deskwork-plugin` at commit `37683c8` ("fix(38·1): clone gate honors .gitignore — set gitignore:true (#354)"). Sets `"gitignore": true` in the scope-discovery `.jscpd.json` + the adopter template seed; regression at `clone-detector.gitignore.test.ts`. Closes pilot-reported [#354](https://github.com/audiocontrol-org/deskwork/issues/354) (issue stays open per closure-requires-verified-release rule).
+
+The fix SHA is on `origin/feature/deskwork-plugin` only; `feature/scope-discovery` inherits it on merge to main. No re-implementation needed.
+
+Scoped into workplan: Phase 14 Task 4 (verify-on-merge) — confirms the SHA reaches this branch and the regression test passes here too. Awaiting `verified-<date>` after the merge + post-merge re-audit.
