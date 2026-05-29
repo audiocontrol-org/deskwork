@@ -3164,3 +3164,60 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - **Triage [#335](https://github.com/audiocontrol-org/deskwork/issues/335)** (gh-runtime extraction) — cheaper to extract now than after a 5th consumer arrives.
 - **Run `/dw-lifecycle:complete hygiene`** to move docs to `003-COMPLETE/` and close the parent + remaining phase issues. Note: `complete-gate`'s scanner is the same one #339 fixed. Either wait for v0.26.1 install OR pass `--skip-tbd-gate --reason "<substantive>"` pointing at the #339 root cause.
 - **Watch for the next batched-proposal dogfood opportunity** — the `studio-mobile-first` workplan has 15 TBDs per the baseline; promoting those is the next natural Phase-3 cycle once v0.26.1 is installed.
+
+## 2026-05-29: Merge sync + #142 closure + Phase 38 bootstrap + 38·0 blast-radius gate
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Sync the feature branch with main, look at the deskwork-core burndown, and act on the highest-impact item — which the operator scoped up to "the entire core + studio burndown" as a tracked Phase 38, then drove canonically through `/dw-lifecycle:extend` → deskwork PRD re-iteration → `/dwi`.
+
+**Accomplished:**
+
+- **Merged `origin/main` (326 commits) into `feature/deskwork-plugin`** (`1a1f95e`). Resolved two append-only journal conflicts (DEVELOPMENT-NOTES.md, USAGE-JOURNAL.md) as unions. The merge pulled new `ajv`/scope-discovery deps; ran `npm install` so the pre-commit scope-discovery gate could run (not bypassed). Committed package-lock sync (`48c8b3a`).
+- **Deleted the `.audiocontrol.org` dogfood sandbox** (operator decision). It was a gitignored 593MB clone of `oletizi/audiocontrol.org` on `feature/adopt-deskwork-plugin` — fully pushed, only `.deskwork/config.json` local-only (captured in transcript). It was tripping the jscpd clone gate (the gate scans gitignored dirs; main's worktree has no such dir, which is why the gate passed there but not here). Removing it let the merge commit pass the hook honestly.
+- **Closed #142 as superseded by graphical-entries (#301)** (`b3100a9`): posted a cross-reference comment, moved it out of the deskwork-core operator-triage bucket into a "Superseded" section, closed not-planned.
+- **Phase 38 bootstrapped via `/dw-lifecycle:extend`** (`fed6c9a`): the core+studio burndown tranche. Plan at `docs/superpowers/plans/2026-05-28-deskwork-core-studio-burndown.md` (38a detailed to TDD granularity; 38b–38h enumerated from the burndown for just-in-time expansion). Operator decisions captured via AskUserQuestion: #246 → make approve universal (option a); uniform Final→Published mechanics.
+- **PRD re-iterated through deskwork per the lifecycle gate** (the binding "PRD extension always re-iterates via deskwork" rule): inducted Final→Drafting → snapshot v5 → operator margin note → addressed → v6 (`716c17d`) → `/deskwork:approve` → Final (`3a1f77c`).
+- **`/dwi` ran sub-phase 38·0 — graphical-entries (#301) blast-radius review** (`2b5a35c`, `505da9e`): a `code-explorer` dispatch (through the dispatch wrapper; return validated) read the live `feature/graphical-entries` branch (Phases 1–6 done: pipeline templates + lanes + template-aware verbs + swimlane dashboard; 7–12 not started) and classified all 66 burndown issues: 16 HIGH / 12 MEDIUM / 38 LOW. Report at `38-0-blast-radius-review.md`.
+
+**Didn't Work:**
+
+- **The clone gate scans gitignored directories.** `.jscpd.json` lacks `"gitignore": true`, so the gate enumerated ~65 `.audiocontrol.org` sandbox files as NEW clones, blocking the merge commit. Not a real finding — local-environment-only. Resolved by deleting the sandbox (operator's call). Underlying gate-config gap left as-is (not in scope).
+- **`code-explorer` lacks the Write tool**, so it couldn't persist its own report despite the brief instructing it to. It returned the full content in its response; the controller wrote `38-0-blast-radius-review.md`. Worth encoding in dispatch briefs: only dispatch report-writing to agents whose toolset includes Write.
+- **`deskwork doctor --check` exited 1 after the PRD approve** with 13 findings — verified as the known #300/#219 doctor false-positives (the PRD's id IS in calendar.md) + pre-existing unrelated entries, NOT corruption from the approve. Live dogfood evidence for the 38c doctor-rule fixes.
+- **`session-end-hygiene` range conflated merge-in with session work** (#340-shaped): `0030c55..HEAD` swept in 326 merged origin/main commits, so its "issues filed this session" listed scope-discovery/hygiene issues from other branches. Recommendation hand-corrected below.
+
+**Course Corrections:**
+
+- **[PROCESS] Operator vetoed bypassing canon.** When offered "light in-thread TDD + review" vs "full `/dwi` orchestration" for #246, the operator chose the canonical path: *"A. we bypass the canon at our peril."* Drove the full `/dw-lifecycle:extend` → deskwork re-iteration → `/dwi` lifecycle instead of a quick fix.
+- **[PROCESS] Operator's blast-radius margin note caught the keystone risk before any code.** The note on the PRD ("steer clear of in-flight graphical-entries work … add a step to review what's being built … mark blast-radius issues blocked") became gating sub-phase 38·0 — which then found that #246 itself (the thing the whole effort was scoped around) is already being rewritten on `feature/graphical-entries`. A Phase-38 edit to `approve.ts` would have been throwaway. Operator confirmed reassigning #246/#230 to #301.
+- **[PROCESS] Outward-facing actions surfaced for decision, not pre-decided.** Held the 16-HIGH/12-MEDIUM issue Blocked-labeling for operator go-ahead (they chose: hold; block list lives in the report) rather than mass-labeling unilaterally.
+
+**Quantitative:**
+
+- Messages from operator: ~20
+- Commits this session: 8 (1 merge + 7 substantive: `b3100a9`, `48c8b3a`, `fed6c9a`, `716c17d`, `3a1f77c`, `2b5a35c`, `505da9e`) + this session-end
+- Sub-agent dispatches: 1 (`code-explorer` for the 38·0 blast-radius review; returned via the dispatch wrapper, validate-return passed)
+- Skill invocations: `/dw-lifecycle:session-start`, `/deskwork:iterate`, `/deskwork:approve`, `/dw-lifecycle:extend`, `superpowers:writing-plans`, `superpowers:test-driven-development` (loaded, not yet executed — code phase is 38b), `/dw-lifecycle:implement` (38·0), `/dw-lifecycle:session-end`
+- Issues closed: 1 (#142)
+- deskwork PRD revisions: v5 → v6; stage Final → Drafting → Final
+- Releases: 0 (docs/setup session)
+
+**Insights:**
+
+- **The blast-radius gate is the highest-leverage thing this session produced.** Without it, Phase 38 would have started with #246 — and thrown the work away on the #301 merge. The pattern generalizes: before burning down a backlog, check it against in-flight large features; a one-dispatch overlap review can save a sub-phase of throwaway work. Bake 38·0 into the burndown-tranche playbook.
+- **"Make approve universal" is real and correct — it just belongs on the graphical-entries branch.** The spec/skill (DESKWORK-STATE-MACHINE Commandment II, approve SKILL.md) already say approve is universal; only the core code lags. graphical-entries' template-aware verb rewrite is exactly where that lag gets closed (`preTerminalLinearStage(template)` at `approve.ts:109-115`). #246 isn't wrong — it's mislocated.
+- **Canon caught what a shortcut would have missed.** The operator's "we bypass canon at our peril" + the mandatory deskwork PRD re-iteration is what created the surface for the margin note that surfaced the #246/#301 collision. A light in-thread fix would have shipped the throwaway edit.
+
+### Hygiene observations
+
+- No new TBD/defer markers introduced into the workplan this session; the markers the helper flagged are pre-existing (Phases 19–35) and unrelated to Phase 38. Phase 38's own deferrals are tracked as explicit dispositions (38f/38g gates, 38·0 block list in the report), not bare TBDs.
+- Issues touched this session: closed #142 (superseded by #301). No issues filed. (The helper's "issues filed this session" list is merge-range noise — scope-discovery/hygiene issues from other branches pulled in by the origin/main merge; the #340-shaped calendar-date scoping bug.)
+- Doctor `--check` exits 1 on the known #300/#219 false-positive family (surfaced live by the PRD approve) — addressed by 38c, not a blocker.
+
+### Next session recommendation (hygiene)
+
+- **Resume:** `/dwi` at Phase 38 sub-phase 38b — the LOW-overlap unblocked work set (20 core + 18 studio, per `38-0-blast-radius-review.md`). Start with core quick fixes #256 (CLI `--version`) → #221 → #232 → #198, then the 38c doctor-rule family (#219/#65/#223; SKIP #300 here — already fixed on the graphical-entries branch).
+- **Coordinate (#301):** #246/#230 land on `feature/graphical-entries` (verb-model rewrite), not Phase 38.
+- **Note:** the deskwork-studio still runs detached on port 47328 from this session.
