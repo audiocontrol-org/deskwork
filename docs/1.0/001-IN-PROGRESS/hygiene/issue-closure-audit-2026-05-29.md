@@ -12,6 +12,8 @@ Systematic verification of open issues against shipped code. Operator decision: 
 **Closed in this audit:** 68 (cumulative; live `gh issue list --state open` shows 110 remaining).
 **Methodology:** for each candidate, verify against actual code or run the failing command; close only with concrete evidence.
 
+**Burndown marching orders** (operator-handoff sheets): the remaining 110 open issues are sliced by feature/component at [`../../burndown/`](../../burndown/). One sheet per lane (scope-discovery, graphical-entries, dw-lifecycle, deskwork-core, deskwork-studio, operator-triage, roadmap); each lists quick-fixes / medium / sprint-sized / operator-triage with concrete actions + size + dependencies.
+
 ## Hygiene phase issues (10 closed)
 
 The hygiene feature shipped across v0.26.0 → v0.26.5 via PRs #338 + #341 + #344 + #345 + #346 + #348. Phase issues #324–#333 + parent #323 + Phase 6 Task 4 #336 all carry concrete shipping evidence. #336 install-verification ran against v0.26.5 (the bug claimed at v0.26.1 was fixed by PR #344 commit `273c8f3`).
