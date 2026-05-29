@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T01:03:57.568Z
+generated_at: 2026-05-29T01:51:21.646Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -440,13 +440,14 @@ clones:
       - packages/studio/src/pages/content.ts:347:352
     disposition: pending
     reason: null
-  - id: ae309588f08f
+  - id: 6cdca5bc1a40
     lines: 7
     members:
       - packages/studio/src/pages/dashboard.ts:37:43
       - packages/studio/src/pages/lanes.ts:36:42
+      - packages/studio/src/pages/pipelines.ts:40:47
     disposition: keep-with-reason
-    reason: Canonical studio page-shell imports — every page using the masthead+folio scaffold needs this exact set; extracting would be a useless re-export
+    reason: shared page-renderer imports (StudioContext, html, layout, masthead) are foundational and re-exporting would add indirection without savings
   - id: a1cac4b2512f
     lines: 15
     members:
@@ -557,36 +558,36 @@ clones:
   - id: d6093f110268
     lines: 10
     members:
-      - packages/studio/src/server.ts:394:403
-      - packages/studio/src/server.ts:403:412
+      - packages/studio/src/server.ts:406:415
+      - packages/studio/src/server.ts:415:424
     disposition: pending
     reason: null
   - id: 14579dae3bdf
     lines: 20
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:114:126
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:146:165
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:115:127
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:147:166
     disposition: pending
     reason: null
   - id: 8a46fe453209
     lines: 17
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:115:126
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:479:495
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:116:127
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:480:496
     disposition: pending
     reason: null
   - id: 82d6dc44c67e
     lines: 11
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:116:126
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:200:210
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:117:127
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:201:211
     disposition: pending
     reason: null
   - id: f0e04e87d0e2
     lines: 7
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:167:173
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:88:94
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:168:174
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:89:95
     disposition: pending
     reason: null
   - id: 7c1800068cfe

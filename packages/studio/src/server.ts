@@ -45,6 +45,7 @@ import { renderEntryReviewPage } from './pages/entry-review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
 import { renderLanesPage } from './pages/lanes.ts';
+import { renderPipelinesPage } from './pages/pipelines.ts';
 import { renderScrapbookPage, ScrapbookPageError } from './pages/scrapbook.ts';
 import {
   renderContentTopLevel,
@@ -264,6 +265,17 @@ export function createApp(ctx: StudioContext): Hono {
   // /deskwork:lane <verb> slash command per THESIS Consequence 2.
   app.get('/dev/lanes', async (c) => c.html(await renderLanesPage(ctx)));
   app.get('/dev/lanes/', async (c) => c.html(await renderLanesPage(ctx)));
+  // Phase 6 Task 6.4: studio pipeline-editor page. Server-renders
+  // the pipeline registry (plugin presets + project overrides) with
+  // a copy-builder New form, per-row View / Edit / Delete affordances
+  // (Edit surfaces the five mutually-exclusive update operations as
+  // collapsed sub-forms), and an error banner + inline error rows
+  // when any override JSON fails to load. Per THESIS Consequence 2
+  // no button mutates server state — every action copies an
+  // equivalent /deskwork:pipeline <verb> slash command to the
+  // clipboard.
+  app.get('/dev/pipelines', async (c) => c.html(await renderPipelinesPage(ctx)));
+  app.get('/dev/pipelines/', async (c) => c.html(await renderPipelinesPage(ctx)));
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx)),
   );

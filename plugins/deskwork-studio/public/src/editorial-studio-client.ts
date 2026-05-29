@@ -18,6 +18,7 @@ import { initSwimlaneDrag } from './dashboard/swimlane-drag.ts';
 import { initSwimlanePresets } from './dashboard/swimlane-presets.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 import { initLanesPage } from './lanes/lanes-page.ts';
+import { initPipelinesPage } from './pipelines/pipelines-page.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
   const site = btn.dataset.site;
@@ -538,6 +539,9 @@ function init(): void {
   // Phase 6 Task 6.3: lanes-page controller (idempotent — no-op
   // when [data-lanes-container] is absent on the dashboard).
   initLanesPage();
+  // Phase 6 Task 6.4: pipelines-page controller (idempotent — no-op
+  // when [data-pipelines-container] is absent).
+  initPipelinesPage();
 }
 
 init();

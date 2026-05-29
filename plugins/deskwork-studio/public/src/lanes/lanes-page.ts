@@ -49,10 +49,9 @@
  * surfaces without per-surface guard checks at the import site.
  */
 
-import { copyOrShowFallback } from '../clipboard.ts';
+import { copyAndFlash } from '../copy-builder.ts';
 import { resolveProjectKey } from '../dashboard/swimlane-storage.ts';
 
-const COPIED_FLASH_MS = 1500;
 const ARCHIVED_OPEN_STORAGE_PREFIX = 'deskwork:lanes:';
 const ARCHIVED_OPEN_STORAGE_SUFFIX = ':archived-open';
 
@@ -177,27 +176,6 @@ function rebuildEditFormPreview(form: HTMLElement, laneId: string): string {
   const preview = form.querySelector<HTMLElement>('[data-lanes-preview]');
   if (preview) preview.textContent = command;
   return command;
-}
-
-async function copyAndFlash(
-  command: string,
-  button: HTMLButtonElement,
-  successMessage: string,
-): Promise<void> {
-  const original = button.textContent;
-  const ok = await copyOrShowFallback(command, {
-    successMessage,
-    fallbackMessage:
-      'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
-  });
-  if (ok) {
-    button.classList.add('is-copied');
-    button.textContent = 'Copied ✓';
-    window.setTimeout(() => {
-      button.classList.remove('is-copied');
-      if (original !== null) button.textContent = original;
-    }, COPIED_FLASH_MS);
-  }
 }
 
 function initNewForm(container: HTMLElement): void {
