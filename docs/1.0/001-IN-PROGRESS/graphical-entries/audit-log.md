@@ -2079,3 +2079,96 @@ All controller-side gates listed in this audit section passed at
 and core/CLI/Studio package dry-runs. The one new actionable finding is
 limited to repair-choice correctness in the `lane-config-missing-template`
 doctor rule; it is not a build, packaging, or broad regression failure.
+
+## 2026-05-29 audit: AUDIT-10 dual-viewport verification (post-`e228e26`)
+
+Probe scope: `feature/graphical-entries` at `e228e26..f7ca553` — the
+mobile lane-stack accordion variant landed by AUDIT-20260528-10 plus
+the wave-5 observation closures. Verification protocol per
+`.claude/rules/ui-verification.md` § Dual-viewport verification: run
+the dev studio against this worktree's editorial-internal calendar;
+probe at desktop (1920×1080) AND phone (390×844) viewports.
+
+Probe results — desktop (1920×1080):
+- `matchMedia('(max-width: 720px)')` = `false` ✓
+- `.lane-stack` exists with `display: none` ✓ (correctly hidden on desktop)
+- `.bay-body` wraps the desktop `.swim` cards, visible at 978×3075px ✓
+- DOM both-trees-emitted: server-rendered, CSS gates which renders ✓
+
+Probe results — mobile (390×844):
+- `matchMedia('(max-width: 720px)')` = `true` ✓
+- `.lane-stack` `display: block`, visible at 298×1384px ✓
+- `.bay-body` `display: none`, swim cards collapsed to 0×0 ✓
+- `.lane-section > .lane-head + .lane-body` structure matches the
+  D3 Press Bay brief contract ✓
+- `.lane-head` children: `.lh-glyph` + `.lh-name` + `.lh-count` +
+  `.lh-chev.collapse-chev` + `.swim-compose.lh-compose` +
+  `.view-toggle.lh-view-toggle` — matches brief's accordion-header
+  affordance list ✓
+- Accordion expand/collapse: chevron click toggles `aria-expanded`
+  AND `[hidden]` on `.lane-body`; `aria-label="Collapse Default lane"`;
+  semantic hidden attribute (not just CSS display:none) so SR users
+  skip the collapsed body ✓
+- List-default rendering on mobile: `.swim.view-list` class applied,
+  `.lane-body` first child is `.list-body` ✓
+- Compose chip: clipboard receives `/deskwork:add <SLUG> --lane
+  default --stage Ideas`; `.copied` class flashes; aria-label flips
+  to "Copied — paste in chat" ✓ (existing `swim-compose` data-attr
+  binding from Task 5.1C works transparently on the new mobile DOM
+  tree)
+
+### AUDIT-20260529-10 — view-toggle cells under WCAG 2.2 SC 2.5.8 AA on mobile
+
+Finding-ID: AUDIT-20260529-10
+Status:     fixed-<this-commit>
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/css/dashboard-lane-stack.css:149-153`
+
+The lane-head's view-toggle (`.lh-view-toggle .vt-cell`) shrinks
+padding and font-size to fit alongside the chevron + compose chip +
+count strip on the 390px viewport. With the shrunken padding the
+individual cells measure 18-19px wide × 24px tall — under the WCAG
+2.2 SC 2.5.8 AA "Target Size (Minimum)" requirement of 24×24 CSS
+pixels per target.
+
+Hit-target probe at 390×844:
+- `.collapse-chev`: 24×24 ✓
+- `.swim-compose`: 30×30 ✓
+- `.vt-cell` (Kanban): 19×24 ✗
+- `.vt-cell` (List): 18×24 ✗
+
+Desktop cells are unaffected (72×26 and 57×26) because the lane-head
+chrome doesn't compete for horizontal space there.
+
+Fix: add explicit `min-width: 24px; min-height: 24px;` floors to the
+shrunken-cell rule. The view-toggle container grows from 39×26 to
+50×26; cells grow to 24×24 each. No CSS cascade conflict with the
+desktop swim view-toggle rule (this rule is scoped to
+`.lane-head .lh-view-toggle .vt-cell` inside the
+`@media (max-width: 720px)` block).
+
+Verified post-fix at 390×844:
+- view_cell_kanban: 24×24 ✓
+- view_cell_list: 24×24 ✓
+- view_toggle_container: 50×26 (was 39×26)
+
+Studio test suite: 933/933 + 11 skipped (unchanged from baseline).
+
+### AUDIT-20260529-11 — Phase 6 closeout audit completed end-to-end
+
+Finding-ID: AUDIT-20260529-11
+Status:     observation (no action)
+Severity:   observation
+Surface:    Phase 6 closeout dual-viewport verification
+
+Every brief-contracted aspect of the mobile lane-stack accordion
+variant verified at both desktop and phone viewports via Playwright
+probe against the live dev studio. The one defect surfaced
+(`AUDIT-20260529-10`) was a WCAG 2.2 SC 2.5.8 AA target-size
+violation on the lane-head's view-toggle cells; that defect is fixed
+in the same commit as this audit-log entry. No other contract
+mismatch found.
+
+The dual-viewport verification gap noted in the AUDIT-10 commit body
+(`e228e26`) is closed. The audit-log open-count remains 0 after this
+audit cycle.

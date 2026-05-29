@@ -150,6 +150,13 @@
     padding: 0.18rem 0.35rem;
     font-size: 0.6rem;
     gap: 0.18rem;
+    /* WCAG 2.2 SC 2.5.8 AA target-size minimum — each cell must be at
+     * least 24x24 CSS pixels. The shrunken padding/font-size above
+     * collapse the cell below 24x24; the explicit min-* floors restore
+     * the hit target without altering the visual chrome (the cell
+     * grows from ~19px wide to 24px wide). */
+    min-width: 24px;
+    min-height: 24px;
   }
 
   .lane-head .lh-view-toggle .vt-cell .vt-icon {
