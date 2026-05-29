@@ -609,17 +609,17 @@ Scoped into workplan: Phase 14 Task 3 (fix-finding-AUDIT-20260529-14).
 ### AUDIT-20260529-15 — clone gate scanned gitignored directories until `gitignore: true` set
 
 Finding-ID: AUDIT-20260529-15
-Status:     fixed-37683c8
+Status:     verified-2026-05-29
 Severity:   low
 Surface:    `plugins/dw-lifecycle/templates/scope-discovery/.jscpd.json`, scope-discovery's own `.jscpd.json`
 
 Imported from deskwork-plugin TF-005 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`).
 
-Fix landed on `feature/deskwork-plugin` at commit `37683c8` ("fix(38·1): clone gate honors .gitignore — set gitignore:true (#354)"). Sets `"gitignore": true` in the scope-discovery `.jscpd.json` + the adopter template seed; regression at `clone-detector.gitignore.test.ts`. Closes pilot-reported [#354](https://github.com/audiocontrol-org/deskwork/issues/354) (issue stays open per closure-requires-verified-release rule).
+Fix originated on `feature/deskwork-plugin` at commit `37683c8` ("fix(38·1): clone gate honors .gitignore — set gitignore:true (#354)"). Cherry-picked onto `feature/scope-discovery` at commit `884851e` to close the cross-branch verification loop without waiting for `feature/deskwork-plugin → main` merge. Sets `"gitignore": true` in the scope-discovery `.jscpd.json` + the adopter template seed; regression at `clone-detector.gitignore.test.ts` (4 tests; 1.2s — gitignored dir skipped, tracked clone still caught). Closes pilot-reported [#354](https://github.com/audiocontrol-org/deskwork/issues/354) (the GH issue stays open per the closure-requires-verified-release rule until verified post-release).
 
-The fix SHA is on `origin/feature/deskwork-plugin` only; `feature/scope-discovery` inherits it on merge to main. No re-implementation needed.
+Verified live (2026-05-29): `npx vitest run src/__tests__/scope-discovery/clone-detector.gitignore.test.ts` exits 0 with 4/4 green; pre-commit clone-gate ran cleanly on the cherry-pick commit.
 
-Scoped into workplan: Phase 14 Task 4 (verify-on-merge) — confirms the SHA reaches this branch and the regression test passes here too. Awaiting `verified-<date>` after the merge + post-merge re-audit.
+Cross-branch chemistry note: when `feature/deskwork-plugin` eventually merges to main, the `37683c8` patch content will be a duplicate of what `884851e` already applied here. Git resolves by patch ID — no conflict expected.
 
 ## 2026-05-29 — Three-track review integration (post-Phase-14 commits)
 
