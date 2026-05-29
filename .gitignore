@@ -109,3 +109,4 @@ yarn-error.log*
 
 ## Stray pnpm lockfile — this project uses npm workspaces, not pnpm.
 /pnpm-lock.yaml
+.dw-lifecycle/dismantle-worktrees/
