@@ -1996,3 +1996,86 @@ npm-cache permission issue already isolated by the escalated run.
 - Test deltas: studio suite 880 → 888 (+8 new tests for validation gates + XSS regression); core 711 throughout; CLI tests unchanged.
 - Builds: `@deskwork/{core, studio, cli}` all exit 0.
 - New clone disposition: `9e3f04426ee7` disposed `keep-with-reason` for the set-locked / set-off-pipeline panel symmetry (parallel pipeline-schema operations; collapsing would obscure per-panel error-message identity).
+
+## Phase 6 closeout audit — Tasks 6.5/6.6 + end-state gates (2026-05-29)
+
+Audit scope: clean `feature/graphical-entries` worktree at
+`1e78a5e` (`docs(graphical-entries): Phase 6 closeout — README status
+row Done`), covering the Phase 6.5 doctor rule, Phase 6.6 custom-pipeline
+integration test, and Phase 6 closeout documentation.
+
+Changed surfaces reviewed:
+
+- `packages/core/src/doctor/rules/lane-config-missing-template.ts`
+- `packages/core/src/doctor/runner.ts`
+- `packages/core/src/schema/journal-events.ts`
+- `packages/core/test/doctor/lane-config-missing-template.test.ts`
+- `packages/cli/test/custom-pipeline-lane-integration.test.ts`
+- `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md`
+- `docs/1.0/001-IN-PROGRESS/graphical-entries/README.md`
+
+Track 1 controller verification:
+
+- `npm --workspace @deskwork/core test` — passed:
+  65 files, 715 tests.
+- `npm --workspace @deskwork/cli test` — passed:
+  30 files passed, 2 skipped; 321 tests passed, 29 skipped.
+- `npm --workspace @deskwork/studio test` — passed:
+  78 files passed, 2 skipped; 893 tests passed, 11 skipped.
+- `npm run build --workspaces --if-present` — passed for core, CLI,
+  and Studio.
+- `tsx scripts/smoke-phase4-issues.mjs` — passed. It reports two
+  informational `orphan-frontmatter-id` findings in the smoke fixture,
+  but the script's regression probes pass.
+- `tsx scripts/smoke-phase4-migration.mjs` — passed and idempotent.
+- `npm pack --dry-run --workspace @deskwork/core` — passed; tarball
+  includes `dist/doctor/rules/lane-config-missing-template.{js,ts,d.ts}`.
+- `npm pack --dry-run --workspace @deskwork/cli` — passed; tarball
+  includes `dist/commands/{lane,pipeline}.js`.
+- `npm pack --dry-run --workspace @deskwork/studio` — passed; tarball
+  includes `dist/pages/pipelines/*`.
+
+Track 2 spec-compliance review: one medium finding.
+Track 3 code-quality review: no blocking/high findings beyond the same
+repair-choice correctness gap.
+
+### AUDIT-20260529-08 — Doctor repair prompt can offer malformed template ids
+
+Finding-ID: AUDIT-20260529-08
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:214-220`,
+            `packages/core/src/pipelines/loader.ts:267-280`,
+            `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:331`
+
+Task 6.5.2 says the prompt plan offers one `set-template-<id>` choice per
+resolvable preset/override. The implementation builds those choices from
+`listAvailablePipelineTemplates(ctx.projectRoot)`, whose documented
+contract intentionally does not validate templates and includes malformed
+override JSON so UI pickers can show "this id exists but won't load".
+
+Actual result: if `.deskwork/pipelines/broken.json` is malformed, the
+doctor repair prompt can still offer `set-template-broken`. Choosing it
+then fails later in `apply()` when `loadPipelineTemplate()` revalidates
+the template. The late refusal prevents data loss, but the repair prompt
+is not actionable and violates the "resolvable preset/override" contract.
+
+Expected: `plan()` should filter choices through `loadPipelineTemplate()`
+and include only template ids that resolve at plan time, while still
+retaining the apply-time revalidation for races between planning and
+applying. Add a fixture where one valid template and one malformed
+override exist, then assert the malformed id is not present in the repair
+choices.
+
+### AUDIT-20260529-09 — Phase 6 end-state verification passed
+
+Finding-ID: AUDIT-20260529-09
+Status:     observation (no action)
+Severity:   observation
+Surface:    Phase 6 closeout verification
+
+All controller-side gates listed in this audit section passed at
+`1e78a5e`: core/CLI/Studio tests, workspace build, Phase 4 smoke probes,
+and core/CLI/Studio package dry-runs. The one new actionable finding is
+limited to repair-choice correctness in the `lane-config-missing-template`
+doctor rule; it is not a build, packaging, or broad regression failure.
