@@ -300,11 +300,11 @@ async function resolveAndApply(
 function reportOnlySkipReason(
   rule: DoctorRule,
   _finding: import('./types.ts').Finding,
-):
-  | 'prerequisite-missing'
-  | 'editorial-decision'
-  | 'schema-rejected'
-  | 'no-action-needed' {
+): 'editorial-decision' | 'schema-rejected' {
+  // After missing-frontmatter-id was retired (#219), no bundled rule
+  // maps to 'prerequisite-missing' or 'no-action-needed' here; the
+  // surviving report-only rules resolve to one of these two. The full
+  // SkipReason union still lives in types.ts for plan-supplied reasons.
   switch (rule.id) {
     case 'slug-collision':
       // Editorial: which slug "owns" the public URL.
