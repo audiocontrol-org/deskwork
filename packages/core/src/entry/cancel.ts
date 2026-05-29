@@ -30,7 +30,7 @@ interface CancelOptions {
    * Non-group entries (no `members[]` array, or empty) ignore this
    * flag — there's nothing to cascade into.
    */
-  readonly cascade?: boolean;
+   readonly cascade?: boolean;
 }
 
 interface CancelledMember {
@@ -80,22 +80,23 @@ interface CancelResult {
 const CANCEL_STAGE = 'Cancelled';
 
 /**
- * Move an entry to the template's cancel destination (canonically
- * `Cancelled`). Records priorStage on the sidecar so a later
- * `inductEntry` can return it to the linear pipeline if the decision
- * is reversed.
+ * Internal cascade walker (Step 7.2.7, graphical-entries, GitHub
+ * #360 / AUDIT-20260529-18).
  *
- * Refuses:
- *   - terminal linear stage (e.g. `Published` for editorial) — already
- *     shipped; cancellation is meaningless.
- *   - any off-pipeline stage (e.g. `Blocked`, `Cancelled`, `Archived`)
- *     — entry is already off-pipeline.
- *   - unknown stages — surfaces the template's allowed stage list.
+ * Does everything the public `cancelEntry` did before the walker /
+ * wrapper split EXCEPT call `regenerateCalendar` — the wrapper is
+ * responsible for the single boundary regenerate. Used by the
+ * cascade walk to recursively cancel every member without N+1
+ * calendar regenerations.
  *
- * Requires the template's `offPipelineStages` to include `Cancelled`.
- * Templates that omit it raise a configuration error.
+ * Behaviour-preserving: same refusals, same `CancelResult` shape
+ * (including `cascadedMembers` / `skippedMembers` arrays when
+ * `cascade === true`), same journal events fired per entry. The
+ * only externally-observable difference is that `calendar.md` is
+ * NOT rewritten by this function; the caller must invoke
+ * `regenerateCalendar` itself to keep the calendar in sync.
  */
-export async function cancelEntry(
+async function cancelEntryWithoutCalendarRegen(
   projectRoot: string,
   opts: CancelOptions,
 ): Promise<CancelResult> {
@@ -148,11 +149,15 @@ export async function cancelEntry(
   // the caller explicitly opted in via `cascade: true`. Per the
   // universal-verb-no-cascade rule (Commandment II + PRD § Group
   // lifecycle), cancel does NOT propagate to members by default.
-  // When the flag IS set, we walk `members[]` and call back into
-  // `cancelEntry` recursively for each — recursive groups would
-  // cascade transitively, though doctor's `group-recursive` rule
-  // (Task 7.5.1) refuses that shape; the cascade here is the
-  // operator-visible behaviour the flag promises.
+  // When the flag IS set, we walk `members[]` and call THIS walker
+  // (not the public wrapper) recursively for each — recursive
+  // groups would cascade transitively, though doctor's
+  // `group-recursive` rule (Task 7.5.1) refuses that shape; the
+  // cascade here is the operator-visible behaviour the flag
+  // promises. Step 7.2.7 moved the recursive call from the public
+  // `cancelEntry` to this walker so calendar regeneration fires
+  // exactly once at the cascade boundary (the public wrapper)
+  // rather than N+1 times.
   const cascadedMembers: CancelledMember[] = [];
   const skippedMembers: SkippedMember[] = [];
   if (
@@ -190,7 +195,7 @@ export async function cancelEntry(
           });
           continue;
         }
-        const memberResult = await cancelEntry(projectRoot, {
+        const memberResult = await cancelEntryWithoutCalendarRegen(projectRoot, {
           uuid: memberUuid,
           cascade: true,
           ...(opts.reason !== undefined && { reason: opts.reason }),
@@ -221,8 +226,6 @@ export async function cancelEntry(
     }
   }
 
-  // #148: keep calendar.md in sync after every transition.
-  await regenerateCalendar(projectRoot);
   const result: CancelResult = {
     entryId: sidecar.uuid,
     fromStage: from,
@@ -230,5 +233,44 @@ export async function cancelEntry(
     ...(opts.cascade === true && { cascadedMembers }),
     ...(opts.cascade === true && { skippedMembers }),
   };
+  return result;
+}
+
+/**
+ * Move an entry to the template's cancel destination (canonically
+ * `Cancelled`). Records priorStage on the sidecar so a later
+ * `inductEntry` can return it to the linear pipeline if the decision
+ * is reversed.
+ *
+ * Refuses:
+ *   - terminal linear stage (e.g. `Published` for editorial) — already
+ *     shipped; cancellation is meaningless.
+ *   - any off-pipeline stage (e.g. `Blocked`, `Cancelled`, `Archived`)
+ *     — entry is already off-pipeline.
+ *   - unknown stages — surfaces the template's allowed stage list.
+ *
+ * Requires the template's `offPipelineStages` to include `Cancelled`.
+ * Templates that omit it raise a configuration error.
+ *
+ * Public-wrapper structure (Step 7.2.7, graphical-entries, GitHub
+ * #360 / AUDIT-20260529-18): delegates the per-entry transition (and
+ * the recursive cascade walk) to the internal
+ * `cancelEntryWithoutCalendarRegen` walker, then calls
+ * `regenerateCalendar` exactly ONCE at the cascade boundary. Prior
+ * to the split the recursive cascade re-entered the public wrapper,
+ * triggering N+1 calendar regenerations on a group with N cascaded
+ * members. The result shape, refusals, and per-entry journal
+ * semantics are unchanged.
+ */
+export async function cancelEntry(
+  projectRoot: string,
+  opts: CancelOptions,
+): Promise<CancelResult> {
+  const result = await cancelEntryWithoutCalendarRegen(projectRoot, opts);
+  // #148: keep calendar.md in sync after every transition.
+  // Step 7.2.7 boundary: a single regenerate covers the head entry
+  // AND every cascaded member, because the walker does not call
+  // regenerateCalendar itself.
+  await regenerateCalendar(projectRoot);
   return result;
 }

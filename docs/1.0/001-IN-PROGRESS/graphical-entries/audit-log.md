@@ -2406,10 +2406,10 @@ already correct (line 44 explicitly states this). The
 `cascadeFrom`-on-event feature is captured in the follow-up issue
 filed alongside this audit entry.
 
-### AUDIT-20260529-18 — `regenerateCalendar` runs N+1 times per cascade (medium, deferred)
+### AUDIT-20260529-18 — `regenerateCalendar` runs N+1 times per cascade (medium, fixed)
 
 Finding-ID: AUDIT-20260529-18
-Status:     acknowledged-2026-05-29-issue-#360
+Status:     fixed-pending-sha
 Severity:   medium
 Surface:    `packages/core/src/entry/cancel.ts:225`
 
@@ -2428,6 +2428,24 @@ regenerates once at the cascade boundary) that's bigger than this
 review-action commit. Filed as a follow-up GitHub issue against the
 graphical-entries milestone; the issue body has the recommended
 refactor shape.
+
+Resolution: Step 7.2.7 (graphical-entries workplan) lands the
+walker / wrapper split. `cancelEntryWithoutCalendarRegen` (private)
+performs the per-entry transition + journal append + sidecar write
+WITHOUT calling `regenerateCalendar`; the cascade walk recurses
+into the walker directly rather than re-entering the public
+wrapper. The public `cancelEntry` is now a thin boundary that
+delegates to the walker for the head entry (which itself walks all
+members) and then calls `regenerateCalendar` exactly ONCE. The new
+test file `packages/core/test/entry/cancel-cascade.test.ts`
+asserts the call-count invariant via
+`vi.spyOn(regenerateModule, 'regenerateCalendar')` across four
+scenarios (single-entry, 3-member cascade, mixed-skip cascade,
+non-group with cascade flag) — each expects exactly one call where
+the pre-fix shape produced N+1 / 2 / 2 respectively. All existing
+CLI cascade tests (`packages/cli/test/cancel-cascade.test.ts`)
+still pass; the `CancelResult` shape, refusals, and per-entry
+journal semantics are behavior-preserved.
 
 ### AUDIT-20260529-19 — create→list round-trip test gap (medium)
 
