@@ -3221,3 +3221,59 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - **Resume:** `/dwi` at Phase 38 sub-phase 38b — the LOW-overlap unblocked work set (20 core + 18 studio, per `38-0-blast-radius-review.md`). Start with core quick fixes #256 (CLI `--version`) → #221 → #232 → #198, then the 38c doctor-rule family (#219/#65/#223; SKIP #300 here — already fixed on the graphical-entries branch).
 - **Coordinate (#301):** #246/#230 land on `feature/graphical-entries` (verb-model rewrite), not Phase 38.
 - **Note:** the deskwork-studio still runs detached on port 47328 from this session.
+
+## 2026-05-29 (cont.): Phase 38 burndown — 38·1 + 38b + 38c-partial (clean wins; clusters held for decisions)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Resume Phase 38 via `/dwi`. Per the session-start hygiene recommendation, start at the infra prerequisite (38·1 clone-gate), then walk the core burndown sub-phases (38b quick fixes, 38c mediums) in a batched cadence the operator confirmed.
+
+**Accomplished:**
+
+- **38·1 — clone-gate gitignore (#354)** (`37683c8`, `fdc25c3`). Set `"gitignore": true` in the scope-discovery `.jscpd.json` (repo-root symlinks to it) + the adopter template seed, so the jscpd clone gate stops scanning gitignored dirs. Verified jscpd 4.2.3's option reads `cwd/.gitignore`; the real `.audiocontrol.org` reproducer is covered by `.gitignore:97`. Regression `clone-detector.gitignore.test.ts` (config-wiring assertion + cwd-scan behavior guard). Reviewed; audit-logged `AUDIT-20260529-01/02`.
+- **38b — core quick fixes.** Of the four: **#256** (CLI `--version`/`-v`/`version`) fixed (`d6d3032`) + reviewed; **#221** (dotted slugs) and **#198** (iterate `--dispositions` longform/outline) were ALREADY landed on-branch in prior commits — re-verified green (4/4, 12/12), open pending release-verification; **#232** (calendar honors per-site `calendarPath`) is the one real decision — operator chose option (b), fixed for the write sites (`517159b`) + reviewed.
+- **#232 implementation (option b).** `regenerateCalendar` + `doctor` repair now resolve `resolveCalendarPath(projectRoot, readConfig(projectRoot))` (default site — entries carry no `site` field) instead of the hardcoded `.deskwork/calendar.md`. Chose internal config-read over threading config through 5 stage-helpers (far less churn; throws if config absent — no fallback). 14 core unit tests gained a config.json fixture. Regression `calendar-path-honored.test.ts`.
+- **38c — clean self-contained wins.** **#64** (ingest derives title from first ATX heading, not just slug) fixed (`953565c`); **#58** (`/deskwork:add` → ingest redirect) prose (`411d762`); **#226** verified already-landed (`afc81e9`).
+- **Fixed the pre-existing core `tsc` debt** the operator flagged (`45af283`): 7 type errors in retired-`reviewState` test code + unused imports. Rewrote retirement tests to plant a legacy field on disk and assert absence in raw JSON (genuinely verifying stripping). core typecheck now clean (0 errors).
+- **Review cycle ran on every production commit** (`/dw-lifecycle:review` → dispatched `feature-dev:code-reviewer` through the dispatch wrapper, return-grammar validated each time). Findings were integrated or filed, never IOU'd.
+
+**Didn't Work:**
+
+- **#232 validate read-side over-reach.** First implementation also pointed `validateCalendarSidecar` at the configured path; it broke `doctor.test` (calendar-uuid-missing: a legacy row-primary calendar with no sidecars → orphans correctly flagged). Reverted to the hardcoded path: validate was ALREADY blind to custom calendarPaths, so scoping to the operator-approved write sites introduced no new divergence. The conflation of the entry-centric calendar with the legacy per-site calendar is the #234 surface question. Filed [#357](https://github.com/audiocontrol-org/deskwork/issues/357).
+- **#64 first heading extractor matched the trimmed line** — so a 4-space-indented `# x` (CommonMark indented code) was mis-read as a heading; Setext headings silently unhandled. The review caught both; fixed immediately in `ece678a` (untrimmed 0–3 space match + ATX-only documented + 3 edge-case tests).
+- **38c is much larger + more entangled than 38b.** The doctor-model cluster (#219/#65/#218) and calendar-surface cluster (#223/#234) need decisions, not code — held rather than rushed.
+
+**Course Corrections:**
+
+- **[PROCESS] Operator: "why not fix the broken test? if not now, when?"** — I'd dismissed the 7 pre-existing core `tsc` errors as out-of-scope. That's the "we'll fix it later" dodge the rules forbid once I've read them. Fixed all 7 immediately (`45af283`). Lesson: encountered-and-read inherited debt is mine to dispose now or file — not to wave off.
+- **[PROCESS] Operator chose option (b) for #232** via AskUserQuestion — I'd surfaced the architecture fork rather than guess (the issue itself escalates it). Correct boundary: operator owns the deprecate-vs-keep-a-required-config-key call.
+- **[PROCESS] Held the 38c clusters for decisions** rather than piecemeal — the #232 validate over-reach was a live lesson in not conflating surfaces before the design question is settled.
+
+**Quantitative:**
+
+- Commits this session: 11 (5 fix + 1 tsc-cleanup + 5 docs/review-record).
+- Issues fixed (pending release-verification): #354, #256, #232 (write sites), #64, #58. Verified already-landed: #221, #198, #226.
+- Issues filed this session (mine): #357 (validate read-side), #358 (writeSidecar hardening) — both review residuals, tracked not IOU'd. (The session-end-hygiene helper's list also shows #355/#356/#359/#360 — those are NOT this session's work; merge-range / same-GitHub-user noise, the #340-shaped scoping bug.)
+- Sub-agent dispatches: 4 `feature-dev:code-reviewer` (38·1, #256, #232+tsc, #64) — all wrapper-validated.
+- Test posture: core 530/530, cli 216 passed, core+cli tsc 0 errors.
+- Releases: 0.
+
+**Insights:**
+
+- **The dispatch-wrapper review loop earns its cost.** Two review passes (#232, #64) surfaced real defects in my own new code (the validate over-reach's doctor.test break; the indented-code heading false-positive). Both would have shipped without the adversarial pass.
+- **"Open" ≠ "code not landed."** Three 38b/38c issues (#221/#198/#226) were already fixed on-branch; they stay open only because closure waits for release-verification. Triage-before-implement saved redoing them.
+- **Scope discipline cuts both ways.** #232 taught: don't EXPAND a fix into adjacent surfaces (validate) without the design decision; the tsc-debt correction taught: don't CONTRACT away inherited debt I've read. The operator owns scope; the agent's job is to surface and not pre-decide in either direction.
+
+### Hygiene observations
+
+- No NEW bare TBD/defer markers introduced this session. The session-end-hygiene helper flagged ~15 markers — all pre-existing (Phases 12–26 historical deferral prose), unrelated to Phase 38.
+- Issues filed this session by me: #357, #358 (both #232-review residuals, with full analysis). The helper's broader list (#355/#356/#359/#360) is merge-range / same-user noise from other branches, not this session.
+- 38c residuals are tracked two-track (GitHub issue + workplan): #357/#358 + the AUDIT-20260529-04/05/08 entries. No code-comment IOUs.
+
+### Next session recommendation (hygiene)
+
+- **Decisions needed first (unblock the two largest 38c clusters):** (1) **doctor-model** — patch #219's legacy `missing-frontmatter-id` rule to be stage/artifact-aware, OR retire it (option 3 in the issue) in favor of the entry-centric validators; this also frames #218 (the missing legacy→sidecars migration rule) and #65. (2) **#357 surface question** — is the entry-centric calendar the same surface as the per-site `calendarPath` or distinct? Unblocks #223/#234 + the validate read-side.
+- **#62** needs a UX call (ingest default for no-frontmatter legacy active docs).
+- **Resume (no decision needed):** `/dwi` at **#267** — CLI to enumerate pending annotations; clean self-contained medium.
+- **Note:** #357/#358 are the live review residuals; triage when the calendar/sidecar clusters are picked up.
