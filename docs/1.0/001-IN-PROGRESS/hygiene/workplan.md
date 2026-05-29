@@ -381,8 +381,15 @@ Operator decisions (locked in during definition):
 
 ### Task 6: Dogfood
 
-- [ ] Step 1: Run the worktree verb(s) against the operator's actual worktree-base directory (`~/work/deskwork-work/`). Report current state. File any friction surfaces against `tooling-feedback.md` per the scope-discovery dogfood pattern.
-- [ ] Step 2: Operator-driven dismantle pass (batched propose → review → apply) against shipped features (open-issue-tranche-cleanup, deskwork-plugin remnants, etc.). At least one full batched-proposal cycle.
+- [x] Step 1: Run the worktree verb(s) against the operator's actual worktree-base directory (`~/work/deskwork-work/`). Report current state. File any friction surfaces against `tooling-feedback.md` per the scope-discovery dogfood pattern. (Run produced 4 stale candidates + 4 keep + 1 main + 1 current. Friction filed at `tooling-feedback.md` TF-002 — runGit-contract bug in `archive-branch` preflight when composed inside `dismantle-worktrees apply`. Promoted to [#364](https://github.com/audiocontrol-org/deskwork/issues/364).)
+- [x] Step 2: Operator-driven dismantle pass (batched propose → review → apply) against shipped features (open-issue-tranche-cleanup, deskwork-plugin remnants, etc.). At least one full batched-proposal cycle. (Operator dispositioned 3 × archive-then-dismantle + 1 × skip. Initial apply hit the TF-002 bug; recovered via standalone `archive-branch` after the preflight fix landed. End state: `feature/deskwork-dw-lifecycle`, `feature/deskwork-triage`, `feature/visual-verification-gate` archived to `archived/<branch>-2026-05-29` tags pushed to origin; branches deleted locally + remotely where present; worktrees gone. `feature/studio-bridge` left in place per operator-decided skip — parked-until-security-clears exception.)
+
+**Implementation notes (Phase 11 Task 6 dogfood):**
+
+- The operator's `--threshold-count 3` default surfaced 4 stale candidates from the 10-worktree set: `deskwork-dw-lifecycle` (3/402, merged PR #172), `deskwork-triage` (1/790, merged PR #6, 32-day idle), `studio-bridge` (0/0, prunable gitdir), `visual-verification-gate` (2/82, no PR, recent activity 2 days ago).
+- Operator chose `archive-then-dismantle` for three (preserve ahead-commits via tag) and `skip` for `studio-bridge` (operator-decided parked-until-security-clears exception, per prior session journal).
+- TF-002 surfaced live: the apply step removed the worktrees but false-failed every archive step with "tag already exists" — root cause was a `runGit`-contract mismatch (`archive-branch` preflight assumes throw-on-failure; `dismantle-worktrees apply` wires the swallowing `runGitStdout`). Promoted to [#364](https://github.com/audiocontrol-org/deskwork/issues/364); Light fix landed this session + regression test in `archive-branch-preflight.test.ts`.
+- Recovery: ran `dw-lifecycle archive-branch <branch>` standalone for each of the 3 affected branches. The standalone path uses the throwing runGit contract correctly. All three archived + remotes cleaned where present.
 
 **Acceptance Criteria:**
 

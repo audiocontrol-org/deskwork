@@ -147,6 +147,29 @@ Verification: Track 1 was running the smoke script end-to-end (exits `OK`, all t
 
 ---
 
+## AUDIT-20260529-07 — Phase 11 Task 6 dogfood: archive-branch preflight runGit-contract bug
+
+Finding-ID: AUDIT-20260529-07
+Status:     fixed-pending-verification
+Severity:   high
+Surface:    plugins/dw-lifecycle/src/archive-branch/preflight.ts (`assertTagDoesNotExist`)
+
+Phase 11 Task 6 dogfood surfaced a real runGit-contract bug in `archive-branch`'s preflight: `assertTagDoesNotExist` ran `runGit(['rev-parse', '--verify', 'refs/tags/<tag>'])` and assumed THROW-on-failure semantics (exception fires when the tag doesn't exist → tag absent → preflight passes). The standalone `archive-branch` subcommand wires that throwing contract. But `dismantle-worktrees apply` calls `applyArchive` with `runGitStdout` from `subcommands/lib/process-probes.ts` — a SWALLOWING runner that catches `execFileSync` failures and returns `''`. Under that runner, the `try` block always completes silently, `exists = true` is set unconditionally, and every `archive-then-dismantle` decision false-fails before any archive tag is created.
+
+Concrete failure: ran `dismantle-worktrees apply` against 4-item proposal (3 archive-then-dismantle + 1 skip). The skip succeeded. All 3 archive-then-dismantle items failed with "Tag already exists" (tag did NOT actually exist). The worktrees were already removed (step 1 of the dismantle sequence runs before archive), leaving the operator with 3 dangling local branches + 2 still-extant remote branches + no archive tags.
+
+Confidence: 100 (reproduced + root-caused).
+
+Fix (Light): updated `assertTagDoesNotExist` to check the RETURNED value (`output.length > 0`) in addition to the try/catch. Robust against both runGit contracts. Regression test added at `archive-branch-preflight.test.ts` — "passes tag-doesnotexist when runGit returns empty on failure (swallowing variant)".
+
+Recovery: ran `dw-lifecycle archive-branch <branch>` standalone for each of the 3 affected branches (which uses the throwing runGit contract). All three archived successfully + remotes cleaned (visual-verification-gate's remote was already gone, surfaced as a non-fatal "skipped" line).
+
+Promoted to [#364](https://github.com/audiocontrol-org/deskwork/issues/364) for visibility + the Medium fix (unifying the runGit contracts) + the Heavy fix (auditing every `runGitStdout` consumer for the same latent bug shape).
+
+Verification status: `fixed-pending-verification` per the project's "issue closure requires verification in a formally-installed release" rule. The Light fix is committed; the regression test passes. Verification = re-running `dismantle-worktrees apply` with `archive-then-dismantle` decisions against a real worktree-base AFTER the fix ships in an installed release.
+
+---
+
 ## Clone-detector summary
 
 | Run | Detected | NEW | DROPPED | Notes |
