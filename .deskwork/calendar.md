@@ -38,7 +38,6 @@
 | 738b5007-c16e-4b57-9127-8184110b87dc | design-standards-rule | Design Standards Rule |  |  | manual | 2026-05-10T04:38:05.971Z |
 | 9845c268-670f-4793-b986-0433e9ef4fb9 | deskwork-plugin/prd | Prd |  | deskwork-plugin, prd, feature-tracking, internal-doc | manual | 2026-05-03T18:18:46.400Z |
 | 998b8a29-e754-4114-8998-d1aebf6f39d3 | open-issue-tranche-cleanup/prd-workplan-audit | PRD and Workplan Audit |  |  | manual | 2026-05-05T18:08:28.297Z |
-| aee9b719-7451-401e-be45-7dba8a8cd41a | hygiene/prd | Hygiene |  |  | manual | 2026-05-28T17:11:13.034Z |
 | b3f20364-969a-4004-87bd-278cd5992e3c | open-issue-tranche-cleanup/prd | open-issue-tranche-cleanup |  |  | manual | 2026-05-05T05:57:08.343Z |
 | f8fe989e-e845-4b4b-a5fb-1ef2bf77309e | thesis | Deskwork architectural thesis | The architectural commitments deskwork is built around — agent-as-primary-tool, skills do the work, operator extends via their agent. Read before touching any deskwork code. |  | manual | 2026-05-08T17:46:21.190Z |
 
@@ -48,6 +47,7 @@
 |------|------|------|------|------|------|------|
 | 49cb7baf-dc4f-4acc-a860-1fc2d2681831 | command-shortcuts/prd | Command shortcuts for dw-lifecycle |  |  | manual | 2026-05-12T04:20:48.532Z |
 | 4e4d6912-3edf-4aeb-b6ed-ba455f362f14 | scope-discovery/prd | Scope discovery — canonize audiocontrol pilot into dw-lifecycle |  |  | manual | 2026-05-26T23:38:36.086Z |
+| aee9b719-7451-401e-be45-7dba8a8cd41a | hygiene/prd | Hygiene |  |  | manual | 2026-05-29T08:45:34.846Z |
 
 ## Blocked
 

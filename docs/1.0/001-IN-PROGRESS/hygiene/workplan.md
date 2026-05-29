@@ -321,7 +321,7 @@ Operator decisions (locked in during definition):
 - [x] `RELEASING.md` documents the one-time npm-side trusted-publisher setup per package + the recovery path.
 - [ ] First real release uses the new workflow and succeeds end-to-end. Verification step closes [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project rule.
 
-## Phase 11: Stale worktree discovery + dismantle  ·  *(issue pending PRD re-approval)*
+## Phase 11: Stale worktree discovery + dismantle  ·  [#356](https://github.com/audiocontrol-org/deskwork/issues/356)
 
 **Deliverable:** mechanism to find stale worktrees in the operator's worktree-base directory and dismantle them under operator approval. Closes the fourth structural-closure asymmetry (matches GH-issue / workplan-TBD / parked-branch streams). Sibling of [#347](https://github.com/audiocontrol-org/deskwork/issues/347) — the stale-branch-sessions failure mode that motivates this phase.
 
