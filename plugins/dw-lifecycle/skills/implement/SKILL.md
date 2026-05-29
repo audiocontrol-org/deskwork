@@ -10,28 +10,38 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
 ## Steps
 
 1. Confirm slug and target version.
-2. Invoke `superpowers:subagent-driven-development` as the orchestration discipline. The skill walks the workplan, dispatching per-task subagents with full task context.
-3. For features touching existing code, dispatch `code-explorer` (from `feature-dev`) once at start to orient the agent. Skip if feature-dev not installed.
-4. For each task in the workplan:
+2. **Open-findings gate.** Before picking up the next task, run:
+
+   ```bash
+   dw-lifecycle check-open-findings --feature <slug>
+   ```
+
+   On `exit 0` (zero `Status: open` audit-log findings), proceed. On `exit 1` (one or more open findings), the verb emits a refusal message naming every open finding ID and pointing at `/dw-lifecycle:promote-findings` as the cure — STOP the skill and surface the refusal to the operator. On `exit 2` (feature root not found or argv error), surface the message and pause for operator action.
+
+   Per Phase 13's anti-deferral discipline, open findings block task pickup with no override flag in v1. The cure is to either run `/dw-lifecycle:promote-findings --feature <slug>` to scope each open finding into the workplan as a TDD-first fix task, OR (if the finding's fix has already landed) flip its audit-log status to `fixed-<sha>` and re-run the gate. Project rule cited verbatim: "broken implementation is not done — it's broken."
+3. Invoke `superpowers:subagent-driven-development` as the orchestration discipline. The skill walks the workplan, dispatching per-task subagents with full task context.
+4. For features touching existing code, dispatch `code-explorer` (from `feature-dev`) once at start to orient the agent. Skip if feature-dev not installed.
+5. For each task in the workplan:
+   - **Re-run the open-findings gate before picking up the task** (see Step 2). Findings can accrue mid-session — a per-turn audit, a closed PR's verification re-audit, an in-band judge fire — and the gate's purpose is to refuse advance the moment any open finding exists. Skipping the re-check on follow-on tasks defeats the discipline.
    - If the task involves architecture decisions, dispatch `code-architect` (from `feature-dev`) to propose 2–3 approaches before coding. Skip if feature-dev not installed.
    - If the task introduces or modifies tested code, follow `superpowers:test-driven-development` (write failing test → minimal impl → pass → commit).
    - If a step is independent of others, consider `superpowers:dispatching-parallel-agents` to fan out.
    - Every sub-agent dispatched in this loop (implementer, reviewer, code-explorer, code-architect, etc.) MUST be routed through the dispatch wrapper — see "Dispatch-wrapper engagement" below.
    - When the task body is complete, mark its checkboxes and commit.
-5. Auto-invoke scope-widen between tasks (default behavior) unless `--no-scope-widen` was passed:
+6. Auto-invoke scope-widen between tasks (default behavior) unless `--no-scope-widen` was passed:
    - Runs after the task-completion commit lands and BEFORE the next task starts.
    - When the completed task introduced NEW shapes / surfaces / primitives not enumerated in the project's existing `.dw-lifecycle/scope-discovery/scope-manifest.yaml`, invoke `dw-lifecycle scope-widen <slug> "<task brief as complaint>"` to expand the manifest. The "complaint" is the task title or workplan brief reframed as the unmet-coverage observation (e.g. `"new <NewPrimitive> surface introduced by Task N; scope-manifest needs the additional theme"`).
    - The widened scope-manifest is read by the next task's implementer brief so its dispatch sees the augmented scope context.
    - If `.dw-lifecycle/scope-discovery/` is not present in the project, the auto-invocation is silently skipped. No warning, no error — scope-discovery is opt-in per project.
-6. After each task, optionally run `/dw-lifecycle:review` or `/dw-lifecycle:audit` (does NOT block; operator chooses cadence).
+7. After each task, optionally run `/dw-lifecycle:review` or `/dw-lifecycle:audit` (does NOT block; operator chooses cadence).
    - They are synonyms. Both write findings into `audit-log.md` with stable IDs and explicit status transitions.
-7. Repeat from step 4 until all tasks done or operator pauses.
+8. Repeat from step 5 until all tasks done or operator pauses.
 
 ## Flags
 
 | Flag | Purpose |
 |---|---|
-| `--no-scope-widen` | Skip the Step 5 between-tasks auto-invocation of `scope-widen`. Use when the operator has already widened the manifest explicitly, or when the feature's tasks are all purely-additive against an already-comprehensive scope-manifest. |
+| `--no-scope-widen` | Skip the Step 6 between-tasks auto-invocation of `scope-widen`. Use when the operator has already widened the manifest explicitly, or when the feature's tasks are all purely-additive against an already-comprehensive scope-manifest. |
 
 ## When to use `--no-scope-widen`
 
@@ -140,10 +150,12 @@ Defaults at `DEFAULT_LOOP_CONFIG` in `orchestrator-loop/loop-config.ts`. Operato
 
 ## Error handling
 
+- **Open-findings gate refuses (`dw-lifecycle check-open-findings` exit 1).** STOP the skill. Surface the refusal message verbatim. The cure is `/dw-lifecycle:promote-findings --feature <slug>` to scope each open finding into the workplan as a TDD-first fix task. Per Phase 13's anti-deferral discipline there is no `--ignore-open-findings` flag — the gate is intentionally strict. If a finding is already addressed but its audit-log Status still reads `open`, flip it to `fixed-<sha>` (or `acknowledged-<ref>` with a substantive reason that passes the validator) before re-running the gate.
+- **Open-findings gate config error (`dw-lifecycle check-open-findings` exit 2).** Feature root not found OR an argv error. Surface the message; pause for operator action. Common causes: invalid slug, missing `docs/<v>/001-IN-PROGRESS/<slug>/` layout, missing `--feature` argument.
 - **feature-dev not installed.** Print one-line warning at start; agent dispatch steps that depend on it are skipped. Skill continues with single-agent fallback. Dispatch-wrapper engagement still applies to the remaining dispatches.
 - **Bug surfaces during a task.** Invoke `superpowers:systematic-debugging` before continuing the task. Don't push through with a known bug.
 - **Test failures during TDD.** Per the TDD discipline: failing test is expected before implementation. Failing tests AFTER implementation means the impl is wrong; iterate, don't bypass the test.
-- **Auto-invocation behavior (scope-widen).** When `.dw-lifecycle/scope-discovery/` is absent, the Step 5 auto-invocation is silently skipped. When present, `scope-widen` runs with default flags (dry-run is its default; `--apply` is passed when this skill invokes it because the merged manifest must be readable by the next task's implementer brief). The widen run's resulting `scope-manifest.yaml` path AND the additive-delta summary are passed into the next task's dispatched-agent context so the implementer sees the augmented scope before starting.
+- **Auto-invocation behavior (scope-widen).** When `.dw-lifecycle/scope-discovery/` is absent, the Step 6 auto-invocation is silently skipped. When present, `scope-widen` runs with default flags (dry-run is its default; `--apply` is passed when this skill invokes it because the merged manifest must be readable by the next task's implementer brief). The widen run's resulting `scope-manifest.yaml` path AND the additive-delta summary are passed into the next task's dispatched-agent context so the implementer sees the augmented scope before starting.
 - **`scope-widen` fails.** Surface the error in the next task's brief; the task still proceeds. The operator can re-run scope-widen manually (`/dw-lifecycle:scope-widen <slug> "<complaint>"`) after addressing the cause.
 - **`dw-lifecycle validate-return` exit 1.** The sub-agent's response was rejected by the dispatch grammar (missing block / forbidden phrase / skipped-audit signal / refactor-precondition violation). Re-dispatch with the same augmented prompt + a correction note that quotes the violation surfaced in the JSON. After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
 - **Orchestrator loop — judge dispatch fails.** `dw-lifecycle orchestrator-turn` exits non-zero when the in-band judge's wrapper call rejects. Surface the violation to the operator; the next turn re-runs the judge with the same input (recovery is operator-decided per the wrong-decision-recovery primitives at `recovery/`).

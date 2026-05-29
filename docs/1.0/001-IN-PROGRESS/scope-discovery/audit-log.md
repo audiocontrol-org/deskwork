@@ -354,7 +354,7 @@ Per-model durations: claude 195s / 13495 stdout bytes (8 findings + 1 framing fi
 
 ### Cross-model agreement (HIGH-confidence findings, both models found the same bug)
 
-#### AUDIT-20260529-01 — Exit-vs-close event truncation
+### AUDIT-20260529-01 — Exit-vs-close event truncation
 
 Finding-ID: AUDIT-20260529-01 (claude-exit-vs-close + codex-stream-error-race; cross-model)
 Status: fixed-08971e4
@@ -369,7 +369,7 @@ Cross-cite: codex independently flagged the same root cause from the error-handl
 
 **Fix:** attach completion logic to `child.on('close', ...)` instead; attach stream error handlers immediately after stream creation.
 
-#### AUDIT-20260529-02 — args_template validation vs spawn-cli substitution drift
+### AUDIT-20260529-02 — args_template validation vs spawn-cli substitution drift
 
 Finding-ID: AUDIT-20260529-02 (claude-args-template-substring-mismatch + codex-placeholder-contract; cross-model)
 Status: fixed-08971e4
@@ -384,7 +384,7 @@ Both models independently identified this exact failure mode (substring validati
 
 **Fix:** either (a) `buildArgs` does intra-token replace via `tok.split('{{prompt}}').join(prompt)`, or (b) validation tightens to require `{{prompt}}` as a standalone whitespace-delimited token with a clear error message rejecting embedded forms.
 
-#### AUDIT-20260529-03 — Exit-code contract drift vs PRD
+### AUDIT-20260529-03 — Exit-code contract drift vs PRD
 
 Finding-ID: AUDIT-20260529-03 (claude-exitcode-vs-prd + codex-exit-contract-drift; cross-model)
 Status: fixed-08971e4
@@ -397,7 +397,7 @@ PRD says: "CLI exit code: 0 if any model produced output; 1 if all failed." Impl
 
 **Fix:** decide which contract is authoritative + align all three. Recommended: relax `isHealthyModelRun` to "produced positive-byte stdout AND was not a spawn error / timeout" (matching the PRD's "produced output" wording).
 
-#### AUDIT-20260529-04 — Prompt-renderer is exported but not wired into the verb
+### AUDIT-20260529-04 — Prompt-renderer is exported but not wired into the verb
 
 Finding-ID: AUDIT-20260529-04 (claude-prompt-renderer-orphaned + codex-prompt-seed-override; cross-model + in-band Finding-001)
 Status: fixed-08971e4
@@ -416,7 +416,7 @@ The operator hit this in-band during the dogfood (Finding-001 — couldn't rende
 
 ### Single-model findings (claude only)
 
-#### AUDIT-20260529-05 — Timeout timer leaks on spawn-error path (~305s dangling per uninstalled CLI)
+### AUDIT-20260529-05 — Timeout timer leaks on spawn-error path (~305s dangling per uninstalled CLI)
 
 Finding-ID: AUDIT-20260529-05 (claude-timeout-leak-on-spawn-error)
 Status: fixed-08971e4
@@ -431,7 +431,7 @@ The common dogfood case is "not all three CLIs are installed" — this fires on 
 
 **Fix:** move `clearTimeout(timeoutTimer)` into `finish()` alongside the `sigkillTimer` cleanup so every settle path clears both.
 
-#### AUDIT-20260529-06 — `--prompt-file` read failure exits 1; config-error exits 2 (inconsistent usage-vs-runtime classification)
+### AUDIT-20260529-06 — `--prompt-file` read failure exits 1; config-error exits 2 (inconsistent usage-vs-runtime classification)
 
 Finding-ID: AUDIT-20260529-06 (claude-promptfile-exit-code)
 Status: fixed-08971e4
@@ -444,7 +444,7 @@ A missing/unreadable `--prompt-file` is operator-input error of the same class a
 
 **Fix:** `loadPromptText` exits 2 on file-read failure (matching the config-error path; both are pre-orchestration input validation).
 
-#### AUDIT-20260529-07 — Run-dir timestamp collision risk (second-resolution + recursive mkdir)
+### AUDIT-20260529-07 — Run-dir timestamp collision risk (second-resolution + recursive mkdir)
 
 Finding-ID: AUDIT-20260529-07 (claude-rundir-collision)
 Status: fixed-08971e4
@@ -457,7 +457,7 @@ Run-dir name is `<second-resolution-timestamp>-<feature>` + `mkdir({recursive:tr
 
 **Fix:** millisecond-resolution timestamp OR detect existing dir + suffix `-2`/`-3`.
 
-#### AUDIT-20260529-08 — Misleading comment in `orchestrateBarrage`
+### AUDIT-20260529-08 — Misleading comment in `orchestrateBarrage`
 
 Finding-ID: AUDIT-20260529-08 (claude-orchestrate-comment-drift)
 Status: fixed-08971e4
@@ -470,7 +470,7 @@ Comment reads "assemble it without the indexPath first, then patch it on after t
 
 **Fix:** align comment to actual code (or drop the inaccurate "patch on after" framing).
 
-#### AUDIT-20260529-09 — Test files for this feature were outside the audited diff (range scoping concern)
+### AUDIT-20260529-09 — Test files for this feature were outside the audited diff (range scoping concern)
 
 Finding-ID: AUDIT-20260529-09 (claude-test-files-outside-range)
 Status: informational
@@ -481,7 +481,7 @@ The audit prompt's diff excluded `*.test.ts` (I scoped narrowly to the productio
 
 ### Operator-side in-band findings during the dogfood
 
-#### AUDIT-20260529-10 — Renderer's unsubstituted-token rejection over-eager on instructional prose
+### AUDIT-20260529-10 — Renderer's unsubstituted-token rejection over-eager on instructional prose
 
 Finding-ID: AUDIT-20260529-10 (in-band Finding-001; subsumed by AUDIT-20260529-04)
 Status: fixed-08971e4
@@ -492,7 +492,7 @@ Fix note (commit `08971e4`): `rejectUnsubstitutedTokens` now scans ONLY for unsu
 
 Operator hit this in-band trying to render the prompt template — the template's instructional prose mentions `{{var}}` / `{{prompt}}` / `{{name}}` / `{{var_name}}` as documentation about the substitution mechanism. `rejectUnsubstitutedTokens` rejects ANY `{{xxx}}` substring, so it rejects the template's own instructional examples. Subsumed by AUDIT-20260529-04; fix lands together.
 
-#### AUDIT-20260529-11 — Prompt template's marker triplet pattern triples large vars
+### AUDIT-20260529-11 — Prompt template's marker triplet pattern triples large vars
 
 Finding-ID: AUDIT-20260529-11 (in-band Finding-002)
 Status: fixed-08971e4
@@ -544,12 +544,14 @@ Mapping:
 
 Fix scoping into Phase 14 — Friction-fix sweep (`workplan.md`).
 
-#### AUDIT-20260529-12 — orchestrator-turn 3/6 catalog NOTE is constant per-turn noise
+### AUDIT-20260529-12 — orchestrator-turn 3/6 catalog NOTE is constant per-turn noise
 
-Finding-ID: AUDIT-20260529-12 (imported from deskwork-plugin TF-002)
+Finding-ID: AUDIT-20260529-12
 Status:     open
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/` (the summary printer that emits the NOTE; likely `runOrchestratorTurn` in `runner.ts` or a sibling)
+
+Imported from deskwork-plugin TF-002 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`).
 
 Every `dw-lifecycle orchestrator-turn --feature <slug> --skip-judge --skip-auditor` invocation emits the identical stderr summary: `NOTE: only 3/6 catalog files present (anti-patterns.yaml, adopter-manifests.yaml, clones.yaml). 0 new audit entries; 0 wrong-decisions; ...`. The NOTE never changes between turns when the project has a steady-state catalog count and carries no actionable signal — it dilutes the genuinely-variable parts of the summary.
 
@@ -559,12 +561,14 @@ Suggested fix (from TF-002):
 
 Scoped into workplan: Phase 14 Task 1 (fix-finding-AUDIT-20260529-12).
 
-#### AUDIT-20260529-13 — dispatch-wrapper wrap-prompt round-trip + grammar false-positives
+### AUDIT-20260529-13 — dispatch-wrapper wrap-prompt round-trip + grammar false-positives
 
-Finding-ID: AUDIT-20260529-13 (imported from deskwork-plugin TF-003; co-tracked with AUDIT-20260529-14 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362))
+Finding-ID: AUDIT-20260529-13
 Status:     open
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts`, `plugins/dw-lifecycle/src/subcommands/wrap-prompt.ts`, `plugins/dw-lifecycle/src/subcommands/validate-return.ts`
+
+Imported from deskwork-plugin TF-003 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`). Co-tracked with AUDIT-20260529-14 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362).
 
 Every `/dw-lifecycle:review` reviewer dispatch requires a hand-managed round-trip: `mktemp` a prompt file → Write the prompt body into it → `dw-lifecycle wrap-prompt --prompt-file <path>` → paste the (120+ line) wrapped stdout into the Agent tool. The wrapped suffix's return grammar has three sharp edges that recur per session: the Searched-count noun whitelist (`5 issues found` rejected; must end in `matches`/`hits`/...), mandatory `path:LINE` on every Excluded entry (`:1` sentinel for whole-file), and a forbidden-substring list that collides with ordinary descriptive prose (`stub` / `placeholder` / `pending` in a reason trips the deferral detector even in non-deferral usage).
 
@@ -577,12 +581,14 @@ Suggested fix (from TF-003 / #362):
 
 Scoped into workplan: Phase 14 Task 2 (fix-finding-AUDIT-20260529-13) — covers Medium grammar relaxation; Light stdin fix lives in Task 3 below.
 
-#### AUDIT-20260529-14 — validate-return has no stdin path
+### AUDIT-20260529-14 — validate-return has no stdin path
 
-Finding-ID: AUDIT-20260529-14 (imported from deskwork-plugin TF-004; co-tracked with AUDIT-20260529-13 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362))
+Finding-ID: AUDIT-20260529-14
 Status:     open
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/validate-return.ts`
+
+Imported from deskwork-plugin TF-004 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`). Co-tracked with AUDIT-20260529-13 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362).
 
 Validating each reviewer return requires writing the agent's Searched / Included / Excluded block to a temp file, then `dw-lifecycle validate-return --response-file <path> --json`. There's no stdin path (`--response-file -`), so the response can't be piped; it must round-trip through a temp file the orchestrator hand-creates.
 
@@ -592,12 +598,14 @@ Suggested fix (from TF-004): accept `--response-file -` (read from stdin). Mirro
 
 Scoped into workplan: Phase 14 Task 3 (fix-finding-AUDIT-20260529-14).
 
-#### AUDIT-20260529-15 — clone gate scanned gitignored directories until `gitignore: true` set
+### AUDIT-20260529-15 — clone gate scanned gitignored directories until `gitignore: true` set
 
-Finding-ID: AUDIT-20260529-15 (imported from deskwork-plugin TF-005)
+Finding-ID: AUDIT-20260529-15
 Status:     fixed-37683c8
 Severity:   low
 Surface:    `plugins/dw-lifecycle/templates/scope-discovery/.jscpd.json`, scope-discovery's own `.jscpd.json`
+
+Imported from deskwork-plugin TF-005 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`).
 
 Fix landed on `feature/deskwork-plugin` at commit `37683c8` ("fix(38·1): clone gate honors .gitignore — set gitignore:true (#354)"). Sets `"gitignore": true` in the scope-discovery `.jscpd.json` + the adopter template seed; regression at `clone-detector.gitignore.test.ts`. Closes pilot-reported [#354](https://github.com/audiocontrol-org/deskwork/issues/354) (issue stays open per closure-requires-verified-release rule).
 

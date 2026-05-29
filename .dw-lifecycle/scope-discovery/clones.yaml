@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T09:38:31.506Z
+generated_at: 2026-05-29T18:07:49.549Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1141,6 +1141,13 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:155:161
     disposition: keep-with-reason
     reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
+  - id: 0cfcd1c934fd
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:151:162
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:378:389
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (parseFlags + help + projectRoot resolution + run() call) recurs across every dw-lifecycle subcommand by convention; each verb owns its own entry point per existing pattern. Extracting a helper here would couple all subcommands to a single signature for marginal DRY gain on ~12 lines.
   - id: 13b12da5062e
     lines: 28
     members:

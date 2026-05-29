@@ -36,6 +36,7 @@ import { debtReport } from './subcommands/debt-report.js';
 import { triageIssues } from './subcommands/triage-issues.js';
 import { promoteDeferrals } from './subcommands/promote-deferrals.js';
 import { promoteFindings } from './subcommands/promote-findings.js';
+import { checkOpenFindingsCli } from './subcommands/check-open-findings.js';
 import { archiveBranch } from './subcommands/archive-branch.js';
 import { closeShipped } from './subcommands/close-shipped.js';
 import { sessionEndHygiene } from './subcommands/session-end-hygiene.js';
@@ -92,6 +93,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'triage-issues': triageIssues,
   'promote-deferrals': promoteDeferrals,
   'promote-findings': promoteFindings,
+  'check-open-findings': checkOpenFindingsCli,
   'archive-branch': archiveBranch,
   'close-shipped': closeShipped,
   'session-end-hygiene': sessionEndHygiene,

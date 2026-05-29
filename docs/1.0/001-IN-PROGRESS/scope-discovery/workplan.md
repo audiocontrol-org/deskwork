@@ -794,21 +794,26 @@ NEW skill + CLI verb that walks `audit-log.md` for `Status: open` entries on the
 
 Augment `/dw-lifecycle:implement` to refuse picking up the next task while the current feature has any `Status: open` audit-log findings. Strict; no override flag in v1.
 
-- [ ] Step 1: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/open-findings-gate.ts` — pure function `checkOpenFindings({featureSlug, repoRoot}): Promise<OpenFindingsGateResult>`. Returns `{ allowed: true }` when zero open findings; returns `{ allowed: false, openFindings: [...] }` when ≥1.
-- [ ] Step 2: Wire the gate into `subcommands/implement.ts` (or wherever the `/dw-lifecycle:implement` skill's helper lives) at task-pickup time. On `{ allowed: false }`, emit the refusal message:
+- [x] Step 1: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/open-findings-gate.ts` — pure function `checkOpenFindings({featureSlug, repoRoot}): Promise<OpenFindingsGateResult>`. Returns `{ allowed: true }` when zero open findings; returns `{ allowed: false, openFindings: [...] }` when ≥1.
+- [x] Step 2: Wire the gate into the `/dw-lifecycle:implement` skill via a NEW CLI verb `dw-lifecycle check-open-findings --feature <slug>` at `plugins/dw-lifecycle/src/subcommands/check-open-findings.ts` (no `subcommands/implement.ts` exists because `/dw-lifecycle:implement` is a skill not a TS subcommand — the gate is a CLI verb the SKILL.md invokes). On `{ allowed: false }`, emits the refusal message:
   ```
-  Cannot advance: feature <slug> has N open audit findings (AUDIT-XX-XX, AUDIT-YY-YY). 
+  Cannot advance: feature <slug> has N open audit findings (AUDIT-XX-XX, AUDIT-YY-YY).
   Open findings block task pickup per project rule "broken implementation is not done."
   Run `/dw-lifecycle:promote-findings --feature <slug>` to scope into workplan before continuing.
   ```
-  Exit 1.
-- [ ] Step 3: Update SKILL.md prose to document the gate + the cure (`promote-findings` workflow).
-- [ ] Step 4: Tests: gate-allowed-on-zero-open; gate-refuses-on-one-open; gate-refuses-with-multiple; refusal message includes all finding IDs + the suggested cure.
+  Exits 1. Exit 2 on feature-not-found / argv error.
+- [x] Step 3: Updated `plugins/dw-lifecycle/skills/implement/SKILL.md` — new Step 2 documents the gate + the cure (`promote-findings` workflow), Step 5's per-task loop re-runs the gate before each task pickup (findings can accrue mid-session), Error-handling block names the exit-1 (refusal) + exit-2 (config error) shapes. Step numbering renumbered through Step 8.
+- [x] Step 4: 18 tests — 7 library scenarios at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/open-findings-gate.test.ts` (allowed-zero-open, allowed-no-auditlog, refused-single, refused-multiple-with-ordering, throws-feature-missing, throws-docs-missing, 0.x version fallback), 11 CLI scenarios at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-open-findings-cli.test.ts` (parseFlags cases + exit-0/1/2 surfaces + refusal-message naming + multi-finding count + --repo-root override). Cited refusal-message assertions verify EVERY open finding ID is named + the `/dw-lifecycle:promote-findings` cure is cited. Plugin suite at 2115/2115 (2097 baseline + 18 new).
 
 **Acceptance Criteria:**
-- [ ] `/dw-lifecycle:implement` refuses to advance when ≥1 open finding exists on the current feature.
-- [ ] Refusal message names the open findings + points at `promote-findings`.
-- [ ] No `--ignore-open-findings` flag in v1. (Per operator decision: err on rigidity; revisit if unworkable.)
+- [x] `/dw-lifecycle:implement` refuses to advance when ≥1 open finding exists on the current feature.
+- [x] Refusal message names the open findings + points at `promote-findings`.
+- [x] No `--ignore-open-findings` flag in v1. (Per operator decision: err on rigidity; revisit if unworkable.)
+
+**Notes:**
+
+- Smoke-verified live on `feature/scope-discovery` itself: `dw-lifecycle check-open-findings --feature scope-discovery` exits 1 and names AUDIT-20260529-12 + AUDIT-20260529-13 + AUDIT-20260529-14 (the Phase 14 imports from `feature/deskwork-plugin` TF log). The cure is to walk Phase 14 Tasks 1-3 (the fixes) before resuming Phase 13 Task 3+ work, OR run `/dw-lifecycle:promote-findings --feature scope-discovery` (which is a no-op against AUDIT-12/13/14 since Phase 14 already scoped them).
+- Side fix landed in the same commit: the existing AUDIT-20260529-01..11 entries (Phase 12 audit-barrage findings) were authored with `#### ...` headers (4-hash). The audit-log parser's `HEADING_LINE_RE = /^###\s+(.+?)\s*$/` only matches 3-hash. Those 11 entries were silently unparseable. Re-leveled to `###` along with AUDIT-20260529-12..15 so the parser sees them all. Functional impact zero (all 11 were Status: fixed-08971e4 or informational, never surfacing as `open`), but parser-correctness fix worth landing.
 
 ### Task 3: TDD-enforcement mechanical check
 
