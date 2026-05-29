@@ -387,3 +387,31 @@ Operator decisions (locked in during definition):
 - [ ] Vitest unit + integration tests against fixture worktree layouts. Smoke test in `scripts/smoke-hygiene.sh`.
 - [ ] Adopter docs: README + per-skill SKILL.md + agent-discipline.md § Closure extension.
 - [ ] Dogfood pass against the operator's actual worktree-base ran one full batched-proposal cycle.
+
+## Phase 12: session-end-hygiene "issues filed this session" scoping fix  ·  [#361](https://github.com/audiocontrol-org/deskwork/issues/361)
+
+**Deliverable:** the "issues filed this session" observation block in `session-end-hygiene` reports issues the current session actually touched — not every issue the same GitHub user filed inside the session-boundary time window. Closes a recurring #340-shaped scoping bug that has bitten at least two consecutive deskwork-plugin sessions; surfaced from the `deskwork-plugin` dogfood tooling-feedback log (TF-001) and promoted to [#361](https://github.com/audiocontrol-org/deskwork/issues/361) per the agent-discipline rule's recurring-pattern trigger.
+
+### Task 1: Fix the issues-filed scoping in `session-end-hygiene`
+
+- [ ] Step 1: In `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts`, replace the bare `gh issue list --author @me --search "created:>=<iso>"` sweep (currently around line 301–315) with a session-scoped filter. Choose between:
+  - **Light:** keep the gh query as a coarse filter, then AND-intersect with the set of `#NNN` references parsed from `git log <sessionStartSha>..HEAD` commit subjects + bodies. Only issues that BOTH satisfy `created:>=<iso>` AND appear in a session commit's `#NNN` references count as "filed this session."
+  - **Medium:** drop the gh-side time-window query entirely; derive the list purely from `#NNN` references in `git log <sessionStartSha>..HEAD` (then `gh issue view <N>` per referenced number to get title + state). The commit range is the authoritative record of what the session touched.
+  Operator decision captured in the implementation thread; default to **Medium** if no preference surfaces (drops the same-user assumption entirely; commit-range is the truth source).
+- [ ] Step 2: Apply the same scoping principle to the "Address TBD markers" observation stream (`scanWorkplanTBDs` callsite + renderer). Only report markers introduced by the session diff (`git diff <sessionStartSha>..HEAD -- '<workplan-glob>'`), not every pre-existing TBD in the whole-file scan. Per #361's follow-up note.
+- [ ] Step 3: Update vitest coverage. New cases: (a) two same-user issues filed in the time window where ONE is referenced by a session commit and ONE is not → block lists only the referenced one; (b) a `#NNN` reference appearing in a commit body (not subject) is still picked up; (c) the TBD-scanner reports only markers introduced by the session diff, not pre-existing prose; (d) no-SHA fallback still works (no false-positive sweep when `--session-start-sha` is omitted).
+- [ ] Step 4: SKILL.md update for `session-end` — adopter-facing prose names the new commit-range-driven scoping (replaces the prior "since the last git fetch" no-SHA fallback wording where appropriate).
+
+**Acceptance Criteria:**
+
+- [ ] `dw-lifecycle session-end-hygiene --slug <s> --session-start-sha <sha>` reports only issues referenced (`#NNN`) by a commit in `<sha>..HEAD`, not every same-user issue in the time window.
+- [ ] "Address TBD markers" reports markers introduced by the session diff, not pre-existing whole-file prose.
+- [ ] Vitest coverage for the four cases above passes; full plugin suite remains green.
+- [ ] Re-running `dw-lifecycle session-end-hygiene` against this hygiene session at the time of #361's fix produces a signal-only block (no merge-range / same-user noise).
+
+**Provenance:**
+
+- Surfaced via the `deskwork-plugin` tooling-feedback log: `docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` TF-001 (recurring across two deskwork-plugin sessions).
+- Promoted to [#361](https://github.com/audiocontrol-org/deskwork/issues/361) per the agent-discipline rule's "recurring cross-session pattern → promote" trigger.
+- Code path: `session-end-hygiene.ts:282–334` (gh query + observation builder); the no-SHA fallback path lives in `resolveSessionBoundaryIso` and stays as-is.
+- Adjacent infrastructure friction surfaced in the same dogfood (TF-003 + TF-004, promoted to [#362](https://github.com/audiocontrol-org/deskwork/issues/362) — `wrap-prompt` / `validate-return` round-trip ergonomics) is dw-lifecycle infra, not hygiene-feature work; not in scope for this phase.
