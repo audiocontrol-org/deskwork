@@ -65,6 +65,9 @@ const BANNED_PHRASES: readonly BannedPhraseRule[] = [
   { display: 'next sprint', match: { kind: 'substring', value: 'next sprint' } },
   { display: 'next cycle', match: { kind: 'substring', value: 'next cycle' } },
   { display: 'next milestone', match: { kind: 'substring', value: 'next milestone' } },
+  // 'deferred to v<N>' (PRD-named) before bare 'deferred' so the more-
+  // specific match fires first and surfaces the PRD-mandated display name.
+  { display: 'deferred to v<N>', match: { kind: 'regex', pattern: /\bdeferred to v\d+/i } },
   { display: 'deferred', match: { kind: 'substring', value: 'deferred' } },
   { display: 'todo', match: { kind: 'regex', pattern: /\btodo\b/i } },
   { display: 'fixme', match: { kind: 'regex', pattern: /\bfixme\b/i } },
@@ -86,11 +89,12 @@ const BANNED_PHRASES: readonly BannedPhraseRule[] = [
   { display: 'until v<version>', match: { kind: 'regex', pattern: /until v\d+/i } },
 
   // ===== Phase 13 PRD additions =====
-  // P13: from the task brief's "banned list MUST INCLUDE" list.
+  // P13: from the task brief's "banned list MUST INCLUDE" list. The
+  // 'deferred to v<N>' entry was promoted into the hygiene-canon section
+  // above (before bare 'deferred') so the more-specific match fires first.
   { display: 'TODO', match: { kind: 'regex', pattern: /\bTODO\b/i } },
   { display: 'non-trivial', match: { kind: 'regex', pattern: /\bnon-trivial\b/i } },
   { display: 'future work', match: { kind: 'substring', value: 'future work' } },
-  { display: 'deferred to v<N>', match: { kind: 'regex', pattern: /\bdeferred to v\d+/i } },
   { display: 'not in scope', match: { kind: 'substring', value: 'not in scope' } },
   { display: 'come back to', match: { kind: 'substring', value: 'come back to' } },
 ];

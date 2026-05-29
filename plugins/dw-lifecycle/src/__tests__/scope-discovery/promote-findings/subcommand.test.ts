@@ -495,4 +495,57 @@ describe('runPromoteFindings — apply-mode round-trip', () => {
       fix4.cleanup();
     }
   });
+
+  it('rejects an informational disposition with a blank rationale', async () => {
+    const fix5 = makeFixture();
+    try {
+      const proposalFs = new Map<string, string>();
+      const outputPath = join(fix5.root, 'p5.json');
+      const proposeRun = makeRunArgs(
+        {
+          verb: 'propose',
+          featureSlug: fix5.featureSlug,
+          bucket: 'open',
+          limit: 10,
+          outputPath,
+        },
+        fix5,
+        proposalFs,
+      );
+      await runPromoteFindings(proposeRun.args);
+      const raw = proposalFs.get(outputPath);
+      if (raw === undefined) throw new Error('no proposal written');
+      const proposal: unknown = JSON.parse(raw);
+      const items = asItemArray(proposal);
+      const first = items[0];
+      if (first === undefined) throw new Error('no first item');
+      first.disposition = 'informational';
+      first.fields = { rationale: '   ' };
+      proposalFs.set(outputPath, `${JSON.stringify(proposal, null, 2)}\n`);
+      const applyRun = makeRunArgs(
+        {
+          verb: 'apply',
+          featureSlug: fix5.featureSlug,
+          proposalPath: outputPath,
+          startingTaskNumber: '13.7',
+        },
+        fix5,
+        proposalFs,
+      );
+      const exit = await runPromoteFindings(applyRun.args);
+      expect(exit).toBe(1);
+      // No audit-log write should have happened.
+      const auditLogPath = join(
+        fix5.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        fix5.featureSlug,
+        'audit-log.md',
+      );
+      expect(applyRun.diskWrites.has(auditLogPath)).toBe(false);
+    } finally {
+      fix5.cleanup();
+    }
+  });
 });

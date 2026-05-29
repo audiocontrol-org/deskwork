@@ -190,3 +190,77 @@ describe('applyStatusFlips — wraps flipAuditLogStatus + writes', () => {
     expect(called).toBe(false);
   });
 });
+
+describe('findStatusLineForEntry — field-block boundary (regression for body-prose false-match)', () => {
+  it('does not match a Status: line that appears in body prose AFTER the field block', async () => {
+    // Entry where the canonical Status: is followed by body prose that
+    // itself contains a line starting with "Status:" (a quoted example).
+    // The editor must flip the canonical Status: open, NOT the body line.
+    const content = [
+      '# Audit Log',
+      '',
+      '### Body-Status finding',
+      '',
+      'Finding-ID: AUDIT-BSF',
+      'Status:     open',
+      'Severity:   medium',
+      '',
+      'Before the fix the sidecar carried this shape:',
+      '',
+      'Status:     example-value-from-body-prose',
+      '',
+      'After the fix it carries Status: fixed-deadbeef.',
+    ].join('\n');
+    const { newContent } = await flipAuditLogStatus({
+      auditLogPath: '/tmp/al.md',
+      flips: [{ findingId: 'AUDIT-BSF', newStatus: 'acknowledged-#777' }],
+      read: makeRead(content),
+    });
+    // Field flipped:
+    expect(newContent).toContain('Status:     acknowledged-#777\nSeverity:   medium');
+    // Body line PRESERVED verbatim:
+    expect(newContent).toContain('Status:     example-value-from-body-prose');
+    expect(newContent).toContain('After the fix it carries Status: fixed-deadbeef.');
+  });
+
+  it('walks past intervening field lines (Severity, Surface) to find Status when reordered', async () => {
+    const content = [
+      '# Audit Log',
+      '',
+      '### Reordered fields',
+      '',
+      'Finding-ID: AUDIT-RF',
+      'Severity:   high',
+      'Surface:    file.ts:42',
+      'Status:     open',
+      '',
+      'Body content.',
+    ].join('\n');
+    const { newContent } = await flipAuditLogStatus({
+      auditLogPath: '/tmp/al.md',
+      flips: [{ findingId: 'AUDIT-RF', newStatus: 'informational' }],
+      read: makeRead(content),
+    });
+    expect(newContent).toContain('Status:     informational');
+    expect(newContent).toContain('Severity:   high');
+    expect(newContent).toContain('Body content.');
+  });
+
+  it('refuses to flip when entry has no Status: line in its field block', async () => {
+    const content = [
+      '### No-status finding',
+      '',
+      'Finding-ID: AUDIT-NS',
+      'Severity:   low',
+      '',
+      'Body has Status: open but it is body, not a field.',
+    ].join('\n');
+    await expect(
+      flipAuditLogStatus({
+        auditLogPath: '/tmp/al.md',
+        flips: [{ findingId: 'AUDIT-NS', newStatus: 'informational' }],
+        read: makeRead(content),
+      }),
+    ).rejects.toBeInstanceOf(AuditLogEditError);
+  });
+});

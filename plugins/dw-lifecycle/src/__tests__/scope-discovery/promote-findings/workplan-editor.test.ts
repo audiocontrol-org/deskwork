@@ -219,3 +219,107 @@ describe('applyTaskBlocks — wraps insertTaskBlock + writes', () => {
     expect(writeCalled).toBe(false);
   });
 });
+
+describe('insertTaskBlock — idempotency on partial-apply re-run', () => {
+  it('skips findings whose (fix-finding-<id>) marker is already in the workplan', async () => {
+    // First insert AUDIT-1, then re-invoke with both AUDIT-1 + AUDIT-2.
+    // AUDIT-1 should be skipped (already present); AUDIT-2 should land.
+    const wp = workplanFixture();
+    const first = await insertTaskBlock({
+      workplanPath: '/tmp/t.md',
+      insertions: [
+        {
+          findingId: 'AUDIT-1',
+          taskBlock: '### Task 13.2 (fix-finding-AUDIT-1): one',
+          phaseHeading: '## Phase 13: Audit-finding lifecycle',
+          insertAfterLine: 7,
+        },
+      ],
+      read: makeRead(wp),
+    });
+    const second = await insertTaskBlock({
+      workplanPath: '/tmp/t.md',
+      insertions: [
+        {
+          findingId: 'AUDIT-1',
+          taskBlock: '### Task 13.2 (fix-finding-AUDIT-1): one-DUP',
+          phaseHeading: '## Phase 13: Audit-finding lifecycle',
+          insertAfterLine: 7,
+        },
+        {
+          findingId: 'AUDIT-2',
+          taskBlock: '### Task 13.3 (fix-finding-AUDIT-2): two',
+          phaseHeading: '## Phase 13: Audit-finding lifecycle',
+          insertAfterLine: 7,
+        },
+      ],
+      read: makeRead(first.newContent),
+    });
+    // AUDIT-1 NOT double-inserted: only ONE occurrence of the marker.
+    const occurrences = (second.newContent.match(/fix-finding-AUDIT-1/g) ?? []).length;
+    expect(occurrences).toBe(1);
+    // AUDIT-1 keeps its original block text; the -DUP variant must not appear.
+    expect(second.newContent).toContain('one');
+    expect(second.newContent).not.toContain('one-DUP');
+    // AUDIT-2 landed.
+    expect(second.newContent).toContain('fix-finding-AUDIT-2');
+  });
+
+  it('returns original content (no-op) when every insertion is already present', async () => {
+    const wp = workplanFixture();
+    const first = await insertTaskBlock({
+      workplanPath: '/tmp/t.md',
+      insertions: [
+        {
+          findingId: 'AUDIT-A',
+          taskBlock: '### Task 13.2 (fix-finding-AUDIT-A): a',
+          phaseHeading: '## Phase 13: Audit-finding lifecycle',
+          insertAfterLine: 7,
+        },
+      ],
+      read: makeRead(wp),
+    });
+    const second = await insertTaskBlock({
+      workplanPath: '/tmp/t.md',
+      insertions: [
+        {
+          findingId: 'AUDIT-A',
+          taskBlock: '### Task 13.2 (fix-finding-AUDIT-A): a-DUP',
+          phaseHeading: '## Phase 13: Audit-finding lifecycle',
+          insertAfterLine: 7,
+        },
+      ],
+      read: makeRead(first.newContent),
+    });
+    expect(second.newContent).toBe(first.newContent);
+  });
+});
+
+describe('insertTaskBlock — deterministic order when insertAfterLine values are equal', () => {
+  it('preserves input-array order as a stable tiebreaker', async () => {
+    const wp = workplanFixture();
+    const insertions: WorkplanInsertion[] = [
+      {
+        findingId: 'AUDIT-FIRST',
+        taskBlock: '### Task 13.2 (fix-finding-AUDIT-FIRST): first',
+        phaseHeading: '## Phase 13: Audit-finding lifecycle',
+        insertAfterLine: 7,
+      },
+      {
+        findingId: 'AUDIT-SECOND',
+        taskBlock: '### Task 13.3 (fix-finding-AUDIT-SECOND): second',
+        phaseHeading: '## Phase 13: Audit-finding lifecycle',
+        insertAfterLine: 7,
+      },
+    ];
+    const { newContent } = await insertTaskBlock({
+      workplanPath: '/tmp/t.md',
+      insertions,
+      read: makeRead(wp),
+    });
+    const firstIdx = newContent.indexOf('AUDIT-FIRST');
+    const secondIdx = newContent.indexOf('AUDIT-SECOND');
+    expect(firstIdx).toBeGreaterThan(0);
+    expect(secondIdx).toBeGreaterThan(firstIdx);
+  });
+});

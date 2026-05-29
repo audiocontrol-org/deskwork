@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T09:27:34.867Z
+generated_at: 2026-05-29T09:38:31.506Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -700,28 +700,28 @@ clones:
     lines: 11
     members:
       - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:112:122
-      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:113:123
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:117:127
     disposition: keep-with-reason
     reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; cross-skill import would couple dw-lifecycle hygiene canon to scope-discovery anti-deferral contract.
-  - id: e894df0cc21f
-    lines: 18
+  - id: 7632ba487d34
+    lines: 15
     members:
-      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:38:55
-      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:54:71
-    disposition: pending
-    reason: null
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:38:52
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:54:68
+    disposition: keep-with-reason
+    reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; clone shifted post-review-fix reordering deferred-to-vN before deferred.
   - id: 2781f314de77
     lines: 7
     members:
       - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:77:83
-      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:79:85
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:82:88
     disposition: keep-with-reason
     reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; cross-skill import would couple dw-lifecycle hygiene canon to scope-discovery anti-deferral contract.
   - id: 24dde2d5a138
     lines: 11
     members:
       - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:88:98
-      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:95:105
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:99:109
     disposition: keep-with-reason
     reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; cross-skill import would couple dw-lifecycle hygiene canon to scope-discovery anti-deferral contract.
   - id: 1801f1b7dd0b

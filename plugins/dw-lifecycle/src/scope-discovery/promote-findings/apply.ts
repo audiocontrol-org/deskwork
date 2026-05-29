@@ -181,7 +181,12 @@ function preValidate(args: ApplyProposalArgs): PreValidated {
       return;
     }
     // informational
-    asInformationalFields(item.fields);
+    const infoFields = asInformationalFields(item.fields);
+    if (infoFields.rationale.trim() === '') {
+      throw new ApplyProposalError(
+        `item ${idx + 1} (finding ${item.finding.findingId}) informational rationale is empty; supply a non-empty rationale or pick a different disposition.`,
+      );
+    }
     flips.push({
       findingId: item.finding.findingId,
       newStatus: 'informational',
@@ -213,13 +218,28 @@ export async function applyProposal(args: ApplyProposalArgs): Promise<ApplyResul
   }
 
   if (flips.length > 0) {
-    await applyStatusFlips({
-      auditLogPath: args.proposal.audit_log_path,
-      flips,
-      read: args.read.auditLog,
-      write: args.write.auditLog,
-    });
-    auditLogWritten = true;
+    try {
+      await applyStatusFlips({
+        auditLogPath: args.proposal.audit_log_path,
+        flips,
+        read: args.read.auditLog,
+        write: args.write.auditLog,
+      });
+      auditLogWritten = true;
+    } catch (err) {
+      // Surface the partial-apply state in the error message so the
+      // operator knows what's already durable on disk. The workplan side
+      // is idempotent on re-run (see workplan-editor's findingsAlreadyInserted
+      // filter) — re-invoking --apply with the same proposal file will
+      // skip the workplan and retry the audit-log flips.
+      const completedNote = workplanWritten
+        ? 'workplan side already written; re-run --apply (workplan inserts are idempotent) once the audit-log issue is resolved.'
+        : 'workplan side not touched.';
+      const original = err instanceof Error ? err.message : String(err);
+      throw new ApplyProposalError(
+        `audit-log apply failed: ${original}. ${completedNote}`,
+      );
+    }
   }
 
   const result: ApplyResult = {

@@ -108,6 +108,21 @@ function validateOne(
   }
 }
 
+// Idempotency guard: the rendered task block always carries
+// `(fix-finding-<findingId>):` in its heading. Re-running apply after a
+// partial-apply (workplan write succeeded; audit-log write failed) MUST
+// NOT double-insert. Scan the workplan for the marker before inserting.
+const FIX_FINDING_MARKER_RE = /\(fix-finding-([A-Z0-9-]+)\)/g;
+
+function findingsAlreadyInserted(content: string): Set<string> {
+  const found = new Set<string>();
+  for (const match of content.matchAll(FIX_FINDING_MARKER_RE)) {
+    const id = match[1];
+    if (id !== undefined) found.add(id);
+  }
+  return found;
+}
+
 export async function insertTaskBlock(
   args: InsertTaskBlockArgs,
 ): Promise<InsertTaskBlockResult> {
@@ -119,11 +134,35 @@ export async function insertTaskBlock(
     validateOne(lines, insertion);
   }
 
-  // Sort descending by insertAfterLine so later-line inserts don't
-  // shift the anchors of earlier-line inserts.
-  const sorted = [...args.insertions].sort(
-    (a, b) => b.insertAfterLine - a.insertAfterLine,
+  // Idempotency filter: drop insertions whose finding already has a
+  // `(fix-finding-<id>):` marker in the workplan. This is the recovery
+  // path for partial-apply (workplan write succeeded; audit-log write
+  // failed) — re-running apply should be a no-op on the workplan side.
+  const alreadyInserted = findingsAlreadyInserted(content);
+  const todo = args.insertions.filter(
+    (ins) => !alreadyInserted.has(ins.findingId),
   );
+
+  if (todo.length === 0) {
+    return { newContent: content };
+  }
+
+  // Sort descending by insertAfterLine so later-line inserts don't
+  // shift the anchors of earlier-line inserts. Tiebreaker: original
+  // input-array index DESCENDING — when two insertions share the same
+  // anchor, processing the higher-index item FIRST means the lower-
+  // index item gets spliced AT THE SAME POSITION later, pushing the
+  // higher-index item further down. Net result: input-array order is
+  // preserved in the output (lower input index = lower output line
+  // number). Without the tiebreaker, Array.prototype.sort's stability
+  // isn't guaranteed by spec for equal-keyed elements in older engines.
+  const indexOf = new Map<string, number>();
+  todo.forEach((ins, i) => indexOf.set(ins.findingId, i));
+  const sorted = [...todo].sort((a, b) => {
+    const delta = b.insertAfterLine - a.insertAfterLine;
+    if (delta !== 0) return delta;
+    return (indexOf.get(b.findingId) ?? 0) - (indexOf.get(a.findingId) ?? 0);
+  });
 
   const out = [...lines];
   for (const insertion of sorted) {

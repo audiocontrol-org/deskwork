@@ -74,10 +74,19 @@ function findFindingIdLine(
   return null;
 }
 
+// Field-line shape `<FieldName>: <value>`. Matches the audit-log-parser's
+// FIELD_LINE_RE so the field-block boundary detection here stays in sync
+// with how the parser sees entries.
+const FIELD_LINE_RE = /^([A-Za-z][A-Za-z0-9 -]+):\s*(.*)$/;
+
 // Locate the `Status:` line within the SAME entry block as the
 // Finding-ID line. Scan downward from the line after the Finding-ID
-// line; stop at the next `### ` heading or `## ` heading (a new entry
-// or section boundary).
+// line; restrict to the FIELD BLOCK (consecutive field-shaped lines).
+// Stop at the next `### ` / `## ` heading (entry/section boundary),
+// blank line (field block ends), or non-field-shaped line (body prose
+// begins). This prevents body prose that happens to start with
+// `Status:` (e.g., quoted example output, before/after sidecar values)
+// from being mistaken for the entry's canonical Status field.
 function findStatusLineForEntry(
   lines: readonly string[],
   findingIdLineIdx: number,
@@ -86,6 +95,8 @@ function findStatusLineForEntry(
     const line = lines[i];
     if (line === undefined) continue;
     if (line.startsWith('### ') || line.startsWith('## ')) return null;
+    if (line.trim() === '') return null;
+    if (!FIELD_LINE_RE.test(line)) return null;
     if (line.startsWith('Status:')) return { lineIdx: i, line };
   }
   return null;
