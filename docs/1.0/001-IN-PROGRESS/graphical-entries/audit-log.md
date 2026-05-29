@@ -2409,7 +2409,7 @@ filed alongside this audit entry.
 ### AUDIT-20260529-18 — `regenerateCalendar` runs N+1 times per cascade (medium, fixed)
 
 Finding-ID: AUDIT-20260529-18
-Status:     fixed-pending-sha
+Status:     fixed-4e3b911
 Severity:   medium
 Surface:    `packages/core/src/entry/cancel.ts:225`
 
