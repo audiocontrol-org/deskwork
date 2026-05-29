@@ -333,14 +333,14 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 6.6: Integration test
 
-- [ ] Step 6.6.1: Tmp-fixture project; create a custom pipeline (`custom-blog` with stages "Idea → Drafting → Reviewed → Live"); create a lane bound to it; add 2 entries; archive the lane; restore; verify entries persist + state intact.
+- [x] Step 6.6.1: Tmp-fixture project; create a custom pipeline (`custom-blog` with stages "Idea → Drafting → Reviewed → Live"); create a lane bound to it; add 2 entries; archive the lane; restore; verify entries persist + state intact. (End-to-end test at `packages/cli/test/custom-pipeline-lane-integration.test.ts`; one `it()` block drives real `deskwork` CLI subprocess through pipeline create → lane create → 2-sidecar write → archive → restore → purge-refusal → state-intact-byte-compare. `pipeline update --set-locked` / `--set-off-pipeline` invoked separately since `pipeline create` doesn't accept those flags. 1/1 pass; full @deskwork/cli suite 320 → 321 pass, 0 regressions.)
 
 **Acceptance Criteria:**
 
-- [ ] Lane + pipeline CRUD CLI + studio surfaces work end-to-end.
-- [ ] Soft-archive is the default; hard delete refused when references exist.
-- [ ] Doctor surfaces orphan pipeline references with actionable repair.
-- [ ] Studio writes nothing to sidecar state — every action clipboard-copies the equivalent CLI invocation per THESIS Consequence 2.
+- [x] Lane + pipeline CRUD CLI + studio surfaces work end-to-end. (CLI exercised end-to-end via Task 6.6's integration test; studio surfaces shipped in Tasks 6.3 + 6.4 with their own test suites.)
+- [x] Soft-archive is the default; hard delete refused when references exist. (Task 6.6 step 6 asserts `lane purge` exits non-zero + lane file persists when entries are bound, naming both bound slugs in the error.)
+- [x] Doctor surfaces orphan pipeline references with actionable repair. (Task 6.5's `lane-config-missing-template` rule + 4-scenario test suite — audit-positive, set-template repair + journal, delete-lane + journal, delete-refusal-when-bound.)
+- [x] Studio writes nothing to sidecar state — every action clipboard-copies the equivalent CLI invocation per THESIS Consequence 2. (Tasks 6.3 + 6.4 — both pages render server-side then clipboard-copy the CLI verb on save/delete; no fetch/POST surfaces.)
 
 ## Phase 7: Groups — members field + CRUD + review surface + multi-lane composition  ·  [#308](https://github.com/audiocontrol-org/deskwork/issues/308)
 
