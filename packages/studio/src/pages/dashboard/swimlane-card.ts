@@ -74,7 +74,10 @@ import { renderListBody } from './swimlane-list-body.ts';
 import type { LaneBucket } from './lane-data.ts';
 import type { LaneRailRow } from './swimlane-rail.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
-import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
+import {
+  stageNameToFilesystemToken,
+  type StrictPipelineTemplate,
+} from '@deskwork/core/pipelines';
 
 /**
  * Editorial-template empty-state strings. The pre-Task-5.1 dashboard
@@ -163,7 +166,16 @@ function renderStageCol(
   // `.stage-col.locked` modifier emitted here; dashboard-swimlane.
   // css applies the colour to the stage-glyph + stage-name.
   const lockedClass = isLocked ? ' locked' : '';
-  const stageIdSlug = stage.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  // Per AUDIT-20260528-07: the previous tokenizer collapsed underscores
+  // and hyphens into the same character class, so stage names like
+  // `QA Review` and `QA_Review` (both permitted by the pipeline-template
+  // schema — see packages/core/src/pipelines/stage-token.ts:71's
+  // `[a-z0-9_-]` allowance) collided to `qa-review` and produced
+  // duplicate DOM ids on a lane carrying both. `stageNameToFilesystemToken`
+  // preserves the underscore→underscore mapping and the template-schema
+  // `uniqueTokens` refinement (types.ts:152) already rejects token-level
+  // collisions at template-load time, so DOM uniqueness rides for free.
+  const stageIdSlug = stageNameToFilesystemToken(stage);
   const laneIdSlug = laneId.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
   // Lane-scoped DOM ID is the canonical anchor — unique per multi-
   // lane page (AUDIT-20260528-05). The default editorial lane also
