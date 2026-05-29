@@ -47,7 +47,7 @@ import {
 const FOCUS_KEY_SUFFIX = ':focus';
 const VISIBILITY_KEY_SUFFIX = ':visibility';
 
-export interface SwimlaneState {
+interface SwimlaneState {
   /** Set of lane ids currently focused. */
   readonly focused: Set<string>;
   /**
@@ -242,7 +242,7 @@ function toggleFocus(
  * controller) can chain additional behavior — closing the sheet on
  * focus activation, for instance.
  */
-export type RailRowActivation = 'unhid-and-focused' | 'focus-toggled';
+type RailRowActivation = 'unhid-and-focused' | 'focus-toggled';
 
 export function handleRailRowActivation(
   state: SwimlaneState,
