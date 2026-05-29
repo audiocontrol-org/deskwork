@@ -235,6 +235,41 @@ describe('doctor: lane-config-missing-template', () => {
     expect(repairEvents[0].details.laneFilePath).toBe(laneFile);
   });
 
+  it('plan: filters malformed override ids out of set-template choices (AUDIT-20260529-08)', async () => {
+    // Dangling lane to trigger the finding.
+    writeLaneJson(fixture.root, 'dangling', {
+      id: 'dangling',
+      name: 'Dangling Lane',
+      pipelineTemplate: 'nonsense',
+      contentDir: 'docs',
+    });
+    // Malformed override under .deskwork/pipelines/broken.json —
+    // `listAvailablePipelineTemplates` will surface its basename, but
+    // `loadPipelineTemplate` rejects on the JSON parse. The plan's
+    // filter must drop it from the choices.
+    mkdirSync(join(fixture.root, '.deskwork', 'pipelines'), { recursive: true });
+    writeFileSync(
+      join(fixture.root, '.deskwork', 'pipelines', 'broken.json'),
+      '{',
+      'utf8',
+    );
+
+    const ctx = buildCtx(fixture);
+    const findings = await laneConfigMissingTemplate.audit(ctx);
+    expect(findings).toHaveLength(1);
+
+    const plan = await laneConfigMissingTemplate.plan(ctx, findings[0]);
+    if (plan.kind !== 'prompt') throw new Error('plan must be prompt');
+
+    const choiceIds = plan.choices.map((c) => c.id);
+    // Malformed id is NOT advertised.
+    expect(choiceIds).not.toContain('set-template-broken');
+    // Valid presets ARE advertised.
+    expect(choiceIds).toContain('set-template-editorial');
+    // The non-template repair path is preserved.
+    expect(choiceIds).toContain('delete-lane');
+  });
+
   it('refuses delete-lane when an entry references the lane', async () => {
     writeLaneJson(fixture.root, 'dangling', {
       id: 'dangling',

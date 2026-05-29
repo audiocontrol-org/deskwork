@@ -212,8 +212,17 @@ const rule: DoctorRule = {
       };
     }
     // Re-enumerate templates at plan time so newly-customized templates
-    // since the audit pass show up in the picker.
-    const availableTemplates = listAvailablePipelineTemplates(ctx.projectRoot);
+    // since the audit pass show up in the picker. `listAvailable…` does
+    // NOT validate; it enumerates filenames so UI pickers can advertise
+    // ids that exist on disk even when malformed. We filter through
+    // `loadPipelineTemplate` here so the prompt only offers ids that
+    // resolve cleanly — picking an unresolvable id would otherwise
+    // succeed at plan time and fail late inside `apply()` (the apply-
+    // time revalidation is intentionally retained for the audit→apply
+    // race where a template gets clobbered between phases; see
+    // AUDIT-20260529-08).
+    const availableTemplates = listAvailablePipelineTemplates(ctx.projectRoot)
+      .filter((templateId) => templateResolves(templateId, ctx.projectRoot));
     const setTemplateChoices = availableTemplates.map((templateId) => ({
       id: `set-template-${templateId}`,
       label: `Bind lane to "${templateId}" pipeline template`,
