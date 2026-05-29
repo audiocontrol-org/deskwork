@@ -24,6 +24,7 @@ import { isRetired, printRetiredError } from './commands/retired.ts';
 
 const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promise<void> }>> = {
   add: () => import('./commands/add.ts'),
+  annotations: () => import('./commands/annotations.ts'),
   approve: () => import('./commands/approve.ts'),
   block: () => import('./commands/block.ts'),
   cancel: () => import('./commands/cancel.ts'),
@@ -138,6 +139,7 @@ function printUsage(): void {
   out.write('  shortform-start enqueue a shortform draft for review\n');
   out.write('  distribute      record a posted shortform URL on the calendar\n\n');
   out.write('Maintenance:\n');
+  out.write('  annotations     list an entry\'s comments + dispositions (pending by default)\n');
   out.write('  doctor          audit / repair calendar + sidecar + frontmatter\n');
   out.write('  customize       copy a plugin default into .deskwork/<category>/<name>.ts\n');
   out.write('  repair-install  prune stale entries from Claude Code\'s plugin registry\n\n');
