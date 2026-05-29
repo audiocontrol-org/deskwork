@@ -48,9 +48,9 @@ export function initSwimlaneMobileSheet(): void {
   );
 
   // The shared controller flips `data-lane-sheet-open` on document.
-  // body; the CSS rules in dashboard-swimlane.css translate that into
-  // a slide-up reveal on the `[data-lane-sheet]` container. Local
-  // state mirrors `aria-expanded` on the trigger.
+  // body; the CSS rules in dashboard-swimlane-mobile.css translate
+  // that into a slide-up reveal on the `[data-lane-sheet]` container.
+  // Local state mirrors `aria-expanded` on the trigger.
   const sheetController = createSlideUpSheet({
     sheetEl: sheet,
     bodyOpenAttr: 'data-lane-sheet-open',

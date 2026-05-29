@@ -6,10 +6,10 @@
  *
  *   - Reads the current viewport class via
  *     `window.matchMedia('(max-width: 720px)')`. The 720px breakpoint
- *     is the existing mobile gate in `dashboard-swimlane.css` (line
- *     826 — `.bay-shell` grid collapse + lane-rail hide); reusing it
- *     here keeps the view-default switch aligned with the layout
- *     switch the operator already perceives.
+ *     is the existing mobile gate in `dashboard-swimlane-mobile.css`
+ *     (the `.bay-shell` grid collapse + lane-rail hide block);
+ *     reusing it here keeps the view-default switch aligned with the
+ *     layout switch the operator already perceives.
  *   - Reads any per-lane operator overrides from localStorage at
  *     `deskwork:dashboard:<projectKey>:view-mode` (a `Record<laneId,
  *     'kanban' | 'list'>` map).
@@ -53,8 +53,9 @@ const VIEW_MODE_KEY_SUFFIX = ':view-mode';
  * desktop-kanban defaults are the spec contract (see the brief at
  * `docs/studio-design/ACCEPTED/2026-05-27-multi-lane-dashboard-d3
  * -press-bay/brief.md` § "Implementation notes"). The 720px value
- * matches `dashboard-swimlane.css:826` so the view-default flips
- * at exactly the viewport size the layout collapses.
+ * matches the `@media (max-width: 720px)` rule in
+ * `dashboard-swimlane-mobile.css` so the view-default flips at
+ * exactly the viewport size the layout collapses.
  */
 const MOBILE_MEDIA_QUERY = '(max-width: 720px)';
 

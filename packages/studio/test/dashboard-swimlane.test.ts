@@ -237,23 +237,34 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     }
   });
 
-  it('Task 5.4: dashboard-swimlane.css ships cursor: grab on the drag handle + drop-target feedback rules', async () => {
-    const cssRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane.css'),
+  it('Task 5.4: dashboard-swimlane-{rail,drag}.css ship cursor: grab on the drag handle + drop-target feedback rules', async () => {
+    // Per AUDIT-20260528-14: rail base styles live in `dashboard-
+    // swimlane-rail.css`; drag-state overlays moved to `dashboard-
+    // swimlane-drag.css` so the rail's at-rest appearance is
+    // independent of the DnD state machine. The two-fetch shape
+    // verifies both files ship.
+    const railRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane-rail.css'),
     );
-    expect(cssRes.status).toBe(200);
-    const css = await cssRes.text();
+    expect(railRes.status).toBe(200);
+    const railCss = await railRes.text();
     // `.rail-drag` carries the canonical grab cursor.
-    expect(css).toMatch(/\.rail-lane\s+\.rail-drag\s*\{[\s\S]*?cursor:\s*grab/);
+    expect(railCss).toMatch(/\.rail-lane\s+\.rail-drag\s*\{[\s\S]*?cursor:\s*grab/);
+
+    const dragRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane-drag.css'),
+    );
+    expect(dragRes.status).toBe(200);
+    const dragCss = await dragRes.text();
     // While a row is being dragged the source carries `is-dragging`
     // and the cursor flips to grabbing on both the row and the handle.
-    expect(css).toMatch(/\.rail-lane\.is-dragging\s*\{[\s\S]*?cursor:\s*grabbing/);
+    expect(dragCss).toMatch(/\.rail-lane\.is-dragging\s*\{[\s\S]*?cursor:\s*grabbing/);
     // Drop-target feedback — insertion hairline above / below the
     // target row via inset box-shadow on the red-pencil token.
-    expect(css).toMatch(
+    expect(dragCss).toMatch(
       /\.rail-lane\.drop-target-above\s*\{[\s\S]*?box-shadow:\s*inset\s+0\s+2px\s+0\s+0\s+var\(--er-red-pencil\)/,
     );
-    expect(css).toMatch(
+    expect(dragCss).toMatch(
       /\.rail-lane\.drop-target-below\s*\{[\s\S]*?box-shadow:\s*inset\s+0\s+-2px\s+0\s+0\s+var\(--er-red-pencil\)/,
     );
   });
@@ -330,10 +341,26 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     );
   });
 
-  it('loads dashboard-swimlane.css alongside existing stylesheets', async () => {
+  it('loads each split dashboard-swimlane-*.css alongside existing stylesheets', async () => {
+    // Per AUDIT-20260528-14: `dashboard-swimlane.css` was split into
+    // per-section files (shell/rail/presets/chips/collapse/list/
+    // compose/drag/mobile) to satisfy the project file-size cap. The
+    // page must reference every split so the cascade stays whole.
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.html).toContain('/static/css/dashboard-swimlane.css');
+    for (const file of [
+      'dashboard-swimlane-shell.css',
+      'dashboard-swimlane-rail.css',
+      'dashboard-swimlane-presets.css',
+      'dashboard-swimlane-chips.css',
+      'dashboard-swimlane-collapse.css',
+      'dashboard-swimlane-list.css',
+      'dashboard-swimlane-compose.css',
+      'dashboard-swimlane-drag.css',
+      'dashboard-swimlane-mobile.css',
+    ]) {
+      expect(r.html).toContain(`/static/css/${file}`);
+    }
   });
 
   it('honours ?focus=<csv> URL param: focused lanes render with .swim (no .is-focus-hidden); non-focused with .is-focus-hidden', async () => {
@@ -660,23 +687,35 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     }
   });
 
-  it('AUDIT-04: dashboard-swimlane.css contains `.focus-chip.is-visibility-hidden` hide rule', async () => {
-    const cssRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane.css'),
+  it('AUDIT-04: dashboard-swimlane-{shell,rail}.css ship the visibility-hide + eye-glyph swap rules', async () => {
+    // Per AUDIT-20260528-14: visibility/focus-hide rules ship in
+    // `dashboard-swimlane-shell.css` because they affect the swim +
+    // swim-stub + focus-chip set in a single selector list (cross-
+    // cutting). The eye-glyph swap rules (F6 fix selectors targeting
+    // `.r-eye-btn`) live with the rail row primitives in
+    // `dashboard-swimlane-rail.css`.
+    const shellRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane-shell.css'),
     );
-    expect(cssRes.status).toBe(200);
-    const css = await cssRes.text();
+    expect(shellRes.status).toBe(200);
+    const shellCss = await shellRes.text();
     // Rule body has display: none; matched via the selector list
     // including .focus-chip.is-visibility-hidden.
-    expect(css).toMatch(
+    expect(shellCss).toMatch(
       /\.focus-chip\.is-visibility-hidden[\s\S]*?display:\s*none/,
     );
+
+    const railRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane-rail.css'),
+    );
+    expect(railRes.status).toBe(200);
+    const railCss = await railRes.text();
     // Eye-glyph swap rules — selector + display:inline (F6 fix
     // selectors target `.r-eye-btn`).
-    expect(css).toMatch(
+    expect(railCss).toMatch(
       /\.rail-lane\[data-lane-visible="true"\] \.r-eye-btn \.r-eye-visible/,
     );
-    expect(css).toMatch(
+    expect(railCss).toMatch(
       /\.rail-lane\[data-lane-visible="false"\] \.r-eye-btn \.r-eye-hidden/,
     );
   });
@@ -793,36 +832,47 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     );
   });
 
-  it('Task 5.1A: dashboard-swimlane.css ships the universal `.collapse-chev` primitive + collapsed-state rules', async () => {
-    const cssRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane.css'),
+  it('Task 5.1A: dashboard-swimlane-{collapse,shell}.css ship the universal `.collapse-chev` primitive + collapsed-state rules', async () => {
+    // Per AUDIT-20260528-14: `.collapse-chev` primitive + collapsed
+    // states moved into `dashboard-swimlane-collapse.css`; the
+    // `.swim.collapsed .stage-grid` hide rule stays in
+    // `dashboard-swimlane-shell.css` next to the stage-grid base
+    // styles. Two fetches assert both files ship the rules.
+    const collapseRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane-collapse.css'),
     );
-    expect(cssRes.status).toBe(200);
-    const css = await cssRes.text();
+    expect(collapseRes.status).toBe(200);
+    const collapseCss = await collapseRes.text();
     // Universal primitive: min-width: 24px + min-height: 24px (WCAG
     // 2.2 SC 2.5.8 AA target size).
-    expect(css).toMatch(/\.collapse-chev\s*\{[\s\S]*?min-width:\s*24px/);
-    expect(css).toMatch(/\.collapse-chev\s*\{[\s\S]*?min-height:\s*24px/);
+    expect(collapseCss).toMatch(/\.collapse-chev\s*\{[\s\S]*?min-width:\s*24px/);
+    expect(collapseCss).toMatch(/\.collapse-chev\s*\{[\s\S]*?min-height:\s*24px/);
     // Focus-visible ring (WCAG 2.1 SC 2.4.7 AA).
-    expect(css).toMatch(
+    expect(collapseCss).toMatch(
       /\.collapse-chev:focus-visible\s*\{[\s\S]*?outline:\s*2px\s+solid\s+var\(--er-proof-blue\)/,
     );
     // Collapsed-state rotation.
-    expect(css).toMatch(
+    expect(collapseCss).toMatch(
       /\.collapse-chev\[aria-expanded="false"\]\s*\{[\s\S]*?transform:\s*rotate\(-90deg\)/,
     );
-    // Lane-level: `.swim.collapsed` hides the stage-grid (already
-    // shipped in 5.1; the reciprocal CSS makes the chevron the only
-    // toggle).
-    expect(css).toMatch(/\.swim\.collapsed\s+\.stage-grid\s*\{[\s\S]*?display:\s*none/);
     // Per-stage: `.stage-col.collapsed` becomes a 42px strip.
-    expect(css).toMatch(
+    expect(collapseCss).toMatch(
       /\.stage-col\.collapsed\s*\{[\s\S]*?flex:\s*0\s+0\s+42px/,
     );
     // Vertical writing-mode for the rotated stage name.
-    expect(css).toMatch(
+    expect(collapseCss).toMatch(
       /\.stage-col\.collapsed\s+\.stage-head\s+\.stage-name\s*\{[\s\S]*?writing-mode:\s*vertical-rl/,
     );
+
+    const shellRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane-shell.css'),
+    );
+    expect(shellRes.status).toBe(200);
+    const shellCss = await shellRes.text();
+    // Lane-level: `.swim.collapsed` hides the stage-grid (already
+    // shipped in 5.1; the reciprocal CSS makes the chevron the only
+    // toggle).
+    expect(shellCss).toMatch(/\.swim\.collapsed\s+\.stage-grid\s*\{[\s\S]*?display:\s*none/);
   });
 
   // ============================================================
@@ -1034,35 +1084,45 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     );
   });
 
-  it('Task 5.1B: CSS ships `.view-toggle`, body-switching, list-body, and collapse-precedence rules', async () => {
-    const cssRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane.css'),
+  it('Task 5.1B: split CSS ships `.view-toggle`, body-switching, list-body, and collapse-precedence rules', async () => {
+    // Per AUDIT-20260528-14: view-toggle + list-body + body-switching
+    // rules live in `dashboard-swimlane-list.css`; the mobile-gated
+    // view-toggle narrowing lives in `dashboard-swimlane-mobile.css`.
+    const listRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane-list.css'),
     );
-    expect(cssRes.status).toBe(200);
-    const css = await cssRes.text();
+    expect(listRes.status).toBe(200);
+    const listCss = await listRes.text();
     // View-toggle primitive.
-    expect(css).toMatch(/\.view-toggle\s*\{[\s\S]*?display:\s*inline-flex/);
-    expect(css).toMatch(/\.view-toggle\s+\.vt-cell\s*\{[\s\S]*?min-height:\s*24px/);
+    expect(listCss).toMatch(/\.view-toggle\s*\{[\s\S]*?display:\s*inline-flex/);
+    expect(listCss).toMatch(/\.view-toggle\s+\.vt-cell\s*\{[\s\S]*?min-height:\s*24px/);
     // Focus-visible ring on cells (WCAG 2.1 SC 2.4.7 AA).
-    expect(css).toMatch(
+    expect(listCss).toMatch(
       /\.view-toggle\s+\.vt-cell:focus-visible\s*\{[\s\S]*?outline:\s*2px\s+solid\s+var\(--er-proof-blue\)/,
     );
     // Body switching rules.
-    expect(css).toMatch(/\.swim\.view-kanban\s+\.list-body\s*\{[\s\S]*?display:\s*none/);
-    expect(css).toMatch(/\.swim\.view-list\s+\.stage-grid\s*\{[\s\S]*?display:\s*none/);
+    expect(listCss).toMatch(/\.swim\.view-kanban\s+\.list-body\s*\{[\s\S]*?display:\s*none/);
+    expect(listCss).toMatch(/\.swim\.view-list\s+\.stage-grid\s*\{[\s\S]*?display:\s*none/);
     // Collapse precedence (Task 5.1B.3).
-    expect(css).toMatch(
+    expect(listCss).toMatch(
       /\.swim\.collapsed\s+\.view-toggle\s*\{[\s\S]*?opacity:\s*0\.4[\s\S]*?pointer-events:\s*none/,
     );
     // Locked-stage proof-blue in list-body (mockup line 420 mirror).
-    expect(css).toMatch(
+    expect(listCss).toMatch(
       /\.list-body\s+\.lb-group\.locked\s+\.lb-glyph\s*\{[\s\S]*?color:\s*var\(--er-proof-blue\)/,
     );
     // List-body group head + row presence.
-    expect(css).toMatch(/\.list-body\s+\.lb-group-head\s*\{/);
-    expect(css).toMatch(/\.list-body\s+\.lb-row\s*\{/);
-    // Mobile gate at 720px: view-toggle narrows.
-    expect(css).toMatch(
+    expect(listCss).toMatch(/\.list-body\s+\.lb-group-head\s*\{/);
+    expect(listCss).toMatch(/\.list-body\s+\.lb-row\s*\{/);
+
+    // Mobile gate at 720px: view-toggle narrows. Lives in the
+    // mobile-only split per AUDIT-20260528-14.
+    const mobileRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane-mobile.css'),
+    );
+    expect(mobileRes.status).toBe(200);
+    const mobileCss = await mobileRes.text();
+    expect(mobileCss).toMatch(
       /@media\s*\(max-width:\s*720px\)\s*\{[\s\S]*?\.view-toggle\s+\.vt-cell\s*\{[\s\S]*?font-size:\s*0\.62rem/,
     );
   });
@@ -1285,17 +1345,18 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     );
   });
 
-  it('Task 5.3.1: dashboard-swimlane.css uses `flex-wrap: nowrap` + `overflow-x: auto` on `.focus-strip`', async () => {
+  it('Task 5.3.1: dashboard-swimlane-chips.css uses `flex-wrap: nowrap` + `overflow-x: auto` on `.focus-strip`', async () => {
+    // Per AUDIT-20260528-14: focus-strip + focus-chip rules moved to
+    // `dashboard-swimlane-chips.css`. The Task 5.3.1 override that
+    // historically lived later in the source file was consolidated
+    // into the single `.focus-strip` rule there during the split (no
+    // behavioural change — nowrap + overflow-x: auto wins regardless).
     const cssRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane.css'),
+      new Request('http://x/static/css/dashboard-swimlane-chips.css'),
     );
     expect(cssRes.status).toBe(200);
     const css = await cssRes.text();
-    // The Task 5.3 override block re-declares `.focus-strip` with
-    // `flex-wrap: nowrap` + `overflow-x: auto` (the original 5.1
-    // block at line 254 still ships `flex-wrap: wrap` — the
-    // override later in the cascade wins). Assert the override
-    // rule exists.
+    // Assert the consolidated rule exists with both contracts.
     expect(css).toMatch(
       /\.focus-strip\s*\{[\s\S]*?flex-wrap:\s*nowrap[\s\S]*?overflow-x:\s*auto/,
     );
@@ -1307,9 +1368,13 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(css).toMatch(/\.focus-strip\s*\{[\s\S]*?scroll-behavior:\s*smooth/);
   });
 
-  it('Task 5.3.3: dashboard-swimlane.css ships the mobile lane-sheet rules (trigger, panel, backdrop)', async () => {
+  it('Task 5.3.3: dashboard-swimlane-mobile.css ships the mobile lane-sheet rules (trigger, panel, backdrop)', async () => {
+    // Per AUDIT-20260528-14: mobile lane-sheet rules (both desktop
+    // defaults and the @media (max-width: 720px) block) consolidated
+    // into `dashboard-swimlane-mobile.css` so the responsive cascade
+    // stays in one file.
     const cssRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane.css'),
+      new Request('http://x/static/css/dashboard-swimlane-mobile.css'),
     );
     expect(cssRes.status).toBe(200);
     const css = await cssRes.text();
@@ -1339,8 +1404,10 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
   });
 
   it('Task 5.3.2 followup (AUDIT-22): hidden lanes use an AA-passing readable color (no opacity wash)', async () => {
+    // Per AUDIT-20260528-14: rail row styles (including hidden-lane
+    // color treatment) live in `dashboard-swimlane-rail.css`.
     const cssRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane.css'),
+      new Request('http://x/static/css/dashboard-swimlane-rail.css'),
     );
     expect(cssRes.status).toBe(200);
     const css = await cssRes.text();
@@ -1367,8 +1434,11 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
   });
 
   it('Task 5.2: CSS ships `.swim-empty-cta` rules (block, button, hint, collapse precedence)', async () => {
+    // Per AUDIT-20260528-14: empty-lane CTA lives with `.swim-compose`
+    // in `dashboard-swimlane-compose.css` (the two affordances share
+    // the green-flash semantic + collapse-precedence pattern).
     const cssRes = await app.fetch(
-      new Request('http://x/static/css/dashboard-swimlane.css'),
+      new Request('http://x/static/css/dashboard-swimlane-compose.css'),
     );
     expect(cssRes.status).toBe(200);
     const css = await cssRes.text();

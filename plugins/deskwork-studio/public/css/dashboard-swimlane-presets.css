@@ -1,0 +1,148 @@
+/**
+ * Multi-lane swimlane dashboard — Press Bay PRESETS surface.
+ *
+ * Task 5.5 — saveable focus presets surface. Lives INSIDE the rail
+ * head per `.claude/rules/affordance-placement.md` (component-
+ * attached, not toolbar-attached). The Save button captures the
+ * four-axis state; the list surface renders one row per stored
+ * preset with a Load button (preset name) + Delete button (×) +
+ * Link button (per AUDIT-20260528-37 F2 — copy-deep-link).
+ *
+ * Sibling of `dashboard-swimlane-rail.css`. Splits out for the
+ * file-size cap; selector base is `.lane-rail .preset-*` so the
+ * specificity matches the rail context.
+ */
+
+.lane-rail .rail-presets {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.lane-rail .preset-save {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px dashed var(--er-paper-3);
+  color: var(--er-ink-soft);
+  padding: 0.3rem 0.4rem;
+  cursor: pointer;
+  min-height: 24px;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.lane-rail .preset-save:hover,
+.lane-rail .preset-save:focus-visible {
+  background: var(--er-paper-3);
+  color: var(--er-ink);
+  outline: 2px solid var(--er-proof-blue, currentColor);
+  outline-offset: 1px;
+}
+
+.lane-rail .preset-save.is-flashing {
+  background: var(--er-proof-blue, #2563eb);
+  color: #fff;
+  border-color: var(--er-proof-blue, #2563eb);
+}
+
+.lane-rail .preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.lane-rail .preset-empty {
+  font-family: var(--er-font-mono);
+  font-size: 0.55rem;
+  color: var(--er-faded);
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.3rem;
+  text-transform: none;
+}
+
+.lane-rail .preset-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 24px;
+}
+
+.lane-rail .preset-load {
+  flex: 1;
+  text-align: left;
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  background: transparent;
+  border: 1px solid var(--er-paper-3);
+  color: var(--er-ink);
+  padding: 0.25rem 0.35rem;
+  cursor: pointer;
+  min-height: 24px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lane-rail .preset-load:hover,
+.lane-rail .preset-load:focus-visible {
+  background: var(--er-paper-3);
+  outline: 2px solid var(--er-proof-blue, currentColor);
+  outline-offset: 1px;
+}
+
+.lane-rail .preset-delete {
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--er-faded);
+  cursor: pointer;
+  min-width: 24px;
+  min-height: 24px;
+  line-height: 1;
+  padding: 0;
+}
+
+.lane-rail .preset-delete:hover,
+.lane-rail .preset-delete:focus-visible {
+  color: var(--er-red-pencil, #c0392b);
+  outline: 2px solid var(--er-proof-blue, currentColor);
+  outline-offset: 1px;
+}
+
+/*
+ * Per AUDIT-20260528-37 (F2): copy-deep-link affordance. Lives on
+ * the preset row between the Load and Delete buttons. Same 24x24
+ * hit-target floor as Delete (WCAG 2.2 SC 2.5.8). The `.copied`
+ * flash mirrors `.swim-compose.copied` (now in dashboard-swimlane-
+ * compose.css) — proof-blue background + white text for ~2s.
+ */
+.lane-rail .preset-link {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--er-faded);
+  cursor: pointer;
+  min-width: 24px;
+  min-height: 24px;
+  line-height: 1;
+  padding: 0;
+}
+
+.lane-rail .preset-link:hover,
+.lane-rail .preset-link:focus-visible {
+  color: var(--er-proof-blue, #2563eb);
+  outline: 2px solid var(--er-proof-blue, currentColor);
+  outline-offset: 1px;
+}
+
+.lane-rail .preset-link.copied {
+  background: var(--er-stamp-green, #1e8449);
+  color: #fff;
+}

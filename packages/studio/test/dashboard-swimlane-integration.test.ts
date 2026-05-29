@@ -184,7 +184,12 @@ describe('Phase 5 Task 5.6 — multi-lane integration (server)', () => {
   // ============================================================
 
   it('Step 5.6.6: CSS ships the desktop default + mobile-gated `.lane-sheet-trigger` rules (dual-viewport)', async () => {
-    const r = await getCss(app, '/static/css/dashboard-swimlane.css');
+    // Per AUDIT-20260528-14: the dashboard-swimlane CSS bundle was
+    // split per-section; both the desktop default and the mobile-gated
+    // rule for `.lane-sheet-trigger` land in
+    // `dashboard-swimlane-mobile.css` (which centralises the responsive
+    // cascade).
+    const r = await getCss(app, '/static/css/dashboard-swimlane-mobile.css');
     expect(r.status).toBe(200);
     // Desktop default — trigger hidden.
     expect(r.css).toMatch(/\.lane-sheet-trigger\s*\{[\s\S]*?display:\s*none/);
@@ -195,7 +200,7 @@ describe('Phase 5 Task 5.6 — multi-lane integration (server)', () => {
   });
 
   it('Step 5.6.6: CSS ships the mobile-gated `.swim-compose .sc-label { display: none }` rule (compact compose-chip form on phone)', async () => {
-    const r = await getCss(app, '/static/css/dashboard-swimlane.css');
+    const r = await getCss(app, '/static/css/dashboard-swimlane-mobile.css');
     expect(r.status).toBe(200);
     // The compact compose-chip CSS rule lives inside the
     // `@media (max-width: 720px)` block so the chip's text label
