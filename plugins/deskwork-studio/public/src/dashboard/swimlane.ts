@@ -272,20 +272,21 @@ function bindFocusChips(state: SwimlaneState, projectKey: string): void {
     });
   }
 
-  // "All" chip — focuses every visible lane.
+  // "All" chip — focuses every visible lane. Idempotent: the spec
+  // ("focuses every visible lane") has no documented toggle-off
+  // semantics. The prior `isAlreadyAll`-gated branch left the focus
+  // set EMPTY when the operator clicked `All` while all lanes were
+  // already focused — silently un-focusing everything (AUDIT-20260528-09).
+  // The fix collapses to clear → add-all-visible regardless of prior
+  // state.
   const allChip = document.querySelector<HTMLButtonElement>(
     '[data-focus-chip-all]',
   );
   if (allChip !== null) {
     allChip.addEventListener('click', () => {
       const allVisible = state.allLanes.filter((id) => !state.hidden.has(id));
-      const isAlreadyAll =
-        allVisible.length > 0 &&
-        allVisible.every((id) => state.focused.has(id));
       state.focused.clear();
-      if (!isAlreadyAll) {
-        for (const id of allVisible) state.focused.add(id);
-      }
+      for (const id of allVisible) state.focused.add(id);
       applyState(state);
       persist(state, projectKey);
     });

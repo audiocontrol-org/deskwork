@@ -78,6 +78,14 @@ function buildShell(lanes: readonly string[]): void {
     chip.setAttribute('aria-pressed', 'true');
     strip.appendChild(chip);
   }
+  // "All" chip (server-rendered alongside the per-lane chips).
+  const allChip = document.createElement('button');
+  allChip.type = 'button';
+  allChip.classList.add('focus-chip', 'all', 'active');
+  allChip.dataset.focusChipAll = '';
+  allChip.setAttribute('aria-pressed', 'true');
+  allChip.textContent = 'All';
+  strip.appendChild(allChip);
   shell.appendChild(strip);
 
   // Per-lane swim + stub pairs.
@@ -441,6 +449,66 @@ describe('swimlane client controller — AUDIT-02 / AUDIT-04 acceptance', () => 
     mockupsEye?.click();
     expect(mockupsRow?.dataset.laneVisible).toBe('false');
     expect(mockupsChip?.classList.contains('is-visibility-hidden')).toBe(true);
+  });
+
+  it('AUDIT-09: clicking the All chip is idempotent — all-already-focused stays all-focused (does NOT empty the set)', () => {
+    // The workplan + bindFocusChips docstring define `All` as
+    // "focuses every visible lane" with NO documented toggle-off
+    // semantics. The prior `isAlreadyAll`-gated branch silently
+    // emptied the focus set when the operator clicked `All` while
+    // all lanes were already focused. The fix collapses the handler
+    // to clear → add-all-visible regardless of prior state.
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    // After init, all three lanes are focused (the default-focus path
+    // when no `?focus=` URL param and no storage value).
+    const allChip = document.querySelector<HTMLButtonElement>(
+      '[data-focus-chip-all]',
+    );
+    expect(allChip).not.toBeNull();
+    for (const id of ['default', 'mockups', 'qa']) {
+      const chip = document.querySelector<HTMLButtonElement>(
+        `[data-focus-chip="${id}"]`,
+      );
+      expect(chip?.classList.contains('active')).toBe(true);
+    }
+    // Click All while all three are already focused. The fix
+    // guarantees focus stays at all three (idempotent), NOT emptied.
+    allChip?.click();
+    for (const id of ['default', 'mockups', 'qa']) {
+      const chip = document.querySelector<HTMLButtonElement>(
+        `[data-focus-chip="${id}"]`,
+      );
+      expect(chip?.classList.contains('active')).toBe(true);
+      expect(chip?.getAttribute('aria-pressed')).toBe('true');
+    }
+    // The All chip itself stays active (every visible lane is focused).
+    expect(allChip?.classList.contains('active')).toBe(true);
+    expect(allChip?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('AUDIT-09: clicking the All chip from a partial-focus state restores every visible lane', () => {
+    // Existing behavior the fix MUST preserve: when not all lanes are
+    // focused, clicking `All` puts every visible lane into focus.
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    const qaChip = document.querySelector<HTMLButtonElement>(
+      '[data-focus-chip="qa"]',
+    );
+    const allChip = document.querySelector<HTMLButtonElement>(
+      '[data-focus-chip-all]',
+    );
+    // Toggle qa off — focus is now { default, mockups }.
+    qaChip?.click();
+    expect(qaChip?.classList.contains('active')).toBe(false);
+    // Click All — qa is re-focused, default + mockups stay focused.
+    allChip?.click();
+    for (const id of ['default', 'mockups', 'qa']) {
+      const chip = document.querySelector<HTMLButtonElement>(
+        `[data-focus-chip="${id}"]`,
+      );
+      expect(chip?.classList.contains('active')).toBe(true);
+    }
   });
 
   it('F6: the eye-toggle button carries aria-label + dual decorative glyphs', () => {
