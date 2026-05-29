@@ -80,8 +80,31 @@ interface CancelResult {
 const CANCEL_STAGE = 'Cancelled';
 
 /**
+ * Internal walker options. Augments the public `CancelOptions` with
+ * one cascade-internal field — `cascadeFrom` — that the public
+ * wrapper does NOT expose:
+ *
+ *   - `cascadeFrom`: when set, the walker attaches it to the
+ *     `stage-transition` event's `metadata.cascadeFrom` so the
+ *     event records the originating (top-level) group's UUID. Set
+ *     by the recursive cascade walker call only; unset on the
+ *     originator's own walker invocation (the top-level entry's
+ *     event is the cascade source, not a cascadee).
+ *
+ * Per Step 7.2.8 (#359) the originator semantic is the TOP-LEVEL
+ * cascade invoker — `cascadeFrom` does NOT track the nearest parent
+ * on transitively-cascaded entries. This keeps the audit trail
+ * single-hop ("which top-level cascade caused this cancel?") rather
+ * than requiring a walk through the journal to reconstruct.
+ */
+interface WalkerOptions extends CancelOptions {
+  readonly cascadeFrom?: string;
+}
+
+/**
  * Internal cascade walker (Step 7.2.7, graphical-entries, GitHub
- * #360 / AUDIT-20260529-18).
+ * #360 / AUDIT-20260529-18; metadata.cascadeFrom field added in
+ * Step 7.2.8 / #359).
  *
  * Does everything the public `cancelEntry` did before the walker /
  * wrapper split EXCEPT call `regenerateCalendar` — the wrapper is
@@ -95,10 +118,16 @@ const CANCEL_STAGE = 'Cancelled';
  * only externally-observable difference is that `calendar.md` is
  * NOT rewritten by this function; the caller must invoke
  * `regenerateCalendar` itself to keep the calendar in sync.
+ *
+ * Step 7.2.8 addition: when invoked with `cascadeFrom` set, the
+ * walker attaches it to the `stage-transition` event's
+ * `metadata.cascadeFrom` so cascaded events carry the originating
+ * group's UUID. The top-level wrapper call leaves `cascadeFrom`
+ * unset (it IS the originator).
  */
 async function cancelEntryWithoutCalendarRegen(
   projectRoot: string,
-  opts: CancelOptions,
+  opts: WalkerOptions,
 ): Promise<CancelResult> {
   const sidecar = await readSidecar(projectRoot, opts.uuid);
   const template = resolveEntryStrictTemplate(sidecar, projectRoot);
@@ -143,6 +172,17 @@ async function cancelEntryWithoutCalendarRegen(
     from,
     to: CANCEL_STAGE,
     ...(opts.reason !== undefined && { reason: opts.reason }),
+    // Per Step 7.2.8 (#359): attach `metadata.cascadeFrom` only when
+    // the walker was invoked from a cascade — i.e. on cascaded
+    // members, not on the originator's own event. The public
+    // `cancelEntry` wrapper never passes `cascadeFrom`, so the
+    // originator's event omits the field. The recursive walker
+    // calls below threads the TOP-LEVEL originator's UUID (not the
+    // nearest parent) so transitively-cascaded events still trace
+    // back to the cascade invocation in a single hop.
+    ...(opts.cascadeFrom !== undefined && {
+      metadata: { cascadeFrom: opts.cascadeFrom },
+    }),
   });
 
   // Member cascade (Phase 7 Task 7.2 Step 7.2.6). Only fires when
@@ -199,9 +239,19 @@ async function cancelEntryWithoutCalendarRegen(
         // top-level opt-in propagates through the entire subtree (doctor's
         // `group-recursive` rule normally refuses recursive groups, but
         // the cancel path still has to behave correctly when one exists).
+        //
+        // Per Step 7.2.8 (#359): pass the TOP-LEVEL originator's UUID
+        // through `cascadeFrom` so every cascaded member's event
+        // records the cascade source as a single-hop back-link. If
+        // THIS walker invocation was itself cascaded (transitive
+        // case), we propagate the inherited `opts.cascadeFrom`;
+        // otherwise we ARE the originator and pass our own
+        // `sidecar.uuid` (the top-level group whose cancel started
+        // the cascade).
         const memberResult = await cancelEntryWithoutCalendarRegen(projectRoot, {
           uuid: memberUuid,
           cascade: true,
+          cascadeFrom: opts.cascadeFrom ?? sidecar.uuid,
           ...(opts.reason !== undefined && { reason: opts.reason }),
         });
         cascadedMembers.push({

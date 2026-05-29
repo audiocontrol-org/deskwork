@@ -2595,3 +2595,65 @@ recursive walker call documenting the forced cascade and the
 `group-recursive` rule that normally prevents the shape but
 doesn't relieve the cancel code path from behaving correctly when
 one exists.
+
+### AUDIT-20260529-27 — Step 7.2.8 shipped: `metadata.cascadeFrom` on cascade `stage-transition` events (feature; closes #359)
+
+Finding-ID: AUDIT-20260529-27
+Status:     fixed-pending-commit
+Severity:   medium (audit-trail enhancement)
+Surface:    `packages/core/src/schema/journal-events.ts:65-94`,
+            `packages/core/src/entry/cancel.ts:99-260`
+
+Step 7.2.8 (graphical-entries) shipped the `metadata.cascadeFrom`
+feature originally tracked by AUDIT-20260529-17 + filed at #359.
+Without it, cascade-cancel journal events were
+indistinguishable from single-entry cancels once the operator's
+terminal scrollback was gone — the only durable cascade audit
+trail was the cancel-time stdout JSON.
+
+Resolution:
+
+  - **Schema.** `StageTransitionEvent.metadata` was tightened from
+    the generic `z.record(z.string(), z.unknown()).optional()` to a
+    typed `z.object({ cascadeFrom: z.string().uuid().optional() })
+    .passthrough().optional()`. The `.passthrough()` preserves
+    forward-compat for future metadata-bag enhancements without a
+    schema churn; the typed `cascadeFrom` makes the field part of
+    the parsed `JournalEvent` shape consumers can read without
+    casting through `unknown`. A docblock above the new field
+    fully specifies the contract: originator's event omits
+    `cascadeFrom`; cascaded members carry the TOP-LEVEL
+    originator's UUID (not the nearest parent), so transitively-
+    cascaded events trace back to the cascade invocation in a
+    single hop.
+
+  - **Walker threading.** `cancelEntryWithoutCalendarRegen` was
+    refactored to accept an internal `WalkerOptions` shape that
+    augments the public `CancelOptions` with a `cascadeFrom?: string`
+    field. The public `cancelEntry` wrapper never sets it (the
+    originator is not a cascadee); the recursive walker call DOES
+    set it, threading `opts.cascadeFrom ?? sidecar.uuid` so the
+    top-level originator's UUID propagates through every level of
+    the cascade subtree.
+
+  - **Docblock restored.** The pre-AUDIT-20260529-17 docblock
+    paragraph above the group-* event kinds was restored — it now
+    correctly claims the linkage and references the
+    `StageTransitionEvent` field's contract. The `cancelEntry`
+    docblock at `cancel.ts:243-273` and the new walker `WalkerOptions`
+    docblock explain the originator-semantic decision; the cancel
+    `SKILL.md` safety-rule bullet (line 44) was rewritten to surface
+    the feature to operators.
+
+  - **Tests.** Five new `cancel-cascade.test.ts` cases assert the
+    contract end-to-end (write → read → schema-parse → assert):
+    (a) non-cascade cancel: no `cascadeFrom`; (b) `--cascade` on a
+    non-group: no `cascadeFrom` (no recursion fires); (c) `--cascade`
+    on a 2-member group: members carry `cascadeFrom = group UUID`,
+    originator does not; (d) recursive (nested) group cascade:
+    transitively-cascaded events carry the TOP-LEVEL originator's
+    UUID, NOT the nearest parent; (e) cascade with skipped members:
+    skipped entries emit no `stage-transition` event at all, cascaded
+    member's event carries `cascadeFrom`.
+
+Core test count: 759 → 764 (+5 cascadeFrom contract cases).

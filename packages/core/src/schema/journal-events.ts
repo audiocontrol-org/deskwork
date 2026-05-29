@@ -62,6 +62,21 @@ const ReviewStateChangeEvent = z.object({
   to: ReviewStateEnum.nullable(),
 });
 
+/**
+ * `metadata.cascadeFrom` (Step 7.2.8, graphical-entries, GitHub #359):
+ * when a `stage-transition` event is emitted for a cascaded member of
+ * a group cancel `--cascade` walk, `metadata.cascadeFrom` carries the
+ * UUID of the originating (top-level) group whose cascade invocation
+ * propagated to this entry. The originator's OWN event does NOT carry
+ * `cascadeFrom` — only the cascaded members' events do. The field is
+ * the top-level originator's UUID even on transitively-cascaded entries
+ * (recursive groups), so audit consumers can answer "which cascade
+ * invocation caused this cancel?" with a single field read.
+ *
+ * `metadata` is `.passthrough()` so future enhancement to the metadata
+ * bag doesn't require a schema-level enumeration churn; consumers MAY
+ * record additional keys without invalidating existing events.
+ */
 const StageTransitionEvent = z.object({
   kind: z.literal('stage-transition'),
   at: z.string().datetime(),
@@ -69,7 +84,12 @@ const StageTransitionEvent = z.object({
   from: StageStringSchema,
   to: StageStringSchema,
   reason: z.string().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  metadata: z
+    .object({
+      cascadeFrom: z.string().uuid().optional(),
+    })
+    .passthrough()
+    .optional(),
 });
 
 /**
@@ -346,13 +366,16 @@ const PipelineDeleteEvent = z.object({
  *
  * Group `cancel` propagation (`--cascade`) emits one
  * `stage-transition` event per affected entry (including the group
- * itself) per the universal-cancel verb's event shape. The cascade
- * does NOT record per-member `cascadeFrom` linkage today — the
- * audit trail of which cancels were part of a cascade is currently
- * only reachable via the cancel-time stdout JSON result's
- * `cascadedMembers[]` / `skippedMembers[]` arrays. See the cancel
- * SKILL.md for the rationale and a tracking pointer for the
- * cascadeFrom-on-event enhancement.
+ * itself) per the universal-cancel verb's event shape. Per Step
+ * 7.2.8 (graphical-entries, #359), each cascaded member's event
+ * carries `metadata.cascadeFrom` set to the originating (top-level)
+ * group's UUID — see `StageTransitionEvent` above for the field's
+ * full contract. The originator's own event omits the field. The
+ * cancel-time stdout JSON result's `cascadedMembers[]` /
+ * `skippedMembers[]` arrays remain the canonical per-invocation
+ * summary; the per-event `cascadeFrom` is the durable journal-level
+ * back-link an auditor can grep for after the operator's terminal
+ * scrollback is gone.
  */
 const GroupCreateEvent = z.object({
   kind: z.literal('group-create'),

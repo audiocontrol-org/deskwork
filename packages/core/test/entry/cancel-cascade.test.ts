@@ -29,13 +29,36 @@ import {
   afterEach,
   vi,
 } from 'vitest';
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cancelEntry } from '@/entry/cancel';
 import { writeSidecar } from '@/sidecar/write';
 import { readSidecar } from '@/sidecar/read';
 import * as regenerateModule from '@/calendar/regenerate';
+import { JournalEventSchema, type JournalEvent } from '@/schema/journal-events';
+
+/**
+ * Read every journal event written under the project's history dir
+ * and return only `stage-transition` kinds. Re-parses through the
+ * schema so the assertions exercise the new `metadata.cascadeFrom`
+ * field's contract end-to-end (write -> read -> parse -> assert).
+ */
+async function readStageTransitionEvents(
+  projectRoot: string,
+): Promise<JournalEvent[]> {
+  const dir = join(projectRoot, '.deskwork', 'review-journal', 'history');
+  const names = await readdir(dir);
+  const events: JournalEvent[] = [];
+  for (const name of names) {
+    const raw = await readFile(join(dir, name), 'utf-8');
+    const parsed = JournalEventSchema.parse(JSON.parse(raw));
+    if (parsed.kind === 'stage-transition') {
+      events.push(parsed);
+    }
+  }
+  return events;
+}
 
 const groupUuid = '550e8400-e29b-41d4-a716-446655440a01';
 const memberA = '550e8400-e29b-41d4-a716-446655440a02';
@@ -194,5 +217,188 @@ describe('cancelEntry — regenerate-count contract (#360 / Step 7.2.7)', () => 
     expect(result.cascadedMembers).toEqual([]);
     expect(result.skippedMembers).toEqual([]);
     expect(regenerateSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Step 7.2.8 (#359): `metadata.cascadeFrom` linkage on cascaded
+ * `stage-transition` events. The cascade walker attaches the
+ * originating (top-level) group's UUID to every cascaded member's
+ * event; the originator's own event omits the field; non-cascade
+ * cancels do not populate it. Recursive (transitive) cascades record
+ * the TOP-LEVEL originator's UUID, NOT the nearest parent — single-
+ * hop audit traceability is the contract.
+ */
+describe('cancelEntry — metadata.cascadeFrom contract (#359 / Step 7.2.8)', () => {
+  let projectRoot: string;
+  const memberD = '550e8400-e29b-41d4-a716-446655440b01';
+  const memberE = '550e8400-e29b-41d4-a716-446655440b02';
+  const nestedGroup = '550e8400-e29b-41d4-a716-446655440b03';
+  const nestedMember = '550e8400-e29b-41d4-a716-446655440b04';
+
+  beforeEach(async () => {
+    projectRoot = await mkdtemp(join(tmpdir(), 'dw-cancel-cascadefrom-'));
+    await seedProjectScaffold(projectRoot);
+  });
+
+  afterEach(async () => {
+    await rm(projectRoot, { recursive: true, force: true });
+  });
+
+  it('non-cascade cancel does NOT populate metadata.cascadeFrom', async () => {
+    await seedEntry(projectRoot, soloUuid, 'solo', { currentStage: 'Drafting' });
+
+    await cancelEntry(projectRoot, { uuid: soloUuid });
+
+    const events = await readStageTransitionEvents(projectRoot);
+    expect(events).toHaveLength(1);
+    const evt = events[0];
+    if (evt.kind !== 'stage-transition') throw new Error('unexpected kind');
+    expect(evt.entryId).toBe(soloUuid);
+    expect(evt.metadata?.cascadeFrom).toBeUndefined();
+  });
+
+  it('--cascade on a non-group entry does NOT populate metadata.cascadeFrom (no recursion fires)', async () => {
+    await seedEntry(projectRoot, soloUuid, 'solo-cascaded', {
+      currentStage: 'Drafting',
+    });
+
+    await cancelEntry(projectRoot, { uuid: soloUuid, cascade: true });
+
+    const events = await readStageTransitionEvents(projectRoot);
+    expect(events).toHaveLength(1);
+    const evt = events[0];
+    if (evt.kind !== 'stage-transition') throw new Error('unexpected kind');
+    expect(evt.entryId).toBe(soloUuid);
+    expect(evt.metadata?.cascadeFrom).toBeUndefined();
+  });
+
+  it('--cascade on a group: members carry metadata.cascadeFrom = group UUID; group itself does NOT', async () => {
+    await seedEntry(projectRoot, memberD, 'm-d', { currentStage: 'Drafting' });
+    await seedEntry(projectRoot, memberE, 'm-e', { currentStage: 'Outlining' });
+    await seedEntry(projectRoot, groupUuid, 'cascadefrom-group', {
+      currentStage: 'Drafting',
+      members: [memberD, memberE],
+    });
+
+    await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
+
+    const events = await readStageTransitionEvents(projectRoot);
+    expect(events).toHaveLength(3);
+
+    const byEntry = new Map<string, JournalEvent>();
+    for (const evt of events) {
+      if (evt.kind === 'stage-transition') byEntry.set(evt.entryId, evt);
+    }
+
+    const groupEvt = byEntry.get(groupUuid);
+    const memberDEvt = byEntry.get(memberD);
+    const memberEEvt = byEntry.get(memberE);
+    if (
+      groupEvt?.kind !== 'stage-transition'
+      || memberDEvt?.kind !== 'stage-transition'
+      || memberEEvt?.kind !== 'stage-transition'
+    ) {
+      throw new Error('expected three stage-transition events');
+    }
+
+    // Originator: cascadeFrom MUST be absent (the group IS the source).
+    expect(groupEvt.metadata?.cascadeFrom).toBeUndefined();
+
+    // Cascaded members: cascadeFrom MUST equal the originating group's UUID.
+    expect(memberDEvt.metadata?.cascadeFrom).toBe(groupUuid);
+    expect(memberEEvt.metadata?.cascadeFrom).toBe(groupUuid);
+  });
+
+  it('--cascade on a recursive (nested) group: transitively-cascaded events carry the TOP-LEVEL originator UUID, not the nearest parent', async () => {
+    // Build: groupUuid -> nestedGroup -> nestedMember.
+    // Doctor's group-recursive rule normally refuses this shape, but
+    // the cancel walker still has to behave correctly when one exists
+    // — per the docblock at cancel.ts:198. Per Step 7.2.8 the
+    // top-level originator semantic means nestedMember's event MUST
+    // reference groupUuid, NOT nestedGroup.
+    await seedEntry(projectRoot, nestedMember, 'nested-member', {
+      currentStage: 'Drafting',
+    });
+    await seedEntry(projectRoot, nestedGroup, 'nested-group', {
+      currentStage: 'Drafting',
+      members: [nestedMember],
+    });
+    await seedEntry(projectRoot, groupUuid, 'top-level-group', {
+      currentStage: 'Drafting',
+      members: [nestedGroup],
+    });
+
+    await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
+
+    const events = await readStageTransitionEvents(projectRoot);
+    expect(events).toHaveLength(3);
+
+    const byEntry = new Map<string, JournalEvent>();
+    for (const evt of events) {
+      if (evt.kind === 'stage-transition') byEntry.set(evt.entryId, evt);
+    }
+
+    const topEvt = byEntry.get(groupUuid);
+    const nestedGroupEvt = byEntry.get(nestedGroup);
+    const nestedMemberEvt = byEntry.get(nestedMember);
+    if (
+      topEvt?.kind !== 'stage-transition'
+      || nestedGroupEvt?.kind !== 'stage-transition'
+      || nestedMemberEvt?.kind !== 'stage-transition'
+    ) {
+      throw new Error('expected three stage-transition events');
+    }
+
+    // Top-level originator: cascadeFrom omitted.
+    expect(topEvt.metadata?.cascadeFrom).toBeUndefined();
+
+    // Nested group: cascaded by groupUuid, so cascadeFrom === groupUuid.
+    expect(nestedGroupEvt.metadata?.cascadeFrom).toBe(groupUuid);
+
+    // Nested member: transitively cascaded. The contract demands the
+    // TOP-LEVEL originator UUID, NOT the nearest parent (nestedGroup).
+    expect(nestedMemberEvt.metadata?.cascadeFrom).toBe(groupUuid);
+    expect(nestedMemberEvt.metadata?.cascadeFrom).not.toBe(nestedGroup);
+  });
+
+  it('--cascade on a group with skipped members: skipped entries emit NO stage-transition event (cascadeFrom not applicable)', async () => {
+    // memberD already Cancelled (off-pipeline skip), memberE Drafting
+    // (proper cascade target). The skipped member must not produce a
+    // stage-transition event at all; the cascaded member's event
+    // carries cascadeFrom.
+    await seedEntry(projectRoot, memberD, 'm-d-already', {
+      currentStage: 'Cancelled',
+    });
+    await seedEntry(projectRoot, memberE, 'm-e-draft', {
+      currentStage: 'Drafting',
+    });
+    await seedEntry(projectRoot, groupUuid, 'mixed-skip-group', {
+      currentStage: 'Drafting',
+      members: [memberD, memberE],
+    });
+
+    await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
+
+    const events = await readStageTransitionEvents(projectRoot);
+    // Two events: group + memberE. memberD was skipped (no event).
+    expect(events).toHaveLength(2);
+
+    const byEntry = new Map<string, JournalEvent>();
+    for (const evt of events) {
+      if (evt.kind === 'stage-transition') byEntry.set(evt.entryId, evt);
+    }
+    expect(byEntry.has(memberD)).toBe(false);
+
+    const groupEvt = byEntry.get(groupUuid);
+    const memberEEvt = byEntry.get(memberE);
+    if (
+      groupEvt?.kind !== 'stage-transition'
+      || memberEEvt?.kind !== 'stage-transition'
+    ) {
+      throw new Error('expected group + memberE events');
+    }
+    expect(groupEvt.metadata?.cascadeFrom).toBeUndefined();
+    expect(memberEEvt.metadata?.cascadeFrom).toBe(groupUuid);
   });
 });
