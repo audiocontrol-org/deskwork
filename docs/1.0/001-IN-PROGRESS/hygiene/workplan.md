@@ -272,3 +272,52 @@ Closes three semantic + rendering bugs in `session-end-hygiene` surfaced during 
 - Fix landed in `9086894` on main: Fix A (skip `- [x]` lines), Fix B-1 (tighten TBD regex to require `TBD:` colon-suffix per spec), Fix B-2 (strip backtick code-spans before pattern dispatch). Re-ran propose against hygiene workplan post-fix: 0 false positives. 1829 / 1829 tests pass. The fix is reachable in any v0.26.x build past `9086894`.
 - Lesson saved: the worktree's pinned branch is the fix target — never direct-push to main, never create a sibling fix branch (per `feedback_worktree_pinned_branch_for_fixes.md`).
 - TF-001 (dispatch-wrapper false-positive on cue substring matches in cited file paths) at `docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md` stays open; not surfaced again in Phase 9 but still tracked.
+
+## Phase 10: npm Trusted Publisher CI workflow  ·  [#343](https://github.com/audiocontrol-org/deskwork/issues/343)
+
+**Deliverable:** GitHub Actions workflow at `.github/workflows/publish-npm.yml` that publishes the three `@deskwork/*` packages to npm automatically on `v*` tag push, using OIDC (no npm token). `make publish` stays as a documented manual fallback. `/release` skill collapses Pause 3 (manual `make publish`) and Pause 4 (local marketplace-smoke) into a single "watch the Action" wait.
+
+Operator decisions (locked in during definition):
+
+- **Trigger model:** pure tag-push auto-publish. No GitHub Environment approval gate. The `/release` skill's atomic-push IS the approval moment.
+- **Manual fallback:** `make publish` stays working as documented backup. Used when CI is degraded or operator wants a one-off out-of-band publish.
+- **Scope:** smoke + assert-published roll INTO the workflow. `/release` becomes "atomic-push, watch the Action, done." The local `bash scripts/smoke-marketplace.sh` stays callable but is no longer a hard gate of `/release`.
+
+### Task 1: Author the publish workflow
+
+- [ ] Step 1: Create `.github/workflows/publish-npm.yml` triggered on `push: tags: ['v*']`. Permissions: `id-token: write`, `contents: read`.
+- [ ] Step 2: Steps: checkout → setup-node (node 20, registry-url npmjs.org) → `npm ci` → `make publish` (the existing dep-ordered topology — `npm publish` picks up OIDC when the workflow has `id-token: write` + npm-side trusted-publisher config).
+- [ ] Step 3: Post-publish step: run `tsx .claude/skills/release/lib/release-helpers.ts assert-published $TAG_VERSION` to confirm all three packages are on the registry.
+- [ ] Step 4: Post-assert step: run `bash scripts/smoke-marketplace.sh` so the marketplace clone → install → studio-boot → routes/assets gate fires in CI before the workflow exits success.
+- [ ] Step 5: Failure surface: on any step failure, the workflow exits non-zero. The GitHub release workflow (already firing on tag push) and the publish workflow can fail independently — document the recovery shape.
+
+### Task 2: Add `publishConfig` to each `@deskwork/*` package
+
+- [ ] Step 1: In `packages/core/package.json`, `packages/cli/package.json`, `packages/studio/package.json`: add `"publishConfig": { "access": "public", "provenance": true }`. Provenance is OIDC-anchored attestation — useful for adopter audit + free with the OIDC token.
+- [ ] Step 2: Verify `npm publish` (run locally) accepts the new field cleanly and that the provenance bit doesn't break the manual publish path.
+
+### Task 3: Update `/release` skill
+
+- [ ] Step 1: Edit `.claude/skills/release/SKILL.md`. Pause 3 ("publish step — RUN IN YOUR OWN TERMINAL") collapses into: after the atomic-push lands, the skill fetches the workflow run via `gh run list --workflow=publish-npm.yml --branch=main --limit=1 --json databaseId,status,conclusion`, then `gh run watch <run-id>` (with timeout). On `success`: continue to release-view step. On `failure`: surface the workflow logs URL + advise the operator.
+- [ ] Step 2: Pause 4 (the local marketplace smoke) is no longer a hard gate — the CI workflow runs it. The local `scripts/smoke-marketplace.sh` stays callable for local validation. Document this shift in the SKILL.md.
+- [ ] Step 3: The `assert-published` helper at `.claude/skills/release/lib/release-helpers.ts` keeps its existing API — CI uses the same helper.
+- [ ] Step 4: `make publish` fallback path: SKILL.md gains a "Recovery" section documenting how to manually publish if CI is broken (the operator runs `make publish` in their terminal as before, then re-invokes `/release` post-publish with a `--skip-publish-wait` flag — to be added).
+- [ ] Step 5: New flag `--skip-publish-wait`: when the operator already published manually, `/release` skips the workflow-watch step and proceeds directly to tag-message + atomic-push (the atomic-push step has already happened in this recovery path; the skill should detect that and skip cleanly OR the operator manually invokes the remaining sub-steps).
+
+### Task 4: Document the npm-side trusted-publisher setup
+
+- [ ] Step 1: Add a "Trusted Publisher setup" section to `RELEASING.md` (or create the doc if absent). One-time setup per package on npmjs.com → Settings → Publishing access → Add trusted publisher (organization `audiocontrol-org`, repository `deskwork`, workflow filename `publish-npm.yml`, environment blank).
+- [ ] Step 2: Document the recovery path explicitly: when CI is broken, fall back to `make publish` per the long-standing manual flow + the `/release` skill's `--skip-publish-wait` flag.
+
+### Task 5: Tests + verification
+
+- [ ] Step 1: Local validation against the workflow: use `act` or equivalent to dry-run the workflow against a fixture commit (optional; the project's "no test infrastructure in CI" rule doesn't forbid this — it just keeps the test suite out of CI).
+- [ ] Step 2: First real release (v0.26.2 fixing #342, OR v0.27.0 if Phase 10 ships standalone) uses the new workflow. Verify the workflow run succeeds end-to-end.
+- [ ] Step 3: Post-verification: if any glitches surface, file follow-up issues + close [#TBD-extend] per the project's "Issue closure requires verification in a formally-installed release" rule.
+
+**Acceptance Criteria:**
+- [ ] `.github/workflows/publish-npm.yml` ships, triggers on `v*` tag push, publishes via OIDC.
+- [ ] `publishConfig: { access: public, provenance: true }` added to `packages/core`, `packages/cli`, `packages/studio` package.json files.
+- [ ] `/release` skill SKILL.md updated: Pause 3 collapses into workflow-watch; Pause 4 marketplace-smoke moves to CI; `--skip-publish-wait` flag documented; `make publish` recovery path documented.
+- [ ] `RELEASING.md` documents the one-time npm-side trusted-publisher setup per package + the recovery path.
+- [ ] First real release uses the new workflow and succeeds end-to-end. Verification step closes [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project rule.

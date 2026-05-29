@@ -33,6 +33,8 @@ Ship a family of small, focused `/dw-lifecycle:` skills (one action per skill, U
 - [ ] Local smoke script exercises end-to-end wiring.
 - [ ] Adopter-facing docs (README + per-skill SKILL.md) explain the skills + the operational pattern.
 - [ ] Dogfood round against the existing backlog runs at least one full batched-proposal cycle for each of `:triage-issues` and `:promote-deferrals`.
+- [ ] **npm Trusted Publisher workflow ships:** `.github/workflows/publish-npm.yml` triggers on `v*` tag push, authenticates to npm via OIDC (no token), publishes all three `@deskwork/*` packages in dep order, runs `assert-published` + marketplace smoke as in-CI gates. `make publish` stays as a documented manual fallback.
+- [ ] **`/release` skill simplifies:** the Pause 3 ("publish step — run in your own terminal") collapses into "tag push fired Action `<run-url>`; waiting for `success`". The skill polls the workflow run, surfaces success/failure to the operator. The Pause 4 marketplace-smoke step is rolled into the CI workflow (the local smoke stays available but is no longer a hard gate of the `/release` skill).
 
 ## Out of Scope
 

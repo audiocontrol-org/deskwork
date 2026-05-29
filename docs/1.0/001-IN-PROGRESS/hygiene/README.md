@@ -24,6 +24,7 @@ Ships a family of UNIX-style `/dw-lifecycle:*` skills that surface and burn down
 | 7 | Documentation | [#331](https://github.com/audiocontrol-org/deskwork/issues/331) | Shipped on branch (README section + per-skill SKILL.md audit complete) |
 | 8 | Tests + smoke | [#332](https://github.com/audiocontrol-org/deskwork/issues/332) | Shipped on branch (1804 tests pass + scripts/smoke-hygiene.sh) |
 | 9 | Dogfood round | [#333](https://github.com/audiocontrol-org/deskwork/issues/333) | Shipped (v0.26.0 dogfood; 3 stale issues triaged + closed; promote-deferrals false-positive surfaced as [#339](https://github.com/audiocontrol-org/deskwork/issues/339) and fixed in 9086894) |
+| 10 | npm Trusted Publisher CI workflow | [#343](https://github.com/audiocontrol-org/deskwork/issues/343) | Not started |
 
 ## Key Links
 
