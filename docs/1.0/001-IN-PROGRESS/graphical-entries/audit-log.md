@@ -2268,7 +2268,7 @@ audit ID; no Task 7.1 change.
 ### AUDIT-20260529-14 — non-UUID-rejection test asserted only first-element-invalid; last-element case untested
 
 Finding-ID: AUDIT-20260529-14
-Status:     open
+Status:     fixed-05b6091
 Severity:   low
 Surface:    `packages/core/test/schema/entry.test.ts:322-336`
 
