@@ -327,9 +327,9 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 6.5: Doctor rule: orphan-pipeline-reference
 
-- [ ] Step 6.5.1: Add `lane-config-missing-template` doctor rule per PRD § Doctor rules: when a lane config references a `pipelineTemplate` id that doesn't resolve, surface error with the lane file path.
-- [ ] Step 6.5.2: Repair flow: operator picks a valid template, or removes the lane.
-- [ ] Step 6.5.3: Unit test against a fixture with a dangling pipeline reference.
+- [x] Step 6.5.1: Add `lane-config-missing-template` doctor rule per PRD § Doctor rules: when a lane config references a `pipelineTemplate` id that doesn't resolve, surface error with the lane file path. (Rule emits one severity=error finding per dangling lane with `{ laneId, laneFilePath, unresolvedTemplateId, availableTemplates }`; project-wide scan gated to first-site to avoid duplicates on multi-site projects.)
+- [x] Step 6.5.2: Repair flow: operator picks a valid template, or removes the lane. (Prompt plan offers one `set-template-<id>` choice per resolvable preset/override + `delete-lane` last; set-template uses tmp+rename atomic write and re-validates the chosen template at apply time; delete is gated on entry bindings via `readAllSidecars` with `+N more` sample-limited refusal mirroring `purge.ts`. Both actions emit a `lane-config-repair` journal event added to `JournalEventSchema`.)
+- [x] Step 6.5.3: Unit test against a fixture with a dangling pipeline reference. (4 scenarios in `test/doctor/lane-config-missing-template.test.ts`: audit-positive, set-template-repair + journal + re-audit-clean, delete-lane + journal, delete-lane-refusal-when-entry-bound naming the bound UUID; 715/715 full suite pass.)
 
 ### Task 6.6: Integration test
 

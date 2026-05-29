@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T03:11:32.650Z
+generated_at: 2026-05-29T04:20:08.985Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -244,6 +244,13 @@ clones:
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:96:111
     disposition: pending
     reason: null
+  - id: e1b16a900b51
+    lines: 18
+    members:
+      - packages/core/src/doctor/rules/lane-config-missing-template.ts:232:249
+      - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:158:174
+    disposition: keep-with-reason
+    reason: Doctor rule contract boilerplate (end of plan choices array + apply()'s plan.kind guard + payload coercion); each rule independently implements the DoctorRule interface against the same contract, so shape similarity is interface-driven not duplication; extracting a base class would violate composition-over-inheritance
   - id: 2ccdcd76762f
     lines: 15
     members:
@@ -282,8 +289,8 @@ clones:
   - id: 189be54baaa8
     lines: 9
     members:
-      - packages/core/src/doctor/runner.ts:180:188
-      - packages/core/src/doctor/runner.ts:207:215
+      - packages/core/src/doctor/runner.ts:182:190
+      - packages/core/src/doctor/runner.ts:209:217
     disposition: pending
     reason: null
   - id: 41b3f9fce647

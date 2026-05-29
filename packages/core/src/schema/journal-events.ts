@@ -203,6 +203,36 @@ const LaneMoveEvent = z.object({
 });
 
 /**
+ * Phase 6 Task 6.5 (graphical-entries): doctor-repair record for a lane
+ * config whose `pipelineTemplate` reference does not resolve. The
+ * `lane-config-missing-template` rule emits this event after applying
+ * either a `set-template` rebind (with `before` / `after` template ids)
+ * or a `delete` of the lane file (with `deleted: true`).
+ *
+ * The event is project-scoped (no `entryId`); `laneId` identifies the
+ * lane the repair acted on. `ruleId` records the originating doctor
+ * rule so an audit trail can be filtered by which rule wrote the entry.
+ */
+const LaneConfigRepairEvent = z.object({
+  kind: z.literal('lane-config-repair'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+  ruleId: z.string().min(1),
+  details: z.union([
+    z.object({
+      action: z.literal('set-template'),
+      before: z.string().min(1),
+      after: z.string().min(1),
+    }),
+    z.object({
+      action: z.literal('delete'),
+      deleted: z.literal(true),
+      laneFilePath: z.string().min(1),
+    }),
+  ]),
+});
+
+/**
  * Phase 6 Task 6.2 (graphical-entries): pipeline-template-lifecycle
  * events emitted by the `/deskwork:pipeline` verb family. Each event is
  * project-scoped (no `entryId`); `pipelineId` identifies the template
@@ -310,6 +340,7 @@ export const JournalEventSchema = z.discriminatedUnion('kind', [
   LaneRestoreEvent,
   LanePurgeEvent,
   LaneMoveEvent,
+  LaneConfigRepairEvent,
   PipelineCreateEvent,
   PipelineUpdateEvent,
   PipelineDeleteEvent,
