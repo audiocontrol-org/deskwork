@@ -368,6 +368,11 @@ Schema delta: `archivedAt?: string` added to `EntrySchema` (`packages/core/src/s
 - `@deskwork/cli`: 327 → 400 (+73) — per-verb suites (list/show/create/update/add-member/remove-member/archive+restore) + cancel-cascade.test.ts.
 - `@deskwork/studio`: 933 (unchanged — no studio surface changes in this task; Tasks 7.3 / 7.4 / 7.6 own that).
 
+**Task 7.2 review-action follow-ups (must land before Phase 7 closeout per `.claude/rules/agent-discipline.md` "Just for now is bullshit"):**
+
+- [ ] Step 7.2.7: cascade `regenerateCalendar` N+1 perf fix — split `cancelEntry` into a private walker + public wrapper so the calendar regenerate fires once at the cascade boundary instead of N+1 times. Tracked by [#360](https://github.com/audiocontrol-org/deskwork/issues/360) (AUDIT-20260529-18 deferral from Task 7.2 code-quality review of `15dd424`). Affects `packages/core/src/entry/cancel.ts:225`; existing cascade tests pass behaviorally but a regenerate-count assertion is the missing coverage. Defer-rationale: a structural refactor of `cancelEntry` is bigger than the Task 7.2 review-action commit could absorb without confusing the audit narrative.
+- [ ] Step 7.2.8: record `cascadeFrom` on stage-transition events emitted by cascade — extend `StageTransitionEvent` (`packages/core/src/schema/journal-events.ts`) with optional `metadata.cascadeFrom`; populate it in `cancel.ts`'s cascade walk; restore the journal-events docblock paragraph claiming the linkage. Tracked by [#359](https://github.com/audiocontrol-org/deskwork/issues/359) (AUDIT-20260529-17 follow-up from Task 7.2 code-quality review of `15dd424`). Audit-trail enhancement — without it, cascade journal events are indistinguishable from single-entry cancels post-scrollback. Defer-rationale: scope-creep above what the original Task 7.2 spec required; appropriately filed for operator scope decision.
+
 ### Task 7.3: Group review surface — Members section
 
 - [ ] Step 7.3.1: When the entry's `members[]` is non-empty, the review surface renders an additional "Members" section.
