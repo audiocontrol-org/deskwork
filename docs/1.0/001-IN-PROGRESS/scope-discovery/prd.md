@@ -44,6 +44,20 @@ Phase 11 captures exhaustively per the capture-mode rule. Scoping — which sub-
 
 Phase 12 captures exhaustively. Scoping is operator-driven; the agent does not pre-cut.
 
+**Phase 13 extension (2026-05-29).** Triggered by operator-side observation during the Phase 12 self-dogfood — the agent that ran the audit-barrage lifted 11 findings into the canonical audit-log, then went straight from "findings lifted" to "fix dispatch" without scoping the fixes into the workplan. Findings then got addressed ad-hoc in a parallel session. Both directions (skip-the-workplan-and-just-fix; skip-the-workplan-and-defer-to-GH-issue) are the same failure mode: the workplan stops representing the source of truth for what the implementation loop is supposed to pick up. The operator's framing, verbatim: *"Filing a bug report isn't good enough. It MUST BE SCOPED INTO THE WORKPLAN, otherwise it won't get picked up by the implementation loop. Unless there's truly a good reason NOT to fix a problem, it should be relentlessly scoped into the workplan, not relentlessly deferred — ESPECIALLY problems with the implementation underway. A broken implementation is not done — it's broken. And, along with the discipline to scope the fix, TDD principles should apply such that a test that exercises the bug is written before the fix is implemented — and the implementation isn't considered a candidate for completion until tests are green."*
+
+Phase 13 ships the structural tooling that makes this discipline mechanical:
+
+- **NEW `/dw-lifecycle:promote-findings` skill + CLI verb.** Walks `audit-log.md` for `Status: open` entries; **default disposition is "scope into the workplan as a TDD-first fix task"**. The agent CANNOT pick deferral. Only the operator can — and only with a substantive-reason validator pass (≥40 chars; gaming-phrase reject list per hygiene's `promote-deferrals`).
+- **TDD-first workplan task shape** — every promoted finding renders into a workplan task block whose Steps mandate: (1) write a failing test exercising the bug, (2) confirm it fails, (3) implement the fix, (4) confirm it passes, (5) commit with `Closes AUDIT-<id>` in subject. Operator confirms placement (which phase, where in the phase); task content is not negotiable.
+- **`/dw-lifecycle:implement` strict refusal gate** — refuses to advance to the next task while ANY finding on the current feature has `Status: open`. No `--ignore-open-findings` escape hatch in v1; per operator decision, err on rigidity. (If proves unworkable: revisit relaxation options.)
+- **Mechanical TDD enforcement** — a doctor rule + commit-msg gate verify that fix-finding tasks marked `[x]` actually have a passing test file at the path cited in Step 1. Not a markdown checkbox the agent can flip; a mechanical check the project's existing gate machinery enforces.
+- **Closure-side automation** — `Closes AUDIT-<id>` commits auto-flip audit-log entries to `Status: fixed-<sha>`; release process flips `fixed-<sha>` → `verified-<date>` for findings in the release range; a NEW `re-audit-fixed-findings` skill verifies findings no longer surface post-release.
+
+Phase 13 is the operator-discipline-displacement counterpart to Phase 12. Phase 12 produces the findings; Phase 13 forces them through the workplan into completion. The two ship together; Phase 12 without Phase 13 would just produce more findings to ad-hoc rationalize away.
+
+Phase 13 captures exhaustively. Scoping is operator-driven; the agent does not pre-cut.
+
 ## Acceptance Criteria
 
 - [ ] All ~18 new `/dw-lifecycle:*` slash commands exist and are discoverable via the Claude Code slash-command picker
@@ -94,6 +108,19 @@ Phase 12 captures exhaustively. Scoping is operator-driven; the agent does not p
 - [ ] Agent-discipline rule documents the audit-barrage surface as the third independent audit layer (additive to in-band self-audit + SDD review cycle); cites the operator-triage workflow + the override paths.
 - [ ] ROADMAP.md updated to mark Design A delivered + Design B framed as next.
 - [ ] Adopter-facing docs: `plugins/dw-lifecycle/README.md` carries an audit-barrage section + the operator triage workflow.
+
+**Phase 13 acceptance criteria (added 2026-05-29; extension proposed after the Phase 12 self-dogfood surfaced the audit-finding-lifecycle gap):**
+
+- [ ] NEW `/dw-lifecycle:promote-findings` skill + CLI verb exist. Walks the named feature's `audit-log.md` for `Status: open` entries. Renders each into a TDD-first workplan task block (5 Steps + Acceptance Criteria) and proposes a workplan edit; operator confirms placement (phase + position). Atomic edit (no partial state on operator decline mid-batch).
+- [ ] **Default disposition is "scope into workplan."** The agent CANNOT pick deferral. The operator can pick `acknowledged-<ref>` or `informational` but only with substantive-reason validator pass (≥40 chars; rejects `for now`, `will fix later`, `non-trivial`, `future work`, `deferred to vN`, `not in scope`, `TODO`, `come back to`).
+- [ ] **Implement-loop gate.** `/dw-lifecycle:implement` refuses to advance to next-task while any finding on the current feature has `Status: open`. Refusal message names the open findings + suggests `promote-findings` as the cure. NO `--ignore-open-findings` escape hatch in v1.
+- [ ] **Mechanical TDD enforcement.** NEW doctor rule `fix-task-tdd-discipline` flags `[x]` fix-finding tasks whose cited test file doesn't exist OR whose test doesn't pass. NEW commit-msg gate blocks `Closes AUDIT-<id>` commits whose included test file is missing OR fails.
+- [ ] **Closure-side automation.** Post-commit hook detects `Closes AUDIT-<id>` in commit subjects and auto-flips the audit-log status to `fixed-<sha>`. Release/close-shipped step flips `fixed-<sha>` → `verified-<date>` for findings in the release range. NEW `/dw-lifecycle:re-audit-fixed-findings` runs audit-barrage post-release; cross-references findings against `fixed-<sha>` entries; flips findings that no longer surface; findings that re-surface stay `fixed-<sha>` with new run-id appended.
+- [ ] **Audit-log preservation honored throughout** — Phase 13's status flips are status-only; entry bodies preserved per the existing audit-log preservation rule.
+- [ ] **Live verification + dogfood.** Phase 13's promote-findings runs cleanly against Phase 12's already-closed AUDIT-20260529 entries. Fresh audit-barrage against Phase 13's own promote-findings code; any open findings flow through the loop cleanly; implement-loop gate refuses-to-advance verified live; TDD-enforcement gate refuses-fix-without-passing-test verified live.
+- [ ] Agent-discipline rule documents the anti-deferral discipline (scope-into-workplan is the default + only agent-pickable disposition) + the implement-loop gate's rigidity stance + the TDD-enforcement mechanics.
+- [ ] ROADMAP.md updated to reflect Phase 13's anti-deferral discipline layer.
+- [ ] Adopter-facing docs: `plugins/dw-lifecycle/README.md` carries the promote-findings + implement-loop-gate + TDD-enforcement triad.
 
 ## Out of Scope
 
