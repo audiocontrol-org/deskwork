@@ -33,20 +33,27 @@ const CLI_ENTRY = resolve(HERE, '..', '..', '..', 'cli.ts');
  * Per-fixture jscpd config — same shape as the plugin template but
  * tuned for the small synthetic bodies the validator scenarios plant
  * (minLines: 5, minTokens: 50; matches the audiocontrol pilot).
+ *
+ * `extra` merges additional jscpd config keys on top of the base shape
+ * (e.g. `{ gitignore: true }` for the #354 gitignored-sandbox
+ * regression). Keys in `extra` win over the base defaults.
  */
-const FIXTURE_JSCPD_CONFIG = JSON.stringify(
-  {
-    languages: ['typescript'],
-    pattern: '**/*.ts',
-    ignore: ['**/*.test.ts', '**/dist/**', '**/node_modules/**'],
-    minLines: 5,
-    minTokens: 50,
-    reporters: ['json'],
-    output: 'reports/duplication',
-  },
-  null,
-  2,
-);
+function fixtureJscpdConfig(extra: Readonly<Record<string, unknown>> = {}): string {
+  return JSON.stringify(
+    {
+      languages: ['typescript'],
+      pattern: '**/*.ts',
+      ignore: ['**/*.test.ts', '**/dist/**', '**/node_modules/**'],
+      minLines: 5,
+      minTokens: 50,
+      reporters: ['json'],
+      output: 'reports/duplication',
+      ...extra,
+    },
+    null,
+    2,
+  );
+}
 
 export interface Fixture {
   readonly dir: string;
@@ -60,16 +67,26 @@ export interface Fixture {
  * Create a fresh fixture directory under the OS tmpdir. Each fixture
  * gets a unique random suffix via `mkdtemp` so concurrent vitest
  * workers don't collide.
+ *
+ * `options.jscpdConfig` merges extra keys into the per-fixture
+ * `.jscpd.json` (e.g. `{ gitignore: true }` for the #354
+ * gitignored-sandbox regression).
  */
-export async function makeFixture(label: string): Promise<Fixture> {
+export async function makeFixture(
+  label: string,
+  options: { readonly jscpdConfig?: Readonly<Record<string, unknown>> } = {},
+): Promise<Fixture> {
   const dir = await mkdtemp(join(tmpdir(), `dw-clone-${label}-`));
-  await writeFile(join(dir, '.jscpd.json'), FIXTURE_JSCPD_CONFIG, 'utf8');
+  await writeFile(join(dir, '.jscpd.json'), fixtureJscpdConfig(options.jscpdConfig), 'utf8');
   await mkdir(join(dir, 'reports', 'duplication'), { recursive: true });
   const baseline = join(dir, 'baseline.yaml');
   return {
     dir,
     baseline,
     async writeFile(name: string, body: string): Promise<void> {
+      // mkdir the parent so nested fixture paths (e.g. a gitignored
+      // `sandbox/clone.ts`) can be planted without a separate step.
+      await mkdir(dirname(join(dir, name)), { recursive: true });
       await writeFile(join(dir, name), body, 'utf8');
     },
     async removeFile(name: string): Promise<void> {

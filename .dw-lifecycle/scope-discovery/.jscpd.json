@@ -9,6 +9,7 @@
     "**/coverage/**"
   ],
   "minTokens": 50,
+  "gitignore": true,
   "reporters": ["json"],
   "output": "reports/duplication"
 }
