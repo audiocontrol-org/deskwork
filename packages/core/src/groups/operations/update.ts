@@ -47,9 +47,10 @@ export async function updateGroup(
   const existing = await readSidecar(projectRoot, uuid);
   if (!isGroupEntry(existing)) {
     throw new Error(
-      `Cannot update group "${opts.slugOrUuid}": entry has no members. `
-      + `Per the Task 7.1.2 invariant, only entries with a non-empty `
-      + `\`members[]\` are groups.`,
+      `Cannot update group "${opts.slugOrUuid}": entry is not a group `
+      + `(no \`members\` field on the sidecar). Group-only verbs require `
+      + `the \`members\` field to be present; regular entries should be `
+      + `mutated via the universal entry verbs.`,
     );
   }
 

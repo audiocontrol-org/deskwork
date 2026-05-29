@@ -331,7 +331,7 @@ const PipelineDeleteEvent = z.object({
  * (the group's UUID — groups are themselves entries) and a per-kind
  * `details` payload.
  *
- * The seven kinds mirror the seven mutating verbs that operate on
+ * The six kinds mirror the six mutating verbs that operate on
  * groups specifically (cancel uses the universal `stage-transition`
  * event — `/deskwork:cancel` is a universal verb, see DESKWORK-STATE-
  * MACHINE.md Commandment II):
@@ -346,9 +346,13 @@ const PipelineDeleteEvent = z.object({
  *
  * Group `cancel` propagation (`--cascade`) emits one
  * `stage-transition` event per affected entry (including the group
- * itself), per the universal-verb-no-cascade rule. The cascade
- * surfaces in the per-entry event's `metadata.cascadeFrom` field
- * carrying the originating group's entry id; see `cancel.ts`.
+ * itself) per the universal-cancel verb's event shape. The cascade
+ * does NOT record per-member `cascadeFrom` linkage today — the
+ * audit trail of which cancels were part of a cascade is currently
+ * only reachable via the cancel-time stdout JSON result's
+ * `cascadedMembers[]` / `skippedMembers[]` arrays. See the cancel
+ * SKILL.md for the rationale and a tracking pointer for the
+ * cascadeFrom-on-event enhancement.
  */
 const GroupCreateEvent = z.object({
   kind: z.literal('group-create'),

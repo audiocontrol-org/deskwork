@@ -2,23 +2,11 @@
  * group create — write a new group entry sidecar.
  *
  * Phase 7 Task 7.2 (graphical-entries). A group is an entry whose
- * `members[]` is non-empty (Task 7.1.2). At create time the array is
- * initially empty; the operator populates it via subsequent
- * `add-member` calls.
- *
- * Decision rationale for "empty members at create time":
- *
- *   The Task 7.1.2 invariant says non-empty `members[]` is the GROUP
- *   signal, but a newly-created group has no members yet. The schema
- *   tolerates this — an entry with `members: []` is structurally a
- *   regular entry until the operator adds the first member. The
- *   `group create` verb writes the entry with `members: []` (NOT
- *   `members: undefined`) so the dashboard / studio can distinguish
- *   "intended-as-a-group, awaiting members" from "regular entry that
- *   happens to have no members." Doctor's `group-empty-members-array`
- *   informational rule (Task 7.5.5) surfaces this dual-representation;
- *   here we deliberately write the empty array so the intent survives
- *   the round-trip.
+ * `members` field is PRESENT (see `isGroupEntry`). At create time the
+ * array is initialized empty (`members: []`); the operator populates
+ * it via subsequent `add-member` calls. The `members`-present shape
+ * is the group-declaration marker — `members: undefined` denotes a
+ * regular (non-group) entry.
  *
  * Refuses when:
  *   - the lane id doesn't resolve (`loadLaneConfig` throws).
@@ -111,11 +99,10 @@ export async function createGroup(
     currentStage: startStage,
     iterationByStage: {},
     lane: opts.lane,
-    // Per the docblock: write `members: []` (not undefined) so the
-    // dashboard / studio can distinguish intended-group from
-    // accidental-empty. Doctor's `group-empty-members-array` rule
-    // (Task 7.5.5) surfaces the dual representation; here we
-    // deliberately write the empty array as the group-intent marker.
+    // The empty array is the group-declaration marker — `members`
+    // PRESENT (even if empty) means "this entry is a group, just
+    // not populated yet"; `members` ABSENT means "regular entry."
+    // See `isGroupEntry` for the predicate semantic.
     members: [],
     ...(opts.artifactPath !== undefined && { artifactPath: opts.artifactPath }),
     createdAt: at,

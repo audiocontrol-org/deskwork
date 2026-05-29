@@ -13,9 +13,11 @@
  * `group show` reports them verbatim so the operator sees the
  * dangling reference rather than the resolve-time error.
  *
- * Refuses when the resolved entry is not itself a group (i.e. has no
- * non-empty `members[]`) — the verb is group-specific; for non-group
- * entries, use the universal entry read paths.
+ * Refuses when the resolved entry is not itself a group (no
+ * `members` field on the sidecar) — the verb is group-specific; for
+ * non-group entries, use the universal entry read paths. An empty
+ * group (`members: []`, no UUIDs yet) IS a group and shows with an
+ * empty member list.
  */
 
 import { readSidecar } from '../../sidecar/read.ts';
@@ -47,10 +49,10 @@ export async function showGroup(
   const entry = await readSidecar(projectRoot, uuid);
   if (!isGroupEntry(entry)) {
     throw new Error(
-      `Cannot show group "${slugOrUuid}": entry has no members. `
-      + `Per the Task 7.1.2 invariant, only entries with a non-empty `
-      + `\`members[]\` are groups. Use the universal entry read paths `
-      + `for non-group entries.`,
+      `Cannot show group "${slugOrUuid}": entry is not a group `
+      + `(no \`members\` field on the sidecar). Group-only verbs require `
+      + `the \`members\` field to be present; regular entries should be `
+      + `read via the universal entry paths.`,
     );
   }
 

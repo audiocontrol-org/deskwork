@@ -38,14 +38,23 @@ describe('deskwork group list', () => {
     expect(parsed.groups).toEqual([]);
   });
 
-  it('skips entries with an empty members[] array (per Task 7.1.2)', () => {
+  it('includes empty-members groups (members: [] is the declared-empty marker, not a regular entry)', () => {
+    // Per the Task 7.2 review action superseding AUDIT-20260529-13:
+    // an entry with `members: []` IS a group (just not populated yet)
+    // — `group create` writes this shape so the dashboard surfaces
+    // the new group immediately. `members: undefined` denotes a
+    // regular entry, which IS correctly filtered out by `list`.
     writeSidecar(project, '550e8400-e29b-41d4-a716-446655440002', 'empty-group', {
       members: [],
     });
+    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440003', 'regular-entry');
     const res = group(project, 'list');
     expect(res.code).toBe(0);
-    const parsed = JSON.parse(res.stdout) as { groups: unknown[] };
-    expect(parsed.groups).toEqual([]);
+    const parsed = JSON.parse(res.stdout) as {
+      groups: Array<{ slug: string; memberCount: number }>;
+    };
+    expect(parsed.groups).toHaveLength(1);
+    expect(parsed.groups[0]).toMatchObject({ slug: 'empty-group', memberCount: 0 });
   });
 
   it('emits groups whose members[] is non-empty', () => {

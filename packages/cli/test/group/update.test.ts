@@ -87,11 +87,27 @@ describe('deskwork group update', () => {
     expect(res.stderr).toMatch(/--title must be a non-empty string/);
   });
 
-  it('refuses against a non-group entry', () => {
+  it('refuses against a non-group entry (no members field at all)', () => {
     writeSidecar(project, '550e8400-e29b-41d4-a716-446655440310', 'plain');
     const res = group(project, 'update', 'plain', '--title', 'oops');
     expect(res.code).not.toBe(0);
-    expect(res.stderr).toMatch(/has no members/);
+    expect(res.stderr).toMatch(/entry is not a group/);
+  });
+
+  it('updates an empty group (members: [], no UUIDs yet)', () => {
+    // Per the Task 7.2 review action superseding AUDIT-20260529-13:
+    // `members: []` IS a valid group state. `update --title` works
+    // against a declared-empty group, same as against a populated
+    // one.
+    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440311', 'empty-shell', {
+      title: 'Old Title',
+      members: [],
+    });
+    const res = group(project, 'update', 'empty-shell', '--title', 'New Title');
+    expect(res.code).toBe(0);
+    const parsed = JSON.parse(res.stdout) as { title: string; changedFields: string[] };
+    expect(parsed.title).toBe('New Title');
+    expect(parsed.changedFields).toContain('title');
   });
 
   it('refuses when the slug positional is missing', () => {

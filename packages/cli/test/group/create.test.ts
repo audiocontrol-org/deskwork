@@ -139,4 +139,24 @@ describe('deskwork group create', () => {
     expect(res.code).toBe(2);
     expect(res.stderr).toMatch(/Usage: deskwork group/);
   });
+
+  it('create -> list round-trip: the new group appears in list output immediately', () => {
+    // Regression test for the empty-members discoverability bug
+    // surfaced by the Task 7.2 code-quality review (HIGH-1).
+    // Pre-fix: `group create` wrote `members: []` but `group list`
+    // filtered on length>0, so the new group was invisible. Post-fix:
+    // `isGroupEntry` checks `members`-field-present, so the new group
+    // surfaces in `list` with `memberCount: 0`. Closes review finding
+    // MED-4 (test gap that would have caught HIGH-1 on its own).
+    const createRes = group(project, 'create', 'round-trip-group', '--lane', 'default');
+    expect(createRes.code).toBe(0);
+    const listRes = group(project, 'list');
+    expect(listRes.code).toBe(0);
+    const parsed = JSON.parse(listRes.stdout) as {
+      groups: Array<{ slug: string; memberCount: number }>;
+    };
+    const found = parsed.groups.find((g) => g.slug === 'round-trip-group');
+    expect(found).toBeDefined();
+    expect(found?.memberCount).toBe(0);
+  });
 });

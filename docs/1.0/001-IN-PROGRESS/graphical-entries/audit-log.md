@@ -2289,3 +2289,192 @@ Resolution: a sibling test added at
 members[] entries that are not UUIDs (last element invalid)" —
 mirrors the existing first-element test with the order swapped.
 Lands in the same commit as this audit-log entry.
+
+## 2026-05-29 (session 2) audit: Phase 7 Task 7.2 — /deskwork:group skill family
+
+Audit scope: one commit, `15dd424`. Risk classification: high (new
+core module + CLI dispatcher + schema delta + journal-events
+expansion + cross-skill `--cascade` flag; 3725 insertions across 33
+files).
+
+Track 1 verification (controller, this session):
+
+- `npm --workspace @deskwork/core test`: 755/755 pass (723 → 755,
+  +32 schema + group-operations integration tests).
+- `npm --workspace @deskwork/cli test`: 400/400 pass (327 → 400,
+  +73 per-verb suites + cancel-cascade).
+- `npm --workspace @deskwork/studio test`: 933/933 pass, unchanged.
+- Workspace builds for `@deskwork/core`, `@deskwork/cli`,
+  `@deskwork/studio`: exit 0.
+- `dw-lifecycle check-clones --refresh-baseline`: 18 NEW clone
+  groups, all dispositioned `keep-with-reason` (parallel-domain
+  symmetry across lane/pipeline/group dispatchers + the universal
+  stage-transition verb boilerplate).
+
+Track 2 spec-compliance: parallel `code-reviewer` agent against the
+workplan + PRD. All six workplan sub-steps (7.2.1 through 7.2.6)
+literally satisfied. The implementer's two scope additions (the
+`restore` subcommand and 6 group-* journal-event kinds) defensible
+per project convention (sister-to-archive symmetry + audit-trail
+completeness). No Phase 7.3 / 7.4 / 7.5 / 7.6 / 7.7 / 7.8 scope
+pulled forward. Two informational nits (PRD-sketch field-order vs.
+impl, `show.ts:71` catch{} narrowing) — no-action.
+
+Track 3 code-quality: parallel `code-reviewer` agent against the
+diff. Multiple substantive findings — recorded below.
+
+### AUDIT-20260529-15 — `members: []` is invisible to `group list` / `group show` / `group update` (HIGH)
+
+Finding-ID: AUDIT-20260529-15
+Status:     fixed-PENDING-SHA-SAME-COMMIT
+Severity:   high
+Surface:    `packages/core/src/groups/types.ts:20-22`, `packages/core/src/groups/operations/list.ts:35`, `packages/core/src/groups/operations/show.ts:48`, `packages/core/src/groups/operations/update.ts:48`, `packages/core/src/groups/operations/create.ts:119`
+
+`group create` writes `members: []` deliberately as the "intent
+marker" for a newly-declared group (see `create.ts` doc-comment,
+pre-fix lines 12-22). But `isGroupEntry` defined the predicate as
+"`Array.isArray(members) && members.length > 0`", so `list.ts`
+filtered the new group out, and `show.ts` + `update.ts` refused on
+empty-members entries.
+
+Reproduction (pre-fix):
+
+  $ deskwork group create my-group --lane default
+  {"created":true,"slug":"my-group","members":[]}
+  $ deskwork group list
+  {"groups":[]}
+  $ deskwork group show my-group
+  Cannot show group "my-group": entry has no members.
+
+The operator's just-created group was invisible to every read-side
+verb until they ran `add-member`. Per the CLI's contract that
+`create` makes a group, this was a UX regression.
+
+Resolution: `isGroupEntry` redefined to `Array.isArray(entry.members)`
+— `members: []` IS a group (declared-empty marker); `members:
+undefined` denotes a regular entry. Added sibling predicate
+`isPopulatedGroupEntry` for the "group AND has members" semantic
+(used downstream by the multi-lane composed view in Task 7.4 + the
+informational `group-all-members-cancelled` doctor rule in Task
+7.5.3 — both should skip empty groups). Updated show.ts + update.ts
+refusal messages to refer to "entry is not a group (no `members`
+field)" instead of "entry has no members".
+
+This finding SUPERSEDES AUDIT-20260529-13's framing at the CLI/
+predicate layer; the schema-layer permissiveness (both shapes parse)
+stands.
+
+### AUDIT-20260529-16 — Task 7.5.5 reframed from `group-empty-members-array` to `group-stale-empty-members` (medium)
+
+Finding-ID: AUDIT-20260529-16
+Status:     fixed-PENDING-SHA-SAME-COMMIT
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:390`
+
+The previously-scheduled doctor rule
+`group-empty-members-array` (Task 7.5.5) was framed around the
+assumption that `members: []` and `members: undefined` were
+"semantically equivalent" non-group shapes that needed normalizing.
+AUDIT-20260529-15's resolution invalidates that assumption — the
+two shapes now denote different entities (declared-empty group vs.
+regular entry). Task 7.5.5 reframed to `group-stale-empty-members`:
+surface declared-empty groups whose age exceeds a threshold AND
+have no `group-add-member` journal events. Operator decides whether
+to cancel / archive / populate.
+
+### AUDIT-20260529-17 — journal-events docblock claimed non-existent `cascadeFrom` linkage (medium; cascadeFrom feature tracked at #359)
+
+Finding-ID: AUDIT-20260529-17
+Status:     fixed-PENDING-SHA-SAME-COMMIT
+Severity:   medium
+Surface:    `packages/core/src/schema/journal-events.ts:347-351`
+
+The docblock above the group-* event kinds claimed that group
+cancel `--cascade` "emits one `stage-transition` event per affected
+entry... the cascade surfaces in the per-entry event's
+`metadata.cascadeFrom` field carrying the originating group's
+entry id." `cancel.ts:138-145, :193-197` never sets
+`metadata.cascadeFrom`. The doc-code drift made the audit-trail
+claim load-bearing for downstream consumers who would have searched
+for the field that doesn't exist.
+
+Resolution: docblock rewritten to match the actual behavior — the
+cascade does NOT record per-event linkage today; the audit trail is
+reachable only via the cancel-time stdout JSON result's
+`cascadedMembers[]` / `skippedMembers[]` arrays. SKILL.md was
+already correct (line 44 explicitly states this). The
+`cascadeFrom`-on-event feature is captured in the follow-up issue
+filed alongside this audit entry.
+
+### AUDIT-20260529-18 — `regenerateCalendar` runs N+1 times per cascade (medium, deferred)
+
+Finding-ID: AUDIT-20260529-18
+Status:     acknowledged-2026-05-29-issue-#360
+Severity:   medium
+Surface:    `packages/core/src/entry/cancel.ts:225`
+
+`cancelEntry` runs `regenerateCalendar(projectRoot)` once per
+invocation. The cascade path (`cancel.ts:193`) recursively invokes
+`cancelEntry` for every cascaded member, so a group with N members
+triggers N+1 full sidecar re-reads + calendar.md writes. Quadratic
+disk I/O on large groups; the inner regenerations don't compound to
+incorrect state (the journal is the source of truth and each cancel
+finalizes its own write before the regenerate reads), but the work
+is wasted.
+
+Disposition: medium. The fix is a structural refactor (split
+`cancelEntry` into a private walker + a public wrapper that
+regenerates once at the cascade boundary) that's bigger than this
+review-action commit. Filed as a follow-up GitHub issue against the
+graphical-entries milestone; the issue body has the recommended
+refactor shape.
+
+### AUDIT-20260529-19 — create→list round-trip test gap (medium)
+
+Finding-ID: AUDIT-20260529-19
+Status:     fixed-PENDING-SHA-SAME-COMMIT
+Severity:   medium
+Surface:    `packages/cli/test/group/create.test.ts`, `packages/cli/test/group/list.test.ts`
+
+The original Task 7.2 test suite covered `group create` + `group
+list` in isolation but had no end-to-end round-trip that drove
+both verbs against the same fixture. The HIGH-1 bug
+(AUDIT-20260529-15) was exactly the kind of integration mismatch
+this gap was blind to.
+
+Resolution: new test
+`packages/cli/test/group/create.test.ts:create -> list round-trip`
+that runs `group create round-trip-group --lane default` then
+`group list` and asserts the new slug appears with `memberCount:
+0`. Plus existing tests updated to assert the new (post-fix)
+empty-group semantics across list / show / update.
+
+### AUDIT-20260529-20 — journal-events docblock count off-by-one (low)
+
+Finding-ID: AUDIT-20260529-20
+Status:     fixed-PENDING-SHA-SAME-COMMIT
+Severity:   low
+Surface:    `packages/core/src/schema/journal-events.ts:334`
+
+Docblock prose said "seven kinds" then enumerated six (and six are
+defined). Off-by-one prose error.
+
+Resolution: prose updated from "seven" to "six". One-character fix.
+
+### AUDIT-20260529-21 — group SKILL.md `update` description didn't mention empty-members refusal semantics (low)
+
+Finding-ID: AUDIT-20260529-21
+Status:     fixed-PENDING-SHA-SAME-COMMIT
+Severity:   low
+Surface:    `plugins/deskwork/skills/group/SKILL.md:47`
+
+The `update` verb description didn't surface that update refuses
+against entries without the `members` field. AUDIT-20260529-15's
+resolution changed the refusal predicate (from "empty members" to
+"missing members field"); the SKILL.md needed to match.
+
+Resolution: SKILL.md `update` description updated to read "Works
+against both populated and declared-empty groups; refuses against
+entries without the `members` field at all (regular entries)." The
+header was also expanded to document the empty-vs-absent semantic
+distinction.

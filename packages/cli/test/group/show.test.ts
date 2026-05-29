@@ -137,20 +137,31 @@ describe('deskwork group show', () => {
     expect(parsed.members[1]).toMatchObject({ slug: 'm-mockups-lane', lane: 'mockups' });
   });
 
-  it('refuses against a non-group entry', () => {
+  it('refuses against a non-group entry (no members field at all)', () => {
     writeSidecar(project, '550e8400-e29b-41d4-a716-446655440151', 'regular');
     const res = group(project, 'show', 'regular');
     expect(res.code).not.toBe(0);
-    expect(res.stderr).toMatch(/has no members/);
+    expect(res.stderr).toMatch(/entry is not a group/);
   });
 
-  it('refuses against an entry with empty members[]', () => {
+  it('shows an empty group (members: [], no UUIDs yet) with members: []', () => {
+    // Per the Task 7.2 review action superseding AUDIT-20260529-13:
+    // `members: []` IS a valid group state (declared, awaiting
+    // population). `show` returns the entry plus an empty members
+    // list rather than refusing.
     writeSidecar(project, '550e8400-e29b-41d4-a716-446655440152', 'empty-shell', {
       members: [],
     });
     const res = group(project, 'show', 'empty-shell');
-    expect(res.code).not.toBe(0);
-    expect(res.stderr).toMatch(/has no members/);
+    expect(res.code).toBe(0);
+    const parsed = JSON.parse(res.stdout) as {
+      slug: string;
+      members: unknown[];
+      memberCount: number;
+    };
+    expect(parsed.slug).toBe('empty-shell');
+    expect(parsed.members).toEqual([]);
+    expect(parsed.memberCount).toBe(0);
   });
 
   it('refuses when the slug positional is missing', () => {

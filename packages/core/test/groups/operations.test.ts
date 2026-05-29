@@ -90,10 +90,13 @@ function makeEntry(uuid: string, slug: string, overrides: Partial<Entry> = {}): 
 }
 
 describe('isGroupEntry / isArchivedEntry predicates', () => {
-  it('isGroupEntry returns true only when members is a non-empty array', () => {
+  it('isGroupEntry returns true when members is PRESENT (including empty), per the Task 7.2 review action superseding AUDIT-20260529-13', () => {
     const m = '550e8400-e29b-41d4-a716-446655440f01';
     expect(isGroupEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f02', 'regular'))).toBe(false);
-    expect(isGroupEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f03', 'empty', { members: [] }))).toBe(false);
+    // members: [] IS a group (declared-empty marker; group-create
+    // writes this shape so the new group is visible in list/show
+    // before the first add-member call).
+    expect(isGroupEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f03', 'empty', { members: [] }))).toBe(true);
     expect(isGroupEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f04', 'g', { members: [m] }))).toBe(true);
   });
 
@@ -168,7 +171,10 @@ describe('listGroups + showGroup', () => {
     expect(groups).toEqual([]);
   });
 
-  it('listGroups filters to entries with non-empty members[]', async () => {
+  it('listGroups filters to entries with the members field PRESENT (including empty-array groups)', async () => {
+    // Per the Task 7.2 review action superseding AUDIT-20260529-13:
+    // `members: []` IS a group (declared-empty); only entries
+    // without the `members` field (regular entries) are filtered out.
     const m = '550e8400-e29b-41d4-a716-446655440f30';
     await writeSidecar(projectRoot, makeEntry(m, 'mem'));
     await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f31', 'regular'));
@@ -176,9 +182,11 @@ describe('listGroups + showGroup', () => {
     await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f33', 'real-group', { members: [m] }));
 
     const groups = await listGroups(projectRoot);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].entry.slug).toBe('real-group');
-    expect(groups[0].memberCount).toBe(1);
+    expect(groups.map((g) => g.entry.slug).sort()).toEqual(['empty-shell', 'real-group']);
+    const empty = groups.find((g) => g.entry.slug === 'empty-shell');
+    expect(empty?.memberCount).toBe(0);
+    const real = groups.find((g) => g.entry.slug === 'real-group');
+    expect(real?.memberCount).toBe(1);
   });
 
   it('listGroups respects includeArchived', async () => {

@@ -2,9 +2,11 @@
  * group list — enumerate every group entry in the project.
  *
  * Phase 7 Task 7.2 (graphical-entries). Walks every sidecar via
- * `readAllSidecars` and filters to those whose `members[]` is
- * non-empty (the Task 7.1.2 group invariant). Active by default;
- * `includeArchived` includes entries carrying an `archivedAt` marker.
+ * `readAllSidecars` and filters to those declared as groups (the
+ * `members` field is present, regardless of population — `members:
+ * []` IS a valid empty group, per `isGroupEntry`'s semantic). Active
+ * by default; `includeArchived` includes entries carrying an
+ * `archivedAt` marker.
  *
  * Sort order is alphabetical by slug, matching the lane-list
  * convention. The CLI's group list / studio surfaces can re-sort
@@ -40,8 +42,10 @@ export async function listGroups(
     .map((entry): ListedGroup => ({
       entry,
       archived: isArchivedEntry(entry),
-      // `members` is guaranteed non-empty by `isGroupEntry`, so the
-      // length read is safe — no fallback needed.
+      // `members` is guaranteed to be an array (possibly empty) by
+      // `isGroupEntry`. `members.length` is safe; for a newly-created
+      // empty group the count is 0 and the dashboard renders the
+      // "no members yet" affordance.
       memberCount: entry.members?.length ?? 0,
     }))
     .sort((a, b) => a.entry.slug.localeCompare(b.entry.slug));
