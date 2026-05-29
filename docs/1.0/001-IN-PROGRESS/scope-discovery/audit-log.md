@@ -357,9 +357,11 @@ Per-model durations: claude 195s / 13495 stdout bytes (8 findings + 1 framing fi
 #### AUDIT-20260529-01 — Exit-vs-close event truncation
 
 Finding-ID: AUDIT-20260529-01 (claude-exit-vs-close + codex-stream-error-race; cross-model)
-Status: open
+Status: fixed-08971e4
 Severity: high
 Surface: `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts:128-139`
+
+Fix note (commit `08971e4`): `spawnCliAgainstModel` now settles on `child.on('close', ...)` instead of `'exit'` so stdio pipes have fully drained before the byte-counter snapshot + capture-stream close. Stream `'error'` handlers attached at stream creation so mid-run write failures reject the run instead of crashing the process. New regression test plants 200 lines (~10 KB) of pre-exit stdout via a fake CLI's `process.exit(0)` right after the writes and asserts every byte lands in the on-disk capture.
 
 `spawnCliAgainstModel` finalizes on `child.on('exit', ...)` then immediately ends the capture streams. Per Node semantics, `'exit'` fires when the process ends but its stdio pipes may still have buffered, undelivered data; `'close'` is the event that fires only after all stdio streams have closed. Snapshotting on `'exit'` drops any in-flight stdout chunks — both from the on-disk `<model>.md` capture and from the `stdoutBytes` counter. This is silent data-fidelity loss on the load-bearing path of the whole feature.
 
@@ -370,9 +372,11 @@ Cross-cite: codex independently flagged the same root cause from the error-handl
 #### AUDIT-20260529-02 — args_template validation vs spawn-cli substitution drift
 
 Finding-ID: AUDIT-20260529-02 (claude-args-template-substring-mismatch + codex-placeholder-contract; cross-model)
-Status: open
+Status: fixed-08971e4
 Severity: high
 Surface: `config-loader.ts:200-205`, `schema/audit-barrage-config.yaml.schema.json:38`, `spawn-cli.ts:160-163`
+
+Fix note (commit `08971e4`): chose option (a) — back-compatible intra-token literal replacement via `tok.split('{{prompt}}').join(prompt)`. `args_template: "--prompt={{prompt}}"` now renders `--prompt=<actual-prompt>` at spawn time. Existing adopter configs that put `{{prompt}}` as a standalone token continue to work; embedded forms work too. New tests cover the embedded-form substitution + multiple `{{prompt}}` occurrences in one token.
 
 Config-loader accepts any `args_template` that *contains* `{{prompt}}` as substring; `buildArgs` only substitutes whole-token-equals-`{{prompt}}`. An operator writing `args_template: "--prompt={{prompt}}"` passes both validation + schema, then spawns the CLI with the literal `--prompt={{prompt}}` token and **never receives the rendered prompt**. Silent output-empty run with no error surfaced.
 
@@ -383,9 +387,11 @@ Both models independently identified this exact failure mode (substring validati
 #### AUDIT-20260529-03 — Exit-code contract drift vs PRD
 
 Finding-ID: AUDIT-20260529-03 (claude-exitcode-vs-prd + codex-exit-contract-drift; cross-model)
-Status: open
+Status: fixed-08971e4
 Severity: medium
 Surface: `audit-barrage.ts:230-237` (`isHealthyModelRun`) + `:222-225` (`deriveBarrageExitCode`); PRD criterion in `types.ts:113-119`
+
+Fix note (commit `08971e4`): relaxed `isHealthyModelRun` to `stdoutBytes > 0 && spawnError === undefined` — non-zero CLI exits and timeouts fall on the healthy side because the captured stdout is still triagable. The `types.ts` JSDoc on `BarrageResult.exitCode` and the `deriveBarrageExitCode` docstring were both updated to match the PRD's "produced output" wording. New tests cover non-zero-exit-with-bytes (healthy), timeout-with-bytes (healthy), and spawn-error (unhealthy regardless of byte count).
 
 PRD says: "CLI exit code: 0 if any model produced output; 1 if all failed." Implementation requires `exitCode === 0 && !timedOut && spawnError === undefined && stdoutBytes > 0`. A model that emits a complete useful response but exits non-zero (rate-limit warnings, partial-completion codes, non-zero-on-findings conventions are all common in LLM CLIs) is classified as "failed" — its findings file still on disk but the run reports exit 1 if it was the only "useful" model. Three subtly different contracts: code + `types.ts` comment + PRD all say different things.
 
@@ -394,9 +400,11 @@ PRD says: "CLI exit code: 0 if any model produced output; 1 if all failed." Impl
 #### AUDIT-20260529-04 — Prompt-renderer is exported but not wired into the verb
 
 Finding-ID: AUDIT-20260529-04 (claude-prompt-renderer-orphaned + codex-prompt-seed-override; cross-model + in-band Finding-001)
-Status: open
+Status: fixed-08971e4
 Severity: high
 Surface: `subcommands/audit-barrage.ts:300-307` (`loadPromptText` reads `--prompt-file` raw); `prompt-renderer.ts` (exported but uncalled at runtime); `install-scope-discovery.ts:84-106` (seeds the override unconditionally)
+
+Fix note (commit `08971e4`): chose option (a) — wired the renderer via a NEW sibling CLI verb `dw-lifecycle audit-barrage-render`. New file `subcommands/audit-barrage-render.ts` takes `--feature <slug>`, `--vars-file <path>` (a JSON map of EXPECTED_VARS → values), `--output <path>` (defaults to stdout). Reads + validates the vars JSON (flat string-map), checks the vars `feature_slug` matches the `--feature` flag, runs the renderer (resolves project override vs plugin default), writes the rendered prompt. Registered in `cli.ts`. Operator workflow now: `audit-barrage-render --vars-file ... --output <prompt>` → `audit-barrage --prompt-file <prompt>`. The unsubstituted-token check was refined in the companion AUDIT-20260529-10 fix. Renderer's seed-scaffold concern is moot now that the seeded comment-only scaffold contains no `{{var}}` markers.
 
 The Task 3 prompt-renderer (`renderAuditBarragePrompt`, `EXPECTED_VARS`, `PROMPT_OVERRIDE_PATH`, `DEFAULT_PROMPT_TEMPLATE_PATH`) is referenced ONLY in `prompt-renderer.ts` and its test — **no runtime caller**. The CLI shim reads `--prompt-file` raw and passes the bytes straight through. The Phase 12 Task 3 acceptance criterion "project-overridable prompt template" is only half-met: config override IS wired (`loadAuditBarrageConfig` is called), but prompt override IS NOT.
 
@@ -411,9 +419,11 @@ The operator hit this in-band during the dogfood (Finding-001 — couldn't rende
 #### AUDIT-20260529-05 — Timeout timer leaks on spawn-error path (~305s dangling per uninstalled CLI)
 
 Finding-ID: AUDIT-20260529-05 (claude-timeout-leak-on-spawn-error)
-Status: open
+Status: fixed-08971e4
 Severity: high
 Surface: `spawn-cli.ts:99-110` vs `:118-126`
+
+Fix note (commit `08971e4`): `finish()` now clears BOTH `sigkillTimer` AND `timeoutTimer`; every settle path (spawn-error, close, stream-error) goes through `finish()`. New regression test runs against a nonexistent binary, asserts the run settles in well under a second (no 30s timer dwell), and gives Node a 50ms tick after settle to surface any late timer activity. The change also moves the timer-handle into the closure (declared `let timeoutTimer: NodeJS.Timeout | null = null`) so the stream-error reject path can clear it too.
 
 `clearTimeout(timeoutTimer)` happens ONLY inside the `'exit'` handler. On spawn failure (ENOENT — binary not installed), Node emits `'error'` and never `'exit'`. The error handler calls `finish()` which clears `sigkillTimer` but not `timeoutTimer`. Timer survives ~305 seconds after the run is logically done. The CLI shim's `process.exit()` masks this, but `orchestrateBarrage` is a public library function — any caller that awaits it without forcibly exiting hangs or emits open-handle warnings. Plus the post-finish `child.kill` mutating `timedOut` after the result was reported is a latent race.
 
@@ -424,9 +434,11 @@ The common dogfood case is "not all three CLIs are installed" — this fires on 
 #### AUDIT-20260529-06 — `--prompt-file` read failure exits 1; config-error exits 2 (inconsistent usage-vs-runtime classification)
 
 Finding-ID: AUDIT-20260529-06 (claude-promptfile-exit-code)
-Status: open
+Status: fixed-08971e4
 Severity: low
 Surface: `audit-barrage.ts:300-308` vs `:285-289`
+
+Fix note (commit `08971e4`): `loadPromptText` now exits 2 on file-read failure to match the config-error path. Both are pre-orchestration input validation; wrapper scripts that key on the exit code now distinguish "the audit ran and all models failed" (exit 1) from "you invoked me wrong" (exit 2).
 
 A missing/unreadable `--prompt-file` is operator-input error of the same class as malformed `--models` filter or bad config — yet exits `1` (the "all models failed" code), while malformed config exits `2`. Wrapper scripts distinguishing "the audit ran and everything failed" from "you invoked me wrong" get the wrong signal.
 
@@ -435,9 +447,11 @@ A missing/unreadable `--prompt-file` is operator-input error of the same class a
 #### AUDIT-20260529-07 — Run-dir timestamp collision risk (second-resolution + recursive mkdir)
 
 Finding-ID: AUDIT-20260529-07 (claude-rundir-collision)
-Status: open
+Status: fixed-08971e4
 Severity: low
 Surface: `run-artifacts.ts:30-37` + `orchestrate-barrage.ts:64`
+
+Fix note (commit `08971e4`): chose millisecond resolution — `encodeTimestamp` now emits `YYYYMMDDTHHMMSSsssZ` (3-digit ms suffix). Two barrages for the same feature in the same wall-clock second land in distinct run dirs. Tests updated to assert the new shape (`/^\d{8}T\d{9}Z$/` regex on `timestamp`; smoke script asserts the new run-dir-name shell glob).
 
 Run-dir name is `<second-resolution-timestamp>-<feature>` + `mkdir({recursive:true})` doesn't error on existing dir. Two barrages for the same feature within the same wall-clock second resolve to the same run dir; the second silently overwrites the first. Project's "database preserves, doesn't delete" ethos says this is the wrong default.
 
@@ -446,9 +460,11 @@ Run-dir name is `<second-resolution-timestamp>-<feature>` + `mkdir({recursive:tr
 #### AUDIT-20260529-08 — Misleading comment in `orchestrateBarrage`
 
 Finding-ID: AUDIT-20260529-08 (claude-orchestrate-comment-drift)
-Status: open
+Status: fixed-08971e4
 Severity: low
 Surface: `orchestrate-barrage.ts:71-83`
+
+Fix note (commit `08971e4`): comment replaced with an accurate description — "assemble the BarrageRun, write INDEX.md, return the same record." The deliberate duplication (caller + `writeIndexFile` both derive `<runDir>/INDEX.md`) is now explicitly noted as a composability choice (the helper can be called standalone from tests).
 
 Comment reads "assemble it without the indexPath first, then patch it on after the write so the record we return matches what landed on disk" — but the code does the opposite (computes `indexPath` up front, no post-write patch). `writeIndexFile`'s return value is discarded.
 
@@ -468,18 +484,22 @@ The audit prompt's diff excluded `*.test.ts` (I scoped narrowly to the productio
 #### AUDIT-20260529-10 — Renderer's unsubstituted-token rejection over-eager on instructional prose
 
 Finding-ID: AUDIT-20260529-10 (in-band Finding-001; subsumed by AUDIT-20260529-04)
-Status: open
+Status: fixed-08971e4
 Severity: high
 Surface: `prompt-renderer.ts:205-211`
+
+Fix note (commit `08971e4`): `rejectUnsubstitutedTokens` now scans ONLY for unsubstituted EXPECTED_VARS markers, not arbitrary `{{...}}` strings. Template prose that mentions `{{var}}` / `{{name}}` / `{{var_name}}` as documentation of the substitution mechanism passes through unchanged. New tests cover the pass-through path + assert that a surviving DECLARED-var marker still fails loud (declared-var contract preserved).
 
 Operator hit this in-band trying to render the prompt template — the template's instructional prose mentions `{{var}}` / `{{prompt}}` / `{{name}}` / `{{var_name}}` as documentation about the substitution mechanism. `rejectUnsubstitutedTokens` rejects ANY `{{xxx}}` substring, so it rejects the template's own instructional examples. Subsumed by AUDIT-20260529-04; fix lands together.
 
 #### AUDIT-20260529-11 — Prompt template's marker triplet pattern triples large vars
 
 Finding-ID: AUDIT-20260529-11 (in-band Finding-002)
-Status: open
+Status: fixed-08971e4
 Severity: medium
 Surface: `templates/audit-barrage-prompt.md`
+
+Fix note (commit `08971e4`): `templates/audit-barrage-prompt.md` redesigned to drop the marker triplet pattern. Each declared var now has exactly ONE substitution site (descriptive markdown section header + bare `{{var}}` line beneath it). A 60 KB `diff` now appears once in the rendered output (60 KB, not 180 KB). New test asserts each value's unique sentinel appears exactly once via `rendered.split(value).length - 1 === 1`. The renderer's substitution machinery did not need to change (already a literal `split().join()` — with one occurrence per var in the template, correct by design).
 
 The template wraps each substitution as:
 ```
@@ -505,3 +525,9 @@ Next steps (out of scope for Task 6 itself; track separately):
 - Fix AUDIT-20260529-01..05 in a follow-up task before Phase 12 completes (the HIGH findings are blocking-adjacent per claude's framing).
 - AUDIT-20260529-06..09 are polish; fix in follow-ups or surface as GH issues.
 - AUDIT-20260529-10..11 are the prompt-renderer / template design issues uncovered in-band; fold into the Task 4/7 follow-up that wires the renderer properly.
+
+### Closure note (2026-05-29; commit `08971e4`)
+
+All 11 findings now carry `Status: fixed-08971e4` (or `informational` for AUDIT-20260529-09). The follow-up task referenced above ran in the same session as Phase 12 Tasks 4/5/7 — one coherent commit covers every fix + the remaining Phase 12 deliverables.
+
+Awaiting `verified-<date>` on a post-release dogfood re-run (`/dw-lifecycle:audit-barrage` against the post-fix diff to confirm the fixed shapes don't regress and that the new prompt-renderer wiring produces a usable prompt end-to-end).
