@@ -45,6 +45,62 @@ if (typeof (globalThis as { CSS?: unknown }).CSS === 'undefined') {
   (globalThis as { CSS: CSSShim }).CSS = { escape: (s: string) => s };
 }
 
+/**
+ * Stub `window.matchMedia` so the view-toggle controller's viewport-
+ * default branch resolves deterministically. Mirrors the shim in
+ * `dashboard-swimlane-view-toggle-client.test.ts:194` — installed via
+ * `Object.defineProperty` because jsdom seals `window.matchMedia`
+ * against direct assignment in strict mode. Used by the AUDIT-38
+ * regression test (save under mobile default, apply under desktop).
+ */
+interface MediaQueryListShim {
+  matches: boolean;
+  media: string;
+  onchange: null;
+  addEventListener(
+    type: 'change',
+    listener: (ev: MediaQueryListEvent) => void,
+  ): void;
+  removeEventListener(
+    type: 'change',
+    listener: (ev: MediaQueryListEvent) => void,
+  ): void;
+  addListener(listener: (ev: MediaQueryListEvent) => void): void;
+  removeListener(listener: (ev: MediaQueryListEvent) => void): void;
+  dispatchEvent(ev: Event): boolean;
+}
+
+function setMatchMediaMatches(matches: boolean): void {
+  const listeners = new Set<(ev: MediaQueryListEvent) => void>();
+  function makeMql(): MediaQueryListShim {
+    return {
+      matches,
+      media: '(max-width: 720px)',
+      onchange: null,
+      addEventListener(_type, listener): void {
+        listeners.add(listener);
+      },
+      removeEventListener(_type, listener): void {
+        listeners.delete(listener);
+      },
+      addListener(listener): void {
+        listeners.add(listener);
+      },
+      removeListener(listener): void {
+        listeners.delete(listener);
+      },
+      dispatchEvent(_ev: Event): boolean {
+        return false;
+      },
+    };
+  }
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: makeMql,
+  });
+}
+
 function buildShell(lanes: readonly string[]): void {
   document.body.innerHTML = '';
   const shell = document.createElement('section');
@@ -185,17 +241,20 @@ describe('Task 5.5 — saveable focus presets client controller', () => {
     document.body.innerHTML = '';
     window.localStorage.clear();
     window.history.replaceState({}, '', '/dev/editorial-studio');
+    // Reset viewport to desktop between tests so each test starts from
+    // a known matchMedia stance. The AUDIT-38 test flips this to mobile
+    // mid-test; without the reset its state would leak into subsequent
+    // tests under the module-singleton view-toggle state.
+    setMatchMediaMatches(false);
   });
 
-  it('snapshot captures all four state axes from localStorage', () => {
+  it('snapshot captures all four state axes (view-mode from DOM, others from storage)', () => {
     buildShell(['default', 'mockups', 'qa']);
-    bootControllers();
 
-    // Set up some non-default state across the four axes:
-    //   - Hide `qa` (visibility off).
-    //   - Focus only `default` + `mockups`.
-    //   - Set `default` to list mode.
-    //   - Collapse `mockups` lane and `default`'s Drafting stage.
+    // Set up storage BEFORE booting controllers so the view-toggle
+    // init pass applies `default: list` to the DOM. The snapshot
+    // reads view-mode from the live `.swim.view-*` classes (per
+    // AUDIT-20260528-38) so the DOM must reflect the intended state.
     window.localStorage.setItem(
       `${PREFIX}:visibility`,
       JSON.stringify(['qa']),
@@ -217,15 +276,85 @@ describe('Task 5.5 — saveable focus presets client controller', () => {
       JSON.stringify({ default: ['Drafting'] }),
     );
 
+    bootControllers();
+
     const snapshot = snapshotCurrentState(PROJECT_KEY);
 
     expect(snapshot.visibleLanes).toEqual(['default', 'mockups']);
     expect(snapshot.focusedLanes).toEqual(['default', 'mockups']);
-    expect(snapshot.viewModePerLane).toEqual({ default: 'list' });
+    // The view-toggle's desktop default (matchMedia matches=false in
+    // jsdom) resolves to `kanban` for any lane without an explicit
+    // override. The snapshot reflects the resolved DOM state — `default`
+    // is `list` (operator override), `mockups` + `qa` are `kanban`.
+    expect(snapshot.viewModePerLane).toEqual({
+      default: 'list',
+      mockups: 'kanban',
+      qa: 'kanban',
+    });
     expect(snapshot.laneCollapseState).toEqual({ mockups: true });
     expect(snapshot.stageCollapseState).toEqual({
       default: { Drafting: true },
     });
+  });
+
+  it('AUDIT-20260528-38: preset round-trips view-mode across viewport (mobile→desktop)', () => {
+    // Repro: save under mobile-default list mode (no explicit toggle),
+    // apply under desktop matchMedia. Before the fix, the snapshot
+    // read view-mode from storage only — viewport-derived defaults
+    // are never persisted, so `viewModePerLane` would be `{}`. The
+    // apply then resolves to desktop's `kanban` default, and the
+    // operator's saved "list view" preset opens as kanban. With the
+    // DOM-read fix the snapshot captures the EFFECTIVE per-lane mode
+    // (mobile→list for all three lanes) and the apply restores it.
+    setMatchMediaMatches(true); // simulate mobile viewport
+    buildShell(['default', 'mockups', 'qa']);
+    bootControllers();
+
+    // Sanity: the view-toggle's mobile default applied `view-list`
+    // to every swim. (If this fails the test premise is wrong.)
+    const defaultSwim = document.querySelector<HTMLElement>(
+      '.swim[data-lane-id="default"]',
+    );
+    expect(defaultSwim?.classList.contains('view-list')).toBe(true);
+
+    // Save a preset. localStorage's `view-mode` key is empty (no
+    // operator clicks); only the DOM carries the resolved mode.
+    expect(window.localStorage.getItem(`${PREFIX}:view-mode`)).toBeNull();
+    const saved = savePresetFromCurrent(PROJECT_KEY, 'Mobile list view');
+    // The snapshot captured the DOM state, so all three lanes are
+    // `list`. Without the AUDIT-38 fix this would be `{}` because
+    // storage is empty.
+    expect(saved.viewModePerLane).toEqual({
+      default: 'list',
+      mockups: 'list',
+      qa: 'list',
+    });
+
+    // Now rebuild the page under DESKTOP viewport and apply the
+    // preset. Without the fix the preset's empty view-mode map plus
+    // desktop default would resolve to `kanban`. With the fix the
+    // preset carries `list` for every lane, so the lanes stay list.
+    document.body.innerHTML = '';
+    setMatchMediaMatches(false); // simulate desktop viewport
+    buildShell(['default', 'mockups', 'qa']);
+    bootControllers();
+
+    // Sanity: at this point all three swims are `view-kanban` (desktop
+    // default applied during init).
+    const desktopDefaultSwim = document.querySelector<HTMLElement>(
+      '.swim[data-lane-id="default"]',
+    );
+    expect(desktopDefaultSwim?.classList.contains('view-kanban')).toBe(true);
+
+    // Apply the preset — every lane should flip to list.
+    applyPreset(PROJECT_KEY, saved);
+
+    const swims = document.querySelectorAll<HTMLElement>('.swim[data-lane-id]');
+    expect(swims.length).toBe(3);
+    for (const swim of swims) {
+      expect(swim.classList.contains('view-list')).toBe(true);
+      expect(swim.classList.contains('view-kanban')).toBe(false);
+    }
   });
 
   it('saving captures + persisting + listing the preset round-trips', () => {

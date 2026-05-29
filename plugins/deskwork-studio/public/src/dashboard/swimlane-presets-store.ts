@@ -160,15 +160,58 @@ function readJsonArrayOfStrings(key: string): string[] {
 }
 
 /**
+ * Read the EFFECTIVE per-lane view-mode from the live DOM.
+ *
+ * The DOM is the source of truth for "what the operator currently
+ * sees" because the view-toggle controller's viewport-derived default
+ * (mobile→list, desktop→kanban) is applied as `.view-kanban` /
+ * `.view-list` classes on each `.swim` element BUT is never persisted
+ * to localStorage — only explicit operator toggle clicks write the
+ * `view-mode` storage key. Reading from storage would therefore miss
+ * the viewport default for any lane the operator hasn't explicitly
+ * toggled (per AUDIT-20260528-38).
+ *
+ * Returns a `Record<laneId, ViewMode>` covering every `.swim` with a
+ * recognised class. Swims without either class are skipped (the
+ * controller's `applySwimMode` always sets one, so the omission would
+ * only happen for a transient pre-init paint).
+ */
+function readEffectiveViewModeFromDom(): Record<string, ViewMode> {
+  const out: Record<string, ViewMode> = {};
+  for (const swim of document.querySelectorAll<HTMLElement>(
+    '.swim[data-lane-id]',
+  )) {
+    const laneId = swim.dataset.laneId;
+    if (laneId === undefined) continue;
+    if (swim.classList.contains('view-list')) {
+      out[laneId] = 'list';
+    } else if (swim.classList.contains('view-kanban')) {
+      out[laneId] = 'kanban';
+    }
+  }
+  return out;
+}
+
+/**
  * Snapshot the operator's current view across all four state axes
- * by reading directly from the constituent localStorage keys. The
- * snapshot is what `Save current as preset…` captures. Reading from
- * storage (rather than from the live DOM) is intentional: the
- * storage keys are the canonical source for each axis, and the
- * other controllers persist on every mutation, so storage and DOM
- * are in lockstep. Reading from storage keeps the dependency graph
- * one-directional (presets reads constituent stores; doesn't reach
- * into the other controllers' state).
+ * for `Save current as preset…`.
+ *
+ * Per-axis sourcing:
+ *
+ *   - visibility (`visibleLanes`): rail rows (operator-perceivable
+ *     inventory) minus hidden-set storage key.
+ *   - focus (`focusedLanes`): focus storage key (controller writes
+ *     it on every chip click; persistence in lockstep with DOM).
+ *   - view-mode (`viewModePerLane`): EFFECTIVE mode from the live
+ *     `.swim.view-kanban` / `.swim.view-list` classes (per
+ *     AUDIT-20260528-38). Reading storage would miss the viewport-
+ *     derived default the view-toggle controller applies on init
+ *     without persisting (mobile→list / desktop→kanban). The DOM
+ *     carries the resolved mode; the snapshot reflects what the
+ *     operator actually sees.
+ *   - lane-collapse / stage-collapse: collapse storage keys (the
+ *     collapse controller persists every toggle, so storage matches
+ *     the DOM and is structurally simpler to read).
  */
 export function snapshotCurrentState(projectKey: string): {
   visibleLanes: readonly string[];
@@ -186,14 +229,9 @@ export function snapshotCurrentState(projectKey: string): {
 
   const focusedLanes = readJsonArrayOfStrings(focusKey(projectKey));
 
-  const viewModePerLane: Record<string, ViewMode> = {};
-  const viewModeMap = readStoredObjectMap<ViewMode>(
-    viewModeKey(projectKey),
-    isViewMode,
-  );
-  for (const [laneId, mode] of viewModeMap) {
-    viewModePerLane[laneId] = mode;
-  }
+  // view-mode: read EFFECTIVE per-lane mode from the live DOM, not
+  // from storage. See `readEffectiveViewModeFromDom` for the why.
+  const viewModePerLane = readEffectiveViewModeFromDom();
 
   const laneCollapseState: Record<string, boolean> = {};
   for (const laneId of readJsonArrayOfStrings(laneCollapseKey(projectKey))) {
