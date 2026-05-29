@@ -44,17 +44,13 @@
  */
 
 import { copyAndFlash } from '../copy-builder.ts';
-
-/**
- * Quote an operator-supplied value for inclusion in a slash command.
- * `JSON.stringify` wraps in double quotes and escapes embedded quotes,
- * backslashes, and control characters — applied symmetrically across
- * id / shape / name / description / stage names so injection-shape
- * inputs can't slip through if pasted into a shell.
- */
-function quoteValue(value: string): string {
-  return JSON.stringify(value);
-}
+import {
+  buildCreateCommand,
+  buildEditCommand,
+  UPDATE_OPS,
+  type BuildResult,
+  type UpdateOp,
+} from './pipelines-builders.ts';
 
 /**
  * Module-level tracker for the currently-open per-row panel (View or
@@ -69,136 +65,77 @@ interface OpenPanelState {
 
 let openPanel: OpenPanelState | null = null;
 
-/**
- * Read a field's trimmed value from a form. Returns empty string when
- * the field is absent so callers can treat "missing" and "blank" as
- * equivalent for the preview-rebuild path.
- */
-function readField(form: HTMLElement, name: string): string {
-  const el = form.querySelector<HTMLInputElement | HTMLSelectElement>(
-    `[data-pipelines-field="${name}"]`,
-  );
-  return el?.value.trim() ?? '';
-}
-
-/**
- * Read a set of checkbox values (used by the set-locked sub-operation).
- * Returns the values of every checked input in document order.
- */
-function readCheckedValues(form: HTMLElement, name: string): string[] {
-  const els = Array.from(
-    form.querySelectorAll<HTMLInputElement>(
-      `input[type="checkbox"][data-pipelines-field="${name}"]`,
-    ),
-  );
-  return els.filter((el) => el.checked).map((el) => el.value);
-}
-
-/** Build the `/deskwork:pipeline create` command from the New form. */
-function buildCreateCommand(form: HTMLElement): string {
-  const id = readField(form, 'new-id');
-  const shape = readField(form, 'new-shape');
-  const name = readField(form, 'new-name');
-  const description = readField(form, 'new-description');
-
-  const idArg = id.length > 0 ? quoteValue(id) : '<id>';
-  const shapeArg = shape.length > 0 ? quoteValue(shape) : '<stages>';
-  const nameFragment = name.length > 0 ? ` --name ${quoteValue(name)}` : '';
-  const descFragment =
-    description.length > 0 ? ` --description ${quoteValue(description)}` : '';
-  return `/deskwork:pipeline create ${idArg} --shape ${shapeArg}${nameFragment}${descFragment}`;
-}
-
-function rebuildNewPreview(form: HTMLElement): string {
-  const command = buildCreateCommand(form);
+function rebuildNewPreview(form: HTMLElement): BuildResult {
+  const result = buildCreateCommand(form);
   const preview = form.querySelector<HTMLElement>(
     '[data-pipelines-preview="new"]',
   );
-  if (preview) preview.textContent = command;
-  return command;
+  if (preview) preview.textContent = result.command;
+  return result;
 }
-
-/** Build the `/deskwork:pipeline update <id> --add-stage ...` command. */
-function buildAddCommand(form: HTMLElement, pipelineId: string): string {
-  const name = readField(form, 'add-name');
-  const position = readField(form, 'add-position');
-  const idArg = quoteValue(pipelineId);
-  const nameArg = name.length > 0 ? quoteValue(name) : '<name>';
-  const positionFragment =
-    position.length > 0 ? ` --position ${position}` : '';
-  return `/deskwork:pipeline update ${idArg} --add-stage ${nameArg}${positionFragment}`;
-}
-
-/** Build the `--rename-stage <from> --to-stage <to>` command. */
-function buildRenameCommand(form: HTMLElement, pipelineId: string): string {
-  const from = readField(form, 'rename-from');
-  const to = readField(form, 'rename-to');
-  const idArg = quoteValue(pipelineId);
-  const fromArg = from.length > 0 ? quoteValue(from) : '<from>';
-  const toArg = to.length > 0 ? quoteValue(to) : '<to>';
-  return `/deskwork:pipeline update ${idArg} --rename-stage ${fromArg} --to-stage ${toArg}`;
-}
-
-/** Build the `--remove-stage <name>` command. */
-function buildRemoveCommand(form: HTMLElement, pipelineId: string): string {
-  const name = readField(form, 'remove-name');
-  const idArg = quoteValue(pipelineId);
-  const nameArg = name.length > 0 ? quoteValue(name) : '<name>';
-  return `/deskwork:pipeline update ${idArg} --remove-stage ${nameArg}`;
-}
-
-/** Build the `--set-locked "s1,s2,..."` command. */
-function buildSetLockedCommand(form: HTMLElement, pipelineId: string): string {
-  const checked = readCheckedValues(form, 'set-locked');
-  const idArg = quoteValue(pipelineId);
-  const csv = checked.join(',');
-  // Empty selection means "clear all locks" — emit `--set-locked ""`
-  // so the CLI sees an explicit empty list rather than an absent flag.
-  return `/deskwork:pipeline update ${idArg} --set-locked ${quoteValue(csv)}`;
-}
-
-/** Build the `--set-off-pipeline "s1,s2,..."` command. */
-function buildSetOffCommand(form: HTMLElement, pipelineId: string): string {
-  const csv = readField(form, 'set-off-pipeline');
-  const idArg = quoteValue(pipelineId);
-  return `/deskwork:pipeline update ${idArg} --set-off-pipeline ${quoteValue(csv)}`;
-}
-
-type UpdateOp =
-  | 'add'
-  | 'rename'
-  | 'remove'
-  | 'set-locked'
-  | 'set-off-pipeline';
 
 function rebuildEditPreview(
   form: HTMLElement,
   op: UpdateOp,
   pipelineId: string,
-): string {
-  let command: string;
-  switch (op) {
-    case 'add':
-      command = buildAddCommand(form, pipelineId);
-      break;
-    case 'rename':
-      command = buildRenameCommand(form, pipelineId);
-      break;
-    case 'remove':
-      command = buildRemoveCommand(form, pipelineId);
-      break;
-    case 'set-locked':
-      command = buildSetLockedCommand(form, pipelineId);
-      break;
-    case 'set-off-pipeline':
-      command = buildSetOffCommand(form, pipelineId);
-      break;
-  }
+): BuildResult {
+  const result = buildEditCommand(form, op, pipelineId);
   const preview = form.querySelector<HTMLElement>(
     `[data-pipelines-preview="${op}"]`,
   );
-  if (preview) preview.textContent = command;
-  return command;
+  if (preview) preview.textContent = result.command;
+  return result;
+}
+
+/**
+ * Resolve (or lazily create) the inline notice element adjacent to a
+ * Copy button. The notice is a sibling `<p>` injected into the Copy
+ * button's containing actions block; it shows the validity error when
+ * the build result is invalid and is hidden otherwise. Keeping the
+ * controller responsible for the notice element (rather than the
+ * server-side renderer) means every Copy button — regardless of which
+ * sub-form rendered it — gets the same affordance shape automatically.
+ */
+function resolveNotice(button: HTMLButtonElement): HTMLElement {
+  const existing = button.parentElement?.querySelector<HTMLElement>(
+    '[data-pipelines-copy-notice]',
+  );
+  if (existing) return existing;
+  const notice = document.createElement('p');
+  notice.dataset.pipelinesCopyNotice = '';
+  notice.className = 'pipelines-copy-notice';
+  notice.hidden = true;
+  // Insert AFTER the button so screen-reader order matches visual order
+  // (operator focuses the button, hears "disabled", then reads the notice
+  // explaining why). When no parent exists (test fixtures may attach the
+  // button directly to a container), fall back to inserting nothing —
+  // the disabled state alone still prevents the broken paste.
+  button.parentElement?.insertBefore(notice, button.nextSibling);
+  return notice;
+}
+
+/**
+ * Apply a build result to a Copy button + its adjacent inline notice.
+ * Disables the button (with `disabled` AND `aria-disabled="true"`) when
+ * the result carries a validity error; surfaces the error text in the
+ * notice; otherwise enables the button and hides the notice.
+ */
+function applyResultToCopy(
+  button: HTMLButtonElement,
+  result: BuildResult,
+): void {
+  const notice = resolveNotice(button);
+  if (result.error === null) {
+    button.disabled = false;
+    button.removeAttribute('aria-disabled');
+    notice.hidden = true;
+    notice.textContent = '';
+    return;
+  }
+  button.disabled = true;
+  button.setAttribute('aria-disabled', 'true');
+  notice.hidden = false;
+  notice.textContent = result.error;
 }
 
 function initNewForm(container: HTMLElement): void {
@@ -209,8 +146,12 @@ function initNewForm(container: HTMLElement): void {
       '[data-pipelines-field]',
     ),
   );
+  const copy = form.querySelector<HTMLButtonElement>(
+    '[data-pipelines-copy-button="new"]',
+  );
   const rebuild = (): void => {
-    rebuildNewPreview(form);
+    const result = rebuildNewPreview(form);
+    if (copy) applyResultToCopy(copy, result);
   };
   for (const input of inputs) {
     input.addEventListener('input', rebuild);
@@ -218,24 +159,20 @@ function initNewForm(container: HTMLElement): void {
   }
   rebuild();
 
-  const copy = form.querySelector<HTMLButtonElement>(
-    '[data-pipelines-copy-button="new"]',
-  );
   if (copy) {
     copy.addEventListener('click', async () => {
-      const command = rebuildNewPreview(form);
-      await copyAndFlash(command, copy, 'Copied create command');
+      const result = rebuildNewPreview(form);
+      applyResultToCopy(copy, result);
+      // Refuse to clipboard a command whose preview still carries the
+      // `<id>` / `<stages>` angle-bracket markers. The disabled
+      // attribute prevents native clicks, but defense-in-depth: if a
+      // stale dispatch reaches this handler, the error re-check stops
+      // the clipboard write.
+      if (result.error !== null) return;
+      await copyAndFlash(result.command, copy, 'Copied create command');
     });
   }
 }
-
-const UPDATE_OPS: readonly UpdateOp[] = [
-  'add',
-  'rename',
-  'remove',
-  'set-locked',
-  'set-off-pipeline',
-];
 
 function initEditOpForm(
   panel: HTMLElement,
@@ -251,8 +188,12 @@ function initEditOpForm(
       '[data-pipelines-field]',
     ),
   );
+  const copy = form.querySelector<HTMLButtonElement>(
+    `[data-pipelines-copy-button="${op}"]`,
+  );
   const rebuild = (): void => {
-    rebuildEditPreview(form, op, pipelineId);
+    const result = rebuildEditPreview(form, op, pipelineId);
+    if (copy) applyResultToCopy(copy, result);
   };
   for (const input of inputs) {
     input.addEventListener('input', rebuild);
@@ -260,13 +201,15 @@ function initEditOpForm(
   }
   rebuild();
 
-  const copy = form.querySelector<HTMLButtonElement>(
-    `[data-pipelines-copy-button="${op}"]`,
-  );
   if (copy) {
     copy.addEventListener('click', async () => {
-      const command = rebuildEditPreview(form, op, pipelineId);
-      await copyAndFlash(command, copy, `Copied ${op} command`);
+      const result = rebuildEditPreview(form, op, pipelineId);
+      applyResultToCopy(copy, result);
+      // Defense-in-depth: refuse to clipboard a command the build
+      // reported as invalid (empty required field, empty stage list)
+      // even if the disabled attribute was bypassed.
+      if (result.error !== null) return;
+      await copyAndFlash(result.command, copy, `Copied ${op} command`);
     });
   }
 }

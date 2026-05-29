@@ -215,6 +215,45 @@
   gap: 0.5rem;
 }
 
+/*
+ * Inline notice rendered next to a Copy button when the form is in an
+ * invalid state (empty required field, or set-locked/set-off-pipeline
+ * with no selections — both of which the CLI's `splitStageList`
+ * refuses). Lives in the actions container so the operator's eye lands
+ * on it immediately after the disabled button.
+ */
+.pipelines-copy-notice {
+  margin: 0;
+  flex-basis: 100%;
+  padding: 0.35rem 0.6rem;
+  background: var(--er-paper, #F5F1E8);
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  color: var(--er-ink-soft, #3A332E);
+  font-size: 0.8rem;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+}
+
+/*
+ * Disabled state for the primary Copy command button. Visually distinct
+ * from the hover state so the operator can't mistake "button looks
+ * pressed" for "click already happened."
+ */
+.pipelines-btn--primary[disabled],
+.pipelines-btn--primary[aria-disabled="true"] {
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-faded, #8A7F70);
+  border-color: var(--er-faded-2, #B5AC9B);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.pipelines-btn--primary[disabled]:hover,
+.pipelines-btn--primary[aria-disabled="true"]:hover {
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-faded, #8A7F70);
+  border-color: var(--er-faded-2, #B5AC9B);
+}
+
 /* ---- Edit panel: 5-op accordion ---- */
 
 .pipelines-edit-ops {

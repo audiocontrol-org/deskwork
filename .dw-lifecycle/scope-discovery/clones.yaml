@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T01:51:21.646Z
+generated_at: 2026-05-29T02:49:29.313Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -626,6 +626,13 @@ clones:
       - plugins/deskwork-studio/public/src/scrapbook-mutations.ts:130:136
     disposition: pending
     reason: null
+  - id: 9e3f04426ee7
+    lines: 12
+    members:
+      - plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:153:164
+      - plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:195:206
+    disposition: keep-with-reason
+    reason: set-locked and set-off-pipeline panels share the same disable-Copy gate shape because they expose symmetric operations against the pipeline schema; collapsing into a helper would obscure the per-panel error-message identity
   - id: 2b94a9cef4a7
     lines: 13
     members:

@@ -91,6 +91,17 @@ function appendStageOptions(
   select: HTMLSelectElement,
   stages: readonly string[],
 ): void {
+  // Match the production markup: a `value=""` disabled-selected option
+  // at the top so the field reads as "no choice made" by default. The
+  // controller's empty-required validation depends on this — without
+  // the blank option, the first stage would auto-select and the form
+  // would never enter the "Pick a stage" disabled-copy state.
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.disabled = true;
+  blank.selected = true;
+  blank.textContent = 'Pick a stage…';
+  select.appendChild(blank);
   for (const s of stages) {
     const opt = document.createElement('option');
     opt.value = s;

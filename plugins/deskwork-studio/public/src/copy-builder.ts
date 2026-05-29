@@ -25,6 +25,24 @@ import { copyOrShowFallback } from './clipboard.ts';
 
 export const COPIED_FLASH_MS = 1500;
 
+/**
+ * Quote an operator-supplied value for inclusion in a slash command.
+ *
+ * Uses `JSON.stringify` to wrap the value in double quotes and escape
+ * embedded quotes, backslashes, and control characters. Applied
+ * uniformly to every value routed into a slash-command builder so
+ * the output parses identically across shells and Claude Code's slash
+ * parser (and so a value with spaces or quotes can't slip through as
+ * an injection surface if pasted into a shell).
+ *
+ * Shared across `lanes-page.ts`, `pipelines-page.ts`, and any future
+ * copy-builder surface — keeping one source of truth ensures the
+ * quoting contract is identical across surfaces.
+ */
+export function quoteValue(value: string): string {
+  return JSON.stringify(value);
+}
+
 const FALLBACK_MESSAGE =
   'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:';
 

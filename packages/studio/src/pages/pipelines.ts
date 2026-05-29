@@ -64,11 +64,9 @@ export async function renderPipelinesPage(ctx: StudioContext): Promise<string> {
   const header = renderHeader(data);
   const newForm = renderNewPipelineForm();
   const errorBanner = renderErrorBanner(data.errors);
-  const availableTemplates = [...data.rows.map((r) => r.id)].sort();
   const table = renderPipelineTable({
     rows: data.rows,
     errors: data.errors,
-    availableTemplates,
   });
 
   const body = html`

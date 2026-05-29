@@ -48,13 +48,9 @@ const COPY_BTN_DELETE_LABEL = 'Delete';
 interface RenderPipelineTableInput {
   readonly rows: readonly PipelineRow[];
   readonly errors: readonly PipelineErrorRow[];
-  readonly availableTemplates: readonly string[];
 }
 
-function renderHealthyRow(
-  row: PipelineRow,
-  availableTemplates: readonly string[],
-): RawHtml {
+function renderHealthyRow(row: PipelineRow): RawHtml {
   const deleteButton = renderDeleteButton(row);
   const sourceBadge = renderSourceBadge(row.source);
 
@@ -93,7 +89,7 @@ function renderHealthyRow(
     </tr>
     <tr class="pipelines-row pipelines-row--edit-panel" data-pipeline-edit-row data-pipeline-id="${row.id}" hidden>
       <td class="pipelines-cell" colspan="7">
-        ${renderEditForm(row, availableTemplates)}
+        ${renderEditForm(row)}
       </td>
     </tr>`);
 }
@@ -222,7 +218,7 @@ export function renderPipelineTable(input: RenderPipelineTableInput): RawHtml {
       <caption class="pipelines-table-caption">Pipeline templates</caption>
       <thead>${renderHeadRow()}</thead>
       <tbody>
-        ${input.rows.map((row) => renderHealthyRow(row, input.availableTemplates))}
+        ${input.rows.map((row) => renderHealthyRow(row))}
         ${input.errors.map((row) => renderErrorRow(row))}
       </tbody>
     </table>`);

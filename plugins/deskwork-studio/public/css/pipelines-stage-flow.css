@@ -78,6 +78,26 @@
   background: var(--er-paper-2, #ECE6D4);
   border: 1px solid var(--er-paper-3, #DFD7BF);
   color: var(--er-ink, #1A1614);
+  /*
+   * Prevent a long stage name from rendering as a single un-wrapping
+   * chip wider than the viewport. The chip itself shrinks to fit its
+   * container; the inner label handles the actual text-wrap (see
+   * `.pipelines-stage-label`). Tested via a 60-char fixture in
+   * `pipelines-page.test.ts`.
+   */
+  max-width: 100%;
+}
+
+.pipelines-stage-label {
+  /*
+   * `overflow-wrap: anywhere` lets a long single-word stage name break
+   * at any character boundary so it never overflows the chip. The
+   * combination with `min-width: 0` on the chip lets the flex item
+   * shrink below its natural content size, which is what makes the
+   * wrap actually apply in narrow viewports.
+   */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .pipelines-stage--linear {

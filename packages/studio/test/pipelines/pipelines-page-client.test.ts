@@ -12,13 +12,17 @@
  *   - Add sub-form: preview includes `--position` when set.
  *   - Rename sub-form: composes `--rename-stage <from> --to-stage <to>`.
  *   - Remove sub-form: composes `--remove-stage <name>`.
- *   - Set-locked sub-form: checkboxes feed a comma-separated list,
- *     including the empty-selection "clear all locks" shape.
+ *   - Set-locked sub-form: checkboxes feed a comma-separated list
+ *     (happy path); the disabled-state + inline-notice for the
+ *     zero-selection case lives in
+ *     `pipelines-page-client-validation.test.ts`.
  *   - Set-off-pipeline sub-form: comma-separated input is quoted as
  *     a single arg.
  *
  * Accordion and clipboard-row tests live in
- * `pipelines-page-client-interactions.test.ts`.
+ * `pipelines-page-client-interactions.test.ts`. Copy-button validation
+ * (empty required fields, CLI-gate empty-list refusals) lives in
+ * `pipelines-page-client-validation.test.ts`.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -85,8 +89,17 @@ describe('pipelines-page client controller — preview builders', () => {
     const { calls } = installClipboardStub();
     initPipelinesPage();
 
-    (form.querySelector<HTMLInputElement>('[data-pipelines-field="new-id"]')!).value = 'mockup';
-    (form.querySelector<HTMLInputElement>('[data-pipelines-field="new-shape"]')!).value = 'Idea,Final';
+    const idInput = form.querySelector<HTMLInputElement>(
+      '[data-pipelines-field="new-id"]',
+    )!;
+    idInput.value = 'mockup';
+    idInput.dispatchEvent(inputEvent());
+    const shapeInput = form.querySelector<HTMLInputElement>(
+      '[data-pipelines-field="new-shape"]',
+    )!;
+    shapeInput.value = 'Idea,Final';
+    shapeInput.dispatchEvent(inputEvent());
+
     const copy = form.querySelector<HTMLButtonElement>(
       '[data-pipelines-copy-button="new"]',
     )!;
@@ -106,9 +119,22 @@ describe('pipelines-page client controller — preview builders', () => {
     const { calls } = installClipboardStub();
     initPipelinesPage();
 
-    (form.querySelector<HTMLInputElement>('[data-pipelines-field="new-id"]')!).value = 'q-test';
-    (form.querySelector<HTMLInputElement>('[data-pipelines-field="new-shape"]')!).value = 'A,B';
-    (form.querySelector<HTMLInputElement>('[data-pipelines-field="new-name"]')!).value = 'foo "bar" \\ baz';
+    const idInput = form.querySelector<HTMLInputElement>(
+      '[data-pipelines-field="new-id"]',
+    )!;
+    idInput.value = 'q-test';
+    idInput.dispatchEvent(inputEvent());
+    const shapeInput = form.querySelector<HTMLInputElement>(
+      '[data-pipelines-field="new-shape"]',
+    )!;
+    shapeInput.value = 'A,B';
+    shapeInput.dispatchEvent(inputEvent());
+    const nameInput = form.querySelector<HTMLInputElement>(
+      '[data-pipelines-field="new-name"]',
+    )!;
+    nameInput.value = 'foo "bar" \\ baz';
+    nameInput.dispatchEvent(inputEvent());
+
     const copy = form.querySelector<HTMLButtonElement>(
       '[data-pipelines-copy-button="new"]',
     )!;
@@ -207,13 +233,14 @@ describe('pipelines-page client controller — preview builders', () => {
     );
   });
 
-  it('Set-locked sub-form: checkbox selections feed a comma-separated list', () => {
+  it('Set-locked sub-form: checkbox selections feed a comma-separated list (happy path)', async () => {
     const container = buildContainer();
     const { panel } = buildEditPanel(container, 'editorial', {
       linearStages: ['Ideas', 'Drafting', 'Final'],
       lockedStages: ['Final'],
       offPipelineStages: [],
     });
+    const { calls } = installClipboardStub();
     initPipelinesPage();
     const previewEl = panel.querySelector<HTMLElement>(
       '[data-pipelines-preview="set-locked"]',
@@ -231,15 +258,17 @@ describe('pipelines-page client controller — preview builders', () => {
       '/deskwork:pipeline update "editorial" --set-locked "Drafting,Final"',
     );
 
-    const finalCb = panel.querySelector<HTMLInputElement>(
-      '[data-pipelines-op-form="set-locked"] input[value="Final"]',
+    // Copy button enabled, clipboard fires with the assembled command.
+    const copy = panel.querySelector<HTMLButtonElement>(
+      '[data-pipelines-copy-button="set-locked"]',
     )!;
-    drafting.checked = false;
-    drafting.dispatchEvent(changeEvent());
-    finalCb.checked = false;
-    finalCb.dispatchEvent(changeEvent());
-    expect(previewEl.textContent).toBe(
-      '/deskwork:pipeline update "editorial" --set-locked ""',
+    expect(copy.disabled).toBe(false);
+    copy.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(calls.length).toBe(1);
+    expect(calls[0]).toBe(
+      '/deskwork:pipeline update "editorial" --set-locked "Drafting,Final"',
     );
   });
 
@@ -267,4 +296,5 @@ describe('pipelines-page client controller — preview builders', () => {
       '/deskwork:pipeline update "editorial" --set-off-pipeline "Blocked,Cancelled"',
     );
   });
+
 });

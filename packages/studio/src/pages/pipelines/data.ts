@@ -216,24 +216,33 @@ function readLanePipelineTemplate(
 }
 
 /**
- * Compute the list of lane ids whose `pipelineTemplate` equals
- * `templateId`. Walks every lane config (active + archived) once,
- * reading each lane's raw JSON directly for the field rather than
- * routing through `loadLaneConfig` — see `readLanePipelineTemplate`
- * for the rationale (broken templates must still show their
- * dependents).
+ * Build an inverse map from templateId → referencing lane ids. Walks
+ * every lane config (active + archived) ONCE, reading each lane's raw
+ * JSON for its `pipelineTemplate` field (via `readLanePipelineTemplate`
+ * — see that function's docstring for why this bypasses
+ * `loadLaneConfig`). Lanes whose `pipelineTemplate` cannot be read
+ * (missing file, malformed JSON, non-string field) are silently
+ * skipped — the lanes page surfaces those defects on its own surface.
+ *
+ * O(M) disk reads (where M is lane count). Replaces the prior O(N*M)
+ * pattern that re-walked every lane for each template.
  */
-function findReferencingLanes(
+function buildLaneRefIndex(
   projectRoot: string,
-  templateId: string,
   laneIds: readonly string[],
-): string[] {
-  const out: string[] = [];
+): Map<string, string[]> {
+  const index = new Map<string, string[]>();
   for (const laneId of laneIds) {
-    const ref = readLanePipelineTemplate(projectRoot, laneId);
-    if (ref === templateId) out.push(laneId);
+    const templateId = readLanePipelineTemplate(projectRoot, laneId);
+    if (templateId === null) continue;
+    const existing = index.get(templateId);
+    if (existing === undefined) {
+      index.set(templateId, [laneId]);
+    } else {
+      existing.push(laneId);
+    }
   }
-  return out;
+  return index;
 }
 
 /**
@@ -276,12 +285,17 @@ export async function loadPipelinesPageData(
   const templateIds = listAvailablePipelineTemplates(projectRoot);
   const laneIds = listLaneConfigs(projectRoot, { includeArchived: true });
 
+  // Build the lane-references index ONCE before iterating templates so
+  // template-row construction is O(1) lookup per template rather than
+  // a fresh O(M) walk per template (which was the prior O(N*M) shape).
+  const laneRefs = buildLaneRefIndex(projectRoot, laneIds);
+
   const rows: PipelineRow[] = [];
   const errors: PipelineErrorRow[] = [];
 
   for (const id of templateIds) {
     const source = sourceForId(projectRoot, id);
-    const referencingLanes = findReferencingLanes(projectRoot, id, laneIds);
+    const referencingLanes = laneRefs.get(id) ?? [];
     try {
       const template = loadPipelineTemplate(id, projectRoot);
       rows.push(rowFromTemplate(id, source, template, referencingLanes));

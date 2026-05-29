@@ -241,6 +241,32 @@ describe('pipelines-page — `/dev/pipelines`', () => {
     expect(slice).not.toContain('Plugin preset — customize first');
   });
 
+  it('long stage names render inside .pipelines-stage-label so the CSS wrap rule applies', async () => {
+    // Custom override with a 60-character stage name — the chip would
+    // overflow a narrow viewport if the inner label didn't carry the
+    // wrap-enabling class. The CSS rule lives in
+    // `pipelines-stage-flow.css` (.pipelines-stage-label
+    // { overflow-wrap: anywhere }); this assertion confirms the markup
+    // gives the rule a target to apply to.
+    const longStage = 'A'.repeat(60);
+    writePipelineOverride(root, 'long-stage-template', {
+      id: 'long-stage-template',
+      name: 'Long stage',
+      description: 'one 60-char stage exercises the wrap rule',
+      linearStages: [longStage, 'Final'],
+      offPipelineStages: ['Cancelled'],
+    });
+    const app2 = createApp({ projectRoot: root, config: makeConfig() });
+    const r = await getHtml(app2, '/dev/pipelines');
+    const start = r.html.indexOf('id="pipelines-view-panel-long-stage-template"');
+    expect(start).toBeGreaterThan(-1);
+    const slice = r.html.slice(start, start + 5000);
+    expect(slice).toContain(longStage);
+    expect(slice).toMatch(
+      new RegExp(`<span class="pipelines-stage-label">${longStage}</span>`),
+    );
+  });
+
   it('View panel renders the stage flow visualization', async () => {
     const r = await getHtml(app, '/dev/pipelines');
     // Editorial's linear stages should appear inside its view panel
@@ -282,6 +308,31 @@ describe('pipelines-page — `/dev/pipelines`', () => {
     // The error banner names the failing id at the top of the page
     expect(r.html).toContain('data-pipelines-error-banner');
     expect(r.html).toContain('<code>broken</code>');
+  });
+
+  it('renders Zod / loader error messages with HTML-escaped output (XSS regression)', async () => {
+    // The id-mismatch error message embeds the JSON's `id` field
+    // verbatim ("declares id "<value>" but was loaded as ..."). A
+    // future refactor that swapped `html\`\`` for `unsafe(html\`\`)`
+    // around the error-message render would let an attacker inject
+    // markup via a project-controlled override file. This test asserts
+    // the escaping survives the current render path.
+    const payload = '<img src=x onerror=alert(1)>';
+    writePipelineOverride(root, 'xss-attempt', {
+      id: payload,
+      name: 'XSS',
+      description: 'tries to inject markup via id-mismatch path',
+      linearStages: ['A'],
+      offPipelineStages: [],
+    });
+    const app2 = createApp({ projectRoot: root, config: makeConfig() });
+    const r = await getHtml(app2, '/dev/pipelines');
+    // The error row appears.
+    expect(r.html).toMatch(/data-pipeline-id="xss-attempt"[^>]*data-pipeline-error/);
+    // The escaped payload appears.
+    expect(r.html).toContain('&lt;img');
+    // The RAW payload does NOT appear (which would mean unescaped output).
+    expect(r.html).not.toContain('<img src=x onerror=alert(1)>');
   });
 
   it('error row dependents list names the lanes referencing the broken template', async () => {

@@ -31,11 +31,6 @@
 import { html, unsafe, type RawHtml } from '../html.ts';
 import type { PipelineRow } from './data.ts';
 
-interface EditFormInput {
-  readonly row: PipelineRow;
-  readonly availableTemplates: readonly string[];
-}
-
 function renderCustomizeNotice(row: PipelineRow): RawHtml {
   if (row.source !== 'plugin-preset') return unsafe('');
   return unsafe(html`
@@ -256,14 +251,7 @@ function renderSetOffPanel(row: PipelineRow): RawHtml {
     </details>`);
 }
 
-export function renderEditForm(
-  row: PipelineRow,
-  // availableTemplates kept in the signature for parity with the lanes
-  // edit-form even though the pipeline update verbs don't take a
-  // template id; future extensions (e.g. deletion's --reassign-lanes-to)
-  // can use it without re-threading.
-  _availableTemplates: readonly string[],
-): RawHtml {
+export function renderEditForm(row: PipelineRow): RawHtml {
   return unsafe(html`
     <section
       class="pipelines-edit-panel"
@@ -301,7 +289,3 @@ export function renderEditForm(
       </div>
     </section>`);
 }
-
-// Keep the input interface exported in case future callers want to
-// thread availableTemplates via the structured object form.
-export type { EditFormInput };

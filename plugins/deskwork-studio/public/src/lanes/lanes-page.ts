@@ -49,7 +49,7 @@
  * surfaces without per-surface guard checks at the import site.
  */
 
-import { copyAndFlash } from '../copy-builder.ts';
+import { copyAndFlash, quoteValue } from '../copy-builder.ts';
 import { resolveProjectKey } from '../dashboard/swimlane-storage.ts';
 
 const ARCHIVED_OPEN_STORAGE_PREFIX = 'deskwork:lanes:';
@@ -69,20 +69,6 @@ interface EditFormValues {
   readonly templateCurrent: string;
   readonly contentDir: string;
   readonly contentDirCurrent: string;
-}
-
-/**
- * Quote an operator-supplied value for inclusion in a slash command.
- *
- * Uses `JSON.stringify` to wrap the value in double quotes and escape
- * embedded quotes, backslashes, and control characters. Applied
- * uniformly to every value routed into the slash-command builder so
- * the output parses identically across shells and Claude Code's slash
- * parser (and so a value with spaces or quotes can't slip through as
- * an injection surface if pasted into a shell).
- */
-function quoteValue(value: string): string {
-  return JSON.stringify(value);
 }
 
 /**
