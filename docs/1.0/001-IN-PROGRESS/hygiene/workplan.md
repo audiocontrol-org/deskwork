@@ -394,20 +394,28 @@ Operator decisions (locked in during definition):
 
 ### Task 1: Fix the issues-filed scoping in `session-end-hygiene`
 
-- [ ] Step 1: In `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts`, replace the bare `gh issue list --author @me --search "created:>=<iso>"` sweep (currently around line 301–315) with a session-scoped filter. Choose between:
+- [x] Step 1: In `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts`, replace the bare `gh issue list --author @me --search "created:>=<iso>"` sweep (currently around line 301–315) with a session-scoped filter. Choose between:
   - **Light:** keep the gh query as a coarse filter, then AND-intersect with the set of `#NNN` references parsed from `git log <sessionStartSha>..HEAD` commit subjects + bodies. Only issues that BOTH satisfy `created:>=<iso>` AND appear in a session commit's `#NNN` references count as "filed this session."
   - **Medium:** drop the gh-side time-window query entirely; derive the list purely from `#NNN` references in `git log <sessionStartSha>..HEAD` (then `gh issue view <N>` per referenced number to get title + state). The commit range is the authoritative record of what the session touched.
-  Operator decision captured in the implementation thread; default to **Medium** if no preference surfaces (drops the same-user assumption entirely; commit-range is the truth source).
-- [ ] Step 2: Apply the same scoping principle to the "Address TBD markers" observation stream (`scanWorkplanTBDs` callsite + renderer). Only report markers introduced by the session diff (`git diff <sessionStartSha>..HEAD -- '<workplan-glob>'`), not every pre-existing TBD in the whole-file scan. Per #361's follow-up note.
-- [ ] Step 3: Update vitest coverage. New cases: (a) two same-user issues filed in the time window where ONE is referenced by a session commit and ONE is not → block lists only the referenced one; (b) a `#NNN` reference appearing in a commit body (not subject) is still picked up; (c) the TBD-scanner reports only markers introduced by the session diff, not pre-existing prose; (d) no-SHA fallback still works (no false-positive sweep when `--session-start-sha` is omitted).
-- [ ] Step 4: SKILL.md update for `session-end` — adopter-facing prose names the new commit-range-driven scoping (replaces the prior "since the last git fetch" no-SHA fallback wording where appropriate).
+  Operator decision captured in the implementation thread; default to **Medium** if no preference surfaces (drops the same-user assumption entirely; commit-range is the truth source). **Medium adopted in implementation.**
+- [x] Step 2: Apply the same scoping principle to the "Address TBD markers" observation stream (`scanWorkplanTBDs` callsite + renderer). Only report markers introduced by the session diff (`git diff <sessionStartSha>..HEAD -- '<workplan-glob>'`), not every pre-existing TBD in the whole-file scan. Per #361's follow-up note.
+- [x] Step 3: Update vitest coverage. New cases: (a) two same-user issues filed in the time window where ONE is referenced by a session commit and ONE is not → block lists only the referenced one; (b) a `#NNN` reference appearing in a commit body (not subject) is still picked up; (c) the TBD-scanner reports only markers introduced by the session diff, not pre-existing prose; (d) no-SHA fallback still works (no false-positive sweep when `--session-start-sha` is omitted).
+- [x] Step 4: SKILL.md update for `session-end` — adopter-facing prose names the new commit-range-driven scoping (replaces the prior "since the last git fetch" no-SHA fallback wording where appropriate).
 
 **Acceptance Criteria:**
 
-- [ ] `dw-lifecycle session-end-hygiene --slug <s> --session-start-sha <sha>` reports only issues referenced (`#NNN`) by a commit in `<sha>..HEAD`, not every same-user issue in the time window.
-- [ ] "Address TBD markers" reports markers introduced by the session diff, not pre-existing whole-file prose.
-- [ ] Vitest coverage for the four cases above passes; full plugin suite remains green.
-- [ ] Re-running `dw-lifecycle session-end-hygiene` against this hygiene session at the time of #361's fix produces a signal-only block (no merge-range / same-user noise).
+- [x] `dw-lifecycle session-end-hygiene --slug <s> --session-start-sha <sha>` reports only issues referenced (`#NNN`) by a commit in `<sha>..HEAD`, not every same-user issue in the time window.
+- [x] "Address TBD markers" reports markers introduced by the session diff, not pre-existing whole-file prose.
+- [x] Vitest coverage for the four cases above passes; full plugin suite remains green. (1952 / 1952 tests pass; 5 new commit-range / session-diff acceptance cases land in `lifecycle-session-end-hygiene.test.ts`.)
+- [ ] Re-running `dw-lifecycle session-end-hygiene` against this hygiene session at the time of #361's fix produces a signal-only block (no merge-range / same-user noise). *(Verification deferred until the rebuilt helper ships in a release the operator installs — per the project's "issue closure requires verification in a formally-installed release" rule.)*
+
+**Implementation notes:**
+
+- Medium fix adopted: the gh-side time-window query is gone. Issues surface only via `#NNN` references parsed from `git log <boundarySha>..HEAD` (subject + body), then `gh issue view <N>` per unique number. The "same-user" axis is dropped entirely.
+- Session-boundary SHA helper extracted to `plugins/dw-lifecycle/src/lifecycle-integration/session-range.ts` alongside the commit-ref parser and the diff-hunk walker. `session-end-hygiene.ts` lands at 480 lines (under the 500-line cap; prior 521 was already in violation).
+- TBD-scanner's session-diff filter falls back to the whole-file scan when no boundary is resolvable (greenfield repos / fixtures without git). Preserves the pre-Phase-12 behavior on every test fixture that doesn't wire a real git tree.
+- `#NNN` reference regex (`/(?:^|[^&\w/])#(\d{1,7})\b/`) excludes HTML entities (`&#39;`), id fragments (`id#section`), and cross-repo refs (`org/repo#NNN` — those are not our-repo issues).
+- Commit-log records use `%H\x1f%s\x1f%b\x1e` so subjects + bodies can be safely split per-commit. Both halves are scanned for refs.
 
 **Provenance:**
 
