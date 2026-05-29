@@ -33,9 +33,9 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 |---|---|---|
 | TF-001 | Promoted → #361 | — |
 | TF-002 | Open | — |
-| TF-003 | Open | — |
-| TF-004 | Open | — |
-| TF-005 | Open | — |
+| TF-003 | Promoted → #362 | — |
+| TF-004 | Promoted → #362 | — |
+| TF-005 | Closed | 37683c8 |
 
 ---
 
@@ -63,6 +63,8 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 
 ## TF-003 · MISC · medium · dispatch-wrapper `wrap-prompt` requires a mktemp + Write-file + paste-stdout dance per dispatch, and the return-grammar gotchas are a recurring authoring tax
 
+**Status:** Promoted to [#362](https://github.com/audiocontrol-org/deskwork/issues/362) (2026-05-29) — architectural shape + recurring per-dispatch tax. Co-filed with TF-004 (same dispatch round-trip). Stays in this log per the append-only contract.
+
 **Repro:** every `/dw-lifecycle:review` reviewer dispatch this session (38·1, #256, #232, #64) required: `mktemp` a prompt file → Write the prompt into it → `dw-lifecycle wrap-prompt --prompt-file <path>` → read stdout → paste the (120+ line) wrapped prompt into the Agent tool. The wrapped suffix's return-grammar has sharp edges the orchestrator must hand-satisfy when validating: the Searched-count noun whitelist (`5 issues found` is rejected; must end in `matches`/`hits`/etc.), the mandatory `path:LINE` on every Excluded entry (`:1` sentinel for whole-file), and the forbidden-substring list colliding with ordinary prose ("stub"/"placeholder"/"pending" in a reason trips the parser even in non-deferral usage).
 
 **Workaround used:** built the prompt file via `mktemp` + Write each time; for `validate-return`, re-typed the Searched/Included/Excluded block into a temp file avoiding the forbidden substrings. All 4 dispatches validated on the first try once the gotchas were internalized.
@@ -72,6 +74,8 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 - *Medium:* relax the forbidden-substring match to word-boundary + context (don't trip on "the placeholder tile" when the reason is clearly descriptive), and accept a small set of additional Searched-count nouns. The grammar's intent (no silent deferrals) is right; the false-positive surface is the tax.
 
 ## TF-004 · MISC · low · `validate-return` is a separate write-response-to-file + invoke step with no stdin path
+
+**Status:** Promoted to [#362](https://github.com/audiocontrol-org/deskwork/issues/362) (2026-05-29) — paired with TF-003 because they're the two legs of the same dispatch round-trip. TF-004's `--response-file -` fix is the Light option in #362's suggested-fix ladder. Stays in this log per the append-only contract.
 
 **Repro:** validating each reviewer return required writing the agent's Searched/Included/Excluded block to a temp file, then `dw-lifecycle validate-return --response-file <path> --json`. There's no stdin path (`--response-file -`), so the response can't be piped; it must round-trip through a temp file the orchestrator hand-creates.
 
