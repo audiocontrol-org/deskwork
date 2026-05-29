@@ -646,3 +646,36 @@ Phase 35 closes when:
 - 35b: audit doc renders all 9 inline screenshots on the review surface (loaded: true; `<img>` elements have natural dimensions); the sibling `2026-05-03-issue-158-screenshots/` directory no longer exists; comment `aeaf040f` is recorded as `addressed`.
 - 35c: each of `/deskwork:add`, `/deskwork:ingest`, and `THESIS.md` Consequence 3 mentions the scrapbook-as-asset-home pattern with concrete language an agent can act on.
 
+## Extension: Phase 38 — Core + Studio burndown tranche
+
+Added 2026-05-28 from an operator directive to burn down the two largest open-issue lanes surfaced by the 2026-05-29 repo-wide hygiene audit: `@deskwork/core`/`@deskwork/cli` and `@deskwork/studio`. The audit produced per-lane "marching orders" sheets (`docs/1.0/burndown/deskwork-core.md`, `docs/1.0/burndown/deskwork-studio.md`) that categorize every open issue by effort (quick / medium / sprint), operator-triage need, and dependency. Those sheets are the canonical task source; this phase tracks working through them.
+
+### Why this lands now
+
+- The audit closed 68 of 178 open issues against current code; the remaining 110 are sliced by lane. Core + studio are the two heaviest (23 + 38 issues) and the most user-facing.
+- The keystone is the approve/publish verb model (#246): a documented spec-vs-code divergence (`DESKWORK-STATE-MACHINE.md` Commandment II says verbs are universal; `approve.ts` refuses `Final → Published`). It blocks the studio Publish affordance (#230) and calendar auto-advance (#61). The operator decided it: **make approve universal** (option a), with uniform transition mechanics at `Final → Published`.
+- Several broken-surface defects (#68 dashboard auto-refresh 404, #98 scaffold-button 404, #71 fabricated public URL for host-less collections) are "packaging is UX" blockers every adopter hits.
+
+### Scope of Phase 38
+
+Sub-phases mirror the burndown categories (full breakdown in [`docs/superpowers/plans/2026-05-28-deskwork-core-studio-burndown.md`](../../superpowers/plans/2026-05-28-deskwork-core-studio-burndown.md)):
+
+- **38a — Verb-model unification (#246 + #230).** `approveEntryStage` handles `Final → Published` with the same uniform mechanics as every transition (index.md snapshot → `scrapbook/final.md` + comment-archive) plus the Published-specific `datePublished` + artifact check. `publishEntry` keeps its Final-only guards/messages but delegates the mutation to `approveEntryStage` — publish stays the named release verb. Studio's entry-review surface gains a stage-aware Publish button at Final.
+- **38b — Core quick fixes:** #256, #221, #232, #198.
+- **38c — Core doctor-rule family + ingest/approve mediums:** #219/#300/#65 (shared stage-exclusion gate), #218, #223/#234, #267, #226, #62, #64, #58, #59, #215.
+- **38d — Studio quick fixes:** #68, #98, #71, #233, #229, #177.
+- **38e — Studio medium:** #103, #193, #231, #272, #216, #114, #191, #202, #186, #204, #262, #263, #299, #240, #245.
+- **38f — Sprint / design-driven (gated on `/frontend-design` + operator direction-pick):** #154, #161, #179, #180, #54, #82, #85, #87, #73, #170/#171, #84, #217, #57, #61, #60, #72.
+- **38g — Operator-triage gates (decision before code):** #246 (decided), #266, #56, #222, #173, #174, #164.
+- **38h — Release + post-release verification.**
+
+### What Phase 38 is not
+
+- **Not the other burndown lanes.** dw-lifecycle, scope-discovery, graphical-entries, and roadmap have their own sheets and (for the feature lanes) their own branches; they are out of scope here.
+- **Not a license to auto-resolve operator-triage or design-driven issues.** 38f and 38g items are gated: design items need a `/frontend-design` pass and an operator direction-pick; triage items need an operator decision. `/dwi` pauses at those gates rather than guessing.
+- **Not a single mega-PR.** Fixes land per-issue (or per-shared-fix-shape) on `feature/deskwork-plugin`; shipping batches via `/release`.
+
+### Acceptance
+
+Phase 38 closes when every issue in the two burndown sheets (excluding the already-closed #142 and the audit-closed "informational" sets) is either: fix-landed-pending-release-verification, dispositioned by an operator decision (triage items), or explicitly deferred with both a workplan task and a GitHub-issue record. No code-comment IOUs.
+

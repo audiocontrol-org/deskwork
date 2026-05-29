@@ -1862,3 +1862,38 @@ GitHub tracking issues:
 - Refactoring scrapbook's per-entry semantics (shared scrapbook for feature-doc directories is acceptable for this project).
 
 **GitHub tracking:** issues filed after the PRD's deskwork workflow reaches `applied`.
+
+### Phase 38: Core + Studio burndown tranche (deskwork-core + deskwork-studio lanes)
+
+**Trigger:** Operator directive to burn down the two largest open-issue lanes from the 2026-05-29 hygiene audit. Scoped from `docs/1.0/burndown/deskwork-core.md` + `docs/1.0/burndown/deskwork-studio.md`. Full implementation plan: [`docs/superpowers/plans/2026-05-28-deskwork-core-studio-burndown.md`](../../../superpowers/plans/2026-05-28-deskwork-core-studio-burndown.md). The burndown sheets are the canonical per-issue task source (action / size / deps); the plan details sub-phase 38a to TDD granularity and enumerates 38b–38h for just-in-time expansion via `/dwi`.
+
+**Operator decisions captured:** #246 → make approve universal (option a); Final→Published applies uniform mechanics (snapshot + comment-archive, plus datePublished + artifact check).
+
+**Sub-phase 38a — Verb-model unification (#246 + #230):**
+
+- [ ] `nextStage('Final')` returns `'Published'` (`packages/core/src/schema/entry.ts`); update `entry.test.ts` assertions.
+- [ ] `approveEntryStage` handles `Final → Published` with uniform mechanics + `datePublished` + artifact check; extend `ApproveResult` ([#246](https://github.com/audiocontrol-org/deskwork/issues/246)).
+- [ ] `publishEntry` keeps Final-only guards/messages; delegates the mutation to `approveEntryStage`.
+- [ ] Canonical contract docs updated (`DESKWORK-STATE-MACHINE.md`, approve + publish `SKILL.md`).
+- [ ] Studio: Final-stage `publish` affordance in `stage-affordances.ts`; stage-aware Publish button in `decision-strip.ts` (clipboard-copies `/deskwork:publish <slug>`) ([#230](https://github.com/audiocontrol-org/deskwork/issues/230)). Live dual-viewport UI verification.
+- [ ] Full workspace suite green; `/dw-lifecycle:review` on the diff; fix-landed comments on #246 + #230.
+
+**Sub-phase 38b — Core quick fixes:** #256, #221, #232, #198.
+
+**Sub-phase 38c — Core doctor-rule family + ingest/approve mediums:** #219+#300+#65 (shared gate), #218, #223+#234, #267, #226, #62, #64, #58, #59, #215.
+
+**Sub-phase 38d — Studio quick fixes:** #68, #98, #71, #233, #229, #177.
+
+**Sub-phase 38e — Studio medium:** #103, #193, #231, #272, #216, #114, #191, #202, #186, #204, #262, #263, #299, #240, #245.
+
+**Sub-phase 38f — Sprint / design-driven (GATED on `/frontend-design` + operator direction-pick):** #154, #161, #179, #180, #54, #82, #85, #87, #73, #170/#171, #84, #217, #57, #61, #60, #72.
+
+**Sub-phase 38g — Operator-triage gates (DECISION required before code):** #246 (DECIDED — universal approve), #266, #56, #222, #173, #174, #164.
+
+**Sub-phase 38h — Release + post-release verification:** `/release` for accumulated fixes; marketplace walk; operator closes fix-landed issues.
+
+**Acceptance:** every issue in the two burndown sheets (excluding closed #142 and audit-closed informational sets) is either fix-landed-pending-verification, dispositioned by operator decision, or explicitly deferred with a workplan+issue record. No code-comment IOUs.
+
+**Out of scope:** the dw-lifecycle, scope-discovery, graphical-entries, and roadmap burndown lanes (separate sheets / separate features).
+
+**GitHub tracking:** issues already exist (they ARE the burndown). No new issues filed for sub-phases; 38a posts fix-landed comments on #246 + #230.
