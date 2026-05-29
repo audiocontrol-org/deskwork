@@ -1,6 +1,6 @@
 ---
 name: release
-description: Release the deskwork monorepo (bump → tag → push → CI publishes). Hard-gated procedure with operator pauses at version, post-bump diff, tag message, and final push. CI handles publish + smoke via npm Trusted Publisher (OIDC). Project-internal — for monorepo maintainers, not adopters.
+description: Release the deskwork monorepo (bump → tag → push → CI publishes). Hard-gated procedure with operator pauses at version, post-bump diff, tag message, and final push. CI handles publish + smoke via npm Trusted Publisher (OIDC). Pass `--skip-publish-wait` to bypass the workflow-watch step when the operator already published manually via `make publish`. Project-internal — for monorepo maintainers, not adopters.
 ---
 
 # Release

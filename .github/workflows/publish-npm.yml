@@ -40,9 +40,17 @@ jobs:
       - name: Install workspaces
         run: npm ci
 
-      - name: Build workspaces
-        run: npm run build
-
+      # No standalone build step here on purpose. `npm publish` invokes
+      # each package's `prepack` script automatically (per-package: tsc
+      # build + auxiliary file copies + chmod on bin entries), and the
+      # `prepack` script in every packages/<pkg>/package.json is the
+      # authoritative build for that package. A separate `npm run build`
+      # step would duplicate that work AND create a drift surface — if
+      # build and prepack diverge, the published artifact is ambiguous.
+      # The root build also runs scripts/link-workspace-bins.sh, which is
+      # for local test spawn of node_modules/.bin/deskwork; npm publish
+      # does not read those symlinks (it consumes each package's own
+      # `bin` field), so the symlink side effect is not needed pre-publish.
       - name: Publish all @deskwork packages (OIDC, dep-ordered)
         run: make publish-ci
         env:

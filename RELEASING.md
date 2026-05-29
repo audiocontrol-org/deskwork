@@ -84,30 +84,32 @@ The skill currently pushes directly to `origin/main` (no PR-merge, no CI-as-seco
 
 **When to introduce release branches**: at 1.0 stabilization, when the project starts supporting v1.x bugfixes alongside v2.x development. `release/v1.x` then becomes a real maintenance branch with its own backport policy. Mark this as a deferred decision; the trunk-based model holds for now.
 
-### npm-publish architecture (Phase 26, v0.9.5+)
+### npm-publish architecture
 
 Plugin runtime code ships as published npm packages under the `@deskwork/*` scope: `@deskwork/core`, `@deskwork/cli`, `@deskwork/studio`. Plugin trees themselves are thin shells (`bin/` + `skills/` + `plugin.json`) that first-run-install the corresponding package from the public registry.
 
 The plugin shell's `plugin.json` `version` field is kept in lockstep with the published npm package version. `scripts/bump-version.ts` bumps both atomically, plus the per-plugin shell `package.json#dependencies` pin (e.g. `"@deskwork/cli": "0.9.5"`), so the entire repo moves to the same version in one commit.
 
-**Publish path (driven by `/release`, executed in the operator's terminal):** the publish step is the third pause of the `/release` flow.
+**Publish path (CI-driven via npm Trusted Publisher / OIDC):** `.github/workflows/publish-npm.yml` is triggered by every `v*` tag push and runs the publish + post-publish gates in CI. The workflow is the publish authority; the `/release` skill's atomic tag push is the operator's approval moment.
 
-1. The skill verifies the version is not yet on npm (`assert-not-published`).
-2. The skill prints clear instructions and **the operator runs `make publish` in their own terminal**. The agent's Bash tool can't accept interactive stdin (2FA OTP prompts) — running it from the agent context would hang. `make publish` sources an npm token from `~/.config/deskwork/npm-credentials.txt`, writes an ephemeral `.npmrc` per `npm publish`, and prompts for one 2FA OTP per package (three total).
-3. When all three packages are published, the operator confirms in chat ("done") and the skill runs `assert-published` to verify the registry actually has all three. Only then does it proceed to the smoke gate.
+1. The `/release` skill verifies the version is not yet on npm (`assert-not-published`) BEFORE the tag goes out, so the workflow doesn't fail mid-publish on a duplicate version.
+2. The operator confirms the push prompt; the skill runs `git push --follow-tags`, which lands the tag on origin and fires `publish-npm.yml`.
+3. The workflow checks out the tagged commit, runs `npm ci`, then `make publish-ci` — which calls `npm publish --workspace @deskwork/<pkg>` for each of core / cli / studio under OIDC. Each `npm publish` invokes the package's own `prepack` script automatically (tsc build + auxiliary file copies + chmod on bin entries), so no separate build step is needed. `NPM_CONFIG_PROVENANCE=true` is set on the workflow env, so the publish emits provenance attestation tied to the workflow run.
+4. The workflow then runs `assert-published` (verifies the registry has all three at the new version) and `scripts/smoke-marketplace.sh` (clones the marketplace, npm-installs from the registry, boots studio, asserts routes). Both are release-blocking — workflow failure leaves the artifacts published but signals the release isn't healthy.
+5. The skill watches the workflow via `gh run watch` and reports the release URL on success.
 
-Publish happens BEFORE the smoke gate, so smoke can `npm install` against the freshly-published packages.
+Each `@deskwork/*` package on npmjs.com has a Trusted Publisher entry registered against this exact workflow filename (`publish-npm.yml`). That registration plus the workflow's `id-token: write` permission is what authorizes the publish — there is no `NPM_TOKEN` secret. See § "Trusted Publisher setup" above for the one-time-per-package registration steps and § "Recovery — CI is broken" for the `make publish` manual-fallback procedure when the workflow itself is broken.
+
+**Manual fallback paths:** `make publish` (token-auth, prompts for 2FA OTP per package) is the operator-driven recovery flow when CI is broken or for one-off out-of-band publishes. `make publish-ci` is what the workflow invokes under OIDC; running it from a local shell without the OIDC env will fail. Each per-package manifest declares `"publishConfig": { "access": "public", "provenance": true }` so the registry-side defaults match the workflow path; manual `make publish` overrides provenance off (`--no-provenance`) because token auth can't emit OIDC attestation.
 
 **Adopter install:** Claude Code clones the plugin's `git-subdir` source into the operator's plugin cache. On first invocation, the bin shim (`plugins/<plugin>/bin/<bin>`) runs `npm install --omit=dev` inside the plugin tree, which fetches `@deskwork/<pkg>@<pinned-version>` from the public registry into `<pluginRoot>/node_modules/`. Subsequent invocations skip that step. Plugin updates (via `/plugin marketplace update`) ship a new plugin shell with a bumped `plugin.json` version; the bin shim's version-drift check triggers a re-install on next invocation.
 
-The vendor-materialization mechanism that this replaces (Phase 23b–23g, v0.5.0–v0.9.4) was retired in v0.9.5. CI no longer materializes anything; the release workflow handles tagging + GitHub release notes only.
-
 ### What gets released
 
-Each release has two surfaces:
+Each release has two surfaces, both triggered by the single `v*` tag push:
 
-1. **`@deskwork/{core,cli,studio}@<version>` on npm** — published via `make publish`, run by the operator in their own terminal during Pause 3 of `/release`. This is the primary artifact; the plugin shells fetch this at adopter first-run.
-2. **A git tag on `main`** (e.g. `v0.9.5`). The tag triggers `.github/workflows/release.yml`, which validates `marketplace.json` plugin paths and creates a GitHub release with auto-generated notes from commits since the previous tag. The marketplace's `git-subdir` sources resolve to the default branch (no per-tag `source.ref` pin), so an operator running `/plugin marketplace update deskwork` after the release picks up the new shell.
+1. **`@deskwork/{core,cli,studio}@<version>` on npm** — published by `.github/workflows/publish-npm.yml`, the canonical publish authority. The workflow runs the publish, the post-publish `assert-published` registry check, and the marketplace smoke gate in CI under OIDC (no token). The plugin shells fetch these packages at adopter first-run. `make publish` (token + 2FA) is the manual fallback when CI is broken — see § "Recovery — CI is broken" and § "Trusted Publisher setup" for the registration that makes the workflow path work.
+2. **A git tag on `main`** (e.g. `v0.9.5`). The tag triggers `.github/workflows/release.yml` in parallel with `publish-npm.yml`; `release.yml` creates a GitHub release with auto-generated notes from commits since the previous tag. The marketplace's `git-subdir` sources resolve to the default branch (no per-tag `source.ref` pin), so an operator running `/plugin marketplace update deskwork` after the release picks up the new shell.
 
 ### Operator update path
 
