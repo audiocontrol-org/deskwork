@@ -431,6 +431,11 @@ function buildStateFromStorage(
  * captured object. The shared object pattern is the legitimate
  * generalization the dispatch contract authorizes for Task 5.5's
  * preset-application sequencing.
+ *
+ * Per AUDIT-20260528-37 (F5): tests that mutate this singleton must
+ * reset DOM + storage in `beforeEach` so cross-describe-block state
+ * does not leak. Re-invoking `initSwimlane` after the reset
+ * reassigns the singleton — that is the sanctioned reset path.
  */
 let activeState: SwimlaneState | null = null;
 

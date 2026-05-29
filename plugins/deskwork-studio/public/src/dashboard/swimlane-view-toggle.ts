@@ -257,6 +257,11 @@ function watchViewport(state: ViewToggleState): void {
  * mutated in-place by `reapplyViewToggleFromStorage` so the bound
  * `.vt-cell` click handlers (which closure-capture the state object)
  * keep operating on the same overrides Map after a preset apply.
+ *
+ * Per AUDIT-20260528-37 (F5): tests that mutate this singleton must
+ * reset DOM + storage in `beforeEach` so cross-describe-block state
+ * does not leak. Re-invoking `initSwimlaneViewToggle` after the
+ * reset reassigns the singleton — that is the sanctioned reset path.
  */
 let activeState: ViewToggleState | null = null;
 

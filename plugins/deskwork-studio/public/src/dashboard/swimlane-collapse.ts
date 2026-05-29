@@ -421,6 +421,13 @@ function bindHandlers(state: CollapseState, projectKey: string): void {
  * the state object) keep operating on the same Sets / Maps after a
  * preset apply. See `swimlane.ts:activeState` for the same pattern
  * + rationale.
+ *
+ * Per AUDIT-20260528-37 (F5): tests that mutate this singleton must
+ * reset DOM + storage in `beforeEach` so cross-describe-block state
+ * does not leak. There is no `resetActiveState()` export — the
+ * singleton's lifecycle is bound to `initSwimlaneCollapse`, which
+ * reassigns it. Rebuilding the page shell + re-invoking init is the
+ * sanctioned reset path.
  */
 let activeState: CollapseState | null = null;
 

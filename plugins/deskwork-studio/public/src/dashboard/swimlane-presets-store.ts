@@ -40,9 +40,14 @@ export interface FocusPreset {
   readonly focusedLanes: readonly string[];
   readonly viewModePerLane: Readonly<Record<string, ViewMode>>;
   readonly laneCollapseState: Readonly<Record<string, boolean>>;
-  readonly stageCollapseState: Readonly<
-    Record<string, Readonly<Record<string, boolean>>>
-  >;
+  /**
+   * Collapsed stages per lane (collapsed names only). Per
+   * AUDIT-20260528-37 (F6): the array shape replaces the older
+   * `Record<stageName, boolean>` shape which silently dropped
+   * `false` flags through the snapshot/apply round-trip. Legacy
+   * presets are migrated on read (see `coerceStageCollapseState`).
+   */
+  readonly stageCollapseState: Readonly<Record<string, readonly string[]>>;
 }
 
 export function presetsKey(projectKey: string): string {
@@ -91,33 +96,114 @@ function isBooleanFlagMap(value: unknown): value is {
   return true;
 }
 
-function isPreset(value: unknown): value is FocusPreset {
-  if (!isObject(value)) return false;
-  if (typeof value.id !== 'string') return false;
-  if (typeof value.name !== 'string') return false;
-  if (typeof value.createdAt !== 'string') return false;
-  if (!isStringArray(value.visibleLanes)) return false;
-  if (!isStringArray(value.focusedLanes)) return false;
-  if (!isObject(value.viewModePerLane)) return false;
-  for (const mode of Object.values(value.viewModePerLane)) {
-    if (!isViewMode(mode)) return false;
+/**
+ * Coerce a per-lane stage-collapse value into the canonical readonly-
+ * string-array shape. Accepts either:
+ *
+ *   - the new shape: `readonly string[]` (array of collapsed stage
+ *     names); returned as-is.
+ *   - the legacy shape: `Record<string, boolean>` from presets saved
+ *     before AUDIT-20260528-37 (F6); returns the names whose flag
+ *     was `true` (uncollapsed entries are dropped — they're the same
+ *     as "not present" under the new shape).
+ *
+ * Unrecognised shapes coerce to an empty array (no collapsed
+ * stages). The migration runs on read, so an older preset reopens
+ * with the right semantics without forcing the operator to re-save.
+ */
+function coerceStageCollapseInner(value: unknown): readonly string[] {
+  if (isStringArray(value)) return value;
+  if (isBooleanFlagMap(value)) {
+    const out: string[] = [];
+    for (const [stage, flag] of Object.entries(value)) {
+      if (flag) out.push(stage);
+    }
+    return out;
   }
-  if (!isBooleanFlagMap(value.laneCollapseState)) return false;
-  if (!isObject(value.stageCollapseState)) return false;
-  for (const inner of Object.values(value.stageCollapseState)) {
-    if (!isBooleanFlagMap(inner)) return false;
+  return [];
+}
+
+/**
+ * Coerce the outer `stageCollapseState` object into the canonical
+ * `Record<laneId, readonly string[]>` shape, applying
+ * `coerceStageCollapseInner` to every lane's value. The result is
+ * always a fresh object — the caller can freeze it without aliasing
+ * the parsed-JSON tree.
+ */
+function coerceStageCollapseState(
+  value: unknown,
+): Record<string, readonly string[]> {
+  if (!isObject(value)) return {};
+  const out: Record<string, readonly string[]> = {};
+  for (const [laneId, inner] of Object.entries(value)) {
+    out[laneId] = coerceStageCollapseInner(inner);
   }
-  return true;
+  return out;
+}
+
+/**
+ * Best-effort coercion of a parsed JSON value into a `FocusPreset`.
+ * Returns the normalised preset on success, `null` on any required-
+ * field failure (missing id / name / createdAt, malformed visible /
+ * focused / view-mode / lane-collapse). The stage-collapse axis
+ * accepts either the new array shape OR the legacy boolean-map
+ * shape (see `coerceStageCollapseState`).
+ *
+ * Returning null lets the storage reader silently skip malformed
+ * entries while keeping the rest of the presets readable — the
+ * controller treats localStorage as best-effort persistence.
+ */
+function coercePreset(value: unknown): FocusPreset | null {
+  if (!isObject(value)) return null;
+  if (typeof value.id !== 'string') return null;
+  if (typeof value.name !== 'string') return null;
+  if (typeof value.createdAt !== 'string') return null;
+  if (!isStringArray(value.visibleLanes)) return null;
+  if (!isStringArray(value.focusedLanes)) return null;
+  if (!isObject(value.viewModePerLane)) return null;
+  const viewModePerLane: Record<string, ViewMode> = {};
+  for (const [laneId, mode] of Object.entries(value.viewModePerLane)) {
+    if (!isViewMode(mode)) return null;
+    viewModePerLane[laneId] = mode;
+  }
+  if (!isBooleanFlagMap(value.laneCollapseState)) return null;
+  const stageCollapseState = coerceStageCollapseState(value.stageCollapseState);
+  return {
+    id: value.id,
+    name: value.name,
+    createdAt: value.createdAt,
+    visibleLanes: value.visibleLanes,
+    focusedLanes: value.focusedLanes,
+    viewModePerLane,
+    laneCollapseState: value.laneCollapseState,
+    stageCollapseState,
+  };
 }
 
 /**
  * Read the presets store from localStorage. Returns an empty Map on
  * any read failure (missing entry, parse error, wrong root shape) —
  * the controller treats localStorage as best-effort persistence and
- * never throws on read.
+ * never throws on read. Per-entry coercion applies the legacy →
+ * canonical stage-collapse migration (see `coerceStageCollapseState`).
  */
 export function readPresets(projectKey: string): Map<string, FocusPreset> {
-  return readStoredObjectMap(presetsKey(projectKey), isPreset);
+  const out = new Map<string, FocusPreset>();
+  try {
+    const raw = window.localStorage.getItem(presetsKey(projectKey));
+    if (raw === null) return out;
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return out;
+    }
+    for (const [id, entry] of Object.entries(parsed)) {
+      const preset = coercePreset(entry);
+      if (preset !== null) out.set(id, preset);
+    }
+    return out;
+  } catch {
+    return out;
+  }
 }
 
 function writePresets(
@@ -218,7 +304,7 @@ export function snapshotCurrentState(projectKey: string): {
   focusedLanes: readonly string[];
   viewModePerLane: Record<string, ViewMode>;
   laneCollapseState: Record<string, boolean>;
-  stageCollapseState: Record<string, Record<string, boolean>>;
+  stageCollapseState: Record<string, readonly string[]>;
 } {
   // visible-lanes is `all lanes − hidden set`. Reading allLanes from
   // the rail rows is the most-faithful source — the rail is the
@@ -238,15 +324,17 @@ export function snapshotCurrentState(projectKey: string): {
     laneCollapseState[laneId] = true;
   }
 
-  const stageCollapseState: Record<string, Record<string, boolean>> = {};
+  // Stage-collapse: storage holds `Record<laneId, string[]>` already.
+  // Per AUDIT-20260528-37 (F6) the snapshot retains the array shape
+  // — only collapsed stage names are present, so an absent lane key
+  // or absent stage name unambiguously means "not collapsed."
+  const stageCollapseState: Record<string, readonly string[]> = {};
   const stageMap = readStoredObjectMap<readonly string[]>(
     stageCollapseKey(projectKey),
     isStringArray,
   );
   for (const [laneId, stages] of stageMap) {
-    const inner: Record<string, boolean> = {};
-    for (const stage of stages) inner[stage] = true;
-    stageCollapseState[laneId] = inner;
+    if (stages.length > 0) stageCollapseState[laneId] = stages;
   }
 
   return {
@@ -301,13 +389,13 @@ export function applyPreset(projectKey: string, preset: FocusPreset): void {
   }
   writeJsonOrIgnore(laneCollapseKey(projectKey), collapsedLanes);
 
-  // 3b. Stage-collapse — `Record<laneId, string[]>`.
-  const stageOut: Record<string, string[]> = {};
-  for (const [laneId, inner] of Object.entries(preset.stageCollapseState)) {
-    const stages: string[] = [];
-    for (const [stage, flag] of Object.entries(inner)) {
-      if (flag) stages.push(stage);
-    }
+  // 3b. Stage-collapse — `Record<laneId, string[]>`. Per
+  //     AUDIT-20260528-37 (F6) the preset already carries the array
+  //     shape (collapsed stage names only); empty arrays drop out
+  //     so the controller's "no collapsed stages for this lane"
+  //     branch is reached via key absence rather than empty array.
+  const stageOut: Record<string, readonly string[]> = {};
+  for (const [laneId, stages] of Object.entries(preset.stageCollapseState)) {
     if (stages.length > 0) stageOut[laneId] = stages;
   }
   writeJsonOrIgnore(stageCollapseKey(projectKey), stageOut);

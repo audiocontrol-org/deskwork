@@ -292,8 +292,11 @@ describe('Task 5.5 — saveable focus presets client controller', () => {
       qa: 'kanban',
     });
     expect(snapshot.laneCollapseState).toEqual({ mockups: true });
+    // Per AUDIT-20260528-37 (F6) the stage-collapse axis is now
+    // `Record<laneId, readonly string[]>` — only collapsed names
+    // present.
     expect(snapshot.stageCollapseState).toEqual({
-      default: { Drafting: true },
+      default: ['Drafting'],
     });
   });
 
@@ -388,7 +391,7 @@ describe('Task 5.5 — saveable focus presets client controller', () => {
       focusedLanes: ['default'],
       viewModePerLane: { qa: 'list' },
       laneCollapseState: { default: true },
-      stageCollapseState: { qa: { Drafting: true } },
+      stageCollapseState: { qa: ['Drafting'] },
     };
 
     applyPreset(PROJECT_KEY, preset);

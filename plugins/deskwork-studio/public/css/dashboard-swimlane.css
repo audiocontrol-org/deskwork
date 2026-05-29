@@ -226,6 +226,38 @@
   outline-offset: 1px;
 }
 
+/*
+ * Per AUDIT-20260528-37 (F2): copy-deep-link affordance. Lives on
+ * the preset row between the Load and Delete buttons. Same 24x24
+ * hit-target floor as Delete (WCAG 2.2 SC 2.5.8). The `.copied`
+ * flash mirrors `.swim-compose.copied` at line 1140 — proof-blue
+ * background + white text for ~2s.
+ */
+.lane-rail .preset-link {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--er-faded);
+  cursor: pointer;
+  min-width: 24px;
+  min-height: 24px;
+  line-height: 1;
+  padding: 0;
+}
+
+.lane-rail .preset-link:hover,
+.lane-rail .preset-link:focus-visible {
+  color: var(--er-proof-blue, #2563eb);
+  outline: 2px solid var(--er-proof-blue, currentColor);
+  outline-offset: 1px;
+}
+
+.lane-rail .preset-link.copied {
+  background: var(--er-stamp-green, #1e8449);
+  color: #fff;
+}
+
 .rail-lane {
   display: flex;
   align-items: baseline;

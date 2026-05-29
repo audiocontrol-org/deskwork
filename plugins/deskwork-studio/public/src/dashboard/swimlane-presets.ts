@@ -86,6 +86,20 @@ function renderPresetList(
     loadBtn.textContent = preset.name;
     row.appendChild(loadBtn);
 
+    // Per AUDIT-20260528-37 (F2): copy-deep-link affordance. The
+    // button writes `${origin}/dev/editorial-studio?preset=<id>` to
+    // the clipboard so the operator can share the preset URL.
+    // Per `.claude/rules/affordance-placement.md` the button lives
+    // ON the preset row (component-attached), not in a separate
+    // toolbar.
+    const linkBtn = document.createElement('button');
+    linkBtn.type = 'button';
+    linkBtn.classList.add('preset-link');
+    linkBtn.dataset.presetLink = preset.id;
+    linkBtn.setAttribute('aria-label', `Copy deep-link URL for preset ${preset.name}`);
+    linkBtn.textContent = '🔗';
+    row.appendChild(linkBtn);
+
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.classList.add('preset-delete');
@@ -96,6 +110,41 @@ function renderPresetList(
 
     container.appendChild(row);
   }
+}
+
+/**
+ * Compose the deep-link URL for a preset id. Origin + the canonical
+ * editorial-studio path + `?preset=<id>`. Centralised so the click
+ * handler and any future surface (share menu, etc.) share the same
+ * format.
+ */
+function composeDeepLinkUrl(presetId: string): string {
+  return `${window.location.origin}/dev/editorial-studio?preset=${encodeURIComponent(presetId)}`;
+}
+
+/** Duration the link button stays in the `.copied` flash state (ms). */
+const LINK_COPIED_FLASH_MS = 2000;
+
+/**
+ * Flash `.copied` on the link button for ~2s after a successful
+ * clipboard write. Mirrors the `swimlane-compose.ts` copy-flash
+ * pattern — same duration, same revert path. The button's text
+ * swaps to a checkmark for the duration of the flash so screen
+ * readers + sighted users both get confirmation.
+ */
+function flashLinkCopied(button: HTMLElement): void {
+  button.classList.add('copied');
+  const originalText = button.textContent;
+  const originalLabel = button.getAttribute('aria-label');
+  button.textContent = '✓';
+  button.setAttribute('aria-label', 'Deep-link URL copied to clipboard');
+  window.setTimeout(() => {
+    button.classList.remove('copied');
+    button.textContent = originalText;
+    if (originalLabel !== null) {
+      button.setAttribute('aria-label', originalLabel);
+    }
+  }, LINK_COPIED_FLASH_MS);
 }
 
 /**
@@ -176,6 +225,28 @@ async function handleListClick(
     return;
   }
 
+  const linkBtn = target.closest<HTMLElement>('[data-preset-link]');
+  if (linkBtn !== null) {
+    const id = linkBtn.dataset.presetLink;
+    if (id === undefined) return;
+    // Per the no-fallback rule (swimlane-compose.ts:36-40): when
+    // `navigator.clipboard` is missing the controller surfaces the
+    // runtime error rather than papering over it. The clipboard
+    // API is gated on a secure context (https or localhost) — both
+    // of which the editorial-studio surface always meets.
+    if (
+      typeof navigator === 'undefined' ||
+      typeof navigator.clipboard?.writeText !== 'function'
+    ) {
+      throw new Error(
+        'preset-link copy requires navigator.clipboard.writeText',
+      );
+    }
+    await navigator.clipboard.writeText(composeDeepLinkUrl(id));
+    flashLinkCopied(linkBtn);
+    return;
+  }
+
   const deleteBtn = target.closest<HTMLElement>('[data-preset-delete]');
   if (deleteBtn !== null) {
     const id = deleteBtn.dataset.presetDelete;
@@ -215,6 +286,20 @@ function bindHandlers(
  * AFTER each constituent controller's `init*` has fired (per the
  * editorial-studio-client.ts wiring order) so the reapply functions
  * have a non-null active state to mutate.
+ *
+ * URL precedence — `?preset=` overrides `?focus=`. Per AUDIT-20260528-37
+ * (F4): a deep-link preset apply silently overrides any concurrent
+ * `?focus=<csv>` URL param, because preset apply is a complete-state
+ * restore of all four axes (visible / focused / view-mode / collapse)
+ * — letting a partial-axis param like `?focus=` survive would leave
+ * the operator with a state that's neither the preset NOR the focus
+ * URL. The preset wins; the `?focus=` param is observed by the
+ * pre-preset init pass (writing through to the focus storage key)
+ * and then immediately replaced when `applyPreset` writes the
+ * preset's `focusedLanes` to the same key. The `?preset=` param is
+ * stripped from the URL post-apply (see `stripPresetFromUrl`); the
+ * `?focus=` param is left intact for back-link symmetry but no
+ * longer reflects live state.
  */
 function applyDeepLinkPreset(projectKey: string): void {
   const id = parsePresetIdFromUrl();
