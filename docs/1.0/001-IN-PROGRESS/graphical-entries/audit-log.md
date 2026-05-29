@@ -2326,7 +2326,7 @@ diff. Multiple substantive findings — recorded below.
 ### AUDIT-20260529-15 — `members: []` is invisible to `group list` / `group show` / `group update` (HIGH)
 
 Finding-ID: AUDIT-20260529-15
-Status:     fixed-PENDING-SHA-SAME-COMMIT
+Status:     fixed-50b0ebf
 Severity:   high
 Surface:    `packages/core/src/groups/types.ts:20-22`, `packages/core/src/groups/operations/list.ts:35`, `packages/core/src/groups/operations/show.ts:48`, `packages/core/src/groups/operations/update.ts:48`, `packages/core/src/groups/operations/create.ts:119`
 
@@ -2367,7 +2367,7 @@ stands.
 ### AUDIT-20260529-16 — Task 7.5.5 reframed from `group-empty-members-array` to `group-stale-empty-members` (medium)
 
 Finding-ID: AUDIT-20260529-16
-Status:     fixed-PENDING-SHA-SAME-COMMIT
+Status:     fixed-50b0ebf
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:390`
 
@@ -2385,7 +2385,7 @@ to cancel / archive / populate.
 ### AUDIT-20260529-17 — journal-events docblock claimed non-existent `cascadeFrom` linkage (medium; cascadeFrom feature tracked at #359)
 
 Finding-ID: AUDIT-20260529-17
-Status:     fixed-PENDING-SHA-SAME-COMMIT
+Status:     fixed-50b0ebf
 Severity:   medium
 Surface:    `packages/core/src/schema/journal-events.ts:347-351`
 
@@ -2432,7 +2432,7 @@ refactor shape.
 ### AUDIT-20260529-19 — create→list round-trip test gap (medium)
 
 Finding-ID: AUDIT-20260529-19
-Status:     fixed-PENDING-SHA-SAME-COMMIT
+Status:     fixed-50b0ebf
 Severity:   medium
 Surface:    `packages/cli/test/group/create.test.ts`, `packages/cli/test/group/list.test.ts`
 
@@ -2452,7 +2452,7 @@ empty-group semantics across list / show / update.
 ### AUDIT-20260529-20 — journal-events docblock count off-by-one (low)
 
 Finding-ID: AUDIT-20260529-20
-Status:     fixed-PENDING-SHA-SAME-COMMIT
+Status:     fixed-50b0ebf
 Severity:   low
 Surface:    `packages/core/src/schema/journal-events.ts:334`
 
@@ -2464,7 +2464,7 @@ Resolution: prose updated from "seven" to "six". One-character fix.
 ### AUDIT-20260529-21 — group SKILL.md `update` description didn't mention empty-members refusal semantics (low)
 
 Finding-ID: AUDIT-20260529-21
-Status:     fixed-PENDING-SHA-SAME-COMMIT
+Status:     fixed-50b0ebf
 Severity:   low
 Surface:    `plugins/deskwork/skills/group/SKILL.md:47`
 
