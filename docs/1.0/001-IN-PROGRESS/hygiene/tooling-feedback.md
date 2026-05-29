@@ -23,6 +23,7 @@ Running log of friction surfaces in scope-discovery + dispatch-wrapper tooling, 
 |---|---|---|
 | TF-001 | Open | — |
 | TF-002 | Promoted → #364 | (fix landed on branch this session — see #364 for SHA) |
+| TF-003 | Promoted → #366 | — |
 
 ---
 
@@ -84,3 +85,31 @@ The *Medium* fix would be to unify the two runGit contracts — either make `run
 **Cross-references:**
 - Fix: `plugins/dw-lifecycle/src/archive-branch/preflight.ts` (`assertTagDoesNotExist`) + regression test in `__tests__/archive-branch-preflight.test.ts`.
 - Audit-log entry: `AUDIT-20260529-07`.
+
+## TF-003 · MISC · medium · `close-shipped` commit-log walker treats every `#NNN` mention as a fix-shipped signal; false-positive comments land on adjacent / referenced issues
+
+**Status:** Promoted to [#366](https://github.com/audiocontrol-org/deskwork/issues/366) (2026-05-29). Cleanup of the 6 false-positive comments landed in the operator's PATCH pass (each comment's body now opens with a `**Correction (2026-05-29)…**` header that disclaims the shipped-claim and preserves the original evidence-trail text below for audit; the correction paragraphs back-link to #366).
+
+**Repro:** Phase 11 dogfood + ship cycle — ran `dw-lifecycle close-shipped --from-tag v0.26.5 --to-tag v0.27.0` against the operator's actual repo after the v0.27.0 release. The dry-run surfaced 9 candidates; only 3 (#356, #361, #364) had actual fixes shipped. The other 6 were:
+
+- **#351, #352** — scope-discovery dogfood-follow-up issues. Matched on commit `54cfdb1` ("docs(scope-discovery): scope #349 dogfood follow-ups into workplan") because that commit's BODY cited the issues as among the dogfood follow-ups being scoped. The issues are tracking work still to do, not work shipped by `54cfdb1`.
+- **#353, #355** — scope-discovery Phase 12 + Phase 13 parent issues. Matched on `back-fill <Phase N> parent issue link` commits that cited the issue numbers in docs body to wire workplan ↔ issue cross-references. The actual feature work for those phases lives on `feature/scope-discovery` and has NOT been merged to main / shipped to npm.
+- **#362** — TF-003/004 dispatch round-trip ergonomics. Matched because the workplan-scoping commit `04fe0f3` body cited #362 as adjacent infrastructure friction tracked separately. No fix for #362 has shipped; the issue was just acknowledged in passing.
+- **#365** — the PR ITSELF that landed this release. Matched on the merge commit subject ("Merge pull request #365 from audiocontrol-org/feature/hygiene"). PRs aren't issues tracking fixes; commenting on a PR with "shipped in <version>" is meaningless.
+
+Apply ran (operator-driven) and posted the "Shipped in v0.27.0" evidence-trail comment to all 9 — including the 6 false positives. The operator subsequently PATCHed each false-positive comment with a `**Correction (2026-05-29)…**` header preserving the audit trail below.
+
+**Workaround used:** Six `gh api repos/.../issues/comments/<id> -X PATCH -F body=@<file>.md` invocations with a per-issue correction-header file written via `mktemp + Write`. The correction explains the false-positive shape and disclaims the original shipped-claim. Original "Shipped in v0.27.0" text stays below the correction header so the audit trail is preserved (per the project's never-delete-comments discipline + append-only TF log discipline).
+
+**Suggested fix:**
+
+- **Light:** narrow the commit-log walker's match shape from "any `#NNN` mention" to one of the GitHub fix-keyword forms — `Closes #N`, `Fixes #N`, `Resolves #N`, `Fix #N`, `Close #N`, `Resolve #N` (case-insensitive). GitHub's own "issue auto-close" parser uses these exact verbs; matching them gives the walker the same precision GitHub itself uses. References without the fix verb (incl. PR merge commits "Merge pull request #PR") are dropped.
+- **Medium:** the Light fix plus a separate operator-curation step inside `close-shipped propose` (mirroring `triage-issues propose`'s shape) — emit a JSON proposal with one row per candidate including the matching commit-message excerpt + a `confidence: high|medium|low` derived from match shape (`Closes/Fixes/Resolves` = high; bare `#N` = low). Operator approves a subset; only approved rows apply.
+- **Heavy:** the Medium fix plus per-source confidence scoring across all four evidence sources (commit-log / audit-log / tooling-feedback / workplan-checkbox). Audit-log + tooling-feedback's `Status: fixed-<sha>` entries are already structurally high-confidence (the operator authored them as "fix landed"); workplan-checkbox is medium; commit-log gets per-keyword tuning per Light.
+
+The PR merge-commit (`Merge pull request #PR from ...`) match deserves special-case handling regardless of fix size: it's structurally meaningless evidence and should never produce a comment.
+
+**Cross-references:**
+- Fix surface: `plugins/dw-lifecycle/src/close-shipped/` (commit-log walker module — likely a regex matcher fed to the issue-extractor).
+- Cross-link: [#366](https://github.com/audiocontrol-org/deskwork/issues/366) (filed) + workplan Phase 13.
+- Sibling pattern: the `extractIssueRefsFromRange` helper in `plugins/dw-lifecycle/src/lifecycle-integration/session-range.ts` (Phase 12) accepts the same any-mention-is-a-signal shape but for a different purpose (which issues this session TOUCHED). The Phase 12 design was intentionally permissive because "touched" includes references. Close-shipped's design intent is the stricter "fix shipped" semantic — same regex, different contract.

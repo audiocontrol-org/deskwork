@@ -437,3 +437,37 @@ Operator decisions (locked in during definition):
 - Promoted to [#361](https://github.com/audiocontrol-org/deskwork/issues/361) per the agent-discipline rule's "recurring cross-session pattern → promote" trigger.
 - Code path: `session-end-hygiene.ts` `scanIssuesThisSession` (commit-range walker + per-issue `gh issue view`) + `session-range.ts` `resolveSessionBoundarySha` (priority-ordered SHA fallback). The pre-Phase-12 `resolveSessionBoundaryIso` is deleted; the boundary is now the SHA itself, not a committer-date detour.
 - Adjacent infrastructure friction surfaced in the same dogfood (TF-003 + TF-004, promoted to [#362](https://github.com/audiocontrol-org/deskwork/issues/362) — `wrap-prompt` / `validate-return` round-trip ergonomics) is dw-lifecycle infra, not hygiene-feature work; not in scope for this phase.
+
+## Phase 13: close-shipped commit-log walker fix-keyword filter  ·  [#366](https://github.com/audiocontrol-org/deskwork/issues/366)
+
+**Deliverable:** `dw-lifecycle close-shipped`'s commit-log walker matches only GitHub fix-keyword forms (`Closes #N`, `Fixes #N`, `Resolves #N`) instead of any `#NNN` mention. Drops the false-positive `pending-verification` comments that landed on adjacent / cross-linked / PR-merge-commit issues during the v0.27.0 dogfood. Closes [#366](https://github.com/audiocontrol-org/deskwork/issues/366); originating tooling-feedback entry is `TF-003` in this feature's `tooling-feedback.md`.
+
+### Task 1: Narrow the commit-log walker to GitHub fix-keyword shapes (Light fix per #366)
+
+- [ ] Step 1: In `plugins/dw-lifecycle/src/close-shipped/` (commit-log walker module — likely the issue-extraction regex feeding into the per-source merge), replace the current any-mention match with a fix-keyword match. The verbs to accept (case-insensitive):
+  - `Closes #N`, `Closes: #N`, `Closed #N`, `Close #N`
+  - `Fixes #N`, `Fixes: #N`, `Fixed #N`, `Fix #N`
+  - `Resolves #N`, `Resolves: #N`, `Resolved #N`, `Resolve #N`
+  - GitHub's own auto-close grammar is the spec — match what GitHub itself recognizes; nothing more, nothing less.
+- [ ] Step 2: Filter PR-merge commit subjects unconditionally. The pattern `^Merge pull request #\d+ from ` always matches as `Merge` verb but yields a PR number, not a fix-shipped signal. Drop these matches regardless of fix-keyword presence.
+- [ ] Step 3: Vitest coverage. New cases:
+  - (a) commit subject `feat: close #501 — actually fixes thing` → ref #501 surfaces (Closes verb).
+  - (b) commit body `Fixes #502\n\nLonger body...` → ref #502 surfaces (Fixes verb).
+  - (c) commit subject `feat(x): scoping #503 into workplan` → ref #503 does NOT surface (bare mention, no fix verb).
+  - (d) commit subject `Merge pull request #504 from foo/bar` → no PR-number ref surfaces (PR-merge shape).
+  - (e) commit body markdown link `[#505](https://...)` paired with `Resolves #505` → still surfaces (verb takes precedence over markdown shape).
+- [ ] Step 4: SKILL.md update for `close-shipped` — adopter-facing prose names the fix-keyword shape (replaces the prior any-mention wording).
+
+**Acceptance Criteria:**
+
+- [ ] `dw-lifecycle close-shipped --from-tag <vA> --to-tag <vB> --dry-run` only surfaces issues whose commits carry an explicit fix-keyword reference.
+- [ ] PR-merge commit subjects (`Merge pull request #PR from ...`) never produce a candidate.
+- [ ] Vitest coverage for the five cases above passes; full plugin suite stays green.
+- [ ] Re-running `close-shipped --from-tag v0.26.5 --to-tag v0.27.0` against an installed release-after-this-fix surfaces ONLY the 3 real candidates (#356, #361, #364) from the v0.27.0 dogfood — drops #351, #352, #353, #355, #362, #365.
+
+**Provenance:**
+
+- Surfaced via the v0.27.0 dogfood: ran `dw-lifecycle close-shipped --from-tag v0.26.5 --to-tag v0.27.0` against the operator's actual repo immediately after release. 9 candidates surfaced; 6 were false positives whose commits merely referenced the issue numbers in body context (back-fill links, adjacent-friction acknowledgements, the PR-merge commit itself).
+- Original tooling-feedback entry: `docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md` TF-003.
+- Promoted to [#366](https://github.com/audiocontrol-org/deskwork/issues/366) per the agent-discipline rule's "architectural / recurring-pattern → promote" trigger.
+- The Medium fix (operator-curation propose|apply split mirroring `triage-issues`) and the Heavy fix (per-source confidence scoring across all four evidence walkers) are scoped in the GH issue body for follow-up. This phase ships only the Light fix; Medium + Heavy are tracked as follow-ups under [#366](https://github.com/audiocontrol-org/deskwork/issues/366).
