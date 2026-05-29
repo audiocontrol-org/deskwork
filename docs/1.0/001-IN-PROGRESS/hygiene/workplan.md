@@ -369,8 +369,15 @@ Operator decisions (locked in during definition):
 
 ### Task 5: Tests + smoke
 
-- [ ] Step 1: Extend `scripts/smoke-hygiene.sh` to exercise the worktree verb(s) end-to-end. Sets up a tmp project tree with several fixture worktrees in varying states; runs report; runs propose; runs apply; verifies expected end state.
-- [ ] Step 2: Full `npm test --workspaces` pass with new vitest cases. No CI bloat (per project rule).
+- [x] Step 1: Extend `scripts/smoke-hygiene.sh` to exercise the worktree verb(s) end-to-end. Sets up a tmp project tree with several fixture worktrees in varying states; runs report; runs propose; runs apply; verifies expected end state.
+- [x] Step 2: Full `npm test --workspaces` pass with new vitest cases. No CI bloat (per project rule). (1953 / 1953 plugin tests pass; smoke-hygiene.sh run completes through all 10 verb checks with `OK`.)
+
+**Implementation notes (Phase 11 Task 5):**
+
+- The smoke section adds three checks (worktree-report --json, dismantle-worktrees propose, dismantle-worktrees apply) following the existing per-verb structure. Uses a sibling worktree under `$FIXTURE/worktrees/smoke-wtree` created with `git worktree add -q -b feature/smoke-wtree`. `--threshold-count 1` lowers the bar so the fixture worktree picks up the orphan verdict; the proposal JSON's items get edited via inline python3 to set `decision=skip` + a substantive reason, and apply round-trips without mutating any worktree (sibling worktree still present + still registered with git after apply).
+- The proposal schema uses `items` (not `entries`) for the per-worktree rows. Inline Python noted this explicitly so a future contributor doesn't re-derive the field name.
+- Explicit `g worktree remove --force` + `g branch -D` cleanup at the end keeps the fixture leak-free even when the operator overrides `SMOKE_HYGIENE_TMPDIR` (the FIXTURE-level trap would otherwise leave a dangling worktree admin entry until tmpdir cleanup fires).
+- Step 2 was a verification step, not new code; the test count moved 1948 → 1953 across this session via Phase 12 Task 1's 5 new cases + the F1 regression test.
 
 ### Task 6: Dogfood
 
