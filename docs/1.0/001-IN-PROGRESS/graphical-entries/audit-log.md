@@ -518,7 +518,7 @@ No action unless the test flakes in CI. If it does, switch to a
 ### AUDIT-20260528-14
 
 Finding-ID: AUDIT-20260528-14
-Status:     open
+Status:     fixed-3c5228a
 Severity:   medium
 Surface:    plugins/deskwork-studio/public/css/dashboard-swimlane.css + packages/studio/test/dashboard-swimlane.test.ts
 
@@ -1138,7 +1138,7 @@ the lane remains list.
 ### AUDIT-20260528-39
 
 Finding-ID: AUDIT-20260528-39
-Status:     open
+Status:     fixed-a9214b7
 Severity:   high
 Surface:    dashboard compose chip / deskwork add command integration
 
