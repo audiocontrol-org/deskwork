@@ -2500,7 +2500,7 @@ distinction.
 ### AUDIT-20260529-22 — cancel-cascade test docblock named `vi.mock` but code uses `vi.spyOn` (low)
 
 Finding-ID: AUDIT-20260529-22
-Status:     fixed-pending-sha
+Status:     fixed-cbc53ae
 Severity:   low
 Surface:    `packages/core/test/entry/cancel-cascade.test.ts:15`
 
@@ -2580,7 +2580,7 @@ regression.
 ### AUDIT-20260529-26 — recursive walker call's forced `cascade: true` undocumented (low)
 
 Finding-ID: AUDIT-20260529-26
-Status:     fixed-pending-sha
+Status:     fixed-cbc53ae
 Severity:   low
 Surface:    `packages/core/src/entry/cancel.ts:198-205`
 
