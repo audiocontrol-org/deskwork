@@ -101,16 +101,153 @@ describe('parentTimeline', () => {
     expect(results.map((r) => r.number)).toEqual([324, 325]);
   });
 
+  it('interpolates the resolved repo into the URL and does NOT pass --repo flag (#342)', () => {
+    // Regression: pre-fix the URL carried literal `{owner}/{repo}`
+    // placeholders that `gh api` does not substitute, AND the call passed
+    // `--repo` (which `gh api` rejects with `unknown flag`). Both bugs
+    // surfaced together as a CLI usage error that aborted the walker. The
+    // fix interpolates the repo directly into the URL path and drops the
+    // `--repo` flag.
+    const stub = makeGhStub(() => '[]');
+    parentTimeline({ parentIssue: 323, repo: 'owner/repo', runGh: stub.runGh });
+    const argv = stub.calls[0] ?? [];
+    expect(argv[0]).toBe('api');
+    expect(argv[1]).toBe('/repos/owner/repo/issues/323/timeline');
+    expect(argv).not.toContain('--repo');
+    expect(argv.find((a) => a.includes('{owner}'))).toBeUndefined();
+    expect(argv.find((a) => a.includes('{repo}'))).toBeUndefined();
+  });
+
+  it('recovers gracefully when the gh api call throws a usage error (#342)', () => {
+    // Regression: pre-fix, the walker rejected on usage errors instead of
+    // collapsing to "this source returned []". The recovery contract is
+    // that ANY error from the timeline source backfills to empty + emits a
+    // one-line stderr breadcrumb so the other two sources can still
+    // contribute candidates.
+    const stub = makeGhStub(() => {
+      throw new Error('unknown flag: --repo\nUsage: gh api <endpoint> [flags]');
+    });
+    const errors: string[] = [];
+    const origError = console.error;
+    console.error = (...parts: unknown[]) => {
+      errors.push(parts.map((p) => String(p)).join(' '));
+    };
+    try {
+      const result = parentTimeline({
+        parentIssue: 323,
+        repo: 'owner/repo',
+        runGh: stub.runGh,
+      });
+      expect(result).toEqual([]);
+    } finally {
+      console.error = origError;
+    }
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/complete-parent-closure: timeline source failed/);
+    expect(errors[0]).toMatch(/unknown flag/);
+    expect(errors[0]).toMatch(/continuing with other sources/);
+  });
+
   it('returns empty array on 404 (archived parent etc.)', () => {
     const stub = makeGhStub(() => {
       throw new Error('gh: HTTP 404 not found');
     });
-    expect(parentTimeline({ parentIssue: 999, repo: 'o/r', runGh: stub.runGh })).toEqual([]);
+    const origError = console.error;
+    console.error = () => undefined;
+    try {
+      expect(
+        parentTimeline({ parentIssue: 999, repo: 'o/r', runGh: stub.runGh }),
+      ).toEqual([]);
+    } finally {
+      console.error = origError;
+    }
   });
 
   it('returns empty array on empty output', () => {
     const stub = makeGhStub(() => '');
     expect(parentTimeline({ parentIssue: 1, repo: 'o/r', runGh: stub.runGh })).toEqual([]);
+  });
+
+  it('returns empty array (with diagnostic) when timeline output is not a JSON array', () => {
+    const stub = makeGhStub(() => '{"oops": true}');
+    const origError = console.error;
+    const errors: string[] = [];
+    console.error = (...parts: unknown[]) => {
+      errors.push(parts.map((p) => String(p)).join(' '));
+    };
+    try {
+      expect(
+        parentTimeline({ parentIssue: 1, repo: 'o/r', runGh: stub.runGh }),
+      ).toEqual([]);
+    } finally {
+      console.error = origError;
+    }
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/response was not a JSON array/);
+  });
+});
+
+describe('walk — recovery contract (#342)', () => {
+  let fxRec: Fixture;
+  beforeEach(() => {
+    fxRec = setup();
+  });
+  afterEach(() => rmSync(fxRec.root, { recursive: true, force: true }));
+
+  it('still returns a usable proposal when the gh api timeline call throws a usage error', () => {
+    // Integration-level: the walker's recovery contract says "timeline
+    // source backfills to [], the other two sources contribute the
+    // candidate set." This test exercises that contract end-to-end -- the
+    // gh api call throws a usage error, but title-search + workplan-
+    // anchored sources still supply the parent + a child, and the
+    // walker's classification carries through.
+    writeFileSync(
+      fxRec.workplanPath,
+      [
+        '## Phase 0: setup  ·  [#324](https://github.com/o/r/issues/324)',
+      ].join('\n'),
+      'utf8',
+    );
+    const runGh = (args: readonly string[]): string => {
+      if (args[0] === 'issue' && args[1] === 'list') {
+        return JSON.stringify([
+          { number: 323, title: 'feat(hygiene): parent', state: 'OPEN', url: 'u323' },
+        ]);
+      }
+      if (args[0] === 'api') {
+        throw new Error('unknown flag: --repo');
+      }
+      if (args[0] === 'issue' && args[1] === 'view') {
+        const n = Number.parseInt(args[2] ?? '0', 10);
+        return JSON.stringify({
+          number: n,
+          title: `feat(hygiene): phase ${n}`,
+          state: 'CLOSED',
+          url: `u${n}`,
+        });
+      }
+      return '';
+    };
+    const origError = console.error;
+    console.error = () => undefined;
+    try {
+      const result = walk({
+        slug: 'hygiene',
+        parentIssue: 323,
+        workplanPath: fxRec.workplanPath,
+        repo: 'owner/repo',
+        runGh,
+      });
+      const parent = result.find((r) => r.number === 323);
+      expect(parent).toBeDefined();
+      // Workplan-anchored child #324 still appears (timeline failure didn't
+      // strand it) AND the parent classifies as close-all-children-closed
+      // because its single child (#324) is CLOSED.
+      expect(parent?.child_issues.map((c) => c.number)).toEqual([324]);
+      expect(parent?.classification).toBe('close-all-children-closed');
+    } finally {
+      console.error = origError;
+    }
   });
 });
 

@@ -82,7 +82,7 @@ date: 2026-05-28
 
 # Workplan: Sample
 
-## Phase 1: Sample phase
+## Phase 1: Sample phase  ·  [#2](https://github.com/example/repo/issues/2)
 
 - [x] Step 1: Closed via issue. * [#1](https://github.com/example/repo/issues/1)
 - [ ] Step 2: TBD: needs design.
@@ -105,6 +105,7 @@ cat > "$FIXTURE/docs/1.0/001-IN-PROGRESS/sample/README.md" <<'SAMPLEREADME'
 ---
 slug: sample
 targetVersion: "1.0"
+parentIssue: "#1"
 ---
 
 # Feature: Sample
@@ -294,6 +295,26 @@ fi
 echo "== smoke-hygiene: close-shipped --dry-run =="
 "$DW_BIN" close-shipped --from-tag v0.1.0 --to-tag v0.2.0 --repo example/repo --dry-run >/dev/null 2>&1 \
   || fail "close-shipped --dry-run failed (non-zero exit)"
+
+echo "== smoke-hygiene: complete-parent-closure propose =="
+# Walker integrates THREE sources (title-search, parent timeline, workplan-
+# anchored). Regression for #342: pre-fix the gh api timeline call carried
+# literal `{owner}/{repo}` placeholders + a `--repo` flag, and the walker
+# aborted on the resulting usage error. Post-fix, the URL interpolates the
+# resolved repo and the recovery contract collapses any timeline failure to
+# []. The stub returns `[]` for `gh api`, so the timeline source is a no-op
+# here; the proposal still gets assembled from title-search + workplan.
+"$DW_BIN" complete-parent-closure propose --slug sample --repo example/repo \
+  >/dev/null 2>&1 \
+  || fail "complete-parent-closure propose failed (non-zero exit)"
+PCP_DIR="$FIXTURE/.dw-lifecycle/complete-parent-closure"
+if [ ! -d "$PCP_DIR" ]; then
+  fail "complete-parent-closure propose did not create $PCP_DIR"
+fi
+PCP_PROPOSAL_COUNT="$(find "$PCP_DIR" -name 'proposals-*.json' 2>/dev/null | wc -l | tr -d '[:space:]')"
+if [ "$PCP_PROPOSAL_COUNT" = "0" ]; then
+  fail "complete-parent-closure propose did not write a proposal file"
+fi
 
 echo "== smoke-hygiene: archive-branch --dry-run =="
 # Create a parked branch with novel commits so the preflight has work
