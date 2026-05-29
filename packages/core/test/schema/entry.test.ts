@@ -200,4 +200,154 @@ describe('EntrySchema', () => {
     };
     expect(EntrySchema.safeParse(valid).success).toBe(true);
   });
+
+  // Phase 7 Task 7.1 — members[] schema delta. Per the workplan:
+  //   - 7.1.1: extend EntrySidecar with `members?: string[]` (array of
+  //     member entry UUIDs).
+  //   - 7.1.2: invariant — entries with non-empty `members[]` are
+  //     groups; absent or empty means a regular entry. No separate
+  //     "group" entity; same schema, same code paths.
+  //   - 7.1.3: group entries can optionally carry `artifactPath`
+  //     (content body present) or omit it (metadata-only group). Both
+  //     shapes must parse.
+
+  it('accepts an entry without a members field (regular entry; backward-compat)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440020',
+      slug: 'regular',
+      title: 'Regular Entry',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.members).toBeUndefined();
+    }
+  });
+
+  it('accepts a group entry with non-empty members[] (Step 7.1.1)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440021',
+      slug: 'visual-redesign-group',
+      title: 'Visual Redesign Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      members: [
+        '550e8400-e29b-41d4-a716-446655440100',
+        '550e8400-e29b-41d4-a716-446655440101',
+      ],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.members).toEqual([
+        '550e8400-e29b-41d4-a716-446655440100',
+        '550e8400-e29b-41d4-a716-446655440101',
+      ]);
+    }
+  });
+
+  it('accepts a group entry with empty members[] (semantically equivalent to no members)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440022',
+      slug: 'empty-group',
+      title: 'Empty Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: [],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.members).toEqual([]);
+    }
+  });
+
+  it('accepts a group entry with artifactPath (Step 7.1.3 — group has content body)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440023',
+      slug: 'manifesto-group',
+      title: 'Manifesto Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      members: ['550e8400-e29b-41d4-a716-446655440102'],
+      artifactPath: 'docs/manifesto.md',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.artifactPath).toBe('docs/manifesto.md');
+      expect(result.data.members).toEqual(['550e8400-e29b-41d4-a716-446655440102']);
+    }
+  });
+
+  it('accepts a group entry without artifactPath (Step 7.1.3 — metadata-only group)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440024',
+      slug: 'metadata-only-group',
+      title: 'Metadata-Only Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: ['550e8400-e29b-41d4-a716-446655440103'],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.artifactPath).toBeUndefined();
+      expect(result.data.members).toHaveLength(1);
+    }
+  });
+
+  it('rejects members[] entries that are not UUIDs', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440025',
+      slug: 'bad-member-id',
+      title: 'Bad Member ID',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: ['not-a-uuid', '550e8400-e29b-41d4-a716-446655440104'],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects members when it is not an array', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440026',
+      slug: 'members-wrong-type',
+      title: 'Members Wrong Type',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: '550e8400-e29b-41d4-a716-446655440105',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
 });

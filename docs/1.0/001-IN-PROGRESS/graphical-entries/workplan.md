@@ -348,9 +348,9 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 7.1: Schema delta — members[] on entry
 
-- [ ] Step 7.1.1: Extend `EntrySidecar` schema with `members?: string[]` (array of member entry UUIDs).
-- [ ] Step 7.1.2: Entries with non-empty `members[]` are groups; otherwise they're regular entries. No separate "group" entity — same schema, same code paths, plus the `members` field.
-- [ ] Step 7.1.3: Optional `artifactPath` on group entries: when set, the group has a content body (e.g. `manifesto.md`); when absent, the group is metadata-only.
+- [x] Step 7.1.1: Extend `EntrySidecar` schema with `members?: string[]` (array of member entry UUIDs). — implemented as `members: z.array(z.string().uuid()).optional()` on `EntrySchema` (`packages/core/src/schema/entry.ts`); 7 new schema tests at `packages/core/test/schema/entry.test.ts` cover regular / group / empty-members / with-artifactPath / metadata-only-group / non-UUID-rejection / non-array-rejection.
+- [x] Step 7.1.2: Entries with non-empty `members[]` are groups; otherwise they're regular entries. No separate "group" entity — same schema, same code paths, plus the `members` field. — invariant documented inline in `entry.ts` next to the new `members` field; no separate Group type introduced.
+- [x] Step 7.1.3: Optional `artifactPath` on group entries: when set, the group has a content body (e.g. `manifesto.md`); when absent, the group is metadata-only. — pre-existing optional `artifactPath` field carries the group's content body when present; both shapes (with + without) covered by tests; semantic noted in the inline doc-comment, with the iterate-side refusal scheduled in Task 7.7.2.
 
 ### Task 7.2: `/deskwork:group` skill family
 

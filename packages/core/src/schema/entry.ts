@@ -185,7 +185,28 @@ export const EntrySchema = z.object({
   // ingest-journal lookup. When absent (legacy entries pre-Phase 30
   // migration data fixes), consumers fall back to the slug+stage
   // heuristic.
+  //
+  // Per Phase 7 Task 7.1.3, this same field carries the optional
+  // content body for GROUP entries (entries whose `members` field
+  // below is non-empty). When a group sets `artifactPath`, the group
+  // has its own editable artifact (e.g. `manifesto.md`) and the
+  // `/deskwork:iterate` verb operates on that file. When absent, the
+  // group is metadata-only and `iterate` refuses with a
+  // "metadata-only" message per Task 7.7.2.
   artifactPath: z.string().optional(),
+
+  // Group membership (Phase 7 Task 7.1.1). Optional array of member
+  // entry UUIDs. The schema's invariant per Task 7.1.2: entries with
+  // a non-empty `members[]` ARE groups; entries without `members` (or
+  // with `members: []`) are regular entries. There is no separate
+  // "group" entity — same schema, same code paths, plus this field.
+  // Doctor's `group-recursive` rule (Task 7.5.1) refuses members
+  // whose own `members[]` is non-empty (recursive groups out of scope
+  // for v1); `group-member-missing` (Task 7.5.2) refuses dangling
+  // member UUIDs. Per PRD § Group lifecycle, members are an ORDERED
+  // array — the array's order is preserved; insertion semantics are
+  // the `/deskwork:group` CLI's concern (Tasks 7.2.3 / 7.2.4).
+  members: z.array(z.string().uuid()).optional(),
 
   // Distribution (deferred — shortform model)
   shortformWorkflows: z.record(z.string(), z.string()).optional(),
