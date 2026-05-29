@@ -13,6 +13,36 @@ import {
 interface CancelOptions {
   readonly uuid: string;
   readonly reason?: string;
+  /**
+   * Phase 7 Task 7.2 Step 7.2.6 (graphical-entries). When `true`,
+   * cancel cascades to every entry in `members[]` (recursively if any
+   * member is itself a group, though doctor's `group-recursive` rule
+   * disallows that shape per v1). The cascade is a best-effort
+   * walk — members already off-pipeline (Cancelled / Blocked / etc.)
+   * are SKIPPED rather than refused, so cascading on a partially-
+   * cancelled group still cancels the remainder.
+   *
+   * Default behaviour (no `cascade`): the group's OWN stage flips to
+   * Cancelled; members are untouched. Per the universal-verb-no-
+   * cascade rule (DESKWORK-STATE-MACHINE.md Commandment II + PRD §
+   * Group lifecycle edge cases), cancel is opt-in.
+   *
+   * Non-group entries (no `members[]` array, or empty) ignore this
+   * flag — there's nothing to cascade into.
+   */
+  readonly cascade?: boolean;
+}
+
+interface CancelledMember {
+  readonly entryId: string;
+  readonly slug: string;
+  readonly fromStage: string;
+}
+
+interface SkippedMember {
+  readonly entryId: string;
+  readonly slug: string;
+  readonly reason: string;
 }
 
 interface CancelResult {
@@ -26,6 +56,17 @@ interface CancelResult {
    */
   readonly fromStage: string;
   readonly toStage: string;
+  /**
+   * Members the cascade actually transitioned to Cancelled. Empty
+   * when `cascade !== true` or when the entry has no members.
+   */
+  readonly cascadedMembers?: readonly CancelledMember[];
+  /**
+   * Members the cascade SKIPPED (already off-pipeline, or terminal
+   * stage). Surfaced so the CLI / operator can audit what was passed
+   * over. Empty when `cascade !== true`.
+   */
+  readonly skippedMembers?: readonly SkippedMember[];
 }
 
 /**
@@ -102,7 +143,92 @@ export async function cancelEntry(
     to: CANCEL_STAGE,
     ...(opts.reason !== undefined && { reason: opts.reason }),
   });
+
+  // Member cascade (Phase 7 Task 7.2 Step 7.2.6). Only fires when
+  // the caller explicitly opted in via `cascade: true`. Per the
+  // universal-verb-no-cascade rule (Commandment II + PRD § Group
+  // lifecycle), cancel does NOT propagate to members by default.
+  // When the flag IS set, we walk `members[]` and call back into
+  // `cancelEntry` recursively for each — recursive groups would
+  // cascade transitively, though doctor's `group-recursive` rule
+  // (Task 7.5.1) refuses that shape; the cascade here is the
+  // operator-visible behaviour the flag promises.
+  const cascadedMembers: CancelledMember[] = [];
+  const skippedMembers: SkippedMember[] = [];
+  if (
+    opts.cascade === true
+    && Array.isArray(sidecar.members)
+    && sidecar.members.length > 0
+  ) {
+    for (const memberUuid of sidecar.members) {
+      try {
+        const memberSidecar = await readSidecar(projectRoot, memberUuid);
+        const memberTemplate = resolveEntryStrictTemplate(
+          memberSidecar,
+          projectRoot,
+        );
+        const memberTerminal = terminalLinearStage(memberTemplate);
+        // Members already off-pipeline (or at terminal) are skipped
+        // — refusing would abort the cascade mid-walk, leaving the
+        // group partially cancelled which is exactly the failure
+        // mode the cascade exists to avoid.
+        if (memberSidecar.currentStage === memberTerminal) {
+          skippedMembers.push({
+            entryId: memberUuid,
+            slug: memberSidecar.slug,
+            reason: `at terminal stage "${memberTerminal}"`,
+          });
+          continue;
+        }
+        if (
+          isOffPipelineStageInTemplate(memberTemplate, memberSidecar.currentStage)
+        ) {
+          skippedMembers.push({
+            entryId: memberUuid,
+            slug: memberSidecar.slug,
+            reason: `already off-pipeline (${memberSidecar.currentStage})`,
+          });
+          continue;
+        }
+        const memberResult = await cancelEntry(projectRoot, {
+          uuid: memberUuid,
+          cascade: true,
+          ...(opts.reason !== undefined && { reason: opts.reason }),
+        });
+        cascadedMembers.push({
+          entryId: memberUuid,
+          slug: memberSidecar.slug,
+          fromStage: memberResult.fromStage,
+        });
+        // Nested cascades from the recursive call appear in
+        // `memberResult.cascadedMembers` — flatten them into the
+        // top-level list so the caller sees one cascade summary
+        // rather than a nested tree.
+        if (memberResult.cascadedMembers !== undefined) {
+          cascadedMembers.push(...memberResult.cascadedMembers);
+        }
+        if (memberResult.skippedMembers !== undefined) {
+          skippedMembers.push(...memberResult.skippedMembers);
+        }
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        skippedMembers.push({
+          entryId: memberUuid,
+          slug: '(unresolved)',
+          reason: `read failed: ${detail}`,
+        });
+      }
+    }
+  }
+
   // #148: keep calendar.md in sync after every transition.
   await regenerateCalendar(projectRoot);
-  return { entryId: sidecar.uuid, fromStage: from, toStage: CANCEL_STAGE };
+  const result: CancelResult = {
+    entryId: sidecar.uuid,
+    fromStage: from,
+    toStage: CANCEL_STAGE,
+    ...(opts.cascade === true && { cascadedMembers }),
+    ...(opts.cascade === true && { skippedMembers }),
+  };
+  return result;
 }

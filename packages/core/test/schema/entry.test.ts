@@ -370,4 +370,104 @@ describe('EntrySchema', () => {
     };
     expect(EntrySchema.safeParse(invalid).success).toBe(false);
   });
+
+  // Phase 7 Task 7.2 — archivedAt schema delta. Mirrors the lane-level
+  // archivedAt shape: optional ISO datetime that doubles as the
+  // boolean signal (presence → archived) and the audit trail.
+
+  it('accepts an entry without archivedAt (active entry; backward-compat)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440030',
+      slug: 'active',
+      title: 'Active Entry',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.archivedAt).toBeUndefined();
+    }
+  });
+
+  it('accepts an entry with archivedAt set to an ISO datetime', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440031',
+      slug: 'archived-group',
+      title: 'Archived Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      members: ['550e8400-e29b-41d4-a716-446655440110'],
+      archivedAt: '2026-05-29T12:34:56.789Z',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-05-29T12:34:56.789Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.archivedAt).toBe('2026-05-29T12:34:56.789Z');
+    }
+  });
+
+  it('accepts archivedAt on a non-group entry (forward-compat across entry shapes)', () => {
+    // Per the Task 7.2 schema delta doc-comment: archivedAt is
+    // forward-compat — settable on regular entries too, not just
+    // groups. Tests the field is independent of members[].
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440032',
+      slug: 'archived-regular',
+      title: 'Archived Regular Entry',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      archivedAt: '2026-05-29T12:34:56.789Z',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-05-29T12:34:56.789Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.archivedAt).toBe('2026-05-29T12:34:56.789Z');
+      expect(result.data.members).toBeUndefined();
+    }
+  });
+
+  it('rejects archivedAt that is not a datetime string', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440033',
+      slug: 'bad-archive',
+      title: 'Bad Archive',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      archivedAt: 'yesterday',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects archivedAt when it is not a string', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440034',
+      slug: 'archive-wrong-type',
+      title: 'Archive Wrong Type',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      archivedAt: 17_000_000_000,
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
 });

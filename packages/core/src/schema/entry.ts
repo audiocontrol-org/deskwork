@@ -208,6 +208,26 @@ export const EntrySchema = z.object({
   // the `/deskwork:group` CLI's concern (Tasks 7.2.3 / 7.2.4).
   members: z.array(z.string().uuid()).optional(),
 
+  // Soft-archive marker (Phase 7 Task 7.2). When present, the entry
+  // is considered "archived" — listings hide it by default, dashboard
+  // / studio renderers skip it, but the sidecar JSON stays on disk
+  // along with any artifact / scrapbook / journal history. Restore
+  // strips the field. The value is an ISO datetime carrying the
+  // moment the archive verb ran; the truthiness of the field is the
+  // boolean signal, the datetime is the audit trail.
+  //
+  // Set by `/deskwork:group archive <slug>` (Task 7.2.1); also
+  // settable on regular (non-group) entries via the same Entry-writer
+  // path — the field is forward-compat across entry shapes, matching
+  // the lane-archive pattern shipped in Task 6.1 (`LaneConfig.archivedAt`).
+  // Per PRD line 323: "Soft-archive is the default for lanes and
+  // groups (preserves history, hides from active dashboards)." The
+  // universal `induct` / `iterate` / `approve` / `cancel` verbs
+  // continue to operate on an archived entry — archive does NOT
+  // remove the entry from the pipeline, it hides it from active
+  // surfaces only.
+  archivedAt: z.string().datetime().optional(),
+
   // Distribution (deferred — shortform model)
   shortformWorkflows: z.record(z.string(), z.string()).optional(),
 

@@ -137,6 +137,10 @@
       "types": "./dist/journal.d.ts",
       "default": "./dist/journal.js"
     },
+    "./groups": {
+      "types": "./dist/groups/index.d.ts",
+      "default": "./dist/groups/index.js"
+    },
     "./lanes": {
       "types": "./dist/lanes/index.d.ts",
       "default": "./dist/lanes/index.js"

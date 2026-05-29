@@ -325,6 +325,91 @@ const PipelineDeleteEvent = z.object({
   }),
 });
 
+/**
+ * Phase 7 Task 7.2 (graphical-entries): group-lifecycle events emitted
+ * by the `/deskwork:group` verb family. Each event carries `entryId`
+ * (the group's UUID — groups are themselves entries) and a per-kind
+ * `details` payload.
+ *
+ * The seven kinds mirror the seven mutating verbs that operate on
+ * groups specifically (cancel uses the universal `stage-transition`
+ * event — `/deskwork:cancel` is a universal verb, see DESKWORK-STATE-
+ * MACHINE.md Commandment II):
+ *
+ *   - `group-create`        — a new group entry was created.
+ *   - `group-update`        — group metadata (title) was mutated.
+ *   - `group-add-member`    — a member UUID was appended (or inserted
+ *                             at an explicit index) to `members[]`.
+ *   - `group-remove-member` — a member UUID was removed from `members[]`.
+ *   - `group-archive`       — `archivedAt` was set on the group entry.
+ *   - `group-restore`       — `archivedAt` was cleared.
+ *
+ * Group `cancel` propagation (`--cascade`) emits one
+ * `stage-transition` event per affected entry (including the group
+ * itself), per the universal-verb-no-cascade rule. The cascade
+ * surfaces in the per-entry event's `metadata.cascadeFrom` field
+ * carrying the originating group's entry id; see `cancel.ts`.
+ */
+const GroupCreateEvent = z.object({
+  kind: z.literal('group-create'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  details: z.object({
+    slug: z.string().min(1),
+    lane: z.string().min(1),
+    artifactPath: z.string().optional(),
+  }),
+});
+
+const GroupUpdateEvent = z.object({
+  kind: z.literal('group-update'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  details: z.object({
+    changedFields: z.array(z.string().min(1)).min(1),
+    before: z.record(z.string(), z.unknown()),
+    after: z.record(z.string(), z.unknown()),
+  }),
+});
+
+const GroupAddMemberEvent = z.object({
+  kind: z.literal('group-add-member'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  details: z.object({
+    memberId: z.string().uuid(),
+    memberSlug: z.string().min(1),
+    index: z.number().int().nonnegative(),
+    membersAfter: z.array(z.string().uuid()),
+  }),
+});
+
+const GroupRemoveMemberEvent = z.object({
+  kind: z.literal('group-remove-member'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  details: z.object({
+    memberId: z.string().uuid(),
+    memberSlug: z.string().min(1),
+    membersAfter: z.array(z.string().uuid()),
+  }),
+});
+
+const GroupArchiveEvent = z.object({
+  kind: z.literal('group-archive'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  details: z.object({
+    archivedAt: z.string().datetime(),
+  }),
+});
+
+const GroupRestoreEvent = z.object({
+  kind: z.literal('group-restore'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+});
+
 export const JournalEventSchema = z.discriminatedUnion('kind', [
   EntryCreatedEvent,
   EntryIngestedEvent,
@@ -344,6 +429,12 @@ export const JournalEventSchema = z.discriminatedUnion('kind', [
   PipelineCreateEvent,
   PipelineUpdateEvent,
   PipelineDeleteEvent,
+  GroupCreateEvent,
+  GroupUpdateEvent,
+  GroupAddMemberEvent,
+  GroupRemoveMemberEvent,
+  GroupArchiveEvent,
+  GroupRestoreEvent,
 ]);
 
 export type JournalEvent = z.infer<typeof JournalEventSchema>;
