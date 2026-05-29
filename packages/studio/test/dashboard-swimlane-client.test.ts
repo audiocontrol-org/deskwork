@@ -368,6 +368,81 @@ describe('swimlane client controller — AUDIT-02 / AUDIT-04 acceptance', () => 
     expect(defaultRow?.dataset.laneVisible).toBe('true');
   });
 
+  it('AUDIT-06: keyboard Enter on the eye-button toggles visibility (browser-synthesized click runs without row interception)', () => {
+    // End-to-end keyboard contract for the eye-button. Native browser
+    // behavior on a focused `<button>`: pressing Enter (or Space on
+    // keyup) dispatches a synthetic `click` event on the button. The
+    // row's bubbled keydown handler must NOT preventDefault that
+    // synthesis. jsdom does not synthesize the click itself across
+    // bubbles, so the test (a) asserts the row's handler stays quiet
+    // (no preventDefault, no row mutation) AND (b) explicitly calls
+    // `.click()` on the eye to mirror the native synthesis, proving
+    // the eye's contract delivers the visibility toggle end-to-end.
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    const qaRow = document.querySelector<HTMLElement>(
+      '[data-rail-lane="qa"]',
+    );
+    const qaEye = qaRow?.querySelector<HTMLButtonElement>('.r-eye-btn') ?? null;
+    const qaChip = document.querySelector<HTMLButtonElement>(
+      '[data-focus-chip="qa"]',
+    );
+    expect(qaEye).not.toBeNull();
+    // Start state: visible, focused.
+    expect(qaRow?.dataset.laneVisible).toBe('true');
+    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(false);
+    // Step 1: keydown originates on the eye-button and bubbles to the
+    // row. The row's listener must NOT cancel it (otherwise the native
+    // click synthesis is killed).
+    const keydown = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+    qaEye?.dispatchEvent(keydown);
+    expect(keydown.defaultPrevented).toBe(false);
+    expect(qaRow?.getAttribute('aria-pressed')).toBe('true');
+    // Step 2: simulate the native browser's keyboard→click synthesis.
+    // After Enter on a focused <button>, the browser fires a click —
+    // the eye's click handler flips persistent visibility.
+    qaEye?.click();
+    expect(qaRow?.dataset.laneVisible).toBe('false');
+    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(true);
+  });
+
+  it('AUDIT-06: keyboard Space on the eye-button toggles visibility (browser-synthesized click runs without row interception)', () => {
+    // Same end-to-end contract as the Enter case above, for Space.
+    // Native browsers synthesize click on keyup-Space (not keydown);
+    // the row's keydown handler still must not preventDefault the
+    // bubbled Space gesture.
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    const mockupsRow = document.querySelector<HTMLElement>(
+      '[data-rail-lane="mockups"]',
+    );
+    const mockupsEye
+      = mockupsRow?.querySelector<HTMLButtonElement>('.r-eye-btn') ?? null;
+    const mockupsChip = document.querySelector<HTMLButtonElement>(
+      '[data-focus-chip="mockups"]',
+    );
+    expect(mockupsEye).not.toBeNull();
+    expect(mockupsRow?.dataset.laneVisible).toBe('true');
+    const keydown = new KeyboardEvent('keydown', {
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+    });
+    mockupsEye?.dispatchEvent(keydown);
+    // Row's keydown handler must stay quiet so the browser can
+    // synthesize the keyup-Space click on the focused button.
+    expect(keydown.defaultPrevented).toBe(false);
+    expect(mockupsRow?.getAttribute('aria-pressed')).toBe('true');
+    // Mirror the browser's keyup-Space click synthesis.
+    mockupsEye?.click();
+    expect(mockupsRow?.dataset.laneVisible).toBe('false');
+    expect(mockupsChip?.classList.contains('is-visibility-hidden')).toBe(true);
+  });
+
   it('F6: the eye-toggle button carries aria-label + dual decorative glyphs', () => {
     buildShell(['default', 'mockups', 'qa']);
     initSwimlane();

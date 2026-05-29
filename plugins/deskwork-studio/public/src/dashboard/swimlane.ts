@@ -336,20 +336,25 @@ function bindRailEyeToggles(
     // `handleRailRowActivation` so hidden-lane Enter unhides + focuses
     // identically to click.
     //
-    // Eye-button keyboard symmetry (AUDIT-20260528-21): when the
-    // eye-button has keyboard focus, Enter/Space must trigger its
-    // OWN click handler (visibility-only toggle), not the row's
-    // dual-action handler. Without this guard the row's
-    // `preventDefault` cancels the native button activation and the
-    // eye-button's contract is silently swallowed. The eye-button's
-    // click handler runs `stopPropagation` so the mouse path is
-    // already correct; this guard provides the symmetric keyboard
-    // path.
+    // Eye-button keyboard symmetry (AUDIT-20260528-06 / AUDIT-20260528-21):
+    // when an interactive descendant has keyboard focus, Enter/Space
+    // must trigger ITS OWN activation, not the row's dual-action handler.
+    // Without this guard the row's `preventDefault` cancels the native
+    // button activation and the descendant's contract is silently
+    // swallowed. The descendant's own click handler runs
+    // `stopPropagation` so the mouse path is already correct; this
+    // guard provides the symmetric keyboard path. We match any nested
+    // `button`, `a[href]`, `input`, `select`, `textarea`, or element
+    // carrying its own `role="button"` — not just `.r-eye-btn` — so
+    // future interactive children (compose chips, kebab menus) inherit
+    // the contract without re-touching this handler.
     row.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
       if (
         ev.target instanceof Element
-        && ev.target.closest('.r-eye-btn') !== null
+        && ev.target.closest(
+          'button, a[href], input, select, textarea, [role="button"]:not([data-rail-lane])',
+        ) !== null
       ) {
         return;
       }
