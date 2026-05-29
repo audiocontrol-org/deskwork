@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T21:41:26.959Z
+generated_at: 2026-05-29T23:21:41.793Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1104,55 +1104,58 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
-  - id: b4c59086400a
+  - id: 11a36455541f
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:103:111
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:96:104
-    disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every dw-lifecycle subcommand by convention; each verb owns its own entry point.
-  - id: 7ee065031489
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:103:111
+    disposition: pending
+    reason: null
+  - id: d6607615e28e
     lines: 16
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:112:127
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:106:121
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:127
     disposition: pending
     reason: null
-  - id: 225678baebf8
+  - id: 0d16dcc374e0
     lines: 20
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:205:224
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:154:173
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:137:156
     disposition: pending
     reason: null
-  - id: 480a412e865a
+  - id: f65e258cb71f
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:246:254
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:193:201
-    disposition: pending
-    reason: null
-  - id: "6613286e5128"
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:187:195
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: 7d882bc319d3
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:284:293
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:276:285
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:290
     disposition: pending
     reason: null
-  - id: 2926ac95bced
+  - id: aea3153f38ae
     lines: 19
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:376:394
-      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:144:389
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:144:162
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
     disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE block + parseFlags loop + run-helper + top-level shim) recurs across every dw-lifecycle subcommand; each verb owns its own entry point per the established convention; ~12-line per-section duplication is below the abstraction threshold.
-  - id: 8d31af2c2ec7
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: 69c3cc2125ab
     lines: 17
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:86:102
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:78:94
-    disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every dw-lifecycle subcommand by convention; each verb owns its own entry point.
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:86:102
+    disposition: pending
+    reason: null
   - id: 4295f8a2a16b
     lines: 9
     members:
@@ -1190,34 +1193,62 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:162:168
     disposition: keep-with-reason
     reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
-  - id: adb14591e96d
-    lines: 19
-    members:
-      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:144:162
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:389
-    disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every dw-lifecycle subcommand by convention; each verb owns its own entry point.
-  - id: 0080d853f7aa
+  - id: 5efe053e28a1
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:57:65
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:80:88
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:88:96
     disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every dw-lifecycle subcommand by convention; each verb owns its own entry point.
-  - id: 3023c93f4934
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: d641fc42624b
     lines: 7
     members:
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:78:84
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:107:115
-    disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every dw-lifecycle subcommand by convention; each verb owns its own entry point.
-  - id: 893ac23d8262
-    lines: 12
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:113:121
+    disposition: pending
+    reason: null
+  - id: 5542b0b267c1
+    lines: 17
     members:
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:318:329
-      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:378:389
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:105:121
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:111:127
     disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every dw-lifecycle subcommand by convention; each verb owns its own entry point.
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: d64242911330
+    lines: 22
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:154:175
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:137:158
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: f6b4a78d5804
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:21:31
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:28:38
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: 82a8fb12e17f
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:276:288
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:293
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: e6134a663544
+    lines: 18
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:77:94
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:85:102
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: 88b7f7830725
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:95:104
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:102:111
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
   - id: 13b12da5062e
     lines: 28
     members:
@@ -1365,6 +1396,13 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:107:130
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 557060d42ad4
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:378:389
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:321:332
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
   - id: ec203342fa99
     lines: 12
     members:

@@ -39,6 +39,7 @@ import { promoteFindings } from './subcommands/promote-findings.js';
 import { checkOpenFindingsCli } from './subcommands/check-open-findings.js';
 import { applyAuditFlipsCli } from './subcommands/apply-audit-flips.js';
 import { closeShippedAuditFindingsCli } from './subcommands/close-shipped-audit-findings.js';
+import { reAuditFixedFindingsCli } from './subcommands/re-audit-fixed-findings.js';
 import { archiveBranch } from './subcommands/archive-branch.js';
 import { closeShipped } from './subcommands/close-shipped.js';
 import { sessionEndHygiene } from './subcommands/session-end-hygiene.js';
@@ -98,6 +99,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'check-open-findings': checkOpenFindingsCli,
   'apply-audit-flips': applyAuditFlipsCli,
   'close-shipped-audit-findings': closeShippedAuditFindingsCli,
+  're-audit-fixed-findings': reAuditFixedFindingsCli,
   'archive-branch': archiveBranch,
   'close-shipped': closeShipped,
   'session-end-hygiene': sessionEndHygiene,
