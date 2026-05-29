@@ -586,11 +586,13 @@ Scoped into workplan: Phase 14 Task 2 (fix-finding-AUDIT-20260529-13) — covers
 ### AUDIT-20260529-14 — validate-return has no stdin path
 
 Finding-ID: AUDIT-20260529-14
-Status:     open
+Status:     fixed-95927f5
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/validate-return.ts`
 
 Imported from deskwork-plugin TF-004 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`). Co-tracked with AUDIT-20260529-13 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362).
+
+Fix note (commit `95927f5`, 2026-05-29; Phase 14 Task 3): `--response-file -` now reads from stdin via a new `readResponseSource(responseFile, stdin)` helper. UTF-8 bytes accumulated to EOF; empty stdin throws `EmptyStdinError` (CLI surfaces as exit 2 with the message `validate-return: stdin was empty (...). Pipe the response body in or pass a real file path.`). File-path mode unchanged. 7 tests cover the contract; end-to-end smoke verified with `printf | dw-lifecycle validate-return --response-file - --agent-type reviewer --json`. Awaiting `verified-<date>` after the next live reviewer dispatch uses the pipe form end-to-end.
 
 Validating each reviewer return requires writing the agent's Searched / Included / Excluded block to a temp file, then `dw-lifecycle validate-return --response-file <path> --json`. There's no stdin path (`--response-file -`), so the response can't be piped; it must round-trip through a temp file the orchestrator hand-creates.
 
