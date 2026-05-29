@@ -1893,6 +1893,16 @@ GitHub tracking issues:
 
 **Sub-phase 38c — Core doctor-rule family + ingest/approve mediums:** #219+#300+#65 (shared gate), #218, #223+#234, #267, #226, #62, #64, #58, #59, #215.
 
+- [x] **#64** (ingest title from heading) — fixed `953565c`, hardened per review `ece678a` (indented-code + Setext edge cases). Open pending release-verification.
+- [x] **#58** (`/deskwork:add` → ingest redirect) — SKILL prose, `411d762`.
+- [x] **#226** (iterate `--auto-dispositions`) — already landed `afc81e9`; open pending release-verification.
+- [ ] **#267** (CLI to enumerate pending annotations) — clean self-contained medium; **next actionable**.
+- [ ] **#219 + #65 + #218** — **doctor-model cluster.** #219 (missing-frontmatter-id false-positives) lives in the legacy rule-based doctor mid-migration vs the Phase-30 entry-centric validator; the issue's own option 3 is "retire the rule." Needs a focused doctor-model decision (legacy rules vs entry-centric validator), not a band-aid. #218 = the missing legacy→sidecars migration rule. #300 SKIP (graphical-entries). Audit-log `AUDIT-20260529-08`.
+- [ ] **#223 + #234** — **calendar-surface cluster; blocked on the #357 decision.** #232 unified the write path; these are format/read consistency, entangled with the entry-centric-vs-per-site surface question (#357/#234). Do NOT piecemeal — repeats the #232 over-reach.
+- [ ] **#62** (ingest no-frontmatter default-to-Ideas wrong for legacy active docs) — the right default is an operator UX **design call**.
+- [ ] **#59** (remove a mistakenly-added entry) — new subcommand; narrow "preserve-rule exception" (added-by-mistake only).
+- [ ] **#215** — issues 1/3/4 landed previously; issue 2 was #232 (done). Likely closeable-pending-verification; verify the remaining parts.
+
 **Sub-phase 38d — Studio quick fixes:** #68, #98, #71, #233, #229, #177.
 
 **Sub-phase 38e — Studio medium:** #103, #193, #231, #272, #216, #114, #191, #202, #186, #204, #262, #263, #299, #240, #245.

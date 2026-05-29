@@ -192,3 +192,58 @@ rewritten to plant a legacy reviewState on disk and assert absence in the RAW
 on-disk JSON (genuinely verifying approve/iterate strip it); legacy-input
 fixture de-annotated; unused imports removed. No coverage lost; no `any`/`as`.
 core typecheck now clean (0 errors). Commit 45af283.
+
+---
+
+## 2026-05-29 — Phase 38 sub-phase 38c (started: ingest/skill self-contained wins)
+
+38c is "core doctor-rule family + ingest/approve mediums" — larger + more
+entangled than 38b. This pass took the self-contained, non-decision-gated wins
+and held the entangled clusters (see below).
+
+**Track 1:** `core` ingest suite 68/68 (incl. 6 title-derivation cases); core
+typecheck clean.
+
+Finding-ID: AUDIT-20260529-07
+Status:     fixed-953565c (+ hardened ece678a)
+Severity:   low
+Surface:    packages/core/src/ingest-derive.ts (deriveTitle)
+
+#64: ingest derived title from the slug even when the body had a heading.
+deriveTitle now falls back to the first ATX heading (precedence: frontmatter
+title > body heading > slug-humanize). Reviewed (Tracks 2+3, return-grammar
+validated): no blocking/high. Two MEDIUM review findings on the new
+`firstMarkdownHeading` were FIXED immediately in ece678a (not deferred):
+(1) it matched the trimmed line so a 4-space-indented `# x` (CommonMark
+indented code) was mis-read as a heading → now matches the untrimmed line
+with a 0–3 space allowance; (2) Setext headings were silently unhandled →
+documented as a deliberate ATX-only choice. 3 edge-case tests added
+(fenced-skip, indented-code-skip, Setext-fallback). Open pending
+release-verification.
+
+Finding-ID: AUDIT-20260529-08
+Status:     informational
+Severity:   informational
+Surface:    n/a (38c triage)
+
+38c remaining work, classified (NOT yet done):
+- **Doctor-model cluster (#219, #65, #218; #300 SKIP—graphical-entries):**
+  #219 (missing-frontmatter-id false-positives) lives in the LEGACY
+  rule-based doctor (`doctor/rules/`, CalendarEntry + content-index byId),
+  which is mid-migration vs the Phase-30 entry-centric validator
+  (`doctor/validate.ts`); the issue's own option 3 is "retire the rule." Needs
+  a focused doctor-model decision, not a band-aid. #218 (missing
+  legacy-calendar-to-sidecars rule) is the migration-rule gap. #65 rides on
+  #219's rule.
+- **Calendar-surface cluster (#223, #234):** blocked on the #357 entry-centric-
+  vs-per-site decision (#232 already unified the path; these are format/read
+  consistency). Do NOT piecemeal — repeats the #232 over-reach.
+- **Design-call:** #62 (ingest no-frontmatter default-to-Ideas is wrong for
+  legacy active docs) — the right default is an operator UX decision.
+- **#59** (remove a mistakenly-added entry) — needs a new subcommand; narrow
+  "preserve-rule exception" (added-by-mistake only) per agent-discipline.
+- **#267** (CLI to enumerate pending annotations) — clean, self-contained
+  medium; next actionable.
+- **Already landed:** #226 (afc81e9), #58 (411d762, prose). #215 issues 1/3/4
+  landed previously; issue 2 was #232 (now done) — likely closeable-pending-
+  verification.
