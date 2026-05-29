@@ -319,7 +319,7 @@ describe('EntrySchema', () => {
     }
   });
 
-  it('rejects members[] entries that are not UUIDs', () => {
+  it('rejects members[] entries that are not UUIDs (first element invalid)', () => {
     const invalid = {
       uuid: '550e8400-e29b-41d4-a716-446655440025',
       slug: 'bad-member-id',
@@ -329,6 +329,26 @@ describe('EntrySchema', () => {
       currentStage: 'Ideas',
       iterationByStage: {},
       members: ['not-a-uuid', '550e8400-e29b-41d4-a716-446655440104'],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects members[] entries that are not UUIDs (last element invalid)', () => {
+    // Sibling of the prior test; proves the validator walks every
+    // element rather than short-circuiting on the first. Caught as a
+    // coverage gap in the Track 3 code-quality review of e47ed3e —
+    // see audit-log AUDIT-20260529-14.
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440027',
+      slug: 'bad-last-member-id',
+      title: 'Bad Last Member ID',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: ['550e8400-e29b-41d4-a716-446655440106', 'not-a-uuid'],
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T10:00:00.000Z',
     };

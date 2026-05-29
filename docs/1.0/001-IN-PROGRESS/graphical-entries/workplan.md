@@ -380,6 +380,7 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 - [ ] Step 7.5.2: `group-member-missing` rule: a member UUID doesn't resolve. Repair: prompts to remove the dangling reference.
 - [ ] Step 7.5.3: `group-all-members-cancelled` informational rule: every member is in `Cancelled`; surface for operator review (cancel the group, remove cancelled members, or leave as-is).
 - [ ] Step 7.5.4: Doctor builds a UUID → lane index once per run for efficient member-lookup-across-lanes per PRD § Risks mitigation.
+- [ ] Step 7.5.5: `group-empty-members-array` informational rule. The schema permits both `members: undefined` and `members: []` for non-group entries (Task 7.1 deliberately left this dual representation; both shapes parse). Doctor surfaces every sidecar where `members === []` and offers a write-time normalization to remove the empty array, so downstream length-vs-presence checks converge on one canonical shape on disk. Surfaced as `informational`, not `error` — operator chooses whether to normalize. (Closes audit-log AUDIT-20260529-13; see Track 3 code-quality review of `e47ed3e`.)
 
 ### Task 7.6: Studio group-management page
 

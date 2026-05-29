@@ -2172,3 +2172,120 @@ mismatch found.
 The dual-viewport verification gap noted in the AUDIT-10 commit body
 (`e228e26`) is closed. The audit-log open-count remains 0 after this
 audit cycle.
+
+## 2026-05-29 (session 2) audit: Phase 7 Task 7.1 — EntrySidecar members[] schema delta
+
+Audit scope: one commit, `e47ed3e`. Risk classification: routine
+(purely additive optional field on `EntrySchema`; 7 new tests; no
+runtime call sites consume the new field yet — group readers land in
+Tasks 7.2 / 7.3 / 7.5).
+
+Track 1 verification (controller, this session):
+
+- `npm --workspace @deskwork/core test`: 723/723 pass (716 → 723, +7
+  new schema tests for `members[]`).
+- `npm --workspace @deskwork/cli test`: 327/327 pass, 0 regressions.
+- `npm --workspace @deskwork/studio test`: 933/933 pass, 0 regressions.
+- `npm --workspace @deskwork/core --workspace @deskwork/cli --workspace
+  @deskwork/studio run build`: exit 0.
+- `dw-lifecycle check-clones --gate-mode`: 0 NEW, 0 DROPPED.
+
+Track 2 spec-compliance: parallel `code-reviewer` agent against the
+workplan + PRD. Pass; only informational observations (PRD-sketch
+field-ordering vs. impl placement; pre-existing `artifactPath`
+optionality vs. PRD sketch — both no-action).
+
+Track 3 code-quality: parallel `code-reviewer` agent against the diff.
+Pass; three informational observations recorded below.
+
+### AUDIT-20260529-12 — doc-comments reference future workplan task numbers (phase-number rot risk)
+
+Finding-ID: AUDIT-20260529-12
+Status:     informational
+Severity:   low
+Surface:    `packages/core/src/schema/entry.ts:196,198-209`
+
+The new inline doc-comments on `EntrySchema.members` and on the
+`artifactPath` paragraph mention future workplan task numbers by
+ordinal: "Task 7.5.1", "Task 7.5.2", "Task 7.7.2", "Tasks 7.2.3 /
+7.2.4". A future reordering of the Phase 7 workplan (whether by an
+operator-driven extend, a phase split, or a renumber) would leave
+the comments referencing tasks that no longer exist at those
+addresses, silently rotting the cross-reference.
+
+Disposition: PUSH-BACK on the literal "remove the task numbers"
+recommendation. The doc-comments already pair every task-number
+reference with a behavior anchor — e.g. "Task 7.5.1's
+`group-recursive` rule", "Task 7.7.2's iterate-side refusal",
+"Tasks 7.2.3 / 7.2.4 — the `/deskwork:group` CLI's concern". The
+behavior anchors are stable under renumbering (the rule name and
+the CLI's role survive a workplan-renumber). A future reader who
+greps for `group-recursive` lands in the right place regardless of
+whether Phase 7 is still "Phase 7" by then.
+
+Rationale to keep the task-number references: they ARE meaningful
+right now — Phase 7 is the next several commits, and a contributor
+reading `entry.ts` while picking up Task 7.5 or 7.7 benefits from
+the literal back-pointer. The rot horizon is the duration of this
+feature branch; the cost of rot is small (a confused reader has to
+re-grep). Removing them prematurely would harm readers walking the
+in-progress feature today.
+
+No code change. Informational record of the design tradeoff.
+
+### AUDIT-20260529-13 — schema permits both `members: undefined` and `members: []` (dual representation)
+
+Finding-ID: AUDIT-20260529-13
+Status:     acknowledged-2026-05-29-task-7.5.5
+Severity:   low
+Surface:    `packages/core/src/schema/entry.ts:209`
+
+The schema accepts BOTH `members: undefined` (field absent) and
+`members: []` (empty array) as valid shapes for a "regular entry"
+(non-group). Both shapes round-trip cleanly through `EntrySchema.parse`;
+the test at `packages/core/test/schema/entry.test.ts:259-277`
+explicitly verifies the empty-array case parses. The inline
+doc-comment at `entry.ts:198-209` flags the dual representation
+("entries without `members` (or with `members: []`) are regular
+entries").
+
+Downstream consequence: any downstream group-ness check MUST use a
+length-check (`entry.members && entry.members.length > 0`) rather than
+a presence-check (`!!entry.members`). The presence-check would wrongly
+classify an entry with `members: []` as a group.
+
+Disposition: acknowledged. Defer the on-disk normalization to a new
+Task 7.5.5 doctor rule (`group-empty-members-array` informational
+rule) — the schema layer is the wrong place to normalize, because
+forcing one shape at the schema layer would either reject legitimate
+data on read (bad) or silently mutate data on read (worse). The
+doctor layer is where canonical-shape conventions live in this
+codebase.
+
+Workplan annotation: Task 7.5 now carries Step 7.5.5 referencing this
+audit ID; no Task 7.1 change.
+
+### AUDIT-20260529-14 — non-UUID-rejection test asserted only first-element-invalid; last-element case untested
+
+Finding-ID: AUDIT-20260529-14
+Status:     open
+Severity:   low
+Surface:    `packages/core/test/schema/entry.test.ts:322-336`
+
+The existing non-UUID-rejection test asserts `members: ['not-a-uuid',
+'<valid-uuid>']` fails. It does NOT prove the validator walks every
+element — a (hypothetical) short-circuiting Zod implementation that
+only checked the first element would pass both this assertion AND
+the implementation-correct version. The test's intent is "every
+element is validated", but its assertion only proves "first
+element is validated."
+
+Fix: a sibling test where the invalid UUID is the LAST element. Cheap
+(~12 lines), low-value individually, but a free win that hardens the
+contract against future refactors of the validation code.
+
+Resolution: a sibling test added at
+`packages/core/test/schema/entry.test.ts:338-360` titled "rejects
+members[] entries that are not UUIDs (last element invalid)" —
+mirrors the existing first-element test with the order swapped.
+Lands in the same commit as this audit-log entry.
