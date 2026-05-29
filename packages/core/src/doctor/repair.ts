@@ -2,6 +2,8 @@ import { readdir, readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { join, dirname, relative } from 'node:path';
 import { sidecarsDir } from '../sidecar/paths.ts';
 import { EntrySchema, type Entry, type Stage } from '../schema/entry.ts';
+import { readConfig } from '../config.ts';
+import { resolveCalendarPath } from '../paths.ts';
 import { renderCalendar } from '../calendar/render.ts';
 
 export interface RepairOptions {
@@ -120,7 +122,9 @@ export async function repairAll(projectRoot: string, opts: RepairOptions): Promi
   }
 
   const md = renderCalendar(entries);
-  const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
+  // #232: honor the configured per-site calendarPath (default site) rather
+  // than the hardcoded `.deskwork/calendar.md`, consistent with regenerateCalendar.
+  const calendarPath = resolveCalendarPath(projectRoot, readConfig(projectRoot));
   await mkdir(dirname(calendarPath), { recursive: true });
   await writeFile(calendarPath, md);
   result.applied.push('calendar-regenerated');
