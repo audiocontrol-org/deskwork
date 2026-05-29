@@ -2120,7 +2120,7 @@ Probe results — mobile (390×844):
 ### AUDIT-20260529-10 — view-toggle cells under WCAG 2.2 SC 2.5.8 AA on mobile
 
 Finding-ID: AUDIT-20260529-10
-Status:     fixed-<this-commit>
+Status:     fixed-e4529ab
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/css/dashboard-lane-stack.css:149-153`
 
