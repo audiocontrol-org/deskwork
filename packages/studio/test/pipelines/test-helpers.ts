@@ -201,10 +201,12 @@ export function buildEditPanel(
   container: HTMLElement,
   pipelineId: string,
   current: EditPanelInput,
+  opts: { readonly source?: 'plugin-preset' | 'project-override' } = {},
 ): EditPanel {
   const panel = document.createElement('section');
   panel.dataset.pipelinesEditPanel = '';
   panel.dataset.pipelineId = pipelineId;
+  if (opts.source !== undefined) panel.dataset.pipelinesSource = opts.source;
   panel.appendChild(buildAddDetails(pipelineId));
   panel.appendChild(buildRenameDetails(pipelineId, current));
   panel.appendChild(buildRemoveDetails(pipelineId, current));

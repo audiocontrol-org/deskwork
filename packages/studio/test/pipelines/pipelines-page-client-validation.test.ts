@@ -64,7 +64,7 @@ describe('pipelines-page client controller — Copy-button validation', () => {
     expect(notice).not.toBeNull();
     expect(notice!.hidden).toBe(false);
     expect(notice!.textContent).toContain(
-      'Cannot clear all locks via --set-locked',
+      'Cannot clear all locked stages via --set-locked',
     );
     expect(notice!.textContent).toContain(
       '.deskwork/pipelines/<id>.json',
@@ -253,5 +253,153 @@ describe('pipelines-page client controller — Copy-button validation', () => {
     sel.dispatchEvent(changeEvent());
     expect(copy.disabled).toBe(false);
     expect(notice!.hidden).toBe(true);
+  });
+
+  // AUDIT-20260529-03 — plugin-preset Edit panels must surface a
+  // customize-first gate; the CLI refuses preset mutation, so the
+  // studio shouldn't ship a paste that's known to fail.
+  it('Edit panel: Copy buttons disabled on plugin presets with customize-first notice', () => {
+    const container = buildContainer();
+    const { panel } = buildEditPanel(container, 'editorial', {
+      linearStages: ['Ideas', 'Drafting', 'Final'],
+      lockedStages: ['Drafting'],
+      offPipelineStages: ['Cancelled'],
+    }, { source: 'plugin-preset' });
+    installClipboardStub();
+    initPipelinesPage();
+
+    for (const op of ['add', 'rename', 'remove', 'set-locked', 'set-off-pipeline']) {
+      const copy = panel.querySelector<HTMLButtonElement>(
+        `[data-pipelines-copy-button="${op}"]`,
+      )!;
+      expect(copy.disabled).toBe(true);
+      expect(copy.getAttribute('aria-disabled')).toBe('true');
+      const notice = copy.parentElement!.querySelector<HTMLElement>(
+        '[data-pipelines-copy-notice]',
+      );
+      expect(notice!.hidden).toBe(false);
+      expect(notice!.textContent).toContain('Plugin presets are read-only');
+      expect(notice!.textContent).toContain('/deskwork:customize pipeline editorial');
+    }
+  });
+
+  it('Edit panel: project-override panels keep their normal Copy gating', () => {
+    const container = buildContainer();
+    const { panel } = buildEditPanel(container, 'custom', {
+      linearStages: ['Ideas', 'Drafting', 'Final'],
+      lockedStages: [],
+      offPipelineStages: ['Cancelled'],
+    }, { source: 'project-override' });
+    installClipboardStub();
+    initPipelinesPage();
+
+    // Add panel: empty name → required-field gate (not the preset gate).
+    const addCopy = panel.querySelector<HTMLButtonElement>(
+      '[data-pipelines-copy-button="add"]',
+    )!;
+    expect(addCopy.disabled).toBe(true);
+    const notice = addCopy.parentElement!.querySelector<HTMLElement>(
+      '[data-pipelines-copy-notice]',
+    );
+    expect(notice!.textContent).not.toContain('Plugin presets are read-only');
+    expect(notice!.textContent).toContain('Fill required field');
+  });
+
+  // AUDIT-20260529-04 — Copy-builder must reject CLI-invalid values
+  // (id charset, position integer, blank-entry comma lists) before
+  // emitting the clipboard write.
+  it('New form: rejects invalid pipeline id charset', () => {
+    const container = buildContainer();
+    const form = buildNewForm(container);
+    installClipboardStub();
+    initPipelinesPage();
+
+    const idInput = form.querySelector<HTMLInputElement>(
+      '[data-pipelines-field="new-id"]',
+    )!;
+    const shapeInput = form.querySelector<HTMLInputElement>(
+      '[data-pipelines-field="new-shape"]',
+    )!;
+    idInput.value = 'Bad Id';
+    shapeInput.value = 'Ideas,Drafting,Final';
+    idInput.dispatchEvent(inputEvent());
+    shapeInput.dispatchEvent(inputEvent());
+
+    const copy = form.querySelector<HTMLButtonElement>(
+      '[data-pipelines-copy-button="new"]',
+    )!;
+    expect(copy.disabled).toBe(true);
+    const notice = copy.parentElement!.querySelector<HTMLElement>(
+      '[data-pipelines-copy-notice]',
+    );
+    expect(notice!.textContent).toContain('Invalid pipeline id');
+    expect(notice!.textContent).toContain('kebab-case');
+
+    idInput.value = 'my-pipeline';
+    idInput.dispatchEvent(inputEvent());
+    expect(copy.disabled).toBe(false);
+  });
+
+  it('New form: rejects shape with blank stage entries', () => {
+    const container = buildContainer();
+    const form = buildNewForm(container);
+    installClipboardStub();
+    initPipelinesPage();
+
+    const idInput = form.querySelector<HTMLInputElement>(
+      '[data-pipelines-field="new-id"]',
+    )!;
+    const shapeInput = form.querySelector<HTMLInputElement>(
+      '[data-pipelines-field="new-shape"]',
+    )!;
+    idInput.value = 'ok';
+    shapeInput.value = 'Ideas,,Final';
+    idInput.dispatchEvent(inputEvent());
+    shapeInput.dispatchEvent(inputEvent());
+
+    const copy = form.querySelector<HTMLButtonElement>(
+      '[data-pipelines-copy-button="new"]',
+    )!;
+    expect(copy.disabled).toBe(true);
+    const notice = copy.parentElement!.querySelector<HTMLElement>(
+      '[data-pipelines-copy-notice]',
+    );
+    expect(notice!.textContent).toContain('blank stage');
+  });
+
+  it('Add panel: rejects non-integer position', () => {
+    const container = buildContainer();
+    const { panel } = buildEditPanel(container, 'custom', {
+      linearStages: ['Ideas', 'Drafting', 'Final'],
+      lockedStages: [],
+      offPipelineStages: ['Cancelled'],
+    }, { source: 'project-override' });
+    installClipboardStub();
+    initPipelinesPage();
+
+    const nameInput = panel.querySelector<HTMLInputElement>(
+      '[data-pipelines-op-form="add"] [data-pipelines-field="add-name"]',
+    )!;
+    const posInput = panel.querySelector<HTMLInputElement>(
+      '[data-pipelines-op-form="add"] [data-pipelines-field="add-position"]',
+    )!;
+    nameInput.value = 'Review';
+    posInput.value = '1.5';
+    nameInput.dispatchEvent(inputEvent());
+    posInput.dispatchEvent(inputEvent());
+
+    const copy = panel.querySelector<HTMLButtonElement>(
+      '[data-pipelines-copy-button="add"]',
+    )!;
+    expect(copy.disabled).toBe(true);
+    const notice = copy.parentElement!.querySelector<HTMLElement>(
+      '[data-pipelines-copy-notice]',
+    );
+    expect(notice!.textContent).toContain('Invalid position');
+    expect(notice!.textContent).toContain('non-negative integer');
+
+    posInput.value = '2';
+    posInput.dispatchEvent(inputEvent());
+    expect(copy.disabled).toBe(false);
   });
 });

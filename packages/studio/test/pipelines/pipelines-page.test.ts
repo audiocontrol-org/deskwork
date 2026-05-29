@@ -184,6 +184,19 @@ describe('pipelines-page — `/dev/pipelines`', () => {
     );
     // No active data-copy on the disabled state
     expect(r.html).not.toContain('data-copy="/deskwork:pipeline delete custom"');
+    // AUDIT-20260529-02 — dependent lane ids must be VISIBLE in the row,
+    // not only inside the title= tooltip. Render an inline element so
+    // keyboard / touch / screen-reader users see the gate's specifics
+    // without hovering.
+    expect(r.html).toMatch(
+      /data-pipelines-delete-deps[^>]*>[^]*?custom-consumer[^]*?<\/p>/,
+    );
+    expect(r.html).toMatch(
+      /id="pipelines-delete-deps-custom"/,
+    );
+    expect(r.html).toMatch(
+      /aria-describedby="pipelines-delete-deps-custom"/,
+    );
   });
 
   it('Delete on a project-override with zero referencing lanes IS active', async () => {

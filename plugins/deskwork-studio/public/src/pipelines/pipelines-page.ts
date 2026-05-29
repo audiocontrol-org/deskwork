@@ -178,6 +178,7 @@ function initEditOpForm(
   panel: HTMLElement,
   op: UpdateOp,
   pipelineId: string,
+  isPluginPreset: boolean,
 ): void {
   const form = panel.querySelector<HTMLElement>(
     `[data-pipelines-op-form="${op}"]`,
@@ -191,8 +192,23 @@ function initEditOpForm(
   const copy = form.querySelector<HTMLButtonElement>(
     `[data-pipelines-copy-button="${op}"]`,
   );
+  const buildForCopy = (): BuildResult => {
+    const raw = rebuildEditPreview(form, op, pipelineId);
+    // Plugin presets are read-only at the CLI level; the customize
+    // command writes a project override the operator can then mutate.
+    // Override the build error so every Copy button on a preset panel
+    // surfaces the same next-step guidance regardless of field state.
+    if (isPluginPreset) {
+      return {
+        command: raw.command,
+        error:
+          `Plugin presets are read-only. Run /deskwork:customize pipeline ${pipelineId} first to write a project override, then the Edit operations apply.`,
+      };
+    }
+    return raw;
+  };
   const rebuild = (): void => {
-    const result = rebuildEditPreview(form, op, pipelineId);
+    const result = buildForCopy();
     if (copy) applyResultToCopy(copy, result);
   };
   for (const input of inputs) {
@@ -203,11 +219,12 @@ function initEditOpForm(
 
   if (copy) {
     copy.addEventListener('click', async () => {
-      const result = rebuildEditPreview(form, op, pipelineId);
+      const result = buildForCopy();
       applyResultToCopy(copy, result);
       // Defense-in-depth: refuse to clipboard a command the build
-      // reported as invalid (empty required field, empty stage list)
-      // even if the disabled attribute was bypassed.
+      // reported as invalid (empty required field, empty stage list,
+      // plugin-preset gate, etc.) even if the disabled attribute was
+      // bypassed.
       if (result.error !== null) return;
       await copyAndFlash(result.command, copy, `Copied ${op} command`);
     });
@@ -241,8 +258,10 @@ function initEditPanels(container: HTMLElement): void {
   for (const panel of panels) {
     const pipelineId = panel.dataset.pipelineId;
     if (!pipelineId) continue;
+    const isPluginPreset =
+      panel.dataset.pipelinesSource === 'plugin-preset';
     for (const op of UPDATE_OPS) {
-      initEditOpForm(panel, op, pipelineId);
+      initEditOpForm(panel, op, pipelineId, isPluginPreset);
     }
     initEditSubAccordion(panel);
   }

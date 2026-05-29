@@ -364,6 +364,28 @@
   opacity: 0.7;
 }
 
+.pipelines-delete-blocked {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.pipelines-delete-deps {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--er-ink-soft, #5C4F40);
+  max-width: 36ch;
+}
+
+.pipelines-delete-deps code {
+  font-size: 0.78rem;
+  background: var(--er-paper-2, #ECE6D4);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
 .pipelines-btn--delete-disabled:hover {
   background: var(--er-paper-2, #ECE6D4);
   color: var(--er-faded, #8A7F70);

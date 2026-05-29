@@ -258,6 +258,7 @@ export function renderEditForm(row: PipelineRow): RawHtml {
       id="pipelines-edit-panel-${row.id}"
       data-pipelines-edit-panel
       data-pipeline-id="${row.id}"
+      data-pipelines-source="${row.source}"
       aria-labelledby="pipelines-edit-heading-${row.id}"
     >
       <header class="pipelines-edit-head">

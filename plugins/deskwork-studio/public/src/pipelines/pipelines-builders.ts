@@ -24,6 +24,42 @@
 import { quoteValue } from '../copy-builder.ts';
 
 /**
+ * Pipeline id charset — kebab-case starting with `[a-z0-9]`. Mirrors
+ * `PIPELINE_ID_REGEX` in `@deskwork/core/pipelines/loader.ts`; keeping
+ * this duplicated client-side avoids a workspace dependency. If the
+ * core regex ever changes, the test in `pipelines-page-client.test.ts`
+ * will surface the drift.
+ */
+const PIPELINE_ID_REGEX = /^[a-z0-9][a-z0-9-]*$/;
+
+/**
+ * Integer-string check used by `--position` and any other CLI flag
+ * that expects a non-negative integer. Allows empty (caller decides).
+ */
+const NON_NEGATIVE_INTEGER_REGEX = /^\d+$/;
+
+/**
+ * Split a comma-list value into trimmed entries. Returns `{ entries,
+ * hasBlank }`; the caller decides whether `hasBlank` is an error
+ * (set-locked / set-off-pipeline / create --shape all refuse it
+ * symmetrically per the CLI's `splitStageList`).
+ */
+function splitCsv(value: string): { entries: string[]; hasBlank: boolean } {
+  const parts = value.split(',');
+  const entries: string[] = [];
+  let hasBlank = false;
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.length === 0) {
+      hasBlank = true;
+    } else {
+      entries.push(trimmed);
+    }
+  }
+  return { entries, hasBlank };
+}
+
+/**
  * The set of operations the Edit panel exposes — one per CLI flag on
  * `deskwork pipeline update`. The CLI rejects multiple operations per
  * invocation; the controller's single-open accordion matches that
@@ -97,7 +133,24 @@ export function buildCreateCommand(form: HTMLElement): BuildResult {
   const missing: string[] = [];
   if (id.length === 0) missing.push('id');
   if (shape.length === 0) missing.push('shape');
-  return { command, error: missingFieldsError(missing) };
+  const missingError = missingFieldsError(missing);
+  if (missingError !== null) return { command, error: missingError };
+
+  if (!PIPELINE_ID_REGEX.test(id)) {
+    return {
+      command,
+      error:
+        `Invalid pipeline id "${id}". Use kebab-case [a-z0-9-] starting with [a-z0-9].`,
+    };
+  }
+  const { hasBlank } = splitCsv(shape);
+  if (hasBlank) {
+    return {
+      command,
+      error: 'Shape contains a blank stage (consecutive commas). Remove the empty entry.',
+    };
+  }
+  return { command, error: null };
 }
 
 /** Build the `/deskwork:pipeline update <id> --add-stage ...` command. */
@@ -109,8 +162,16 @@ export function buildAddCommand(form: HTMLElement, pipelineId: string): BuildRes
   const positionFragment =
     position.length > 0 ? ` --position ${position}` : '';
   const command = `/deskwork:pipeline update ${idArg} --add-stage ${nameArg}${positionFragment}`;
-  const error = name.length === 0 ? 'Fill required field: stage name.' : null;
-  return { command, error };
+  if (name.length === 0) {
+    return { command, error: 'Fill required field: stage name.' };
+  }
+  if (position.length > 0 && !NON_NEGATIVE_INTEGER_REGEX.test(position)) {
+    return {
+      command,
+      error: `Invalid position "${position}". Use a non-negative integer (0-indexed).`,
+    };
+  }
+  return { command, error: null };
 }
 
 /** Build the `--rename-stage <from> --to-stage <to>` command. */
@@ -155,13 +216,17 @@ export function buildSetLockedCommand(
   const command = `/deskwork:pipeline update ${idArg} --set-locked ${quoteValue(csv)}`;
   // The CLI's `splitStageList` rejects an empty comma-separated list
   // (exit 2). Surface the gate here so the operator who unchecks every
-  // box doesn't stumble into a broken paste; the inline notice names
-  // the lane-config / direct-edit escape hatch for "clear all locks."
+  // box doesn't stumble into a broken paste. The lock set lives on the
+  // pipeline template (not lanes); there's no CLI verb today to "clear
+  // all locks," so the escape hatch is direct file edit. Renaming or
+  // removing a stage through the Add/Rename/Remove panels above also
+  // drops its locked-state as a side effect.
   const error =
     checked.length === 0
-      ? 'Cannot clear all locks via --set-locked (the CLI rejects an empty list). '
-        + 'To remove individual locks, use Rename / Remove operations on the lane '
-        + 'configs, or edit .deskwork/pipelines/<id>.json directly.'
+      ? 'Cannot clear all locked stages via --set-locked (the CLI rejects an empty list). '
+        + 'There is no CLI verb to clear locks today — edit '
+        + '.deskwork/pipelines/<id>.json directly to remove entries from lockedStages. '
+        + '(Renaming or removing a stage above also drops its locked-state as a side effect.)'
       : null;
   return { command, error };
 }
@@ -176,13 +241,23 @@ export function buildSetOffCommand(
   const command = `/deskwork:pipeline update ${idArg} --set-off-pipeline ${quoteValue(csv)}`;
   // Same CLI gate as set-locked: an empty value reaches `splitStageList`
   // which rejects it (exit 2). Surface the gate symmetrically.
-  const error =
-    csv.length === 0
-      ? 'Cannot clear all off-pipeline stages via --set-off-pipeline (the CLI '
+  if (csv.length === 0) {
+    return {
+      command,
+      error:
+        'Cannot clear all off-pipeline stages via --set-off-pipeline (the CLI '
         + 'rejects an empty list). To remove individual stages, edit '
-        + '.deskwork/pipelines/<id>.json directly.'
-      : null;
-  return { command, error };
+        + '.deskwork/pipelines/<id>.json directly.',
+    };
+  }
+  const { hasBlank } = splitCsv(csv);
+  if (hasBlank) {
+    return {
+      command,
+      error: 'Off-pipeline list contains a blank entry (consecutive commas). Remove the empty entry.',
+    };
+  }
+  return { command, error: null };
 }
 
 /**

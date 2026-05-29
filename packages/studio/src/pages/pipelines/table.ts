@@ -125,13 +125,20 @@ function renderDeleteButton(row: PipelineRow): RawHtml {
     const noun = row.referencingLanes.length === 1 ? 'lane' : 'lanes';
     const list = row.referencingLanes.join(', ');
     return unsafe(html`
-      <button
-        class="pipelines-btn pipelines-btn--delete-disabled"
-        type="button"
-        disabled
-        aria-disabled="true"
-        title="Cannot delete: ${row.referencingLanes.length} ${noun} reference this template (${list}). Reassign first via /deskwork:pipeline delete ${row.id} --reassign-lanes-to <other-id>."
-      >${COPY_BTN_DELETE_LABEL} — ${row.referencingLanes.length} ${noun}</button>`);
+      <div class="pipelines-delete-blocked" data-pipelines-delete-blocked>
+        <button
+          class="pipelines-btn pipelines-btn--delete-disabled"
+          type="button"
+          disabled
+          aria-disabled="true"
+          aria-describedby="pipelines-delete-deps-${row.id}"
+          title="Cannot delete: ${row.referencingLanes.length} ${noun} reference this template (${list}). Reassign first via /deskwork:pipeline delete ${row.id} --reassign-lanes-to <other-id>."
+        >${COPY_BTN_DELETE_LABEL} — ${row.referencingLanes.length} ${noun}</button>
+        <p class="pipelines-delete-deps" id="pipelines-delete-deps-${row.id}" data-pipelines-delete-deps>
+          Used by <code>${list}</code>. Reassign via
+          <code>/deskwork:pipeline delete ${row.id} --reassign-lanes-to &lt;other-id&gt;</code>.
+        </p>
+      </div>`);
   }
   return unsafe(html`
     <button
