@@ -82,6 +82,26 @@ export function pipelineOverridePath(projectRoot: string, id: string): string {
 }
 
 /**
+ * Directory housing per-pipeline rename-migration sidecars. Separate
+ * from the override directory so the pipeline-list enumerator never
+ * mistakes a migration JSON for a template (Phase 6 Task 6.2 review
+ * fix #1 — co-locating the sidecar with templates broke `pipeline
+ * list` and the studio dashboard after any `--rename-stage` call).
+ */
+export function pipelineMigrationsDir(projectRoot: string): string {
+  return join(projectRoot, '.deskwork', 'pipelines', 'migrations');
+}
+
+/**
+ * Path to a specific pipeline's rename-migration sidecar. The schema is
+ * defined and validated by `pipelines/operations/update.ts` (writer)
+ * and consumed by the doctor-side reader once Phase 6 Task 6.5 lands.
+ */
+export function pipelineMigrationPath(projectRoot: string, id: string): string {
+  return join(pipelineMigrationsDir(projectRoot), `${id}.json`);
+}
+
+/**
  * Path to a built-in plugin-default pipeline JSON, regardless of
  * whether it exists. Resolves relative to this module's location so it
  * works in both source-mode (tsx) and built-mode (node dist/).

@@ -12,9 +12,9 @@
  *                          appears (linearStages / lockedStages /
  *                          offPipelineStages). Appends a sidecar
  *                          migration entry to
- *                          `<id>-renames.json` so doctor (Phase 6
- *                          Task 6.5) can offer affected-entry
- *                          remediation later.
+ *                          `migrations/<id>.json` consumed by the
+ *                          doctor verb (Phase 6 Task 6.5) for
+ *                          affected-entry remediation.
  *   - `remove-stage`     — remove `<stage>` from whichever list
  *                          contains it. Refused when any entry's
  *                          `currentStage` references it.
@@ -34,37 +34,42 @@
  *
  * Emits a `pipeline-update` journal event on success carrying the
  * operation discriminator + before/after fields where appropriate.
+ *
+ * Layout note (Phase 6 Task 6.2 review fix #1): the rename-migration
+ * sidecar lives at `<projectRoot>/.deskwork/pipelines/migrations/<id>.json`,
+ * a SIBLING directory of the per-template overrides. Co-locating it
+ * with the templates (the original Task 6.2 shape, `<id>-renames.json`
+ * in the override dir) caused `pipeline list`'s JSON enumerator to try
+ * loading the migration file as a pipeline template; Zod parse failed
+ * and the list verb broke after any rename. The migrations subdirectory
+ * is invisible to the override enumerator because it's a directory, not
+ * a `*.json` file.
+ *
+ * Concurrency note: this module assumes a single operator at-rest;
+ * concurrent `--rename-stage` operations against the same id race on
+ * the migrations sidecar and the second writer wins. The PRD documents
+ * deskwork as operator-driven; no file-locking is added without
+ * explicit operator approval. (Reviewer finding #5, decline-with-
+ * reasoning.)
+ *
+ * Atomicity note: the journal-event append at the bottom of
+ * `updatePipeline` is not atomic with the commit + migration write —
+ * matches the precedent in lanes operations (Phase 6 Task 6.1) where
+ * the same pattern was accepted. (Reviewer finding #11, decline-with-
+ * reasoning.)
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { z } from 'zod';
 import { appendJournalEvent } from '../../journal/append.ts';
 import { readAllSidecars } from '../../sidecar/read-all.ts';
 import {
   hasPipelineOverride,
   isPluginPresetPipeline,
   loadPipelineTemplate,
-  pipelineOverridesDir,
+  assertSafePipelineId,
 } from '../loader.ts';
 import { type PipelineTemplate } from '../types.ts';
 import { commitPipelineTemplate } from './commit.ts';
-
-/**
- * Sidecar migration file schema. Co-located with the only writer (this
- * module). Phase 6 Task 6.5's doctor consumer will import this same
- * schema for the read side once it lands.
- */
-const RenameMigrationSchema = z.object({
-  pipelineId: z.string().min(1),
-  renames: z.array(z.object({
-    from: z.string().min(1),
-    to: z.string().min(1),
-    at: z.string().datetime(),
-  })),
-});
-
-type RenameMigration = z.infer<typeof RenameMigrationSchema>;
+import { appendRenameMigration } from './rename-migration.ts';
 
 export type UpdatePipelineOperation =
   | { readonly op: 'add-stage'; readonly stage: string; readonly position?: number }
@@ -87,6 +92,13 @@ export async function updatePipeline(
   projectRoot: string,
   opts: UpdatePipelineOptions,
 ): Promise<UpdatePipelineResult> {
+  // Reviewer-fix #10: validate the id BEFORE the preset / override
+  // checks so a traversed id surfaces as "Invalid pipeline id" rather
+  // than leaking the traversed path through the override-missing
+  // diagnostic. Idempotent against the subsequent loader-internal
+  // call from loadPipelineTemplate.
+  assertSafePipelineId(projectRoot, opts.id);
+
   // Pre-flight: refuse on read-only presets so the operator gets a
   // pointer to `customize pipeline <id>` rather than a confusing
   // "no override exists" error. The plugin-preset check fires before
@@ -257,6 +269,11 @@ function applyRemoveStage(
   stage: string,
   id: string,
 ): PipelineTemplate {
+  if (stage.trim().length === 0) {
+    throw new Error(
+      `Cannot update pipeline "${id}": --remove-stage value is blank.`,
+    );
+  }
   const allKnown = collectKnownStages(existing);
   if (!allKnown.has(stage)) {
     throw new Error(
@@ -388,53 +405,6 @@ async function refuseRemoveStageWhenReferenced(
     + `stage "${stage}" via currentStage (${sample.join(', ')}${suffix}). `
     + `Induct each entry to another stage before removing.`,
   );
-}
-
-/**
- * Append a single `{from, to, at}` entry to
- * `<projectRoot>/.deskwork/pipelines/<id>-renames.json` for downstream
- * doctor consumption (Phase 6 Task 6.5). The file format:
- *
- *   {
- *     "pipelineId": "<id>",
- *     "renames": [ { "from": "X", "to": "Y", "at": "<iso>" }, ... ]
- *   }
- *
- * The first rename creates the file; subsequent renames append to the
- * `renames` array. The write is whole-file (read + rewrite) — small
- * payloads, append-only access pattern, no concurrent writers.
- */
-function appendRenameMigration(
-  projectRoot: string,
-  pipelineId: string,
-  from: string,
-  to: string,
-): void {
-  const path = join(
-    pipelineOverridesDir(projectRoot),
-    `${pipelineId}-renames.json`,
-  );
-  let payload: RenameMigration;
-  if (existsSync(path)) {
-    const raw = readFileSync(path, 'utf8');
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      // Malformed migration file: start over. The old file is
-      // unreadable; preserving its broken contents would block future
-      // renames forever.
-      parsed = null;
-    }
-    const validated = RenameMigrationSchema.safeParse(parsed);
-    payload = validated.success
-      ? validated.data
-      : { pipelineId, renames: [] };
-  } else {
-    payload = { pipelineId, renames: [] };
-  }
-  payload.renames.push({ from, to, at: new Date().toISOString() });
-  writeFileSync(path, JSON.stringify(payload, null, 2) + '\n', 'utf8');
 }
 
 /**

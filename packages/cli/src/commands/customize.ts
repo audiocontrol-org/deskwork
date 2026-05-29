@@ -41,6 +41,7 @@ import {
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fail } from '@deskwork/core/cli-args';
+import { assertSafePipelineId } from '@deskwork/core/pipelines';
 
 const VALID_CATEGORIES = ['templates', 'prompts', 'doctor', 'pipeline'] as const;
 type Category = (typeof VALID_CATEGORIES)[number];
@@ -212,6 +213,20 @@ export async function run(argv: string[]): Promise<void> {
 
   if (!existsSync(projectRoot)) {
     fail(`project root does not exist: ${projectRoot}`, 1);
+  }
+
+  // Reviewer-fix #9 (defense-in-depth): the pipeline category writes
+  // to `<projectRoot>/.deskwork/pipelines/<name>.json` — same file
+  // surface `pipeline create` writes. Enforce the kebab-case + path-
+  // containment invariant here too so a future plugin preset whose
+  // filename happens to bypass the upstream charset check can't slip
+  // through. Idempotent against the source-existence check below.
+  if (categoryArg === 'pipeline') {
+    try {
+      assertSafePipelineId(projectRoot, name);
+    } catch (err) {
+      fail(err instanceof Error ? err.message : String(err), 2);
+    }
   }
 
   let source: string;

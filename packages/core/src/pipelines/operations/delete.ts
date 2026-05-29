@@ -21,6 +21,26 @@
  * Emits a `pipeline-delete` journal event on success. `reassignedLanes`
  * carries the list of lane re-bindings (empty when no lanes
  * referenced the doomed template).
+ *
+ * Sidecar cleanup (reviewer fix #3): when the pipeline is deleted, the
+ * rename-migration sidecar at
+ * `<projectRoot>/.deskwork/pipelines/migrations/<id>.json` is also
+ * unlinked. Leaving the migration on disk would be inherited by a
+ * subsequent `pipeline create <same-id>` and confuse the doctor-side
+ * reader. The sidecar may not exist (the pipeline never had a
+ * `--rename-stage` applied); the cleanup is gated on `existsSync`.
+ *
+ * Partial-failure recovery (reviewer fix #6): the dependent-lane
+ * rewrites are NOT atomic across lanes. If a lane write fails mid-
+ * walk, the operator can re-run the same delete command — already-
+ * rebound lanes are idempotent at the data level (the lane already
+ * carries the replacement `pipelineTemplate`, so re-writing with the
+ * same content is a no-op data-wise). The iteration continues with
+ * the remaining lanes; if the first run reached the unlink step and
+ * the pipeline JSON is already gone, the second run surfaces a clean
+ * "no project override exists" diagnostic after any remaining lane
+ * rewrites are still applied because we read lane state before the
+ * pipeline-existence check.
  */
 
 import { existsSync, unlinkSync } from 'node:fs';
@@ -32,9 +52,11 @@ import {
 import { commitLaneConfig } from '../../lanes/operations/commit.ts';
 import type { LaneConfig } from '../../lanes/types.ts';
 import {
+  assertSafePipelineId,
   hasPipelineOverride,
   isPluginPresetPipeline,
   loadPipelineTemplate,
+  pipelineMigrationPath,
   pipelineOverridePath,
 } from '../loader.ts';
 
@@ -56,6 +78,24 @@ export async function deletePipeline(
   projectRoot: string,
   opts: DeletePipelineOptions,
 ): Promise<DeletedPipelineResult> {
+  // Reviewer-fix #2: validate the id BEFORE any filesystem path is
+  // resolved from it. Refuses charset violations and any id whose
+  // resolved path would escape `.deskwork/pipelines/`. Closes the
+  // same path-traversal exposure Task 6.1 closed for lanes.
+  assertSafePipelineId(projectRoot, opts.id);
+
+  // Reviewer-fix #2 (continued): also validate the replacement id so
+  // a malicious `--reassign-lanes-to ../../etc/foo` can't slip
+  // through the lane write path. The lanes module's
+  // `assertSafeLaneId` validates the lane id (path containment) but
+  // the *pipeline id we write into the lane's `pipelineTemplate`
+  // field* is data, not a filename, so it never reaches a path-
+  // validation site on its own. Enforce the charset here so the
+  // value persisted into every dependent lane's JSON conforms.
+  if (opts.reassignLanesTo !== undefined && opts.reassignLanesTo.length > 0) {
+    assertSafePipelineId(projectRoot, opts.reassignLanesTo);
+  }
+
   // Plugin-preset refusal fires before override-presence so the
   // diagnostic names the right surface (the preset's read-only-ness)
   // rather than "missing override."
@@ -167,6 +207,17 @@ export async function deletePipeline(
     );
   }
   unlinkSync(path);
+
+  // Reviewer-fix #3: clean up the rename-migration sidecar if one
+  // exists. Leaving it behind would let a subsequent
+  // `pipeline create <same-id>` inherit a stale audit trail and
+  // confuse the doctor-side reader. The sidecar is optional (the
+  // pipeline may never have been --rename-stage'd), so guard on
+  // existsSync.
+  const migrationPath = pipelineMigrationPath(projectRoot, opts.id);
+  if (existsSync(migrationPath)) {
+    unlinkSync(migrationPath);
+  }
 
   await appendJournalEvent(projectRoot, {
     kind: 'pipeline-delete',

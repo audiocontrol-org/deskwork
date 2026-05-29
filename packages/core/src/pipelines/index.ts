@@ -18,6 +18,8 @@ export {
   pipelineOverridesDir,
   pipelineOverridePath,
   pipelinePluginDefaultPath,
+  pipelineMigrationsDir,
+  pipelineMigrationPath,
   assertSafePipelineId,
   isPluginPresetPipeline,
   hasPipelineOverride,

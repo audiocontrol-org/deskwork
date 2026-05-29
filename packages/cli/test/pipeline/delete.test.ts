@@ -14,6 +14,7 @@ import {
   makeProject,
   pipeline,
   pipelineOverrideExists,
+  pipelineRenamesExists,
   readLaneJson,
   writeLaneJson,
   writePipelineOverride,
@@ -146,5 +147,60 @@ describe('deskwork pipeline delete', () => {
     const res = pipeline(project, 'delete');
     expect(res.code).toBe(2);
     expect(res.stderr).toMatch(/Usage: deskwork pipeline/);
+  });
+
+  // Reviewer-fix #2: defense-in-depth path-traversal validation on
+  // delete. Without the explicit assertSafePipelineId, an id like
+  // `../../etc/foo` resolves outside the override directory; if such
+  // a file exists, hasPipelineOverride returns true and unlinkSync
+  // would delete the traversed file.
+  it('refuses pipeline ids that fail the kebab-case charset', () => {
+    const res = pipeline(project, 'delete', 'UPPER');
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/Invalid pipeline id/);
+  });
+
+  it('refuses pipeline ids that look like path-traversal', () => {
+    const res = pipeline(project, 'delete', '../../etc/foo');
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/Invalid pipeline id/);
+  });
+
+  it('refuses --reassign-lanes-to values that fail charset validation', () => {
+    writeLaneJson(project, 'default', {
+      id: 'default',
+      name: 'Default',
+      pipelineTemplate: 'my-blog',
+      contentDir: 'docs',
+    });
+    const res = pipeline(
+      project, 'delete', 'my-blog',
+      '--reassign-lanes-to', '../../etc/foo',
+    );
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/Invalid pipeline id/);
+    expect(pipelineOverrideExists(project, 'my-blog')).toBe(true);
+  });
+
+  // Reviewer-fix #3: deleting a pipeline must unlink any rename-
+  // migration sidecar that exists, so a subsequent
+  // `pipeline create <same-id>` does not inherit stale audit data.
+  it('unlinks the rename-migration sidecar alongside the template JSON', () => {
+    // First, generate a rename so the migration sidecar exists.
+    const renameRes = pipeline(
+      project, 'update', 'my-blog',
+      '--rename-stage', 'Drafting',
+      '--to-stage', 'Writing',
+    );
+    expect(renameRes.code).toBe(0);
+    expect(pipelineRenamesExists(project, 'my-blog')).toBe(true);
+
+    // Now delete the pipeline. The sidecar must be cleaned up.
+    const deleteRes = pipeline(project, 'delete', 'my-blog');
+    expect(deleteRes.stderr).toBe('');
+    expect(deleteRes.code).toBe(0);
+
+    expect(pipelineOverrideExists(project, 'my-blog')).toBe(false);
+    expect(pipelineRenamesExists(project, 'my-blog')).toBe(false);
   });
 });

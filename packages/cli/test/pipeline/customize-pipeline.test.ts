@@ -98,4 +98,16 @@ describe('deskwork customize pipeline <preset-id>', () => {
     expect(Array.isArray(linearStages)).toBe(true);
     expect(linearStages).toContain('Promoted');
   });
+
+  // Reviewer-fix #9: defense-in-depth charset validation when the
+  // category is `pipeline`. The upstream source-existence check
+  // happens to catch most invalid names because the source files are
+  // charset-conforming; the explicit assertSafePipelineId protects
+  // against the case where a future plugin preset filename slips
+  // through.
+  it('refuses pipeline names that fail the kebab-case charset', () => {
+    const res = customize(project, 'pipeline', 'UPPER-CASE');
+    expect(res.code).not.toBe(0);
+    expect(res.stderr + res.stdout).toMatch(/Invalid pipeline id/);
+  });
 });

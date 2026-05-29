@@ -179,6 +179,55 @@ describe('deskwork pipeline update --rename-stage', () => {
     expect(res.code).toBe(2);
     expect(res.stderr).toMatch(/--rename-stage requires --to-stage/);
   });
+
+  // Reviewer-fix #8: cover lockedStages renaming. linearStages /
+  // offPipelineStages already covered above; adding lockedStages
+  // guards against a regression that drops the locked branch.
+  it('renames in lockedStages alongside linearStages', () => {
+    writePipelineOverride(project, 'locked-blog', {
+      id: 'locked-blog',
+      name: 'Locked Blog',
+      description: 'x',
+      linearStages: ['Idea', 'Drafting', 'Review', 'Live'],
+      lockedStages: ['Review'],
+      offPipelineStages: [],
+    });
+    const res = pipeline(
+      project, 'update', 'locked-blog',
+      '--rename-stage', 'Review',
+      '--to-stage', 'Editing',
+    );
+    expect(res.stderr).toBe('');
+    expect(res.code).toBe(0);
+    const onDisk = readPipelineOverride(project, 'locked-blog');
+    expect(onDisk['linearStages']).toEqual([
+      'Idea', 'Drafting', 'Editing', 'Live',
+    ]);
+    expect(onDisk['lockedStages']).toEqual(['Editing']);
+  });
+
+  // Reviewer-fix #1 regression: after a rename, `pipeline list` must
+  // continue to enumerate pipelines correctly — the migration sidecar
+  // must NOT show up as a pipeline id. The original Phase 6 Task 6.2
+  // shape co-located the sidecar with the templates and broke list.
+  it('does not pollute the pipeline list with the rename-migration sidecar', () => {
+    const renameRes = pipeline(
+      project, 'update', 'my-blog',
+      '--rename-stage', 'Drafting',
+      '--to-stage', 'Writing',
+    );
+    expect(renameRes.code).toBe(0);
+
+    const listRes = pipeline(project, 'list');
+    expect(listRes.stderr).toBe('');
+    expect(listRes.code).toBe(0);
+    const parsed = JSON.parse(listRes.stdout) as { pipelines: Array<{ id: string }> };
+    const ids = parsed.pipelines.map((p) => p.id);
+    expect(ids).toContain('my-blog');
+    // No 'my-blog-renames' or similar legacy id appears.
+    expect(ids.some((id) => id.includes('renames'))).toBe(false);
+    expect(ids.some((id) => id.includes('migration'))).toBe(false);
+  });
 });
 
 describe('deskwork pipeline update --remove-stage', () => {

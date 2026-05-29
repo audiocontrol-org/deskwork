@@ -135,7 +135,7 @@ export function readPipelineRenames(
   id: string,
 ): { pipelineId: string; renames: Array<{ from: string; to: string; at: string }> } {
   const raw = readFileSync(
-    join(project, '.deskwork', 'pipelines', `${id}-renames.json`),
+    join(project, '.deskwork', 'pipelines', 'migrations', `${id}.json`),
     'utf-8',
   );
   return JSON.parse(raw) as {
@@ -146,7 +146,7 @@ export function readPipelineRenames(
 
 export function pipelineRenamesExists(project: string, id: string): boolean {
   return existsSync(
-    join(project, '.deskwork', 'pipelines', `${id}-renames.json`),
+    join(project, '.deskwork', 'pipelines', 'migrations', `${id}.json`),
   );
 }
 
