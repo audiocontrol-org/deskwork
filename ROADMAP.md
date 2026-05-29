@@ -4,17 +4,27 @@ Forward-looking plan for the deskwork project. Active initiatives, near-term pla
 
 For released history see [GitHub releases](https://github.com/audiocontrol-org/deskwork/releases). For the open backlog see [`gh issue list`](https://github.com/audiocontrol-org/deskwork/issues).
 
-## Active initiatives (in-flight)
+## Recently shipped
 
 ### Hygiene — recurring debt burndown infrastructure
 
-A family of UNIX-style `/dw-lifecycle:*` skills (`debt-report`, `triage-issues`, `promote-deferrals`, `archive-branch`, `close-shipped`) that surface debt on demand and drive operator-triggered batched-proposal cycles. The skills share no persistent state — every skill reads live state (GitHub via `gh`, workplans via grep, branches via git) and mutates the same source-of-truth.
+Shipped across v0.26.0 → v0.26.5 (parent [#323](https://github.com/audiocontrol-org/deskwork/issues/323) closed; all phase issues [#324](https://github.com/audiocontrol-org/deskwork/issues/324)–[#333](https://github.com/audiocontrol-org/deskwork/issues/333) + [#343](https://github.com/audiocontrol-org/deskwork/issues/343) closed).
 
-Phase 1 (`debt-report`) and Phase 2 (`triage-issues`) shipped to the in-flight `feature/hygiene` branch. Remaining phases (`promote-deferrals`, `archive-branch`, `close-shipped`, lifecycle integration, dogfood) are scoped in the feature's workplan.
+A family of UNIX-style `/dw-lifecycle:*` skills that surface debt on demand and drive operator-triggered batched-proposal cycles. The skills share no persistent state — every skill reads live state (GitHub via `gh`, workplans via grep, branches via git) and mutates the same source-of-truth. Skills shipped:
 
-**Why it's load-bearing:** closes the structural asymmetry between shipping and closing. Every release cycle ships substantive work + carefully tracked follow-ups; without recurring burndown the follow-ups rot. Hygiene mechanizes the closure half of the lifecycle.
+- `dw-lifecycle:debt-report` — read-only cross-source debt snapshot
+- `dw-lifecycle:triage-issues` — batched-proposal cycle for stale issues
+- `dw-lifecycle:promote-deferrals` — workplan TBD → GH issue or substantive-reason inline
+- `dw-lifecycle:archive-branch` — preserve-work-then-delete for parked branches
+- `dw-lifecycle:close-shipped` — release-time pending-verification labeling, with 4-source evidence walker (commit-log + audit-log + tooling-feedback + workplan checkboxes)
+- Lifecycle integration: `session-end-hygiene`, `session-start-recommendation`, `complete-parent-closure`
+- npm Trusted Publisher CI workflow (no per-developer OTP for `make publish`)
 
-Parent: [#323](https://github.com/audiocontrol-org/deskwork/issues/323).
+**Why this closed a structural problem:** shipping was rewarded; closure wasn't, unless the lifecycle gated closure structurally. Hygiene mechanized the closure half of the lifecycle so it can't be skipped without explicit override.
+
+The hygiene feature's documents still live at `docs/1.0/001-IN-PROGRESS/hygiene/` pending the `/dw-lifecycle:complete` invocation that would move them to `003-COMPLETE/`. That's a paperwork follow-up; the substantive work is shipped and reachable on the registry.
+
+## Active initiatives (in-flight)
 
 ### Graphical entries — image-based review workflow extension
 
@@ -22,9 +32,13 @@ Extends deskwork beyond longform markdown into image-review surfaces (annotated 
 
 Serves as the canonical canary for the scope-discovery protocol. Phase 6 dogfood produced [#349](https://github.com/audiocontrol-org/deskwork/issues/349) feedback validating most surfaces; Phase 7 will produce the validation milestone for the [#318](https://github.com/audiocontrol-org/deskwork/issues/318) clustering algorithm against genuinely novel input.
 
-Parent: [#301](https://github.com/audiocontrol-org/deskwork/issues/301).
+Parent: [#301](https://github.com/audiocontrol-org/deskwork/issues/301) (still open).
 
-## Planned next — multi-model audit barrage
+### Audit-barrage — multi-model parallel auditing
+
+About to enter `/dw-lifecycle:setup`. The next major architectural extension to the scope-discovery protocol. See § "Audit-barrage feature shape" below for the full design. The feature's PRD-iterate cycle through deskwork is the next operator-driven step before implementation begins.
+
+## Audit-barrage feature shape
 
 The next major architectural extension to the scope-discovery protocol. Goal: replace the operator's manually-run codex audit with an automated battery that fires multiple LLMs against the same work, gives genetic diversity in failure modes, runs out-of-band so the implementation team focuses on features, and removes the audit-quality dependency on operator discipline.
 
@@ -85,9 +99,9 @@ Project-config knob `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` le
 
 ### Design B — lifecycle-triggered automation + meta-audit
 
-Once Design A is stable and the operator has accumulated cross-model finding patterns, Design B layers:
+Once Design A is stable and the operator has accumulated cross-model finding patterns, Design B layers. Design B composes over the hygiene feature's just-shipped lifecycle-integration primitives (`session-end-hygiene`, `session-start-recommendation`, `complete-parent-closure`, `close-shipped`) — the auto-fire gates already exist as natural extension points:
 
-1. **Auto-fire at lifecycle waypoints.** The audit-barrage runs automatically at `/dw-lifecycle:session-end`, `/dw-lifecycle:complete`, and `/release` Pause 5. No explicit operator invocation; the firing is tied to the natural shipping cadence.
+1. **Auto-fire at lifecycle waypoints.** The audit-barrage runs automatically at `/dw-lifecycle:session-end`, `/dw-lifecycle:complete`, and `/release` Pause 5. No explicit operator invocation; the firing is tied to the natural shipping cadence. Each gate already invokes hygiene helpers; the audit-barrage hook lands as a sibling step.
 2. **Meta-audit synthesizer.** After the N raw audit files land, a meta-audit pass runs a SINGLE LLM call against the raw runs with a synthesis prompt: *"rank these findings by confidence × actionability; de-duplicate; flag high-confidence cross-model agreement; emit a single structured findings block."*
 3. **High-confidence auto-promote to audit-log.** Findings where M of N models converge get auto-lifted into the canonical audit-log as `Status: pending-operator-review`. Low-confidence findings stay in the raw runs dir.
 
@@ -116,17 +130,19 @@ These shape every roadmap item:
 
 ## Backlog signal
 
-~100 open issues at the time of this roadmap. The hygiene feature's `debt-report` skill (Phase 1, shipped) surfaces the snapshot on demand:
+~117 open issues at the time of this roadmap (up from ~100 a release-cycle earlier — active development period accreted new work faster than the hygiene tooling closed shipped items). The hygiene feature's `debt-report` skill surfaces the snapshot on demand:
 
 ```
 dw-lifecycle debt-report
 ```
 
+Two of the three "confirmed shipped-but-open" issues cited in earlier versions of this roadmap ([#284](https://github.com/audiocontrol-org/deskwork/issues/284) + [#289](https://github.com/audiocontrol-org/deskwork/issues/289)) closed since hygiene's `close-shipped` shipped; [#292](https://github.com/audiocontrol-org/deskwork/issues/292) remains open pending its own verification. The closure-lifecycle is now mechanized; the burndown signal is what to watch over the next few release cycles.
+
 Categories:
-- **Confirmed shipped-but-open** ([#284](https://github.com/audiocontrol-org/deskwork/issues/284), [#289](https://github.com/audiocontrol-org/deskwork/issues/289), [#292](https://github.com/audiocontrol-org/deskwork/issues/292)) — closure waits for `close-shipped` workflow (hygiene Phase 5).
-- **Phase parent metadata** (17 of the open issues) — closure waits for the phase-parent closure gate (hygiene Phase 6 Task 4).
+- **Phase parent metadata** — closure path: hygiene's `complete-parent-closure` (now shipped); fires automatically when child phase issues all close.
 - **Real deferrals** (active features' planned work) — track via their respective workplans.
 - **Adopter / studio / doctor bugs** — feed into next regular release cycles.
+- **Audit-barrage backlog** — new bucket; will accumulate as the feature ships and the operator triages cross-model findings into actionable items.
 
 ## Status of the protocol's own dogfood signal
 
