@@ -15,19 +15,19 @@
  *   2 — usage error (missing required flag, mutually-exclusive flags,
  *       unknown flag).
  *
- * # Default model configuration is hard-coded in this file
+ * # Model configuration is loaded from YAML
  *
- * The three v1 model configs (`claude`, `codex`, `gemini`) live in
- * `DEFAULT_MODEL_CONFIGS` below. The args templates mirror the
- * documented invocation pattern from `audit-barrage-cli-notes.md`. The
- * YAML config loader (project-override via
- * `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml`) is the
- * next workplan task; once it lands, this constant gets replaced by a
- * call to the loader.
+ * The model battery is loaded by `loadAuditBarrageConfig(repoRoot)` —
+ * project override at `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml`
+ * takes precedence over the plugin's shipped default at
+ * `plugins/dw-lifecycle/templates/audit-barrage-config.yaml`. See
+ * `scope-discovery/audit-barrage/config-loader.ts` for the resolution
+ * + validation rules.
  */
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { loadAuditBarrageConfig } from '../scope-discovery/audit-barrage/config-loader.js';
 import { orchestrateBarrage } from '../scope-discovery/audit-barrage/orchestrate-barrage.js';
 import type {
   BarrageInput,
@@ -37,33 +37,6 @@ import type {
   ModelRunResult,
 } from '../scope-discovery/audit-barrage/types.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
-
-/**
- * v1 default model battery — mirrors the three CLIs probed in
- * `audit-barrage-cli-notes.md`. Adopters whose environment differs
- * (different binary path, different model selection) will override
- * via the YAML config loader once that lands.
- */
-export const DEFAULT_MODEL_CONFIGS: ReadonlyArray<ModelConfig> = [
-  {
-    name: 'claude',
-    binary: 'claude',
-    argsTemplate: '-p {{prompt}}',
-    timeoutSeconds: 300,
-  },
-  {
-    name: 'codex',
-    binary: 'codex',
-    argsTemplate: 'exec {{prompt}}',
-    timeoutSeconds: 300,
-  },
-  {
-    name: 'gemini',
-    binary: 'gemini',
-    argsTemplate: '{{prompt}}',
-    timeoutSeconds: 300,
-  },
-];
 
 const USAGE = [
   'Usage: dw-lifecycle audit-barrage',
@@ -82,8 +55,8 @@ const USAGE = [
   '--repo-root <path>        Defaults to cwd. The run dir lands under',
   '                          `<repo-root>/.dw-lifecycle/scope-discovery/',
   '                          audit-runs/<timestamp>-<feature>/`.',
-  '--models <comma-list>     Comma-separated subset of the default models',
-  '                          (claude, codex, gemini). Defaults to all three.',
+  '--models <comma-list>     Comma-separated subset of the configured models.',
+  '                          Defaults to every model in the loaded config.',
   '--quiet                   Suppress the stderr summary line.',
   '',
   'Fires the selected CLIs in parallel, captures per-model output into',
@@ -93,12 +66,17 @@ const USAGE = [
 
 /**
  * Parsed flag state. Exported for the test-side flag assertion paths.
+ *
+ * `modelNames` is `undefined` when the operator did not supply
+ * `--models` — the verb then runs every configured model. When
+ * supplied, it carries the operator's filter set in order; unknown
+ * names are caught downstream against the loaded config.
  */
 export interface ParsedFlags {
   readonly repoRoot: string;
   readonly featureSlug: string;
   readonly promptFilePath: string;
-  readonly modelNames: ReadonlyArray<string>;
+  readonly modelNames: ReadonlyArray<string> | undefined;
   readonly quiet: boolean;
 }
 
@@ -175,15 +153,16 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
     };
   }
 
-  const modelNames =
-    modelsCsv === undefined
-      ? DEFAULT_MODEL_CONFIGS.map((m) => m.name)
-      : modelsCsv
-          .split(',')
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
-  if (modelNames.length === 0) {
-    return { ok: false, error: '--models supplied but resolved to zero entries' };
+  let modelNames: ReadonlyArray<string> | undefined;
+  if (modelsCsv !== undefined) {
+    const parts = modelsCsv
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (parts.length === 0) {
+      return { ok: false, error: '--models supplied but resolved to zero entries' };
+    }
+    modelNames = parts;
   }
 
   return {
@@ -199,26 +178,37 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
 }
 
 /**
- * Resolve the operator-supplied model names against the default
+ * Resolve the operator-supplied model names against the loaded
  * battery. Unknown names yield an explicit error so a typo doesn't
- * silently drop a model from the run.
+ * silently drop a model from the run. When `modelNames` is undefined
+ * (operator omitted `--models`), the full available battery is
+ * returned in its configured order.
  */
 export function resolveModels(
-  modelNames: ReadonlyArray<string>,
-  available: ReadonlyArray<ModelConfig> = DEFAULT_MODEL_CONFIGS,
+  modelNames: ReadonlyArray<string> | undefined,
+  available: ReadonlyArray<ModelConfig>,
 ): { ok: true; models: ReadonlyArray<ModelConfig> } | { ok: false; error: string } {
+  if (modelNames === undefined) {
+    return { ok: true, models: available };
+  }
   const byName = new Map(available.map((m) => [m.name, m]));
   const resolved: ModelConfig[] = [];
   for (const name of modelNames) {
     const config = byName.get(name);
     if (config === undefined) {
-      const available = Array.from(byName.keys()).join(', ');
+      const availableNames = Array.from(byName.keys()).join(', ');
       return {
         ok: false,
-        error: `unknown model '${name}' — available: ${available}`,
+        error: `unknown model '${name}' — available: ${availableNames}`,
       };
     }
     resolved.push(config);
+  }
+  if (resolved.length === 0) {
+    return {
+      ok: false,
+      error: '--models filter selected zero entries from the loaded config',
+    };
   }
   return { ok: true, models: resolved };
 }
@@ -267,14 +257,23 @@ export async function auditBarrage(args: string[]): Promise<void> {
   }
 
   const flags = parsed.flags;
-  const resolution = resolveModels(flags.modelNames);
+  const repoRoot = resolve(flags.repoRoot);
+
+  let config: Awaited<ReturnType<typeof loadAuditBarrageConfig>>;
+  try {
+    config = await loadAuditBarrageConfig(repoRoot);
+  } catch (err) {
+    process.stderr.write(`audit-barrage: ${errorMessage(err)}\n`);
+    process.exit(2);
+  }
+
+  const resolution = resolveModels(flags.modelNames, config.models);
   if (!resolution.ok) {
     process.stderr.write(`audit-barrage: ${resolution.error}\n`);
     process.exit(2);
   }
 
   const prompt = await loadPromptText(flags.promptFilePath);
-  const repoRoot = resolve(flags.repoRoot);
 
   const input: BarrageInput = {
     repoRoot,

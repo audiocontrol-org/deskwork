@@ -34,6 +34,8 @@ const SEED_FILE_NAMES = [
   'anti-patterns.yaml',
   'adopter-manifests.yaml',
   'deprecation-queue.yaml',
+  'audit-barrage-prompt.md',
+  'audit-barrage-config.yaml',
 ];
 
 describe('install-scope-discovery — parseCli', () => {

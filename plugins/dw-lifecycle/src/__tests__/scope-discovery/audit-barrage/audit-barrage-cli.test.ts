@@ -9,7 +9,6 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_MODEL_CONFIGS,
   deriveBarrageExitCode,
   parseFlags,
   renderSummaryLine,
@@ -17,8 +16,35 @@ import {
 } from '../../../subcommands/audit-barrage.js';
 import type {
   BarrageRun,
+  ModelConfig,
   ModelRunResult,
 } from '../../../scope-discovery/audit-barrage/types.js';
+
+/**
+ * Fixture battery mirroring the plugin's shipped default. The tests
+ * here exercise the flag-parsing + filter resolution surface; the
+ * config-loader's own tests cover loading the default from disk.
+ */
+const FIXTURE_MODELS: ReadonlyArray<ModelConfig> = [
+  {
+    name: 'claude',
+    binary: 'claude',
+    argsTemplate: '-p {{prompt}}',
+    timeoutSeconds: 300,
+  },
+  {
+    name: 'codex',
+    binary: 'codex',
+    argsTemplate: 'exec {{prompt}}',
+    timeoutSeconds: 300,
+  },
+  {
+    name: 'gemini',
+    binary: 'gemini',
+    argsTemplate: '{{prompt}}',
+    timeoutSeconds: 300,
+  },
+];
 
 describe('parseFlags', () => {
   it('accepts --feature + --prompt-file as the minimal valid invocation', () => {
@@ -28,7 +54,8 @@ describe('parseFlags', () => {
     if (result.flags === undefined) throw new Error('expected flags');
     expect(result.flags.featureSlug).toBe('scope-discovery');
     expect(result.flags.promptFilePath).toBe('/tmp/p.txt');
-    expect(result.flags.modelNames).toEqual(['claude', 'codex', 'gemini']);
+    // `modelNames === undefined` signals "no filter; run every configured model"
+    expect(result.flags.modelNames).toBeUndefined();
     expect(result.flags.quiet).toBe(false);
   });
 
@@ -123,15 +150,15 @@ describe('parseFlags', () => {
 });
 
 describe('resolveModels', () => {
-  it('resolves the default battery by name', () => {
-    const result = resolveModels(['claude', 'codex', 'gemini']);
+  it('resolves the supplied battery by name', () => {
+    const result = resolveModels(['claude', 'codex', 'gemini'], FIXTURE_MODELS);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.models.map((m) => m.name)).toEqual(['claude', 'codex', 'gemini']);
   });
 
   it('rejects unknown model names with an actionable error', () => {
-    const result = resolveModels(['claude', 'made-up-model']);
+    const result = resolveModels(['claude', 'made-up-model'], FIXTURE_MODELS);
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected error');
     expect(result.error).toContain('made-up-model');
@@ -139,25 +166,17 @@ describe('resolveModels', () => {
   });
 
   it('preserves operator order when the operator overrides --models', () => {
-    const result = resolveModels(['gemini', 'claude']);
+    const result = resolveModels(['gemini', 'claude'], FIXTURE_MODELS);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.models.map((m) => m.name)).toEqual(['gemini', 'claude']);
   });
-});
 
-describe('DEFAULT_MODEL_CONFIGS', () => {
-  it('contains the three v1 entries with the documented args templates', () => {
-    expect(DEFAULT_MODEL_CONFIGS.length).toBe(3);
-    const claude = DEFAULT_MODEL_CONFIGS.find((m) => m.name === 'claude');
-    const codex = DEFAULT_MODEL_CONFIGS.find((m) => m.name === 'codex');
-    const gemini = DEFAULT_MODEL_CONFIGS.find((m) => m.name === 'gemini');
-    expect(claude?.argsTemplate).toBe('-p {{prompt}}');
-    expect(codex?.argsTemplate).toBe('exec {{prompt}}');
-    expect(gemini?.argsTemplate).toBe('{{prompt}}');
-    for (const m of DEFAULT_MODEL_CONFIGS) {
-      expect(m.timeoutSeconds).toBeGreaterThan(0);
-    }
+  it('returns the full available battery when modelNames is undefined', () => {
+    const result = resolveModels(undefined, FIXTURE_MODELS);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.models).toEqual(FIXTURE_MODELS);
   });
 });
 

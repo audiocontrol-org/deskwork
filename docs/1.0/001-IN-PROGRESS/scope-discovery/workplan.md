@@ -636,18 +636,20 @@ Confirm the three CLIs are installed + authenticated on the operator's machine. 
 
 ### Task 3: Prompt template + model config
 
-- [ ] Step 1: NEW `plugins/dw-lifecycle/templates/audit-barrage-prompt.md` — uniform audit prompt with `{{var}}` substitutions for `feature_slug`, `workplan_summary`, `diff`, `audit_log_excerpt`, `commit_subjects`. Asks each model for findings in the canonical audit-log entry format (`Finding-ID`, `Status: open`, `Severity`, `Surface`, body). Explicit instruction: "if you find nothing, say so explicitly with reasoning — don't pad with weak findings."
-- [ ] Step 2: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/prompt-renderer.ts` — reads the template (project-override at `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` takes precedence); substitutes vars; surfaces unsubstituted-var errors loud.
-- [ ] Step 3: NEW `plugins/dw-lifecycle/templates/audit-barrage-config.yaml` — default models block with `claude` / `codex` / `gemini` entries; each entry: `name`, `binary`, `args_template` (with `{{prompt}}` placeholder), `timeout_seconds`.
-- [ ] Step 4: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/config-loader.ts` — reads the YAML (project-override takes precedence); validates per-entry shape.
-- [ ] Step 5: NEW `plugins/dw-lifecycle/src/scope-discovery/schema/audit-barrage-config.yaml.schema.json` — JSON Schema for editor autocomplete.
-- [ ] Step 6: Extend `install-scope-discovery` to seed the project-override files (commented-out defaults) at `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` and `audit-barrage-config.yaml`.
+- [x] Step 1: NEW `plugins/dw-lifecycle/templates/audit-barrage-prompt.md` — uniform audit prompt with `{{var}}` substitutions for `feature_slug`, `workplan_summary`, `diff`, `audit_log_excerpt`, `commit_subjects`. Asks each model for findings in canonical audit-log entry format; explicit "say nothing if you find nothing" instruction.
+- [x] Step 2: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/prompt-renderer.ts` — reads template (project-override at `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` takes precedence); substitutes vars via unambiguous `<!-- {{var_name}} -->` markers; surfaces unsubstituted-var errors loud.
+- [x] Step 3: NEW `plugins/dw-lifecycle/templates/audit-barrage-config.yaml` — default models block with claude / codex / gemini entries matching Task 1's CLI invocation contracts.
+- [x] Step 4: NEW `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/config-loader.ts` — reads YAML (project-override takes precedence); per-entry validation (non-empty name/binary/args_template; args_template must contain `{{prompt}}`; timeout_seconds positive integer; no duplicate names); failure-loud on malformed input.
+- [x] Step 5: NEW `plugins/dw-lifecycle/src/scope-discovery/schema/audit-barrage-config.yaml.schema.json` — JSON Schema for editor autocomplete; mirrors anti-patterns.yaml.schema.json pattern.
+- [x] Step 6: Extended `install-scope-discovery` to seed `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` + `audit-barrage-config.yaml` (commented-out scaffolds adopters uncomment + edit).
 
 **Acceptance Criteria:**
-- [ ] Prompt template + config land in `plugins/dw-lifecycle/templates/`.
-- [ ] Project-override pattern works end-to-end.
-- [ ] Schema enables editor autocomplete on the config YAML.
-- [ ] `install-scope-discovery` seeds the override files as commented-out scaffolds.
+- [x] Prompt template + config land in `plugins/dw-lifecycle/templates/`.
+- [x] Project-override pattern works end-to-end — config-loader tests cover plugin-default fallback + project-override-takes-precedence + malformed-override rejection.
+- [x] Schema enables editor autocomplete on the config YAML.
+- [x] `install-scope-discovery` seeds the override files as commented-out scaffolds.
+
+**Live verification:** `subcommands/audit-barrage.ts` rewired to load models via `config-loader.ts` (replacing Task 2's hardcoded list); live invocation against the real installed claude/codex/gemini via the YAML-loaded battery returned 3/3 PROBE-OK. Full plugin suite: 1966/1966 (+27 new for Task 3). Tsc clean.
 
 ### Task 4: Skill prose
 
