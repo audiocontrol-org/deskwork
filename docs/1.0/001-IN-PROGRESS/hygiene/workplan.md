@@ -393,14 +393,14 @@ Operator decisions (locked in during definition):
 
 **Acceptance Criteria:**
 
-- [ ] `/dw-lifecycle:worktree-report` ships as a new pure-read sibling skill; emits markdown + JSON; defaults: `--days 30`, `--threshold-count 3`, auto-detected worktree-base.
-- [ ] `/dw-lifecycle:dismantle-worktrees propose|apply` ships under the batched-proposal pattern matching `:triage-issues` and `:promote-deferrals`.
-- [ ] All safety rails enforced (current-worktree / main-worktree / dirty / local-only-commits / force-push / external-path / multi-worktree).
-- [ ] Optional `--archive-first` composes with `:archive-branch` to preserve branch contents.
-- [ ] Lifecycle integration: session-end hygiene block carries worktree-staleness; session-start displays recommendation; complete suggests dismantle on feature merge.
-- [ ] Vitest unit + integration tests against fixture worktree layouts. Smoke test in `scripts/smoke-hygiene.sh`.
-- [ ] Adopter docs: README + per-skill SKILL.md + agent-discipline.md § Closure extension.
-- [ ] Dogfood pass against the operator's actual worktree-base ran one full batched-proposal cycle.
+- [x] `/dw-lifecycle:worktree-report` ships as a new pure-read sibling skill; emits markdown + JSON; defaults: `--days 30`, `--threshold-count 3`, auto-detected worktree-base. (Task 1; commit `fb94325`.)
+- [x] `/dw-lifecycle:dismantle-worktrees propose|apply` ships under the batched-proposal pattern matching `:triage-issues` and `:promote-deferrals`. (Task 2; commit `2ff389e`.)
+- [x] All safety rails enforced (current-worktree / main-worktree / dirty / local-only-commits / force-push / external-path / multi-worktree). (Task 2; 20 vitest cases cover every refusal path.)
+- [x] Optional `--archive-first` composes with `:archive-branch` to preserve branch contents. (Task 2 + Task 6 runGit-contract fix at `e498ea4` / [#364](https://github.com/audiocontrol-org/deskwork/issues/364) — composition path verified by the dogfood pass.)
+- [x] Lifecycle integration: session-end hygiene block carries worktree-staleness; session-start displays recommendation; complete suggests dismantle on feature merge. (Task 3; complete-gate suggestion deferred to polish per Task 3 Step 3 note.)
+- [x] Vitest unit + integration tests against fixture worktree layouts. Smoke test in `scripts/smoke-hygiene.sh`. (Task 5; `scripts/smoke-hygiene.sh` extended with worktree-verbs round-trip at commit `7b42ed8`.)
+- [x] Adopter docs: README + per-skill SKILL.md + agent-discipline.md § Closure extension. (Task 4; burndown sheet update deferred per Task 4 Step 3 note.)
+- [x] Dogfood pass against the operator's actual worktree-base ran one full batched-proposal cycle. (Task 6; 4 stale → 3 archived + 1 skip; surfaced + fixed runGit-contract bug at [#364](https://github.com/audiocontrol-org/deskwork/issues/364).)
 
 ## Phase 12: session-end-hygiene "issues filed this session" scoping fix  ·  [#361](https://github.com/audiocontrol-org/deskwork/issues/361)
 
