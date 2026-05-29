@@ -81,13 +81,15 @@ The wrapper is engaged via two Bash invocations bracketing every Agent-tool disp
 
    Stdout is the augmented prompt (original prompt + grammar instruction + optional refactor-context prelude). Stderr is a one-line summary (suppress with `--quiet`). Paste stdout into the Agent tool's `prompt` parameter. The verb resolves project overrides under `.dw-lifecycle/scope-discovery/*.yaml` against `--repo-root` (defaults to cwd).
 
-2. **After dispatch — validate the sub-agent's response.** Write the response to a temp file, then invoke:
+2. **After dispatch — validate the sub-agent's response.** Either write the response to a temp file, or pipe it via stdin using the `-` sentinel:
 
    ```bash
    dw-lifecycle validate-return --agent-type <type> --response-file <path>
+   # or, mirroring `gh issue create --body-file -`:
+   echo "$RESPONSE" | dw-lifecycle validate-return --agent-type <type> --response-file -
    ```
 
-   Stdout is a structured `ValidationResult` JSON: `{ valid, foundBlocks: {searched, included, excluded}, missingBlocks, parseError, forbiddenPhrases: [{phrase, file, line, reason}], refactorPreconditionViolations, skippedAudit, summary }`. Exit code: 0 if valid; 1 on validation failure. Pass `--json` to suppress the stderr summary in pipelines.
+   Stdout is a structured `ValidationResult` JSON: `{ valid, foundBlocks: {searched, included, excluded}, missingBlocks, parseError, forbiddenPhrases: [{phrase, file, line, reason}], refactorPreconditionViolations, skippedAudit, summary }`. Exit code: 0 if valid; 1 on validation failure; 2 on usage errors (missing flag, file not found, or empty stdin when `-` is passed). Pass `--json` to suppress the stderr summary in pipelines.
 
    On exit 1, the orchestrator rejects the response and re-dispatches with the same augmented prompt + a correction note quoting the violation surfaced in the JSON. After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
 

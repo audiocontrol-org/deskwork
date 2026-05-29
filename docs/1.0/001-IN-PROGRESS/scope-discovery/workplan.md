@@ -939,15 +939,18 @@ The orchestrator-turn summary printer emits the `NOTE: only 3/6 catalog files pr
 
 `validate-return` currently requires a temp-file round-trip for the agent's response block. Light fix per [#362](https://github.com/audiocontrol-org/deskwork/issues/362): accept `--response-file -` (read from stdin). Mirrors the `gh issue create --body-file -` convention used elsewhere.
 
-- [ ] Step 1: Write failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/validate-return-stdin.test.ts` — asserts (a) `--response-file -` reads from stdin and validates the same as a file path; (b) the existing file-path mode still works; (c) supplying `--response-file -` with empty stdin emits a clear error (not a silent empty-input pass). Run; confirm red.
-- [ ] Step 2: Add the stdin branch to `plugins/dw-lifecycle/src/subcommands/validate-return.ts`. When the arg is `-`, read stdin to EOF before invoking the validator. Mirror the file-path read path's encoding (UTF-8) and error-message shape.
-- [ ] Step 3: Re-run the test; confirm green. Run the full subcommand suite; confirm no regressions.
-- [ ] Step 4: Update the `validate-return` skill prose + `--help` to document the stdin path.
+- [x] Step 1: Wrote failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/validate-return-stdin.test.ts` — 7 scenarios: parseFlags accepts `-`; stdin reads UTF-8 to EOF; multi-chunk stdin (64 KB body); empty stdin throws `EmptyStdinError`; error message names `--response-file` + `stdin`; file-path mode reads from disk; file-path mode does NOT consume stdin. Red confirmed before impl.
+- [x] Step 2: Added `readResponseSource(responseFile, stdin)` helper + `EmptyStdinError` class to `plugins/dw-lifecycle/src/subcommands/validate-return.ts`. When `responseFile === '-'`, reads `stdin` via for-await chunk loop, concatenates as UTF-8. Empty stdin throws `EmptyStdinError` with an actionable message ("pipe the response body in or pass a real file path"). File-path mode delegates to `readFile()` as before. CLI shim wired to use the helper; the empty-stdin error surfaces as exit 2.
+- [x] Step 3: 7 stdin tests green. Plugin suite at 2130/2130 (2123 baseline + 7 new). `tsc --noEmit` clean. End-to-end smoke: `printf '<grammar block>' | dw-lifecycle validate-return --response-file - --agent-type reviewer --json` exits 0 with valid `ValidationResult` JSON on stdout.
+- [x] Step 4: Updated `plugins/dw-lifecycle/skills/implement/SKILL.md` (dispatch-wrapper section) to show the pipe form alongside the file path. CLI `USAGE` (`--response-file <path|->`) names the sentinel + cites the `gh issue create --body-file -` precedent + explains the empty-stdin exit-2 case.
 
 **Acceptance Criteria:**
-- [ ] Test file exists and passes; stdin + file-path + empty-stdin cases covered.
-- [ ] `--response-file -` works end-to-end via a piped invocation.
-- [ ] `Closes AUDIT-20260529-14` in the commit subject.
+- [x] Test file exists and passes; stdin + file-path + empty-stdin cases covered.
+- [x] `--response-file -` works end-to-end via a piped invocation.
+- [x] `Closes AUDIT-20260529-14` in the commit subject.
+
+**Notes:**
+- Status flip from `open` → `fixed-<sha>` on AUDIT-20260529-14 follows in a separate commit (Phase 13 Task 4 not built yet).
 
 ### Task 4: Verify TF-005 clone-gate gitignore fix lands on merge (fix-finding-AUDIT-20260529-15)
 

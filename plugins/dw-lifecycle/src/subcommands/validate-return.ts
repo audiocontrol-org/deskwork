@@ -27,16 +27,60 @@ import { readFile } from 'node:fs/promises';
 import { validateReturnForCli } from '../scope-discovery/dispatch-wrapper-cli.js';
 import { errorMessage, isEnoent } from '../scope-discovery/util/typeguards.js';
 
+/**
+ * Phase 14 Task 3 (AUDIT-20260529-14): signaled-empty stdin when
+ * `--response-file -` is used. Distinct error class lets the CLI surface
+ * an actionable exit-2 message and lets tests assert on the type.
+ */
+export class EmptyStdinError extends Error {
+  constructor() {
+    super(
+      "validate-return: stdin was empty (passed `--response-file -` but no bytes were read). " +
+        'Pipe the response body in (e.g. `… | dw-lifecycle validate-return --response-file - ...`) ' +
+        'or pass a real file path.',
+    );
+    this.name = 'EmptyStdinError';
+  }
+}
+
+/**
+ * Read the sub-agent response from either stdin (when `responseFile`
+ * is the `-` sentinel, mirroring the `gh issue create --body-file -`
+ * convention) or from disk via `readFile`. Exported so tests can pass
+ * an in-memory Readable stream without spawning a child process.
+ */
+export async function readResponseSource(
+  responseFile: string,
+  stdin: NodeJS.ReadableStream,
+): Promise<string> {
+  if (responseFile === '-') {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stdin) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk);
+    }
+    const body = Buffer.concat(chunks).toString('utf8');
+    if (body.length === 0) throw new EmptyStdinError();
+    return body;
+  }
+  return readFile(responseFile, 'utf8');
+}
+
 const USAGE = [
   'Usage: dw-lifecycle validate-return',
-  '    --response-file <path>',
+  '    --response-file <path|->',
   '    --agent-type <type>',
   '    [--repo-root <path>]',
   '    [--json]',
   '    [--help]',
   '',
-  '--response-file <path>   Path to the file containing the sub-agent\'s',
+  '--response-file <path|->',
+  '                         Path to the file containing the sub-agent\'s',
   '                         response text (the Agent tool return value).',
+  '                         Pass `-` to read from stdin (e.g.',
+  '                         `echo "$RESP" | dw-lifecycle validate-return',
+  '                         --response-file - --agent-type reviewer`).',
+  '                         Mirrors the `gh issue create --body-file -`',
+  '                         convention. Empty stdin → exit 2 with hint.',
   '--agent-type <type>      The Agent-tool agent type the response is from.',
   '                         Some validation rules vary by agent type — the',
   '                         refactor-precondition cue check only fires when',
@@ -159,8 +203,12 @@ export async function validateReturn(argv: string[]): Promise<void> {
 
   let response: string;
   try {
-    response = await readFile(parsed.args.responseFile, 'utf8');
+    response = await readResponseSource(parsed.args.responseFile, process.stdin);
   } catch (err) {
+    if (err instanceof EmptyStdinError) {
+      process.stderr.write(`${err.message}\n`);
+      process.exit(2);
+    }
     if (isEnoent(err)) {
       process.stderr.write(
         `validate-return: --response-file not found: ${parsed.args.responseFile}\n`,
