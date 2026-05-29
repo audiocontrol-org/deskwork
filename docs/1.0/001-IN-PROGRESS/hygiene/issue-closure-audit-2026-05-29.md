@@ -9,7 +9,7 @@ kind: issue-closure-audit
 Systematic verification of open issues against shipped code. Operator decision: "Don't trust that the feature documentation is up to date. look into the unfinished tasks to see if they are actually complete. Documentation discipline is spotty, so we should verify." — meaning each closure decision below is grounded in code inspection / empirical run, NOT in trusting the issue body's age or the feature README's status table.
 
 **Starting state:** 178 open issues (post-hygiene-PR-merges).
-**Closed in this audit:** 35 (cumulative, as of this entry).
+**Closed in this audit:** 61 (cumulative; live `gh issue list --state open` shows 117 remaining).
 **Methodology:** for each candidate, verify against actual code or run the failing command; close only with concrete evidence.
 
 ## Hygiene phase issues (10 closed)
@@ -91,6 +91,78 @@ Studio rebuilt during studio-mobile-first (v0.16.0 era, multiple PRs through 202
 |---|---|---|
 | #242 | Studio surfaces have no Cancel affordance | BOTH surfaces ship: decision-strip.ts has `Cancel ⊘` button (source comment cites "Cancel (#242)"); affordances.ts has cancel Verb in row chip menu |
 
+## Studio scrapbook + entry-review cluster (11 closed)
+
+These were filed during the v0.13.0 scrapbook rebuild + Phase 30/34 migration cycles. Each one's reproduction either now passes against current code OR refers to a surface that was retired in Phase 34a.
+
+| # | Bug | Evidence |
+|---|---|---|
+| #151 | publish leaves sidecar publishedDate null | BUG PREMISE WRONG — schema field is `datePublished` (entry.ts:56), not `publishedDate`. jq's `.publishedDate` selector renders null on any missing key; the sidecar persists `datePublished` correctly |
+| #155 | longform review strip wraps to two rows | RETIRED WITH PHASE 34a — `pages/review.ts` (the surface with `.er-strip` wrap) is gone per `server.ts:281` source comment ("Phase 34a (#171): the legacy longform/outline halves of pages/review.ts were retired") |
+| #156 | client init* not invoked at module load | Bootstrap block at end of `scrapbook-client.ts` auto-invokes `init()` on DOMContentLoaded |
+| #157 | dashboard does not link to scrapbook viewers | `dashboard/affordances.ts:81` source comment "Scrapbook URL uses the project's defaultSite (#157, #205)" + working `scrapbookViewerUrl({...})` call |
+| #159 | edit-mode real-estate (longform `.er-page-grid`) | RETIRED WITH PHASE 34a — same surface retirement as #155; entry-review successor has separate layout |
+| #160 | edit-pane typography (mono markdown + frontmatter de-emphasis) | `entry-review.css` has 8+ `font-family: var(--er-font-mono)` rules covering edit pane |
+| #163 | JPEG/WebP/GIF dimensions in scrapbook | `pages/scrapbook/image-readers.ts` header: "Recognizes PNG, JPEG, WebP, and GIF" |
+| #165 | DESKWORK_DEV should bind Tailscale by default | `tailscale.ts` ships layered auto-detection (CGNAT range scan + CLI enrichment); default binds loopback + Tailscale interface(s) |
+| #166 | NEW NOTE uses native window.prompt | `pages/scrapbook/render.ts:330` source comment: "Replaces the F1 window.prompt() regression (#166)" — inline composer (filename + body + secret toggle) ships |
+| #167 | Scrapbook edit button non-functional | `scrapbook-client.ts` action dispatcher: `case 'edit': void enterEditMode(ctx, card); break;` |
+| #168 | Scrapbook has no way to return to main article | `pages/scrapbook/render.ts:221-227` ships `<a href="${reviewLink}">← back to review</a>` when active calendar entry is the nav context |
+| #169 | Stowable TOC on the review surface | `entry-review/outline-drawer.ts` renders `<nav class="er-toc">` from `extractToc(renderedHtml)`; activates ≥2 headings |
+
+Still open in this cluster:
+- **#161** — Scrapbook UI/UX umbrella ("look like the mockup"). Sub-fixes #163/#166/#167/#168 shipped; #164 deferred-by-design. Umbrella stays open until operator triages remaining mockup-vs-built gaps.
+- **#164** — expanded-secret-card visual continuity. Body explicitly cites "Per #161 G3 design review (Q3): explicitly recommended NOT pre-fixing." Stays open by design.
+- **#170** — Phase 34 umbrella. Sub-tracker for 34a-34e. Multiple sub-issues now closed (#155, #156, #157, #160, #163, #164(open-by-design), #165, #166, #167, #168, #169). Umbrella waits on #171 (34a) verification + #164.
+- **#171** — Phase 34a tracker. The legacy `pages/review.ts` retirement IS done (verified at server.ts:281). The chrome port has 7 sub-tasks (folio, version strip, edit toolbar, edit panes, outline drawer, marginalia column, margin-note authoring). Outline drawer + edit panes + folio shipped. Margin-note authoring + version strip status unclear — needs explicit verification.
+
+## dw-lifecycle setup + ingest cluster (7 closed)
+
+Verified against the hygiene feature's own end-to-end use of these helpers + against the current code.
+
+| # | Bug | Evidence |
+|---|---|---|
+| #196 | setup creates doubled worktree when invoked from existing feature worktree | `setup.smoke.test.ts:205` test name "reuses a pre-existing worktree+branch (#196 #209) instead of doubling or aborting" + `repo.ts:46` source comment |
+| #197 | ingest doesn't honor pre-existing deskwork.id from frontmatter | `ingest.ts` comment cites #197 verbatim; `readExistingDeskworkId()` + duplicate-slug guard ship |
+| #205 | scrapbook viewer + link emitters still slug/path-based | `scrapbook-item.ts` ships `entryId?` field; URL builder appends `?entryId=<uuid>` conditionally |
+| #207 | scrapbook.ts 809 LOC split | barrel-pattern: `pages/scrapbook.ts` 17 LOC; sub-directory has 7 files, all under cap (largest 378) |
+| #209 | setup aborts on existing branch | same fix as #196 — branch+worktree reuse smoke test passes |
+| #210 | setup skill doesn't surface install as prereq | SKILL.md opens with explicit `## Prerequisite` section pointing at the exact failure error |
+| #212 | setup missing --workplan flag | `setup.ts:62` parses `--workplan <path>`; usage string at line 71 documents it |
+| #213 | issues silently skips back-fill when placeholder doesn't match | `issues.ts:113-122` source comment cites #213; matches any `parentIssue:` form; warns at line 144 |
+
+## Studio + content cluster (11 closed)
+
+| # | Bug | Evidence |
+|---|---|---|
+| #74 | Approve button — command not copied to clipboard | `entry-review/decision.ts:85` `copyOrShowFallback(command, {...})` in approve handler; same helper that fixed #99 |
+| #99 | intake form silent on copy click | `editorial-studio-client.ts` cites *"#99 fix"* + uses `copyOrShowFallback` + `.copied` button class |
+| #115 | `/dw-lifecycle:help` silent without config | SKILL.md adds Error handling section: *"No config. Suggest `/dw-lifecycle:install`"* |
+| #175 | edit-toolbar Source/Split/Preview tooltips | `entry-review/edit-toolbar.ts` ships `title=` attrs on all three mode buttons |
+| #176 | initLightbox dead bootstrap | Renamed to `initScrapbookLightbox`; called from 4 client surfaces |
+| #178 | index + dashboard both render "Editorial Studio" | Distinct h1: Index renders "Editorial Studio", Dashboard renders "Press-Check" |
+| #199 | marginalia can't be edited | client UI ships (`sidebar-render.ts` edit/delete buttons + `comment-edit-delete.ts` module); server PATCH/DELETE at api.ts:285-293 cite Phase 35 / issue #199 |
+| #201 | `/deskwork:approve` documents retired reviewState gate | SKILL.md no longer documents the gate; describes stage-only gating per Commandment III |
+| #214 | self-description over-narrows to literary content | README enumerates "blog posts, essays, design specs, ADRs, RFCs, internal memos, books, manuscripts, runbooks, post-mortems, knowledge bases" |
+| #225 | approve skill prose scaffolds artifact for non-pipeline content | SKILL.md:45 *"Approve preserves the prior stage's content... it does NOT scaffold a fresh artifact"* |
+| #247 | ingest regen drops Final/Cancelled | `calendar/render.ts:3-4` `STAGE_ORDER` is canonical 8-stage list; `bucketize()` iterates all 8 |
+
+## Still genuinely open (latest sweep)
+
+- **#211** — install has only `--dry-run` / `--config-overlay`; per-field CLI flags + statusDirs-schema flexibility not addressed. Partial mitigation via overlay file. Stays open.
+- **#218** — doctor missing `legacy-calendar-to-sidecars` rule that MIGRATING.md says it ships. No matching rule in `packages/core/src/doctor/rules/`. Confirmed still open.
+- **#221** — ingest slug rejects dots; sanitizer not added. Confirmed still open.
+- **#232** — `regenerateCalendar(projectRoot)` hardcodes `.deskwork/calendar.md` instead of reading `calendarPath` from config. Confirmed still open.
+- **#233** — `/deskwork:doctor` collides with built-in `/doctor` via autocomplete. SKILL.md still uses `name: doctor`. Stays open.
+- **#240** — phone horizontal scroll on review surface. `review-viewport.css` has `overflow-x: auto` rules but the bug body's specific 390px → 520px scrollWidth case I can't verify from code alone. Stays open pending operator browser-test.
+- **#219** — doctor `missing-frontmatter-id` false positives. Rule exists at `rules/missing-frontmatter-id.ts`; doesn't appear to skip Ideas-stage or "no markdown file" cases. Stays open.
+- **#230** — entry-review decision-strip Publish action at Final. Strip has Approve/Iterate/Reject + induct picker; affordances gate; whether the Final → Published path renders a Publish button needs operator browser-test. Stays open.
+- **#68** — dashboard polls `/api/dev/editorial-studio/state-signature` which 404s. Client at `editorial-studio-client.ts:285` still polls the endpoint; server has no matching route. Confirmed still bug.
+- **#71** — content tree fabricates `/blog/<slug>` public URL for collections without `host`. `content-detail.ts` still renders the public-URL hint unconditionally. Confirmed still bug.
+- **#98** — dashboard scaffold button 404. Client at `editorial-studio-client.ts:88` posts to `/api/dev/editorial-calendar/draft` which has no server route. Confirmed still bug.
+- **#84** — iterate Step 2 "read the comments" has no documented agent path. SKILL.md still says "Read the studio's pending comments" without specifying how. Coupled to #267 (no CLI subcommand to enumerate pending annotations).
+- **#198** — iterate rejects `--dispositions` for longform/outline. `iterate/iterate.ts:12` comment says *"Future: --dispositions <path>"* — still TODO. Confirmed still open.
+
 ## NOT closed — still open by design or genuinely unfixed
 
 - **#246** — core/approve refuses Final→Published. Bug body says "approve is universal per Commandment II"; current `DESKWORK-STATE-MACHINE.md` references "publish: Final → Published — the only graduation event from Final." Semantic question — looks like the bug body's spec interpretation may be obsolete. Need operator triage.
@@ -109,6 +181,13 @@ Ordered roughly by effort × value. Each entry: shape of the remediation + estim
 - **#127** — `define` SKILL.md prescribes bare `/tmp/feature-definition-<slug>.md`. Project rule (file-handling.md) explicitly forbids bare /tmp paths. Replace with `mktemp` per the rule. ~5 LOC SKILL.md edit.
 - **#295** — `install-scope-discovery-hooks` writes `dw-lifecycle check-editor-symmetry --gate-mode` but the verb rejects that flag. Either add `--gate-mode` to check-editor-symmetry (mirroring the other check-* verbs) OR drop the flag from the hook fragment. Pick one for consistency with the surrounding chain.
 - **#294** — Pre-commit hook breaks when dw-lifecycle binary predates scope-discovery subcommands. Add a one-shot `dw-lifecycle --version` (depends on #256) or `which dw-lifecycle && dw-lifecycle help | grep check-clones` defensive guard at hook top. ~10 LOC hook-fragment edit + a small test.
+- **#221** — ingest slug sanitizer: replace `.` with `-` in path-derived slug segments before kebab-case validation. ~5 LOC in `core/src/ingest.ts` slug-derivation step.
+- **#232** — `regenerateCalendar(projectRoot)` should read `config.calendarPath` from `.deskwork/config.json` instead of hardcoding `.deskwork/calendar.md`. ~10 LOC; also needs a smoke covering an overlay project.
+- **#233** — Rename the deskwork plugin's `/deskwork:doctor` skill to avoid CC `/doctor` autocomplete collision. Candidates: `/deskwork:check`, `/deskwork:doctor-calendar`. ~5 LOC rename + announcement note.
+- **#68** — Server has no `/api/dev/editorial-studio/state-signature` route. Either add the route (returns a signature for client polling) or remove the polling from `editorial-studio-client.ts:285`. ~15 LOC.
+- **#98** — Server has no `/api/dev/editorial-calendar/draft` route. Either add it (POST scaffold for Planned-stage entries) or remove the scaffold button from the dashboard. ~30 LOC for the route + test.
+- **#71** — `content-detail.ts` renders `/blog/<slug>` public URL hint unconditionally. Gate on `collection.host !== undefined`. ~5 LOC.
+- **#198** — `iterate.ts:12` has `// Future: --dispositions <path>` TODO. Wire through `--dispositions <path>` for longform/outline (same shape that already works for shortform). ~20 LOC.
 
 ### Medium (1–2 days)
 
