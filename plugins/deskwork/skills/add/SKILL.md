@@ -7,6 +7,14 @@ description: Capture a new longform-writing idea — blog post, essay, design sp
 
 Create a new Ideas-stage calendar entry for a content idea.
 
+> **Already have the content on disk? Use `/deskwork:ingest` instead.** (#58)
+> `/deskwork:add` is for a *new* idea not yet written — it scaffolds an empty
+> `idea.md` and starts the entry at **Ideas**, then expects a march through
+> Planned → Outlining → Drafting. If a markdown file with the content already
+> exists (a drafted PRD, an essay, an imported post), `/deskwork:ingest`
+> backfills it into the calendar at the *right* stage and binds `deskwork.id`
+> into the existing file's frontmatter — no empty stub, no needless march.
+
 ### Input
 
 ```
@@ -16,6 +24,10 @@ Create a new Ideas-stage calendar entry for a content idea.
 
 ### Steps
 
+0. **Existing-content check (#58).** If the content already exists as a
+   markdown file on disk, STOP and use `/deskwork:ingest <file>` instead —
+   `add` is only for ideas not yet written. Proceed below only for a genuinely
+   new idea.
 1. Resolve project root (default: current working directory).
 2. Generate entry uuid: `node -e "console.log(require('crypto').randomUUID())"`.
 3. Build entry sidecar:
