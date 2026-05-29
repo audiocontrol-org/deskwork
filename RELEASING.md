@@ -4,17 +4,59 @@ The deskwork marketplace tracks the default branch of `audiocontrol-org/deskwork
 
 ### To release: `/release`
 
-The release ceremony is enshrined as the `/release` skill at `.claude/skills/release/`. Run that — it handles version validation, smoke, tagging, and the atomic push. The skill is hard-gated: no `--force`, no `--skip-smoke`. If a gate refuses, fix the underlying state.
+The release ceremony is enshrined as the `/release` skill at `.claude/skills/release/`. Run that — it handles version validation, tagging, and the atomic push. The publish + smoke gates run inside `.github/workflows/publish-npm.yml` (triggered by the tag push). The skill is hard-gated: no `--force`, no `--skip-smoke`. If a gate refuses, fix the underlying state.
 
-The skill walks five operator decision points:
+The skill walks four operator decision points:
 
 1. **Precondition + version** — clean tree, FF over origin/main, branch up-to-date. Operator types the new version; skill validates it as strictly greater than the last tag.
 2. **Post-bump diff review** — operator confirms the manifest bump diff before commit.
-3. **Publish to npm** — skill verifies `@deskwork/{core,cli,studio}@<version>` are NOT yet published (catches "version already published" before any OTPs); operator runs `make publish` **in their own terminal** (the agent's Bash tool can't accept interactive 2FA OTPs); operator confirms when done; skill verifies all three are now on the registry before continuing.
-4. **Smoke + tag message** — `scripts/smoke-marketplace.sh` runs as a hard gate against the just-published packages; on pass, operator confirms the tag message.
-5. **Final push confirmation** — skill prints the exact push command + what it will do; operator confirms; skill atomic-pushes commit + branch + tag in one `git push --follow-tags` RPC.
+3. **Tag message** — skill verifies `@deskwork/{core,cli,studio}@<version>` are NOT yet published on npm (catches "version already published" before the tag goes out); operator confirms the tag message; skill creates the annotated tag.
+4. **Push + workflow watch** — skill prints the exact push command; operator confirms; skill atomic-pushes commit + branch + tag in one `git push --follow-tags` RPC. The tag push fires `publish-npm.yml`, which publishes all three packages via OIDC, asserts they're on the registry, and runs `scripts/smoke-marketplace.sh`. The skill watches the workflow via `gh run watch` and reports the release URL on success.
 
 The skill refuses to re-tag a published version. Recovery from a botched release is to bump-patch (e.g. `v0.9.0` broken → ship `v0.9.1`).
+
+### Trusted Publisher setup (one-time per package on npmjs.com)
+
+`.github/workflows/publish-npm.yml` authenticates to npm via OIDC, not a token. For npm to honor the workflow's OIDC token, each `@deskwork/*` package on npmjs.com must have a Trusted Publisher entry pointing at this workflow file. Do this once per package:
+
+1. Sign in to npmjs.com.
+2. Navigate to the package page (e.g. `https://www.npmjs.com/package/@deskwork/core`).
+3. Settings → Publishing access (or "Trusted Publishers").
+4. Add trusted publisher:
+   - Publisher: GitHub Actions
+   - Organization: `audiocontrol-org`
+   - Repository: `deskwork`
+   - Workflow filename: `publish-npm.yml`
+   - Environment: (leave blank)
+5. Save.
+
+Repeat for all three packages: `@deskwork/core`, `@deskwork/cli`, `@deskwork/studio`.
+
+The workflow filename is a contract — renaming `publish-npm.yml` requires re-registering the trusted publisher on each package. Keep the path stable.
+
+### Recovery — CI is broken
+
+When the `publish-npm.yml` workflow fails (npm outage, OIDC misconfiguration, transient flake) or the operator wants a one-off out-of-band publish, fall back to `make publish`:
+
+1. **Determine published state** — for each package:
+   ```
+   npm view @deskwork/core versions --json | jq '.[-1]'
+   npm view @deskwork/cli  versions --json | jq '.[-1]'
+   npm view @deskwork/studio versions --json | jq '.[-1]'
+   ```
+2. **Nothing published yet**: revert the bump commit (`git reset --soft HEAD~1`), fix the underlying issue, re-run `/release`. If the tag already went to origin, the npm artifacts are missing but the git tag stands; bump-patch the next release.
+3. **Partial publish state** (some packages succeeded, others failed): the safest path is to bump to v<next-patch> + re-run `/release`. The half-published version stays orphaned on npm — npm forbids republishing the same version anyway. Document the orphaned version in the next release notes.
+4. **Manual publish path**:
+   ```
+   make publish      # token-auth, prompts for 2FA OTP per package
+   ```
+   `make publish` reads the npm token from `~/.config/deskwork/npm-credentials.txt`, writes an ephemeral `.npmrc`, and publishes WITHOUT provenance (the manual path uses token auth; provenance attestation requires the OIDC env that only the workflow has). The artifacts reach adopters; the npm-side trusted-publisher attestation is the only thing missing for that release.
+5. **One-off publish of a single package** (out-of-band fix, no full release):
+   ```
+   make publish-core      # or publish-cli / publish-studio
+   ```
+   Use sparingly. Most fixes should go through a full release.
+6. **Resume `/release` after manual publish** (when CI succeeded at every step except the publish): invoke `/release --skip-publish-wait`. The skill skips Pause 4's workflow-watch step (since the operator already handled publish out-of-band) and proceeds directly to `gh release view`.
 
 ### Maturity stance
 
