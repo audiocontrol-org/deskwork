@@ -610,13 +610,13 @@ The phase implements Design A from `ROADMAP.md` § "Audit-barrage feature shape"
 
 Confirm the three CLIs are installed + authenticated on the operator's machine. Baseline the invocation contracts before designing around them.
 
-- [ ] Step 1: Confirm `claude`, `codex`, `gemini` are on PATH on the operator's machine. Document the invocation pattern for each (flags, prompt-as-arg vs prompt-via-stdin vs prompt-via-file).
-- [ ] Step 2: Probe per-CLI behaviors: long prompts (multi-KB), structured output, error reporting (stderr separation), timeouts.
-- [ ] Step 3: Document findings inline in this workplan (`Task 1 evidence:` block) — operator-readable contract per CLI.
+- [x] Step 1: Confirm `claude`, `codex`, `gemini` are on PATH on the operator's machine. Document the invocation pattern for each (flags, prompt-as-arg vs prompt-via-stdin vs prompt-via-file). All three resolved; `claude -p`, `codex exec`, `gemini "<prompt>"` per `audit-barrage-cli-notes.md`.
+- [x] Step 2: Probe per-CLI behaviors: long prompts (multi-KB), structured output, error reporting (stderr separation), timeouts. 5.4 KB prompts handled by all three; per-CLI timing + stderr/stdout separation documented; claude instruction-adherence caveat on long prompts captured.
+- [x] Step 3: Document findings — landed at `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-barrage-cli-notes.md` (105 lines) covering installed versions + per-CLI invocation pattern + common contract + per-CLI timing + auth surface + open items for Phase 12 Tasks 2-3.
 
 **Acceptance Criteria:**
-- [ ] Per-CLI invocation pattern documented + verified live against the installed binaries.
-- [ ] At least one full prompt-fire-capture round-trip per CLI verified working end-to-end.
+- [x] Per-CLI invocation pattern documented + verified live against the installed binaries (audit-barrage-cli-notes.md).
+- [x] At least one full prompt-fire-capture round-trip per CLI verified working end-to-end (small + 5 KB prompts; all exit 0).
 
 ### Task 2: CLI verb + subprocess orchestration library
 
