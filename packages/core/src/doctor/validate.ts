@@ -76,13 +76,15 @@ async function readSidecarUuids(projectRoot: string): Promise<Set<string>> {
 
 async function validateCalendarSidecar(projectRoot: string): Promise<ValidationFailure[]> {
   const failures: ValidationFailure[] = [];
-  // NOTE (#232 residual): this entry-centric sidecar-consistency check reads
-  // the hardcoded `.deskwork/calendar.md`, NOT the per-site `calendarPath`.
-  // regenerate/repair now write the configured calendar (#232), but whether
-  // the entry-centric calendar and the per-site calendarPath are one surface
-  // or two is an unresolved design question entangled with #234 — so the
-  // read side is intentionally left as-is pending that decision. For the
-  // default config (calendarPath == .deskwork/calendar.md) the two coincide.
+  // NOTE (#232 residual — tracked in #357): this entry-centric
+  // sidecar-consistency check reads the hardcoded `.deskwork/calendar.md`,
+  // NOT the per-site `calendarPath`. regenerate/repair now write the
+  // configured calendar (#232), so for a custom calendarPath this `--check`
+  // reads the wrong file and returns false-clean. Fixing it requires
+  // deciding whether the entry-centric calendar and the per-site
+  // calendarPath are one surface or two (entangled with #234); see #357.
+  // For the default config (calendarPath == .deskwork/calendar.md) the two
+  // coincide and there is no gap.
   const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
   let md: string;
   try {

@@ -100,9 +100,18 @@ binaries.
 ---
 
 Finding-ID: AUDIT-20260529-03
-Status:     open
+Status:     fixed-517159b (write sites; read-side residual → AUDIT-20260529-04 / #357)
 Severity:   medium
 Surface:    packages/core/src/calendar/regenerate.ts:45, packages/core/src/doctor/repair.ts:123
+
+RESOLUTION (2026-05-29): operator chose option (b). regenerateCalendar +
+repair now resolve `resolveCalendarPath(projectRoot, readConfig(projectRoot))`
+(default site) — commit 517159b. Regression: `calendar-path-honored.test.ts`.
+Reviewed (Tracks 2+3, return-grammar validated): spec delivered; regression
+faithful; no `any`/`as`. The read-side validator was deliberately left on the
+hardcoded path (conflating it with the legacy per-site calendar broke the
+calendar-uuid-missing scenario) — split out as AUDIT-20260529-04 / #357.
+Open until verified in a formally-installed release.
 
 #232: `regenerateCalendar(projectRoot)` and `doctor/repair` write the
 hardcoded `.deskwork/calendar.md`, ignoring per-site `siteConfig(config,
@@ -133,3 +142,53 @@ pipeline consistent with ingest, and honors the contract implied by
 `calendarPath` being a REQUIRED config key. NOT implemented unilaterally:
 deprecating-vs-keeping a required adopter config surface is an operator
 decision (Operator-owns-scope rule). Awaiting operator pick before code lands.
+
+---
+
+Finding-ID: AUDIT-20260529-04
+Status:     acknowledged-#357
+Severity:   medium
+Surface:    packages/core/src/doctor/validate.ts:86 (validateCalendarSidecar)
+
+Surfaced by the /dw-lifecycle:review pass on #232 (commit 517159b). After the
+#232 write-side fix, `doctor --check`'s entry-centric calendar-sidecar
+validator still reads the hardcoded `.deskwork/calendar.md` → for a custom
+calendarPath it reads the wrong (often absent) file and returns FALSE-CLEAN,
+while `--fix` correctly writes the configured path. Not fixable in-scope:
+making validate read the per-site path conflates the entry-centric calendar
+with the legacy per-site calendar (proved by the doctor.test
+calendar-uuid-missing scenario: rows without sidecars), which is the #234
+surface question. Filed as [#357](https://github.com/audiocontrol-org/deskwork/issues/357);
+NOTE in validate.ts references it. Resolve alongside #234.
+
+---
+
+Finding-ID: AUDIT-20260529-05
+Status:     acknowledged-#358
+Severity:   low
+Surface:    packages/core/src/sidecar/write.ts:14
+
+Surfaced by the /dw-lifecycle:review pass on #232. `writeSidecar` validates via
+`EntrySchema.safeParse` but serializes the raw input `entry`, not the
+Zod-stripped `result.data` — so unknown/retired fields persist if a caller
+bypasses the type. Latent (normal typed callers pass clean objects; reviewState
+retirement is enforced read-side). Reviewer rated High; downgraded to low here:
+the trigger is a type-bypass which the project bans (no `as`). Hardening (write
+`result.data`) is worthwhile but is a hot-path change needing its own test +
+blast-radius check — out of #232 scope. Filed as
+[#358](https://github.com/audiocontrol-org/deskwork/issues/358).
+
+---
+
+Finding-ID: AUDIT-20260529-06
+Status:     fixed-45af283
+Severity:   low
+Surface:    packages/core/test/{entry/approve,iterate/iterate,schema/entry,sidecar/write}.test.ts
+
+`tsc --noEmit` on @deskwork/core failed on 7 pre-existing type errors
+(retired-`reviewState` test assertions reading a removed field + unused
+imports), surfaced while typechecking the #232 work. Fixed: retirement tests
+rewritten to plant a legacy reviewState on disk and assert absence in the RAW
+on-disk JSON (genuinely verifying approve/iterate strip it); legacy-input
+fixture de-annotated; unused imports removed. No coverage lost; no `any`/`as`.
+core typecheck now clean (0 errors). Commit 45af283.
