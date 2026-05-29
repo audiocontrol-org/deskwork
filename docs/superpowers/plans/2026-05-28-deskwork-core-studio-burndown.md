@@ -20,7 +20,22 @@
 
 ---
 
-## Sub-phase 38a — Verb-model unification (#246 + #230)
+## Sub-phase 38·0 — Blast-radius review against `feature/graphical-entries` (#301) [GATING]
+
+**Runs before any other sub-phase.** graphical-entries (#301) is in flight and generalizes the pipeline into per-lane templates, rebuilds the dashboard ("Press Bay" swimlanes), adds a graphical review surface + extended annotation schema, and reworks the scrapbook. Its blast radius covers the stage model #246/38a touches and much of the studio lane.
+
+- [ ] Read `feature/graphical-entries`: `docs/1.0/001-IN-PROGRESS/graphical-entries/{prd.md,workplan.md,scope-manifest.yaml}`.
+- [ ] Classify every core+studio burndown issue HIGH/MEDIUM/LOW overlap (initial assessment in the PRD's Coordination subsection). Validate against the live branch state — implementation may have moved past the PRD.
+- [ ] Mark HIGH/MEDIUM issues **Blocked** via `gh issue edit <n> --add-label blocked` (create the label if absent) + a comment referencing #301 and the specific superseding surface.
+- [ ] Record the confirmed LOW-overlap unblocked work set; it is the starting point for 38b/38c/38d.
+- [ ] **Reclassify 38a:** gated on #301 coordination. The `SUCCESSOR`/`nextStage` change is the same surface graphical-entries replaces with per-lane templates — coordinate before implementing (do not blindly ship the hardcoded-map edit if #301 is about to delete that map).
+
+**Result:** the unblocked work set + a Blocked-issue list. Only then proceed; start with 38b/38c/38d (LOW overlap), defer 38a until the #246-vs-#301 coordination is resolved.
+
+## Sub-phase 38a — Verb-model unification (#246 + #230) — GATED on 38·0 / #301 coordination
+
+> **Gate:** Do not start until 38·0 confirms #246's `SUCCESSOR`/`nextStage` edit won't be superseded by graphical-entries' pipeline-template generalization. If #301 is replacing the hardcoded stage map imminently, coordinate the verb-model change into that work instead of editing the soon-to-be-deleted map.
+
 
 Make `approve` universal: it handles `Final → Published` with the same uniform mechanics as every other stage transition (snapshot + comment-archive), plus the Published-specific concerns (`datePublished`, artifact check). `publishEntry` keeps its Final-only guards + error messages but delegates the mutation to `approveEntryStage`. The studio's Final-stage affordance gains a stage-aware Publish control.
 

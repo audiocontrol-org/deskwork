@@ -1869,7 +1869,15 @@ GitHub tracking issues:
 
 **Operator decisions captured:** #246 → make approve universal (option a); Final→Published applies uniform mechanics (snapshot + comment-archive, plus datePublished + artifact check).
 
-**Sub-phase 38a — Verb-model unification (#246 + #230):**
+**Sub-phase 38·0 — Blast-radius review against `feature/graphical-entries` (#301) [GATING — runs first]:**
+
+- [ ] Review the graphical-entries PRD + workplan + scope-manifest on `feature/graphical-entries` to identify which core+studio burndown issues its work supersedes or contradicts.
+- [ ] Classify each at-risk issue (HIGH/MEDIUM/LOW overlap) per the PRD's Coordination subsection; validate the initial assessment against the live branch state.
+- [ ] Mark HIGH/MEDIUM-overlap issues **Blocked**: add a GitHub label + comment referencing #301. Candidates from the initial assessment — pipeline/stage: #246, #266, #56, #60, #72, #61; dashboard: #68, #98, #177, #114, #262, #263; review surface/annotations: #154, #161, #179, #180, #54, #299, #204, #85; scrapbook: #191, #202, #186, #245.
+- [ ] Confirm the LOW-overlap unblocked work set (core CLI/doctor/ingest + studio non-dashboard/non-review fixes) is genuinely safe; these are the starting point for 38b/38c/38d.
+- [ ] **38a is reclassified: gated on #301 coordination, NOT first.** Coordinate the `SUCCESSOR`/`nextStage` change with graphical-entries' pipeline-template generalization before implementing.
+
+**Sub-phase 38a — Verb-model unification (#246 + #230) [GATED on 38·0 / #301 coordination]:**
 
 - [ ] `nextStage('Final')` returns `'Published'` (`packages/core/src/schema/entry.ts`); update `entry.test.ts` assertions.
 - [ ] `approveEntryStage` handles `Final → Published` with uniform mechanics + `datePublished` + artifact check; extend `ApproveResult` ([#246](https://github.com/audiocontrol-org/deskwork/issues/246)).
