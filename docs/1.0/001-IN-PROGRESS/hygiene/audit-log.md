@@ -228,6 +228,31 @@ Verification status `fixed-pending-verification` per the project's "issue closur
 
 ---
 
+## AUDIT-20260530-01 — Phase 14 Tasks 1+2 review
+
+Finding-ID: AUDIT-20260530-01
+Status:     fixed-pending-verification
+Severity:   informational
+Surface:    plugins/dw-lifecycle/src/close-shipped/{scanner-config,commit-scanner,audit-log-walker}.ts + 2 test files + SKILL.md
+Tracks-Issue: 369
+
+Combined reviewer (feature-dev:code-reviewer, single-pass) verified the two Phase 14 commits. Zero high-confidence findings.
+
+Reviewer-confirmed clean across:
+
+- `END_OF_SUBJECT_PARENS_RE` regex correctness: applied to stripped subject alone (no `m` flag), `$` correctly anchors end-of-subject, `\s*$` absorbs trailing whitespace, mid-subject parens with trailing text don't match.
+- `loadScannerConfig` robustness: file-absent → defaults; malformed YAML → typed error; null/non-object parsed value → defaults; non-boolean field → defaults. snake_case YAML field ↔ camelCase TS interface mapping is explicit and correct.
+- `TRACKS_ISSUE_PATTERN` regex correctness: `im` flags correct; `Tracks-Issue: invalid` degrades to fallback (no digit match → null → body-scrape).
+- `ENTRY_HEADING_RE` backward-compat with scope-discovery audit-log: `## DATE` parents in that file's date-grouped layout become harmless boundaries — their buffers contain no `Status: fixed-<sha>` so `parseAuditLog` skips them at the status check; each `### entry-name` child still gets its own properly-scoped buffer.
+- Back-fill correctness: all 9 AUDIT entries' `Tracks-Issue:` fields verified against the parent issue they actually track (#361, #356, #364, #366; AUDIT-05 deliberately skipped — pure withdrawal with no specific issue).
+- Discipline-rule checks: no `any`/`as Type`/`@ts-ignore` introduced; the one `as Record<string, unknown>` in `scanner-config.ts:69` is guarded by a typeof narrowing check on the line above and matches the established codebase pattern across 15+ existing files. File sizes within the 300–500 cap.
+
+Track 1 (load-bearing verification): 2344/2344 plugin tests pass. Live `close-shipped` dry-run against v0.26.5..v0.27.0 from THIS project reproduces the expected 5-candidate set with `#356` / `#361` / `#364` surfacing (the 3 genuine fixes) and `#50` from the v0.27.0 dogfood gone.
+
+Verification status `fixed-pending-verification` per the project rule. Closes when the next release ships and the operator runs `close-shipped --from-tag v0.27.0 --to-tag v0.X.Y --dry-run` against an installed version of v0.X.Y and confirms the candidate set matches expectations.
+
+---
+
 ## Clone-detector summary
 
 | Run | Detected | NEW | DROPPED | Notes |
