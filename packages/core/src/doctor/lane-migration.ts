@@ -38,15 +38,29 @@
  * corrupt. Here we attempt the read and inspect the thrown error's
  * `code` instead — equivalent in semantics, one syscall cheaper, no
  * TOCTOU window between the existence probe and the actual read.
+ *
+ * artifactKind authority (AUDIT-20260530-18): the artifactKind
+ * back-fill calls the authoritative `detectArtifactKind` probe
+ * (filesystem-aware) instead of dispatching on `extname()` alone.
+ * The pre-fix path-only heuristic misclassified multi-file HTML
+ * mockups — a directory containing `index.html` — as
+ * `single-file-html`. Visual/mockups lane (the headline
+ * graphical-entries use case) is exactly where multi-file mockups
+ * live, and the migration's idempotency would have made the wrong
+ * kind permanent. The probe throws on a non-existent path (per
+ * AUDIT-20260530-09); the migration catches that case and lists the
+ * entry on `LaneMigrationResult.skippedMissingArtifact` so the
+ * operator can repair the dangling reference and re-run.
  */
 
 import { readFile, readdir } from 'node:fs/promises';
-import { join, extname } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 import { sidecarsDir } from '../sidecar/paths.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { EntrySchema, type Entry } from '../schema/entry.ts';
 import { appendJournalEvent } from '../journal/append.ts';
 import { bootstrapDefaultLaneIfMissing } from '../lanes/bootstrap.ts';
+import { detectArtifactKind } from '../lanes/detection.ts';
 import type { ArtifactKind } from '../lanes/types.ts';
 
 /**
@@ -88,6 +102,16 @@ export interface LaneMigrationResult {
    * `.json` parsed + validated cleanly.
    */
   readonly skippedCorrupt: readonly string[];
+  /**
+   * UUIDs of entries whose sidecar parsed cleanly but whose
+   * `artifactPath` points at a file that does not exist on disk.
+   * Surfaced as an explicit list per AUDIT-20260530-18 because the
+   * authoritative `detectArtifactKind` probe (used to classify the
+   * artifact) throws on missing paths. The lane back-fill still lands
+   * for these entries; only the artifactKind back-fill is skipped.
+   * Empty array means every classifiable artifact was found on disk.
+   */
+  readonly skippedMissingArtifact: readonly string[];
   /** True when this was a dry run (no disk writes). */
   readonly dryRun: boolean;
 }
@@ -98,29 +122,61 @@ export interface LaneMigrationOptions {
 }
 
 /**
- * Derive an `artifactKind` from an entry's `artifactPath`. Unlike
- * `detectArtifactKind` (which probes the filesystem), this function
- * works purely from the path string — the migration needs to be able
- * to derive a kind even for sidecars whose on-disk artifact has been
- * temporarily moved or hasn't landed yet. Returns `undefined` when
- * the path is missing or extensionless.
+ * Outcome of attempting to classify an entry's artifact on disk.
+ * Three branches the migration treats distinctly:
+ *
+ *   - `classified` — the artifact exists and `detectArtifactKind`
+ *     returned a kind; back-fill proceeds with that value.
+ *   - `missing` — the artifact does not exist at `artifactPath`;
+ *     surfaced on `LaneMigrationResult.skippedMissingArtifact` so the
+ *     operator can repair the underlying reference and re-run.
+ *   - `none` — there is no `artifactPath` to classify against (the
+ *     sidecar simply has no artifact yet); skip silently.
  */
-function deriveArtifactKindFromPath(artifactPath: string | undefined): ArtifactKind | undefined {
-  if (artifactPath === undefined || artifactPath.length === 0) return undefined;
-  const ext = extname(artifactPath).toLowerCase();
-  if (ext === '.md') return 'markdown';
-  if (ext === '.html') return 'single-file-html';
-  if (
-    ext === '.png' || ext === '.jpg' || ext === '.jpeg'
-    || ext === '.gif' || ext === '.webp' || ext === '.svg'
-  ) {
-    return 'image';
+type ArtifactClassification =
+  | { readonly kind: 'classified'; readonly value: ArtifactKind }
+  | { readonly kind: 'missing' }
+  | { readonly kind: 'none' };
+
+/**
+ * Classify an entry's artifact using `detectArtifactKind` — the
+ * authoritative filesystem probe used by the lanes / detection
+ * pipeline. Replaces the prior path-extension heuristic
+ * (`deriveArtifactKindFromPath`) per AUDIT-20260530-18: the heuristic
+ * misclassified multi-file HTML mockups (a directory containing
+ * `index.html`) as `single-file-html`, contradicting the authoritative
+ * classifier. Because the migration is idempotent (skips entries that
+ * already carry `artifactKind`), the wrong value would have been
+ * permanent.
+ *
+ * `detectArtifactKind` throws on a non-existent path (per
+ * AUDIT-20260530-09's existence-probe hardening). Catch that case and
+ * return `{ kind: 'missing' }` so the caller can surface it on
+ * `skippedMissingArtifact` — the operator's actionable signal that
+ * something on disk needs repair. Any other classifier throw
+ * propagates (unsupported extension / shape) because that's a
+ * data-shape problem the migration cannot paper over.
+ */
+function classifyArtifact(
+  projectRoot: string,
+  artifactPath: string | undefined,
+): ArtifactClassification {
+  if (artifactPath === undefined || artifactPath.length === 0) {
+    return { kind: 'none' };
   }
-  // No extension or unsupported: skip the back-fill rather than throwing.
-  // The doctor's separate artifact-kind validation rule (later phase)
-  // can surface the missing field; the migration's job is best-effort
-  // back-fill for the clearly-classifiable cases.
-  return undefined;
+  const abs = isAbsolute(artifactPath) ? artifactPath : join(projectRoot, artifactPath);
+  try {
+    const value = detectArtifactKind(abs);
+    return { kind: 'classified', value };
+  } catch (err) {
+    // The classifier's missing-path error has a stable prefix
+    // ("artifact does not exist at"). Match on that prefix to avoid
+    // conflating missing-artifact with unsupported-shape errors.
+    if (err instanceof Error && err.message.includes('artifact does not exist at')) {
+      return { kind: 'missing' };
+    }
+    throw err;
+  }
 }
 
 /**
@@ -128,9 +184,19 @@ function deriveArtifactKindFromPath(artifactPath: string | undefined): ArtifactK
  *
  *   1. Bootstrap a `default` lane if absent (Phase 3 helper).
  *   2. Walk every sidecar; back-fill `lane: "default"` when missing;
- *      back-fill `artifactKind` when missing AND derivable from the
- *      sidecar's `artifactPath`.
+ *      back-fill `artifactKind` when missing AND the authoritative
+ *      `detectArtifactKind` probe can classify the on-disk artifact.
  *   3. Emit a `lane-migration` journal event per modified sidecar.
+ *
+ * The returned `LaneMigrationResult` carries explicit lists of
+ * sidecars the walk did NOT migrate cleanly:
+ *
+ *   - `skippedCorrupt` (AUDIT-20260530-15) — sidecars that exist on
+ *     disk but failed read / JSON parse / schema validation.
+ *   - `skippedMissingArtifact` (AUDIT-20260530-18) — entries whose
+ *     `artifactPath` does not exist on disk, so `detectArtifactKind`
+ *     refused to classify it. The lane back-fill still lands for
+ *     these entries; only the artifactKind portion is skipped.
  *
  * @param projectRoot - Absolute path to the project root.
  * @param opts.dryRun - When true, return the summary without writing.
@@ -175,6 +241,7 @@ export async function migrateLaneMembership(
       entriesArtifactKindBackfilled: 0,
       entriesExamined: 0,
       skippedCorrupt: [],
+      skippedMissingArtifact: [],
       dryRun,
     };
   }
@@ -183,6 +250,7 @@ export async function migrateLaneMembership(
   let artifactKindBackfilled = 0;
   let examined = 0;
   const skippedCorrupt: string[] = [];
+  const skippedMissingArtifact: string[] = [];
   for (const name of names) {
     if (!name.endsWith('.json')) continue;
     const path = join(dir, name);
@@ -231,7 +299,21 @@ export async function migrateLaneMembership(
     }
 
     const needsLane = parsed.lane === undefined;
-    const derivedKind = parsed.artifactKind ?? deriveArtifactKindFromPath(parsed.artifactPath);
+
+    // artifactKind back-fill: only invoke the filesystem probe when
+    // the sidecar lacks `artifactKind`. The probe is the
+    // authoritative classifier (AUDIT-20260530-18) — if the artifact
+    // is missing on disk we record the UUID on `skippedMissingArtifact`
+    // and leave `derivedKind` undefined.
+    let derivedKind: ArtifactKind | undefined = parsed.artifactKind;
+    if (parsed.artifactKind === undefined) {
+      const classification = classifyArtifact(projectRoot, parsed.artifactPath);
+      if (classification.kind === 'classified') {
+        derivedKind = classification.value;
+      } else if (classification.kind === 'missing') {
+        skippedMissingArtifact.push(parsed.uuid);
+      }
+    }
     const needsArtifactKind = parsed.artifactKind === undefined && derivedKind !== undefined;
     if (!needsLane && !needsArtifactKind) continue;
 
@@ -285,6 +367,7 @@ export async function migrateLaneMembership(
     entriesArtifactKindBackfilled: artifactKindBackfilled,
     entriesExamined: examined,
     skippedCorrupt,
+    skippedMissingArtifact,
     dryRun,
   };
 }
