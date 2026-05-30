@@ -628,17 +628,17 @@ Closes AUDIT-20260530-05 (cross-model: AUDIT-BARRAGE-claude-05-P2). Surface: `pa
 
 Closes AUDIT-20260530-06 (cross-model: AUDIT-BARRAGE-claude-06-P2). Surface: `packages/core/src/pipelines/loader.ts:124-138`, `:73-78`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-06 (cross-model: AUDIT-BARRAGE-claude-06-P2)` in subject
+- [x] Step 1: write regression test asserting AUDIT-06's confusing path is unreachable (implicitly closed by Bundle 1 7e15a61's PIPELINE_ID_REGEX guard)
+- [x] Step 2: regression test passes against current code (confirms Bundle 1 reached the surface AUDIT-06 named)
+- [x] Step 3: implement the fix (already in 7e15a61 via PIPELINE_ID_REGEX guard at top of loadPipelineTemplate)
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-06 (cross-model: AUDIT-BARRAGE-claude-06-P2)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Regression test exists at `packages/core/test/pipelines/case-sensitivity.test.ts` (cited in Step 1)
+- [x] `npx vitest run packages/core/test/pipelines/case-sensitivity.test.ts` exits 0 (passes against the implicit Bundle 1 fix)
+- [x] Audit-log Status flipped to `fixed-b51859b` via the close-shipped-audit-findings step
 
 
 ### Task 7.22 (fix-finding-AUDIT-20260530-07 (cross-model: AUDIT-BARRAGE-claude-01-P3 + AUDIT-BARRAGE-codex-01-P3)): AUDIT-20260530-07 — path traversal in `loadLaneConfig` (sister to AUDIT-01; same…

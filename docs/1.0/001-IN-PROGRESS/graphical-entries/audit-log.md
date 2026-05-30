@@ -3200,7 +3200,7 @@ Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). 
 ### AUDIT-20260530-06 — case-insensitive filesystem produces confusing id-mismatch error in `loadPipelineTemplate`
 
 Finding-ID: AUDIT-20260530-06 (cross-model: AUDIT-BARRAGE-claude-06-P2)
-Status:     open
+Status:     fixed-b51859b
 Severity:   low
 Surface:    `packages/core/src/pipelines/loader.ts:124-138`, `:73-78`
 
