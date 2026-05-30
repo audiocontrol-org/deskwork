@@ -3143,7 +3143,7 @@ Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). 
 ### AUDIT-20260530-01 — path traversal in `loadPipelineTemplate` (unsanitized id flows to filesystem path)
 
 Finding-ID: AUDIT-20260530-01 (cross-model: AUDIT-BARRAGE-claude-01-P2 + AUDIT-BARRAGE-codex-01-P2)
-Status:     open
+Status:     fixed-7e15a61
 Severity:   high
 Surface:    `packages/core/src/pipelines/loader.ts:118-141` (`loadPipelineTemplate`), `:36-38` (`projectOverridesDir`), `packages/core/src/pipelines/types.ts:96` (`id: z.string().min(1)`)
 
