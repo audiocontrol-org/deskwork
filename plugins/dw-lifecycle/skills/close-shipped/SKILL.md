@@ -1,6 +1,6 @@
 ---
 name: close-shipped
-description: "Release-time pending-verification labeling for issues flagged by four evidence sources (commit-log, audit-log, tooling-feedback, workplan-checkbox) between two release tags. Posts a per-issue verification-request comment citing every source that flagged the issue and adds a label to each referenced open issue. Does NOT close the issue -- closure waits for operator verification per the project rule."
+description: "Release-time pending-verification labeling. Phase 15 redesign: mechanical narrowing → per-candidate Agent dispatch (parallel, via the Agent tool from within the agent's Claude Code session) → operator-curated propose | apply. Does NOT close the issue — closure waits for operator verification per the project rule."
 ---
 
 # /dw-lifecycle:close-shipped
@@ -17,15 +17,80 @@ Run immediately after a release tag is pushed. The skill's job is the dispositio
 
 ## Steps
 
-1. Confirm the project root has `.dw-lifecycle/config.json` (otherwise run `/dw-lifecycle:install` first).
-2. Confirm the `--from-tag` and `--to-tag` (defaults: previous and most-recent `v*` tags) are both present locally (`git fetch --tags origin` if not).
-3. Run a dry-run first to inspect the commits + issue references the skill will act on:
+The skill operates in three phases (`scan` → agent dispatch → `propose`) followed by an operator review and a final `apply` invocation. The Agent-tool dispatch is what the agent (you) does in the middle; the rest is CLI helpers the agent invokes.
 
-```
-dw-lifecycle close-shipped [--from-tag <vA>] [--to-tag <vB>] [--repo <owner/repo>] [--label <name>] --dry-run
-```
+### Phase A — scan + agent dispatch + propose
 
-4. Re-run without `--dry-run` to apply the comment + label.
+1. Resolve `--from-tag` and `--to-tag` (or accept the defaults: previous + most-recent `v*` tags).
+2. Run the scan helper to emit the candidate bundle set:
+
+   ```bash
+   dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB> --output /tmp/close-shipped-bundles.json
+   ```
+
+3. Read the bundles JSON. Count `bundles.length`. If the count exceeds the configured threshold (default 50), surface the count to the operator and confirm before continuing.
+4. **Dispatch one Agent tool call per bundle, in parallel.** Single message with N `Agent({...})` tool_use blocks. Each agent gets:
+   - `subagent_type: 'general-purpose'`
+   - A prompt composed from the bundle using this template:
+
+     ```
+     You are evaluating whether a GitHub issue's fix was shipped in a specific release range.
+
+     Issue #{number}: {title}
+     State: {state}
+     Body:
+     {body}
+
+     Recent comments:
+     {recent_comments_joined}
+
+     Evidence from the release (commits, PR, audit-log, workplan):
+     {bundle_as_yaml}
+
+     Question: Did the work above actually CLOSE this issue?
+
+     A commit/PR closes an issue if its work made the issue's reported problem go
+     away. References, back-links, cross-cites, and "tracks #N for context"
+     patterns are NOT closes. Mere mentions, back-fill links, or docs commits that
+     cite the issue number for context are NOT closes.
+
+     Return strict JSON only:
+     {"verdict": "shipped" | "not-shipped" | "uncertain", "reason": "<one sentence>"}
+     ```
+
+5. Collect the verdicts. For each candidate, parse the agent's response as JSON. If the first parse fails, re-dispatch ONCE with a short correction note (e.g. "your previous response was not valid JSON; return only the verdict JSON"). If the second response also fails to parse, record `agent_verdict: "error"` with the raw response excerpt.
+
+6. Write the verdicts JSON to `/tmp/close-shipped-verdicts.json` with shape `{ "verdicts": [{ "issue": <number>, "verdict": "...", "reason": "..." }, ...] }`.
+
+7. Run the propose helper:
+
+   ```bash
+   dw-lifecycle close-shipped propose \
+     --bundles /tmp/close-shipped-bundles.json \
+     --verdicts /tmp/close-shipped-verdicts.json
+   ```
+
+   This writes the proposal JSON under `.dw-lifecycle/close-shipped/proposals-<timestamp>.json` and prints the markdown summary table.
+
+8. Stop. Surface the proposal path + markdown table to the operator. The operator reviews the proposal file, fills in the `decision` field per item (`accept-verdict` / `override-shipped` / `override-not-shipped` / `skip`), then re-invokes the skill in apply mode.
+
+### Phase B — apply
+
+1. Run the apply helper:
+
+   ```bash
+   dw-lifecycle close-shipped apply --proposal <path-from-phase-A>
+   ```
+
+2. Pre-validation: every item must have a non-empty `decision`. If any is empty, the helper exits 2 and the operator re-edits the proposal.
+
+3. Per-item dispatch: each `accept-verdict`-shipped or `override-shipped` item posts a `pending-verification` comment + adds the label via `gh`. Failures recorded per-item; partial-success surfaces with per-row reasons.
+
+4. Report `applied: N, skipped: M, failed: P` to the operator.
+
+## Legacy fallback
+
+A bare `dw-lifecycle close-shipped --from-tag <vA> --to-tag <vB>` invocation (no sub-verb) still runs the pre-Phase-15 4-walker flow. The legacy path is preserved for one release cycle to give adopters time to migrate; in a later version it will require an explicit `--legacy` flag, then be removed entirely.
 
 ## What it does
 
@@ -214,8 +279,21 @@ When no issues are flagged for verification, the body still renders the heading 
 
 For non-deskwork adopters with their own release flows: invoke `close-shipped` as the last step of the release procedure, after the tag is pushed to origin. The skill's pre-flight on `assertTagsExist` will refuse if the tag has not propagated yet, which is the right failure mode.
 
-## Why it ships as a single-action verb
+## Why the propose | apply split now exists (Phase 15)
 
-Like `/dw-lifecycle:archive-branch`, `close-shipped` has no operator-judgment seam that would justify a propose / apply split. The scanner is deterministic; the apply step is the same shape for every issue (state-check -> comment -> label); the per-issue partial-success is recorded inline. The dry-run flag covers the "preview first" use case.
+Earlier versions shipped `close-shipped` as a single-action verb on the
+assumption that the scanner was deterministic enough to dispatch the
+apply step without operator review. Six release cycles of dogfood
+disproved this: each release surfaced false-positive `pending-verification`
+labels on adjacent, cross-linked, or PR-merge issues, and each fix
+narrowed the scanner one step further without ever closing the gap
+([#366](https://github.com/audiocontrol-org/deskwork/issues/366) was
+the proposal to escape the loop).
 
-If an adopter project has issues that need per-issue commentary tailoring (e.g. different repro steps per surface), the right path is to run `close-shipped --dry-run`, copy the issue list, then run `gh issue comment` manually for the customized cases -- not to add per-issue customization flags to the skill itself.
+Phase 15 separates the concerns: the `scan` helper does mechanical
+narrowing (every `#NNN` mention from every evidence source is a
+candidate), per-bundle Agent dispatches render the judgment ("did this
+commit set actually CLOSE the issue?"), and the `propose | apply` split
+puts the operator in the disposition seat. Adopters who want different
+repro steps per surface still own the proposal JSON they hand-edit
+before `apply`; the per-row `decision` field is the seam.
