@@ -142,6 +142,27 @@ describe('dashboard row Member-of pull-tab (Phase 7 Task 7.3 Direction 1)', () =
     expect(multiRowMatch).toContain(`data-parent-uuid="${GROUP_A_UUID}"`);
     expect(multiRowMatch).toContain(`data-parent-uuid="${GROUP_B_UUID}"`);
 
+    // AUDIT-20260529-36 (Phase 7 Task 7.9) — the popover MUST be
+    // collapsed at rest. The original test only asserted the
+    // popover markup was PRESENT (`toContain('er-row-member-popover')`),
+    // which let the cascade-order bug ship: the CSS rule
+    // `.er-row-member-popover { display: block }` won over the
+    // UA `[hidden]` rule and painted the popover on every member
+    // row at all times. Closing the test-coverage gap by checking
+    // the CSS contract that gates visibility.
+    //
+    // The full computed-visibility check (with the CSS injected
+    // into jsdom + getComputedStyle) lives in the sibling test
+    // `dashboard-row-member-popover-visibility.test.ts`. Here we
+    // assert the server-side contract that the popover ships with
+    // the `hidden` attribute AND that the row shell does NOT
+    // carry `.is-member-expanded` at render time — together these
+    // ensure the popover starts in the collapsed state.
+    expect(multiRowMatch).toMatch(
+      /<div\s+class="er-row-member-popover"[^>]*\bhidden\b/,
+    );
+    expect(multiRowMatch).not.toContain('is-member-expanded');
+
     // Non-member row carries NO tab.
     const nonMemberRowMatch = sliceRow(html, NON_MEMBER_UUID);
     expect(nonMemberRowMatch).not.toContain('er-row-member-tab');

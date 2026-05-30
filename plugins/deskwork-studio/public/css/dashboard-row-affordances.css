@@ -340,9 +340,25 @@
   background: var(--er-paper-2);
 }
 
-/* Popover — inline reveal below the row foreground when expanded. */
-.er-row-member-popover {
+/* Popover — inline reveal below the row foreground when expanded.
+ *
+ * AUDIT-20260529-36 (Phase 7 Task 7.9): visibility is driven by the
+ * row shell's `.is-member-expanded` class — NOT by a UA `[hidden]`
+ * cascade. The previous unconditional `display: block` rule won
+ * over `[hidden] { display: none }` (same specificity 0,1,0; author
+ * origin declared later wins) so every member-row popover painted
+ * at rest. Gating on the state class makes the cascade contract
+ * explicit and immune to the `hidden` attribute being inert.
+ * The runtime markup still emits `hidden` on the popover as a
+ * defensive belt-and-braces signal (assistive tech / no-CSS
+ * fallback), but the visual gate is the CSS rule below. */
+.er-row-shell:not(.is-member-expanded) .er-row-member-popover {
+  display: none;
+}
+.er-row-shell.is-member-expanded .er-row-member-popover {
   display: block;
+}
+.er-row-member-popover {
   margin: 0 0 0 22px;
   padding: 10px 14px 12px;
   background: var(--er-paper);
