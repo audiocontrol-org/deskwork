@@ -70,4 +70,4 @@ The studio is **dev-only** — no auth, localhost binding only.
 
 ### Updates + pinning
 
-Tracks the default branch of `audiocontrol-org/deskwork`. Update with `/plugin marketplace update deskwork && /reload-plugins`. Pin to a tagged release via `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. Full story in the [root README](../../README.md#getting-updates).
+Tracks the default branch of `audiocontrol-org/deskwork`. Update with `/plugin marketplace update deskwork && /reload-plugins`. Pin to a tagged release via `/plugin marketplace add audiocontrol-org/deskwork#<tag>` (pick a tag from the [releases page](https://github.com/audiocontrol-org/deskwork/releases)). Full story in the [root README](../../README.md#getting-updates).

@@ -4,7 +4,7 @@ Project lifecycle orchestration plugin for [Claude Code](https://claude.com/clau
 
 ## Status
 
-Under development. v0.1.0 is not yet tagged. Local smoke test passes; tagged release is gated on upstream `audiocontrol-org/deskwork#81`.
+Shipping. Per-release notes on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).
 
 Design and workplan live in the deskwork repo:
 
@@ -101,7 +101,7 @@ All commands are under the `/dw-lifecycle:` namespace. Grouped by lifecycle stag
 
 See [Shortcuts](#shortcuts) below for the schemes, manifest layout, and drift behavior.
 
-Twenty commands total. Each is a single, composable action — UNIX-style — never a monolithic guided flow. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
+Each command is a single, composable action — UNIX-style — never a monolithic guided flow. The specialized verb families (Hygiene, Audit-barrage, Audit-finding lifecycle) get their own dedicated sections below. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
 
 ## Shortcuts
 
@@ -386,4 +386,4 @@ GPL-3.0-or-later. See the monorepo `LICENSE`.
 
 ---
 
-Status: v0.1.0 in active development. Local smoke test passes; gated on upstream `audiocontrol-org/deskwork#81` for tagged release.
+Status: Shipping. Per-release notes on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).
