@@ -3303,7 +3303,7 @@ Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + 
 ### AUDIT-20260530-15 — corrupt sidecars silently skipped during lane migration (no-silent-fallback violation)
 
 Finding-ID: AUDIT-20260530-15 (cross-model: AUDIT-BARRAGE-claude-02-P4 + AUDIT-BARRAGE-codex-03-P4)
-Status:     open
+Status:     fixed-bf2fb98
 Severity:   medium
 Surface:    `packages/core/src/doctor/lane-migration.ts:145-158`
 
