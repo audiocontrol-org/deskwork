@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Member-of badge — Direction 1: Pull-tab on row edge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --er-paper:     #F5F1E8;
+    --er-paper-2:   #ECE6D4;
+    --er-paper-3:   #DFD7BF;
+    --er-ink:       #1A1614;
+    --er-ink-soft:  #3A3530;
+    --er-faded:     #8A7F70;
+    --er-red-pencil:  #B8362A;
+    --er-proof-blue:  #2A4B7C;
+    --er-stamp-green: #2E5D45;
+    --er-kraft:       #8A7250;
+    --display: "Newsreader", Georgia, serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--er-ink);
+    font-family: var(--display);
+    color: var(--er-ink);
+    min-height: 100vh;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at top, rgba(255,255,255,0.04), transparent 70%),
+      var(--er-ink);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .stack {
+    max-width: 390px;
+    margin: 32px auto;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .frame {
+    background: var(--er-paper);
+    position: relative;
+    box-shadow:
+      0 24px 60px rgba(0,0,0,0.4),
+      0 8px 20px rgba(0,0,0,0.3);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .frame::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: 2;
+    mix-blend-mode: multiply;
+  }
+  .surface { position: relative; z-index: 3; }
+
+  /* Surface chrome — dashboard miniature */
+  .masthead {
+    display: grid;
+    grid-template-columns: 56px 1fr 56px;
+    align-items: center;
+    height: 56px;
+    border-bottom: 1px solid var(--er-paper-3);
+    background: var(--er-paper);
+  }
+  .masthead .center {
+    display: flex; flex-direction: column; align-items: center;
+    line-height: 1.15;
+  }
+  .masthead .kicker {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+  }
+  .masthead .slug {
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--er-ink);
+  }
+  .masthead .menu {
+    font-family: var(--mono);
+    font-size: 1.2rem;
+    color: var(--er-ink-soft);
+    text-align: center;
+  }
+
+  /* Dashboard rows — three rows demonstrate single-parent, multi-parent, non-member */
+  .lane-strip {
+    padding: 8px 16px;
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    border-bottom: 1px solid var(--er-paper-3);
+    background: var(--er-paper);
+  }
+  .row-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .row {
+    position: relative;
+    padding: 14px 50px 14px 36px;
+    border-bottom: 1px dashed var(--er-paper-3);
+    background: var(--er-paper);
+  }
+  .row:last-child { border-bottom: none; }
+  .row .stage-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin-bottom: 4px;
+  }
+  .row .stage-meta .g {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--er-red-pencil);
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .row .stage-meta .stage {
+    color: var(--er-ink-soft);
+    font-weight: 500;
+  }
+  .row .title {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.1rem;
+    color: var(--er-ink);
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+  }
+  .row .slug {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--er-faded);
+    margin-top: 4px;
+  }
+  .row .overflow {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 1.2rem;
+    color: var(--er-ink-soft);
+    cursor: pointer;
+    user-select: none;
+    padding: 8px;
+  }
+
+  /* The Member-of pull-tab — vertical tab on the row's LEFT edge */
+  .member-tab {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--er-paper-2);
+    border-right: 1px solid var(--er-paper-3);
+    cursor: pointer;
+    user-select: none;
+  }
+  .member-tab .label {
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--er-kraft);
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-weight: 600;
+  }
+  .member-tab .count {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    color: var(--er-kraft);
+    background: var(--er-paper);
+    border: 1px solid var(--er-kraft);
+    border-radius: 50%;
+    width: 14px; height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+  }
+  .row.no-member { padding-left: 16px; }
+  .row.no-member .member-tab { display: none; }
+
+  /* Member popover (expanded state on the multi-parent row) */
+  .row.is-expanded {
+    background: var(--er-paper-2);
+  }
+  .row.is-expanded .member-tab {
+    background: var(--er-kraft);
+    border-right-color: var(--er-kraft);
+  }
+  .row.is-expanded .member-tab .label {
+    color: var(--er-paper);
+  }
+  .row.is-expanded .member-tab .count {
+    background: var(--er-kraft);
+    color: var(--er-paper);
+    border-color: var(--er-paper);
+  }
+  .member-popover {
+    margin: 10px 0 0 -20px;
+    padding: 10px 14px 12px 56px;
+    background: var(--er-paper);
+    border-left: 3px solid var(--er-kraft);
+    border-top: 1px solid var(--er-paper-3);
+  }
+  .member-popover .kicker {
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--er-kraft);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .parent-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--er-ink);
+    cursor: pointer;
+  }
+  .parent-link .slug-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .parent-link .name {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--er-ink);
+  }
+  .parent-link .slug-mini {
+    font-size: 0.625rem;
+    color: var(--er-faded);
+    letter-spacing: 0.04em;
+  }
+  .parent-link .open {
+    color: var(--er-proof-blue);
+    font-size: 0.9rem;
+  }
+
+  .note {
+    max-width: 390px;
+    margin: 0 auto;
+    padding: 16px 20px;
+    background: rgba(232, 226, 208, 0.12);
+    color: rgba(245, 241, 232, 0.7);
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    line-height: 1.7;
+    letter-spacing: 0.04em;
+    border-left: 2px solid rgba(138, 114, 80, 0.8);
+    position: relative;
+    z-index: 1;
+  }
+  .note .title {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.95rem;
+    color: rgba(245, 241, 232, 0.95);
+    margin-bottom: 8px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .note ul { margin: 6px 0 0; padding-left: 18px; }
+  .note li { margin-bottom: 3px; }
+
+  .label-strip {
+    max-width: 390px;
+    margin: 0 auto;
+    padding: 0 4px;
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(245, 241, 232, 0.45);
+  }
+</style>
+</head>
+<body>
+  <div class="stack">
+    <div class="note">
+      <div class="title">Member-of Direction 1 — Pull-tab on row edge</div>
+      Vertical pull-tab on the row's LEFT edge, kraft-color, with member count badge.
+      Tap → expands inline below the row with the parent group(s) as clipboard-copy back-links.
+      <ul>
+        <li>Mirrors `.er-marginalia-tab` / `.er-outline-tab` precedent (per `affordance-placement.md`).</li>
+        <li>Discoverable at-rest (visible color + count) without crowding the row's content area.</li>
+        <li>Multi-parent surfaces naturally: the count is the digit; the popover lists every parent.</li>
+        <li>Non-member rows show no tab — chrome doesn't pay for what doesn't apply.</li>
+        <li>Lane dashboard's existing overflow `⋮` on the right edge stays untouched.</li>
+      </ul>
+    </div>
+
+    <div class="frame">
+      <div class="surface">
+        <div class="masthead">
+          <div></div>
+          <div class="center">
+            <div class="kicker">DASHBOARD · FEATURE LANE</div>
+            <div class="slug">Drafting</div>
+          </div>
+          <div class="menu">⋮</div>
+        </div>
+
+        <div class="lane-strip">FEATURE · 3 entries</div>
+
+        <ul class="row-list">
+          <li class="row">
+            <div class="member-tab">
+              <span class="label">Member</span>
+              <span class="count">1</span>
+            </div>
+            <div class="stage-meta">
+              <span class="g">✎</span>
+              <span class="stage">Drafting</span>
+              <span style="color: var(--er-paper-3);">·</span>
+              <span>v3 · 2h ago</span>
+            </div>
+            <div class="title">Row chrome cascade rewrite</div>
+            <div class="slug">row-chrome-cascade-rewrite</div>
+            <div class="overflow">⋮</div>
+          </li>
+
+          <li class="row is-expanded">
+            <div class="member-tab">
+              <span class="label">Member</span>
+              <span class="count">3</span>
+            </div>
+            <div class="stage-meta">
+              <span class="g">✎</span>
+              <span class="stage">Drafting</span>
+              <span style="color: var(--er-paper-3);">·</span>
+              <span>v6 · 1d ago</span>
+            </div>
+            <div class="title">Stage-aware verb router</div>
+            <div class="slug">stage-aware-verb-router</div>
+            <div class="overflow">⋮</div>
+
+            <div class="member-popover">
+              <div class="kicker">Member of 3 groups</div>
+              <div class="parent-link">
+                <div class="slug-line">
+                  <span class="name">v0.18 row rebuild</span>
+                  <span class="slug-mini">v0.18-row-rebuild</span>
+                </div>
+                <div class="open">↪</div>
+              </div>
+              <div class="parent-link">
+                <div class="slug-line">
+                  <span class="name">Verb harmonization</span>
+                  <span class="slug-mini">verb-harmonization</span>
+                </div>
+                <div class="open">↪</div>
+              </div>
+              <div class="parent-link">
+                <div class="slug-line">
+                  <span class="name">Phase 7 closeout</span>
+                  <span class="slug-mini">phase-7-closeout</span>
+                </div>
+                <div class="open">↪</div>
+              </div>
+            </div>
+          </li>
+
+          <li class="row no-member">
+            <div class="stage-meta">
+              <span class="g">✎</span>
+              <span class="stage">Drafting</span>
+              <span style="color: var(--er-paper-3);">·</span>
+              <span>v1 · 6h ago</span>
+            </div>
+            <div class="title">Solo entry, no group binding</div>
+            <div class="slug">solo-entry-no-binding</div>
+            <div class="overflow">⋮</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
