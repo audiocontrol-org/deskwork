@@ -56,6 +56,7 @@ import {
   type BucketingResult,
   type LaneScopedBucket,
 } from './members-bucketing.ts';
+import type { MemberItem } from './data.ts';
 
 export type MembersViewMode = 'composed' | 'list';
 
@@ -77,6 +78,15 @@ export interface RenderMembersSectionInput {
    * corruption as a mere reference gap.
    */
   readonly corruptMemberUuids: readonly string[];
+  /**
+   * Ordered discriminated-union sequence of {kind: 'resolved' |
+   * 'missing' | 'corrupt'} items — one per declared UUID in
+   * `group.members[]` order. The list-view renderer walks this
+   * sequence so the operator sees rows in declared insertion order,
+   * regardless of which resolution outcome each position carries.
+   * Per AUDIT-20260529-40.
+   */
+  readonly orderedMembers: readonly MemberItem[];
   /**
    * Lane configs keyed by lane id; the section needs the lane's display
    * name + template binding to render the swim-head correctly.
@@ -275,17 +285,36 @@ function renderCorruptRow(uuid: string): RawHtml {
     </li>`);
 }
 
+/**
+ * AUDIT-20260529-40 — list-mode preserves declared insertion order.
+ *
+ * Walks the discriminated `orderedMembers` sequence directly so the
+ * resolved / missing / corrupt rows interleave in the operator's
+ * declared `group.members[]` order. Pre-fix, the renderer
+ * concatenated resolved-first, then corrupt, then missing — which
+ * silently re-ordered the operator's declared sequence and violated
+ * the list-mode contract.
+ */
 function renderListBody(
-  members: readonly Entry[],
-  missingMemberUuids: readonly string[],
-  corruptMemberUuids: readonly string[],
+  orderedMembers: readonly MemberItem[],
   laneConfigsById: ReadonlyMap<string, StrictLaneConfig>,
 ): RawHtml {
-  const rowsRaw = members.map((m) => renderListRow(m, laneConfigsById).__raw).join('');
-  const corruptRaw = corruptMemberUuids.map((u) => renderCorruptRow(u).__raw).join('');
-  const missingRaw = missingMemberUuids.map((u) => renderMissingRow(u).__raw).join('');
+  const rowsRaw = orderedMembers
+    .map((item) => {
+      if (item.kind === 'resolved') {
+        return renderListRow(item.entry, laneConfigsById).__raw;
+      }
+      if (item.kind === 'corrupt') {
+        return renderCorruptRow(item.uuid).__raw;
+      }
+      // kind === 'missing' — exhaustive over the discriminated union
+      // (no `default` branch needed; TypeScript narrows item to
+      // 'missing' here).
+      return renderMissingRow(item.uuid).__raw;
+    })
+    .join('');
   return unsafe(html`
-    <ul class="er-members-list" data-list>${unsafe(rowsRaw)}${unsafe(corruptRaw)}${unsafe(missingRaw)}</ul>`);
+    <ul class="er-members-list" data-list>${unsafe(rowsRaw)}</ul>`);
 }
 
 function renderToggle(initial: MembersViewMode): RawHtml {
@@ -348,9 +377,7 @@ function renderPopulatedSection(input: RenderMembersSectionInput): RawHtml {
   const sectionMode = initial === 'composed' ? 'composed' : 'list';
   const composedBody = renderComposedBody(bucketing);
   const listBody = renderListBody(
-    input.members,
-    input.missingMemberUuids,
-    input.corruptMemberUuids,
+    input.orderedMembers,
     input.laneConfigsById,
   );
   return unsafe(html`

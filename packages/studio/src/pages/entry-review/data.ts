@@ -60,6 +60,26 @@ import type { CalendarEntry } from '@deskwork/core/types';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
 
 /**
+ * Discriminated-union row item carrying ONE position in the group's
+ * declared `members[]` order (AUDIT-20260529-40). The three kinds
+ * mirror the three resolution outcomes:
+ *
+ *   - `resolved` — the sidecar read + validated cleanly.
+ *   - `missing` — the sidecar file is absent on disk (ENOENT).
+ *   - `corrupt` — the sidecar file is present but failed to load.
+ *
+ * The renderer's list-view path walks this sequence directly so
+ * insertion order is preserved end-to-end, regardless of which
+ * resolution outcome each position carries. Pre-AUDIT-40 the
+ * renderer concatenated resolved rows first, then corrupt, then
+ * missing — re-ordering the operator's declared sequence.
+ */
+export type MemberItem =
+  | { readonly kind: 'resolved'; readonly entry: Entry }
+  | { readonly kind: 'missing'; readonly uuid: string }
+  | { readonly kind: 'corrupt'; readonly uuid: string };
+
+/**
  * When the entry is a populated group (Phase 7 Task 7.3 + 7.4), the
  * loader resolves each member sidecar plus the lane configs + pipeline
  * templates the members span. Members are returned in the original
@@ -80,6 +100,14 @@ import type { DraftAnnotation } from '@deskwork/core/review/types';
  *     pre-AUDIT-39 behavior) violated the project's no-silent-
  *     fallbacks discipline.
  *
+ * `orderedMembers` carries the three-variant discriminated union
+ * per AUDIT-20260529-40 — one item per declared UUID in
+ * `group.members[]` order. The list-view renderer walks this
+ * sequence so insertion order is preserved across resolution
+ * outcomes; the composed view continues to read `members` directly
+ * because it buckets by (lane, stage) rather than rendering an
+ * ordered flat list.
+ *
  * `laneConfigsById` iterates in operator-configured lane order (per
  * `listLaneConfigs`) — the same order the dashboard uses — so the
  * composed view's per-lane block ordering is consistent across
@@ -89,6 +117,7 @@ export interface GroupMembersBundle {
   readonly members: readonly Entry[];
   readonly missingMemberUuids: readonly string[];
   readonly corruptMemberUuids: readonly string[];
+  readonly orderedMembers: readonly MemberItem[];
   readonly laneConfigsById: ReadonlyMap<string, StrictLaneConfig>;
   readonly templatesById: ReadonlyMap<string, StrictPipelineTemplate>;
 }
@@ -205,6 +234,10 @@ async function loadGroupMembersBundle(
   const members: Entry[] = [];
   const missing: string[] = [];
   const corrupt: string[] = [];
+  // AUDIT-20260529-40: parallel ordered sequence of {kind, ...}
+  // items so the renderer can walk declared `group.members[]` order
+  // regardless of which resolution outcome each position carries.
+  const orderedMembers: MemberItem[] = [];
   for (const uuid of uuids) {
     // Distinguish ENOENT-missing from read/parse failure (corrupt)
     // by file-existence check before the read. existsSync is sync +
@@ -213,11 +246,13 @@ async function loadGroupMembersBundle(
     const path = sidecarPath(projectRoot, uuid);
     if (!existsSync(path)) {
       missing.push(uuid);
+      orderedMembers.push({ kind: 'missing', uuid });
       continue;
     }
     try {
       const sidecar = await readSidecar(projectRoot, uuid);
       members.push(sidecar);
+      orderedMembers.push({ kind: 'resolved', entry: sidecar });
     } catch (err) {
       // Sidecar file exists but the read / parse / schema validation
       // failed. Surface as corrupt — NOT missing — so the operator
@@ -227,6 +262,7 @@ async function loadGroupMembersBundle(
       const detail = err instanceof Error ? err.message : String(err);
       console.warn(`entry-review: corrupt member sidecar ${uuid}: ${detail}`);
       corrupt.push(uuid);
+      orderedMembers.push({ kind: 'corrupt', uuid });
     }
   }
 
@@ -288,6 +324,7 @@ async function loadGroupMembersBundle(
     members,
     missingMemberUuids: missing,
     corruptMemberUuids: corrupt,
+    orderedMembers,
     laneConfigsById,
     templatesById,
   };
