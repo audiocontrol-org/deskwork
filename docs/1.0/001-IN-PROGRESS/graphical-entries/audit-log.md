@@ -3290,7 +3290,7 @@ Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (codex). F
 ### AUDIT-20260530-14 — multi-lane calendar renderer silently drops entries whose `currentStage` isn't in their lane's template (re-introduces #247)
 
 Finding-ID: AUDIT-20260530-14 (cross-model: AUDIT-BARRAGE-claude-01-P4 + AUDIT-BARRAGE-codex-02-P4)
-Status:     open
+Status:     fixed-f345069
 Severity:   high
 Surface:    `packages/core/src/calendar/render.ts:86-98`, `:179-201`; test coverage at `packages/core/test/calendar/regenerate-multilane.test.ts`
 
