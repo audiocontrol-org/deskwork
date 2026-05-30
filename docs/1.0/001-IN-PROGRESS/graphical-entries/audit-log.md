@@ -3279,7 +3279,7 @@ Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). 
 ### AUDIT-20260530-13 — `bootstrapDefaultLaneIfMissing` can leave a lane file without its migration journal event (partial-success)
 
 Finding-ID: AUDIT-20260530-13 (cross-model: AUDIT-BARRAGE-codex-03-P3)
-Status:     open
+Status:     fixed-908eb49
 Severity:   medium
 Surface:    `packages/core/src/lanes/bootstrap.ts:102-123`
 

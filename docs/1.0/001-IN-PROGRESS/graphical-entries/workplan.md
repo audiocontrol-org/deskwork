@@ -747,17 +747,17 @@ Closes AUDIT-20260530-12 (cross-model: AUDIT-BARRAGE-claude-06-P3). Surface: `pa
 
 Closes AUDIT-20260530-13 (cross-model: AUDIT-BARRAGE-codex-03-P3). Surface: `packages/core/src/lanes/bootstrap.ts:102-123`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-13 (cross-model: AUDIT-BARRAGE-codex-03-P3)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-13 (cross-model: AUDIT-BARRAGE-codex-03-P3)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/lanes/bootstrap.test.ts` (AUDIT-20260530-13 rollback case) (cited in Step 1)
+- [x] `npx vitest run packages/core/test/lanes/bootstrap.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-908eb49` via the close-shipped-audit-findings step
 
 
 ### Task 7.29 (fix-finding-AUDIT-20260530-14 (cross-model: AUDIT-BARRAGE-claude-01-P4 + AUDIT-BARRAGE-codex-02-P4)): AUDIT-20260530-14 — multi-lane calendar renderer silently drops entries whose `c…
