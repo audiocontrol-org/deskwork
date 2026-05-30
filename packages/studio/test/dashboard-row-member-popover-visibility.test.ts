@@ -192,14 +192,36 @@ describe('row member-popover cascade order (AUDIT-20260529-36 + 41)', () => {
     // and a literal-aligned fix both satisfy this contract;
     // the contract pins the invariant that matters (alignment),
     // not the mechanism that delivers it.
+    //
+    // jsdom note: jsdom does NOT resolve CSS custom properties
+    // through getComputedStyle — it returns the literal `var(...)`
+    // string. We resolve the token's value via
+    // getPropertyValue('--er-member-tab-width') on the root, then
+    // normalise both sides (literal-pixel-value OR var-reference
+    // resolved to its declared value) before comparison. This keeps
+    // the test honest regardless of which fix variant the
+    // implementer picked.
     injectCss();
     const { popover, tab } = buildMemberRowShell();
-    // The tab is positioned absolute; jsdom needs `width: <px>`
-    // computed against the rule. The tab rule is unconditional
-    // (`.er-row-member-tab { width: 24px; ... }`), so getComputedStyle
-    // returns the literal pixel value.
-    const tabWidth = window.getComputedStyle(tab).width;
-    const popoverMarginLeft = window.getComputedStyle(popover).marginLeft;
+    const rootStyle = window.getComputedStyle(document.documentElement);
+    const tokenValue = rootStyle.getPropertyValue('--er-member-tab-width').trim();
+    // Token MUST be declared and MUST be 24px to satisfy WCAG 2.5.8.
+    expect(tokenValue).toBe('24px');
+
+    const resolve = (value: string): string => {
+      // jsdom returns the literal `var(--name)` string; resolve by
+      // substituting the declared token value. Falls through unchanged
+      // when the value is already a literal (e.g. `24px`).
+      const m = /var\(\s*(--[a-zA-Z0-9_-]+)\s*\)/.exec(value);
+      if (m === null) return value;
+      const resolved = rootStyle.getPropertyValue(m[1]).trim();
+      return value.replace(m[0], resolved);
+    };
+
+    const tabWidth = resolve(window.getComputedStyle(tab).width);
+    const popoverMarginLeft = resolve(
+      window.getComputedStyle(popover).marginLeft,
+    );
     expect(tabWidth).toBe('24px');
     expect(popoverMarginLeft).toBe(tabWidth);
   });

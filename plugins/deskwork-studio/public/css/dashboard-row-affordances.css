@@ -240,14 +240,30 @@
  * it when applicable (chrome doesn't pay for what doesn't apply, but
  * when it DOES apply the discoverability signal is uniform across
  * viewport classes).
+ *
+ * AUDIT-20260529-41 (Phase 7 Task 7.14): the tab width is extracted
+ * to `--er-member-tab-width` so the dependent rules (foreground
+ * padding-left + popover margin-left) derive from a single source of
+ * truth. AUDIT-31 widened the tab from 22px to 24px (WCAG 2.5.8
+ * target-size minimum) but the popover's left margin was not swept
+ * in lockstep — the popover started 2px inside the tab column. The
+ * token prevents that regression class from recurring: any future
+ * tab-width change automatically sweeps both dependents.
  * ----------------------------------------------------------------- */
+
+:root {
+  /* WCAG 2.2 SC 2.5.8 minimum target size 24x24. The dependent rules
+   * (`.has-member-tab .er-row-fg padding-left` and
+   * `.er-row-member-popover margin-left`) derive from this token. */
+  --er-member-tab-width: 24px;
+}
 
 .er-row-member-tab {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 24px;
+  width: var(--er-member-tab-width);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -313,11 +329,12 @@
 }
 
 /* Row shells that carry the member tab inset their main content so
- * the tab's 22px column doesn't overlap the row foreground. The class
- * is added server-side when parents.length > 0; non-member rows keep
- * their original padding. */
+ * the tab's column doesn't overlap the row foreground. The class is
+ * added server-side when parents.length > 0; non-member rows keep
+ * their original padding. The +4px gutter beyond the tab width gives
+ * the foreground content breathing room from the tab's right edge. */
 .er-row-shell.has-member-tab .er-row-fg {
-  padding-left: 28px;
+  padding-left: calc(var(--er-member-tab-width) + 4px);
 }
 
 /* Expanded state — popover visible, tab color inverts to kraft. */
@@ -359,7 +376,11 @@
   display: block;
 }
 .er-row-member-popover {
-  margin: 0 0 0 22px;
+  margin: 0;
+  /* Longhand left-margin so the token resolves cleanly through
+   * the cascade (JSDOM-friendly + matches the single-axis intent
+   * of the alignment contract: only the left edge is tab-bound). */
+  margin-left: var(--er-member-tab-width);
   padding: 10px 14px 12px;
   background: var(--er-paper);
   border-top: 1px solid var(--er-paper-3);
