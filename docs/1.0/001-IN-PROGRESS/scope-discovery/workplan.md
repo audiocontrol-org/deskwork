@@ -224,16 +224,16 @@ Closes AUDIT-20260530-04. Surface: `plugins/dw-lifecycle/src/subcommands/audit-b
 
 Closes AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/subcommands/promote-findings.ts` (auto-apply branch, items mapped with shared `insertAfterLine`), `__tests__/.../subcommand.test.ts:551-771`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model)` in subject
+- [x] Step 1: 3 multi-finding tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` covering N=3 inserts at one anchor, physical-order=input-order, monotonic 15.2/15.3/15.4 numbering.
+- [x] Step 2: tests pass on first run — the multi-finding path WORKS; the bug the audit caught was specifically the absence of test coverage on this load-bearing path. Adding the tests IS the fix per TDD-as-regression-coverage.
+- [x] Step 3: no source change needed — the missing-tests gap was the finding's actual content.
+- [x] Step 4: plugin suite 2414/2414.
+- [x] Step 5: commit with `Closes AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model)` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` covering the multi-finding path (Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 

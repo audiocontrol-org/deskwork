@@ -769,3 +769,185 @@ describe('runPromoteFindings — auto-apply (Phase 15 Task 4b)', () => {
     }
   });
 });
+
+/**
+ * AUDIT-20260530-05 regression: every pre-fix `--auto` test exercised
+ * exactly one open finding. The barrage's primary case is multi-finding
+ * runs (Phase 12 surfaced 13; the Phase 15 self-dogfood surfaced 7),
+ * so the multi-finding insertion path is the load-bearing one. These
+ * tests pin the contract: N findings → N task blocks at the chosen
+ * anchor, input order preserved in physical order, gate sees all N
+ * at positions [0..N-1].
+ */
+describe('runPromoteFindings — auto-apply MULTI-finding path (AUDIT-20260530-05)', () => {
+  function makeMultiFixture(): {
+    root: string;
+    featureSlug: string;
+    cleanup: () => void;
+  } {
+    const root = mkdtempSync(join(tmpdir(), 'pf-multi-'));
+    const featureSlug = 'demo-feature';
+    const featureDir = join(root, 'docs', '1.0', '001-IN-PROGRESS', featureSlug);
+    mkdirSync(featureDir, { recursive: true });
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '',
+        '## Phase 15: current',
+        '',
+        '### Task 15.1: pre-existing',
+        '',
+        '- [ ] Step 1.',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    writeFileSync(
+      join(featureDir, 'audit-log.md'),
+      [
+        '# Audit Log',
+        '',
+        '### First finding',
+        '',
+        'Finding-ID: AUDIT-20260530-91',
+        'Status: open',
+        'Severity: high',
+        'Surface: src/a.ts:10',
+        '',
+        'Body A.',
+        '',
+        '### Second finding',
+        '',
+        'Finding-ID: AUDIT-20260530-92',
+        'Status: open',
+        'Severity: medium',
+        'Surface: src/b.ts:20',
+        '',
+        'Body B.',
+        '',
+        '### Third finding',
+        '',
+        'Finding-ID: AUDIT-20260530-93',
+        'Status: open',
+        'Severity: low',
+        'Surface: src/c.ts:30',
+        '',
+        'Body C.',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    return {
+      root,
+      featureSlug,
+      cleanup: () => rmSync(root, { recursive: true, force: true }),
+    };
+  }
+
+  it('inserts 3 fix-task blocks for 3 open findings at the chosen anchor', async () => {
+    const fix = makeMultiFixture();
+    try {
+      const proposalFs = new Map<string, string>();
+      const { args, diskWrites } = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: fix.featureSlug,
+          bucket: 'open',
+          limit: 10,
+        },
+        fix,
+        proposalFs,
+      );
+      const exit = await runPromoteFindings(args);
+      expect(exit).toBe(0);
+      const workplanPath = join(
+        fix.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        fix.featureSlug,
+        'workplan.md',
+      );
+      const written = diskWrites.get(workplanPath);
+      expect(written).toBeDefined();
+      if (written === undefined) return;
+      const ids = ['AUDIT-20260530-91', 'AUDIT-20260530-92', 'AUDIT-20260530-93'];
+      for (const id of ids) {
+        const occurrences = (written.match(new RegExp(`fix-finding-${id}`, 'g')) ?? []).length;
+        expect(occurrences).toBe(1);
+      }
+    } finally {
+      fix.cleanup();
+    }
+  });
+
+  it('preserves input order in physical workplan order (91 before 92 before 93)', async () => {
+    const fix = makeMultiFixture();
+    try {
+      const proposalFs = new Map<string, string>();
+      const { args, diskWrites } = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: fix.featureSlug,
+          bucket: 'open',
+          limit: 10,
+        },
+        fix,
+        proposalFs,
+      );
+      await runPromoteFindings(args);
+      const workplanPath = join(
+        fix.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        fix.featureSlug,
+        'workplan.md',
+      );
+      const written = diskWrites.get(workplanPath) ?? '';
+      const pos91 = written.indexOf('AUDIT-20260530-91');
+      const pos92 = written.indexOf('AUDIT-20260530-92');
+      const pos93 = written.indexOf('AUDIT-20260530-93');
+      expect(pos91).toBeGreaterThan(-1);
+      expect(pos92).toBeGreaterThan(pos91);
+      expect(pos93).toBeGreaterThan(pos92);
+    } finally {
+      fix.cleanup();
+    }
+  });
+
+  it('emits monotonically increasing task numbers (hierarchical: 15.2, 15.3, 15.4)', async () => {
+    const fix = makeMultiFixture();
+    try {
+      const proposalFs = new Map<string, string>();
+      const { args, diskWrites } = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: fix.featureSlug,
+          bucket: 'open',
+          limit: 10,
+        },
+        fix,
+        proposalFs,
+      );
+      await runPromoteFindings(args);
+      const workplanPath = join(
+        fix.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        fix.featureSlug,
+        'workplan.md',
+      );
+      const written = diskWrites.get(workplanPath) ?? '';
+      // The pre-existing Task 15.1 sets currentMax=1; new tasks get
+      // 15.2, 15.3, 15.4 in finding order.
+      expect(written).toMatch(/### Task 15\.2 \(fix-finding-AUDIT-20260530-91\)/);
+      expect(written).toMatch(/### Task 15\.3 \(fix-finding-AUDIT-20260530-92\)/);
+      expect(written).toMatch(/### Task 15\.4 \(fix-finding-AUDIT-20260530-93\)/);
+    } finally {
+      fix.cleanup();
+    }
+  });
+});
