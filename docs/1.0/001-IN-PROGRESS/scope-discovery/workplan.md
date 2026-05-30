@@ -1123,7 +1123,7 @@ Verify the new triad (Task 1 gate + Task 3 lift + Task 4 hook) composes correctl
 
 - [ ] Step 1: Positive scenario — deliberately seed a small implementation gap, run `/dw-lifecycle:implement`:
   - Task A completes + commits.
-  - End-of-task hook fires `audit-barrage` (real CLIs; operator-supervised cost).
+  - End-of-task hook fires `audit-barrage` (real CLIs; runs against the operator's existing CLI subscriptions, no direct API metering).
   - `audit-barrage-lift --apply` writes the findings to audit-log.
   - `promote-findings --apply` scopes them as workplan's next tasks.
   - Next-task pickup checks the new gate.

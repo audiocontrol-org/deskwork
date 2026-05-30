@@ -9,6 +9,8 @@ Run a multi-model audit barrage: fire N installed CLI tools in parallel against 
 
 The barrage is the **third independent audit surface**, additive to the in-band self-audit (orchestrator-loop) and the SDD two-reviewer cycle. Cross-model genetic diversity surfaces failure modes single-model audits miss. Per the dogfood data (Phase 12 self-audit, AUDIT-20260529-01..11 in the scope-discovery audit-log): one full barrage against an in-flight feature surfaced 4 cross-model HIGH-confidence findings that the in-band layer + the SDD cycle missed.
 
+**Why CLIs and not direct API calls.** The verb dispatches `claude`, `codex`, `gemini`, etc. as installed CLI binaries — each tool runs against the operator's existing CLI subscription (Claude Pro, Codex, Gemini CLI), not against a metered API endpoint. The cost shape that matters in practice is "is the CLI installed + authenticated" not "how many tokens did this prompt consume." A barrage on a multi-thousand-line diff is the same operator cost as a one-line probe: zero direct API metering, bounded by the per-CLI subscription. This is the load-bearing design choice that lets the `/dw-lifecycle:implement` end-of-task hook fire unconditionally at every task boundary.
+
 ## When to run
 
 - **After substantive task work lands on the branch.** Sub-agent dispatches that materially change behavior get a barrage pass before the next commit batches ship.
