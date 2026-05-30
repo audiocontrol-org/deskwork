@@ -707,3 +707,70 @@ All 4 actionable findings (AUDIT-20260529-16/17/18/19/20) land in the same revie
 - `dw-lifecycle check-open-findings --feature open-issue-tranche-cleanup` → exit 0 (NEW)
 
 Awaiting `verified-<date>` on each of -16 through -20 after the next batch of dispatch-wrapper-using or gate-using work confirms no regression.
+
+## 2026-05-30 — audit-barrage lift (20260530T071155888Z-scope-discovery)
+
+### AUDIT-20260530-01 — Audit-barrage finding extraction silently downgrades unrecognized severities to `informational` (the LOWEST rank)
+
+Finding-ID: AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:130-136`
+
+`normalizeSeverity` maps any value outside `{blocking, high, medium, low, informational}` to `'informational'` — the lowest rank in `SEVERITY_RANK` (0). The test suite even pins this: `expect(normalizeSeverity('critical')).toBe('informational')` (extract-barrage-findings.test.ts). The single most likely model deviation from the canonical set is `critical` (every model uses it), and the chosen fallback buries it at the bottom of the triage queue. For merged clusters this is doubly harmful: `mergeCluster` picks `max-of-cluster` rank (lines 254-258), so a cluster where one model says `blocking` and another says `critical` collapses the `critical` voice to rank 0, and if BOTH models say `critical`, the merged finding is `informational` — i.e. a cross-model HIGH-confidence agreement on a critical bug surfaces to the operator as `informational`. The whole feature exists to prioritize findings into the work queue; an unknown-severity fallback to the lowest rank actively defeats that. A safer fallback is `high` (fail toward attention, not away from it) or preserving the raw string as a flagged "non-canonical severity" so the operator sees it. The lift verb (audit-barrage-lift.ts:`renderEntry`) writes this normalized value straight into the audit-log `Severity:` line, so the downgrade is persisted.
+
+### AUDIT-20260530-02 — `computeAutoPosition` hard-codes `## Phase` headings; non-Phase workplans throw and HALT the unconditional implement-loop hook
+
+Finding-ID: AUDIT-20260530-02
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:96,97,166-170`
+
+`PHASE_HEADING_RE = /^##\s+Phase\b/i` and `PHASE_NUMBER_RE = /^##\s+Phase\s+(\d+)/i` only match headings literally beginning with "Phase". When no such heading exists, `computeAutoPosition` throws `AutoPositionError` (lines 166-170), which `promote-findings --auto` maps to exit 2 (promote-findings.ts:`runPromoteFindings` auto-apply branch). Per the SKILL.md Step 6 failure policy, `promote-findings --auto` non-zero is a **STOP-the-loop event** — and the hook is **unconditional** (no `--skip-audit-barrage-hook` flag). The project's own PM standard (work-level CLAUDE.md / PROJECT-MANAGEMENT.md) explicitly sanctions non-temporal terms "milestone, sprint, **phase**". An adopter whose workplan uses `## Milestone 3` or `## Sprint 2` will therefore: complete a task, fire the barrage, surface ≥1 finding, and then hit a hard loop-stop at the first auto-promote — at every task boundary, forever, with an error that points at the wrong cause ("no parseable Phase headings"). Because the failure only manifests once the barrage surfaces a finding, it won't show up in a clean dogfood and will ambush a real adopter mid-loop. The regex should accept the sanctioned heading vocabulary (Phase/Milestone/Sprint) or the AutoPositionError path should degrade (skip auto-scope, surface a warning) rather than stop the loop, given the hook's unconditional contract.
+
+### AUDIT-20260530-03 — Auto-position task numbering assumes hierarchical `Task <phase>.<minor>` but the scope-discovery workplan itself uses flat `Task N:`
+
+Finding-ID: AUDIT-20260530-03
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:182-191` (`nextTaskNumberFactory`), `auto-position.ts:153-157` (`currentMaxMinorInPhase`)
+
+`nextTaskNumberFactory` emits `${phaseNumber}.${currentMaxMinorInPhase + 1 + idx}`, deriving the major segment from the `## Phase N` heading and the minor from existing `Task N.M` headings *whose major equals the phase number*. The auto-position tests validate this against fixtures using hierarchical numbering (`### Task 14.1`, `### Task 15.1`, `### Task 15.2`). But the actual scope-discovery workplan under audit uses **flat** numbering: `### Task 1:` … `### Task 6:` under `## Phase 15` (see the workplan.md hunks — every task heading is `### Task <single-int>:`). On that workplan: `collectTaskHeadings` parses `### Task 5:` as major=5/minor=0; the phase is 15; no task has major===15, so `currentMaxMinorInPhase = 0`; new fix-tasks are numbered `Task 15.1`, `Task 15.2`. The result is `### Task 15.1:` interleaved among `Task 1..6` — visually broken, non-monotonic numbering, and inconsistent with the file's own convention. The gate keys on the `(fix-finding-AUDIT-...)` tag rather than the number so it still opens, but the workplan the operator reads is now incoherent. The library's numbering scheme and its test fixtures encode an assumption the project's own workplans violate; the helper should detect the workplan's prevailing task-numbering convention (flat vs hierarchical) instead of assuming `<phase>.<minor>`.
+
+### AUDIT-20260530-04 — `audit-barrage-lift` writes the canonical audit-log non-atomically, risking loss of all preserved history on crash
+
+Finding-ID: AUDIT-20260530-04
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:333-340`
+
+The apply path reads the full audit-log, concatenates the new section, and writes the whole file back with a single `writeFile(auditLogPath, ...)` (default writer at line 312; the `--apply` branch at 333-340). `writeFile` truncates-then-writes — it is not atomic. If the process is interrupted between truncate and full write (signal, disk-full, operator Ctrl-C mid-hook), the canonical `audit-log.md` is left truncated or empty. This file is precious historical record under the project's own rule ("Content-management databases preserve, they don't delete… deleting from a database wipes them from history"), and the lift's entire contract (Step 5: "preserve all pre-existing entries verbatim") depends on the write succeeding atomically. The fix is the standard write-temp-then-`rename` pattern (rename is atomic on POSIX), so a crash leaves either the old file or the new file, never a truncated one. The same concern applies to `promote-findings --auto`'s workplan write, but the audit-log is the higher-stakes append-only ledger.
+
+### AUDIT-20260530-05 — The `--auto` multi-finding insertion path (the feature's primary case) is untested; all `--auto` tests use a single finding
+
+Finding-ID: AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/promote-findings.ts` (auto-apply branch, items mapped with shared `insertAfterLine`), `__tests__/.../subcommand.test.ts:551-771`
+
+In the auto-apply branch every proposal item is given the **same** `fields.insertAfterLine = position.insertAfterLine` (all findings anchor to one line); ordering and task-number coherence then depend entirely on how `applyProposal` sequences multiple inserts at an identical anchor — code not shown in this diff and therefore unverified. The barrage's whole reason to exist is surfacing **multiple** findings per run (Phase 12 cited "4 cross-model HIGH + 7 single-model"), so multi-finding auto-scope is the primary path. Yet every `--auto` test in subcommand.test.ts exercises exactly one open finding (`AUDIT-20260529-77`): the "writes a workplan insert" test asserts a single `Task 15.2`, and the idempotency test re-runs with one finding. There is no test that two findings at the same anchor produce two correctly-ordered, non-colliding task blocks whose physical order matches their `15.1 / 15.2` numbering, nor that the workplan-aware gate then sees both at positions [0..1]. Per the project's TDD discipline and the audit-log's own "passing the spec test suite ≠ correct implementation" lesson, the load-bearing path needs a ≥2-finding fixture before this is callable from an unconditional loop hook.
+
+### AUDIT-20260530-06 — Feature-root resolution is non-deterministic when a slug exists under multiple version dirs
+
+Finding-ID: AUDIT-20260530-06
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:120-141` (`findFeatureRoot`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:289-305` (`resolveFeatureRoot`)
+
+Both walkers iterate `await readdir(docsRoot)` and return the **first** `docs/<version>/001-IN-PROGRESS/<slug>` match. `readdir` returns entries in arbitrary (filesystem) order, not sorted. If the same slug exists under two version directories (e.g. a feature carried across `docs/1.0/` and `docs/0.19.0/`, which AUDIT-20260529-17 shows is a real layout in this repo), the gate and the lift can each pick a *different* directory, and either can change which one it picks between runs. The gate would then read one feature's audit-log while the lift writes the other's — a split-brain that silently corrupts the closure loop. The walk should sort `topEntries` deterministically (and ideally error if a slug is ambiguous across versions) rather than depend on readdir order. Low because the multi-version-same-slug case is uncommon, but the failure is silent and cross-verb when it happens.
+
+### AUDIT-20260530-07 — Auto-promoted fix tasks are invisible to the new gate
+
+Finding-ID: AUDIT-20260530-07
+Status:     open
+Severity:   blocking
+Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:204-222, plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:41-46
+
+`findUncheckedTasksInOrder` only recognizes task headings shaped like `### Task 15.2:` because `TASK_HEADING_RE` requires the colon immediately after the numeric task id. The canonical renderer used by `promote-findings --auto` emits `### Task 15.2 (fix-finding-AUDIT-...): ...`, with the fix marker before the colon. That means the hook can insert fix tasks successfully, but `check-open-findings` will not see those tasks as unchecked workplan tasks, so the sanity gate in the hook still refuses.
+
+The tests miss this because their fixtures use `### Task 99.1: Fix ... (fix-finding-...)`, not the renderer’s real heading shape. Update the task-heading parser to accept the canonical rendered heading, and add an integration test that runs `promote-findings --auto` then `check-open-findings` against the resulting workplan.
