@@ -133,8 +133,19 @@ export const StageEnum = z.enum(['Ideas', 'Planned', 'Outlining', 'Drafting', 'F
  * Per Phase 3 Task 3.2.2: a stage on the sidecar is now any non-empty
  * string (validated against the lane's template at runtime, not at
  * the schema layer).
+ *
+ * Per AUDIT-20260530-11: `.trim().min(1)` rejects whitespace-only
+ * stage values too. The pre-fix `z.string().min(1)` only checked
+ * raw length, so `currentStage: '   '` parsed successfully and then
+ * silently failed every downstream stage-equality check. The trim
+ * also canonicalizes the parsed output so consumers compare against
+ * the trimmed value rather than a value with leading/trailing
+ * whitespace that no template's stage list contains.
  */
-const StageStringSchema = z.string().min(1, 'stage must be a non-empty string');
+const StageStringSchema = z
+  .string()
+  .trim()
+  .min(1, 'stage must be a non-empty string');
 
 /**
  * Per Phase 3 Task 3.2.1: `artifactKind` is the four-case enum

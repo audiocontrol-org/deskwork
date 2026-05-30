@@ -119,6 +119,45 @@ describe('EntrySchema', () => {
     expect(EntrySchema.safeParse(invalid).success).toBe(false);
   });
 
+  /**
+   * AUDIT-20260530-11 regression: `StageStringSchema = z.string().min(1)`
+   * accepted whitespace-only stage values because `min(1)` measures
+   * string length, not trimmed length. Sibling validations like
+   * `LANE_ID_REGEX` already reject whitespace; the stage-string path
+   * accepted it. A whitespace stage silently fails every editorial-
+   * default helper that compares against canonical stage names. The
+   * fix uses `.trim().min(1)` to reject after-trim whitespace.
+   */
+  it('rejects an entry with a whitespace-only stage (AUDIT-20260530-11)', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440002',
+      slug: 'x',
+      title: 'X',
+      keywords: [],
+      source: 'manual',
+      currentStage: '   ',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects an entry with a tab/newline-only stage (AUDIT-20260530-11)', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440002',
+      slug: 'x',
+      title: 'X',
+      keywords: [],
+      source: 'manual',
+      currentStage: '\t\n ',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
   it('rejects an entry with malformed uuid', () => {
     const invalid = {
       uuid: 'not-a-uuid',

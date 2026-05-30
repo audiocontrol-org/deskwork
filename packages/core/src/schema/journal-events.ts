@@ -10,8 +10,15 @@ import { DraftAnnotationSchema } from './draft-annotation.ts';
  * legacy `StageEnum` 8-value list is retired from the schema; readers
  * that still want to narrow to the editorial-default vocabulary can
  * do so explicitly via `schema/entry.ts#StageEnum`.
+ *
+ * Per AUDIT-20260530-11: `.trim().min(1)` rejects whitespace-only
+ * stage values. Mirrors the sibling schema in `./entry.ts`; both
+ * schemas agree that "stage value" excludes raw-whitespace inputs.
  */
-const StageStringSchema = z.string().min(1, 'stage must be a non-empty string');
+const StageStringSchema = z
+  .string()
+  .trim()
+  .min(1, 'stage must be a non-empty string');
 const ReviewStateEnum = z.enum(['in-review', 'iterating', 'approved']);
 
 const EntryCreatedEvent = z.object({
