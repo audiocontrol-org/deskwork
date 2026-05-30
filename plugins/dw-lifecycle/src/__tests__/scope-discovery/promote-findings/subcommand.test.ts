@@ -549,3 +549,223 @@ describe('runPromoteFindings — apply-mode round-trip', () => {
     }
   });
 });
+
+describe('parseFlags — --auto flag (Phase 15 Task 4b)', () => {
+  it('accepts --auto and produces auto-apply opts', () => {
+    const r = parseFlags(['--feature', 'demo', '--auto']);
+    expect(r.ok).toBe(true);
+    const opts = r.opts;
+    if (opts === undefined) throw new Error('no opts');
+    expect(opts.verb).toBe('auto-apply');
+  });
+
+  it('rejects --auto combined with --apply <path>', () => {
+    const r = parseFlags(['--feature', 'demo', '--auto', '--apply', '/tmp/x.json']);
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/mutually exclusive/i);
+  });
+});
+
+describe('runPromoteFindings — auto-apply (Phase 15 Task 4b)', () => {
+  it('returns 0 with no-findings message when audit-log has no open entries', async () => {
+    const emptyFixture = makeFixture();
+    try {
+      const featureDir = join(
+        emptyFixture.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        emptyFixture.featureSlug,
+      );
+      mkdirSync(featureDir, { recursive: true });
+      writeFileSync(
+        join(featureDir, 'workplan.md'),
+        '# wp\n\n## Phase 15: x\n\n### Task 15.1: y\n\n- [ ] step\n',
+        'utf8',
+      );
+      writeFileSync(
+        join(featureDir, 'audit-log.md'),
+        '### A\nFinding-ID: AUDIT-1\nStatus: fixed-deadbeef\n\nBody.\n',
+        'utf8',
+      );
+      const proposalFs = new Map<string, string>();
+      const { args, stdout } = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: emptyFixture.featureSlug,
+          bucket: 'open',
+          limit: 10,
+        },
+        emptyFixture,
+        proposalFs,
+      );
+      const exit = await runPromoteFindings(args);
+      expect(exit).toBe(0);
+      expect(stdout.text()).toMatch(/no open findings/i);
+    } finally {
+      emptyFixture.cleanup();
+    }
+  });
+
+  it('writes a workplan insert + audit-log flip without a proposal-file roundtrip', async () => {
+    const autoFix = makeFixture();
+    try {
+      const featureDir = join(
+        autoFix.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        autoFix.featureSlug,
+      );
+      // Replace the fixture workplan with one having Phase 15 + an unchecked task.
+      writeFileSync(
+        join(featureDir, 'workplan.md'),
+        [
+          '# Workplan',
+          '',
+          '## Phase 15: current',
+          '',
+          '### Task 15.1: ongoing',
+          '',
+          '- [ ] Step 1.',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      const proposalFs = new Map<string, string>();
+      const { args, stdout, diskWrites } = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: autoFix.featureSlug,
+          bucket: 'open',
+          limit: 10,
+        },
+        autoFix,
+        proposalFs,
+      );
+      const exit = await runPromoteFindings(args);
+      expect(exit).toBe(0);
+      const workplanPath = join(featureDir, 'workplan.md');
+      const auditLogPath = join(featureDir, 'audit-log.md');
+      // The auto-apply path writes the workplan via the injected
+      // writeWorkplan seam (not the proposalFs).
+      expect(diskWrites.has(workplanPath)).toBe(true);
+      const newWp = diskWrites.get(workplanPath) ?? '';
+      expect(newWp).toMatch(/AUDIT-20260529-77/);
+      expect(newWp).toMatch(/Task 15\.2/);
+      expect(stdout.text()).toMatch(/Auto-applied: 1/);
+      // No audit-log flip should happen on promote-to-workplan disposition.
+      expect(diskWrites.has(auditLogPath)).toBe(false);
+    } finally {
+      autoFix.cleanup();
+    }
+  });
+
+  it('exits 2 with actionable message when workplan has no phase headings', async () => {
+    const broken = makeFixture();
+    try {
+      const featureDir = join(
+        broken.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        broken.featureSlug,
+      );
+      writeFileSync(
+        join(featureDir, 'workplan.md'),
+        '# wp\n\nSome prose without any phase headings.\n',
+        'utf8',
+      );
+      const proposalFs = new Map<string, string>();
+      const { args, stderr } = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: broken.featureSlug,
+          bucket: 'open',
+          limit: 10,
+        },
+        broken,
+        proposalFs,
+      );
+      const exit = await runPromoteFindings(args);
+      expect(exit).toBe(2);
+      expect(stderr.text()).toMatch(/no parseable.*Phase/);
+    } finally {
+      broken.cleanup();
+    }
+  });
+
+  it('is idempotent on re-run (no-op workplan write on second invocation)', async () => {
+    const idemFix = makeFixture();
+    try {
+      const featureDir = join(
+        idemFix.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        idemFix.featureSlug,
+      );
+      writeFileSync(
+        join(featureDir, 'workplan.md'),
+        [
+          '# Workplan',
+          '',
+          '## Phase 15: x',
+          '',
+          '### Task 15.1: ongoing',
+          '',
+          '- [ ] Step 1.',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      // First run: applies + writes.
+      const proposalFs = new Map<string, string>();
+      const run1 = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: idemFix.featureSlug,
+          bucket: 'open',
+          limit: 10,
+        },
+        idemFix,
+        proposalFs,
+      );
+      const exit1 = await runPromoteFindings(run1.args);
+      expect(exit1).toBe(0);
+      const workplanPath = join(featureDir, 'workplan.md');
+      const written = run1.diskWrites.get(workplanPath) ?? '';
+      expect(written).toMatch(/AUDIT-20260529-77/);
+      // Write the workplan from the in-memory write back to disk so
+      // the second run reads it.
+      writeFileSync(workplanPath, written, 'utf8');
+      // Second run: applyTaskBlocks's findingsAlreadyInserted filter
+      // skips the workplan write; outcomes still report applied=true.
+      const run2 = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: idemFix.featureSlug,
+          bucket: 'open',
+          limit: 10,
+        },
+        idemFix,
+        new Map<string, string>(),
+      );
+      const exit2 = await runPromoteFindings(run2.args);
+      expect(exit2).toBe(0);
+      // Idempotency contract: the workplan re-write is a no-op insert
+      // (insertTaskBlock returns the same content when findings already
+      // sit in the workplan). When the second run does write the
+      // workplan, its content must equal the workplan that existed
+      // going in — no double-insertion of the fix-finding marker.
+      const written2 = run2.diskWrites.get(workplanPath);
+      if (written2 !== undefined) {
+        const markerCountRun1 = (written.match(/\(fix-finding-AUDIT-20260529-77\)/g) ?? []).length;
+        const markerCountRun2 = (written2.match(/\(fix-finding-AUDIT-20260529-77\)/g) ?? []).length;
+        expect(markerCountRun2).toBe(markerCountRun1);
+      }
+    } finally {
+      idemFix.cleanup();
+    }
+  });
+});

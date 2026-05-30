@@ -32,6 +32,11 @@ import {
   InvalidProposalFileError,
 } from '../scope-discovery/promote-findings/proposal-file.js';
 import { applyProposal, ApplyProposalError } from '../scope-discovery/promote-findings/apply.js';
+import {
+  AutoPositionError,
+  computeAutoPosition,
+  nextTaskNumberFactory,
+} from '../scope-discovery/promote-findings/auto-position.js';
 import type {
   OpenFinding,
   ProposalFile,
@@ -49,6 +54,7 @@ const USAGE = [
   '    [--bucket <name>]',
   '    [--limit <N>]',
   '    [--apply <proposal-path>]',
+  '    [--auto]',
   '    [--output <path>]',
   '    [--task-number <N.M>]',
   '    [--help]',
@@ -61,10 +67,18 @@ const USAGE = [
   '--limit <N>           Cap the proposal batch size. Default: 10.',
   '--apply <path>        Apply a previously-written proposal file. When omitted,',
   '                      runs in propose-mode (writes a fresh proposal file).',
+  '--auto                Apply WITHOUT a proposal-file roundtrip: all findings get',
+  '                      disposition=promote-to-workplan with insertAfterLine',
+  '                      auto-computed as "just before the first unchecked',
+  '                      workplan task" so the workplan-aware gate opens on next',
+  '                      pickup. Used by the /dw-lifecycle:implement end-of-task',
+  '                      audit-barrage hook (Phase 15). Mutually exclusive with',
+  '                      --apply <path>.',
   '--output <path>       Override the propose-mode output path.',
   '--task-number <N.M>   Starting task-number for the renderer. Default: 13.1.',
   '                      Each subsequent promote-to-workplan item increments the',
-  '                      minor segment by 1 (13.1, 13.2, 13.3, ...).',
+  '                      minor segment by 1 (13.1, 13.2, 13.3, ...). Ignored in',
+  '                      --auto mode (auto-derives <phase>.<currentMax+1> instead).',
   '',
 ].join('\n');
 
@@ -85,7 +99,15 @@ export interface ApplyOptions {
   readonly startingTaskNumber: string;
 }
 
-export type PromoteFindingsCliOptions = ProposeOptions | ApplyOptions;
+export interface AutoApplyOptions {
+  readonly verb: 'auto-apply';
+  readonly featureSlug: string;
+  readonly repoRoot?: string;
+  readonly bucket: 'open';
+  readonly limit: number;
+}
+
+export type PromoteFindingsCliOptions = ProposeOptions | ApplyOptions | AutoApplyOptions;
 
 export interface ParseResult {
   readonly ok: boolean;
@@ -112,12 +134,17 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
   let applyPath: string | undefined;
   let outputPath: string | undefined;
   let startingTaskNumber = '13.1';
+  let auto = false;
 
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--help' || flag === '-h') return { ok: true, help: true };
     if (flag === undefined) {
       return { ok: false, error: 'unexpected empty flag' };
+    }
+    if (flag === '--auto') {
+      auto = true;
+      continue;
     }
     if (VALUED_FLAGS.has(flag)) {
       const value = argv[i + 1];
@@ -148,6 +175,24 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
     return {
       ok: false,
       error: `--bucket '${bucket}' is not supported in v1 (only 'open' is supported); see Phase 13 PRD for future-bucket plans.`,
+    };
+  }
+  if (auto && applyPath !== undefined) {
+    return {
+      ok: false,
+      error: '--auto and --apply are mutually exclusive; --auto skips the proposal-file roundtrip entirely.',
+    };
+  }
+  if (auto) {
+    const base: AutoApplyOptions = {
+      verb: 'auto-apply',
+      featureSlug,
+      bucket: 'open',
+      limit,
+    };
+    return {
+      ok: true,
+      opts: repoRootOverride !== undefined ? { ...base, repoRoot: repoRootOverride } : base,
     };
   }
   if (applyPath !== undefined) {
@@ -298,6 +343,86 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
     stdout.write('\n\n');
     stdout.write(renderProposalTable(proposal.items));
     stdout.write('\n');
+    return 0;
+  }
+
+  if (opts.verb === 'auto-apply') {
+    const findings = await walkOpenFindings({
+      auditLogPath,
+      featureSlug: opts.featureSlug,
+    });
+    if (findings.length === 0) {
+      stdout.write(
+        `promote-findings --auto: no open findings on feature ${opts.featureSlug}; nothing to scope.\n`,
+      );
+      return 0;
+    }
+    const cappedFindings: readonly OpenFinding[] = findings.slice(0, opts.limit);
+    let workplanText: string;
+    try {
+      workplanText = await args.read.workplan(workplanPath);
+    } catch (err) {
+      stderr.write(
+        `promote-findings --auto: cannot read workplan at ${workplanPath}: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      return 2;
+    }
+    let position;
+    try {
+      position = computeAutoPosition(workplanText);
+    } catch (err) {
+      if (err instanceof AutoPositionError) {
+        stderr.write(`promote-findings --auto: ${err.message}\n`);
+        return 2;
+      }
+      throw err;
+    }
+    const proposal: ProposalFile = {
+      ...makeProposalFile({
+        featureSlug: opts.featureSlug,
+        auditLogPath,
+        workplanPath,
+        findings: cappedFindings,
+        now,
+      }),
+      items: cappedFindings.map((finding) => ({
+        finding,
+        disposition: 'promote-to-workplan',
+        fields: {
+          phaseHeading: position.phaseHeading,
+          insertAfterLine: position.insertAfterLine,
+        },
+        applied: null,
+        apply_error: null,
+        result: null,
+      })),
+    };
+    let result;
+    try {
+      result = await applyProposal({
+        proposal,
+        featureSlug: opts.featureSlug,
+        read: args.read,
+        write: args.write,
+        taskNumberFor: nextTaskNumberFactory(position),
+      });
+    } catch (err) {
+      if (err instanceof ApplyProposalError) {
+        stderr.write(`promote-findings --auto: ${err.message}\n`);
+        return 1;
+      }
+      throw err;
+    }
+    stdout.write(
+      `Auto-applied: ${result.outcomes.filter((o) => o.applied).length} finding(s) at ${position.phaseHeading} (line ${position.insertAfterLine}).\n`,
+    );
+    for (const outcome of result.outcomes) {
+      if (outcome.applied && outcome.result !== null) {
+        stdout.write(
+          `  Item ${outcome.itemIndex} (${outcome.findingId}): ${outcome.result}\n`,
+        );
+      }
+    }
     return 0;
   }
 

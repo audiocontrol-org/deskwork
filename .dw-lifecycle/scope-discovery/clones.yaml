@@ -1,4 +1,4 @@
-generated_at: 2026-05-30T06:42:40.939Z
+generated_at: 2026-05-30T06:50:41.712Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1165,11 +1165,11 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:83:90
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
-  - id: 9e3aa2d4168b
-    lines: 11
+  - id: 808397c61b8b
+    lines: 10
     members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:119:129
-      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:119:129
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:120:129
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:147:156
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 2fb54234f46e
@@ -1205,7 +1205,7 @@ clones:
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:112:119
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:106:113
-      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:122:129
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:149:156
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 05782de08529
@@ -1422,7 +1422,7 @@ clones:
   - id: 557060d42ad4
     lines: 12
     members:
-      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:378:389
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:503:514
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:321:332
     disposition: keep-with-reason
     reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
