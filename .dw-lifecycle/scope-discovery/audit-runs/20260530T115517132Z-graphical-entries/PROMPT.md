@@ -1,0 +1,3169 @@
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface bugs, design issues, missed edge cases, and code-quality concerns in the work product captured in the diff below.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+graphical-entries
+
+## Feature scope (workplan / PRD summary)
+
+Phase 5 Tasks 5.4 + 5.5 of graphical-entries: drag-to-reorder + saveable focus presets + deep-link URL. Task 5.4 adds per-lane drag-to-reorder in the focus-chip strip (HTML5 drag API; visual drop indicators; persists order to localStorage; keyboard alternative via per-row move-up/move-down buttons). Task 5.5 adds saveable focus-state presets: the operator can name + save a focus configuration (which lanes are visible, in what order); presets persist to localStorage; deep-link URL parameter rehydrates the preset on cold load. Audit focus: drag-API browser quirks (FF vs Chrome vs Safari iOS); keyboard a11y of the move-up/move-down alternative; deep-link URL encoding/decoding correctness (XSS via malformed URL params; round-trip integrity); preset storage size limits (localStorage quota); preset migration when lane id changes (rename / archive / purge); race conditions between drag-end persistence + concurrent focus-state changes.
+
+## Commit subjects in the audited range
+
+35299e6 feat(graphical-entries): Phase 5 Task 5.5 — saveable focus presets + deep-link URL
+b92019f fix(graphical-entries): Phase 5 Task 5.4 review followups (AUDIT-27..32)
+67880ff feat(graphical-entries): Phase 5 Task 5.4 — drag-to-reorder + lane order persistence
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+
+The `initGroupMembersSection` docblock states "Idempotent — calling twice has no visible effect." That is true for `applyMode` (it reads current state) but NOT for the three `wire*` helpers: `wireToggle`, `wireEmptyStateCta`, and `wireMemberRowCopy` each call `addEventListener` unconditionally on every invocation. There is no module-level `wired` guard analogous to the one in the sibling `row-member-tab.ts` (which correctly guards with `let wired = false`).
+
+If `initPressCheckSurface` ever runs twice (re-init after a partial DOM swap, or a future refresh path), the section accumulates duplicate listeners — clicking a member row would fire `copyOrShowFallback` twice (two clipboard writes + two toasts), and the toggle would double-write localStorage.
+
+LOW severity because the current single call site doesn't trigger it, but the docstring asserts a property the code doesn't have.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: mirror the `row-member-tab.ts` pattern with a module-level `wired = false` guard, OR bind via a `dataset` sentinel on the section element so re-init is a genuine no-op.
+
+<!-- ===========================================================
+     Audit-barrage sweep — 2026-05-30 — 4 retroactive barrages
+     ===========================================================
+     Phase 2 (pipeline templates), Phase 3 (lane data model),
+     Phase 4 (verb refactor), Phase 7 small surfaces
+     (T7.1 + T7.2.7 + T7.2.8). 30 raw findings consolidated into
+     24 unique entries (cross-model agreement merged where same
+     surface). Run dirs:
+       20260530T062828859Z (P2)
+       20260530T063131307Z (P3)
+       20260530T063443880Z (P4)
+       20260530T064014571Z (P7 small)
+     -->
+
+### AUDIT-20260530-01 — path traversal in `loadPipelineTemplate` (unsanitized id flows to filesystem path)
+
+Finding-ID: AUDIT-20260530-01 (cross-model: AUDIT-BARRAGE-claude-01-P2 + AUDIT-BARRAGE-codex-01-P2)
+Status:     fixed-7e15a61
+Severity:   high
+Surface:    `packages/core/src/pipelines/loader.ts:118-141` (`loadPipelineTemplate`), `:36-38` (`projectOverridesDir`), `packages/core/src/pipelines/types.ts:96` (`id: z.string().min(1)`)
+
+`loadPipelineTemplate(id, projectRoot)` string-interpolates the caller-supplied `id` directly into both candidate paths. The only guard is `id.length === 0`. No charset constraint — the schema validates the `id` field INSIDE a loaded file, never the REQUESTED id. An `id` of `'../../../../etc/something'` normalizes out of the intended directory and reads an arbitrary `.json` from disk.
+
+Cross-references the downstream `LANE_ID_REGEX` fix from AUDIT-30 (applied at the studio render site for the same charset gap on lane ids). The right fix is here at the canonical chokepoint, not at every consumer.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude + codex cross-model agreement). Fix: introduce `PIPELINE_ID_REGEX` mirroring `LANE_ID_REGEX` (`^[a-z0-9][a-z0-9-]*$`); enforce in `PipelineTemplateSchema.id` AND at the top of `loadPipelineTemplate` before any path construction; have `listAvailablePipelineTemplates` ignore filenames that don't match.
+
+### AUDIT-20260530-02 — `.passthrough()` on `PipelineTemplateSchema` silently accepts misspelled optional fields
+
+Finding-ID: AUDIT-20260530-02 (cross-model: AUDIT-BARRAGE-claude-02-P2)
+Status:     fixed-c569a61
+Severity:   medium
+Surface:    `packages/core/src/pipelines/types.ts:107-110` (`.passthrough()`), `:101` (`lockedStages: ...optional()`)
+
+The schema uses blanket `.passthrough()` to tolerate a single known extra key (`$rationale`). Every unknown top-level key is silently accepted, including typos of real optional fields. An operator who writes `"lockdStages": ["Review"]` (transposed) gets zero diagnostics — `lockedStages` resolves to `undefined`, the pipeline ships with no lock gate, and iterate-at-lock-stage silently permits edits.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: declare `$rationale: z.string().optional()` explicitly and drop `.passthrough()` (default strip, or `.strict()` if unknown keys should be rejected outright).
+
+### AUDIT-20260530-03 — `PLUGIN_DEFAULTS_DIR` doubles as module directory AND preset registry (stray `.json` becomes phantom template)
+
+Finding-ID: AUDIT-20260530-03 (cross-model: AUDIT-BARRAGE-claude-03-P2)
+Status:     fixed-d5303ed
+Severity:   low
+Surface:    `packages/core/src/pipelines/loader.ts:31`, `:148-159`, `:180-189`
+
+`listAvailablePipelineTemplates` enumerates every `.json` in `PLUGIN_DEFAULTS_DIR` = `dirname(import.meta.url)`. The directory serves dual roles: holds loader/types modules + acts as preset registry. Any future non-template JSON that lands in `src/pipelines/` is copied to `dist/pipelines/` and appears as a bogus template id in the operator picker.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: name the preset set explicitly (`PRESET_IDS` constant the build also drives, or a `presets.json` index).
+
+### AUDIT-20260530-04 — verify `dist/pipelines/*.json` actually ships in the `@deskwork/core` published tarball
+
+Finding-ID: AUDIT-20260530-04 (cross-model: AUDIT-BARRAGE-claude-04-P2)
+Status:     fixed-c99e6d1
+Severity:   medium
+Surface:    `packages/core/package.json:214-215` (`build`/`prepack` cp step) — `files` whitelist (not in diff; needs inspection)
+
+Build/prepack scripts `cp src/pipelines/*.json dist/pipelines/`, but the whole feature depends on those JSON files being present in the published tarball. If `package.json`'s `files` whitelist enumerates specific dist subpaths rather than shipping `dist/` wholesale, the JSON gets excluded and every `loadPipelineTemplate` call in the marketplace-installed package throws "file not found." Same shape as v0.11.0 missing-`zod`. Tests can't catch it (no test exercises the built `dist/` resolution path).
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: `npm pack --dry-run` in `packages/core/` and assert `dist/pipelines/blog-post.json` et al. appear. If absent, widen `files` whitelist and add a CI/smoke check.
+
+### AUDIT-20260530-05 — `dev` watch never re-copies preset JSON after edit (build/watch asymmetry)
+
+Finding-ID: AUDIT-20260530-05 (cross-model: AUDIT-BARRAGE-claude-05-P2)
+Status:     fixed-f0090c2
+Severity:   low
+Surface:    `packages/core/package.json:217` (`dev` script)
+
+`build`/`prepack` copy `src/pipelines/*.json` into `dist/pipelines/`, but `dev` is `npm run build && tsc -b --watch`. Initial build copies once; thereafter `tsc --watch` only recompiles `.ts`. An operator iterating on a preset during `dev` sees no dist update.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: add parallel JSON watcher OR document in the script comment that JSON edits require manual `npm run build` during dev.
+
+### AUDIT-20260530-06 — case-insensitive filesystem produces confusing id-mismatch error in `loadPipelineTemplate`
+
+Finding-ID: AUDIT-20260530-06 (cross-model: AUDIT-BARRAGE-claude-06-P2)
+Status:     fixed-b51859b
+Severity:   low
+Surface:    `packages/core/src/pipelines/loader.ts:124-138`, `:73-78`
+
+On macOS's default case-insensitive filesystem, `existsSync(...'Editorial.json')` returns true for on-disk `editorial.json`. `loadPipelineTemplate('Editorial', root)` reads the file, then trips the id-mismatch check and throws a misleading error. Behavior diverges by host OS.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: pair with AUDIT-01's charset guard so the regex rejects mixed-case ids up front.
+
+### AUDIT-20260530-07 — path traversal in `loadLaneConfig` (sister to AUDIT-01; same shape, different surface)
+
+Finding-ID: AUDIT-20260530-07 (cross-model: AUDIT-BARRAGE-claude-01-P3 + AUDIT-BARRAGE-codex-01-P3)
+Status:     fixed-9edc085
+Severity:   high
+Surface:    `packages/core/src/lanes/loader.ts:33-49` (`laneConfigPath`), `:90-115` (`loadLaneConfig`), `packages/core/src/schema/entry.ts:148` (`lane: z.string().min(1).optional()`)
+
+`loadLaneConfig(id, projectRoot)` builds the path via `join(lanesDir(projectRoot), \`${id}.json\`)`. Only guard is `id.trim().length === 0`. `EntrySchema.lane` is `z.string().min(1).optional()` — NOT regex-bound — so a malformed sidecar (`lane: "../../secrets"`) flows straight into `loadLaneConfig` and reads arbitrary JSON.
+
+AUDIT-30 already fixed this at the studio render site. The canonical chokepoint still doesn't enforce the charset.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude + codex cross-model agreement). Fix: bind `EntrySchema.lane` to `LANE_ID_REGEX` at the schema layer AND validate the loader's `id` param up-front. Same pattern as AUDIT-01's pipeline-id fix; consider a shared validator.
+
+### AUDIT-20260530-08 — `StrictLaneConfig` / `StrictPipelineTemplate` aliases are no-op; comments misdescribe Zod `.passthrough()`
+
+Finding-ID: AUDIT-20260530-08 (cross-model: AUDIT-BARRAGE-claude-02-P3)
+Status:     fixed-16917db
+Severity:   medium
+Surface:    `packages/core/src/lanes/types.ts:69-78`, `packages/core/src/pipelines/types.ts:137-161`
+
+Both aliases claim to "narrow" a `z.infer` type that `.passthrough()` "widens." In Zod v3, `.passthrough()` changes only RUNTIME parsing; it does NOT add a `[k: string]: unknown` index signature to the inferred type. So `StrictLaneConfig = Pick<LaneConfig, ...>` is structurally identical to `LaneConfig`. The alias buys zero type safety; the comment's claim about catching typos at compile time is false.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: verify against the project's actual Zod version with a type probe; if confirmed, delete the aliases and the misdescribing comments. If extra-key safety is genuinely wanted, switch the schemas to explicit `.catchall()`.
+
+### AUDIT-20260530-09 — `detectArtifactKind` classifies non-existent files as valid artifacts (inconsistent disk contract)
+
+Finding-ID: AUDIT-20260530-09 (cross-model: AUDIT-BARRAGE-claude-03-P3 + AUDIT-BARRAGE-codex-02-P3)
+Status:     fixed-2b42356
+Severity:   medium
+Surface:    `packages/core/src/lanes/detection.ts:44-77`, `packages/core/test/lanes/detection.test.ts:15-50`
+
+Module doc says "classifies an on-disk path," but only the `html-mockup` branch touches disk. `.md`/`.html`/image branches dispatch purely on `extname` with NO existence check. `detectArtifactKind('/deleted/post.md')` returns `'markdown'` for a non-existent file; a deleted html-mockup throws. Asymmetric failure modes for the same root cause. Test fixture locks this in but the contract drift between doc and code is unintentional.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude + codex cross-model agreement). Fix: probe existence once at the top and refuse non-existent paths with a clear error, then dispatch on extension; OR document detection as path-shape-only.
+
+### AUDIT-20260530-10 — `bootstrap` doc claims "no readable config → no-config" but only checks existence
+
+Finding-ID: AUDIT-20260530-10 (cross-model: AUDIT-BARRAGE-claude-04-P3)
+Status:     fixed-234ac5a
+Severity:   low
+Surface:    `packages/core/src/lanes/bootstrap.ts:74-83`
+
+Docblock states "If the project has no readable `.deskwork/config.json`, returns `{ created: false, reason: 'no-config' }`." Code only guards existsSync, then calls `readConfig` unguarded — a corrupt config throws, contradicting the "best-effort hook" contract.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: update doc to say "absent" instead of "no readable"; consider catch+rethrow with lane-bootstrap context.
+
+### AUDIT-20260530-11 — `StageStringSchema` accepts whitespace-only stage values (`min(1)` is not `trim()`)
+
+Finding-ID: AUDIT-20260530-11 (cross-model: AUDIT-BARRAGE-claude-05-P3)
+Status:     fixed-242a434
+Severity:   low
+Surface:    `packages/core/src/schema/entry.ts:108`, `packages/core/test/schema/entry.test.ts:75-101`
+
+`StageStringSchema = z.string().min(1)` parses `currentStage: '   '` successfully. Sibling validations disagree: lane ids reject whitespace via `.trim()`; stage values accept it. A whitespace stage silently fails every editorial-default helper.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: `z.string().trim().min(1)` on `StageStringSchema`; add regression test.
+
+### AUDIT-20260530-12 — `inferPriorStageFromJournal` silently skips non-editorial `from` values (semantics regression)
+
+Finding-ID: AUDIT-20260530-12 (cross-model: AUDIT-BARRAGE-claude-06-P3)
+Status:     fixed-15f7f41
+Severity:   low
+Surface:    `packages/core/src/doctor/migrate.ts:248-260`
+
+Pre-diff the loop returned `e.from` unconditionally. Now returns only `if (isEditorialStage(e.from))`; non-editorial `from` is silently skipped and the loop walks past it. For editorial-only legacy migration this is a no-op, but `StageTransitionEvent.from` is broadened to `StageStringSchema` — the moment any journal carries non-editorial `from`, the function silently produces a wrong prior-stage.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: if migration is genuinely editorial-only, assert/refuse on non-editorial `from` rather than silently skipping; if it must tolerate lane stages, return raw `from`.
+
+### AUDIT-20260530-13 — `bootstrapDefaultLaneIfMissing` can leave a lane file without its migration journal event (partial-success)
+
+Finding-ID: AUDIT-20260530-13 (cross-model: AUDIT-BARRAGE-codex-03-P3)
+Status:     fixed-908eb49
+Severity:   medium
+Surface:    `packages/core/src/lanes/bootstrap.ts:102-123`
+
+Writes `default.json` BEFORE appending the `lane-migration` journal event. If journal append fails after the write, the project is left with a lane but no migration audit record. Next invocation returns `already-exists` and never repairs the missing event.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (codex). Fix: compensating operation — if journal append fails, remove the just-created lane file; OR record enough state to retry the missing event.
+
+### AUDIT-20260530-14 — multi-lane calendar renderer silently drops entries whose `currentStage` isn't in their lane's template (re-introduces #247)
+
+Finding-ID: AUDIT-20260530-14 (cross-model: AUDIT-BARRAGE-claude-01-P4 + AUDIT-BARRAGE-codex-02-P4)
+Status:     fixed-f345069
+Severity:   high
+Surface:    `packages/core/src/calendar/render.ts:86-98`, `:179-201`; test coverage at `packages/core/test/calendar/regenerate-multilane.test.ts`
+
+#247's stated fix was "stop silently dropping entries whose stage the renderer doesn't know about." Multi-lane path reintroduces it: `bucketize` only creates buckets for `templateStageOrder(template)`; entries whose `currentStage` is not in `byStage` are never pushed. Two vectors: (a) entry bound to valid lane carrying out-of-template `currentStage` vanishes from its lane section; (b) orphan entry (lane undefined OR lane id deleted) renders through `EDITORIAL_FALLBACK`, so a deleted-visual-lane entry at `Sketched`/`Iterating` has no matching editorial-fallback bucket and disappears from "(unassigned)" too.
+
+Same shape as just-fixed AUDIT-37 composed-view drop, but on the CANONICAL calendar surface — the doctor's SSOT. Bigger blast radius. Regression tests assert only entries in known stages appear.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + codex cross-model agreement). Fix: collect any entry whose `currentStage` produced no bucket into an explicit `## (unrecognized stage)` tail per lane (or unassigned block). Add regression test seeding an entry with stage outside its lane template.
+
+### AUDIT-20260530-15 — corrupt sidecars silently skipped during lane migration (no-silent-fallback violation)
+
+Finding-ID: AUDIT-20260530-15 (cross-model: AUDIT-BARRAGE-claude-02-P4 + AUDIT-BARRAGE-codex-03-P4)
+Status:     fixed-bf2fb98
+Severity:   medium
+Surface:    `packages/core/src/doctor/lane-migration.ts:145-158`
+
+`migrateLaneMembership` walks every `*.json`; `readFile`/`JSON.parse`/`EntrySchema.safeParse` failures are all swallowed via `catch { continue }`. The sidecar is not counted in `examined`, not migrated, no diagnostic. Same root cause AUDIT-39 flagged in `entry-review/data.ts` — surfacing in a new file.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + codex cross-model agreement). Fix: distinguish ENOENT from parse/validation/IO failures; count every `.json` examined; surface skipped-corrupt sidecars in `LaneMigrationResult` (e.g. `skippedCorrupt: string[]`) OR throw with the offending path. Migration test suite has no corrupt-sidecar case.
+
+### AUDIT-20260530-16 — `iterateEntry` now refuses editorial `Final` stage (untested behavior change)
+
+Finding-ID: AUDIT-20260530-16 (cross-model: AUDIT-BARRAGE-claude-03-P4)
+Status:     fixed-fe21786
+Severity:   medium
+Surface:    `packages/core/src/iterate/iterate.ts:99-106`, `packages/core/test/iterate/iterate.test.ts:141`
+
+Resolution: outcome A (lock the new semantic). DESKWORK-STATE-MACHINE.md is explicit that iterate is NOT available in Final ("Final locks the content; to iterate, induct backward to Drafting first" — verb iterate § "When it can be invoked"; reinforced in the stage table for Final: "Content is locked — ready to publish, no further edits or iterations allowed in this stage" + Commandment I's stage-gate example). The Phase-4 `isLockedStageInTemplate` gate is the spec-conformant implementation; the pre-Phase-4 hardcoded Published-only gate was the bug. Regression test added at `packages/core/test/iterate/iterate.test.ts` :: "refuses to iterate an editorial Final entry (locked-stage gate, DESKWORK-STATE-MACHINE.md Commandment II)" asserts iterate throws naming the locked stage + pipeline + induct recovery path AND verifies the iteration counter does not advance. Existing docstring at iterate.ts:70-79 already documents the locked-stage behavior — no code or docstring change needed; the test pins the contract.
+
+Pre-Phase-4 `iterateEntry` refused only `Published`/`Blocked`/`Cancelled` — `Final` was iterable. Refactor adds `isLockedStageInTemplate`, editorial's `lockedStages = ['Final']`, so iterate-on-`Final` now throws. Semantic change to editorial workflow; operators who pinned new revisions while at `Final` must `induct` back to `Drafting` first. May be intended state-machine semantics but shipped untested + un-changelogged.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: confirm Final-refuses-iterate intent against DESKWORK-STATE-MACHINE.md; add editorial regression test asserting refusal.
+
+### AUDIT-20260530-17 — `regenerateCalendar` couples per-entry transitions to validity of unrelated lane files
+
+Finding-ID: AUDIT-20260530-17 (cross-model: AUDIT-BARRAGE-claude-04-P4)
+Status:     fixed-165e7a7
+Severity:   medium
+Surface:    `packages/core/src/calendar/render.ts:111-121` (`loadLaneContexts`)
+
+`loadLaneContexts` calls `loadLaneConfig` + `loadPipelineTemplate` per lane with no error handling. Any throw propagates out of `renderCalendar` → `regenerateCalendar`. Every verb calls `regenerateCalendar` as final step AFTER `writeSidecar` + `appendJournalEvent`. A single malformed lane file breaks all six verbs for every entry — AFTER the sidecar mutation has already landed.
+
+Pre-Phase-4 `renderCalendar` was pure over the entry list. Lane-config read multiplies blast radius from "this entry" to "the whole project, on any verb."
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: make `regenerateCalendar`'s failure non-fatal to the transition (calendar reconciled by `doctor --fix`, the documented recovery path); OR validate lane configs once up-front. At minimum the partial-state window should be tested.
+
+### AUDIT-20260530-18 — `deriveArtifactKindFromPath` writes wrong `artifactKind` for multi-file HTML mockups
+
+Finding-ID: AUDIT-20260530-18 (cross-model: AUDIT-BARRAGE-claude-05-P4)
+Status:     fixed-edb8122
+Severity:   medium
+Surface:    `packages/core/src/doctor/lane-migration.ts:deriveArtifactKindFromPath`; test acknowledgement at `packages/core/test/doctor/lane-migration.test.ts:131-138`
+
+Migration derives `artifactKind` purely from path extension: any `.html` → `'single-file-html'`. But authoritative `detectArtifactKind` probes the filesystem and would classify a directory of HTML as `html-mockup`. For a multi-file HTML mockup whose `artifactPath` ends in `index.html`, migration writes `'single-file-html'` — contradicting the authoritative classifier. Migration is idempotent so the wrong value is permanent.
+
+Visual/`mockups` lane (the headline graphical-entries use case) is exactly where multi-file HTML mockups live.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: have migration call `detectArtifactKind` (already filesystem-touching code); OR only back-fill kinds the path heuristic can classify unambiguously (`.md`, image extensions).
+
+### AUDIT-20260530-19 — `EDITORIAL_FALLBACK` duplicates `editorial.json` with manual "keep in sync" + Phase-8 deferral
+
+Finding-ID: AUDIT-20260530-19 (cross-model: AUDIT-BARRAGE-claude-06-P4)
+Status:     fixed-00fb2bc
+Severity:   low
+Surface:    `packages/core/src/calendar/render.ts:130-145`
+
+Hardcodes editorial's `linearStages` / `lockedStages` / `offPipelineStages` inline, duplicating `packages/core/src/pipelines/editorial.json`. Code documents the hazard. Defers cleanup to "Phase 8 … this constant can be deleted" with NO issue link.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: load editorial preset from the bundled package resource rather than duplicating; at minimum file the Phase-8 deletion as a GitHub issue.
+
+### AUDIT-20260530-20 — `induct` CLI still editorial-narrow (Phase 4 "verbs are universal" goal half-wired at CLI; deferral phrase in comment)
+
+Finding-ID: AUDIT-20260530-20 (cross-model: AUDIT-BARRAGE-claude-07-P4 + AUDIT-BARRAGE-codex-01-P4)
+Status:     fixed-e85bb8e
+Severity:   high
+Surface:    `packages/cli/src/commands/induct.ts:84-95,114`
+
+Core `inductEntry` is template-aware, but CLI keeps editorial-only `isLinearPipelineTarget(flags.to)` guard and hardcoded error text. A visual-lane operator running `deskwork induct icon-set --to Sketched` is rejected before the request reaches the template-aware core helper. CLI comment explicitly defers ("until a lane-aware CLI lands") with no issue link — violates "Just for now is bullshit" rule.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + codex cross-model agreement). Fix: read sidecar in CLI, resolve template, validate `--to` against `template.linearStages`; replace deferral comment with reference to tracked issue OR widen the guard now.
+
+### AUDIT-20260530-21 — `renderCalendar` docstring drift: promises `## Lane:` but emits `# Lane:` (h1)
+
+Finding-ID: AUDIT-20260530-21 (cross-model: AUDIT-BARRAGE-claude-08-P4)
+Status:     fixed-66f2854
+Severity:   low
+Surface:    `packages/core/src/calendar/render.ts:157-159` (docstring) vs `:194` and `:199` (emit)
+
+Docstring says h2 lane headers; code writes h1. Multi-lane test asserts h1 — code consistent with test, only docstring wrong. Heading level meaningful: output opens with `# Editorial Calendar` (h1), so per-lane blocks at h1 are sibling top-level rather than nested.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: decide intentionally (h1 vs h2); fix docstring; verify doctor's section-agnostic UUID scan is the only consumer.
+
+### AUDIT-20260530-22 — partial cascade failure leaves `calendar.md` persistently stale (7.2.7 single-regen regression)
+
+Finding-ID: AUDIT-20260530-22 (cross-model: AUDIT-BARRAGE-claude-01-P7small)
+Status:     fixed-8296171
+Severity:   medium
+Surface:    `packages/core/src/entry/cancel.ts` (public `cancelEntry` wrapper)
+
+The wrapper's `await regenerateCalendar(projectRoot)` runs ONLY if the walker returns normally. If the walker throws partway through a cascade (member with missing/corrupt sidecar), the group + every member processed before the failure are already `Cancelled` on disk but `calendar.md` is never regenerated. PERSISTENT divergence, not the transient window AUDIT-25 dispositioned as informational.
+
+Behavior regression vs pre-7.2.7: each invocation regenerated immediately, so mid-cascade throws left calendar consistent with completed work. The N+1→1 optimization traded for a wider, now-persistent inconsistency on the failure path. The four regenerate-count tests exercise only the happy path.
+
+Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (claude). Fix: `try { result = await cancelEntryWithoutCalendarRegen(...) } finally { await regenerateCalendar(projectRoot) }`. Add test seeding a missing/corrupt member that drives the throw and asserts calendar reconciles.
+
+### AUDIT-20260530-23 — cascade catch swallows write/journal failures as "skipped member" (can hide state corruption)
+
+Finding-ID: AUDIT-20260530-23 (cross-model: AUDIT-BARRAGE-codex-01-P7small)
+Status:     fixed-5264770
+Severity:   medium
+Surface:    `packages/core/src/entry/cancel.ts:209-279`
+
+Cascade loop wraps member lookup + template resolution + recursive walker call in ONE broad `try/catch`. Failures from the recursive transition path become a skipped member with `slug: '(unresolved)'` and `reason: 'read failed: ...'`, even when the failure was not a read failure. If journal append fails after sidecar write, the result claims the member was skipped while its sidecar is already `Cancelled` with no durable `stage-transition` event.
+
+Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (codex). Fix: narrow the recoverable catch to the specific missing-member/read case; let template/config/write/journal errors propagate. If distinct recoverable cases beyond missing-sidecar are wanted, classify them explicitly.
+
+### AUDIT-20260530-24 — indentation regression on `CancelOptions.cascade` (3-space indent slipped through)
+
+Finding-ID: AUDIT-20260530-24 (cross-model: AUDIT-BARRAGE-claude-02-P7small)
+Status:     fixed-f283f9b
+Severity:   low
+Surface:    `packages/core/src/entry/cancel.ts` — `interface CancelOptions { ... }`
+
+Pure-whitespace change with no functional purpose: `readonly cascade?: boolean;` indented with 3 spaces instead of the surrounding 2-space indentation. Signals formatting is not enforced on this file's edit path.
+
+Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (claude). Fix: restore 2-space indentation; consider format-on-commit enforcement.
+
+## Diff under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+index fac1c5c..5bfbf10 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+@@ -790,3 +790,120 @@ row-activation) become candidates if the file grows.
+ 
+ Trajectory note alongside AUDIT-14 (CSS) and AUDIT-20
+ (swimlane-card.ts).
++
++## 2026-05-28 audit: Phase 5 Task 5.4 (drag-to-reorder + lane order persistence)
++
++Audit scope: commit `5c5864a` + in-task review followup.
++Predecessor: `a3480c2`. Tests 751 → 771 (+20, including +3 review-
++followup regression tests). Build exit 0 across core + studio.
++
++Two-stage review via the dw-lifecycle trussing. Spec ✅ SPEC-COMPLIANT;
++quality ⚠️ APPROVED WITH FOLLOWUPS — 0 blocking, 4 actionable non-
++blocking findings + a11y observation. The actionables landed in this
++in-task followup commit.
++
++### AUDIT-20260528-27
++
++Finding-ID: AUDIT-20260528-27
++Status:     fixed-followup-commit
++Severity:   low
++Surface:    packages/studio/test/dashboard-swimlane-drag-client.test.ts
++
++Test coverage gaps: dragleave-that-exits-rail clearing drop-target
++classes; visibility-hidden-lane reorder preserving `is-visibility-
++hidden`; dragstart sweep of stale `.is-dragging` (AUDIT-30).
++
++Resolution: 3 new regression tests added.
++
++### AUDIT-20260528-28
++
++Finding-ID: AUDIT-20260528-28
++Status:     fixed-followup-commit
++Severity:   medium
++Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
++
++The dragend handler's `querySelector` interpolated `state.draggingId`
++into an attribute selector without `CSS.escape`. Lane ids are
++operator-authored (`.deskwork/lanes/<id>.json`) and not constrained
++to alphanumeric — an id containing `"`, `]`, or `\` would break the
++selector. The companion `swimlane.ts:138,141` consistently uses
++`CSS.escape` for the same data dictionary; the inconsistency was
++the maintainability concern.
++
++Resolution: wrapped `state.draggingId` with `CSS.escape`. Added a
++`CSS.escape` shim at the top of the drag-client test (jsdom 29.x
++does not ship `CSS.escape` natively) mirroring the existing pattern
++in `dashboard-swimlane-client.test.ts:98-107`.
++
++### AUDIT-20260528-29
++
++Finding-ID: AUDIT-20260528-29
++Status:     fixed-followup-commit
++Severity:   low
++Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
++
++The `drop` handler called `writeStoredOrder` even when
++`computeReorder` short-circuited (same source-target id, or stale
++target). The localStorage write was a harmless no-op but violated
++the controller's "writes happen on real reorders" contract.
++
++Resolution: added an `orderEquals(prev, next)` helper; the drop
++handler guards the DOM-reorder + localStorage write on a real
++change. Inline comment cites the invariant that class state
++survives `appendChild` moves on a per-id basis, so no
++`applyState` reapply is needed post-reorder. Test updated to
++assert the no-op drop produces ZERO localStorage entries.
++
++### AUDIT-20260528-30
++
++Finding-ID: AUDIT-20260528-30
++Status:     fixed-followup-commit
++Severity:   low
++Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
++
++If a previous `dragend` failed to fire (browser quirks — disconnect,
++page navigation, dev-tools cancellation), a stale `.is-dragging`
++class would survive on the old row. The next `dragstart` would
++stamp the new source without sweeping the stale class.
++
++Resolution: added a one-time stale-class sweep at the top of the
++`dragstart` handler. Cheap insurance against a hard-to-reproduce
++browser quirk. Regression test added.
++
++### AUDIT-20260528-31
++
++Finding-ID: AUDIT-20260528-31
++Status:     open
++Severity:   medium
++Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
++
++HTML5 native DnD has no keyboard equivalent. Keyboard-only operators
++cannot reorder lanes. The workplan accepted the native-DnD-only
++constraint for Phase 5; this finding tracks the gap for future
++disposition.
++
++Options:
++1. ARIA grabbed/listbox semantics with custom keyboard handler
++   (deprecated grabbed but functional).
++2. A separate "move up / move down" affordance on each row reachable
++   via keyboard.
++3. Replace HTML5 native DnD with a keyboard-sensor-equipped library
++   (dnd-kit ships one).
++
++Operator-decision required. No immediate action; tracking for Phase 6
++disposition.
++
++### AUDIT-20260528-32
++
++Finding-ID: AUDIT-20260528-32
++Status:     open
++Severity:   informational
++Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
++
++`swimlane-drag.ts` post-followup is 396 lines (was 365 pre-followup).
++Approaching the 500-line cap. The recent additions (orderEquals,
++stale-class sweep, CSS.escape, comments) consumed ~30 lines. Future
++Phase 5 expansions (e.g., touch-drag via Pointer Events, or
++animation polish) would push past the cap.
++
++Trajectory note alongside AUDIT-14 / -20 / -26.
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+index afd59cb..4656aa4 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+@@ -260,15 +260,15 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
+ 
+ ### Task 5.4: Lane-visibility panel + drag-to-reorder
+ 
+-- [ ] Step 5.4.1: Studio surface (gear menu or sidebar) listing every lane with: visible toggle, drag handle for reorder.
+-- [ ] Step 5.4.2: Hidden lanes don't render tabs but their entries still exist and count in dashboard stats.
+-- [ ] Step 5.4.3: Order stored at `.deskwork/lane-order.json` (project-wide) or per-operator via localStorage per PRD § Implied scope captured.
++- [x] Step 5.4.1: Studio surface (gear menu or sidebar) listing every lane with: visible toggle, drag handle for reorder.
++- [x] Step 5.4.2: Hidden lanes don't render tabs but their entries still exist and count in dashboard stats.
++- [x] Step 5.4.3: Order stored at `.deskwork/lane-order.json` (project-wide) or per-operator via localStorage per PRD § Implied scope captured.
+ 
+ ### Task 5.5: Saveable focus presets + deep-link URL pattern
+ 
+-- [ ] Step 5.5.1: The dashboard's base view is already multi-lane (D3 Press Bay) — every focused lane renders simultaneously. The "composed view" concept becomes a **saved focus preset**: a named subset of `{ visible-lanes, focused-lanes, per-lane-view-mode, per-lane-collapse-state }` that the operator can re-open later.
+-- [ ] Step 5.5.2: Saved presets stored at `.deskwork/personal/<operator-id>/focus-presets.json` (per-operator) or `.deskwork/focus-presets/<preset-id>.json` (project-wide).
+-- [ ] Step 5.5.3: Deep-link URL pattern: `/dev/editorial-studio?preset=<preset-id>` opens the saved preset. The lane-visibility rail surfaces "Save current as preset…" and "Load preset…" affordances.
++- [x] Step 5.5.1: The dashboard's base view is already multi-lane (D3 Press Bay) — every focused lane renders simultaneously. The "composed view" concept becomes a **saved focus preset**: a named subset of `{ visible-lanes, focused-lanes, per-lane-view-mode, per-lane-collapse-state }` that the operator can re-open later.
++- [x] Step 5.5.2: Saved presets stored at `${STORAGE_KEY_PREFIX}${projectKey}:focus-presets` localStorage (per-operator). `.deskwork/personal/<operator-id>/focus-presets.json` server-side path deferred to Phase 6 enhancements per dispatch scope.
++- [x] Step 5.5.3: Deep-link URL pattern: `/dev/editorial-studio?preset=<preset-id>` opens the saved preset. The rail head surfaces "Save current as preset…" + a per-row "Load <name>" affordance + "Delete" sibling. Per `.claude/rules/affordance-placement.md`, affordances live on the rail head (component-attached), not in a separate page-level toolbar.
+ 
+ ### Task 5.6: Integration test against multi-lane fixture
+ 
+diff --git a/packages/studio/src/pages/dashboard/swimlane-rail.ts b/packages/studio/src/pages/dashboard/swimlane-rail.ts
+index 1bebe6e..dfb3336 100644
+--- a/packages/studio/src/pages/dashboard/swimlane-rail.ts
++++ b/packages/studio/src/pages/dashboard/swimlane-rail.ts
+@@ -10,7 +10,12 @@
+  *     a real focusable `<button>` with `aria-label`; the visible /
+  *     hidden glyphs render as `aria-hidden` siblings whose display
+  *     is driven by the parent `.rail-lane[data-lane-visible]` CSS)
+- *   - a non-interactive drag-handle stub (Task 5.4 wires the handler)
++ *   - a drag handle (`.rail-drag`). Task 5.4 wires the rail-level
++ *     HTML5 native drag-and-drop handler — the whole row carries
++ *     `draggable="true"` per the HTML5 DnD contract (the browser only
++ *     starts a drag when the source root opts in). The handle glyph
++ *     is the operator's visual cue ("grab here"); the CSS surfaces
++ *     `cursor: grab` on `.rail-drag` to reinforce that mental model.
+  *
+  * The rail row itself remains a `role="button"` div (the whole row
+  * is the focus toggle). Keyboard activation (Enter / Space) is wired
+@@ -43,9 +48,18 @@ function renderRailRow(row: LaneRailRow): RawHtml {
+   // which one shows based on the parent `.rail-lane
+   // [data-lane-visible]` attribute the client controller updates on
+   // click.
++  //
++  // Task 5.4 drag handle: HTML5 native DnD requires the source root
++  // to carry `draggable="true"`; the visible `.rail-drag` glyph is
++  // the operator's "grab here" cue (cursor: grab in CSS). Whole-row
++  // drag is the pragmatic call — the browser fires dragstart from
++  // any descendant; the visual handle anchors the mental model. The
++  // reorder controller lives in
++  // `plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts`.
+   const eyeLabel = `Toggle visibility for ${row.name} lane`;
+   return unsafe(html`
+     <div class="${classes}" role="button" tabindex="0"
++      draggable="true"
+       data-rail-lane="${row.id}"
+       aria-pressed="${row.inFocus ? 'true' : 'false'}"
+       data-lane-visible="true">
+@@ -55,23 +69,51 @@ function renderRailRow(row: LaneRailRow): RawHtml {
+       <span class="r-glyph" aria-hidden="true">${laneGlyph(row.templateId)}</span>
+       <span class="r-name">${row.name}</span>
+       <span class="r-count">${row.entryCount}</span>
+-      <!-- Task 5.4 slot: drag handle for lane reorder. Renders as a
+-           non-interactive stub for 5.1 so muscle-memory is in place;
+-           5.4 wires the handler. -->
+       <span class="rail-drag" aria-hidden="true">⋮⋮</span>
+     </div>`);
+ }
+ 
++/**
++ * Render the rail head's preset-save / preset-list surface (Phase 5
++ * Task 5.5). Per `.claude/rules/affordance-placement.md`, the Save +
++ * Load affordances live on the component they control — the rail —
++ * not in the page-level masthead. The Save button captures the
++ * current four-axis state (visible / focused / view-mode / collapse)
++ * as a named preset; the per-row Load buttons re-apply a saved
++ * preset; the per-row Delete buttons remove a preset.
++ *
++ * The list container is server-rendered empty + populated by the
++ * client controller (`swimlane-presets.ts`) on init. The empty
++ * state is `<span class="preset-empty">No saved presets</span>`,
++ * matching what the client renders before any preset exists. This
++ * means the SSR output is operator-perceivable on first paint
++ * (before client JS runs) and re-rendered identically by the client
++ * once it boots — no flash-of-empty-content.
++ */
++function renderPresetSurface(): RawHtml {
++  return unsafe(html`
++    <div class="rail-presets" data-rail-presets>
++      <button class="preset-save" type="button"
++        data-preset-save
++        aria-label="Save current view as preset">+ Save as preset</button>
++      <div class="preset-list" data-preset-list>
++        <span class="preset-empty">No saved presets</span>
++      </div>
++    </div>`);
++}
++
+ export function renderRail(
+   laneRows: readonly LaneRailRow[],
+   laneCount: number,
+ ): RawHtml {
+   const rowsRaw = laneRows.map((r) => renderRailRow(r).__raw).join('');
++  const presetSurfaceRaw = renderPresetSurface().__raw;
+   return unsafe(html`
+     <aside class="lane-rail" data-lane-rail>
+       <div class="rail-head">
+         Lanes
+         <span class="rail-head-count" aria-hidden="true">${laneCount} visible</span>
++        ${unsafe(presetSurfaceRaw)}
+       </div>
+       ${unsafe(rowsRaw)}
+     </aside>`);
+diff --git a/packages/studio/src/pages/dashboard/swimlane-shell.ts b/packages/studio/src/pages/dashboard/swimlane-shell.ts
+index 51335d3..ff1c827 100644
+--- a/packages/studio/src/pages/dashboard/swimlane-shell.ts
++++ b/packages/studio/src/pages/dashboard/swimlane-shell.ts
+@@ -17,7 +17,12 @@
+  * Slots still empty (later-task affordances not yet rendered):
+  *   - Per-lane `+ new` Compose chip (Task 5.1C).
+  *   - Drag-to-reorder rail handler (Task 5.4).
+- *   - Saveable focus presets + deep-link URL (Task 5.5).
++ *
++ * Task 5.5 (saveable focus presets + deep-link URL) landed: the rail
++ * head renders the Save + per-row Load + Delete affordances; the
++ * preset-list is server-rendered empty + populated by the client
++ * controller (`plugins/deskwork-studio/public/src/dashboard/swimlane-
++ * presets.ts` + `swimlane-presets-store.ts`).
+  *
+  * Tasks 5.1A + 5.1B + 5.1C landed: the lane-level + per-stage
+  * collapse chevrons (5.1A), the segmented kanban↔list view-toggle
+diff --git a/packages/studio/test/dashboard-swimlane-drag-client.test.ts b/packages/studio/test/dashboard-swimlane-drag-client.test.ts
+new file mode 100644
+index 0000000..b3074d7
+--- /dev/null
++++ b/packages/studio/test/dashboard-swimlane-drag-client.test.ts
+@@ -0,0 +1,485 @@
++/**
++ * @vitest-environment jsdom
++ *
++ * Client-side controller tests for the lane reorder drag-and-drop
++ * affordance — Phase 5 Task 5.4.
++ *
++ * Exercises `initSwimlaneDrag` against a synthesised DOM mirroring
++ * the server-rendered rail + focus-strip + swim/stub pairs.
++ *
++ * Coverage:
++ *   - dragstart on a rail row sets `.is-dragging` and stashes the
++ *     lane id via DataTransfer.
++ *   - dragover on a different row preventDefaults and adds
++ *     `.drop-target-above` or `.drop-target-below` based on cursor
++ *     Y vs the row's midpoint.
++ *   - drop reorders the rail rows, the focus-chip strip, and the
++ *     swim+stub pairs in the bay AND persists to localStorage.
++ *   - dragend clears all drag-related classes from every row.
++ *   - On reload, a stored order pre-seeded in localStorage is
++ *     applied — the DOM lands in the stored order before any
++ *     drag gesture.
++ *   - `computeReorder` pure function: above/below semantics for
++ *     same-id, contiguous, and non-contiguous moves.
++ *
++ * jsdom does NOT implement HTML5 DnD's DataTransfer object — the
++ * helper builds a real DragEvent with a synthesised DataTransfer
++ * (via Object.defineProperty so the controller can read/write the
++ * field without runtime errors).
++ */
++
++import { describe, it, expect, beforeEach } from 'vitest';
++import {
++  initSwimlaneDrag,
++  computeReorder,
++} from '../../../plugins/deskwork-studio/public/src/dashboard/swimlane-drag';
++
++// jsdom lacks `CSS.escape`. Per AUDIT-20260528-28 the drag controller
++// escapes lane ids in querySelector calls; the test installs an
++// identity shim mirroring the pattern in
++// `dashboard-swimlane-client.test.ts:98-107`. Real browsers ship
++// `CSS.escape`; this is a jsdom-only gap.
++interface CSSShim {
++  escape: (id: string) => string;
++}
++if (typeof (globalThis as { CSS?: unknown }).CSS === 'undefined') {
++  (globalThis as { CSS: CSSShim }).CSS = { escape: (s: string) => s };
++}
++
++const PROJECT_KEY = 'task-5-4-drag-test-key';
++const ORDER_STORAGE_KEY = `deskwork:dashboard:${PROJECT_KEY}:lane-order`;
++
++interface FakeDataTransfer {
++  effectAllowed: string;
++  dropEffect: string;
++  data: Map<string, string>;
++  setData(format: string, value: string): void;
++  getData(format: string): string;
++}
++
++function makeFakeDataTransfer(): FakeDataTransfer {
++  return {
++    effectAllowed: '',
++    dropEffect: '',
++    data: new Map(),
++    setData(format: string, value: string): void {
++      this.data.set(format, value);
++    },
++    getData(format: string): string {
++      return this.data.get(format) ?? '';
++    },
++  };
++}
++
++interface DragEventOptions {
++  readonly target: HTMLElement;
++  readonly clientY: number;
++  readonly dataTransfer?: FakeDataTransfer;
++  readonly relatedTarget?: HTMLElement | null;
++}
++
++function dispatchDragEvent(
++  type: string,
++  options: DragEventOptions,
++): Event {
++  // jsdom's DragEvent constructor exists but does not populate
++  // DataTransfer; we attach our fake via defineProperty so the
++  // controller reads/writes it without "as" casts. clientY is also
++  // not honored by jsdom's MouseEvent init for DragEvent, so we
++  // pin it via defineProperty too.
++  const ev = new Event(type, { bubbles: true, cancelable: true });
++  Object.defineProperty(ev, 'target', {
++    value: options.target,
++    configurable: true,
++  });
++  Object.defineProperty(ev, 'clientY', {
++    value: options.clientY,
++    configurable: true,
++  });
++  Object.defineProperty(ev, 'dataTransfer', {
++    value: options.dataTransfer ?? null,
++    configurable: true,
++  });
++  if (options.relatedTarget !== undefined) {
++    Object.defineProperty(ev, 'relatedTarget', {
++      value: options.relatedTarget,
++      configurable: true,
++    });
++  }
++  options.target.dispatchEvent(ev);
++  return ev;
++}
++
++function buildShell(lanes: readonly string[]): HTMLElement {
++  document.body.innerHTML = '';
++  const shell = document.createElement('section');
++  shell.classList.add('bay-shell');
++  shell.dataset.bayShell = '';
++  shell.dataset.projectKey = PROJECT_KEY;
++  document.body.appendChild(shell);
++
++  // Lane rail.
++  const rail = document.createElement('aside');
++  rail.classList.add('lane-rail');
++  rail.dataset.laneRail = '';
++  for (const id of lanes) {
++    const row = document.createElement('div');
++    row.classList.add('rail-lane');
++    row.setAttribute('draggable', 'true');
++    row.dataset.railLane = id;
++    row.dataset.laneVisible = 'true';
++    rail.appendChild(row);
++  }
++  shell.appendChild(rail);
++
++  // Focus strip with one chip per lane (plus a non-lane "All" chip).
++  const strip = document.createElement('nav');
++  strip.classList.add('focus-strip');
++  strip.dataset.focusStrip = '';
++  const allChip = document.createElement('button');
++  allChip.type = 'button';
++  allChip.classList.add('focus-chip', 'all');
++  allChip.dataset.focusChipAll = '';
++  strip.appendChild(allChip);
++  for (const id of lanes) {
++    const chip = document.createElement('button');
++    chip.type = 'button';
++    chip.classList.add('focus-chip');
++    chip.dataset.focusChip = id;
++    strip.appendChild(chip);
++  }
++  shell.appendChild(strip);
++
++  // Bay column holding head + swim+stub pairs.
++  const bay = document.createElement('main');
++  bay.classList.add('bay');
++  bay.dataset.bay = '';
++  const bayHead = document.createElement('div');
++  bayHead.classList.add('bay-head');
++  bay.appendChild(bayHead);
++  for (const id of lanes) {
++    const swim = document.createElement('article');
++    swim.classList.add('swim');
++    swim.dataset.laneId = id;
++    bay.appendChild(swim);
++    const stub = document.createElement('button');
++    stub.type = 'button';
++    stub.classList.add('swim-stub');
++    stub.dataset.swimStub = id;
++    bay.appendChild(stub);
++  }
++  shell.appendChild(bay);
++
++  return rail;
++}
++
++function getLaneOrder(): readonly string[] {
++  return Array.from(
++    document.querySelectorAll<HTMLElement>('[data-rail-lane]'),
++  ).map((el) => el.dataset.railLane ?? '');
++}
++
++function getChipOrder(): readonly string[] {
++  return Array.from(
++    document.querySelectorAll<HTMLElement>('[data-focus-chip]'),
++  ).map((el) => el.dataset.focusChip ?? '');
++}
++
++function getSwimOrder(): readonly string[] {
++  const bay = document.querySelector<HTMLElement>('[data-bay]');
++  if (bay === null) return [];
++  const out: string[] = [];
++  for (const child of Array.from(bay.children)) {
++    if (!(child instanceof HTMLElement)) continue;
++    if (child.classList.contains('swim')) {
++      out.push(child.dataset.laneId ?? '');
++    }
++  }
++  return out;
++}
++
++function getRow(id: string): HTMLElement {
++  const el = document.querySelector<HTMLElement>(`[data-rail-lane="${id}"]`);
++  if (el === null) throw new Error(`row ${id} not found`);
++  // Mock getBoundingClientRect — every row 32px tall, sequential top.
++  const ids = getLaneOrder();
++  const idx = ids.indexOf(id);
++  Object.defineProperty(el, 'getBoundingClientRect', {
++    value: (): DOMRect => ({
++      top: idx * 32,
++      bottom: idx * 32 + 32,
++      left: 0,
++      right: 200,
++      height: 32,
++      width: 200,
++      x: 0,
++      y: idx * 32,
++      toJSON: () => ({}),
++    }),
++    configurable: true,
++  });
++  return el;
++}
++
++describe('computeReorder pure function — Task 5.4', () => {
++  it('returns the input unchanged when source === target', () => {
++    const result = computeReorder(['a', 'b', 'c'], 'b', 'b', 'above');
++    expect(result).toEqual(['a', 'b', 'c']);
++  });
++
++  it('drops source ABOVE target — moves source up', () => {
++    const result = computeReorder(['a', 'b', 'c', 'd'], 'd', 'b', 'above');
++    expect(result).toEqual(['a', 'd', 'b', 'c']);
++  });
++
++  it('drops source BELOW target — moves source down', () => {
++    const result = computeReorder(['a', 'b', 'c', 'd'], 'a', 'c', 'below');
++    expect(result).toEqual(['b', 'c', 'a', 'd']);
++  });
++
++  it('handles same-position drop as a no-op (above immediate neighbor)', () => {
++    const result = computeReorder(['a', 'b', 'c'], 'a', 'b', 'above');
++    expect(result).toEqual(['a', 'b', 'c']);
++  });
++
++  it('returns unchanged order when target id is not in the list', () => {
++    const result = computeReorder(['a', 'b'], 'a', 'z', 'above');
++    expect(result).toEqual(['a', 'b']);
++  });
++});
++
++describe('swimlane drag client controller — Task 5.4', () => {
++  beforeEach(() => {
++    document.body.innerHTML = '';
++    window.localStorage.clear();
++  });
++
++  it('dragstart on a rail row sets .is-dragging + writes the lane id to DataTransfer', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    const row = getRow('mockups');
++    const dt = makeFakeDataTransfer();
++    dispatchDragEvent('dragstart', { target: row, clientY: 16, dataTransfer: dt });
++    expect(row.classList.contains('is-dragging')).toBe(true);
++    expect(dt.effectAllowed).toBe('move');
++    expect(dt.getData('text/plain')).toBe('mockups');
++  });
++
++  it('dragover above the target midpoint adds .drop-target-above', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    const source = getRow('qa');
++    const target = getRow('default');
++    const dt = makeFakeDataTransfer();
++    dispatchDragEvent('dragstart', { target: source, clientY: 80, dataTransfer: dt });
++    // Target `default` is at top=0, bottom=32, midY=16. cursor at Y=8
++    // is ABOVE the midpoint.
++    const ev = dispatchDragEvent('dragover', {
++      target,
++      clientY: 8,
++      dataTransfer: dt,
++    });
++    expect(ev.defaultPrevented).toBe(true);
++    expect(target.classList.contains('drop-target-above')).toBe(true);
++    expect(target.classList.contains('drop-target-below')).toBe(false);
++  });
++
++  it('dragover below the target midpoint adds .drop-target-below', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    const source = getRow('qa');
++    const target = getRow('mockups');
++    const dt = makeFakeDataTransfer();
++    dispatchDragEvent('dragstart', { target: source, clientY: 80, dataTransfer: dt });
++    // Target `mockups` is at top=32, bottom=64, midY=48. cursor at Y=60
++    // is BELOW the midpoint.
++    const ev = dispatchDragEvent('dragover', {
++      target,
++      clientY: 60,
++      dataTransfer: dt,
++    });
++    expect(ev.defaultPrevented).toBe(true);
++    expect(target.classList.contains('drop-target-below')).toBe(true);
++    expect(target.classList.contains('drop-target-above')).toBe(false);
++  });
++
++  it('drop reorders rail rows, focus chips, and swim+stub pairs AND writes localStorage', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    expect(getLaneOrder()).toEqual(['default', 'mockups', 'qa']);
++    expect(getChipOrder()).toEqual(['default', 'mockups', 'qa']);
++    expect(getSwimOrder()).toEqual(['default', 'mockups', 'qa']);
++
++    // Drag `qa` ABOVE `default` (cursor Y=8 < midY=16) → new order
++    // ['qa', 'default', 'mockups'].
++    const source = getRow('qa');
++    const target = getRow('default');
++    const dt = makeFakeDataTransfer();
++    dispatchDragEvent('dragstart', { target: source, clientY: 80, dataTransfer: dt });
++    dispatchDragEvent('dragover', { target, clientY: 8, dataTransfer: dt });
++    const ev = dispatchDragEvent('drop', {
++      target,
++      clientY: 8,
++      dataTransfer: dt,
++    });
++    expect(ev.defaultPrevented).toBe(true);
++    expect(getLaneOrder()).toEqual(['qa', 'default', 'mockups']);
++    expect(getChipOrder()).toEqual(['qa', 'default', 'mockups']);
++    expect(getSwimOrder()).toEqual(['qa', 'default', 'mockups']);
++    // localStorage carries the new order.
++    const stored = window.localStorage.getItem(ORDER_STORAGE_KEY);
++    expect(stored).not.toBeNull();
++    expect(JSON.parse(stored ?? '[]')).toEqual([
++      'qa',
++      'default',
++      'mockups',
++    ]);
++  });
++
++  it('dragend clears all drag-related classes', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    const source = getRow('mockups');
++    const target = getRow('qa');
++    const dt = makeFakeDataTransfer();
++    dispatchDragEvent('dragstart', { target: source, clientY: 48, dataTransfer: dt });
++    // Target `qa` is at top=64, bottom=96, midY=80. cursor at Y=88
++    // is BELOW the midpoint.
++    dispatchDragEvent('dragover', { target, clientY: 88, dataTransfer: dt });
++    expect(source.classList.contains('is-dragging')).toBe(true);
++    expect(target.classList.contains('drop-target-below')).toBe(true);
++    dispatchDragEvent('dragend', { target: source, clientY: 88 });
++    expect(source.classList.contains('is-dragging')).toBe(false);
++    expect(target.classList.contains('drop-target-above')).toBe(false);
++    expect(target.classList.contains('drop-target-below')).toBe(false);
++  });
++
++  it('reload restoration: pre-seeded localStorage order applies on init', () => {
++    // Pre-seed an order BEFORE init. The server rendered the
++    // canonical order ['default', 'mockups', 'qa']; the operator has
++    // previously dragged into ['qa', 'default', 'mockups'].
++    window.localStorage.setItem(
++      ORDER_STORAGE_KEY,
++      JSON.stringify(['qa', 'default', 'mockups']),
++    );
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    expect(getLaneOrder()).toEqual(['qa', 'default', 'mockups']);
++    expect(getChipOrder()).toEqual(['qa', 'default', 'mockups']);
++    expect(getSwimOrder()).toEqual(['qa', 'default', 'mockups']);
++  });
++
++  it('reconciliation: stored order with stale ids falls back to live order', () => {
++    // Stored order references a lane that no longer exists on disk
++    // (`removed`); the controller's validity check fails AND the
++    // live server-rendered order wins.
++    window.localStorage.setItem(
++      ORDER_STORAGE_KEY,
++      JSON.stringify(['removed', 'qa', 'default', 'mockups']),
++    );
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    expect(getLaneOrder()).toEqual(['default', 'mockups', 'qa']);
++  });
++
++  it('reconciliation: lanes added since the order was stored land at the tail', () => {
++    // Stored: ['mockups', 'default']; live now includes a new 'qa'
++    // lane. Reconciliation prepends the stored order and appends new
++    // lanes at the tail.
++    window.localStorage.setItem(
++      ORDER_STORAGE_KEY,
++      JSON.stringify(['mockups', 'default']),
++    );
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    expect(getLaneOrder()).toEqual(['mockups', 'default', 'qa']);
++  });
++
++  it('drag with source === target is a no-op (no localStorage write, no reorder) — AUDIT-29', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    const row = getRow('mockups');
++    const dt = makeFakeDataTransfer();
++    dispatchDragEvent('dragstart', { target: row, clientY: 48, dataTransfer: dt });
++    dispatchDragEvent('dragover', { target: row, clientY: 48, dataTransfer: dt });
++    dispatchDragEvent('drop', { target: row, clientY: 48, dataTransfer: dt });
++    expect(getLaneOrder()).toEqual(['default', 'mockups', 'qa']);
++    // Per AUDIT-20260528-29 — the no-op drop branch skips the
++    // localStorage write entirely so the controller's contract is
++    // "writes happen only on real reorders." Confirm no stored entry
++    // was emitted by the no-op drop.
++    expect(window.localStorage.getItem(ORDER_STORAGE_KEY)).toBeNull();
++  });
++
++  it('AUDIT-27: dragleave that exits the rail clears all drop-target classes', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    const source = getRow('default');
++    const target = getRow('qa');
++    const dt = makeFakeDataTransfer();
++    dispatchDragEvent('dragstart', { target: source, clientY: 8, dataTransfer: dt });
++    // Stage a drop-target class on `qa`.
++    dispatchDragEvent('dragover', { target, clientY: 95, dataTransfer: dt });
++    expect(
++      target.classList.contains('drop-target-above')
++        || target.classList.contains('drop-target-below'),
++    ).toBe(true);
++    // dragleave that exits the rail (relatedTarget outside the rail)
++    // should clear the drop-target classes. Synthesize relatedTarget
++    // as a node OUTSIDE the rail container.
++    const outside = document.createElement('div');
++    document.body.appendChild(outside);
++    const leaveEv = new Event('dragleave', { bubbles: true, cancelable: true });
++    Object.defineProperty(leaveEv, 'relatedTarget', {
++      configurable: true,
++      get: () => outside,
++    });
++    target.dispatchEvent(leaveEv);
++    expect(target.classList.contains('drop-target-above')).toBe(false);
++    expect(target.classList.contains('drop-target-below')).toBe(false);
++  });
++
++  it('AUDIT-27: dragging a visibility-hidden lane preserves the is-visibility-hidden class post-reorder', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    // Pretend the qa lane was previously hidden via the eye-toggle —
++    // stamp the class directly on the rail row + focus chip.
++    const qaRow = getRow('qa');
++    const qaChip = document.querySelector<HTMLElement>(
++      '[data-focus-chip="qa"]',
++    );
++    qaRow.dataset.laneVisible = 'false';
++    qaChip?.classList.add('is-visibility-hidden');
++    // Drag qa above default.
++    const source = qaRow;
++    const target = getRow('default');
++    const dt = makeFakeDataTransfer();
++    dispatchDragEvent('dragstart', { target: source, clientY: 96, dataTransfer: dt });
++    dispatchDragEvent('dragover', { target, clientY: 4, dataTransfer: dt });
++    dispatchDragEvent('drop', { target, clientY: 4, dataTransfer: dt });
++    // Order has changed: qa moved to the top.
++    expect(getLaneOrder()).toEqual(['qa', 'default', 'mockups']);
++    // Class state on the moved row + chip survives the appendChild
++    // moves (per AUDIT-20260528-29 — class state is preserved on a
++    // per-id basis by appendChild; no applyState reapply needed).
++    expect(qaRow.dataset.laneVisible).toBe('false');
++    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(true);
++  });
++
++  it('AUDIT-30: dragstart sweeps stale .is-dragging classes from a prior aborted drag', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlaneDrag();
++    // Simulate a previous drag's dragend that failed to fire — a
++    // stale .is-dragging class is sitting on default.
++    const stale = getRow('default');
++    stale.classList.add('is-dragging');
++    expect(stale.classList.contains('is-dragging')).toBe(true);
++    // Now start a new drag on a different row. The dragstart sweep
++    // should clear the stale class.
++    const newSource = getRow('mockups');
++    const dt = makeFakeDataTransfer();
++    dispatchDragEvent('dragstart', { target: newSource, clientY: 48, dataTransfer: dt });
++    expect(stale.classList.contains('is-dragging')).toBe(false);
++    expect(newSource.classList.contains('is-dragging')).toBe(true);
++  });
++});
+diff --git a/packages/studio/test/dashboard-swimlane-presets-client.test.ts b/packages/studio/test/dashboard-swimlane-presets-client.test.ts
+new file mode 100644
+index 0000000..b0ce5cf
+--- /dev/null
++++ b/packages/studio/test/dashboard-swimlane-presets-client.test.ts
+@@ -0,0 +1,448 @@
++/**
++ * @vitest-environment jsdom
++ *
++ * Client-side controller tests for the Phase 5 Task 5.5 saveable
++ * focus presets feature. Verifies:
++ *
++ *   - Save snapshot captures all four state axes (visible / focused /
++ *     view-mode / collapse) from localStorage at the moment of save.
++ *   - Load apply writes through all four axes + updates the DOM via
++ *     the constituent controllers' `reapply*FromStorage` exports.
++ *   - Deep-link URL `?preset=<id>` on init applies the named preset
++ *     when the id resolves.
++ *   - Delete removes a preset + refreshes the list surface.
++ *   - Four-axis snapshot round-trip — every axis the snapshot
++ *     captures is restorable through the apply path.
++ *
++ * Mirrors the CSS.escape shim pattern from `dashboard-swimlane-
++ * client.test.ts:98-107` because jsdom does not ship `CSS.escape`
++ * and the swimlane controller calls it on every apply pass.
++ */
++
++import { describe, it, expect, beforeEach } from 'vitest';
++import { initSwimlane } from '../../../plugins/deskwork-studio/public/src/dashboard/swimlane';
++import { initSwimlaneCollapse } from '../../../plugins/deskwork-studio/public/src/dashboard/swimlane-collapse';
++import { initSwimlaneViewToggle } from '../../../plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle';
++import {
++  initSwimlanePresets,
++  type PresetControllerHooks,
++} from '../../../plugins/deskwork-studio/public/src/dashboard/swimlane-presets';
++import {
++  applyPreset,
++  listPresets,
++  savePresetFromCurrent,
++  snapshotCurrentState,
++  type FocusPreset,
++} from '../../../plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store';
++
++const PROJECT_KEY = 'test-project-key';
++const PREFIX = `deskwork:dashboard:${PROJECT_KEY}`;
++
++interface CSSShim {
++  escape: (id: string) => string;
++}
++if (typeof (globalThis as { CSS?: unknown }).CSS === 'undefined') {
++  (globalThis as { CSS: CSSShim }).CSS = { escape: (s: string) => s };
++}
++
++function buildShell(lanes: readonly string[]): void {
++  document.body.innerHTML = '';
++  const shell = document.createElement('section');
++  shell.classList.add('bay-shell');
++  shell.dataset.bayShell = '';
++  shell.dataset.projectKey = PROJECT_KEY;
++  document.body.appendChild(shell);
++
++  const rail = document.createElement('aside');
++  rail.classList.add('lane-rail');
++  rail.dataset.laneRail = '';
++
++  // Rail head + preset surface (mirrors server-rendered markup).
++  const head = document.createElement('div');
++  head.classList.add('rail-head');
++  head.textContent = 'Lanes';
++  const presetSurface = document.createElement('div');
++  presetSurface.classList.add('rail-presets');
++  presetSurface.dataset.railPresets = '';
++  const saveBtn = document.createElement('button');
++  saveBtn.type = 'button';
++  saveBtn.classList.add('preset-save');
++  saveBtn.dataset.presetSave = '';
++  saveBtn.textContent = '+ Save as preset';
++  presetSurface.appendChild(saveBtn);
++  const list = document.createElement('div');
++  list.classList.add('preset-list');
++  list.dataset.presetList = '';
++  presetSurface.appendChild(list);
++  head.appendChild(presetSurface);
++  rail.appendChild(head);
++
++  for (const id of lanes) {
++    const row = document.createElement('div');
++    row.classList.add('rail-lane', 'focused');
++    row.dataset.railLane = id;
++    row.dataset.laneVisible = 'true';
++    row.setAttribute('aria-pressed', 'true');
++
++    const eye = document.createElement('button');
++    eye.type = 'button';
++    eye.classList.add('r-eye-btn');
++    eye.setAttribute('aria-label', `Toggle visibility for ${id} lane`);
++    row.appendChild(eye);
++    rail.appendChild(row);
++  }
++  shell.appendChild(rail);
++
++  // Focus chips.
++  const strip = document.createElement('nav');
++  strip.classList.add('focus-strip');
++  strip.dataset.focusStrip = '';
++  for (const id of lanes) {
++    const chip = document.createElement('button');
++    chip.type = 'button';
++    chip.classList.add('focus-chip', 'active');
++    chip.dataset.focusChip = id;
++    chip.setAttribute('aria-pressed', 'true');
++    strip.appendChild(chip);
++  }
++  shell.appendChild(strip);
++
++  // Swims (+ a stage column + a view-toggle radiogroup per lane so
++  // the constituent controllers have something to apply to).
++  for (const id of lanes) {
++    const swim = document.createElement('article');
++    swim.classList.add('swim', 'view-kanban');
++    swim.dataset.laneId = id;
++
++    const swimHead = document.createElement('div');
++    swimHead.classList.add('swim-head');
++    const collapseChev = document.createElement('button');
++    collapseChev.type = 'button';
++    collapseChev.classList.add('collapse-chev');
++    collapseChev.dataset.collapseTarget = 'lane';
++    collapseChev.dataset.laneId = id;
++    swimHead.appendChild(collapseChev);
++
++    const viewToggle = document.createElement('div');
++    viewToggle.classList.add('view-toggle');
++    viewToggle.setAttribute('role', 'radiogroup');
++    for (const mode of ['kanban', 'list'] as const) {
++      const cell = document.createElement('button');
++      cell.type = 'button';
++      cell.classList.add('vt-cell');
++      cell.dataset.viewMode = mode;
++      cell.dataset.laneId = id;
++      cell.setAttribute('role', 'radio');
++      cell.setAttribute('aria-checked', mode === 'kanban' ? 'true' : 'false');
++      viewToggle.appendChild(cell);
++    }
++    swimHead.appendChild(viewToggle);
++    swim.appendChild(swimHead);
++
++    const stageGrid = document.createElement('div');
++    stageGrid.classList.add('stage-grid');
++    const stageCol = document.createElement('div');
++    stageCol.classList.add('stage-col');
++    stageCol.dataset.stageCol = 'Drafting';
++    const stageHead = document.createElement('div');
++    stageHead.classList.add('stage-head');
++    const stageChev = document.createElement('button');
++    stageChev.type = 'button';
++    stageChev.classList.add('collapse-chev');
++    stageChev.dataset.collapseTarget = 'stage';
++    stageChev.dataset.laneId = id;
++    stageChev.dataset.stageName = 'Drafting';
++    stageHead.appendChild(stageChev);
++    stageCol.appendChild(stageHead);
++    stageGrid.appendChild(stageCol);
++    swim.appendChild(stageGrid);
++
++    shell.appendChild(swim);
++
++    const stub = document.createElement('button');
++    stub.type = 'button';
++    stub.classList.add('swim-stub', 'is-focus-hidden');
++    stub.dataset.swimStub = id;
++    shell.appendChild(stub);
++  }
++}
++
++function bootControllers(): void {
++  initSwimlane();
++  initSwimlaneCollapse();
++  initSwimlaneViewToggle();
++}
++
++function makeHooks(name: string, confirm: boolean = true): PresetControllerHooks {
++  return {
++    promptForName: () => name,
++    confirmDelete: () => confirm,
++  };
++}
++
++describe('Task 5.5 — saveable focus presets client controller', () => {
++  beforeEach(() => {
++    document.body.innerHTML = '';
++    window.localStorage.clear();
++    window.history.replaceState({}, '', '/dev/editorial-studio');
++  });
++
++  it('snapshot captures all four state axes from localStorage', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    bootControllers();
++
++    // Set up some non-default state across the four axes:
++    //   - Hide `qa` (visibility off).
++    //   - Focus only `default` + `mockups`.
++    //   - Set `default` to list mode.
++    //   - Collapse `mockups` lane and `default`'s Drafting stage.
++    window.localStorage.setItem(
++      `${PREFIX}:visibility`,
++      JSON.stringify(['qa']),
++    );
++    window.localStorage.setItem(
++      `${PREFIX}:focus`,
++      JSON.stringify(['default', 'mockups']),
++    );
++    window.localStorage.setItem(
++      `${PREFIX}:view-mode`,
++      JSON.stringify({ default: 'list' }),
++    );
++    window.localStorage.setItem(
++      `${PREFIX}:lane-collapse`,
++      JSON.stringify(['mockups']),
++    );
++    window.localStorage.setItem(
++      `${PREFIX}:stage-collapse`,
++      JSON.stringify({ default: ['Drafting'] }),
++    );
++
++    const snapshot = snapshotCurrentState(PROJECT_KEY);
++
++    expect(snapshot.visibleLanes).toEqual(['default', 'mockups']);
++    expect(snapshot.focusedLanes).toEqual(['default', 'mockups']);
++    expect(snapshot.viewModePerLane).toEqual({ default: 'list' });
++    expect(snapshot.laneCollapseState).toEqual({ mockups: true });
++    expect(snapshot.stageCollapseState).toEqual({
++      default: { Drafting: true },
++    });
++  });
++
++  it('saving captures + persisting + listing the preset round-trips', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    bootControllers();
++
++    window.localStorage.setItem(
++      `${PREFIX}:focus`,
++      JSON.stringify(['default']),
++    );
++
++    const saved = savePresetFromCurrent(PROJECT_KEY, 'Press Bay only');
++    expect(saved.name).toBe('Press Bay only');
++    expect(saved.focusedLanes).toEqual(['default']);
++
++    const all = listPresets(PROJECT_KEY);
++    expect(all.length).toBe(1);
++    expect(all[0].id).toBe(saved.id);
++    expect(all[0].name).toBe('Press Bay only');
++  });
++
++  it('applyPreset writes through all four storage keys', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    bootControllers();
++
++    const preset: FocusPreset = {
++      id: 'p-test',
++      name: 'Test',
++      createdAt: '2026-05-28T12:00:00.000Z',
++      visibleLanes: ['default', 'qa'],
++      focusedLanes: ['default'],
++      viewModePerLane: { qa: 'list' },
++      laneCollapseState: { default: true },
++      stageCollapseState: { qa: { Drafting: true } },
++    };
++
++    applyPreset(PROJECT_KEY, preset);
++
++    // Visibility: hidden = allLanes − visibleLanes = [mockups].
++    expect(window.localStorage.getItem(`${PREFIX}:visibility`)).toBe(
++      JSON.stringify(['mockups']),
++    );
++    // Focus: written through verbatim.
++    expect(window.localStorage.getItem(`${PREFIX}:focus`)).toBe(
++      JSON.stringify(['default']),
++    );
++    // View-mode: per-lane map written through verbatim.
++    expect(window.localStorage.getItem(`${PREFIX}:view-mode`)).toBe(
++      JSON.stringify({ qa: 'list' }),
++    );
++    // Lane-collapse: only `default` is true → ['default'].
++    expect(window.localStorage.getItem(`${PREFIX}:lane-collapse`)).toBe(
++      JSON.stringify(['default']),
++    );
++    // Stage-collapse: { qa: ['Drafting'] }.
++    expect(window.localStorage.getItem(`${PREFIX}:stage-collapse`)).toBe(
++      JSON.stringify({ qa: ['Drafting'] }),
++    );
++  });
++
++  it('applyPreset reapplies through controllers (focused state matches preset)', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    bootControllers();
++
++    const preset: FocusPreset = {
++      id: 'p-focus',
++      name: 'Focus',
++      createdAt: '2026-05-28T12:00:00.000Z',
++      visibleLanes: ['default', 'mockups', 'qa'],
++      focusedLanes: ['mockups'],
++      viewModePerLane: { mockups: 'list' },
++      laneCollapseState: {},
++      stageCollapseState: {},
++    };
++
++    applyPreset(PROJECT_KEY, preset);
++
++    // DOM should reflect: only `mockups` is focused (its swim is
++    // visible); default + qa are stubs.
++    const mockupsSwim = document.querySelector<HTMLElement>(
++      '.swim[data-lane-id="mockups"]',
++    );
++    const defaultSwim = document.querySelector<HTMLElement>(
++      '.swim[data-lane-id="default"]',
++    );
++    expect(mockupsSwim?.classList.contains('is-focus-hidden')).toBe(false);
++    expect(defaultSwim?.classList.contains('is-focus-hidden')).toBe(true);
++
++    // View-mode: mockups should now be list.
++    expect(mockupsSwim?.classList.contains('view-list')).toBe(true);
++    expect(mockupsSwim?.classList.contains('view-kanban')).toBe(false);
++  });
++
++  it('deep-link `?preset=<id>` applies the named preset on init', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    bootControllers();
++
++    // Seed a preset in storage.
++    const preset: FocusPreset = {
++      id: 'deeplink',
++      name: 'Deep Link',
++      createdAt: '2026-05-28T12:00:00.000Z',
++      visibleLanes: ['default', 'mockups', 'qa'],
++      focusedLanes: ['qa'],
++      viewModePerLane: {},
++      laneCollapseState: {},
++      stageCollapseState: {},
++    };
++    window.localStorage.setItem(
++      `${PREFIX}:focus-presets`,
++      JSON.stringify({ deeplink: preset }),
++    );
++
++    // Arrange the URL with the preset param and init the preset
++    // controller — it should read the param + apply the preset.
++    window.history.replaceState({}, '', '/dev/editorial-studio?preset=deeplink');
++    initSwimlanePresets(makeHooks(''));
++
++    expect(window.localStorage.getItem(`${PREFIX}:focus`)).toBe(
++      JSON.stringify(['qa']),
++    );
++    const qaSwim = document.querySelector<HTMLElement>(
++      '.swim[data-lane-id="qa"]',
++    );
++    expect(qaSwim?.classList.contains('is-focus-hidden')).toBe(false);
++    const defaultSwim = document.querySelector<HTMLElement>(
++      '.swim[data-lane-id="default"]',
++    );
++    expect(defaultSwim?.classList.contains('is-focus-hidden')).toBe(true);
++  });
++
++  it('deep-link with unknown preset id is a no-op', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    bootControllers();
++    window.history.replaceState({}, '', '/dev/editorial-studio?preset=does-not-exist');
++    // Before init: focus has all-three (default behavior in init).
++    const before = window.localStorage.getItem(`${PREFIX}:focus`);
++    initSwimlanePresets(makeHooks(''));
++    const after = window.localStorage.getItem(`${PREFIX}:focus`);
++    expect(after).toBe(before);
++  });
++
++  it('Save button + name prompt + Load + Delete affordances are bound', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    bootControllers();
++
++    // Hook that always returns "MySaved" as the preset name.
++    const hooks = makeHooks('MySaved', true);
++    initSwimlanePresets(hooks);
++
++    // Initially empty.
++    expect(document.querySelector('.preset-empty')).not.toBeNull();
++
++    // Click Save.
++    const saveBtn = document.querySelector<HTMLButtonElement>(
++      '[data-preset-save]',
++    );
++    expect(saveBtn).not.toBeNull();
++    saveBtn?.click();
++
++    // Save flash applied.
++    expect(saveBtn?.classList.contains('is-flashing')).toBe(true);
++    // Empty state replaced by the saved row.
++    expect(document.querySelector('.preset-empty')).toBeNull();
++    const loadBtn = document.querySelector<HTMLButtonElement>(
++      '[data-preset-load]',
++    );
++    expect(loadBtn?.textContent).toBe('MySaved');
++
++    // Delete the preset.
++    const deleteBtn = document.querySelector<HTMLButtonElement>(
++      '[data-preset-delete]',
++    );
++    expect(deleteBtn).not.toBeNull();
++    deleteBtn?.click();
++
++    // List goes back to empty.
++    expect(document.querySelector('.preset-empty')).not.toBeNull();
++    expect(listPresets(PROJECT_KEY).length).toBe(0);
++  });
++
++  it('Save prompt returning null short-circuits the save', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    bootControllers();
++
++    const hooks: PresetControllerHooks = {
++      promptForName: () => null,
++      confirmDelete: () => true,
++    };
++    initSwimlanePresets(hooks);
++    const saveBtn = document.querySelector<HTMLButtonElement>(
++      '[data-preset-save]',
++    );
++    saveBtn?.click();
++    expect(listPresets(PROJECT_KEY).length).toBe(0);
++  });
++
++  it('Delete confirm returning false short-circuits the delete', () => {
++    buildShell(['default', 'mockups', 'qa']);
++    bootControllers();
++
++    const hooks: PresetControllerHooks = {
++      promptForName: () => 'Saved',
++      confirmDelete: () => false,
++    };
++    initSwimlanePresets(hooks);
++
++    const saveBtn = document.querySelector<HTMLButtonElement>(
++      '[data-preset-save]',
++    );
++    saveBtn?.click();
++    expect(listPresets(PROJECT_KEY).length).toBe(1);
++
++    const deleteBtn = document.querySelector<HTMLButtonElement>(
++      '[data-preset-delete]',
++    );
++    deleteBtn?.click();
++    expect(listPresets(PROJECT_KEY).length).toBe(1);
++  });
++});
+diff --git a/packages/studio/test/dashboard-swimlane.test.ts b/packages/studio/test/dashboard-swimlane.test.ts
+index 17a142f..459d877 100644
+--- a/packages/studio/test/dashboard-swimlane.test.ts
++++ b/packages/studio/test/dashboard-swimlane.test.ts
+@@ -176,7 +176,7 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
+     expect(r.html).toContain('data-focus-chip-all');
+   });
+ 
+-  it('lane-visibility rail contains one row per lane with drag stub', async () => {
++  it('lane-visibility rail contains one row per lane with drag handle', async () => {
+     const r = await getHtml(app, '/dev/editorial-studio');
+     expect(r.status).toBe(200);
+     const railMatches = r.html.match(/data-rail-lane="[^"]+"/g) ?? [];
+@@ -184,10 +184,96 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
+     expect(r.html).toContain('data-rail-lane="default"');
+     expect(r.html).toContain('data-rail-lane="mockups"');
+     expect(r.html).toContain('data-rail-lane="qa"');
+-    // Drag handle stub renders (Task 5.4 wires the handler).
++    // Drag handle glyph renders on every row (Task 5.4 controller in
++    // `swimlane-drag.ts` reads this).
+     expect(r.html).toMatch(/<span class="rail-drag" aria-hidden="true">⋮⋮<\/span>/);
+   });
+ 
++  // ============================================================
++  //  Task 5.5 — saveable focus presets surface.
++  // ============================================================
++
++  it('Task 5.5: rail head renders the "Save current as preset…" + preset-list surface', async () => {
++    // Per `.claude/rules/affordance-placement.md`, the Save / Load
++    // preset affordances live ON the rail head (component-attached),
++    // not in a separate page-level toolbar. Server-rendered markup
++    // ships the Save button + an empty preset-list container the
++    // client controller populates from localStorage.
++    const r = await getHtml(app, '/dev/editorial-studio');
++    expect(r.status).toBe(200);
++    // The rail head exists.
++    expect(r.html).toMatch(/<div class="rail-head">/);
++    // The preset-save button is inside the rail (a real focusable
++    // <button> with an accessible name + data hook).
++    expect(r.html).toMatch(
++      /<button class="preset-save" type="button"\s+data-preset-save\s+aria-label="Save current view as preset">\+ Save as preset<\/button>/,
++    );
++    // The preset-list container is server-rendered with the empty-
++    // state child so first paint matches what the client renders
++    // for an operator with no saved presets.
++    expect(r.html).toMatch(/<div class="preset-list" data-preset-list>/);
++    expect(r.html).toMatch(
++      /<span class="preset-empty">No saved presets<\/span>/,
++    );
++  });
++
++  // ============================================================
++  //  Task 5.4 — drag-to-reorder server contract.
++  // ============================================================
++
++  it('Task 5.4: every rail row carries draggable="true" so HTML5 DnD can start', async () => {
++    // HTML5 native drag-and-drop requires the source root to opt
++    // into draggable. The whole `.rail-lane` row carries the attribute
++    // (per the affordance-placement contract — drag handle on the
++    // row, not in a separate toolbar). The visible `.rail-drag` glyph
++    // is the operator's grab-here cue (cursor: grab in CSS).
++    const r = await getHtml(app, '/dev/editorial-studio');
++    expect(r.status).toBe(200);
++    for (const id of ['default', 'mockups', 'qa']) {
++      const re = new RegExp(
++        `<div class="rail-lane(?:\\s[^"]*)?"[^>]*draggable="true"[^>]*data-rail-lane="${id}"`,
++      );
++      expect(r.html).toMatch(re);
++    }
++  });
++
++  it('Task 5.4: dashboard-swimlane.css ships cursor: grab on the drag handle + drop-target feedback rules', async () => {
++    const cssRes = await app.fetch(
++      new Request('http://x/static/css/dashboard-swimlane.css'),
++    );
++    expect(cssRes.status).toBe(200);
++    const css = await cssRes.text();
++    // `.rail-drag` carries the canonical grab cursor.
++    expect(css).toMatch(/\.rail-lane\s+\.rail-drag\s*\{[\s\S]*?cursor:\s*grab/);
++    // While a row is being dragged the source carries `is-dragging`
++    // and the cursor flips to grabbing on both the row and the handle.
++    expect(css).toMatch(/\.rail-lane\.is-dragging\s*\{[\s\S]*?cursor:\s*grabbing/);
++    // Drop-target feedback — insertion hairline above / below the
++    // target row via inset box-shadow on the red-pencil token.
++    expect(css).toMatch(
++      /\.rail-lane\.drop-target-above\s*\{[\s\S]*?box-shadow:\s*inset\s+0\s+2px\s+0\s+0\s+var\(--er-red-pencil\)/,
++    );
++    expect(css).toMatch(
++      /\.rail-lane\.drop-target-below\s*\{[\s\S]*?box-shadow:\s*inset\s+0\s+-2px\s+0\s+0\s+var\(--er-red-pencil\)/,
++    );
++  });
++
++  it('Task 5.4.2: bay-head meta total INCLUDES hidden lanes\' entry counts', async () => {
++    // Step 5.4.2 verification: hidden lanes don't render swimlanes
++    // but their entries DO count in dashboard stats. The server
++    // emits the total via `countTotal(lanes)` which iterates every
++    // lane bucket regardless of visibility (visibility is a client-
++    // side concern; server has no knowledge of it). This invariant
++    // ships at the server boundary.
++    //
++    // Fixture: 3 lanes (default=1 entry, mockups=2 entries, qa=1
++    // entry) = 4 total. Even if the operator hides any subset
++    // client-side, the server-rendered total is still 4.
++    const r = await getHtml(app, '/dev/editorial-studio');
++    expect(r.status).toBe(200);
++    expect(r.html).toContain('4 entries');
++  });
++
+   it('each swimlane emits a .stage-grid with one column per template stage', async () => {
+     const r = await getHtml(app, '/dev/editorial-studio');
+     expect(r.status).toBe(200);
+diff --git a/plugins/deskwork-studio/public/css/dashboard-swimlane.css b/plugins/deskwork-studio/public/css/dashboard-swimlane.css
+index 40c23f5..552461b 100644
+--- a/plugins/deskwork-studio/public/css/dashboard-swimlane.css
++++ b/plugins/deskwork-studio/public/css/dashboard-swimlane.css
+@@ -116,6 +116,116 @@
+   text-transform: none;
+ }
+ 
++/* ----------------------------------------------------------------
++ * Task 5.5 — saveable focus presets surface. Lives INSIDE the rail
++ * head per `.claude/rules/affordance-placement.md` (component-
++ * attached, not toolbar-attached). The Save button captures the
++ * four-axis state; the list surface renders one row per stored
++ * preset with a Load button (preset name) + Delete button (×).
++ * ---------------------------------------------------------------- */
++
++.lane-rail .rail-presets {
++  margin-top: 0.4rem;
++  display: flex;
++  flex-direction: column;
++  gap: 0.3rem;
++}
++
++.lane-rail .preset-save {
++  font-family: var(--er-font-mono);
++  font-size: 0.6rem;
++  letter-spacing: 0.12em;
++  text-transform: uppercase;
++  background: transparent;
++  border: 1px dashed var(--er-paper-3);
++  color: var(--er-ink-soft);
++  padding: 0.3rem 0.4rem;
++  cursor: pointer;
++  min-height: 24px;
++  transition: background-color 0.18s ease, color 0.18s ease;
++}
++
++.lane-rail .preset-save:hover,
++.lane-rail .preset-save:focus-visible {
++  background: var(--er-paper-3);
++  color: var(--er-ink);
++  outline: 2px solid var(--er-proof-blue, currentColor);
++  outline-offset: 1px;
++}
++
++.lane-rail .preset-save.is-flashing {
++  background: var(--er-proof-blue, #2563eb);
++  color: #fff;
++  border-color: var(--er-proof-blue, #2563eb);
++}
++
++.lane-rail .preset-list {
++  display: flex;
++  flex-direction: column;
++  gap: 0.2rem;
++}
++
++.lane-rail .preset-empty {
++  font-family: var(--er-font-mono);
++  font-size: 0.55rem;
++  color: var(--er-faded);
++  letter-spacing: 0.08em;
++  padding: 0.2rem 0.3rem;
++  text-transform: none;
++}
++
++.lane-rail .preset-row {
++  display: flex;
++  align-items: center;
++  gap: 0.3rem;
++  min-height: 24px;
++}
++
++.lane-rail .preset-load {
++  flex: 1;
++  text-align: left;
++  font-family: var(--er-font-mono);
++  font-size: 0.6rem;
++  background: transparent;
++  border: 1px solid var(--er-paper-3);
++  color: var(--er-ink);
++  padding: 0.25rem 0.35rem;
++  cursor: pointer;
++  min-height: 24px;
++  letter-spacing: 0.04em;
++  text-transform: none;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.lane-rail .preset-load:hover,
++.lane-rail .preset-load:focus-visible {
++  background: var(--er-paper-3);
++  outline: 2px solid var(--er-proof-blue, currentColor);
++  outline-offset: 1px;
++}
++
++.lane-rail .preset-delete {
++  font-family: var(--er-font-mono);
++  font-size: 0.75rem;
++  background: transparent;
++  border: 1px solid transparent;
++  color: var(--er-faded);
++  cursor: pointer;
++  min-width: 24px;
++  min-height: 24px;
++  line-height: 1;
++  padding: 0;
++}
++
++.lane-rail .preset-delete:hover,
++.lane-rail .preset-delete:focus-visible {
++  color: var(--er-red-pencil, #c0392b);
++  outline: 2px solid var(--er-proof-blue, currentColor);
++  outline-offset: 1px;
++}
++
+ .rail-lane {
+   display: flex;
+   align-items: baseline;
+@@ -213,6 +323,29 @@
+   user-select: none;
+ }
+ 
++/* Task 5.4 drag-and-drop feedback. While a row is being dragged the
++ * source dims; the row whose midpoint the cursor is above gets a
++ * red-pencil insertion hairline on the appropriate edge ("above" or
++ * "below" the target row's center Y). The grabbing cursor persists
++ * during the drag so the operator's pointer state matches the
++ * dragstart's intent. */
++.rail-lane.is-dragging {
++  opacity: 0.45;
++  cursor: grabbing;
++}
++
++.rail-lane.is-dragging .rail-drag {
++  cursor: grabbing;
++}
++
++.rail-lane.drop-target-above {
++  box-shadow: inset 0 2px 0 0 var(--er-red-pencil);
++}
++
++.rail-lane.drop-target-below {
++  box-shadow: inset 0 -2px 0 0 var(--er-red-pencil);
++}
++
+ /* ============================================================
+  *  Bay main column — focus-chip strip + swimlanes.
+  * ============================================================ */
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts
+index 4124cbd..56f849f 100644
+--- a/plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts
+@@ -414,6 +414,42 @@ function bindHandlers(state: CollapseState, projectKey: string): void {
+   }
+ }
+ 
++/**
++ * Module-level singleton — written by `initSwimlaneCollapse`,
++ * mutated in-place by `reapplyCollapseFromStorage` so the bound
++ * `swim-head` / `stage-col` click handlers (which closure-capture
++ * the state object) keep operating on the same Sets / Maps after a
++ * preset apply. See `swimlane.ts:activeState` for the same pattern
++ * + rationale.
++ */
++let activeState: CollapseState | null = null;
++
++/**
++ * Re-read storage + re-apply to the DOM. Used by the Task 5.5
++ * preset controller after writing through the lane-collapse + stage-
++ * collapse storage keys. No-op when `initSwimlaneCollapse` hasn't
++ * fired yet (controllers run in order at DOMContentLoaded).
++ */
++export function reapplyCollapseFromStorage(): void {
++  if (activeState === null) return;
++  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
++  if (shell === null) return;
++  const projectKey = resolveProjectKey(shell);
++
++  const nextLanes = readStoredLanes(laneCollapseKey(projectKey));
++  const nextStages = readStoredStages(stageCollapseKey(projectKey));
++
++  // Mutate the singleton in-place so already-bound handlers see the
++  // new lane + stage state through their closure-captured references.
++  activeState.lanes.clear();
++  for (const id of nextLanes) activeState.lanes.add(id);
++  activeState.stages.clear();
++  for (const [laneId, stages] of nextStages) {
++    activeState.stages.set(laneId, stages);
++  }
++  applyCollapseState(activeState);
++}
++
+ /**
+  * Entry point — wire collapse-chev handlers + restore persisted
+  * state. No-op when there's no bay-shell on the page.
+@@ -427,6 +463,7 @@ export function initSwimlaneCollapse(): void {
+     lanes: readStoredLanes(laneCollapseKey(projectKey)),
+     stages: readStoredStages(stageCollapseKey(projectKey)),
+   };
++  activeState = state;
+ 
+   applyCollapseState(state);
+   bindHandlers(state, projectKey);
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
+new file mode 100644
+index 0000000..8aca8d3
+--- /dev/null
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
+@@ -0,0 +1,403 @@
++/**
++ * Lane reorder (drag-to-reorder) controller — Phase 5 Task 5.4.
++ *
++ * Wires HTML5 native drag-and-drop on the lane-visibility rail so the
++ * operator can reorder lanes by dragging a `.rail-lane` row up or
++ * down. The new order:
++ *
++ *   - reorders the rail rows in the DOM (visible reorder),
++ *   - reorders the focus-chip strip (`.focus-chip[data-focus-chip]`)
++ *     to match, so the operator's mental model of "chip order
++ *     mirrors rail order" is preserved across reorder gestures,
++ *   - reorders the per-lane swim + stub pairs inside the bay so the
++ *     bay column matches the new rail order,
++ *   - persists to localStorage as `string[]` of lane ids under
++ *     `deskwork:dashboard:<projectKey>:lane-order` — per-operator,
++ *     per-project (matches the other 5.x state idioms — visibility,
++ *     focus, view-mode, collapse, compose). PRD `Two split state
++ *     axes for lanes` leaves `.deskwork/lane-order.json` (project-
++ *     wide) open as a Phase 6 enhancement; localStorage is the
++ *     Phase 5 ship.
++ *
++ * Per `.claude/rules/affordance-placement.md`, the drag handle is ON
++ * the rail row (`.rail-drag` glyph + `cursor: grab`), not in a
++ * separate toolbar. HTML5 DnD requires `draggable="true"` on the
++ * source root (`.rail-lane`), so the entire row is grabbable —
++ * pragmatic given the browser contract; the visible handle anchors
++ * the operator's mental model.
++ *
++ * Per THESIS Consequence 2 (no sidecar mutation): order is pure
++ * client-side state. No CLI calls; no `writeSidecar`; no
++ * `journal.append`. The order surfaces in the operator's local view
++ * only — collaborators see their own ordering.
++ *
++ * Drop targeting: dragover over a target row computes the cursor's
++ * Y vs the target's `getBoundingClientRect()` midpoint and applies
++ * `.drop-target-above` or `.drop-target-below` for visual feedback
++ * (CSS draws an insertion hairline on the corresponding edge).
++ *
++ * Restoration: on init, the stored order (if any) wins over the
++ * server-rendered order. The validity check (every stored id present
++ * in the live lane set) prevents stale order entries from breaking
++ * the reorder pass when a lane is removed on disk; mismatch
++ * collapses to the server order.
++ */
++
++import {
++  readStoredStringArray,
++  resolveProjectKey,
++  STORAGE_KEY_PREFIX,
++} from './swimlane-storage.ts';
++
++const ORDER_KEY_SUFFIX = ':lane-order';
++
++function orderKey(projectKey: string): string {
++  return STORAGE_KEY_PREFIX + projectKey + ORDER_KEY_SUFFIX;
++}
++
++// Delegates to the shared string-array reader in swimlane-storage.ts.
++// The lane order surface keeps the positional array (order matters);
++// the focus / hidden surface in swimlane.ts projects into a Set.
++const readStoredOrder = readStoredStringArray;
++
++function writeStoredOrder(key: string, value: readonly string[]): void {
++  try {
++    window.localStorage.setItem(key, JSON.stringify(value));
++  } catch {
++    // localStorage unavailable — the reorder still applies in-page;
++    // the operator just loses persistence across reloads.
++  }
++}
++
++/**
++ * Reconcile a stored order with the current lane set. The stored
++ * order wins only when EVERY stored id is present in the live set;
++ * otherwise the live (server-rendered) order is the source of truth.
++ * Lanes added on disk since the stored order was written are
++ * appended at the tail.
++ */
++function reconcileOrder(
++  stored: readonly string[] | null,
++  live: readonly string[],
++): readonly string[] {
++  if (stored === null) return live;
++  const liveSet = new Set(live);
++  for (const id of stored) {
++    if (!liveSet.has(id)) return live;
++  }
++  const storedSet = new Set(stored);
++  const tail = live.filter((id) => !storedSet.has(id));
++  return [...stored, ...tail];
++}
++
++function collectRailLanes(rail: HTMLElement): string[] {
++  const ids: string[] = [];
++  for (const el of rail.querySelectorAll<HTMLElement>('[data-rail-lane]')) {
++    const id = el.dataset.railLane;
++    if (id !== undefined) ids.push(id);
++  }
++  return ids;
++}
++
++/**
++ * Reorder DOM nodes within a parent so they appear in the given
++ * sequence. Nodes outside the sequence (e.g. backdrop, headings,
++ * other chrome) are left in place — appendChild on a node already in
++ * the parent moves it to the end, so we append each target node in
++ * sequence to land them in order at the tail. Non-target siblings
++ * remain at their original positions.
++ *
++ * Caller provides:
++ *   - `parent`: the element whose direct children include the targets,
++ *   - `idForChild`: a function returning the order-id of a child or
++ *     null when the child is not a target node.
++ *   - `desiredOrder`: the sequence of ids the targets should appear
++ *     in (left-to-right / top-to-bottom).
++ */
++function reorderChildren(
++  parent: HTMLElement,
++  idForChild: (child: HTMLElement) => string | null,
++  desiredOrder: readonly string[],
++): void {
++  const byId = new Map<string, HTMLElement>();
++  for (const child of Array.from(parent.children)) {
++    if (!(child instanceof HTMLElement)) continue;
++    const id = idForChild(child);
++    if (id !== null) byId.set(id, child);
++  }
++  for (const id of desiredOrder) {
++    const el = byId.get(id);
++    if (el !== undefined) parent.appendChild(el);
++  }
++}
++
++function reorderRail(rail: HTMLElement, order: readonly string[]): void {
++  reorderChildren(
++    rail,
++    (child) => {
++      if (!child.classList.contains('rail-lane')) return null;
++      return child.dataset.railLane ?? null;
++    },
++    order,
++  );
++}
++
++function reorderFocusStrip(order: readonly string[]): void {
++  const strip = document.querySelector<HTMLElement>('[data-focus-strip]');
++  if (strip === null) return;
++  reorderChildren(
++    strip,
++    (child) => {
++      const id = child.dataset.focusChip;
++      // The "All" chip carries `data-focus-chip-all`, not `data-focus-
++      // chip`; skipping it leaves it pinned at its original position
++      // (before the strip-divider), which matches the operator's
++      // mental model — "All" is not a lane.
++      return id ?? null;
++    },
++    order,
++  );
++}
++
++function reorderBay(order: readonly string[]): void {
++  const bay = document.querySelector<HTMLElement>('[data-bay]');
++  if (bay === null) return;
++  // The bay holds (head, swim+stub pairs...). Each lane has TWO
++  // direct-child nodes — the swim and the stub. Append the pair in
++  // sequence so the bay column matches the rail order. Non-lane
++  // siblings (bay-head, etc.) stay at their original positions
++  // because we only move nodes whose id resolution returns non-null.
++  const swimsById = new Map<string, HTMLElement>();
++  const stubsById = new Map<string, HTMLElement>();
++  for (const child of Array.from(bay.children)) {
++    if (!(child instanceof HTMLElement)) continue;
++    if (child.classList.contains('swim')) {
++      const id = child.dataset.laneId;
++      if (id !== undefined) swimsById.set(id, child);
++    } else if (child.classList.contains('swim-stub')) {
++      const id = child.dataset.swimStub;
++      if (id !== undefined) stubsById.set(id, child);
++    }
++  }
++  for (const id of order) {
++    const swim = swimsById.get(id);
++    if (swim !== undefined) bay.appendChild(swim);
++    const stub = stubsById.get(id);
++    if (stub !== undefined) bay.appendChild(stub);
++  }
++}
++
++/**
++ * Compute the desired new order after dropping `sourceId` relative
++ * to a target row. `position === 'above'` inserts the source
++ * directly before the target; `'below'` directly after. Source's
++ * old slot is removed first so the new index counts from the post-
++ * removal positions.
++ */
++export function computeReorder(
++  order: readonly string[],
++  sourceId: string,
++  targetId: string,
++  position: 'above' | 'below',
++): readonly string[] {
++  if (sourceId === targetId) return order;
++  const without = order.filter((id) => id !== sourceId);
++  const targetIdx = without.indexOf(targetId);
++  if (targetIdx === -1) return order;
++  const insertIdx = position === 'above' ? targetIdx : targetIdx + 1;
++  return [
++    ...without.slice(0, insertIdx),
++    sourceId,
++    ...without.slice(insertIdx),
++  ];
++}
++
++function clearDropTargets(rail: HTMLElement): void {
++  for (const row of rail.querySelectorAll<HTMLElement>('.rail-lane')) {
++    row.classList.remove('drop-target-above', 'drop-target-below');
++  }
++}
++
++/**
++ * Strict positional equality on two lane-order arrays. Used by the
++ * drop handler to detect no-op drops (same source-target or
++ * `computeReorder` short-circuit) so we don't bother writing the
++ * unchanged array back to localStorage.
++ */
++function orderEquals(a: readonly string[], b: readonly string[]): boolean {
++  if (a.length !== b.length) return false;
++  for (let i = 0; i < a.length; i += 1) {
++    if (a[i] !== b[i]) return false;
++  }
++  return true;
++}
++
++function findRowFromTarget(target: EventTarget | null): HTMLElement | null {
++  if (!(target instanceof Element)) return null;
++  const closest = target.closest<HTMLElement>('[data-rail-lane]');
++  return closest;
++}
++
++/**
++ * Shared HTML5-DnD precondition resolver for `dragover` and `drop`:
++ * both events bail when not actively dragging, otherwise resolve the
++ * target lane id from the event and `preventDefault` (required by
++ * HTML5 DnD to allow the subsequent drop). Returns the target row +
++ * id when the event should proceed; null when it should be ignored.
++ */
++function resolveDropTarget(
++  ev: DragEvent,
++  state: DragControllerState,
++): { row: HTMLElement; id: string } | null {
++  if (state.draggingId === null) return null;
++  const row = findRowFromTarget(ev.target);
++  if (row === null) return null;
++  const id = row.dataset.railLane;
++  if (id === undefined) return null;
++  ev.preventDefault();
++  return { row, id };
++}
++
++interface DragControllerState {
++  order: string[];
++  draggingId: string | null;
++}
++
++function bindDragHandlers(
++  rail: HTMLElement,
++  projectKey: string,
++  state: DragControllerState,
++): void {
++  rail.addEventListener('dragstart', (ev) => {
++    const row = findRowFromTarget(ev.target);
++    if (row === null) return;
++    const id = row.dataset.railLane;
++    if (id === undefined) return;
++    // Per AUDIT-20260528-30 — if a previous drag's `dragend` failed
++    // to fire (browser quirks: disconnect mid-drag, page navigation,
++    // dev-tools-cancellation), a stale `.is-dragging` class may
++    // survive on an old row. Sweep before stamping the new source so
++    // the visual state matches the actual drag.
++    for (const stale of rail.querySelectorAll('.is-dragging')) {
++      stale.classList.remove('is-dragging');
++    }
++    state.draggingId = id;
++    row.classList.add('is-dragging');
++    if (ev.dataTransfer !== null) {
++      ev.dataTransfer.effectAllowed = 'move';
++      ev.dataTransfer.setData('text/plain', id);
++    }
++  });
++
++  rail.addEventListener('dragover', (ev) => {
++    const resolved = resolveDropTarget(ev, state);
++    if (resolved === null) return;
++    if (ev.dataTransfer !== null) ev.dataTransfer.dropEffect = 'move';
++    if (resolved.id === state.draggingId) {
++      clearDropTargets(rail);
++      return;
++    }
++    const rect = resolved.row.getBoundingClientRect();
++    const midY = rect.top + rect.height / 2;
++    const position: 'above' | 'below' = ev.clientY < midY ? 'above' : 'below';
++    clearDropTargets(rail);
++    resolved.row.classList.add(
++      position === 'above' ? 'drop-target-above' : 'drop-target-below',
++    );
++  });
++
++  rail.addEventListener('dragleave', (ev) => {
++    // dragleave fires per-row; only clear when the cursor leaves the
++    // rail entirely. relatedTarget is the element the cursor entered;
++    // null means "left the document"; outside the rail means "left
++    // the rail."
++    const next = ev.relatedTarget;
++    if (next instanceof Node && rail.contains(next)) return;
++    clearDropTargets(rail);
++  });
++
++  rail.addEventListener('drop', (ev) => {
++    const resolved = resolveDropTarget(ev, state);
++    if (resolved === null || state.draggingId === null) return;
++    const rect = resolved.row.getBoundingClientRect();
++    const midY = rect.top + rect.height / 2;
++    const position: 'above' | 'below' = ev.clientY < midY ? 'above' : 'below';
++    const next = computeReorder(
++      state.order,
++      state.draggingId,
++      resolved.id,
++      position,
++    );
++    // Per AUDIT-20260528-29 — skip the DOM reorder + localStorage
++    // write when the drop didn't move anything (same source as
++    // target, or computeReorder short-circuited). `is-visibility-
++    // hidden` / `is-focus-hidden` / `aria-pressed` classes survive
++    // `appendChild` moves on a per-id basis, so no `applyState` call
++    // is needed after the reorder; the appended class state IS the
++    // state.
++    const changed = !orderEquals(state.order, next);
++    if (changed) {
++      state.order = [...next];
++      reorderRail(rail, state.order);
++      reorderFocusStrip(state.order);
++      reorderBay(state.order);
++      writeStoredOrder(orderKey(projectKey), state.order);
++    }
++    clearDropTargets(rail);
++  });
++
++  rail.addEventListener('dragend', () => {
++    if (state.draggingId !== null) {
++      // Per AUDIT-20260528-28 — escape the id via CSS.escape; lane
++      // ids are operator-authored (`.deskwork/lanes/<id>.json`) and
++      // are not constrained to alphanumeric. An id containing `"`,
++      // `]`, or `\` would break the attribute selector. Mirrors the
++      // CSS.escape usage in `swimlane.ts:138,141` for the same
++      // data dictionary.
++      const sourceRow = rail.querySelector<HTMLElement>(
++        `[data-rail-lane="${CSS.escape(state.draggingId)}"]`,
++      );
++      if (sourceRow !== null) sourceRow.classList.remove('is-dragging');
++    }
++    state.draggingId = null;
++    clearDropTargets(rail);
++  });
++}
++
++/**
++ * Entry point — wire reorder controller on the lane rail. No-op when
++ * the bay shell or rail is absent. Applies any stored order on init
++ * so reload restores the operator's reordering.
++ */
++export function initSwimlaneDrag(): void {
++  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
++  if (shell === null) return;
++  const rail = document.querySelector<HTMLElement>('[data-lane-rail]');
++  if (rail === null) return;
++  const live = collectRailLanes(rail);
++  if (live.length === 0) return;
++
++  const projectKey = resolveProjectKey(shell);
++  const stored = readStoredOrder(orderKey(projectKey));
++  const initial = reconcileOrder(stored, live);
++
++  // Apply the reconciled order on init (only when it differs from
++  // the live server-rendered order). When stored === live the apply
++  // is a no-op; when stored is a strict subset / superset the live
++  // order wins (per `reconcileOrder`'s validity check).
++  const orderChanged
++    = initial.length !== live.length
++      || initial.some((id, idx) => id !== live[idx]);
++  if (orderChanged) {
++    reorderRail(rail, initial);
++    reorderFocusStrip(initial);
++    reorderBay(initial);
++  }
++
++  const state: DragControllerState = {
++    order: [...initial],
++    draggingId: null,
++  };
++
++  bindDragHandlers(rail, projectKey, state);
++}
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts
+new file mode 100644
+index 0000000..a3d4b3b
+--- /dev/null
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts
+@@ -0,0 +1,356 @@
++/**
++ * Pure preset-store helpers for the Phase 5 Task 5.5 saveable focus
++ * presets feature. Holds the `FocusPreset` type, the storage-key
++ * resolvers, the snapshot + apply + save + delete + list functions —
++ * everything that DOES NOT touch the DOM-bound controller wiring.
++ *
++ * Split from `swimlane-presets.ts` to keep both files under the
++ * project's 300–500 line cap. The controller imports from here; the
++ * jsdom test suite also imports from here so it can verify snapshot
++ * + apply round-trips without instantiating the full controller.
++ *
++ * Per THESIS Consequence 2 (no sidecar mutation): every helper here
++ * operates on localStorage. No CLI calls, no `writeSidecar`, no
++ * `journal.append`. Failures collapse to the read-empty / write-no-op
++ * fallbacks the other Phase 5 controllers already use.
++ */
++
++import {
++  readStoredObjectMap,
++  STORAGE_KEY_PREFIX,
++} from './swimlane-storage.ts';
++import { reapplyFromStorage as reapplySwimlaneFromStorage } from './swimlane.ts';
++import { reapplyCollapseFromStorage } from './swimlane-collapse.ts';
++import { reapplyViewToggleFromStorage } from './swimlane-view-toggle.ts';
++
++const PRESETS_KEY_SUFFIX = ':focus-presets';
++const FOCUS_KEY_SUFFIX = ':focus';
++const VISIBILITY_KEY_SUFFIX = ':visibility';
++const VIEW_MODE_KEY_SUFFIX = ':view-mode';
++const LANE_COLLAPSE_KEY_SUFFIX = ':lane-collapse';
++const STAGE_COLLAPSE_KEY_SUFFIX = ':stage-collapse';
++
++type ViewMode = 'kanban' | 'list';
++
++export interface FocusPreset {
++  readonly id: string;
++  readonly name: string;
++  readonly createdAt: string;
++  readonly visibleLanes: readonly string[];
++  readonly focusedLanes: readonly string[];
++  readonly viewModePerLane: Readonly<Record<string, ViewMode>>;
++  readonly laneCollapseState: Readonly<Record<string, boolean>>;
++  readonly stageCollapseState: Readonly<
++    Record<string, Readonly<Record<string, boolean>>>
++  >;
++}
++
++export function presetsKey(projectKey: string): string {
++  return STORAGE_KEY_PREFIX + projectKey + PRESETS_KEY_SUFFIX;
++}
++
++function focusKey(projectKey: string): string {
++  return STORAGE_KEY_PREFIX + projectKey + FOCUS_KEY_SUFFIX;
++}
++
++function visibilityKey(projectKey: string): string {
++  return STORAGE_KEY_PREFIX + projectKey + VISIBILITY_KEY_SUFFIX;
++}
++
++function viewModeKey(projectKey: string): string {
++  return STORAGE_KEY_PREFIX + projectKey + VIEW_MODE_KEY_SUFFIX;
++}
++
++function laneCollapseKey(projectKey: string): string {
++  return STORAGE_KEY_PREFIX + projectKey + LANE_COLLAPSE_KEY_SUFFIX;
++}
++
++function stageCollapseKey(projectKey: string): string {
++  return STORAGE_KEY_PREFIX + projectKey + STAGE_COLLAPSE_KEY_SUFFIX;
++}
++
++function isViewMode(value: unknown): value is ViewMode {
++  return value === 'kanban' || value === 'list';
++}
++
++function isStringArray(value: unknown): value is readonly string[] {
++  return Array.isArray(value) && value.every((v) => typeof v === 'string');
++}
++
++function isObject(value: unknown): value is { readonly [k: string]: unknown } {
++  return value !== null && typeof value === 'object' && !Array.isArray(value);
++}
++
++function isBooleanFlagMap(value: unknown): value is {
++  readonly [k: string]: boolean;
++} {
++  if (!isObject(value)) return false;
++  for (const flag of Object.values(value)) {
++    if (typeof flag !== 'boolean') return false;
++  }
++  return true;
++}
++
++function isPreset(value: unknown): value is FocusPreset {
++  if (!isObject(value)) return false;
++  if (typeof value.id !== 'string') return false;
++  if (typeof value.name !== 'string') return false;
++  if (typeof value.createdAt !== 'string') return false;
++  if (!isStringArray(value.visibleLanes)) return false;
++  if (!isStringArray(value.focusedLanes)) return false;
++  if (!isObject(value.viewModePerLane)) return false;
++  for (const mode of Object.values(value.viewModePerLane)) {
++    if (!isViewMode(mode)) return false;
++  }
++  if (!isBooleanFlagMap(value.laneCollapseState)) return false;
++  if (!isObject(value.stageCollapseState)) return false;
++  for (const inner of Object.values(value.stageCollapseState)) {
++    if (!isBooleanFlagMap(inner)) return false;
++  }
++  return true;
++}
++
++/**
++ * Read the presets store from localStorage. Returns an empty Map on
++ * any read failure (missing entry, parse error, wrong root shape) —
++ * the controller treats localStorage as best-effort persistence and
++ * never throws on read.
++ */
++export function readPresets(projectKey: string): Map<string, FocusPreset> {
++  return readStoredObjectMap(presetsKey(projectKey), isPreset);
++}
++
++function writePresets(
++  projectKey: string,
++  presets: ReadonlyMap<string, FocusPreset>,
++): void {
++  try {
++    const obj: Record<string, FocusPreset> = {};
++    for (const [id, preset] of presets) {
++      obj[id] = preset;
++    }
++    window.localStorage.setItem(presetsKey(projectKey), JSON.stringify(obj));
++  } catch {
++    // localStorage unavailable — in-page state still works.
++  }
++}
++
++function collectAllLaneIds(): string[] {
++  const out: string[] = [];
++  for (const el of document.querySelectorAll<HTMLElement>('[data-rail-lane]')) {
++    const id = el.dataset.railLane;
++    if (id !== undefined) out.push(id);
++  }
++  return out;
++}
++
++function readJsonArrayOfStrings(key: string): string[] {
++  const out: string[] = [];
++  const raw = window.localStorage.getItem(key);
++  if (raw === null) return out;
++  try {
++    const parsed: unknown = JSON.parse(raw);
++    if (Array.isArray(parsed)) {
++      for (const v of parsed) if (typeof v === 'string') out.push(v);
++    }
++  } catch {
++    // Read collapsed to empty.
++  }
++  return out;
++}
++
++/**
++ * Snapshot the operator's current view across all four state axes
++ * by reading directly from the constituent localStorage keys. The
++ * snapshot is what `Save current as preset…` captures. Reading from
++ * storage (rather than from the live DOM) is intentional: the
++ * storage keys are the canonical source for each axis, and the
++ * other controllers persist on every mutation, so storage and DOM
++ * are in lockstep. Reading from storage keeps the dependency graph
++ * one-directional (presets reads constituent stores; doesn't reach
++ * into the other controllers' state).
++ */
++export function snapshotCurrentState(projectKey: string): {
++  visibleLanes: readonly string[];
++  focusedLanes: readonly string[];
++  viewModePerLane: Record<string, ViewMode>;
++  laneCollapseState: Record<string, boolean>;
++  stageCollapseState: Record<string, Record<string, boolean>>;
++} {
++  // visible-lanes is `all lanes − hidden set`. Reading allLanes from
++  // the rail rows is the most-faithful source — the rail is the
++  // operator-perceivable inventory.
++  const allLanes = collectAllLaneIds();
++  const hidden = new Set(readJsonArrayOfStrings(visibilityKey(projectKey)));
++  const visibleLanes = allLanes.filter((id) => !hidden.has(id));
++
++  const focusedLanes = readJsonArrayOfStrings(focusKey(projectKey));
++
++  const viewModePerLane: Record<string, ViewMode> = {};
++  const viewModeMap = readStoredObjectMap<ViewMode>(
++    viewModeKey(projectKey),
++    isViewMode,
++  );
++  for (const [laneId, mode] of viewModeMap) {
++    viewModePerLane[laneId] = mode;
++  }
++
++  const laneCollapseState: Record<string, boolean> = {};
++  for (const laneId of readJsonArrayOfStrings(laneCollapseKey(projectKey))) {
++    laneCollapseState[laneId] = true;
++  }
++
++  const stageCollapseState: Record<string, Record<string, boolean>> = {};
++  const stageMap = readStoredObjectMap<readonly string[]>(
++    stageCollapseKey(projectKey),
++    isStringArray,
++  );
++  for (const [laneId, stages] of stageMap) {
++    const inner: Record<string, boolean> = {};
++    for (const stage of stages) inner[stage] = true;
++    stageCollapseState[laneId] = inner;
++  }
++
++  return {
++    visibleLanes,
++    focusedLanes,
++    viewModePerLane,
++    laneCollapseState,
++    stageCollapseState,
++  };
++}
++
++function writeJsonOrIgnore(key: string, value: unknown): void {
++  try {
++    window.localStorage.setItem(key, JSON.stringify(value));
++  } catch {
++    // localStorage unavailable — DOM apply still happens.
++  }
++}
++
++/**
++ * Apply a preset by writing through its four state axes to the
++ * constituent storage keys, then re-applying each controller's DOM
++ * state from storage in the documented sequence:
++ *
++ *   1. visibility — gate for focus (hidden lanes can't be focused).
++ *   2. view-mode — independent axis; reapply doesn't depend on focus.
++ *   3. collapse — independent axis; lane + stage scope.
++ *   4. focus — last, because the visibility pass establishes the
++ *      universe of focusable lanes and may force-hide a lane that
++ *      the preset's `focusedLanes` then re-includes.
++ *
++ * Storage writes happen FIRST (all four axes) so each `reapply*`
++ * call reads a consistent post-preset world. Calling reapply between
++ * writes would race the controllers against a partial state.
++ */
++export function applyPreset(projectKey: string, preset: FocusPreset): void {
++  // 1. Visibility — visible-lanes is the inverse of the on-disk
++  //    `hidden` set. Rebuild as "every lane known to the page that's
++  //    NOT in the preset's visibleLanes set."
++  const allLanes = collectAllLaneIds();
++  const visibleSet = new Set(preset.visibleLanes);
++  const hidden = allLanes.filter((id) => !visibleSet.has(id));
++  writeJsonOrIgnore(visibilityKey(projectKey), hidden);
++
++  // 2. View-mode — per-lane map.
++  writeJsonOrIgnore(viewModeKey(projectKey), preset.viewModePerLane);
++
++  // 3a. Lane-collapse — array of collapsed-lane ids.
++  const collapsedLanes: string[] = [];
++  for (const [laneId, flag] of Object.entries(preset.laneCollapseState)) {
++    if (flag) collapsedLanes.push(laneId);
++  }
++  writeJsonOrIgnore(laneCollapseKey(projectKey), collapsedLanes);
++
++  // 3b. Stage-collapse — `Record<laneId, string[]>`.
++  const stageOut: Record<string, string[]> = {};
++  for (const [laneId, inner] of Object.entries(preset.stageCollapseState)) {
++    const stages: string[] = [];
++    for (const [stage, flag] of Object.entries(inner)) {
++      if (flag) stages.push(stage);
++    }
++    if (stages.length > 0) stageOut[laneId] = stages;
++  }
++  writeJsonOrIgnore(stageCollapseKey(projectKey), stageOut);
++
++  // 4. Focus — focused-lanes array.
++  writeJsonOrIgnore(focusKey(projectKey), preset.focusedLanes);
++
++  // Re-apply each constituent controller from storage. Order in the
++  // visual / DOM apply matters less than the storage-write order
++  // (which is the authoritative sequence) but still follows the
++  // contract: lane chrome resolves (view-mode + collapse) → focus
++  // pass paints visibility + focus state in lockstep.
++  reapplyViewToggleFromStorage();
++  reapplyCollapseFromStorage();
++  reapplySwimlaneFromStorage();
++}
++
++/**
++ * Save a snapshot of the current state under a new id + name.
++ * Returns the saved preset. The id is a timestamp-derived token —
++ * collision-resistant for human use without dragging in a UUID
++ * library. The createdAt timestamp is the same instant, ISO-8601.
++ */
++export function savePresetFromCurrent(
++  projectKey: string,
++  name: string,
++): FocusPreset {
++  const now = new Date();
++  const id = `p${now.getTime().toString(36)}`;
++  const snapshot = snapshotCurrentState(projectKey);
++  const preset: FocusPreset = {
++    id,
++    name,
++    createdAt: now.toISOString(),
++    visibleLanes: snapshot.visibleLanes,
++    focusedLanes: snapshot.focusedLanes,
++    viewModePerLane: snapshot.viewModePerLane,
++    laneCollapseState: snapshot.laneCollapseState,
++    stageCollapseState: snapshot.stageCollapseState,
++  };
++  const presets = readPresets(projectKey);
++  presets.set(id, preset);
++  writePresets(projectKey, presets);
++  return preset;
++}
++
++/**
++ * Delete a preset by id. Returns true when the preset was present
++ * and removed; false when the id wasn't in the store.
++ */
++export function deletePreset(projectKey: string, id: string): boolean {
++  const presets = readPresets(projectKey);
++  if (!presets.has(id)) return false;
++  presets.delete(id);
++  writePresets(projectKey, presets);
++  return true;
++}
++
++/**
++ * List all stored presets, sorted by creation timestamp (oldest
++ * first). The order matches what the Load dropdown surfaces to the
++ * operator — first-created at the top, newest at the bottom — so
++ * the operator's mental model of "I just saved one; it should be
++ * the latest entry" matches the surface.
++ */
++export function listPresets(projectKey: string): readonly FocusPreset[] {
++  const presets = readPresets(projectKey);
++  return Array.from(presets.values()).sort((a, b) =>
++    a.createdAt.localeCompare(b.createdAt),
++  );
++}
++
++/**
++ * Parse the `?preset=<id>` parameter from the current URL. Returns
++ * the trimmed id when present + non-empty, otherwise null.
++ */
++export function parsePresetIdFromUrl(): string | null {
++  const url = new URL(window.location.href);
++  const raw = url.searchParams.get('preset');
++  if (raw === null) return null;
++  const trimmed = raw.trim();
++  if (trimmed.length === 0) return null;
++  return trimmed;
++}
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts
+new file mode 100644
+index 0000000..4657237
+--- /dev/null
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts
+@@ -0,0 +1,230 @@
++/**
++ * Saveable focus presets controller — Phase 5 Task 5.5.
++ *
++ * Thin DOM-binding layer for the preset save / load / delete
++ * affordances. All store-side semantics (read, write, snapshot,
++ * apply, list) live in the sibling `swimlane-presets-store.ts` so
++ * this file stays focused on the click-handler contract + the
++ * surface inside the rail head.
++ *
++ * Affordance placement (per `.claude/rules/affordance-placement.md`):
++ * the Save + Load + Delete controls live INSIDE the rail head — the
++ * "Lanes" head at the top of `.lane-rail`. They are not surfaced in
++ * the page-level masthead because the affordances control rail-and-
++ * bay state, not page-wide state. Component-attached, not toolbar-
++ * attached.
++ *
++ * Deep-link URL pattern: `/dev/editorial-studio?preset=<id>` reads
++ * the preset id from `window.location.search` on init and applies
++ * the preset to the four state axes after the constituent
++ * controllers have wired themselves. The reapply functions are no-
++ * ops until each constituent controller's `init*` fires, which is
++ * why `initSwimlanePresets` is invoked last in the editorial-
++ * studio-client.ts dispatch order.
++ *
++ * Per THESIS Consequence 2 (no sidecar mutation): preset state is
++ * pure client-side localStorage — see `swimlane-presets-store.ts`
++ * for the canonical reasoning.
++ */
++
++import {
++  resolveProjectKey,
++} from './swimlane-storage.ts';
++import {
++  type FocusPreset,
++  applyPreset,
++  deletePreset,
++  listPresets,
++  parsePresetIdFromUrl,
++  readPresets,
++  savePresetFromCurrent,
++} from './swimlane-presets-store.ts';
++
++export type { FocusPreset };
++export {
++  applyPreset,
++  deletePreset,
++  listPresets,
++  readPresets,
++  savePresetFromCurrent,
++} from './swimlane-presets-store.ts';
++
++/**
++ * Render the saved-preset list surface inside the rail head. Called
++ * after every save / delete to refresh the surface. The chip carries
++ * a `data-preset-load` attribute the click handler resolves into a
++ * preset id; the chip's `data-preset-delete` sibling button triggers
++ * removal.
++ */
++function renderPresetList(
++  container: HTMLElement,
++  projectKey: string,
++): void {
++  container.textContent = '';
++  const presets = listPresets(projectKey);
++  if (presets.length === 0) {
++    const empty = document.createElement('span');
++    empty.classList.add('preset-empty');
++    empty.textContent = 'No saved presets';
++    container.appendChild(empty);
++    return;
++  }
++  for (const preset of presets) {
++    const row = document.createElement('div');
++    row.classList.add('preset-row');
++    row.dataset.presetRow = preset.id;
++
++    const loadBtn = document.createElement('button');
++    loadBtn.type = 'button';
++    loadBtn.classList.add('preset-load');
++    loadBtn.dataset.presetLoad = preset.id;
++    loadBtn.setAttribute('aria-label', `Load preset ${preset.name}`);
++    loadBtn.textContent = preset.name;
++    row.appendChild(loadBtn);
++
++    const deleteBtn = document.createElement('button');
++    deleteBtn.type = 'button';
++    deleteBtn.classList.add('preset-delete');
++    deleteBtn.dataset.presetDelete = preset.id;
++    deleteBtn.setAttribute('aria-label', `Delete preset ${preset.name}`);
++    deleteBtn.textContent = '×';
++    row.appendChild(deleteBtn);
++
++    container.appendChild(row);
++  }
++}
++
++/**
++ * Flash the Save button green for ~1.4s to confirm a successful
++ * save. The class is removed by a `setTimeout`; if the operator
++ * clicks Save again mid-flash, the new save's `setTimeout` resets
++ * the cleanup. The flash is purely affordance feedback.
++ */
++function flashSaveConfirm(button: HTMLElement): void {
++  button.classList.add('is-flashing');
++  window.setTimeout(() => {
++    button.classList.remove('is-flashing');
++  }, 1400);
++}
++
++export interface PresetControllerHooks {
++  readonly promptForName: (defaultName: string) => string | null;
++  readonly confirmDelete: (presetName: string) => boolean;
++}
++
++const defaultHooks: PresetControllerHooks = {
++  promptForName: (defaultName) => window.prompt('Preset name:', defaultName),
++  confirmDelete: (presetName) =>
++    window.confirm(`Delete preset "${presetName}"?`),
++};
++
++function handleSaveClick(
++  saveBtn: HTMLButtonElement,
++  projectKey: string,
++  listContainer: HTMLElement,
++  hooks: PresetControllerHooks,
++): void {
++  const defaultName = `Preset ${listPresets(projectKey).length + 1}`;
++  const name = hooks.promptForName(defaultName);
++  if (name === null) return;
++  const trimmed = name.trim();
++  if (trimmed.length === 0) return;
++  savePresetFromCurrent(projectKey, trimmed);
++  renderPresetList(listContainer, projectKey);
++  flashSaveConfirm(saveBtn);
++}
++
++function handleListClick(
++  ev: MouseEvent,
++  projectKey: string,
++  listContainer: HTMLElement,
++  hooks: PresetControllerHooks,
++): void {
++  const target = ev.target;
++  if (!(target instanceof HTMLElement)) return;
++
++  const loadBtn = target.closest<HTMLElement>('[data-preset-load]');
++  if (loadBtn !== null) {
++    const id = loadBtn.dataset.presetLoad;
++    if (id === undefined) return;
++    const presets = readPresets(projectKey);
++    const preset = presets.get(id);
++    if (preset === undefined) return;
++    applyPreset(projectKey, preset);
++    return;
++  }
++
++  const deleteBtn = target.closest<HTMLElement>('[data-preset-delete]');
++  if (deleteBtn !== null) {
++    const id = deleteBtn.dataset.presetDelete;
++    if (id === undefined) return;
++    const presets = readPresets(projectKey);
++    const preset = presets.get(id);
++    if (preset === undefined) return;
++    if (!hooks.confirmDelete(preset.name)) return;
++    deletePreset(projectKey, id);
++    renderPresetList(listContainer, projectKey);
++    return;
++  }
++}
++
++function bindHandlers(
++  rail: HTMLElement,
++  projectKey: string,
++  listContainer: HTMLElement,
++  hooks: PresetControllerHooks,
++): void {
++  const saveBtn = rail.querySelector<HTMLButtonElement>('[data-preset-save]');
++  if (saveBtn !== null) {
++    saveBtn.addEventListener('click', () => {
++      handleSaveClick(saveBtn, projectKey, listContainer, hooks);
++    });
++  }
++
++  listContainer.addEventListener('click', (ev) => {
++    handleListClick(ev, projectKey, listContainer, hooks);
++  });
++}
++
++/**
++ * Apply the deep-link preset on init when `?preset=<id>` is present
++ * AND the id resolves to a stored preset. The four-axis apply runs
++ * AFTER each constituent controller's `init*` has fired (per the
++ * editorial-studio-client.ts wiring order) so the reapply functions
++ * have a non-null active state to mutate.
++ */
++function applyDeepLinkPreset(projectKey: string): void {
++  const id = parsePresetIdFromUrl();
++  if (id === null) return;
++  const presets = readPresets(projectKey);
++  const preset = presets.get(id);
++  if (preset === undefined) return;
++  applyPreset(projectKey, preset);
++}
++
++/**
++ * Entry point — wire the preset Save + Load + Delete affordances in
++ * the rail head, apply any deep-link preset from `?preset=`, and
++ * render the saved-preset list. No-op when the bay shell is absent.
++ *
++ * The `hooks` parameter exists so tests can substitute deterministic
++ * prompt + confirm shims (jsdom honors `window.prompt` returning
++ * null by default, which would skip every save).
++ */
++export function initSwimlanePresets(
++  hooks: PresetControllerHooks = defaultHooks,
++): void {
++  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
++  if (shell === null) return;
++  const rail = document.querySelector<HTMLElement>('[data-lane-rail]');
++  if (rail === null) return;
++  const listContainer = rail.querySelector<HTMLElement>(
++    '[data-preset-list]',
++  );
++  if (listContainer === null) return;
++
++  const projectKey = resolveProjectKey(shell);
++  renderPresetList(listContainer, projectKey);
++  bindHandlers(rail, projectKey, listContainer, hooks);
++  applyDeepLinkPreset(projectKey);
++}
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts
+index 46f8d30..c01cb3f 100644
+--- a/plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts
+@@ -38,6 +38,34 @@ export function resolveProjectKey(shell: HTMLElement): string {
+   return window.location.pathname;
+ }
+ 
++/**
++ * Read a JSON array of strings from localStorage. Returns null on
++ * any read failure (missing entry, parse error, wrong root shape).
++ * Non-string array elements are dropped. Callers pick their own
++ * container type — `swimlane.ts:readStoredSet` projects into a
++ * `Set<string>`; `swimlane-drag.ts:readStoredOrder` keeps the
++ * positional array (lane order is positional, not set-like).
++ *
++ * Centralising the read+parse boilerplate avoids drift between the
++ * two surfaces while letting each caller pick the in-memory shape
++ * that matches its access pattern.
++ */
++export function readStoredStringArray(key: string): readonly string[] | null {
++  try {
++    const raw = window.localStorage.getItem(key);
++    if (raw === null) return null;
++    const parsed: unknown = JSON.parse(raw);
++    if (!Array.isArray(parsed)) return null;
++    const out: string[] = [];
++    for (const item of parsed) {
++      if (typeof item === 'string') out.push(item);
++    }
++    return out;
++  } catch {
++    return null;
++  }
++}
++
+ /**
+  * Read a JSON object from localStorage and project it into a
+  * `Map<string, T>` via a per-value type guard. Returns an empty
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts
+index 00b87af..72a9ed5 100644
+--- a/plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts
+@@ -252,6 +252,32 @@ function watchViewport(state: ViewToggleState): void {
+   }
+ }
+ 
++/**
++ * Module-level singleton — written by `initSwimlaneViewToggle`,
++ * mutated in-place by `reapplyViewToggleFromStorage` so the bound
++ * `.vt-cell` click handlers (which closure-capture the state object)
++ * keep operating on the same overrides Map after a preset apply.
++ */
++let activeState: ViewToggleState | null = null;
++
++/**
++ * Re-read storage + re-apply to every swim. Used by the Task 5.5
++ * preset controller after writing through the view-mode storage
++ * key. No-op when `initSwimlaneViewToggle` hasn't fired yet.
++ */
++export function reapplyViewToggleFromStorage(): void {
++  if (activeState === null) return;
++  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
++  if (shell === null) return;
++  const projectKey = resolveProjectKey(shell);
++  const next = readStoredOverrides(viewModeKey(projectKey));
++  // Mutate the singleton's overrides Map in-place so bound handlers
++  // observe the new entries through their closure-captured reference.
++  activeState.overrides.clear();
++  for (const [k, v] of next) activeState.overrides.set(k, v);
++  applyAll(activeState.overrides, activeState.isMobile);
++}
++
+ /**
+  * Entry point — wire view-toggle handlers + restore the operator's
+  * resolved view-mode for every swim on the page. No-op when the
+@@ -271,6 +297,7 @@ export function initSwimlaneViewToggle(): void {
+     overrides,
+     isMobile,
+   };
++  activeState = state;
+ 
+   applyAll(state.overrides, state.isMobile);
+   bindCellClicks(state, projectKey);
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane.ts
+index 7b4ed1d..0fc2d2a 100644
+--- a/plugins/deskwork-studio/public/src/dashboard/swimlane.ts
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane.ts
+@@ -39,6 +39,7 @@
+  */
+ 
+ import {
++  readStoredStringArray,
+   resolveProjectKey,
+   STORAGE_KEY_PREFIX,
+ } from './swimlane-storage.ts';
+@@ -69,20 +70,14 @@ function visibilityKey(projectKey: string): string {
+ }
+ 
+ function readStoredSet(key: string): Set<string> | null {
+-  try {
+-    const raw = window.localStorage.getItem(key);
+-    if (raw === null) return null;
+-    const parsed: unknown = JSON.parse(raw);
+-    if (!Array.isArray(parsed)) return null;
+-    const out = new Set<string>();
+-    for (const item of parsed) {
+-      if (typeof item === 'string') out.add(item);
+-    }
+-    return out;
+-  } catch {
+-    // localStorage unavailable or corrupted — proceed without stored state.
+-    return null;
+-  }
++  // Delegates to the shared string-array reader in swimlane-storage.ts
++  // (the read+parse boilerplate); this surface returns a Set because
++  // the focus + hidden state is set-shaped (membership matters,
++  // order does not). The order surface in swimlane-drag.ts uses the
++  // same reader but keeps the positional array.
++  const items = readStoredStringArray(key);
++  if (items === null) return null;
++  return new Set(items);
+ }
+ 
+ function writeStoredSet(key: string, value: ReadonlySet<string>): void {
+@@ -380,22 +375,22 @@ function bindSwimStubs(state: SwimlaneState, projectKey: string): void {
+ }
+ 
+ /**
+- * Entry point — wire the swimlane shell to localStorage + click
+- * handlers. No-op when the bay shell is absent (e.g. on a project
+- * without lanes, or a page that doesn't render the dashboard).
++ * Build a fresh `SwimlaneState` from current localStorage + URL +
++ * live lane set. Factored out of `initSwimlane` so the preset
++ * controller (Task 5.5) can rebuild state from storage without
++ * re-binding click handlers — the preset apply pipeline writes
++ * through the constituent storage keys and then calls
++ * `reapplyFromStorage` to push DOM into the new state. The bound
++ * handlers' closure-captured state object is mutated in-place so
++ * subsequent click/keyboard gestures see the same focused + hidden
++ * sets the DOM reflects.
+  */
+-export function initSwimlane(): void {
+-  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
+-  if (shell === null) return;
+-
+-  const allLanes = collectAllLanes();
+-  if (allLanes.length === 0) return;
+-
+-  const projectKey = resolveProjectKey(shell);
+-
+-  // Establish the initial focus set. URL takes precedence; it also
+-  // writes through to localStorage so subsequent loads pick it up.
+-  const urlFocus = parseFocusFromUrl();
++function buildStateFromStorage(
++  allLanes: readonly string[],
++  projectKey: string,
++  honorUrlFocus: boolean,
++): SwimlaneState {
++  const urlFocus = honorUrlFocus ? parseFocusFromUrl() : null;
+   const storedFocus = readStoredSet(focusKey(projectKey));
+   const storedHidden = readStoredSet(visibilityKey(projectKey)) ?? new Set<string>();
+ 
+@@ -414,11 +409,65 @@ export function initSwimlane(): void {
+     focused = new Set<string>(allLanes.filter((id) => !storedHidden.has(id)));
+   }
+ 
+-  const state: SwimlaneState = {
++  return {
+     focused,
+     hidden: storedHidden,
+     allLanes,
+   };
++}
++
++/**
++ * Module-level singleton state — written by `initSwimlane` and
++ * mutated by `reapplyFromStorage` so all bound handlers operate on
++ * the same object. Without the singleton, calling `reapplyFromStorage`
++ * would create a fresh state object that the already-bound click
++ * handlers wouldn't see — they'd keep mutating the original closure-
++ * captured object. The shared object pattern is the legitimate
++ * generalization the dispatch contract authorizes for Task 5.5's
++ * preset-application sequencing.
++ */
++let activeState: SwimlaneState | null = null;
++
++/**
++ * Re-read storage and re-apply the resulting state to the DOM. Used
++ * by the Task 5.5 preset controller after writing through the
++ * visibility + focus storage keys. URL `?focus=` is NOT honored on
++ * re-apply — preset application is the authoritative source on this
++ * call (the URL was honored once at initial paint).
++ */
++export function reapplyFromStorage(): void {
++  if (activeState === null) return;
++  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
++  if (shell === null) return;
++  const projectKey = resolveProjectKey(shell);
++  const next = buildStateFromStorage(activeState.allLanes, projectKey, false);
++  // Mutate the singleton in-place so already-bound click handlers
++  // observe the new sets through their closure-captured reference.
++  activeState.focused.clear();
++  for (const id of next.focused) activeState.focused.add(id);
++  activeState.hidden.clear();
++  for (const id of next.hidden) activeState.hidden.add(id);
++  applyState(activeState);
++}
++
++/**
++ * Entry point — wire the swimlane shell to localStorage + click
++ * handlers. No-op when the bay shell is absent (e.g. on a project
++ * without lanes, or a page that doesn't render the dashboard).
++ */
++export function initSwimlane(): void {
++  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
++  if (shell === null) return;
++
++  const allLanes = collectAllLanes();
++  if (allLanes.length === 0) return;
++
++  const projectKey = resolveProjectKey(shell);
++
++  // Establish the initial focus set. URL takes precedence; it also
++  // writes through to localStorage so subsequent loads pick it up.
++  const state = buildStateFromStorage(allLanes, projectKey, true);
++  activeState = state;
+ 
+   applyState(state);
+   // Persist after applyState so URL-driven values land in storage
+diff --git a/plugins/deskwork-studio/public/src/editorial-studio-client.ts b/plugins/deskwork-studio/public/src/editorial-studio-client.ts
+index 357604b..147f413 100644
+--- a/plugins/deskwork-studio/public/src/editorial-studio-client.ts
++++ b/plugins/deskwork-studio/public/src/editorial-studio-client.ts
+@@ -14,6 +14,8 @@ import { initSwimlaneCollapse } from './dashboard/swimlane-collapse.ts';
+ import { initSwimlaneViewToggle } from './dashboard/swimlane-view-toggle.ts';
+ import { initSwimlaneCompose } from './dashboard/swimlane-compose.ts';
+ import { initSwimlaneMobileSheet } from './dashboard/swimlane-mobile-sheet.ts';
++import { initSwimlaneDrag } from './dashboard/swimlane-drag.ts';
++import { initSwimlanePresets } from './dashboard/swimlane-presets.ts';
+ import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
+ 
+ function siteFromButton(btn: HTMLButtonElement): string {
+@@ -523,6 +525,13 @@ function init(): void {
+   initSwimlaneViewToggle();
+   initSwimlaneCompose();
+   initSwimlaneMobileSheet();
++  initSwimlaneDrag();
++  // Task 5.5: must run AFTER initSwimlane / initSwimlaneCollapse /
++  // initSwimlaneViewToggle — the preset controller's deep-link
++  // apply path calls their `reapply*FromStorage` exports, which
++  // require each init function to have populated the controller's
++  // module-level singleton state.
++  initSwimlanePresets();
+   initRowActions();
+   initMastheadPopover();
+ }
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...). Use `blocking` only for issues that would break the feature's stated goals in obvious ways; `high` for correctness bugs adopters will hit; `medium` for design issues that compound over time; `low` for hygiene; `informational` for context you think the operator should see but isn't itself a bug.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
