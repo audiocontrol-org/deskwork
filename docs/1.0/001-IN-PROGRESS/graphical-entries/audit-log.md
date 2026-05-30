@@ -3086,7 +3086,7 @@ Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (codex). F
 ### AUDIT-20260529-40 — missing-member rows lose declared insertion order (list-mode contract violation)
 
 Finding-ID: AUDIT-20260529-40 (cross-model: AUDIT-BARRAGE-codex-02)
-Status:     open
+Status:     fixed-b01eb21
 Severity:   medium
 Surface:    `packages/studio/src/pages/entry-review/data.ts:176-183`, `packages/studio/src/pages/entry-review/members-section.ts:263-271` (`renderListBody`)
 
