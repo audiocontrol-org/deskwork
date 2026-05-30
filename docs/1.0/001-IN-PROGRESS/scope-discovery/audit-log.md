@@ -774,3 +774,90 @@ Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforc
 `findUncheckedTasksInOrder` only recognizes task headings shaped like `### Task 15.2:` because `TASK_HEADING_RE` requires the colon immediately after the numeric task id. The canonical renderer used by `promote-findings --auto` emits `### Task 15.2 (fix-finding-AUDIT-...): ...`, with the fix marker before the colon. That means the hook can insert fix tasks successfully, but `check-open-findings` will not see those tasks as unchecked workplan tasks, so the sanity gate in the hook still refuses.
 
 The tests miss this because their fixtures use `### Task 99.1: Fix ... (fix-finding-...)`, not the renderer’s real heading shape. Update the task-heading parser to accept the canonical rendered heading, and add an integration test that runs `promote-findings --auto` then `check-open-findings` against the resulting workplan.
+
+## 2026-05-30 — audit-barrage lift (20260530T180223318Z-scope-discovery)
+
+### AUDIT-20260530-08 — Lexicographic version-dir sort fixes split-brain but picks the semantically-wrong (older) version and still never errors on ambiguity
+
+Finding-ID: AUDIT-20260530-08
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120`, `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180`
+
+The AUDIT-20260530-06 fix replaces `await readdir(docsRoot)` with `[...(await readdir(docsRoot))].sort()` in both walkers and picks the first match. This *does* eliminate the cross-verb split-brain (gate and lift now agree, since both apply identical default lexicographic sort), so that half of the finding is genuinely closed. But two problems remain unaddressed by this fix:
+
+1. **The pick is semantically arbitrary and usually wrong.** Default `.sort()` is lexicographic, not semver. With the repo's own real layout (`docs/1.0/`, `docs/0.19.0/`, `docs/0.16.0/` — all cited verbatim in AUDIT-20260529-17), a slug present under both `1.0` and `0.19.0` resolves to `0.19.0` because `'0' < '1'` — i.e. the walker deterministically prefers the *older/archived* version over the active one. Worse, lexicographic ordering breaks within a major: `'0.10.0' < '0.9.0'` (since `'1' < '9'`), so the chosen dir doesn't even track string-version intuition. The closure loop would then read/write the wrong feature's audit-log + workplan — silently.
+
+2. **The original finding explicitly recommended erroring on ambiguity** ("ideally error if a slug is ambiguous across versions"); the fix chose silent-deterministic-pick instead. Determinism without a loud signal means a genuinely-ambiguous slug is resolved by an arbitrary rule the operator never sees. A reasonable fix: when `readdir` yields ≥2 version dirs containing the same slug, throw (or warn loudly and prefer the lexicographically-*greatest* `001-IN-PROGRESS` match, which at least biases toward `1.0` over `0.x`). The frequency is low (multi-version same-slug is uncommon), but the failure is silent and cross-verb when it lands — exactly the shape the finding named.
+
+### AUDIT-20260530-09 — `feature-root-determinism.test.ts` "resolve to the SAME version dir" test asserts nothing meaningful — it does not test the split-brain it's named for
+
+Finding-ID: AUDIT-20260530-09
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` (the `'audit-barrage-lift + workplan-aware-gate resolve to the SAME version dir'` case)
+
+This test claims to verify the AUDIT-06 split-brain contract (lift and gate pick the same dir), but its own inline comments concede it can't: *"If the gate picked a DIFFERENT version than the lift, we wouldn't have a way to detect that here — so let me just assert determinism (both calls return the same gate result)."* The actual assertions are `expect(liftExit).toBe(0)`, `expect(gateResult.allowed).toBe(true)` (both versions' audit-logs are empty, so this is trivially true regardless of which dir either verb chose), and `expect(liftStderr).toBeDefined()` — which is a tautology, since a captured-string accumulator is always defined. None of these would fail if the lift wrote `0.x` while the gate read `1.0`. Per the project's own testing rule ("tests that don't test the contract they claim to test"), this is a misleading test: its name and docblock assert split-brain coverage that the body does not provide.
+
+The split-brain contract IS partially covered by the third test (lex-first pick → `0.x`'s open finding makes the gate refuse), so the regression isn't entirely untested — but this middle test should either be made to actually compare the two verbs' chosen paths (e.g. have the lift `--apply` write a distinguishable marker into whichever audit-log it picked, then assert the gate reads that same marker) or be deleted, because as written it provides false confidence.
+
+### AUDIT-20260530-10 — `atomicWriteFile` wraps `writeFile` in a no-op try/catch and its "rename fails" test actually exercises the write-fail path
+
+Finding-ID: AUDIT-20260530-10
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/atomic-write-file.ts:36-41`, `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (the `'cleans up the temp file if the rename itself somehow fails'` case)
+
+Two hygiene issues in the otherwise-correct AUDIT-04 atomic-write helper:
+
+1. The `try { await writeFile(tmpPath, content, 'utf8'); } catch (writeErr) { throw writeErr; }` block catches and immediately re-throws with no added behavior — it's a no-op try/catch that obscures the real control flow (the meaningful cleanup is only in the *rename* catch). Drop the write-side try/catch; let the write error propagate directly. The comment above it is the only thing the block contributes, and a comment doesn't need a try/catch to exist.
+
+2. The test named `'cleans up the temp file if the rename itself somehow fails'` does not test a rename failure at all — it targets `does-not-exist/subdir/file.md`, so the *write* throws before any rename is attempted (the test's own comment admits this: "the temp file write throws BEFORE the rename"). The rename-failure cleanup path (`unlink(tmpPath).catch(...)` at lines 47-50) is therefore never exercised by any test, despite being the one branch where the cleanup logic actually matters. The named contract — temp-file cleanup after a *rename* failure — is unverified. Either rename the test to match what it checks, or inject a failing `rename` seam to cover the real branch.
+
+### AUDIT-20260530-11 — `normalizeSeverity('')` now maps empty/missing severity to `high`, conflating a parse artifact with an unknown-but-real severity
+
+Finding-ID: AUDIT-20260530-11
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:90-101`
+
+The AUDIT-01 fix correctly raises the unknown-severity fallback from `informational` to `high` ("fail toward attention"), which is the right call for a real-but-non-canonical token like `critical`. But the same fallback — and the new test pinning it (`expect(normalizeSeverity('')).toBe('high')`) — also routes an **empty** severity to `high`. An empty severity field is qualitatively different from `critical`: it's most often a *parse artifact* (the model emitted a malformed finding where the `Severity:` line was absent or unparseable), not a model judgment of high impact. Because merged clusters take max-of-cluster rank, a single malformed empty-severity finding can now inflate an entire cross-model cluster to `high` and jump the triage queue ahead of findings the models actually rated. 
+
+This is defensible as the operator-chosen "fail toward attention" stance, so it's informational-bordering-low rather than a bug — but worth surfacing: consider distinguishing "non-canonical token" (→ `high`, the AUDIT-01 case) from "absent/empty severity" (→ a flagged `needs-severity` marker, or `medium`) so a parser miss doesn't masquerade as a model-asserted high. The graceful-skip path (Task 2 Step 4) already exists for fully-malformed `<model>.md` files; an empty severity inside an otherwise-parseable finding falls through that net and lands at `high` instead.
+
+---
+
+I walked the seven fix commits (severity fallback, Phase/Milestone/Sprint heading vocabulary, flat-vs-hierarchical numbering, atomic write, lex-sort determinism, canonical-ID matching across the gate/renderer/editor/apply-flips quartet, and the permissive task-heading regexes). The canonical-ID matching changes (workplan-aware-gate.ts, workplan-task-renderer.ts, workplan-editor.ts, apply-audit-flips.ts, audit-log-editor.ts) are internally consistent — all five sites now key on `\bAUDIT-\d{8}-\d+`, and the renderer strips the cross-model annotation from the marker while preserving it in the `Closes` line and the audit-log Finding-ID, so the round-trip holds. The auto-position convention detection is correct for the clean flat and hierarchical cases. My four findings are: the lex-sort version pick is deterministic-but-semantically-wrong and still silent on ambiguity (medium), one determinism test is vacuous (medium), and two hygiene issues in the atomic-write helper + an empty-severity conflation (low). No `blocking` findings — the canonical-ID unification genuinely closes the AUDIT-07 gate-blindness regression.
+
+### AUDIT-20260530-12 — Auto-position still cannot see renderer-shaped fix-task headings
+
+Finding-ID: AUDIT-20260530-12
+Status:     open
+Severity:   high
+Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:44,170-216; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:60-61
+
+`workplan-task-renderer` now emits fix tasks as `### Task N.M (fix-finding-AUDIT-...): title`, but `auto-position.ts` still uses `TASK_HEADING_RE = /^###\s+Task\s+(\d+)(?:\.(\d+))?\s*:/i`, which only matches when the colon comes immediately after the task number. The same parser feeds both first-unchecked detection and current task-number calculation at lines 170-216, so already auto-promoted fix tasks disappear from `computeAutoPosition`.
+
+This is the same shape that was fixed for the gate in `tdd-enforcement.ts`, but the auto-position copy was left behind. On a repeated `promote-findings --auto` run, or any run against a workplan that already contains renderer-shaped fix tasks, the helper can insert at the wrong anchor and reuse stale task numbers because it ignores those existing tasks. The fix is to align `auto-position.ts` task-heading parsing with the renderer-output shape and add a regression where `computeAutoPosition` runs after a rendered fix task already exists.
+
+### AUDIT-20260530-13 — Cross-model workplan idempotency canonicalizes only the existing marker side
+
+Finding-ID: AUDIT-20260530-13
+Status:     open
+Severity:   high
+Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-editor.ts:120-149; plugins/dw-lifecycle/src/scope-discovery/promote-findings/apply.ts:150-155; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:57-63
+
+`findingsAlreadyInserted` now stores canonical marker IDs like `AUDIT-20260530-01`, but the idempotency filter compares those values directly against `ins.findingId` at line 148. `apply.ts` passes `item.finding.findingId` into the insertion unchanged, and cross-model findings carry the full annotated value, e.g. `AUDIT-20260530-01 (claude-01 + codex-03; cross-model)`. Meanwhile, the renderer deliberately writes only the canonical marker in the heading.
+
+That means the recovery path for a cross-model partial apply is still not idempotent: the workplan may already contain `(fix-finding-AUDIT-20260530-01)`, but a re-run with insertion ID `AUDIT-20260530-01 (claude-...; cross-model)` does not match the set and inserts a duplicate task. Canonicalize `ins.findingId` before the `alreadyInserted.has(...)` check and in the tie-breaker map key.
+
+### AUDIT-20260530-14 — Fixed audit tasks remain unchecked in the workplan
+
+Finding-ID: AUDIT-20260530-14
+Status:     open
+Severity:   medium
+Surface:    docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:167-271; docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:713-768
+
+The diff flips AUDIT-20260530-01 through AUDIT-20260530-07 to `fixed-<sha>` in the audit log, but every corresponding workplan task still has an unchecked acceptance criterion saying the audit-log status must be flipped. Examples are lines 167-169, 184-186, 201-203, and the same pattern continues through line 271.
+
+Because `findUncheckedTasksInOrder` treats any task block with a `- [ ]` checkbox as unchecked, these completed fix tasks still look unfinished to workplan consumers even though the audit log says they are fixed. That can make next-task pickup or live verification operate on stale fix tasks before the real remaining work. Mark those acceptance criteria checked wherever the audit-log status was flipped, or keep the audit-log status open until the workplan task is actually complete.

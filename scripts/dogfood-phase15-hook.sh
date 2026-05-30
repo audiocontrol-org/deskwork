@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 FEATURE=scope-discovery
-BASE=54ebcd6
+BASE="${BARRAGE_BASE:-54ebcd6}"
 HEAD_SHA=$(git rev-parse HEAD)
 
 WORKDIR=$(mktemp -d)
