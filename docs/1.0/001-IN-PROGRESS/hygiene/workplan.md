@@ -422,6 +422,31 @@ Operator decisions (locked in during definition):
 - [x] "Address TBD markers" reports markers introduced by the session diff, not pre-existing whole-file prose.
 - [x] Vitest coverage for the four cases above passes; full plugin suite remains green. (1952 / 1952 tests pass; 5 new commit-range / session-diff acceptance cases land in `lifecycle-session-end-hygiene.test.ts`.)
 - [x] Re-running `dw-lifecycle session-end-hygiene` against this hygiene session at the time of #361's fix produces a signal-only block (no merge-range / same-user noise). (Verified against installed **v0.27.0** 2026-05-29.)
+- [ ] Rendered prose matches the Medium-fix semantic. Task 1 changed the data source from "issues FILED in the time window" to "issues TOUCHED by session commits" but kept the pre-fix label `filed this session` everywhere in the renderer. Adopters reading the block see closed-long-ago / prior-session issues annotated as "filed this session" because their numbers appear in this session's commit prose. The labels need to track the new semantic. *(Task 2 below.)*
+
+### Task 2: Rename label from `filed` to `referenced` to match the Medium-fix semantic
+
+**Background:** Task 1 landed the data-source half of the #361 fix — the scanner now derives candidates from `git log <boundarySha>..HEAD` `#NNN` refs instead of the same-user `gh issue list --search "created:>=<iso>"` sweep. That correctly excludes the merge-range noise the original bug surfaced. But the renderer (and the observation `category`, and the markdown templates, and the test-assertion text) still calls the result `filed this session` — wording inherited from when the data actually represented filed-in-window issues. Under the new semantic, an issue gets listed because its number appears in a session commit's subject OR body — i.e. the session TOUCHED / REFERENCED it. Issues closed weeks before the session, prior-session-filed issues, and parent-tracker issues all surface accurately under the new contract but get a label that lies about their nature. Operator running session-end against this hygiene session at v0.27.0 saw #340 (closed weeks ago) + #347 (filed prior session) + #356 (filed when Phase 11 started) all listed as `filed this session` because Phase 11/12 workplan-scoping commit bodies referenced them.
+
+- [ ] Step 1: Rename the observation category in `plugins/dw-lifecycle/src/lifecycle-integration/types.ts`: `'issue-filed-this-session'` → `'issue-referenced-this-session'`. Single source-of-truth string.
+- [ ] Step 2: Update every emit + filter site in `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts` to the new category name. Sites: `scanIssuesThisSession` emit (line ~274), `recommend`'s Triage filter (line ~336), markdown renderer's issue branch (line ~391–393), "no issues..." default fallback line (line ~416). Switch the user-facing prose from `filed this session` to `referenced this session` in BOTH the per-issue line and the empty-Triage default.
+- [ ] Step 3: Update tests in `plugins/dw-lifecycle/src/__tests__/lifecycle-session-end-hygiene.test.ts` — change every `category === 'issue-filed-this-session'` filter and every assertion text mentioning `filed this session` to the new shape. Keep the test SHAPE identical (we're only renaming).
+- [ ] Step 4: SKILL.md update for `session-end` — replace `issues filed this session by the current GitHub user` with `issues referenced (#NNN) by commits in the session range`. The "by the current GitHub user" wording is also stale post-Medium-fix; drop it.
+- [ ] Step 5: Audit the rest of the codebase + docs for `filed this session` references. Grep + judgment call per hit: rendered prose → rename; documentation prose that DESCRIBES the historical behavior → leave (it's accurate historically).
+
+**Acceptance Criteria:**
+
+- [ ] `category === 'issue-referenced-this-session'` is the only spelling in `lifecycle-integration/` source + tests.
+- [ ] The markdown block renders `- issue #N [STATE] referenced this session: <title>` and the empty-Triage fallback says `(no issues referenced this session need disposition)`.
+- [ ] Re-running `dw-lifecycle session-end-hygiene --slug hygiene --session-start-sha 2dcda6a` against this hygiene session after the fix emits a block whose prose matches the listed issues' actual nature.
+- [ ] No regression in the data-source half — same set of issues surfaces, just with the corrected label.
+- [ ] Vitest + smoke pass; clone gate stays clean.
+
+**Provenance:**
+
+- Surfaced during the v0.27.0 dogfood verification: ran `dw-lifecycle session-end-hygiene --slug hygiene --session-start-sha 2dcda6a` and noticed the labels said `filed this session` for 4 issues the session did NOT file (it only referenced them). Operator asked "have we fixed #361?" — the core same-user-in-window sweep was fixed; the prose was not. Captured during the v0.27.0 + v0.28.0 sync session.
+- Sub-bug of [#361](https://github.com/audiocontrol-org/deskwork/issues/361) — the prose-half of the same fix. Tracked here rather than a new issue because the existing #361 isn't fully resolved until both halves ship.
+- Cross-link: the close-shipped `pending-verification` comment on #361 was edited to point at this Task 2 so the operator doesn't close #361 prematurely on the v0.27.0 install-verify pass.
 
 **Implementation notes:**
 
