@@ -1,4 +1,4 @@
-generated_at: 2026-05-30T09:06:16.586Z
+generated_at: 2026-05-30T09:37:21.136Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -11,7 +11,7 @@ clones:
     lines: 12
     members:
       - packages/cli/src/commands/approve.ts:110:121
-      - packages/cli/src/commands/induct.ts:78:63
+      - packages/cli/src/commands/induct.ts:84:63
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 09fe516bb060
@@ -25,7 +25,7 @@ clones:
     lines: 17
     members:
       - packages/cli/src/commands/approve.ts:141:157
-      - packages/cli/src/commands/approve.ts:93:80
+      - packages/cli/src/commands/approve.ts:93:86
     disposition: pending
     reason: null
   - id: fed80612d9af
@@ -35,40 +35,47 @@ clones:
       - packages/studio/src/pages/shortform-review.ts:62:72
     disposition: pending
     reason: null
-  - id: 497f5bbe1afa
+  - id: 672805e7cce5
     lines: 15
     members:
       - packages/cli/src/commands/approve.ts:46:60
-      - packages/cli/src/commands/block.ts:21:35
+      - packages/cli/src/commands/induct.ts:54:68
       - packages/cli/src/commands/publish.ts:51:65
-    disposition: keep-with-reason
-    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+    disposition: ignore-with-justification
+    reason: Pre-existing CLI command boilerplate (parseArgs + projectRoot + readConfig + resolveSite) re-keyed when AUDIT-20260530-20 fix shifted induct.ts line ranges; identical shape was previously dispositioned across approve/publish/block. Not a NEW clone; extracting a shared helper is a cross-CLI refactor out of scope for the audit-finding fix.
   - id: 24450692261b
     lines: 11
     members:
       - packages/cli/src/commands/approve.ts:97:107
-      - packages/cli/src/commands/induct.ts:68:78
+      - packages/cli/src/commands/induct.ts:74:84
     disposition: pending
     reason: null
+  - id: 629544bcec48
+    lines: 15
+    members:
+      - packages/cli/src/commands/block.ts:21:35
+      - packages/cli/src/commands/induct.ts:54:65
+    disposition: ignore-with-justification
+    reason: Pre-existing CLI command boilerplate (parseArgs + projectRoot + readConfig + resolveSite) re-keyed when AUDIT-20260530-20 fix shifted induct.ts line ranges; identical shape was previously dispositioned across approve/publish/block. Not a NEW clone; extracting a shared helper is a cross-CLI refactor out of scope for the audit-finding fix.
   - id: 341413173fdd
     lines: 16
     members:
       - packages/cli/src/commands/block.ts:36:51
-      - packages/cli/src/commands/induct.ts:63:78
+      - packages/cli/src/commands/induct.ts:69:84
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 51d6e4ed7584
     lines: 10
     members:
       - packages/cli/src/commands/block.ts:52:61
-      - packages/cli/src/commands/induct.ts:78:87
+      - packages/cli/src/commands/induct.ts:84:93
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: ead1a31d31bc
     lines: 16
     members:
       - packages/cli/src/commands/block.ts:64:79
-      - packages/cli/src/commands/induct.ts:137:152
+      - packages/cli/src/commands/induct.ts:171:186
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: b7462277a662
@@ -82,14 +89,14 @@ clones:
     lines: 25
     members:
       - packages/cli/src/commands/cancel.ts:51:75
-      - packages/cli/src/commands/induct.ts:63:87
+      - packages/cli/src/commands/induct.ts:69:93
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: ed4e65efa7f3
     lines: 14
     members:
       - packages/cli/src/commands/cancel.ts:81:94
-      - packages/cli/src/commands/publish.ts:110:151
+      - packages/cli/src/commands/publish.ts:110:185
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 4b85626d608b
@@ -130,15 +137,8 @@ clones:
   - id: 89f8a99f8ce2
     lines: 13
     members:
-      - packages/cli/src/commands/induct.ts:138:150
+      - packages/cli/src/commands/induct.ts:172:184
       - packages/cli/src/commands/publish.ts:110:122
-    disposition: pending
-    reason: null
-  - id: 99536ef5fb66
-    lines: 16
-    members:
-      - packages/cli/src/commands/induct.ts:47:62
-      - packages/cli/src/commands/iterate.ts:74:65
     disposition: pending
     reason: null
   - id: 039be133bac2
