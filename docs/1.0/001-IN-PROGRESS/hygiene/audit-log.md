@@ -253,6 +253,42 @@ Verification status `fixed-pending-verification` per the project rule. Closes wh
 
 ---
 
+## AUDIT-20260530-02 — Phase 15 close-shipped redesign (commits per task)
+
+Finding-ID: AUDIT-20260530-02
+Status:     fixed-pending-verification
+Severity:   informational
+Surface:    plugins/dw-lifecycle/src/close-shipped/{scan,propose,apply-v2,bundle,mention-scanner}.ts + subcommands/close-shipped.ts + skills/close-shipped/SKILL.md
+Tracks-Issue: 366
+
+Phase 15 redesign of `close-shipped`: replaced the prose-grammar 4-walker
+architecture with mechanical narrowing + Agent-tool dispatch from within
+the agent's Claude Code session + operator-curated `propose | apply` flow.
+Closes the unbounded patching cycle that motivated #366's Medium fix
+proposal.
+
+Mechanical pieces shipped as TDD red-green-commit cycles:
+
+- `mention-scanner.ts` — pure `#NNN` extractor with URL stripping; 9 cases.
+- `bundle.ts` — pure per-candidate aggregator over 4 evidence sources; 6 cases.
+- `scan.ts` — runtime that wires injected I/O + emits `BundleSet` with per-commit `diff_stat`; 3 cases.
+- `propose.ts` — `BundleSet + VerdictSet → Proposal` composer + markdown table renderer; 6 cases.
+- `apply-v2.ts` — pre-validates `decision` field + dispatches `gh` per accepted row; 5 cases.
+
+Live verification: `dw-lifecycle close-shipped scan --from-tag v0.27.0 --to-tag v0.28.1`
+produces 23 candidate bundles. The genuine ships (#361, #364) appear alongside
+back-fill / cite noise (#3, #4, #340, #347, #350–#355, #356, #362, #365–#368)
+— exactly the noise the agent dispatch is designed to filter. Canned-verdicts
+pass through `propose`; the smoke fixture exercises the full `scan → propose →
+apply` round-trip with the all-skip path.
+
+Verification status `fixed-pending-verification` closes when the next release
+ships the redesign + an operator runs the full agent-dispatch flow against an
+installed release per the project's "Issue closure requires verification in a
+formally-installed release" rule.
+
+---
+
 ## Clone-detector summary
 
 | Run | Detected | NEW | DROPPED | Notes |

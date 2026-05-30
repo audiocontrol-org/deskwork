@@ -557,29 +557,28 @@ Light fix: add an optional per-entry field `tracks_issue: NNN`. The walker prefe
 
 Each step of the implementation plan ships its own commit (TDD red → green → commit per the writing-plans skill's discipline). The 11 tasks in the plan are:
 
-- [ ] Step 1: Add new types (`CandidateBundle`, `BundleSet`, `Verdict`, `VerdictSet`, `ProposalItem`, `Proposal`, `ProposalDecision`) to `close-shipped/types.ts`.
-- [ ] Step 2: `mention-scanner.ts` — pure regex extractor over arbitrary text; 9 vitest cases.
-- [ ] Step 3: `bundle.ts` — pure bundle assembler grouping mentions into per-candidate evidence; 6 vitest cases.
-- [ ] Step 4: `scan.ts` runtime — emits BundleSet with diff stats per commit; 3 vitest cases.
-- [ ] Step 5: `propose.ts` — composes Proposal JSON + markdown table; 6 vitest cases.
-- [ ] Step 6: `apply-v2.ts` — pre-validates Proposal + dispatches gh per accepted row; 5 vitest cases.
-- [ ] Step 7: CLI verb dispatch — `scan` / `propose` / `apply` keywords route to new code; bare invocation routes to existing legacy flow.
-- [ ] Step 8: Wire `scan` CLI to real walkers + git/gh; live-test against v0.26.5..v0.27.0.
-- [ ] Step 9: SKILL.md rewrite — Agent-tool dispatch orchestration (parallel single-message multi-tool-use; one-retry on JSON parse failure).
-- [ ] Step 10: Extend `scripts/smoke-hygiene.sh` with the scan → propose → apply round-trip using canned verdicts.
-- [ ] Step 11: Live verification against v0.27.0..v0.28.1 + AUDIT-20260530-02 entry + tick acceptance criteria.
+- [x] Step 1: Add new types (`CandidateBundle`, `BundleSet`, `Verdict`, `VerdictSet`, `ProposalItem`, `Proposal`, `ProposalDecision`) to `close-shipped/types.ts`. (Commit c59b6fe)
+- [x] Step 2: `mention-scanner.ts` — pure regex extractor over arbitrary text; 9 vitest cases. (Commit prior to bundle.ts)
+- [x] Step 3: `bundle.ts` — pure bundle assembler grouping mentions into per-candidate evidence; 6 vitest cases.
+- [x] Step 4: `scan.ts` runtime — emits BundleSet with diff stats per commit; 3 vitest cases. (Commit d6981ff)
+- [x] Step 5: `propose.ts` — composes Proposal JSON + markdown table; 6 vitest cases. (Commit 7d93f2e)
+- [x] Step 6: `apply-v2.ts` — pre-validates Proposal + dispatches gh per accepted row; 5 vitest cases. (Commit 5f20fc6)
+- [x] Step 7+8: CLI verb dispatch + real wiring — `scan` / `propose` / `apply` keywords route to new code; bare invocation routes to existing legacy flow; scan wired to real walkers + git/gh. (Combined commit 57d577d)
+- [x] Step 9: SKILL.md rewrite — Agent-tool dispatch orchestration (parallel single-message multi-tool-use; one-retry on JSON parse failure). (Commit 24029c6)
+- [x] Step 10: Extend `scripts/smoke-hygiene.sh` with the scan → propose → apply round-trip using canned verdicts. (Commit 52293bc)
+- [x] Step 11: Live verification against v0.27.0..v0.28.1 + AUDIT-20260530-02 entry + tick acceptance criteria.
 
 **Acceptance Criteria:**
 
-- [ ] `dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB>` walks all 4 sources permissively + emits the per-candidate bundle set as JSON.
-- [ ] `dw-lifecycle close-shipped propose --bundles <path> --verdicts <path>` writes a `proposals-<timestamp>.json` + prints a markdown summary table.
-- [ ] `dw-lifecycle close-shipped apply --proposal <path>` validates every item has a non-empty `decision`, dispatches `gh issue comment` + `--add-label pending-verification` per `accept-verdict`-shipped + `override-shipped` row, records per-item success/failure.
-- [ ] SKILL.md prose covers the `scan → Agent-tool parallel dispatch → propose → operator review → apply` orchestration end-to-end.
-- [ ] Live verification against v0.27.0..v0.28.1: agent correctly identifies #356, #361, #364, #366 as shipped (genuine fixes); correctly rejects #353, #355 (back-fill docs commits), #340/#347/etc. (already-closed / cross-reference), #365 (PR self-reference).
-- [ ] Candidate-count threshold (default 50) surfaces a confirmation prompt before the parallel Agent dispatch fires.
-- [ ] Vitest unit + integration tests for the mechanical paths; full plugin suite stays green.
-- [ ] Legacy bare-`close-shipped` invocation preserves the old single-command behavior for one release cycle.
-- [ ] SKILL.md prose names the new flow + the Agent-tool dispatch + the proposal/apply gate + the legacy-flag sunset.
+- [x] `dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB>` walks all 4 sources permissively + emits the per-candidate bundle set as JSON. (Live-verified against v0.27.0..v0.28.1: 23 candidate bundles produced; the genuine ships #361, #364 are present alongside the back-fill / cite noise the agent dispatch is designed to filter.)
+- [x] `dw-lifecycle close-shipped propose --bundles <path> --verdicts <path>` writes a `proposals-<timestamp>.json` + prints a markdown summary table. (Live-verified — proposal at `.dw-lifecycle/close-shipped/proposals-2026-05-30T06-48-50-421Z.json`; markdown table renders cleanly.)
+- [x] `dw-lifecycle close-shipped apply --proposal <path>` validates every item has a non-empty `decision`, dispatches `gh issue comment` + `--add-label pending-verification` per `accept-verdict`-shipped + `override-shipped` row, records per-item success/failure. (Smoke round-trip exercises the all-skip path; unit tests cover applied / skipped / failed branches; runtime InvalidProposalError validates pre-dispatch.)
+- [x] SKILL.md prose covers the `scan → Agent-tool parallel dispatch → propose → operator review → apply` orchestration end-to-end.
+- [ ] Live verification against v0.27.0..v0.28.1: agent correctly identifies #356, #361, #364, #366 as shipped (genuine fixes); correctly rejects #353, #355 (back-fill docs commits), #340/#347/etc. (already-closed / cross-reference), #365 (PR self-reference). _(Mechanical narrowing verified above with canned verdicts; the agent-dispatch step itself can only run from a Claude Code session, not from CI/tests, so this acceptance criterion closes after an operator runs the full agent-dispatch flow against the next installed release per the project's "Issue closure requires verification in a formally-installed release" rule.)_
+- [ ] Candidate-count threshold (default 50) surfaces a confirmation prompt before the parallel Agent dispatch fires. _(SKILL.md prose documents the threshold step; runtime confirmation lives in the agent's session as a check on `bundles.length`. Closes after operator-run live walk.)_
+- [x] Vitest unit + integration tests for the mechanical paths; full plugin suite stays green. (191 test files, 2373 tests pass post-Step-9.)
+- [x] Legacy bare-`close-shipped` invocation preserves the old single-command behavior for one release cycle. (Step 7+8 dispatch only intercepts on `scan`/`propose`/`apply` first-positional; everything else falls through to existing `parseCloseShippedArgs` + `runCloseShipped`. Existing close-shipped tests pass unchanged.)
+- [x] SKILL.md prose names the new flow + the Agent-tool dispatch + the proposal/apply gate + the legacy-flag sunset.
 
 **Provenance (Phase 15):**
 
