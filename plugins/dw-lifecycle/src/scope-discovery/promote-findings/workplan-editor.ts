@@ -112,7 +112,12 @@ function validateOne(
 // `(fix-finding-<findingId>):` in its heading. Re-running apply after a
 // partial-apply (workplan write succeeded; audit-log write failed) MUST
 // NOT double-insert. Scan the workplan for the marker before inserting.
-const FIX_FINDING_MARKER_RE = /\(fix-finding-([A-Z0-9-]+)\)/g;
+//
+// Per AUDIT-20260530-07: the regex anchors on `fix-finding-AUDIT-NN-N+`
+// directly rather than the surrounding parens, so cross-model markers
+// like `(fix-finding-AUDIT-20260530-01 (claude-01; cross-model))` match
+// — the canonical AUDIT-ID is the de-dupe key, not the full marker text.
+const FIX_FINDING_MARKER_RE = /\bfix-finding-(AUDIT-\d{8}-\d+)/g;
 
 function findingsAlreadyInserted(content: string): Set<string> {
   const found = new Set<string>();

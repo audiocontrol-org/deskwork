@@ -51,6 +51,20 @@ import {
 } from './tdd-enforcement.js';
 import type { OpenFinding } from './types.js';
 
+const CANONICAL_AUDIT_ID_RE = /\bAUDIT-\d{8}-\d+/;
+
+/**
+ * Strip any trailing cross-model annotation from a Finding-ID value
+ * (e.g. `AUDIT-20260530-01 (claude-01 + codex-03; cross-model)` →
+ * `AUDIT-20260530-01`) so the gate's coverage comparison matches the
+ * canonical-only marker the workplan task renderer emits. Falls back
+ * to the input verbatim if no canonical pattern is present.
+ */
+function canonicalAuditId(findingId: string): string {
+  const m = CANONICAL_AUDIT_ID_RE.exec(findingId);
+  return m !== null ? m[0] : findingId;
+}
+
 export type WorkplanAwareGateResult =
   | {
       readonly allowed: true;
@@ -147,7 +161,12 @@ export async function checkWorkplanAwareGate(
   }
   const unchecked = findUncheckedTasksInOrder(workplanText, n);
 
-  const openIds = new Set(findings.map((f) => f.findingId));
+  // Per AUDIT-20260530-07: the walker's findingId carries the full
+  // Finding-ID value including any cross-model suffix (e.g.
+  // "AUDIT-20260530-01 (claude-01 + codex-03; cross-model)"), while
+  // the workplan marker now stores only the canonical AUDIT-ID. Compare
+  // on the canonical form so the two sides match.
+  const openIds = new Set(findings.map((f) => canonicalAuditId(f.findingId)));
 
   // Coverage-check first when unchecked count is less than n — the
   // operator can't have scoped all N findings at all, so "missing" is

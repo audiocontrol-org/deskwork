@@ -138,7 +138,12 @@ export function findCompletedFixFindingTasks(
       i++;
       continue;
     }
-    const headingMatch = /^###\s+Task\s+[\d.]+:.*?\(fix-finding-(AUDIT-\d{8}-\d+)\)/i.exec(line);
+    // Permissive heading-match per AUDIT-20260530-07: accept the
+    // renderer-output shape `### Task N.M (fix-finding-AUDIT-...): title`
+    // AND the legacy synthetic-fixture shape `### Task N.M: Fix ...
+    // (fix-finding-AUDIT-...)`. The `.*?fix-finding-(AUDIT-\d{8}-\d+)`
+    // captures the canonical AUDIT-ID anywhere in the heading line.
+    const headingMatch = /^###\s+Task\s+[\d.]+.*?fix-finding-(AUDIT-\d{8}-\d+)/i.exec(line);
     if (headingMatch === null) {
       i++;
       continue;
@@ -201,8 +206,19 @@ export interface UncheckedTask {
   readonly findingId: string | null;
 }
 
-const FIX_FINDING_TAG_RE = /\(fix-finding-(AUDIT-\d{8}-\d+)\)/i;
-const TASK_HEADING_RE = /^###\s+Task\s+[\d.]+:.*$/i;
+// Permissive matchers that accept the canonical renderer-output shape
+// (per AUDIT-20260530-07): `### Task N.M (fix-finding-AUDIT-...): title`
+// where the parenthetical sits BETWEEN the task number and the colon.
+// The inner content may contain nested parens for cross-model findings
+// like `(fix-finding-AUDIT-20260530-01 (claude-01 + codex-03; cross-model))`.
+// `\bfix-finding-(AUDIT-\d{8}-\d+)` skips paren-balancing entirely by
+// anchoring on the canonical-ID prefix; the closing paren of the marker
+// doesn't have to follow immediately.
+const FIX_FINDING_TAG_RE = /\bfix-finding-(AUDIT-\d{8}-\d+)/i;
+// `.*?:` lazily walks any characters between the task number and the
+// FIRST `:` on the line — so the optional parenthetical is absorbed
+// without paren-balancing.
+const TASK_HEADING_RE = /^###\s+Task\s+[\d.]+.*?:/i;
 
 export function findUncheckedTasksInOrder(
   workplanText: string,

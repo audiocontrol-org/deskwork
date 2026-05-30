@@ -1,4 +1,4 @@
-generated_at: 2026-05-30T06:50:41.712Z
+generated_at: 2026-05-30T07:35:32.667Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1055,6 +1055,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-config.ts:75:84
     disposition: pending
     reason: null
+  - id: 6018afb62ce2
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:157:165
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:242:250
+    disposition: ignore-with-justification
+    reason: Twin task-block walkers (findCompletedFixFindingTasks + findUncheckedTasksInOrder) share the boundary-scan + block-collect loop by design — one filters to [x]-checked fix-finding tasks for the TDD doctor rule, the other filters to unchecked tasks for the workplan-aware gate. Extracting a shared primitive would couple two consumers with different downstream contracts; the duplication is the documented Phase 13/15 split.
   - id: d724eab25113
     lines: 8
     members:

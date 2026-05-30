@@ -258,16 +258,16 @@ Closes AUDIT-20260530-06. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 
 Closes AUDIT-20260530-07. Surface: plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:204-222, plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:41-46.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-07` in subject
+- [x] Step 1: 5 failing tests added in `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` (`findUncheckedTasksInOrder` against both clean + nested-paren renderer-output shapes; `findCompletedFixFindingTasks` for the same).
+- [x] Step 2: confirmed all 5 tests fail against current code (red phase).
+- [x] Step 3: fix applied across 4 sites — `TASK_HEADING_RE` + `FIX_FINDING_TAG_RE` in tdd-enforcement.ts; `FIX_FINDING_MARKER_RE` in workplan-editor.ts; `canonicalAuditId` helper in workplan-task-renderer.ts; canonical-id comparison in workplan-aware-gate.ts.
+- [x] Step 4: all 5 tests pass; plugin suite 2400/2400; live gate now exits 0 against the dogfood-produced workplan.
+- [x] Step 5: commit with `Closes AUDIT-20260530-07` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 5: 43-scenario adversarial harness

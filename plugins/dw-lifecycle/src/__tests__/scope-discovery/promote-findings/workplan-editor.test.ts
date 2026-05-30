@@ -36,8 +36,8 @@ describe('insertTaskBlock — atomic in-place inserts', () => {
   it('inserts a single task block at the chosen anchor', async () => {
     const wp = workplanFixture();
     const insertion: WorkplanInsertion = {
-      findingId: 'AUDIT-1',
-      taskBlock: '### Task 13.2 (fix-finding-AUDIT-1): foo\n\nbody.',
+      findingId: 'AUDIT-20260601-01',
+      taskBlock: '### Task 13.2 (fix-finding-AUDIT-20260601-01): foo\n\nbody.',
       phaseHeading: '## Phase 13: Audit-finding lifecycle',
       insertAfterLine: 7, // after 'Some content.'
     };
@@ -50,7 +50,7 @@ describe('insertTaskBlock — atomic in-place inserts', () => {
     // Original line 7 was 'Some content.'; new content inserted after it.
     expect(lines[6]).toBe('Some content.');
     expect(lines[7]).toBe('');
-    expect(lines[8]).toBe('### Task 13.2 (fix-finding-AUDIT-1): foo');
+    expect(lines[8]).toBe('### Task 13.2 (fix-finding-AUDIT-20260601-01): foo');
     expect(lines[9]).toBe('');
     expect(lines[10]).toBe('body.');
     expect(lines[11]).toBe('');
@@ -60,7 +60,7 @@ describe('insertTaskBlock — atomic in-place inserts', () => {
     const wp = workplanFixture();
     const insertions: WorkplanInsertion[] = [
       {
-        findingId: 'AUDIT-A',
+        findingId: 'AUDIT-20260601-99',
         taskBlock: '### A-block',
         phaseHeading: '## Phase 13: Audit-finding lifecycle',
         insertAfterLine: 5, // after '### Task 1'
@@ -222,15 +222,15 @@ describe('applyTaskBlocks — wraps insertTaskBlock + writes', () => {
 
 describe('insertTaskBlock — idempotency on partial-apply re-run', () => {
   it('skips findings whose (fix-finding-<id>) marker is already in the workplan', async () => {
-    // First insert AUDIT-1, then re-invoke with both AUDIT-1 + AUDIT-2.
-    // AUDIT-1 should be skipped (already present); AUDIT-2 should land.
+    // First insert AUDIT-20260601-01, then re-invoke with both AUDIT-20260601-01 + AUDIT-20260601-02.
+    // AUDIT-20260601-01 should be skipped (already present); AUDIT-20260601-02 should land.
     const wp = workplanFixture();
     const first = await insertTaskBlock({
       workplanPath: '/tmp/t.md',
       insertions: [
         {
-          findingId: 'AUDIT-1',
-          taskBlock: '### Task 13.2 (fix-finding-AUDIT-1): one',
+          findingId: 'AUDIT-20260601-01',
+          taskBlock: '### Task 13.2 (fix-finding-AUDIT-20260601-01): one',
           phaseHeading: '## Phase 13: Audit-finding lifecycle',
           insertAfterLine: 7,
         },
@@ -241,28 +241,28 @@ describe('insertTaskBlock — idempotency on partial-apply re-run', () => {
       workplanPath: '/tmp/t.md',
       insertions: [
         {
-          findingId: 'AUDIT-1',
-          taskBlock: '### Task 13.2 (fix-finding-AUDIT-1): one-DUP',
+          findingId: 'AUDIT-20260601-01',
+          taskBlock: '### Task 13.2 (fix-finding-AUDIT-20260601-01): one-DUP',
           phaseHeading: '## Phase 13: Audit-finding lifecycle',
           insertAfterLine: 7,
         },
         {
-          findingId: 'AUDIT-2',
-          taskBlock: '### Task 13.3 (fix-finding-AUDIT-2): two',
+          findingId: 'AUDIT-20260601-02',
+          taskBlock: '### Task 13.3 (fix-finding-AUDIT-20260601-02): two',
           phaseHeading: '## Phase 13: Audit-finding lifecycle',
           insertAfterLine: 7,
         },
       ],
       read: makeRead(first.newContent),
     });
-    // AUDIT-1 NOT double-inserted: only ONE occurrence of the marker.
-    const occurrences = (second.newContent.match(/fix-finding-AUDIT-1/g) ?? []).length;
+    // AUDIT-20260601-01 NOT double-inserted: only ONE occurrence of the marker.
+    const occurrences = (second.newContent.match(/fix-finding-AUDIT-20260601-01/g) ?? []).length;
     expect(occurrences).toBe(1);
-    // AUDIT-1 keeps its original block text; the -DUP variant must not appear.
+    // AUDIT-20260601-01 keeps its original block text; the -DUP variant must not appear.
     expect(second.newContent).toContain('one');
     expect(second.newContent).not.toContain('one-DUP');
-    // AUDIT-2 landed.
-    expect(second.newContent).toContain('fix-finding-AUDIT-2');
+    // AUDIT-20260601-02 landed.
+    expect(second.newContent).toContain('fix-finding-AUDIT-20260601-02');
   });
 
   it('returns original content (no-op) when every insertion is already present', async () => {
@@ -271,8 +271,8 @@ describe('insertTaskBlock — idempotency on partial-apply re-run', () => {
       workplanPath: '/tmp/t.md',
       insertions: [
         {
-          findingId: 'AUDIT-A',
-          taskBlock: '### Task 13.2 (fix-finding-AUDIT-A): a',
+          findingId: 'AUDIT-20260601-99',
+          taskBlock: '### Task 13.2 (fix-finding-AUDIT-20260601-99): a',
           phaseHeading: '## Phase 13: Audit-finding lifecycle',
           insertAfterLine: 7,
         },
@@ -283,8 +283,8 @@ describe('insertTaskBlock — idempotency on partial-apply re-run', () => {
       workplanPath: '/tmp/t.md',
       insertions: [
         {
-          findingId: 'AUDIT-A',
-          taskBlock: '### Task 13.2 (fix-finding-AUDIT-A): a-DUP',
+          findingId: 'AUDIT-20260601-99',
+          taskBlock: '### Task 13.2 (fix-finding-AUDIT-20260601-99): a-DUP',
           phaseHeading: '## Phase 13: Audit-finding lifecycle',
           insertAfterLine: 7,
         },
