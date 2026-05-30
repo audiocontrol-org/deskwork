@@ -156,16 +156,16 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 Closes AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:130-136`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model)` in subject
+- [x] Step 1: failing test added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts:86-100` covering `normalizeSeverity('critical')`, `normalizeSeverity('')`, `normalizeSeverity('???')` asserting `'high'` not `'informational'`.
+- [x] Step 2: confirmed test failed against pre-fix code (red phase).
+- [x] Step 3: fix applied — `normalizeSeverity` fallback changed from `'informational'` to `'high'` ("fail toward attention, not away from it").
+- [x] Step 4: test passes; plugin suite 2400/2400.
+- [x] Step 5: commit with `Closes AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model)` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 

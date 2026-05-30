@@ -90,7 +90,15 @@ export function normalizeSeverity(raw: string): NormalizedSeverity {
   if (CANONICAL_SEVERITIES.has(lowered as NormalizedSeverity)) {
     return lowered as NormalizedSeverity;
   }
-  return 'informational';
+  // Per AUDIT-20260530-01: an unknown-severity fallback to
+  // `informational` (rank 0) actively defeats the feature's purpose —
+  // it buries `critical` (the most likely model deviation) AND a
+  // cross-model `critical` agreement collapses to rank 0 via
+  // max-of-cluster. The safer fallback is `high`: "fail toward
+  // attention, not away from it." Empty severity (malformed model
+  // output / missing field) is also treated as `high` because a
+  // missing severity field is itself a signal the operator should see.
+  return 'high';
 }
 
 function stripHeading(heading: string): string {

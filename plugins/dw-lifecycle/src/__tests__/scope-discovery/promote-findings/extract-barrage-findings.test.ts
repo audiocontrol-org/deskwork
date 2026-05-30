@@ -83,10 +83,21 @@ describe('normalizeSeverity — case + canonical-set mapping', () => {
     expect(normalizeSeverity('   medium   ')).toBe('medium');
   });
 
-  it("falls back to 'informational' on unknown values", () => {
-    expect(normalizeSeverity('critical')).toBe('informational');
-    expect(normalizeSeverity('')).toBe('informational');
-    expect(normalizeSeverity('???')).toBe('informational');
+  /**
+   * AUDIT-20260530-01 regression: pre-fix, normalizeSeverity mapped
+   * every non-canonical value to `informational` — the LOWEST rank.
+   * That buried `critical` (the most likely model deviation) at the
+   * bottom of the triage queue, and a cross-model `critical`
+   * agreement collapsed to `informational` via max-of-cluster rank-0.
+   * Post-fix: unknown values fall back to `high` — "fail toward
+   * attention, not away from it." Empty severity (malformed model
+   * output) is also treated as `high` because a missing severity
+   * field is itself a signal the operator should see.
+   */
+  it("falls back to 'high' on unknown values (AUDIT-20260530-01)", () => {
+    expect(normalizeSeverity('critical')).toBe('high');
+    expect(normalizeSeverity('')).toBe('high');
+    expect(normalizeSeverity('???')).toBe('high');
   });
 });
 
