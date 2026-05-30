@@ -3364,7 +3364,7 @@ Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). 
 ### AUDIT-20260530-20 — `induct` CLI still editorial-narrow (Phase 4 "verbs are universal" goal half-wired at CLI; deferral phrase in comment)
 
 Finding-ID: AUDIT-20260530-20 (cross-model: AUDIT-BARRAGE-claude-07-P4 + AUDIT-BARRAGE-codex-01-P4)
-Status:     open
+Status:     fixed-e85bb8e
 Severity:   high
 Surface:    `packages/cli/src/commands/induct.ts:84-95,114`
 

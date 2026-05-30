@@ -866,17 +866,17 @@ Closes AUDIT-20260530-19 (cross-model: AUDIT-BARRAGE-claude-06-P4). Surface: `pa
 
 Closes AUDIT-20260530-20 (cross-model: AUDIT-BARRAGE-claude-07-P4 + AUDIT-BARRAGE-codex-01-P4). Surface: `packages/cli/src/commands/induct.ts:84-95,114`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-20 (cross-model: AUDIT-BARRAGE-claude-07-P4 + AUDIT-BARRAGE-codex-01-P4)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/cli/test/induct-entry-centric.test.ts` :: four new tests covering (a) visual-lane Cancelled → Sketched via explicit `--to`, (b) editorial-lane Cancelled → Drafting regression, (c) visual-lane `--to Drafting` refusal asserting error message names visual stages (Sketched / Iterating / Approved / Shipped) and NOT the editorial six, (d) visual-lane Archived (template-extra off-pipeline stage) defaulting to priorStage without `--to`.
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — two of the four (visual-lane Sketched + visual-lane Archived) failed pre-fix with the editorial-narrow guard rejecting them; the visual-lane refusal and editorial-lane regression passed pre-fix because the editorial vocabulary happened to overlap.
+- [x] Step 3: implement the fix — `packages/cli/src/commands/induct.ts` now reads the sidecar early, resolves the template via `resolveEntryStrictTemplate`, and validates `--to` against `template.linearStages` via `isLinearPipelineStageInTemplate`. The off-pipeline default-stage branch uses `isOffPipelineStageInTemplate` so visual-lane `Archived` (template-extra cul-de-sac) routes through priorStage. The editorial-specific `Final → Drafting` shortcut is preserved verbatim (only fires when `currentStage === 'Final'`, which no other bundled template has). The deferral comment is deleted.
+- [x] Step 4: confirm test passes — full induct test file 11/11 green; workspace `npm --workspaces test` 1896/1896 green across 154 files.
+- [x] Step 5: commit with `Closes AUDIT-20260530-20 (cross-model: AUDIT-BARRAGE-claude-07-P4 + AUDIT-BARRAGE-codex-01-P4)` in subject — `e85bb8e`.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/cli/test/induct-entry-centric.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-e85bb8e` via the close-shipped-audit-findings step
 
 
 ### Task 7.36 (fix-finding-AUDIT-20260530-21 (cross-model: AUDIT-BARRAGE-claude-08-P4)): AUDIT-20260530-21 — `renderCalendar` docstring drift: promises `## Lane:` but em…
