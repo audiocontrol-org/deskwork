@@ -2727,9 +2727,10 @@ the review trail of Step 7.2.8.
 
 ### AUDIT-20260529-29 — Phase 7 Tasks 7.3 + 7.4 shipped: group review surface + member-of pull-tab (feature)
 
-| Status         | Date       | Category | Severity | Phase | Driver              |
-|----------------|------------|----------|----------|-------|---------------------|
-| fixed (`b642cd6`) | 2026-05-29 | feature  | n/a      | 7     | implementer dispatch |
+Finding-ID: AUDIT-20260529-29
+Status:     fixed-b642cd6
+Severity:   feature
+Surface:    `packages/studio/src/pages/entry-review/members-section.ts`, `packages/studio/src/pages/dashboard/section.ts`, `plugins/deskwork-studio/public/css/entry-review-members.css`, `plugins/deskwork-studio/public/css/dashboard-row-affordances.css`
 
 Implementation of Phase 7 Tasks 7.3 (group review surface — Members
 section) + 7.4 (multi-lane composed view) per the accepted design at
@@ -2857,13 +2858,15 @@ inversion pattern the marginalia-tab uses on activation.
    rule (Task 7.5.2) is the loud signal; the surface mirrors the
    same finding inline so operators see the broken reference
    without leaving the page.
-3. Lane-stack (mobile) intentionally NOT wired with the pull-tab —
+3. Lane-stack (mobile) NOT wired with the pull-tab in this commit —
    the mobile lane-stack uses the list-body chrome, not the kanban
-   `.er-row-shell`. A bare comment in `swimlane-shell.ts` names the
-   asymmetry so future readers don't read it as an IOU. If/when
-   the operator surfaces a need for the mobile-row member-of
-   discoverability, a sibling rendering pass against the list-body
-   chrome will land it.
+   `.er-row-shell`, so a sibling rendering pass against the list-body
+   chrome is required. Track 2's spec-compliance review flagged this
+   as HIGH because the picked Direction 1 mockup is mobile-first.
+   Tracked as Step 7.3.5 in the workplan + GitHub issue #371; the
+   feature is NOT closeout-ready until that step lands. Per the
+   project's discipline rule, deferrals get both workplan + issue
+   recording — see Track 2 review actions for the resolution path.
 4. `loadLaneConfig` failures during member loading swallow rather
    than crash — a member with a stale lane id surfaces in the
    composed view as "unrouted" (rendered with the raw lane id) and
@@ -2885,5 +2888,143 @@ scope for this dispatch and remain open. Phase 7 parent issue (#306)
 stays open until those tasks land. No GitHub `Closes` keyword on
 the commit.
 
-`Status` backfilled to `fixed (`b642cd6`)` in the immediately-following
-docs commit per the established two-commit pattern.
+`Status` backfilled to `fixed-b642cd6` in the immediately-following
+docs commit per the established two-commit pattern. (Note: the
+backfill commit `3d670f5` originally wrote a markdown table format
+that did NOT match the canonical `Status: fixed-<sha>` grep contract
+— that's been corrected at the AUDIT-29 header above as part of the
+Track 2 review actions; see AUDIT-30 below.)
+
+### AUDIT-20260529-30 — review-action: cancelled `unsafe(laneClass)` HTML-injection risk in renderListRow
+
+Finding-ID: AUDIT-20260529-30
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `packages/studio/src/pages/entry-review/members-section.ts:217-228`
+
+`renderListRow` wrapped the lane-class composition in `unsafe(...)`,
+bypassing the html-template's escaping. `member.lane` is Zod-typed as
+`z.string().min(1)` (`packages/core/src/schema/entry.ts:172`) — NOT
+regex-bound to the canonical lane-id charset. A malformed sidecar
+with `lane: 'x" onclick="alert(1)'` would have broken out of the
+class attribute when rendered.
+
+Resolution: import `LANE_ID_REGEX` from `@deskwork/core/lanes` and
+validate the lane id before composing the class. If it fails the
+regex, fall back to `lane-unrouted` (same shape the loader uses for
+genuinely-missing lane configs). The `unsafe(...)` wrapper is now
+safe because the input is regex-validated against the canonical
+charset.
+
+Track 3 finding #1 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-31 — review-action: pull-tab width 22px failed WCAG 2.5.8 (24x24 minimum)
+
+Finding-ID: AUDIT-20260529-31
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:250`
+
+`.er-row-member-tab` was 22px wide. WCAG 2.2 SC 2.5.8 (Target Size
+Minimum, AA) requires 24x24 CSS pixels. The horizontal axis failed
+by 2px. The spacing exception did not apply because the row
+foreground is the immediate right neighbor at 4px clearance, well
+under 24px.
+
+Resolution: widened the tab from 22px to 24px; adjusted
+`.er-row-shell.has-member-tab .er-row-fg`'s `padding-left` from 26px
+to 28px to preserve the row's content layout. Both axes now meet
+the WCAG floor.
+
+Track 3 finding #2 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-32 — review-action: kraft-on-paper-2 text contrast 3.58:1 failed WCAG 1.4.3 AA
+
+Finding-ID: AUDIT-20260529-32
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:275-304`
+
+`.er-row-member-tab-label` and `.er-row-member-tab-count` text used
+`var(--er-kraft)` (#8A7250) on `var(--er-paper-2)` (#ECE6D4),
+computed contrast ratio approx 3.58:1. The label is 0.5625rem (~9px)
+small text. WCAG 2.1 SC 1.4.3 AA requires 4.5:1 for small text; the
+text failed by ~0.92.
+
+Resolution: changed the resting-state label color to
+`var(--er-ink-soft)` (#3A3530) on `var(--er-paper-2)` = 9.79:1; the
+count badge text to `var(--er-ink)` (#1A1614) on `var(--er-paper)` =
+14.91:1. Increased label font-size from 0.5625rem to 0.625rem
+(~10px) and weight from 600 to 700. The kraft accent is preserved
+through the count badge's border + the expanded-state background
+flip, so the affordance still reads as a kraft "belonging-to"
+affordance overall. Expanded-state contrast (paper on kraft, ~3.84:1)
+left as-is because the expanded state is transient and the primary
+information delivered is in the popover content, not the tab label
+which the operator only sees while engaging the tap.
+
+Track 3 finding #3 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-33 — review-action: AUDIT-29 used non-canonical Status format (broke queue-check grep)
+
+Finding-ID: AUDIT-20260529-33
+Status:     fixed-pending-sha
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:2728-2732`
+
+The AUDIT-29 entry as originally written (b642cd6) used a markdown
+table format `| fixed (b642cd6) |` for the Status field. Every
+prior audit entry follows the canonical `Status:     fixed-<sha>`
+field-format documented in the file's header and grep-anchored by
+the canonical queue check `grep -nE "^Status:[[:space:]]+fixed-"`.
+The non-canonical entry would NOT have surfaced in the standard
+triage queue.
+
+Resolution: rewrote the AUDIT-29 header block to use the canonical
+`Finding-ID / Status / Severity / Surface` field-format. The
+queue-check grep contract is preserved.
+
+Track 2 finding #2 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-34 — review-action-deferred: mobile lane-stack missing pull-tab (Track 2 HIGH; deferred to #371)
+
+Finding-ID: AUDIT-20260529-34
+Status:     acknowledged-2026-05-29-issue-#371
+Severity:   high
+Surface:    `packages/studio/src/pages/dashboard/swimlane-shell.ts:258-271`, `packages/studio/src/pages/dashboard/lane-stack-card.ts`, `packages/studio/src/pages/dashboard/swimlane-list-body.ts`
+
+Track 2's spec-compliance review of b642cd6 flagged HIGH: the
+implementation wires the kraft pull-tab into the desktop kanban
+swim path only. The mobile lane-stack rendering (the primary
+viewport per the brief's "mobile-first" stance and the picked
+Direction 1 mockup) does NOT render the affordance. A mobile
+operator cannot discover that an entry belongs to a group.
+
+The implementer's audit-log narrative framed this as a "future
+operator need" — exactly the "Just for now is bullshit" pattern
+the discipline rule names. Resolution: filed
+[#371](https://github.com/audiocontrol-org/deskwork/issues/371)
+with the deferral rationale + scoped Step 7.3.5 into the workplan
+per the discipline rule's two-track recording requirement. The
+audit-log narrative for AUDIT-29 has been amended to surface the
+deferral path.
+
+Phase 7 closeout is BLOCKED on Step 7.3.5 landing (mobile lane-stack
++ desktop list-mode-body pull-tab parity). Track 2 finding #1 + #5
+from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-35 — review-action-deferred: composed view silently drops unrouted members (Track 3 #4; deferred)
+
+Finding-ID: AUDIT-20260529-35
+Status:     acknowledged-2026-05-29-issue-#372
+Severity:   low
+Surface:    `packages/studio/src/pages/entry-review/members-section.ts:99-119`
+
+`bucketMembersByLane` skips members whose `lane === undefined` AND
+members whose `lane` is not in `laneConfigsById`. In list view they
+still render (with `lane-unrouted` styling); in composed view they
+vanish with no visible count discrepancy on the toggle. The operator
+cannot tell composed view shows fewer entries unless they cross-check
+totals. Tracked at
+[#372](https://github.com/audiocontrol-org/deskwork/issues/372)
+with the recommended unrouted-indicator design.

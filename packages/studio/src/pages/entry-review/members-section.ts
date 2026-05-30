@@ -49,7 +49,7 @@ import { html, unsafe, type RawHtml } from '../html.ts';
 import { stageGlyph } from '../dashboard/swimlane-stage-glyph.ts';
 import { isGroupEntry, isPopulatedGroupEntry } from '@deskwork/core/groups';
 import type { Entry } from '@deskwork/core/schema/entry';
-import type { StrictLaneConfig } from '@deskwork/core/lanes';
+import { LANE_ID_REGEX, type StrictLaneConfig } from '@deskwork/core/lanes';
 import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
 
 export type MembersViewMode = 'composed' | 'list';
@@ -217,7 +217,15 @@ function renderListRow(
   const laneId = member.lane;
   const laneConfig = laneId !== undefined ? laneConfigsById.get(laneId) : undefined;
   const laneLabel = laneConfig !== undefined ? laneConfig.name : (laneId ?? 'unrouted');
-  const laneClass = laneId !== undefined ? `lane-${laneId}` : 'lane-unrouted';
+  // Validate lane id against LANE_ID_REGEX (`^[a-z0-9][a-z0-9-]*$`) before
+  // composing the class attribute — `member.lane` is only Zod-typed as a
+  // non-empty string, not regex-bound to the canonical lane-id charset.
+  // A malformed sidecar with `lane: 'x" onclick="alert(1)'` would otherwise
+  // break out of the class attribute when wrapped in `unsafe(...)`.
+  const laneClass =
+    laneId !== undefined && LANE_ID_REGEX.test(laneId)
+      ? `lane-${laneId}`
+      : 'lane-unrouted';
   const glyph = stageGlyph(member.currentStage);
   return unsafe(html`
     <li class="er-member-row ${unsafe(laneClass)}" data-member-uuid="${member.uuid}">

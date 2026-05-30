@@ -11,6 +11,7 @@
 export {
   LaneConfigSchema,
   ArtifactKindSchema,
+  LANE_ID_REGEX,
   type LaneConfig,
   type StrictLaneConfig,
   type ArtifactKind,

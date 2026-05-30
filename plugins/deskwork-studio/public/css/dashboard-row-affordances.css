@@ -247,7 +247,7 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 22px;
+  width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -258,8 +258,8 @@
   user-select: none;
   padding: 0;
   z-index: 6;
-  /* WCAG 2.2 SC 2.5.8 minimum target size 24x24 — the row's height
-   * provides the vertical dimension (≥44 in standard rows). */
+  /* WCAG 2.2 SC 2.5.8 minimum target size 24x24 — both axes meet the
+   * floor: 24px width here + ≥44px vertical via row height. */
   min-height: 24px;
 }
 
@@ -274,13 +274,19 @@
 
 .er-row-member-tab-label {
   font-family: var(--er-font-mono);
-  font-size: 0.5625rem;
-  letter-spacing: 0.32em;
+  font-size: 0.625rem;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: var(--er-kraft);
+  /* var(--er-ink-soft) #3A3530 on var(--er-paper-2) #ECE6D4 = 9.79:1
+   * (passes WCAG 1.4.3 AA at any size). Previously used var(--er-kraft)
+   * at 3.58:1 which failed for small text. The kraft accent is
+   * preserved via the count badge's border + the expanded-state
+   * background flip, so the affordance still reads as a kraft
+   * "belonging-to" affordance overall. */
+  color: var(--er-ink-soft);
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .er-row-member-tab-count {
@@ -289,8 +295,11 @@
   left: 50%;
   transform: translateX(-50%);
   font-family: var(--er-font-mono);
-  font-size: 0.55rem;
-  color: var(--er-kraft);
+  font-size: 0.625rem;
+  /* var(--er-ink) #1A1614 on var(--er-paper) #F5F1E8 = 14.91:1
+   * (passes WCAG 1.4.3 AA easily). Border still uses kraft so the
+   * badge reads visually as a kraft member-count marker. */
+  color: var(--er-ink);
   background: var(--er-paper);
   border: 1px solid var(--er-kraft);
   border-radius: 50%;
@@ -299,7 +308,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -308,7 +317,7 @@
  * is added server-side when parents.length > 0; non-member rows keep
  * their original padding. */
 .er-row-shell.has-member-tab .er-row-fg {
-  padding-left: 26px;
+  padding-left: 28px;
 }
 
 /* Expanded state — popover visible, tab color inverts to kraft. */
