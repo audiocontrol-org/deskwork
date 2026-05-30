@@ -36,6 +36,7 @@ Finding-ID: AUDIT-20260529-01
 Status:     verified-2026-05-29
 Severity:   informational
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts + session-range.ts
+Tracks-Issue: 361
 
 Track 2 reviewer (feature-dev:code-reviewer) verified all six spec compliance items in #361:
 
@@ -56,6 +57,7 @@ Finding-ID: AUDIT-20260529-02
 Status:     fixed-d8e08f0
 Severity:   medium
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts:90
+Tracks-Issue: 361
 
 Track 3 reviewer surfaced a defensive-posture asymmetry: `scanIssuesThisSession` handled an invalid `sessionStartSha` gracefully via `resolveSessionBoundarySha`'s `rev-parse --verify` probe, but `readCommits` passed the SHA directly into `git log <sha>..HEAD`. On a dangling ref (force-push / rebase / stale SHA from a prior session), `git log` exits non-zero, the exception propagates through `captureSessionEndHygiene`, and the entire hygiene capture aborts before the issue scan runs.
 
@@ -75,6 +77,7 @@ Finding-ID: AUDIT-20260529-03
 Status:     fixed-d8e08f0
 Severity:   low
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/walk.ts:162
+Tracks-Issue: 361
 
 Track 3 reviewer flagged a stale code comment: `walk.ts:162` says "the diagnostic pattern mirrors session-end-hygiene.ts's `resolveSessionBoundaryIso` error handling." That function was deleted in commit `8841be9` (replaced by `resolveSessionBoundarySha` in `session-range.ts`). A future contributor following the breadcrumb would find nothing.
 
@@ -90,6 +93,7 @@ Finding-ID: AUDIT-20260529-04
 Status:     fixed-d8e08f0
 Severity:   low
 Surface:    docs/1.0/001-IN-PROGRESS/hygiene/workplan.md:424
+Tracks-Issue: 361
 
 Track 3 reviewer flagged a stale provenance note in the Phase 12 workplan implementation notes: it claimed "the no-SHA fallback path lives in `resolveSessionBoundaryIso` and stays as-is." Both claims are now wrong — the function was deleted/renamed, and the no-SHA fallback was materially changed (now SHA-based, not committer-date-based).
 
@@ -138,6 +142,7 @@ Finding-ID: AUDIT-20260529-06
 Status:     verified-2026-05-29
 Severity:   informational
 Surface:    scripts/smoke-hygiene.sh (worktree-section, lines 333–411)
+Tracks-Issue: 356
 
 Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's small-routine carve-out) verified the smoke extension is technically correct, the assertions are falsifiable, cleanup is leak-free under both default-mktemp and `SMOKE_HYGIENE_TMPDIR` paths, and the new section is stylistically consistent with the pre-existing smoke structure.
 
@@ -153,6 +158,7 @@ Finding-ID: AUDIT-20260529-07
 Status:     verified-2026-05-29
 Severity:   high
 Surface:    plugins/dw-lifecycle/src/archive-branch/preflight.ts (`assertTagDoesNotExist`)
+Tracks-Issue: 364
 
 **Verified 2026-05-29 against installed v0.27.0** — created a tmp worktree (`feature/v0270-verify` with one ahead-commit), ran `dw-lifecycle dismantle-worktrees propose --worktree-base <tmp> --threshold-count 1`, set `decision=archive-then-dismantle` + substantive reason, ran `apply`. Result: `Applied 1, skipped 0, failed 0. applied: <path> [archive-then-dismantle] (tag: archived/feature-v0270-verify-2026-05-29)`. Pre-fix this would have reported `Tag already exists` and aborted the archive step; post-fix the preflight passes through correctly. Test artifacts cleaned up (tag deleted locally + on origin; tmp worktree-base removed).
 
@@ -178,6 +184,7 @@ Finding-ID: AUDIT-20260529-08
 Status:     fixed-pending-verification
 Severity:   informational
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/ + .claude/rules/agent-discipline.md + docs/1.0/burndown/dw-lifecycle.md
+Tracks-Issue: 361
 
 Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's small-routine-change carve-out) verified the rename. Found one legitimate stale-reference cluster the workplan Step 5 audit scope missed:
 
@@ -198,6 +205,7 @@ Finding-ID: AUDIT-20260529-09
 Status:     fixed-pending-verification
 Severity:   informational
 Surface:    plugins/dw-lifecycle/src/close-shipped/commit-scanner.ts + SKILL.md + 2 test files
+Tracks-Issue: 366
 
 Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's medium-routine carve-out) verified the Phase 13 / #366 fix and reported two doc-accuracy findings — both applied as a follow-up commit:
 
@@ -217,6 +225,67 @@ Reviewer confirmed clean on the substantive change:
 Track 1 (load-bearing verification): 2336/2336 plugin tests pass; smoke-hygiene OK end-to-end.
 
 Verification status `fixed-pending-verification` per the project's "issue closure requires verification in a formally-installed release" rule. Acceptance is re-running `close-shipped --from-tag v0.26.5 --to-tag v0.27.0` post-install and confirming only the 3 real candidates (#356, #361, #364) from the v0.27.0 dogfood land — not the 6 false positives (#351, #352, #353, #355, #362, #365).
+
+---
+
+## AUDIT-20260530-01 — Phase 14 Tasks 1+2 review
+
+Finding-ID: AUDIT-20260530-01
+Status:     fixed-pending-verification
+Severity:   informational
+Surface:    plugins/dw-lifecycle/src/close-shipped/{scanner-config,commit-scanner,audit-log-walker}.ts + 2 test files + SKILL.md
+Tracks-Issue: 369
+
+Combined reviewer (feature-dev:code-reviewer, single-pass) verified the two Phase 14 commits. Zero high-confidence findings.
+
+Reviewer-confirmed clean across:
+
+- `END_OF_SUBJECT_PARENS_RE` regex correctness: applied to stripped subject alone (no `m` flag), `$` correctly anchors end-of-subject, `\s*$` absorbs trailing whitespace, mid-subject parens with trailing text don't match.
+- `loadScannerConfig` robustness: file-absent → defaults; malformed YAML → typed error; null/non-object parsed value → defaults; non-boolean field → defaults. snake_case YAML field ↔ camelCase TS interface mapping is explicit and correct.
+- `TRACKS_ISSUE_PATTERN` regex correctness: `im` flags correct; `Tracks-Issue: invalid` degrades to fallback (no digit match → null → body-scrape).
+- `ENTRY_HEADING_RE` backward-compat with scope-discovery audit-log: `## DATE` parents in that file's date-grouped layout become harmless boundaries — their buffers contain no `Status: fixed-<sha>` so `parseAuditLog` skips them at the status check; each `### entry-name` child still gets its own properly-scoped buffer.
+- Back-fill correctness: all 9 AUDIT entries' `Tracks-Issue:` fields verified against the parent issue they actually track (#361, #356, #364, #366; AUDIT-05 deliberately skipped — pure withdrawal with no specific issue).
+- Discipline-rule checks: no `any`/`as Type`/`@ts-ignore` introduced; the one `as Record<string, unknown>` in `scanner-config.ts:69` is guarded by a typeof narrowing check on the line above and matches the established codebase pattern across 15+ existing files. File sizes within the 300–500 cap.
+
+Track 1 (load-bearing verification): 2344/2344 plugin tests pass. Live `close-shipped` dry-run against v0.26.5..v0.27.0 from THIS project reproduces the expected 5-candidate set with `#356` / `#361` / `#364` surfacing (the 3 genuine fixes) and `#50` from the v0.27.0 dogfood gone.
+
+Verification status `fixed-pending-verification` per the project rule. Closes when the next release ships and the operator runs `close-shipped --from-tag v0.27.0 --to-tag v0.X.Y --dry-run` against an installed version of v0.X.Y and confirms the candidate set matches expectations.
+
+---
+
+## AUDIT-20260530-02 — Phase 15 close-shipped redesign (commits per task)
+
+Finding-ID: AUDIT-20260530-02
+Status:     fixed-pending-verification
+Severity:   informational
+Surface:    plugins/dw-lifecycle/src/close-shipped/{scan,propose,apply-v2,bundle,mention-scanner}.ts + subcommands/close-shipped.ts + skills/close-shipped/SKILL.md
+Tracks-Issue: 366
+
+Phase 15 redesign of `close-shipped`: replaced the prose-grammar 4-walker
+architecture with mechanical narrowing + Agent-tool dispatch from within
+the agent's Claude Code session + operator-curated `propose | apply` flow.
+Closes the unbounded patching cycle that motivated #366's Medium fix
+proposal.
+
+Mechanical pieces shipped as TDD red-green-commit cycles:
+
+- `mention-scanner.ts` — pure `#NNN` extractor with URL stripping; 9 cases.
+- `bundle.ts` — pure per-candidate aggregator over 4 evidence sources; 6 cases.
+- `scan.ts` — runtime that wires injected I/O + emits `BundleSet` with per-commit `diff_stat`; 3 cases.
+- `propose.ts` — `BundleSet + VerdictSet → Proposal` composer + markdown table renderer; 6 cases.
+- `apply-v2.ts` — pre-validates `decision` field + dispatches `gh` per accepted row; 5 cases.
+
+Live verification: `dw-lifecycle close-shipped scan --from-tag v0.27.0 --to-tag v0.28.1`
+produces 23 candidate bundles. The genuine ships (#361, #364) appear alongside
+back-fill / cite noise (#3, #4, #340, #347, #350–#355, #356, #362, #365–#368)
+— exactly the noise the agent dispatch is designed to filter. Canned-verdicts
+pass through `propose`; the smoke fixture exercises the full `scan → propose →
+apply` round-trip with the all-skip path.
+
+Verification status `fixed-pending-verification` closes when the next release
+ships the redesign + an operator runs the full agent-dispatch flow against an
+installed release per the project's "Issue closure requires verification in a
+formally-installed release" rule.
 
 ---
 

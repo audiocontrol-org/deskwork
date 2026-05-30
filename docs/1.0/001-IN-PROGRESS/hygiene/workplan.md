@@ -493,3 +493,96 @@ Operator decisions (locked in during definition):
 - Original tooling-feedback entry: `docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md` TF-003.
 - Promoted to [#366](https://github.com/audiocontrol-org/deskwork/issues/366) per the agent-discipline rule's "architectural / recurring-pattern → promote" trigger.
 - The Medium fix (operator-curation propose|apply split mirroring `triage-issues`) and the Heavy fix (per-source confidence scoring across all four evidence walkers) are scoped in the GH issue body for follow-up. This phase ships only the Light fix; Medium + Heavy are tracked as follow-ups under [#366](https://github.com/audiocontrol-org/deskwork/issues/366).
+
+## Phase 14: close-shipped walker accuracy follow-ups (Phase 13 dogfood)  ·  [#369](https://github.com/audiocontrol-org/deskwork/issues/369)
+
+**Deliverable:** Two follow-up fixes that the v0.28.1 install verification surfaced. Phase 13's strict narrowing is GitHub-grammar-correct, but the dogfood revealed (1) a convention mismatch with this project's commit-message practice and (2) a sibling false-positive shape in the audit-log walker. Closes [#369](https://github.com/audiocontrol-org/deskwork/issues/369).
+
+### Task 1: Configurable end-of-subject parens for the commit-log walker
+
+**Background:** Phase 13 dropped `parens` (end-of-subject `(#NNN)`) because the same shape appears in both genuine fix commits (`feat(scope): subject (#NNN)`) and back-fill / docs cite commits (`docs: back-fill (#NNN) link in workplan`). Distinguishing them mechanically isn't possible without more context. The v0.28.1 verification confirmed the cost: zero commit-log matches against the v0.26.5..v0.27.0 range even though `#356` / `#361` / `#364` all had explicit `(#NNN)` fix commits in that range. The deskwork project's commit-message convention uses end-of-subject parens; many adopters likely do too.
+
+Light fix: add a project-level config knob that opts adopters with this convention back into the parens shape, ONLY for end-of-subject matches (mid-subject and body parens stay dropped — those are usually cites, not fix-shipping signals).
+
+- [x] Step 1: Add `.dw-lifecycle/close-shipped-config.yaml` schema + loader (`plugins/dw-lifecycle/src/close-shipped/scanner-config.ts`). Single field: `treat_end_of_subject_parens_as_fix_marker: boolean` (default `false`). When the file is absent, defaults hold; when the file exists, the loader returns the parsed config. Resolves relative to the project root.
+- [x] Step 2: Update `commit-scanner.ts` to take a `ScannerConfig` argument. When `treat_end_of_subject_parens_as_fix_marker` is `true`, add an end-of-subject parens matcher (`END_OF_SUBJECT_PARENS_RE = /\(#(\d+)\)\s*$/`). The matcher runs on the STRIPPED SUBJECT alone so the `$` anchor is end-of-subject, not end-of-record. Body parens and mid-subject parens stay dropped.
+- [x] Step 3: Thread the config through `scanAndGroup` / the subcommand orchestration. The CLI subcommand calls `loadScannerConfig(projectRoot)` at startup; tests pass the config explicitly.
+- [x] Step 4: Vitest coverage. 5 new cases land in `close-shipped-commit-scanner.test.ts` covering Phase 14 (a) through (d) plus a back-compat case verifying omitted-config still defaults to strict.
+- [x] Step 5: SKILL.md update for `close-shipped` — documents the new config file + knob + the trade-off (relaxes GitHub's strict grammar in exchange for project-convention support). Includes example YAML snippet + the explicit limitation note about back-fill docs commits whose subject happens to end in `(#NNN)`.
+- [x] Step 6: Ship the deskwork project's own `close-shipped-config.yaml` set to `true` — this project uses the convention.
+
+**Acceptance Criteria:**
+
+- [x] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` from THIS project (with the new config file shipped) surfaces `#356`, `#361`, `#364` from the v0.27.0 dogfood range. (Live-tested against the real range; all 3 surface via verb `parens`.)
+- [ ] ~~Still does NOT surface `#353`, `#355`~~ — **corrected during implementation**: `dc92137 docs(scope-discovery): back-fill Phase 13 parent issue (#355)` and `4b5487d docs(scope-discovery): back-fill Phase 12 issue link (#353)` both end in `(#NNN)` so the end-of-subject anchor matches them. The pre-implementation criterion assumed all back-fill commits placed parens mid-subject; that's not how they were actually written. Operationalized as a documented limitation in `close-shipped/SKILL.md` — adopters who care can curate the dry-run output, convert back-fill subjects to mid-subject parens, or wait for the Phase 13 Medium follow-up (operator-curation propose | apply split) under [#366](https://github.com/audiocontrol-org/deskwork/issues/366).
+- [x] An adopter WITHOUT the config file (or with knob `false`) gets the Phase 13 strict behavior. (Vitest cases (b) and (b2) confirm.)
+- [x] Vitest coverage for the cases above passes; full plugin suite stays green.
+
+### Task 2: Audit-log walker entry-tracked vs prose-cited disambiguation
+
+**Background:** v0.28.1 dogfood also surfaced `#50` as a false-positive candidate via the audit-log walker. `AUDIT-20260529-09`'s entry body literally contains the test-fixture text `Bare \`#50\` in subject is dropped post-Phase-13; the \`Closes #50\` in the body is the only fix-shipping signal.` — describing a test case, not claiming to fix #50. The walker's body scrape matches the `Closes #50` substring and surfaces #50. Same false-positive shape Phase 13 fixed for the commit-log walker, but in the sibling walker.
+
+Light fix: add an optional per-entry field `tracks_issue: NNN`. The walker prefers this field; body scrape becomes a fallback only when the field is absent. Mirrors how the workplan-checkbox walker's `· [#NNN](url)` back-fill is the canonical signal.
+
+- [x] Step 1: Update `audit-log-walker.ts` to parse an optional `Tracks-Issue: NNN` line from each AUDIT entry (sits alongside the existing `Status:` / `Severity:` / `Surface:` fields). The walker reads this field first; only when absent does it fall through to body fix-keyword scraping. (Also fixed an under-the-cover bug: the splitter only recognized `### entry-name` boundaries but this project's audit-log uses `## AUDIT-NNN —` at top level — the splitter was treating the whole file as one giant entry, which is how the false-positive `#50` was leaking from AUDIT-09's body into the entire file's match set. Splitter now accepts `## ` OR `### ` as entry boundaries.)
+- [x] Step 2: Updated all 9 existing AUDIT entries in `docs/1.0/001-IN-PROGRESS/hygiene/audit-log.md` with `Tracks-Issue:` fields — #361 for Phase 12 work, #356 for Phase 11 Task 5 review, #364 for the runGit-contract bug, #366 for Phase 13.
+- [x] Step 3: Vitest coverage. 3 new cases in `close-shipped-audit-log-walker.test.ts`:
+  - (a) Entry with `Tracks-Issue: 200` + body mentioning `Closes #100` → surfaces #200 only.
+  - (b) Entry without `Tracks-Issue` field + body `Closes #100` → surfaces #100 (back-compat).
+  - (c) Entry with prose-cited test fixture `Closes #50` and `Tracks-Issue: 366` → surfaces only #366, not #50.
+- [x] Step 4: SKILL.md prose for `close-shipped` updated — Source-(b) table row names `Tracks-Issue` as canonical with body-scrape fallback; new paragraph explains the precedence + the splitter's `##` / `###` heading-level support.
+
+**Acceptance Criteria:**
+
+- [x] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` against an installed release-after-this-fix does NOT surface `#50` from the audit-log walker. (Verified locally on this branch — pre-Task-2 dry-run had `#50 sources: audit-log`; post-Task-2 it's gone. `#361` now also shows audit-log as a second source via its `Tracks-Issue: 361` field on entries 02/03/04.)
+- [x] Existing AUDIT entries with explicit `Tracks-Issue:` fields are honored; entries without the field still use the body-scrape fallback (no breakage for adopters who haven't migrated). (Test case (b) confirms back-compat.)
+- [x] Vitest coverage for the 3 cases above passes; full plugin suite green. (2344 / 2344 plugin tests pass.)
+
+**Provenance (Phase 14):**
+
+- Surfaced during the v0.28.1 install verification (2026-05-30) — Phase 13's strict semantic was correct under GitHub's grammar but the project's convention doesn't match, AND the audit-log walker had a sibling any-mention bug.
+- Promoted to [#369](https://github.com/audiocontrol-org/deskwork/issues/369) per the agent-discipline rule.
+- Sibling consideration: Phase 13's Medium fix (operator-curation `propose|apply` split) tracked under [#366](https://github.com/audiocontrol-org/deskwork/issues/366) is a strictly stronger response — if it ships, the configurable-parens approach here becomes one of several heuristics the operator can override at curation time. Phase 14's Light fix here is the immediate-value path; Phase 13's Medium remains the future architectural change.
+
+## Phase 15: close-shipped redesign — narrow mechanically, judge with Agent tool  ·  [#374](https://github.com/audiocontrol-org/deskwork/issues/374)
+
+**Deliverable:** Replace `close-shipped`'s 4-walker prose-grammar architecture with **mechanical narrowing + Agent-tool dispatch from within the agent's Claude Code session + operator-curated `propose | apply`**. Retires the unbounded patching cycle by moving the "did this commit close this issue" judgment out of regex-and-config-knob territory and into per-candidate agent dispatches. Closes [#374](https://github.com/audiocontrol-org/deskwork/issues/374); supersedes [#366](https://github.com/audiocontrol-org/deskwork/issues/366)'s Medium fix proposal and finishes the architectural shift [#369](https://github.com/audiocontrol-org/deskwork/issues/369) started.
+
+**Reference artifacts (already on branch):**
+
+- Design spec: [`docs/superpowers/specs/2026-05-30-close-shipped-redesign.md`](../../../superpowers/specs/2026-05-30-close-shipped-redesign.md) (commit `52baa75`).
+- Implementation plan: [`docs/superpowers/plans/2026-05-30-close-shipped-redesign.md`](../../../superpowers/plans/2026-05-30-close-shipped-redesign.md) (commit `ad62b64`). 11 tasks, TDD throughout.
+
+### Task 1: Implement Phase 15 per the design spec + implementation plan
+
+Each step of the implementation plan ships its own commit (TDD red → green → commit per the writing-plans skill's discipline). The 11 tasks in the plan are:
+
+- [x] Step 1: Add new types (`CandidateBundle`, `BundleSet`, `Verdict`, `VerdictSet`, `ProposalItem`, `Proposal`, `ProposalDecision`) to `close-shipped/types.ts`. (Commit c59b6fe)
+- [x] Step 2: `mention-scanner.ts` — pure regex extractor over arbitrary text; 9 vitest cases. (Commit prior to bundle.ts)
+- [x] Step 3: `bundle.ts` — pure bundle assembler grouping mentions into per-candidate evidence; 6 vitest cases.
+- [x] Step 4: `scan.ts` runtime — emits BundleSet with diff stats per commit; 3 vitest cases. (Commit d6981ff)
+- [x] Step 5: `propose.ts` — composes Proposal JSON + markdown table; 6 vitest cases. (Commit 7d93f2e)
+- [x] Step 6: `apply-v2.ts` — pre-validates Proposal + dispatches gh per accepted row; 5 vitest cases. (Commit 5f20fc6)
+- [x] Step 7+8: CLI verb dispatch + real wiring — `scan` / `propose` / `apply` keywords route to new code; bare invocation routes to existing legacy flow; scan wired to real walkers + git/gh. (Combined commit 57d577d)
+- [x] Step 9: SKILL.md rewrite — Agent-tool dispatch orchestration (parallel single-message multi-tool-use; one-retry on JSON parse failure). (Commit 24029c6)
+- [x] Step 10: Extend `scripts/smoke-hygiene.sh` with the scan → propose → apply round-trip using canned verdicts. (Commit 52293bc)
+- [x] Step 11: Live verification against v0.27.0..v0.28.1 + AUDIT-20260530-02 entry + tick acceptance criteria.
+
+**Acceptance Criteria:**
+
+- [x] `dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB>` walks all 4 sources permissively + emits the per-candidate bundle set as JSON. (Live-verified against v0.27.0..v0.28.1: 23 candidate bundles produced; the genuine ships #361, #364 are present alongside the back-fill / cite noise the agent dispatch is designed to filter.)
+- [x] `dw-lifecycle close-shipped propose --bundles <path> --verdicts <path>` writes a `proposals-<timestamp>.json` + prints a markdown summary table. (Live-verified — proposal at `.dw-lifecycle/close-shipped/proposals-2026-05-30T06-48-50-421Z.json`; markdown table renders cleanly.)
+- [x] `dw-lifecycle close-shipped apply --proposal <path>` validates every item has a non-empty `decision`, dispatches `gh issue comment` + `--add-label pending-verification` per `accept-verdict`-shipped + `override-shipped` row, records per-item success/failure. (Smoke round-trip exercises the all-skip path; unit tests cover applied / skipped / failed branches; runtime InvalidProposalError validates pre-dispatch.)
+- [x] SKILL.md prose covers the `scan → Agent-tool parallel dispatch → propose → operator review → apply` orchestration end-to-end.
+- [ ] Live verification against v0.27.0..v0.28.1: agent correctly identifies #356, #361, #364, #366 as shipped (genuine fixes); correctly rejects #353, #355 (back-fill docs commits), #340/#347/etc. (already-closed / cross-reference), #365 (PR self-reference). _(Mechanical narrowing verified above with canned verdicts; the agent-dispatch step itself can only run from a Claude Code session, not from CI/tests, so this acceptance criterion closes after an operator runs the full agent-dispatch flow against the next installed release per the project's "Issue closure requires verification in a formally-installed release" rule.)_
+- [ ] Candidate-count threshold (default 50) surfaces a confirmation prompt before the parallel Agent dispatch fires. _(SKILL.md prose documents the threshold step; runtime confirmation lives in the agent's session as a check on `bundles.length`. Closes after operator-run live walk.)_
+- [x] Vitest unit + integration tests for the mechanical paths; full plugin suite stays green. (191 test files, 2373 tests pass post-Step-9.)
+- [x] Legacy bare-`close-shipped` invocation preserves the old single-command behavior for one release cycle. (Step 7+8 dispatch only intercepts on `scan`/`propose`/`apply` first-positional; everything else falls through to existing `parseCloseShippedArgs` + `runCloseShipped`. Existing close-shipped tests pass unchanged.)
+- [x] SKILL.md prose names the new flow + the Agent-tool dispatch + the proposal/apply gate + the legacy-flag sunset.
+
+**Provenance (Phase 15):**
+
+- v0.28.1 install verification confirmed Phase 14's documented limitations would keep accruing (back-fill docs commits with end-of-subject parens still produce false-positives; prose-cited fixture text inside audit-log entries was leaking before the splitter heading-level fix). Operator pushback after the verification surfaced the structural concern: parsing prose to infer fix-ship semantics is an unbounded patching cycle.
+- Brainstormed via `superpowers:brainstorming` (2026-05-30 session). Initial draft proposed subprocess dispatch (audit-barrage pattern); operator pushback corrected to Agent-tool-from-skill-prose dispatch, matching the existing `/dw-lifecycle:review` and `/dw-lifecycle:implement` pattern.
+- Design spec + implementation plan on branch; Phase 15 promoted to [#374](https://github.com/audiocontrol-org/deskwork/issues/374) per the agent-discipline rule.
+- Supersedes [#366](https://github.com/audiocontrol-org/deskwork/issues/366) (Phase 13 Medium follow-up — operator-curation `propose | apply` split is now the v1 shape, not a follow-up) and [#369](https://github.com/audiocontrol-org/deskwork/issues/369) (Phase 14 prose-grammar follow-ups — retired in favor of mechanical narrowing + agent judgment).

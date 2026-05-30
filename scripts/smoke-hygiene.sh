@@ -410,4 +410,50 @@ g worktree list --porcelain | grep -q "$WTREE_BASE/smoke-wtree" \
 g worktree remove --force "$WTREE_BASE/smoke-wtree" >/dev/null 2>&1 || true
 g branch -D feature/smoke-wtree >/dev/null 2>&1 || true
 
+# -------- 6. Phase 15: close-shipped scan/propose/apply round-trip --------
+
+echo "== smoke-hygiene: close-shipped scan =="
+CS_BUNDLES="$FIXTURE/close-shipped-bundles.json"
+"$DW_BIN" close-shipped scan --from-tag v0.1.0 --to-tag v0.2.0 --repo example/repo \
+    --output "$CS_BUNDLES" >/dev/null 2>&1 \
+  || fail "close-shipped scan failed (non-zero exit)"
+test -s "$CS_BUNDLES" \
+  || fail "close-shipped scan produced no bundle output"
+python3 -c "import json,sys; d=json.loads(open('$CS_BUNDLES').read()); assert 'bundles' in d, 'missing bundles'" \
+  || fail "close-shipped scan emitted malformed BundleSet"
+
+echo "== smoke-hygiene: close-shipped propose (with canned verdicts) =="
+CS_VERDICTS="$FIXTURE/close-shipped-verdicts.json"
+python3 - "$CS_BUNDLES" "$CS_VERDICTS" <<'PY'
+import json, sys
+from pathlib import Path
+bundles = json.loads(Path(sys.argv[1]).read_text())
+verdicts = {"verdicts": []}
+for b in bundles.get("bundles", []):
+    verdicts["verdicts"].append({
+        "issue": b["issue"]["number"],
+        "verdict": "shipped",
+        "reason": "smoke fixture: marked all candidates as shipped",
+    })
+Path(sys.argv[2]).write_text(json.dumps(verdicts, indent=2))
+PY
+"$DW_BIN" close-shipped propose --bundles "$CS_BUNDLES" --verdicts "$CS_VERDICTS" >/dev/null 2>&1 \
+  || fail "close-shipped propose failed (non-zero exit)"
+CS_PROPOSAL="$(find "$FIXTURE/.dw-lifecycle/close-shipped" -name 'proposals-*.json' 2>/dev/null | head -n1)"
+test -n "$CS_PROPOSAL" \
+  || fail "close-shipped propose did not write a proposal JSON"
+
+echo "== smoke-hygiene: close-shipped apply (all-skip via decision flip) =="
+python3 - "$CS_PROPOSAL" <<'PY'
+import json, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+data = json.loads(p.read_text())
+for item in data["items"]:
+    item["decision"] = "skip"
+p.write_text(json.dumps(data, indent=2))
+PY
+"$DW_BIN" close-shipped apply --proposal "$CS_PROPOSAL" >/dev/null 2>&1 \
+  || fail "close-shipped apply (all-skip) failed (non-zero exit)"
+
 echo "OK"

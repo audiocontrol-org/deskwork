@@ -119,3 +119,5 @@ yarn-error.log*
 .dw-lifecycle/dismantle-worktrees/
 
 .dw-lifecycle/complete-parent-closure/
+
+.dw-lifecycle/close-shipped/

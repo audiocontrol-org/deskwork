@@ -140,3 +140,95 @@ export interface CloseShippedOptions {
   readonly runGh: RunGh;
   readonly runGit: RunGit;
 }
+
+// === Phase 15 redesign types ===
+//
+// Phase 15 retires the per-walker prose-grammar architecture in favor of
+// mechanical narrowing + Agent-tool dispatch from within the agent's
+// Claude Code session + operator-curated propose|apply. The types below
+// are the data shapes the new flow exchanges between mechanical helpers
+// (scan, propose, apply-v2) and the SKILL.md prose orchestration.
+
+/**
+ * Per-candidate evidence bundle the agent reads to render a verdict.
+ * Mechanically assembled by bundle.ts — no judgment, no filtering.
+ */
+export interface CandidateBundle {
+  readonly issue: {
+    readonly number: number;
+    readonly title: string;
+    readonly state: 'OPEN' | 'CLOSED' | 'UNKNOWN';
+    readonly body: string;
+    readonly recent_comments: readonly string[];
+  };
+  readonly commits: readonly {
+    readonly sha: string;
+    readonly subject: string;
+    readonly body: string;
+    readonly diff_stat: string;
+  }[];
+  readonly pr: {
+    readonly number: number;
+    readonly title: string;
+    readonly body: string;
+  } | null;
+  readonly audit_log_entries: readonly {
+    readonly finding_id: string | null;
+    readonly status: string;
+    readonly tracks_issue: number | null;
+    readonly surface: string;
+    readonly body: string;
+  }[];
+  readonly workplan_backfills: readonly {
+    readonly file: string;
+    readonly line: number;
+    readonly text: string;
+  }[];
+}
+
+/** The entire `close-shipped scan` output. */
+export interface BundleSet {
+  readonly generated_at: string;
+  readonly from_tag: string;
+  readonly to_tag: string;
+  readonly repo: string;
+  readonly bundles: readonly CandidateBundle[];
+}
+
+/** One agent verdict for one candidate. */
+export interface Verdict {
+  readonly issue: number;
+  readonly verdict: 'shipped' | 'not-shipped' | 'uncertain' | 'error';
+  readonly reason: string;
+}
+
+/** Agent verdicts collected by SKILL.md orchestration, passed to propose. */
+export interface VerdictSet {
+  readonly verdicts: readonly Verdict[];
+}
+
+export type ProposalDecision =
+  | 'accept-verdict'
+  | 'override-shipped'
+  | 'override-not-shipped'
+  | 'skip';
+
+/** Per-proposal-row record. `decision` is mutable so the operator can fill it in. */
+export interface ProposalItem {
+  readonly issue: number;
+  readonly issue_title: string;
+  readonly issue_state: 'OPEN' | 'CLOSED' | 'UNKNOWN';
+  readonly agent_verdict: Verdict['verdict'];
+  readonly agent_reason: string;
+  readonly evidence_summary: string;
+  decision: ProposalDecision | '';
+}
+
+/** The proposal JSON file. */
+export interface Proposal {
+  readonly generated_at: string;
+  readonly from_tag: string;
+  readonly to_tag: string;
+  readonly repo: string;
+  readonly items: readonly ProposalItem[];
+}

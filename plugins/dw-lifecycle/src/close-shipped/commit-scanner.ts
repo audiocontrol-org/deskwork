@@ -37,6 +37,8 @@ import type {
   RunGit,
   ScannedCommit,
 } from './types.js';
+import type { ScannerConfig } from './scanner-config.js';
+import { DEFAULT_SCANNER_CONFIG } from './scanner-config.js';
 
 export class CommitScanError extends Error {
   override name = 'CommitScanError';
@@ -155,6 +157,14 @@ const PATTERNS: readonly PatternEntry[] = [
 // at the subject start; bodies + non-prefixed subjects are unaffected.
 const MERGE_PR_SUBJECT_RE = /^Merge pull request #\d+ from /;
 
+// Phase 14 / #369: end-of-subject `(#NNN)` pattern. Only used when the
+// project-level config knob `treat_end_of_subject_parens_as_fix_marker`
+// is true. Anchored to end-of-subject (the regex is applied to the
+// subject string alone, not to subject + body). Mid-subject parens and
+// body parens stay dropped regardless because they don't reach this
+// matcher.
+const END_OF_SUBJECT_PARENS_RE = /\(#(\d+)\)\s*$/;
+
 interface ExtractedMatch {
   readonly issue: number;
   readonly verb: ReferenceVerb;
@@ -171,6 +181,7 @@ interface ExtractedMatch {
  */
 export function extractReferencesFromCommit(
   commit: ScannedCommit,
+  config: ScannerConfig = DEFAULT_SCANNER_CONFIG,
 ): readonly CommitIssueReference[] {
   // PR-merge commits never contribute fix-shipped signals. The actual
   // fix commits travel inside the merge as their own records; the merge
@@ -181,6 +192,24 @@ export function extractReferencesFromCommit(
   const text = `${commit.subject}\n${commit.body}`;
   const stripped = stripIssueLikeUrls(text);
   const matches: ExtractedMatch[] = [];
+
+  // Phase 14 / #369 opt-in: end-of-subject parens. Scanned on the
+  // STRIPPED SUBJECT alone, not on subject + body. This ensures the
+  // anchor `$` matches end-of-subject, not end-of-record. Mid-subject
+  // and body parens stay invisible to this matcher.
+  if (config.treatEndOfSubjectParensAsFixMarker) {
+    const subjectStripped = stripIssueLikeUrls(commit.subject);
+    const m = END_OF_SUBJECT_PARENS_RE.exec(subjectStripped);
+    if (m !== null) {
+      const n = m[1];
+      if (n !== undefined) {
+        const issue = Number.parseInt(n, 10);
+        if (Number.isFinite(issue) && issue > 0) {
+          matches.push({ issue, verb: 'parens', start: m.index });
+        }
+      }
+    }
+  }
   const consumed = new Set<string>();
   for (const entry of PATTERNS) {
     const re = new RegExp(entry.pattern.source, entry.pattern.flags);
@@ -274,16 +303,20 @@ export function groupReferencesByIssue(
   return result;
 }
 
-export type ScanAndGroupArgs = ScanArgs;
+export interface ScanAndGroupArgs extends ScanArgs {
+  /** Phase 14 / #369 scanner config; defaults to strict (Phase 13). */
+  readonly config?: ScannerConfig;
+}
 
 export function scanAndGroup(args: ScanAndGroupArgs): {
   readonly commits: readonly ScannedCommit[];
   readonly groups: readonly IssueReferenceGroup[];
 } {
   const commits = scanCommits(args);
+  const config = args.config ?? DEFAULT_SCANNER_CONFIG;
   const allRefs: CommitIssueReference[] = [];
   for (const commit of commits) {
-    for (const ref of extractReferencesFromCommit(commit)) {
+    for (const ref of extractReferencesFromCommit(commit, config)) {
       allRefs.push(ref);
     }
   }
