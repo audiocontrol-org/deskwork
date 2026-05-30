@@ -713,7 +713,7 @@ Awaiting `verified-<date>` on each of -16 through -20 after the next batch of di
 ### AUDIT-20260530-01 — Audit-barrage finding extraction silently downgrades unrecognized severities to `informational` (the LOWEST rank)
 
 Finding-ID: AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model)
-Status:     open
+Status:     fixed-2af92b7ee1cdb32df61584a7a2d80c00412fec34
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:130-136`
 
@@ -722,7 +722,7 @@ Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-b
 ### AUDIT-20260530-02 — `computeAutoPosition` hard-codes `## Phase` headings; non-Phase workplans throw and HALT the unconditional implement-loop hook
 
 Finding-ID: AUDIT-20260530-02
-Status:     open
+Status:     fixed-16be1bbec4cc0fe8dd52b914d328c871f0be4951
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:96,97,166-170`
 
@@ -731,7 +731,7 @@ Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-posi
 ### AUDIT-20260530-03 — Auto-position task numbering assumes hierarchical `Task <phase>.<minor>` but the scope-discovery workplan itself uses flat `Task N:`
 
 Finding-ID: AUDIT-20260530-03
-Status:     open
+Status:     fixed-1645d43021ccc45190f7d339e43c80f5dd67e176
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:182-191` (`nextTaskNumberFactory`), `auto-position.ts:153-157` (`currentMaxMinorInPhase`)
 
@@ -740,7 +740,7 @@ Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-posi
 ### AUDIT-20260530-04 — `audit-barrage-lift` writes the canonical audit-log non-atomically, risking loss of all preserved history on crash
 
 Finding-ID: AUDIT-20260530-04
-Status:     open
+Status:     fixed-4335b64a8a4a0fd11d420dfde5fa93cdd0682697
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:333-340`
 
@@ -749,7 +749,7 @@ The apply path reads the full audit-log, concatenates the new section, and write
 ### AUDIT-20260530-05 — The `--auto` multi-finding insertion path (the feature's primary case) is untested; all `--auto` tests use a single finding
 
 Finding-ID: AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model)
-Status:     open
+Status:     fixed-3ba712dea1a110718764eb3c4597dc3b47945419
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/subcommands/promote-findings.ts` (auto-apply branch, items mapped with shared `insertAfterLine`), `__tests__/.../subcommand.test.ts:551-771`
 
@@ -758,7 +758,7 @@ In the auto-apply branch every proposal item is given the **same** `fields.inser
 ### AUDIT-20260530-06 — Feature-root resolution is non-deterministic when a slug exists under multiple version dirs
 
 Finding-ID: AUDIT-20260530-06
-Status:     open
+Status:     fixed-b67627bef41c1004d92af60c8abe8c81d8d22905
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:120-141` (`findFeatureRoot`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:289-305` (`resolveFeatureRoot`)
 
@@ -767,7 +767,7 @@ Both walkers iterate `await readdir(docsRoot)` and return the **first** `docs/<v
 ### AUDIT-20260530-07 — Auto-promoted fix tasks are invisible to the new gate
 
 Finding-ID: AUDIT-20260530-07
-Status:     open
+Status:     fixed-e0b20c1267029aad2654b20e2b650b12cf1d1e5c
 Severity:   blocking
 Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:204-222, plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:41-46
 

@@ -293,7 +293,15 @@ export async function runApplyAuditFlips(args: RunArgs): Promise<number> {
   const auditLog = await parseAuditLogFile(auditLogPath);
   const currentStatusById = new Map<string, string>();
   for (const entry of auditLog.entries) {
-    currentStatusById.set(entry.findingId, entry.status);
+    // Per AUDIT-20260530-07 / -08-equivalent: cross-model audit-log
+    // entries carry their Finding-ID with a trailing `(claude-X +
+    // codex-Y; cross-model)` annotation. The auto-flip proposal's
+    // findingId (parsed from `Closes AUDIT-NNNNNNNN-NN` in the
+    // commit subject) is canonical. Index the map by the canonical
+    // form on both sides so the lookup succeeds for cross-model
+    // findings too.
+    const canonical = /AUDIT-\d{8}-\d+/.exec(entry.findingId)?.[0] ?? entry.findingId;
+    currentStatusById.set(canonical, entry.status);
   }
 
   const actionable: StatusFlip[] = [];

@@ -72,16 +72,31 @@ const FINDING_ID_LINE_RE = /^Finding-ID:\s*(.+?)\s*$/;
 // gap; replacing only the value preserves the formatting verbatim.
 const STATUS_LINE_RE = /^(Status:\s*)(.*?)\s*$/;
 
+// Per AUDIT-20260530-07 (and the cross-model gap apply-audit-flips
+// hit during the Phase 15 dogfood): canonical AUDIT-IDs may carry a
+// trailing `(claude-X + codex-Y; cross-model)` annotation in the
+// audit-log's Finding-ID line. The proposal-side findingId is the
+// canonical `AUDIT-YYYYMMDD-NN` prefix. Match on the canonical form
+// from both sides so cross-model entries don't slip through as
+// "not found".
+const CANONICAL_AUDIT_ID_RE = /\bAUDIT-\d{8}-\d+/;
+
+function canonicalAuditId(value: string): string {
+  const m = CANONICAL_AUDIT_ID_RE.exec(value);
+  return m !== null ? m[0] : value;
+}
+
 function findFindingIdLine(
   lines: readonly string[],
   findingId: string,
 ): number | null {
+  const targetCanonical = canonicalAuditId(findingId);
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
     if (line === undefined) continue;
     const match = FINDING_ID_LINE_RE.exec(line);
     if (match === null) continue;
-    if (match[1] === findingId) return i;
+    if (canonicalAuditId(match[1] ?? '') === targetCanonical) return i;
   }
   return null;
 }
