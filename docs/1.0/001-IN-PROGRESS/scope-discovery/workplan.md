@@ -1096,31 +1096,26 @@ NEW CLI verb that walks the run-dir, extracts findings via the Task 2 library, a
 
 Modify `/dw-lifecycle:implement` SKILL.md to add an end-of-task hook that fires audit-barrage + lifts findings + scopes them via promote-findings, so the next-task pickup sees them as the workplan's next tasks (and the Task 1 gate allows pickup).
 
-- [ ] Step 1: Add NEW Step in SKILL.md between "When the task body is complete, mark its checkboxes and commit" and the existing Step 6 (scope-widen). The new step composes four CLI calls:
-  ```bash
-  RUN_DIR=$(dw-lifecycle audit-barrage --feature <slug> --range <task-start-sha>..HEAD --output-run-dir)
-  dw-lifecycle audit-barrage-lift --feature <slug> --run-dir "$RUN_DIR" --apply
-  dw-lifecycle promote-findings --feature <slug> --apply
-  dw-lifecycle check-open-findings --feature <slug>  # confirms gate now allows
-  ```
-- [ ] Step 2: `dw-lifecycle audit-barrage` gains a `--output-run-dir` flag at `subcommands/audit-barrage.ts`. When passed, the verb prints the resolved run-dir path on stdout (rest of summary on stderr — same pattern as `wrap-prompt --quiet`) so bash can capture it cleanly.
-- [ ] Step 3: Auto-position inference for promote-findings. The hook calls `dw-lifecycle promote-findings --feature <slug> --apply` WITHOUT an explicit `--task-number` flag; promote-findings auto-detects the "next unchecked task position" from the workplan (sibling helper added to the existing renderer's anchor logic) and inserts new fix-finding task blocks AT that position so the Task 1 gate sees them as the next N tasks immediately. No operator prompt; per the directive, the default IS the action.
-- [ ] Step 4: Failure-path policy — fail loud, do not pause:
-  - Audit-barrage CLIs missing (claude/codex/gemini binaries absent) → barrage's existing spawn-error path emits per-CLI errors; hook continues with whichever CLIs ARE installed (cross-model agreement degrades to single-model). If ALL three fail, the hook treats that as a barrage outage and proceeds without lift (the loop is forward-progressing; missing the barrage is friction for follow-up, not a stop-the-loop event).
-  - Audit-barrage timeout → captured to stderr; hook proceeds with partial results (whatever models returned in budget).
-  - `audit-barrage-lift` failure (e.g. malformed model output across the board → no findings extracted) → the hook treats the empty result as "no findings this round" and proceeds. A non-empty extraction that FAILS to write to audit-log (drift / permissions / parser error) is a stop-the-loop event — surface the error, do NOT advance to next-task pickup, exit with non-zero. The implement skill's per-task report shows the failure so the operator can investigate after the fact.
-  - `promote-findings` failure → same shape as audit-log write failure: stop the loop, surface error, exit non-zero. Per the operator directive, findings ARE guardrails; failing to scope them is a structural failure of the loop, not an operator decision point.
-- [ ] Step 5: Update implement-skill's per-task report to include: barrage-fire status (success/timeout/no-CLIs); count of new findings extracted; count of new workplan tasks scoped; gate-check result.
-- [ ] Step 6: Tests for the audit-barrage `--output-run-dir` flag (4 scenarios: prints absolute path, prints nothing when not set, prints to stdout not stderr, error path still goes to stderr).
-- [ ] Step 7: Update `audit-barrage` SKILL.md to document the new flag.
+- [x] Step 1: Added NEW Step 6 in implement SKILL.md between "When the task body is complete, mark its checkboxes and commit" and the existing scope-widen step (which became Step 7). The new step composes FIVE CLI calls (audit-barrage-render → audit-barrage --output-run-dir → audit-barrage-lift --apply → promote-findings --auto → check-open-findings). The original workplan called for four; the fifth is `audit-barrage-render` because the audit-barrage runner's contract is `--prompt-file`, not `--range`. The render step IS the bridge from session context to prompt.
+- [x] Step 2: `dw-lifecycle audit-barrage` gained a `--output-run-dir` flag (shipped in Phase 15 Task 4a, commit c7274da). When set, stdout becomes JUST the absolute run-dir path (newline-terminated); the BarrageRun JSON is suppressed. Stderr behavior unchanged.
+- [x] Step 3: Auto-position inference for promote-findings shipped as `--auto` flag (Phase 15 Task 4b, commit ee54f44). Walks open findings; reads workplan; computes "insert immediately BEFORE the first unchecked workplan task" anchor; defaults each finding's disposition to `promote-to-workplan`; applies in one shot. No proposal-file roundtrip, no operator prompts. The workplan-aware gate sees the new fix-tasks as positions [0..N-1] on next pickup.
+- [x] Step 4: Failure-path policy documented in SKILL.md Step 6 + Error-handling block. fail-loud rules:
+  - audit-barrage-render non-zero → stop loop, fix vars/template.
+  - audit-barrage all-models-failed (exit 1) → degraded path: proceed without lift; surface single-line warning.
+  - audit-barrage-lift non-zero with extracted findings → stop loop (audit-log write failed: drift/permissions/parser).
+  - promote-findings --auto non-zero → stop loop (findings are guardrails; failing to scope them is structural).
+  - check-open-findings non-zero AFTER auto-promote → stop loop (the gate refused despite the scoping; investigate workplan + audit-log state).
+- [x] Step 5: Per-task report shape documented in SKILL.md Step 6: barrage status (e.g. "2/3 models healthy"), findings extracted (count), findings scoped (count), gate result (allowed: open-findings-scoped-as-next / allowed: no-open-findings / refused: <mode>).
+- [x] Step 6: Tests for `--output-run-dir` shipped in Phase 15 Task 4a (6 tests covering 2 parseFlags scenarios + 4 renderStdoutOutput scenarios — JSON-shape contract, path-only contract, no-JSON-leakage, single-newline-termination).
+- [x] Step 7: Updated `audit-barrage` SKILL.md (`plugins/dw-lifecycle/skills/audit-barrage/SKILL.md`) Step 3 to document the new `--output-run-dir` flag with the bash composition example.
 
 **Acceptance Criteria:**
-- [ ] SKILL.md documents the end-of-task four-command hook recipe.
-- [ ] **No `--skip-audit-barrage-hook` flag.** Per the operator-directive on guardrails-not-exceptions, the hook ALWAYS fires.
-- [ ] `audit-barrage --output-run-dir` flag added + tested.
-- [ ] Failure paths behave per spec: missing CLIs degrade gracefully; audit-log write failures + promote-findings failures are stop-the-loop events (fail loud; do not pause for operator).
-- [ ] Per-task report includes barrage status + finding-extract count + scoped-task count + gate-check result.
-- [ ] promote-findings auto-positions new fix-tasks at the workplan's next-unchecked position (no operator prompt; Task 1 gate sees them immediately).
+- [x] SKILL.md documents the end-of-task five-command hook recipe (renderer + barrage + lift + auto-promote + gate sanity).
+- [x] **No `--skip-audit-barrage-hook` flag.** Per the operator-directive on guardrails-not-exceptions, the hook ALWAYS fires. Silent skip only when `.dw-lifecycle/scope-discovery/` is absent (project opt-in).
+- [x] `audit-barrage --output-run-dir` flag added + tested (Task 4a).
+- [x] Failure paths behave per spec: missing CLIs degrade gracefully; audit-log write failures + promote-findings failures are stop-the-loop events.
+- [x] Per-task report includes barrage status + finding-extract count + scoped-task count + gate-check result.
+- [x] promote-findings --auto positions new fix-tasks at the workplan's next-unchecked position; Task 1 gate sees them immediately as positions [0..N-1] (Task 4b).
 
 ### Task 5: Live verification + dogfood
 

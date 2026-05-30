@@ -37,20 +37,80 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    - If a step is independent of others, consider `superpowers:dispatching-parallel-agents` to fan out.
    - Every sub-agent dispatched in this loop (implementer, reviewer, code-explorer, code-architect, etc.) MUST be routed through the dispatch wrapper — see "Dispatch-wrapper engagement" below.
    - When the task body is complete, mark its checkboxes and commit.
-6. Auto-invoke scope-widen between tasks (default behavior) unless `--no-scope-widen` was passed:
+6. **End-of-task audit-barrage hook (always fires).** After the task-completion commit lands AND before any between-task work, run an audit-barrage pass against the task's diff, lift the surfaced findings into the audit-log, and auto-scope them at the head of the workplan so the workplan-aware gate (Step 2) sees them as the next work on next pickup. Per the Phase 15 operator directive (*"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do. Audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path"*), the hook is unconditional — there is NO `--skip-audit-barrage-hook` flag. The hook composes five CLI invocations:
+
+   ```bash
+   # 1. Render the prompt from the project's audit-barrage template (or override).
+   #    The vars JSON carries feature_slug, workplan_summary, diff,
+   #    audit_log_excerpt, commit_subjects. The agent builds it from session
+   #    context: slug from --feature; workplan_summary from workplan.md tail;
+   #    diff from `git diff <task-start-sha>..HEAD`; audit_log_excerpt from
+   #    audit-log.md tail; commit_subjects from `git log --format=%s
+   #    <task-start-sha>..HEAD`. No operator prompts on the happy path.
+   VARS=$(mktemp).json
+   # ...write vars JSON to "$VARS"...
+   PROMPT=$(mktemp).md
+   dw-lifecycle audit-barrage-render \
+     --feature <slug> \
+     --vars-file "$VARS" \
+     --output "$PROMPT"
+
+   # 2. Fire the barrage. --output-run-dir prints JUST the run-dir path on
+   #    stdout (suppressing the JSON) so bash captures it cleanly.
+   RUN_DIR=$(dw-lifecycle audit-barrage \
+     --feature <slug> \
+     --prompt-file "$PROMPT" \
+     --output-run-dir)
+
+   # 3. Lift findings into audit-log.md. Sequential AUDIT-<date>-<NN> IDs
+   #    continue from the highest existing for today.
+   dw-lifecycle audit-barrage-lift \
+     --feature <slug> \
+     --run-dir "$RUN_DIR" \
+     --apply
+
+   # 4. Auto-scope findings at the workplan's next-unchecked position. Each
+   #    new fix-finding task lands BEFORE the first existing unchecked task,
+   #    so the workplan-aware gate's positions [0..N-1] are exactly the
+   #    fix-tasks for the open finding IDs. No operator dispositions needed.
+   dw-lifecycle promote-findings --feature <slug> --auto
+
+   # 5. Sanity-check the gate now allows pickup (it will: findings are
+   #    scoped as the next N tasks). Loop re-runs the gate at next pickup
+   #    in Step 2, this is a smoke for the hook itself.
+   dw-lifecycle check-open-findings --feature <slug>
+   ```
+
+   **Failure-path policy (fail loud; do not pause the loop on findings):**
+
+   - `audit-barrage-render` non-zero: stop loop, surface error. The vars JSON is malformed or the template has unsubstituted EXPECTED_VARS. Fix the vars + re-run the hook.
+   - `audit-barrage` exit 1 (every CLI failed: spawn errors, zero-byte outputs): the barrage was an outage, NOT a finding. The hook continues without lifting (the loop forward-progresses; missing the barrage is friction for the operator to investigate, not a stop-the-loop event). Surface a single-line warning in the per-task report.
+   - `audit-barrage` exit 0 but some models failed spawn (claude/codex/gemini partially installed): proceed with the healthy models' findings (degraded barrage; cross-model agreement is weaker but still emits findings).
+   - `audit-barrage-lift` exit 0 with zero findings: "nothing new this round" — proceed to Step 7 (scope-widen) without firing promote-findings.
+   - `audit-barrage-lift` non-zero (extraction succeeded but write to audit-log failed: drift, permissions, parser error): STOP loop, surface error, exit non-zero. The per-task report shows the failure so the operator can investigate post-facto.
+   - `promote-findings --auto` non-zero: STOP loop, surface error. Per the operator directive, findings ARE guardrails; failing to scope them is a structural failure of the loop, not an operator decision point.
+   - `check-open-findings` non-zero post-promote: STOP loop, surface error. This means the auto-scoping landed but the gate still refuses — investigate the workplan + audit-log state.
+
+   **Per-task report shape includes:** `barrage status` (e.g. `2/3 models healthy`), `findings extracted` (count), `findings scoped to workplan` (count), `gate result` (`allowed: open-findings-scoped-as-next` / `allowed: no-open-findings` / `refused: <mode>`).
+
+   When `.dw-lifecycle/scope-discovery/` is absent in the project, the hook is silently skipped (scope-discovery is opt-in; no audit-barrage config means no barrage).
+
+7. Auto-invoke scope-widen between tasks (default behavior) unless `--no-scope-widen` was passed:
    - Runs after the task-completion commit lands and BEFORE the next task starts.
    - When the completed task introduced NEW shapes / surfaces / primitives not enumerated in the project's existing `.dw-lifecycle/scope-discovery/scope-manifest.yaml`, invoke `dw-lifecycle scope-widen <slug> "<task brief as complaint>"` to expand the manifest. The "complaint" is the task title or workplan brief reframed as the unmet-coverage observation (e.g. `"new <NewPrimitive> surface introduced by Task N; scope-manifest needs the additional theme"`).
    - The widened scope-manifest is read by the next task's implementer brief so its dispatch sees the augmented scope context.
    - If `.dw-lifecycle/scope-discovery/` is not present in the project, the auto-invocation is silently skipped. No warning, no error — scope-discovery is opt-in per project.
-7. After each task, optionally run `/dw-lifecycle:review` or `/dw-lifecycle:audit` (does NOT block; operator chooses cadence).
+8. After each task, optionally run `/dw-lifecycle:review` or `/dw-lifecycle:audit` (does NOT block; operator chooses cadence).
    - They are synonyms. Both write findings into `audit-log.md` with stable IDs and explicit status transitions.
-8. Repeat from step 5 until all tasks done or operator pauses.
+9. Repeat from step 5 until all tasks done or operator pauses.
 
 ## Flags
 
 | Flag | Purpose |
 |---|---|
-| `--no-scope-widen` | Skip the Step 6 between-tasks auto-invocation of `scope-widen`. Use when the operator has already widened the manifest explicitly, or when the feature's tasks are all purely-additive against an already-comprehensive scope-manifest. |
+| `--no-scope-widen` | Skip the Step 7 between-tasks auto-invocation of `scope-widen`. Use when the operator has already widened the manifest explicitly, or when the feature's tasks are all purely-additive against an already-comprehensive scope-manifest. |
+
+There is **no `--skip-audit-barrage-hook` flag.** Per Phase 15's operator directive, the end-of-task audit-barrage hook (Step 6) is unconditional. The hook is silently skipped when `.dw-lifecycle/scope-discovery/` is absent in the project (scope-discovery is opt-in), but cannot be skipped via a flag when the project HAS opted in.
 
 ## When to use `--no-scope-widen`
 
@@ -168,7 +228,8 @@ Defaults at `DEFAULT_LOOP_CONFIG` in `orchestrator-loop/loop-config.ts`. Operato
 - **feature-dev not installed.** Print one-line warning at start; agent dispatch steps that depend on it are skipped. Skill continues with single-agent fallback. Dispatch-wrapper engagement still applies to the remaining dispatches.
 - **Bug surfaces during a task.** Invoke `superpowers:systematic-debugging` before continuing the task. Don't push through with a known bug.
 - **Test failures during TDD.** Per the TDD discipline: failing test is expected before implementation. Failing tests AFTER implementation means the impl is wrong; iterate, don't bypass the test.
-- **Auto-invocation behavior (scope-widen).** When `.dw-lifecycle/scope-discovery/` is absent, the Step 6 auto-invocation is silently skipped. When present, `scope-widen` runs with default flags (dry-run is its default; `--apply` is passed when this skill invokes it because the merged manifest must be readable by the next task's implementer brief). The widen run's resulting `scope-manifest.yaml` path AND the additive-delta summary are passed into the next task's dispatched-agent context so the implementer sees the augmented scope before starting.
+- **Auto-invocation behavior (scope-widen).** When `.dw-lifecycle/scope-discovery/` is absent, the Step 7 auto-invocation is silently skipped. When present, `scope-widen` runs with default flags (dry-run is its default; `--apply` is passed when this skill invokes it because the merged manifest must be readable by the next task's implementer brief). The widen run's resulting `scope-manifest.yaml` path AND the additive-delta summary are passed into the next task's dispatched-agent context so the implementer sees the augmented scope before starting.
+- **End-of-task audit-barrage hook failures (Step 6).** Each stage of the five-CLI hook has a specific failure response. `audit-barrage-render` non-zero → stop loop, fix vars/template. `audit-barrage` all-models-failed (exit 1) → degraded path: proceed without lift; surface single-line warning. `audit-barrage-lift` non-zero with extracted findings → stop loop (audit-log write failed; drift/permissions/parser issue). `promote-findings --auto` non-zero → stop loop (per operator directive, findings are guardrails; failing to scope them is a structural failure). `check-open-findings` non-zero AFTER the auto-promote → stop loop (the gate refused despite the auto-scoping; investigate workplan + audit-log state). Failures that stop the loop surface the underlying error verbatim in the per-task report; the operator addresses them before the next `/dw-lifecycle:implement` invocation.
 - **`scope-widen` fails.** Surface the error in the next task's brief; the task still proceeds. The operator can re-run scope-widen manually (`/dw-lifecycle:scope-widen <slug> "<complaint>"`) after addressing the cause.
 - **`dw-lifecycle validate-return` exit 1.** The sub-agent's response was rejected by the dispatch grammar (missing block / forbidden phrase / skipped-audit signal / refactor-precondition violation). Re-dispatch with the same augmented prompt + a correction note that quotes the violation surfaced in the JSON. After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
 - **Orchestrator loop — judge dispatch fails.** `dw-lifecycle orchestrator-turn` exits non-zero when the in-band judge's wrapper call rejects. Surface the violation to the operator; the next turn re-runs the judge with the same input (recovery is operator-decided per the wrong-decision-recovery primitives at `recovery/`).

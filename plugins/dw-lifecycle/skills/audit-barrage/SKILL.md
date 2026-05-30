@@ -61,8 +61,28 @@ dw-lifecycle audit-barrage \
     --prompt-file <path-to-prompt.md> \
     [--models <comma-list>] \
     [--repo-root <path>] \
-    [--quiet]
+    [--quiet] \
+    [--output-run-dir]
 ```
+
+The `--output-run-dir` flag is for bash composition (used by the
+`/dw-lifecycle:implement` end-of-task audit-barrage hook). When set,
+stdout becomes JUST the absolute run-dir path (newline-terminated);
+the `BarrageRun` JSON is suppressed. Stderr behavior unchanged. Use
+in `$()` capture:
+
+```
+RUN_DIR=$(dw-lifecycle audit-barrage \
+  --feature <slug> \
+  --prompt-file <prompt> \
+  --output-run-dir)
+dw-lifecycle audit-barrage-lift \
+  --feature <slug> \
+  --run-dir "$RUN_DIR" --apply
+```
+
+Default mode (without the flag) keeps the JSON-on-stdout shape used
+by the existing skill triage walk.
 
 The barrage:
 
