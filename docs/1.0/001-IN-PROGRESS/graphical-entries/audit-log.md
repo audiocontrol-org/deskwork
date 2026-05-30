@@ -3211,7 +3211,7 @@ Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). 
 ### AUDIT-20260530-07 — path traversal in `loadLaneConfig` (sister to AUDIT-01; same shape, different surface)
 
 Finding-ID: AUDIT-20260530-07 (cross-model: AUDIT-BARRAGE-claude-01-P3 + AUDIT-BARRAGE-codex-01-P3)
-Status:     open
+Status:     fixed-9edc085
 Severity:   high
 Surface:    `packages/core/src/lanes/loader.ts:33-49` (`laneConfigPath`), `:90-115` (`loadLaneConfig`), `packages/core/src/schema/entry.ts:148` (`lane: z.string().min(1).optional()`)
 
