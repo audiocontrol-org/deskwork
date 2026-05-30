@@ -997,6 +997,12 @@ Phase 15 closes three gaps in the closure triad (Phase 13 Task 4) so the loop se
 
 The three gaps form a single semantic — *findings must flow automatically into the work queue, and the work queue's gate must allow the queue's next item to be a fix*.
 
+Per operator directive 2026-05-29 (the same directive that triggered this phase):
+
+> *"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do — unless the default behavior of running the barrage, putting findings into the audit log, then scoping into the workplan is not possible without operator decision making. Audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path."*
+
+The whole phase is built around that framing. **No `--skip-audit-barrage-hook` flag. No operator prompts at the hook's run-time. Default disposition is "scope into workplan as the next task" — the same default Phase 13 Task 1 already established as the only agent-pickable disposition.** When a finding can't be auto-scoped (e.g. the operator-supplied audit-log entry has no parseable Surface/Heading the gate's Task 1 logic can match), the loop fails loud — the failure IS the information.
+
 ### Task 1: Workplan-aware implement-loop gate
 
 Replace the strict "refuse on any open finding" semantic of `check-open-findings` (Phase 13 Task 2) with workplan-aware: the gate allows when (a) zero open findings exist, OR (b) the next N unchecked workplan tasks (where N = open findings count) are EXACTLY the fix-finding tasks for those open findings.
@@ -1127,22 +1133,23 @@ Modify `/dw-lifecycle:implement` SKILL.md to add an end-of-task hook that fires 
   dw-lifecycle check-open-findings --feature <slug>  # confirms gate now allows
   ```
 - [ ] Step 2: `dw-lifecycle audit-barrage` gains a `--output-run-dir` flag at `subcommands/audit-barrage.ts`. When passed, the verb prints the resolved run-dir path on stdout (rest of summary on stderr — same pattern as `wrap-prompt --quiet`) so bash can capture it cleanly.
-- [ ] Step 3: NEW `--skip-audit-barrage-hook` flag on `/dw-lifecycle:implement` for fast iteration cycles where the operator doesn't want the per-task barrage cost. Default is to fire the hook; skipping is opt-in (parallels `--no-scope-widen`).
-- [ ] Step 4: Failure-path documentation in SKILL.md Error handling:
-  - Audit-barrage CLIs missing (claude/codex/gemini binaries absent) → barrage's existing spawn-error path emits per-CLI errors; hook continues with whichever CLIs ARE installed. If ALL fail, the hook surfaces the error + skips the lift + proceeds (operator-supervised).
-  - Audit-barrage timeout → captured to stderr; hook proceeds with partial results.
-  - `audit-barrage-lift` failure (e.g. malformed model output across the board) → surface + pause for operator (don't silently lose findings).
-  - `promote-findings` failure → surface + pause for operator.
+- [ ] Step 3: Auto-position inference for promote-findings. The hook calls `dw-lifecycle promote-findings --feature <slug> --apply` WITHOUT an explicit `--task-number` flag; promote-findings auto-detects the "next unchecked task position" from the workplan (sibling helper added to the existing renderer's anchor logic) and inserts new fix-finding task blocks AT that position so the Task 1 gate sees them as the next N tasks immediately. No operator prompt; per the directive, the default IS the action.
+- [ ] Step 4: Failure-path policy — fail loud, do not pause:
+  - Audit-barrage CLIs missing (claude/codex/gemini binaries absent) → barrage's existing spawn-error path emits per-CLI errors; hook continues with whichever CLIs ARE installed (cross-model agreement degrades to single-model). If ALL three fail, the hook treats that as a barrage outage and proceeds without lift (the loop is forward-progressing; missing the barrage is friction for follow-up, not a stop-the-loop event).
+  - Audit-barrage timeout → captured to stderr; hook proceeds with partial results (whatever models returned in budget).
+  - `audit-barrage-lift` failure (e.g. malformed model output across the board → no findings extracted) → the hook treats the empty result as "no findings this round" and proceeds. A non-empty extraction that FAILS to write to audit-log (drift / permissions / parser error) is a stop-the-loop event — surface the error, do NOT advance to next-task pickup, exit with non-zero. The implement skill's per-task report shows the failure so the operator can investigate after the fact.
+  - `promote-findings` failure → same shape as audit-log write failure: stop the loop, surface error, exit non-zero. Per the operator directive, findings ARE guardrails; failing to scope them is a structural failure of the loop, not an operator decision point.
 - [ ] Step 5: Update implement-skill's per-task report to include: barrage-fire status (success/timeout/no-CLIs); count of new findings extracted; count of new workplan tasks scoped; gate-check result.
 - [ ] Step 6: Tests for the audit-barrage `--output-run-dir` flag (4 scenarios: prints absolute path, prints nothing when not set, prints to stdout not stderr, error path still goes to stderr).
 - [ ] Step 7: Update `audit-barrage` SKILL.md to document the new flag.
 
 **Acceptance Criteria:**
 - [ ] SKILL.md documents the end-of-task four-command hook recipe.
-- [ ] `--skip-audit-barrage-hook` flag bypasses for fast iteration.
+- [ ] **No `--skip-audit-barrage-hook` flag.** Per the operator-directive on guardrails-not-exceptions, the hook ALWAYS fires.
 - [ ] `audit-barrage --output-run-dir` flag added + tested.
-- [ ] All four failure paths documented + behave as specified.
+- [ ] Failure paths behave per spec: missing CLIs degrade gracefully; audit-log write failures + promote-findings failures are stop-the-loop events (fail loud; do not pause for operator).
 - [ ] Per-task report includes barrage status + finding-extract count + scoped-task count + gate-check result.
+- [ ] promote-findings auto-positions new fix-tasks at the workplan's next-unchecked position (no operator prompt; Task 1 gate sees them immediately).
 
 ### Task 5: Live verification + dogfood
 
@@ -1181,21 +1188,27 @@ Verify the new triad (Task 1 gate + Task 3 lift + Task 4 hook) composes correctl
 
 ### Phase 15 — Out of Scope
 
-- **Audit-barrage parallelization / batching across tasks.** v1 fires the hook once per completed task; future enhancement: amortize cost by firing every N tasks, or at session-end, or only on substantial-change tasks. Configurability captured but not v1.
-- **Cross-feature audit-barrage.** v1 scopes the barrage to a single feature; multi-feature audits are downstream.
 - **Operator-side override of the gate.** The strict v1 stance per Phase 13 (no `--ignore-open-findings`) survives unchanged; the workplan-aware semantic IS the cure, not an escape hatch.
+- **`--skip-audit-barrage-hook` flag.** Per operator directive: findings are guardrails-not-exceptions; the hook ALWAYS fires. No flag.
+- **Operator-pickable disposition in the per-task promote-findings call.** Phase 13 Task 1 already established "scope into workplan" as the only agent-pickable disposition; the hook reuses that default (no operator prompt at hook run-time).
+- **Audit-barrage parallelization / batching across tasks.** v1 fires the hook once per completed task. If cost amortization proves needed in practice, batching is a follow-up improvement; the per-task default is opinionated by the operator directive ("seamless").
+- **Cross-feature audit-barrage.** v1 scopes the barrage to a single feature; multi-feature audits are downstream.
 - **TDD-order enforcement at gate-time.** Phase 13 Task 3's commit-msg gate handles TDD-first shape verification at commit; replicating the check at gate-time would be redundant.
 - **Re-audit-fixed-findings integration into the per-task hook.** Phase 13 Task 4 Step 3's `re-audit-fixed-findings` skill is for post-RELEASE verification (`fixed-<sha> → verified-<date>`); the per-task barrage hook is for surfacing NEW findings while the implementation is in flight. Different cadence; out of scope to combine.
 
-### Phase 15 — Open scoping questions (operator iterate)
+### Phase 15 — Operator-resolved design decisions (2026-05-29 directive)
 
-1. **Definition of "next tasks":** strict (open findings' fix-tasks must occupy positions `[0..N-1]` of unchecked tasks) vs lax (anywhere in the first `M` unchecked tasks where `M > N`)? Operator framing reads as strict ("the next tasks"). Strict is recommended; capture so operator confirms.
-2. **TDD-order enforcement at gate-time** — covered above (out of scope per recommendation); operator can override.
-3. **Audit-barrage hook cadence** — per task vs batched. v1 per-task (correctness-first); throttle as a follow-up if cost is real.
-4. **Cross-model agreement threshold** — Phase 12 used `≥2` for HIGH-confidence; v1 carries that forward. Configurable later.
-5. **Audit-barrage CLI availability handling** — soft-skip (warn + continue) when binaries are missing (recommended; doesn't block adopters without all 3 CLIs) vs hard-fail (force install). v1 soft-skip per Phase 12's spawn-error path precedent.
-6. **`--output-run-dir` flag shape on `audit-barrage`** — print path on stdout while summary goes to stderr (recommended; mirrors `wrap-prompt --quiet`) vs JSON output mode. v1 recommended pattern.
-7. **Lift-verb auto-fire vs explicit invocation** — should `audit-barrage` auto-fire `audit-barrage-lift` when there's a single feature in scope? v1: explicit (operator/skill composes them); future: optional auto-fire.
+The original draft of this phase captured 7 "open scoping questions" for operator iteration. Operator's response on 2026-05-29 resolves all 7 at once: *"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do — unless the default behavior of running the barrage, putting findings into the audit log, then scoping into the workplan is not possible without operator decision making."*
+
+Recorded resolutions (no further operator iteration required; each is the seamless-default position):
+
+1. **"Next tasks" definition: STRICT.** Open findings' fix-tasks must occupy positions `[0..N-1]` of the unchecked tasks list. The new gate refuses if a non-fix task appears before all open-finding fix-tasks. Strict matches the operator's "next tasks" framing verbatim and avoids the cognitive overhead of a "lax window" rule.
+2. **TDD-order at gate-time: NOT enforced.** Phase 13 Task 3's commit-msg gate handles this; replication would be redundant. (Already out of scope above.)
+3. **Audit-barrage hook cadence: PER TASK, no configurable.** The seamless default fires after every task. Cost-throttling is a follow-up if cost proves real in practice.
+4. **Cross-model agreement threshold: ≥2 models.** Phase 12 precedent; carries forward without a config knob.
+5. **Audit-barrage CLI availability: SOFT-SKIP missing binaries.** The hook proceeds with whichever CLIs ARE installed (Phase 12's spawn-error path precedent). Missing all three degrades to "no findings this round" — does not block the loop.
+6. **`audit-barrage --output-run-dir` flag shape: PATH on stdout, summary on stderr.** Mirrors `wrap-prompt --quiet` precedent; lets bash capture the path cleanly.
+7. **Lift-verb invocation: AUTO from the hook.** The hook composes `audit-barrage → audit-barrage-lift → promote-findings` as one atomic flow. Standalone CLI invocation of `audit-barrage-lift` remains available for operator use, but inside the implement loop the lift fires unconditionally as part of the hook.
 
 ### Phase 15 — Existing primitives this composes over
 
