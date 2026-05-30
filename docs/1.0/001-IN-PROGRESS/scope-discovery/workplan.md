@@ -1026,11 +1026,11 @@ Replace the strict "refuse on any open finding" semantic of `check-open-findings
 
 NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts` that parses an audit-runs directory's per-model markdown files and extracts structured finding records (one per finding, with cross-model agreement merged).
 
-- [ ] Step 1: Library exports `extractBarrageFindings({runDir}): Promise<ExtractedFinding[]>`. Walks every `<model>.md` file (skipping `INDEX.md` and `PROMPT.md`); for each, parses the prompt-template-prescribed finding format (heading + Finding-ID line + Status + Severity + Surface + body).
-- [ ] Step 2: Heading + Surface substring matcher (reuse + extend the heuristics from `cross-reference-audit-run.ts`). When ≥2 models flag a similar issue (heading-substring OR surface-token match), the library merges into a single `ExtractedFinding` carrying `sourceModels: ['claude', 'codex']` and `crossModelAgreement: true`.
-- [ ] Step 3: Severity normalization: handle minor differences between model conventions (`high` vs `High` vs `HIGH`); normalize to the canonical `blocking | high | medium | low | informational` set used by Phase 13.
-- [ ] Step 4: Graceful skip on malformed model output — if a `<model>.md` is empty, doesn't contain the expected finding shape, or fails to parse, emit a warning to stderr and skip that file; continue with the others.
-- [ ] Step 5: 10+ tests at `__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts`:
+- [x] Step 1: Library exports `extractBarrageFindings({runDir}): Promise<ExtractedFinding[]>`. Walks every `<model>.md` file (skipping `INDEX.md` and `PROMPT.md`); for each, parses the prompt-template-prescribed finding format (heading + Finding-ID line + Status + Severity + Surface + body).
+- [x] Step 2: Heading + Surface substring matcher (reuse + extend the heuristics from `cross-reference-audit-run.ts`). When ≥2 models flag a similar issue (heading-substring OR surface-token match), the library merges into a single `ExtractedFinding` carrying `sourceModels: ['claude', 'codex']` and `crossModelAgreement: true`.
+- [x] Step 3: Severity normalization: handle minor differences between model conventions (`high` vs `High` vs `HIGH`); normalize to the canonical `blocking | high | medium | low | informational` set used by Phase 13. Merged-cluster severity = max-of-cluster.
+- [x] Step 4: Graceful skip on malformed model output — if a `<model>.md` is empty, doesn't contain the expected finding shape, or fails to parse, emit a warning via the injectable `warn` sink and skip that file; continue with the others.
+- [x] Step 5: 10+ tests at `__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` (delivered 22 tests):
   - (a) single-model finding extracted correctly.
   - (b) two-model agreement → one merged finding, `sourceModels.length === 2`.
   - (c) three-model agreement → one merged finding, `sourceModels.length === 3`.
@@ -1041,12 +1041,13 @@ NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/e
   - (h) severity normalization (`HIGH` → `high`).
   - (i) surface containing multiple paths — each path considered in the cross-model match.
   - (j) heading substring match when wording differs across models.
+  - Extras: CLEAN sentinel filtered; severity-normalization edge cases; merged-cluster severity = max-of-cluster; same-model multi-finding kept separate; `parseModelMarkdown` exported and unit-tested in isolation.
 
 **Acceptance Criteria:**
-- [ ] Library extracts findings from real per-model markdown.
-- [ ] Cross-model agreement detected correctly with `sourceModels` populated.
-- [ ] Severity normalization implemented.
-- [ ] Audit-log preservation rule honored (extraction is read-only).
+- [x] Library extracts findings from real per-model markdown.
+- [x] Cross-model agreement detected correctly with `sourceModels` populated.
+- [x] Severity normalization implemented.
+- [x] Audit-log preservation rule honored (extraction is read-only).
 
 ### Task 3: `dw-lifecycle audit-barrage-lift` CLI verb
 
