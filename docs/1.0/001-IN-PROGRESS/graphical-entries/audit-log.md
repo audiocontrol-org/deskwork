@@ -3189,7 +3189,7 @@ Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). 
 ### AUDIT-20260530-05 — `dev` watch never re-copies preset JSON after edit (build/watch asymmetry)
 
 Finding-ID: AUDIT-20260530-05 (cross-model: AUDIT-BARRAGE-claude-05-P2)
-Status:     open
+Status:     fixed-f0090c2
 Severity:   low
 Surface:    `packages/core/package.json:217` (`dev` script)
 
