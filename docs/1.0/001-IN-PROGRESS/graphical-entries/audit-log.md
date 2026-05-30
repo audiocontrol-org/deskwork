@@ -3268,7 +3268,7 @@ Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). 
 ### AUDIT-20260530-12 — `inferPriorStageFromJournal` silently skips non-editorial `from` values (semantics regression)
 
 Finding-ID: AUDIT-20260530-12 (cross-model: AUDIT-BARRAGE-claude-06-P3)
-Status:     open
+Status:     fixed-15f7f41
 Severity:   low
 Surface:    `packages/core/src/doctor/migrate.ts:248-260`
 
