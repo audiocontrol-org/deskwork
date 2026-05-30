@@ -3032,7 +3032,7 @@ with the recommended unrouted-indicator design.
 ### AUDIT-20260529-36 — popover renders visible at rest on every member row (cascade order defeats `hidden`)
 
 Finding-ID: AUDIT-20260529-36 (cross-model: AUDIT-BARRAGE-claude-01)
-Status:     open
+Status:     fixed-ffce4ba
 Severity:   high
 Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:347-354`, `packages/studio/src/pages/dashboard/section.ts:50` (`renderMemberPopover`)
 
