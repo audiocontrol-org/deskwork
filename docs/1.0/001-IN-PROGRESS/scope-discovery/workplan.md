@@ -982,3 +982,229 @@ TF-005's fix originated on `feature/deskwork-plugin` at commit `37683c8` (Closes
 - `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts` grammar definitions — Task 2 widens the existing rules in place.
 - `plugins/dw-lifecycle/src/subcommands/validate-return.ts` argument parsing — Task 3 adds the `--response-file -` branch.
 - `clone-detector.gitignore.test.ts` (lands with `37683c8`) — Task 4 confirms green on this branch post-merge.
+
+## Phase 15: Workplan-aware implement-loop gate + audit-barrage hook + audit-log lift
+
+Parent issue: [#373](https://github.com/audiocontrol-org/deskwork/issues/373)
+
+Trigger: v0.28.0 dogfood + operator framing 2026-05-29 — Phase 13's implement-loop gate (Task 2) is too strict. It refuses on ANY `Status: open` audit-log finding, which creates a structural chicken-and-egg: the fixes for those findings can't be worked through `/dw-lifecycle:implement` because the loop refuses to start with them open. Per operator verbatim:
+
+> *"There's a problem with the audit log /dwi gate. it currently won't proceed until the audit log is clean — but, we can't fix any of the problems using the /dwi loop unless we can run the /dwi loop. What should probably happen instead is that the /dwi gate won't open until all of the unfixed items in the audit log are scoped into the workplan as the next tasks to work on. That way, the /dwi gate won't allow deferring audit fixes, but it will allow the gate to open if the next items in the workplan are those fixes."*
+
+> *"we need to add an audit barrage hook at the end of the /dwi loop with a mandate to scope the fixes as the next workplan items. And, we must ensure that the findings from the audit barrage are actually written to the audit log."*
+
+Phase 15 closes three gaps in the closure triad (Phase 13 Task 4) so the loop self-heals: implement → barrage → lift to audit-log → promote to workplan as next tasks → gate allows next pickup → implement (which is now a fix).
+
+The three gaps form a single semantic — *findings must flow automatically into the work queue, and the work queue's gate must allow the queue's next item to be a fix*.
+
+### Task 1: Workplan-aware implement-loop gate
+
+Replace the strict "refuse on any open finding" semantic of `check-open-findings` (Phase 13 Task 2) with workplan-aware: the gate allows when (a) zero open findings exist, OR (b) the next N unchecked workplan tasks (where N = open findings count) are EXACTLY the fix-finding tasks for those open findings.
+
+- [ ] Step 1: NEW pure-fn `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` exporting `checkWorkplanAwareGate({featureSlug, repoRoot}): Promise<WorkplanAwareGateResult>`. Discriminated union result:
+  ```ts
+  type WorkplanAwareGateResult =
+    | { allowed: true; reason: 'no-open-findings' | 'open-findings-scoped-as-next' }
+    | { allowed: false; reason: 'non-fix-task-before-fix-tasks'; offendingTask: string; openFindings: ReadonlyArray<OpenFinding> }
+    | { allowed: false; reason: 'coverage-mismatch'; missingIds: ReadonlyArray<string>; extraIds: ReadonlyArray<string>; openFindings: ReadonlyArray<OpenFinding> }
+  ```
+- [ ] Step 2: Algorithm:
+  - `findings = walkOpenFindings(audit-log)`.
+  - If `findings.length === 0` → `{ allowed: true, reason: 'no-open-findings' }`.
+  - `uncheckedTasks = parseWorkplan().uncheckedTasksInOrder()` — preserves workplan order.
+  - Inspect the first `findings.length` unchecked tasks:
+    - If any unchecked task in `[0..N-1]` is NOT tagged `(fix-finding-AUDIT-<id>)` → `{ allowed: false, reason: 'non-fix-task-before-fix-tasks', offendingTask: <title>, openFindings: [...] }`.
+    - Build `scopedIds` from those N fix-tagged tasks.
+    - `missingIds = openFindingIds \ scopedIds`; `extraIds = scopedIds \ openFindingIds`.
+    - If either non-empty → `{ allowed: false, reason: 'coverage-mismatch', missingIds, extraIds, openFindings: [...] }`.
+  - Otherwise → `{ allowed: true, reason: 'open-findings-scoped-as-next' }`.
+- [ ] Step 3: NEW helper `findUncheckedFixFindingTasks(workplan, sliceLimit?)` at `scope-discovery/promote-findings/tdd-enforcement.ts` (sibling of the existing `findCompletedFixFindingTasks`). Returns `[{ taskBlock, findingId, position }]` in workplan order; optional `sliceLimit` for the gate's first-N inspection.
+- [ ] Step 4: Update `subcommands/check-open-findings.ts` to use the workplan-aware semantic by default. Each refusal mode emits a distinct, actionable message:
+  - `non-fix-task-before-fix-tasks`: *"Cannot advance: <N> open audit findings (...) on feature <slug>. The next unchecked workplan task is `<offendingTask>`, which is NOT a fix-finding task — reorder the workplan so the (fix-finding-AUDIT-...) tasks come first."*
+  - `coverage-mismatch` with non-empty `missingIds`: *"Cannot advance: open finding(s) (<missingIds>) are not scoped as the next unchecked tasks. Run `dw-lifecycle promote-findings --feature <slug> --apply` to scope them."*
+  - `coverage-mismatch` with non-empty `extraIds` only: *"Cannot advance: the first N unchecked tasks include (fix-finding-AUDIT-...) entries for findings that are NOT open (<extraIds>) — either remove the stale scoped tasks or flip the corresponding audit-log entries' status."*
+- [ ] Step 5: Update SKILL.md prose at `plugins/dw-lifecycle/skills/implement/SKILL.md` Step 2 + Error-handling to document the new gate semantic. The "no escape hatch" rigidity stance survives — the new semantic IS the cure, not a flag.
+- [ ] Step 6: 12+ tests at `__tests__/scope-discovery/promote-findings/workplan-aware-gate.test.ts`:
+  - (a) zero open findings → allowed (`no-open-findings`).
+  - (b) 1 open + matching fix-task at position 0 → allowed.
+  - (c) 1 open + non-fix task at position 0 → refused (`non-fix-task-before-fix-tasks`).
+  - (d) 1 open + no fix-task anywhere in workplan → refused (`coverage-mismatch`, missingIds = [the id]).
+  - (e) 3 open + 3 matching fix-tasks at positions 0/1/2 in any order → allowed.
+  - (f) 3 open + 2 matching + 1 non-fix at position 2 → refused (non-fix).
+  - (g) 3 open + 4 fix-tasks (extra) at positions 0..3 → refused (`coverage-mismatch`, extraIds populated).
+  - (h) refusal-message asserts: every open finding ID surfaces; cure path cited (`promote-findings` for missing, "reorder" for non-fix-first, "flip status or remove" for extras).
+  - (i) edge: open finding ID has no corresponding fix-finding tag anywhere in workplan.
+  - (j) edge: workplan has zero unchecked tasks (all done) with N open findings → refused (`coverage-mismatch`).
+  - (k) order-invariance: 3 open in {C, A, B} order; 3 fix-tasks in {A, B, C} order → allowed.
+  - (l) integration: CLI exit codes (0 / 1 / 2) match the discriminated union; smoke against fixture repo.
+- [ ] Step 7: Live smoke against `feature/scope-discovery` worktree: deliberately add a synthetic `Status: open` audit entry; observe CLI refuses with `coverage-mismatch`; scope via `promote-findings --apply`; observe CLI allows.
+
+**Acceptance Criteria:**
+- [ ] Gate refuses to advance when open findings exist AND aren't all scoped as the next N tasks.
+- [ ] Gate ALLOWS advance when open findings exist AND the next N unchecked tasks are fix-finding tasks covering exactly those finding IDs.
+- [ ] Refusal message names the specific failure mode (non-fix-task / missing scoped / extra scoped) and the specific cure.
+- [ ] No `--ignore-open-findings` flag in v1 (per Phase 13 operator decision; carries forward).
+- [ ] Live verified against scope-discovery branch.
+
+### Task 2: Audit-barrage finding extraction library
+
+NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts` that parses an audit-runs directory's per-model markdown files and extracts structured finding records (one per finding, with cross-model agreement merged).
+
+- [ ] Step 1: Library exports `extractBarrageFindings({runDir}): Promise<ExtractedFinding[]>`. Walks every `<model>.md` file (skipping `INDEX.md` and `PROMPT.md`); for each, parses the prompt-template-prescribed finding format (heading + Finding-ID line + Status + Severity + Surface + body).
+- [ ] Step 2: Heading + Surface substring matcher (reuse + extend the heuristics from `cross-reference-audit-run.ts`). When ≥2 models flag a similar issue (heading-substring OR surface-token match), the library merges into a single `ExtractedFinding` carrying `sourceModels: ['claude', 'codex']` and `crossModelAgreement: true`.
+- [ ] Step 3: Severity normalization: handle minor differences between model conventions (`high` vs `High` vs `HIGH`); normalize to the canonical `blocking | high | medium | low | informational` set used by Phase 13.
+- [ ] Step 4: Graceful skip on malformed model output — if a `<model>.md` is empty, doesn't contain the expected finding shape, or fails to parse, emit a warning to stderr and skip that file; continue with the others.
+- [ ] Step 5: 10+ tests at `__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts`:
+  - (a) single-model finding extracted correctly.
+  - (b) two-model agreement → one merged finding, `sourceModels.length === 2`.
+  - (c) three-model agreement → one merged finding, `sourceModels.length === 3`.
+  - (d) two independent findings from two models (no overlap) → two separate `ExtractedFinding` records.
+  - (e) malformed `<model>.md` → warning emitted, other models still processed.
+  - (f) empty run-dir → empty result, no error.
+  - (g) `INDEX.md` and `PROMPT.md` skipped (not treated as model outputs).
+  - (h) severity normalization (`HIGH` → `high`).
+  - (i) surface containing multiple paths — each path considered in the cross-model match.
+  - (j) heading substring match when wording differs across models.
+
+**Acceptance Criteria:**
+- [ ] Library extracts findings from real per-model markdown.
+- [ ] Cross-model agreement detected correctly with `sourceModels` populated.
+- [ ] Severity normalization implemented.
+- [ ] Audit-log preservation rule honored (extraction is read-only).
+
+### Task 3: `dw-lifecycle audit-barrage-lift` CLI verb
+
+NEW CLI verb that walks the run-dir, extracts findings via the Task 2 library, assigns sequential AUDIT-IDs, and writes them as `Status: open` entries to the canonical audit-log.
+
+- [ ] Step 1: CLI shim at `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts`. Args:
+  - `--feature <slug>` (REQUIRED)
+  - `--run-dir <path>` (REQUIRED)
+  - `--date <YYYYMMDD>` (default: today UTC)
+  - `--repo-root <path>` (optional override)
+  - `--apply` (default dry-run; `--apply` writes)
+  - `--help`
+- [ ] Step 2: Reads existing audit-log; finds highest `AUDIT-<date>-<NN>` for `<date>`; sequential numbering continues from there.
+- [ ] Step 3: For each `ExtractedFinding`, compose the audit-log entry shape used by Phase 13:
+  ```
+  ### AUDIT-<date>-<NN> — <heading>
+
+  Finding-ID: AUDIT-<date>-<NN><optional ' (claude-X + codex-Y; cross-model)' suffix>
+  Status:     open
+  Severity:   <severity>
+  Surface:    <surface>
+
+  <body>
+  ```
+- [ ] Step 4: Append a new section heading `## <ISO-date> — audit-barrage lift (<run-dir-basename>)` above the new entries so the lift is auditable per-run.
+- [ ] Step 5: Atomic write — read full audit-log, append new section, write whole file once; preserve all pre-existing entries verbatim per the preservation rule.
+- [ ] Step 6: Register in `cli.ts` as `'audit-barrage-lift'`.
+- [ ] Step 7: 8+ tests at `__tests__/scope-discovery/promote-findings/audit-barrage-lift-cli.test.ts`:
+  - (a) parseFlags coverage (required-feature, required-run-dir, --apply, --date, unknown flag).
+  - (b) dry-run reports the count + the proposed IDs without writing.
+  - (c) `--apply` writes the section + entries with sequential IDs.
+  - (d) Sequential ID continues from existing highest AUDIT-<date>-NN.
+  - (e) Cross-model finding rendered with the `(claude-X + codex-Y; cross-model)` suffix.
+  - (f) Pre-existing audit-log content preserved verbatim (diff is purely additive).
+  - (g) Feature-not-found → exit 2.
+  - (h) Run-dir-not-found → exit 2.
+
+**Acceptance Criteria:**
+- [ ] `dw-lifecycle audit-barrage-lift --help` resolves from the installed shim.
+- [ ] Dry-run reports proposed entries; `--apply` writes them.
+- [ ] Sequential AUDIT-ID assignment honored.
+- [ ] Cross-model agreement reflected in the rendered Finding-ID line.
+- [ ] Audit-log preservation rule honored (entries below the new section unchanged).
+
+### Task 4: Implement-loop audit-barrage hook
+
+Modify `/dw-lifecycle:implement` SKILL.md to add an end-of-task hook that fires audit-barrage + lifts findings + scopes them via promote-findings, so the next-task pickup sees them as the workplan's next tasks (and the Task 1 gate allows pickup).
+
+- [ ] Step 1: Add NEW Step in SKILL.md between "When the task body is complete, mark its checkboxes and commit" and the existing Step 6 (scope-widen). The new step composes four CLI calls:
+  ```bash
+  RUN_DIR=$(dw-lifecycle audit-barrage --feature <slug> --range <task-start-sha>..HEAD --output-run-dir)
+  dw-lifecycle audit-barrage-lift --feature <slug> --run-dir "$RUN_DIR" --apply
+  dw-lifecycle promote-findings --feature <slug> --apply
+  dw-lifecycle check-open-findings --feature <slug>  # confirms gate now allows
+  ```
+- [ ] Step 2: `dw-lifecycle audit-barrage` gains a `--output-run-dir` flag at `subcommands/audit-barrage.ts`. When passed, the verb prints the resolved run-dir path on stdout (rest of summary on stderr — same pattern as `wrap-prompt --quiet`) so bash can capture it cleanly.
+- [ ] Step 3: NEW `--skip-audit-barrage-hook` flag on `/dw-lifecycle:implement` for fast iteration cycles where the operator doesn't want the per-task barrage cost. Default is to fire the hook; skipping is opt-in (parallels `--no-scope-widen`).
+- [ ] Step 4: Failure-path documentation in SKILL.md Error handling:
+  - Audit-barrage CLIs missing (claude/codex/gemini binaries absent) → barrage's existing spawn-error path emits per-CLI errors; hook continues with whichever CLIs ARE installed. If ALL fail, the hook surfaces the error + skips the lift + proceeds (operator-supervised).
+  - Audit-barrage timeout → captured to stderr; hook proceeds with partial results.
+  - `audit-barrage-lift` failure (e.g. malformed model output across the board) → surface + pause for operator (don't silently lose findings).
+  - `promote-findings` failure → surface + pause for operator.
+- [ ] Step 5: Update implement-skill's per-task report to include: barrage-fire status (success/timeout/no-CLIs); count of new findings extracted; count of new workplan tasks scoped; gate-check result.
+- [ ] Step 6: Tests for the audit-barrage `--output-run-dir` flag (4 scenarios: prints absolute path, prints nothing when not set, prints to stdout not stderr, error path still goes to stderr).
+- [ ] Step 7: Update `audit-barrage` SKILL.md to document the new flag.
+
+**Acceptance Criteria:**
+- [ ] SKILL.md documents the end-of-task four-command hook recipe.
+- [ ] `--skip-audit-barrage-hook` flag bypasses for fast iteration.
+- [ ] `audit-barrage --output-run-dir` flag added + tested.
+- [ ] All four failure paths documented + behave as specified.
+- [ ] Per-task report includes barrage status + finding-extract count + scoped-task count + gate-check result.
+
+### Task 5: Live verification + dogfood
+
+Verify the new triad (Task 1 gate + Task 3 lift + Task 4 hook) composes correctly via the implement loop.
+
+- [ ] Step 1: Positive scenario — deliberately seed a small implementation gap, run `/dw-lifecycle:implement`:
+  - Task A completes + commits.
+  - End-of-task hook fires `audit-barrage` (real CLIs; operator-supervised cost).
+  - `audit-barrage-lift --apply` writes the findings to audit-log.
+  - `promote-findings --apply` scopes them as workplan's next tasks.
+  - Next-task pickup checks the new gate.
+  - Gate ALLOWS (the findings are scoped as the next tasks).
+  - Loop continues to the fix-finding tasks.
+- [ ] Step 2: Negative scenario A — scope a finding NOT in the next-N position (place it 5 tasks down). Run `check-open-findings`; confirm refusal (`non-fix-task-before-fix-tasks`).
+- [ ] Step 3: Negative scenario B — scope an EXTRA fix-task for a finding that isn't open. Run `check-open-findings`; confirm refusal (`coverage-mismatch`, extraIds populated).
+- [ ] Step 4: Negative scenario C — open finding has no `(fix-finding-AUDIT-<id>)` task anywhere. Run `check-open-findings`; confirm refusal (`coverage-mismatch`, missingIds populated).
+- [ ] Step 5: Friction-feedback log entries (per project rule "Capture friction over scope") for any roughness in the implement-loop integration.
+
+**Acceptance Criteria:**
+- [ ] Positive scenario verified live: full self-healing loop runs end-to-end.
+- [ ] Negative scenarios A, B, C all surface the correct refusal mode.
+- [ ] Refusal messages name the actionable cure for each mode.
+
+### Task 6: Cross-references + docs
+
+- [ ] Step 1: Update `.claude/rules/agent-discipline.md` § "Audit findings: scope-don't-defer + TDD enforcement" — replace the `check-open-findings` row with the new workplan-aware semantic; add the `audit-barrage-lift` and end-of-task hook rows to the triad table.
+- [ ] Step 2: Update `plugins/dw-lifecycle/README.md` § "Audit-finding lifecycle" — same row updates + the four-command bash recipe for the end-of-task hook.
+- [ ] Step 3: Update `ROADMAP.md` § "Design A.5" — note that v0.28.0's strict gate was reframed in v0.X.Y to the workplan-aware semantic; add audit-barrage hook to the closure-loop description.
+- [ ] Step 4: Update the implement skill's prose to make the end-of-task hook discoverable (cross-link from the skill description).
+
+**Acceptance Criteria:**
+- [ ] Agent-discipline rule documents the new gate semantic + audit-barrage hook + lift verb.
+- [ ] README documents the four-command operational pattern.
+- [ ] ROADMAP reflects the v2 shape.
+- [ ] Implement-skill description names the hook for discoverability.
+
+### Phase 15 — Out of Scope
+
+- **Audit-barrage parallelization / batching across tasks.** v1 fires the hook once per completed task; future enhancement: amortize cost by firing every N tasks, or at session-end, or only on substantial-change tasks. Configurability captured but not v1.
+- **Cross-feature audit-barrage.** v1 scopes the barrage to a single feature; multi-feature audits are downstream.
+- **Operator-side override of the gate.** The strict v1 stance per Phase 13 (no `--ignore-open-findings`) survives unchanged; the workplan-aware semantic IS the cure, not an escape hatch.
+- **TDD-order enforcement at gate-time.** Phase 13 Task 3's commit-msg gate handles TDD-first shape verification at commit; replicating the check at gate-time would be redundant.
+- **Re-audit-fixed-findings integration into the per-task hook.** Phase 13 Task 4 Step 3's `re-audit-fixed-findings` skill is for post-RELEASE verification (`fixed-<sha> → verified-<date>`); the per-task barrage hook is for surfacing NEW findings while the implementation is in flight. Different cadence; out of scope to combine.
+
+### Phase 15 — Open scoping questions (operator iterate)
+
+1. **Definition of "next tasks":** strict (open findings' fix-tasks must occupy positions `[0..N-1]` of unchecked tasks) vs lax (anywhere in the first `M` unchecked tasks where `M > N`)? Operator framing reads as strict ("the next tasks"). Strict is recommended; capture so operator confirms.
+2. **TDD-order enforcement at gate-time** — covered above (out of scope per recommendation); operator can override.
+3. **Audit-barrage hook cadence** — per task vs batched. v1 per-task (correctness-first); throttle as a follow-up if cost is real.
+4. **Cross-model agreement threshold** — Phase 12 used `≥2` for HIGH-confidence; v1 carries that forward. Configurable later.
+5. **Audit-barrage CLI availability handling** — soft-skip (warn + continue) when binaries are missing (recommended; doesn't block adopters without all 3 CLIs) vs hard-fail (force install). v1 soft-skip per Phase 12's spawn-error path precedent.
+6. **`--output-run-dir` flag shape on `audit-barrage`** — print path on stdout while summary goes to stderr (recommended; mirrors `wrap-prompt --quiet`) vs JSON output mode. v1 recommended pattern.
+7. **Lift-verb auto-fire vs explicit invocation** — should `audit-barrage` auto-fire `audit-barrage-lift` when there's a single feature in scope? v1: explicit (operator/skill composes them); future: optional auto-fire.
+
+### Phase 15 — Existing primitives this composes over
+
+- `check-open-findings` library (`scope-discovery/promote-findings/open-findings-gate.ts`) — Phase 15 Task 1 replaces its semantic; pure-fn shape + CLI verb structure preserved.
+- `walkOpenFindings` (`scope-discovery/promote-findings/audit-log-walker.ts`) — unchanged; Tasks 1 and 3 reuse.
+- `audit-log-parser.ts` — unchanged; Tasks 1 and 3 reuse for ID extraction + sequential numbering.
+- `findCompletedFixFindingTasks` (`scope-discovery/promote-findings/tdd-enforcement.ts`) — Phase 15 Task 1 Step 3 adds a sibling `findUncheckedFixFindingTasks` next to it.
+- `cross-reference-audit-run.ts` — Task 2 reuses the heading-substring + surface-token heuristics; extends them with severity-normalization.
+- `flipAuditLogStatus` + `applyStatusFlips` (`scope-discovery/promote-findings/audit-log-editor.ts`) — Task 3 reuses the atomic write pattern.
+- `audit-barrage` skill + CLI verb (Phase 12) — Task 4 composes with the new `--output-run-dir` flag.
+- `promote-findings` library + CLI verb (Phase 13 Task 1) — Task 4 composes as the final step of the per-task hook.
+- `apply-audit-flips` (Phase 13 Task 4 Step 2) — unchanged; its `Closes AUDIT-<id> → fixed-<sha>` semantic remains the bridge between fix commits and audit-log status.
