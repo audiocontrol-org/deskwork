@@ -3246,7 +3246,7 @@ Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude + 
 ### AUDIT-20260530-10 — `bootstrap` doc claims "no readable config → no-config" but only checks existence
 
 Finding-ID: AUDIT-20260530-10 (cross-model: AUDIT-BARRAGE-claude-04-P3)
-Status:     open
+Status:     fixed-234ac5a
 Severity:   low
 Surface:    `packages/core/src/lanes/bootstrap.ts:74-83`
 
