@@ -112,12 +112,16 @@ async function findFeatureRoot(
   }
   let topEntries: ReadonlyArray<string>;
   try {
-    // Per AUDIT-20260530-06: sort lexicographically so the same slug
-    // under multiple version dirs resolves deterministically across
-    // runs + filesystems. Pre-fix this iterated readdir order, which
-    // could differ between the gate and the lift, causing a silent
-    // split-brain where the two verbs read/write different audit-logs.
-    topEntries = [...(await readdir(docsRoot))].sort();
+    // Per AUDIT-20260530-06 (determinism) + AUDIT-20260530-08
+    // (semantic correctness): sort lexicographically DESCENDING so
+    // the walker picks the lex-greatest version dir (biases toward
+    // the active `1.0` over archived `0.x` / `0.19.0`). Lex-ascending
+    // — the pre-AUDIT-08 fix — was deterministic but picked the
+    // oldest version, the silent-wrong-pick the round-2 audit
+    // caught. Lex-greatest isn't semver-correct (`0.10.0` > `0.9.0`
+    // lex-wise is wrong by version intuition), but it's a workable
+    // default until a semver-aware sort lands.
+    topEntries = [...(await readdir(docsRoot))].sort().reverse();
   } catch {
     return { root: undefined, versionsChecked: [] };
   }

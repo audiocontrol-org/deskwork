@@ -174,10 +174,12 @@ async function resolveFeatureRoot(rootDir: string, slug: string): Promise<string
   if (!existsSync(docsRoot)) return null;
   let topEntries: ReadonlyArray<string>;
   try {
-    // Per AUDIT-20260530-06: sort lexicographically (see same fix in
-    // workplan-aware-gate.ts) so the gate and the lift always pick the
-    // same version dir when a slug exists under multiple.
-    topEntries = [...(await readdir(docsRoot))].sort();
+    // Per AUDIT-20260530-06 (determinism) + AUDIT-20260530-08
+    // (semantic correctness): sort lex-DESCENDING (see same fix in
+    // workplan-aware-gate.ts) so the gate and the lift always pick
+    // the lex-greatest version dir — biasing toward the active
+    // `1.0` over archived `0.x`.
+    topEntries = [...(await readdir(docsRoot))].sort().reverse();
   } catch {
     return null;
   }

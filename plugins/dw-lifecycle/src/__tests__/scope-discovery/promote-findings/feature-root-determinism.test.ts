@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkWorkplanAwareGate } from '../../../scope-discovery/promote-findings/workplan-aware-gate.js';
@@ -80,59 +80,87 @@ describe('feature-root resolution determinism (AUDIT-20260530-06)', () => {
     expect(r2.reason).toBe(r3.reason);
   });
 
-  it('audit-barrage-lift + workplan-aware-gate resolve to the SAME version dir', async () => {
-    // The split-brain failure mode: lift writes to one version's
-    // audit-log; gate reads the other's. After the fix, both pick
-    // the lexicographically-first version (0.x in this fixture).
-    const repoRoot = makeMultiVersionRepo('split-brain', 'demo');
-    const runDir = join(workDir, 'fake-run-dir');
+  it('audit-barrage-lift + workplan-aware-gate resolve to the SAME version dir (real split-brain check)', async () => {
+    // Per AUDIT-20260530-09: replace the previous vacuous version of
+    // this test with a real comparison. Lift `--apply` writes a
+    // distinguishable marker into whichever audit-log it picked; gate
+    // reads back and proves it saw the same one.
+    const repoRoot = join(workDir, 'split-brain-real');
+    const v0x = join(repoRoot, 'docs', '0.x', '001-IN-PROGRESS', 'demo');
+    const v10 = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');
+    mkdirSync(v0x, { recursive: true });
+    mkdirSync(v10, { recursive: true });
+    const emptyAuditLog = '# Audit Log\n';
+    writeFileSync(join(v0x, 'audit-log.md'), emptyAuditLog, 'utf8');
+    writeFileSync(join(v0x, 'workplan.md'), '# WP 0.x\n\n## Phase 1: x\n\n### Task 1: t\n\n- [ ] step\n', 'utf8');
+    writeFileSync(join(v10, 'audit-log.md'), emptyAuditLog, 'utf8');
+    writeFileSync(join(v10, 'workplan.md'), '# WP 1.0\n\n## Phase 1: x\n\n### Task 1: t\n\n- [ ] step\n', 'utf8');
+
+    // Set up a minimal run-dir with one parseable finding so the
+    // lift actually writes a finding (the previous test used an
+    // empty run-dir → no write → no signal).
+    const runDir = join(workDir, 'sb-run-dir');
     mkdirSync(runDir, { recursive: true });
-    // Empty run dir → lift exits 0 with "no findings" but still
-    // resolves the feature-root.
+    writeFileSync(
+      join(runDir, 'claude.md'),
+      [
+        '### Marker finding for split-brain test',
+        '',
+        'Finding-ID: AUDIT-BARRAGE-claude-01',
+        'Status:     open',
+        'Severity:   medium',
+        'Surface:    src/test.ts:42',
+        '',
+        'Body that will land in whichever audit-log the lift picks.',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
     const stdout = new CaptureStream();
     const stderr = new CaptureStream();
     const liftExit = await runAuditBarrageLift({
-      opts: {
-        featureSlug: 'demo',
-        runDir,
-        date: '20260601',
-        apply: false,
-      },
+      opts: { featureSlug: 'demo', runDir, date: '20260601', apply: true },
       projectRoot: repoRoot,
       stdout,
       stderr,
     });
     expect(liftExit).toBe(0);
-    // The lift's stderr names the audit-log path it chose. We
-    // assert it's deterministic by parsing the path out.
-    const liftStderr = stderr.text();
-    // Lift's empty-run-dir path doesn't print the audit-log; instead
-    // we resolve the docs path manually for the assertion. The
-    // important contract is that the gate's pick MATCHES the
-    // sort-order pick (lexicographic, so `0.x` before `1.0`).
+
+    // Read both audit-logs back. EXACTLY ONE should have the marker.
+    // Whichever it is, the gate MUST see the same finding-ID (proves
+    // gate + lift picked the same dir).
+    const log0x = readFileSync(join(v0x, 'audit-log.md'), 'utf8');
+    const log10 = readFileSync(join(v10, 'audit-log.md'), 'utf8');
+    const has0x = log0x.includes('AUDIT-20260601-01');
+    const has10 = log10.includes('AUDIT-20260601-01');
+    expect(has0x !== has10).toBe(true); // exclusive — exactly one
+
     const gateResult = await checkWorkplanAwareGate({
       featureSlug: 'demo',
       repoRoot,
     });
-    expect(gateResult).toBeDefined();
-    // The audit-log was empty for both versions; gate returns
-    // `no-open-findings`. If the gate picked a DIFFERENT version
-    // than the lift, we wouldn't have a way to detect that here —
-    // so let me just assert determinism (both calls return the
-    // same gate result) and rely on the sort-determinism contract.
-    expect(gateResult.allowed).toBe(true);
-    // Suppress unused-var warning for liftStderr — kept as evidence
-    // that the lift ran cleanly against the same repo.
-    expect(liftStderr).toBeDefined();
+    // Gate must REFUSE (the audit-log it picked has an open finding
+    // that's not yet scoped in the workplan). If it picked the other
+    // version's empty audit-log, it would return `no-open-findings`.
+    expect(gateResult.allowed).toBe(false);
+    if (gateResult.allowed === false && gateResult.reason === 'coverage-mismatch') {
+      // The open finding is AUDIT-20260601-01 (canonical) regardless
+      // of which version-dir the lift+gate agreed on. Verifies the
+      // round-trip: lift wrote AUDIT-20260601-01 SOMEWHERE; gate saw
+      // it. If the two had picked different dirs, gate would have
+      // returned `no-open-findings` (empty audit-log on its side).
+      expect(gateResult.missingIds).toContain('AUDIT-20260601-01');
+    }
   });
 
-  it('checkWorkplanAwareGate against multi-version repo picks `0.x` (lex-first), not `1.0`', async () => {
-    // The deterministic-pick contract: with version dirs ['0.x', '1.0'],
-    // sorted lex order is ['0.x', '1.0']; the walker picks the first
-    // match → 0.x. We assert by writing a DISTINCT audit-log into each
-    // version (one with an open finding, the other clean) and checking
-    // which one the gate read.
-    const repoRoot = join(workDir, 'lex-first');
+  it('checkWorkplanAwareGate against multi-version repo picks `1.0` (lex-greatest), not `0.x`', async () => {
+    // Per AUDIT-20260530-08: lex-sort biased to `0.x` (oldest) over
+    // `1.0` (newest) was the wrong default. The fix reverses the
+    // sort to pick lex-greatest, biasing toward the active version.
+    // Test: 0.x has an open finding (would refuse if picked); 1.0
+    // is clean. New behavior: gate reads 1.0 → exits ALLOWED.
+    const repoRoot = join(workDir, 'lex-greatest');
     const v0x = join(repoRoot, 'docs', '0.x', '001-IN-PROGRESS', 'demo');
     const v10 = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');
     mkdirSync(v0x, { recursive: true });
@@ -160,12 +188,11 @@ describe('feature-root resolution determinism (AUDIT-20260530-06)', () => {
       'utf8',
     );
     writeFileSync(join(v10, 'audit-log.md'), '# Audit Log (1.0 — clean)\n', 'utf8');
-    writeFileSync(join(v10, 'workplan.md'), '# Workplan 1.0\n', 'utf8');
+    writeFileSync(join(v10, 'workplan.md'), '# Workplan 1.0\n\n## Phase 1: x\n\n### Task 1: t\n\n- [ ] step\n', 'utf8');
     const gate = await checkWorkplanAwareGate({ featureSlug: 'demo', repoRoot });
-    // The 0.x audit-log has 1 open finding; if the walker picked it,
-    // the gate sees the finding. If it picked 1.0 (clean), the gate
-    // returns `no-open-findings`. The new sort-deterministic walker
-    // picks 0.x first → gate sees the open finding.
-    expect(gate.allowed).toBe(false); // because 0.x's audit-log has an open finding
+    // Post-AUDIT-08: walker picks lex-greatest. With [0.x, 1.0],
+    // lex-greatest is `1.0` (clean) → gate returns `no-open-findings`.
+    // (Pre-AUDIT-08 the walker picked `0.x` and saw its open finding.)
+    expect(gate.allowed).toBe(true);
   });
 });
