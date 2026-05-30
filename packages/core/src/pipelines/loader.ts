@@ -65,8 +65,47 @@ export const PIPELINE_ID_REGEX = /^[a-z0-9][a-z0-9-]*$/;
  * Directory shipping the plugin's built-in preset templates. The path
  * is resolved relative to the compiled module's location (works in
  * both source-mode and dist-mode without configuration).
+ *
+ * NOTE: this directory also holds loader/types modules — it serves
+ * dual roles (module dir + preset registry). Earlier code enumerated
+ * every `.json` here as a preset, which let a stray non-template JSON
+ * (something a future commit might land alongside the loader modules)
+ * surface in the operator picker as a phantom template id. The
+ * authoritative preset roster is `PRESET_IDS` below; preset
+ * enumeration goes through that list, NOT through `readdirSync(this)`.
+ * The `.json` files in the directory are loaded by ID via
+ * `pipelinePluginDefaultPath` after the operator's selection — that
+ * resolves a specific basename, so a stray .json never gets loaded
+ * unless its basename happens to match a registered preset id.
  */
 const PLUGIN_DEFAULTS_DIR = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Authoritative list of preset pipeline template ids shipped with the
+ * plugin. Single source of truth for "which preset JSONs ship in
+ * `dist/pipelines/`" — referenced by both the picker
+ * (`listAvailablePipelineTemplates`) and the packaging-regression test
+ * that asserts `npm pack` includes each id's JSON.
+ *
+ * Adding a new preset requires both: (a) the JSON file in
+ * `src/pipelines/`, and (b) the id appearing here. The build's `cp
+ * src/pipelines/*.json dist/pipelines/` step copies whatever files
+ * exist; this list is what the loader / picker / packaging test
+ * consult. Mismatch between disk and list fails the preset.test.ts
+ * regression sweep (every PRESET_ID must load via the resolver) and
+ * the packaging test (every PRESET_ID must ship in the tarball).
+ *
+ * AUDIT-20260530-03 — explicit list replaces the previous
+ * `readdirSync(PLUGIN_DEFAULTS_DIR)` enumeration that let stray
+ * `.json` files in the module directory surface as phantom presets.
+ */
+export const PRESET_IDS: readonly string[] = [
+  'blog-post',
+  'editorial',
+  'feature-doc',
+  'qa-plan',
+  'visual',
+];
 
 /**
  * Directory inside a project where operator overrides live.
@@ -274,18 +313,24 @@ function listJsonBasenames(dir: string): string[] {
  * is suitable for showing the operator a picker; resolve each id via
  * `loadPipelineTemplate` to get the full template.
  *
+ * Plugin-default presets come from the authoritative `PRESET_IDS`
+ * list (NOT a `readdirSync` of the module directory — see
+ * AUDIT-20260530-03 + the `PRESET_IDS` doc comment). Override JSONs
+ * are enumerated from `<projectRoot>/.deskwork/pipelines/` with
+ * `PIPELINE_ID_REGEX` filtering applied.
+ *
  * The function does NOT validate any template — it just enumerates
- * what's on disk. A malformed override JSON still appears in the list;
- * the operator finds out about the malformation at load time.
+ * what is registered (PRESET_IDS) or on disk (override directory). A
+ * malformed override JSON still appears in the list; the operator
+ * finds out about the malformation at load time.
  *
  * @param projectRoot - Absolute path to the project root.
  */
 export function listAvailablePipelineTemplates(projectRoot: string): string[] {
   const overrideIds = listJsonBasenames(pipelineOverridesDir(projectRoot));
-  const defaultIds = listJsonBasenames(PLUGIN_DEFAULTS_DIR);
   // De-duplicate by id; overrides win, but for enumeration both sources
   // contribute the same id to the same slot in the de-dup set, so
   // precedence is moot until the operator calls loadPipelineTemplate.
-  const all = new Set<string>([...overrideIds, ...defaultIds]);
+  const all = new Set<string>([...overrideIds, ...PRESET_IDS]);
   return [...all].sort();
 }
