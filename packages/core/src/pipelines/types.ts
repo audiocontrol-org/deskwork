@@ -41,11 +41,15 @@
  *
  * The on-disk JSON additionally permits a top-level `"$rationale"`
  * string field as a stand-in for the JSON-with-comments convention
- * (since RFC 8259 JSON disallows comments). The loader passes the field
- * through the schema via `.passthrough()` and ignores it at runtime;
- * it exists so the preset files can carry lifecycle documentation that
- * survives `jq` / `cat` inspection. Custom operator-authored templates
- * are free to include or omit the field.
+ * (since RFC 8259 JSON disallows comments). The schema declares
+ * `$rationale: z.string().optional()` explicitly and uses `.strict()`
+ * so every unknown top-level key fails parse with an actionable error
+ * naming the offending key — typos like `lockdStages` (transposed
+ * `lockedStages`) used to silently resolve to `undefined` under a
+ * blanket `.passthrough()` and ship a pipeline with no lock gate
+ * (AUDIT-20260530-02). Custom operator-authored templates are free to
+ * include or omit `$rationale`; anything beyond the declared key set
+ * is rejected.
  */
 
 import { z } from 'zod';
@@ -120,8 +124,12 @@ export const PipelineTemplateSchema = z.object({
   linearStages: uniqueStringArray('linearStages', 1),
   lockedStages: uniqueStringArray('lockedStages', 0).optional(),
   offPipelineStages: uniqueStringArray('offPipelineStages', 0),
+  // Sole explicitly-declared "extra" key — the comments-in-JSON
+  // workaround the presets use. Declared so `.strict()` admits it.
+  // Anything else at the top level is rejected (AUDIT-20260530-02).
+  $rationale: z.string().optional(),
 })
-  .passthrough()
+  .strict()
   .refine(
     (template) =>
       template.lockedStages === undefined
@@ -196,32 +204,30 @@ function uniqueTokens(stages: readonly string[]): boolean {
  * `PipelineTemplate` interface — the schema is the source of truth and
  * the inferred type tracks it without manual duplication.
  *
- * Note: `passthrough()` widens the inferred type to allow arbitrary
- * extra keys; runtime callers should treat the named fields as the
- * contract and ignore any extras.
+ * The schema is `.strict()`, so the inferred type lists exactly the
+ * declared keys: `id`, `name`, `description`, `linearStages`,
+ * `lockedStages` (optional), `offPipelineStages`, `$rationale`
+ * (optional). Unknown top-level keys fail parse at the schema layer.
  */
 export type PipelineTemplate = z.infer<typeof PipelineTemplateSchema>;
 
 /**
- * Narrower projection of `PipelineTemplate` exposing only the named
- * fields the runtime contract documents. `PipelineTemplate` itself is
- * widened by the schema's `.passthrough()` (which admits unknown extra
- * keys like `$rationale`); downstream consumers that index named fields
- * should accept this strict type instead so typos like
- * `template.lockedSatges` fail at compile time rather than silently
- * resolving to `unknown`.
+ * Narrower projection of `PipelineTemplate` exposing only the
+ * stage-shape fields the runtime verb-routing contract reads. Drops
+ * `$rationale` (documentation-only on disk; never consulted by verbs).
  *
  * The runtime VALUES are the same — `PipelineTemplate` and
  * `StrictPipelineTemplate` describe the same JSON. The only difference
- * is the type-level surface: `StrictPipelineTemplate` lists exactly the
- * keys the contract names, no more.
+ * is the type-level surface: `StrictPipelineTemplate` excludes the
+ * documentation-only fields so verb code doesn't accidentally read
+ * them.
  *
- * Convention: loader functions return `PipelineTemplate` (the wide
- * type). Functions whose parameter is the resolved template and which
- * read its named fields should declare `StrictPipelineTemplate`; pass a
+ * Convention: loader functions return `PipelineTemplate`. Functions
+ * whose parameter is the resolved template and which only need the
+ * stage shape declare `StrictPipelineTemplate`; pass a
  * `PipelineTemplate` to such a function with no conversion (the wide
- * type is assignable to the narrow one through structural subtyping at
- * the property set, since `Pick` drops keys without renaming).
+ * type is assignable to the narrow one through structural subtyping
+ * at the property set).
  */
 export type StrictPipelineTemplate = Pick<
   PipelineTemplate,

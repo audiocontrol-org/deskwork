@@ -34,9 +34,12 @@
  *     dist/) work without configuration.
  *
  *   - JSON files may carry a top-level `"$rationale"` string as a
- *     comments-in-JSON workaround; the schema's `.passthrough()`
- *     ignores it. Operator-authored override templates can include or
- *     omit the field freely.
+ *     comments-in-JSON workaround; the schema declares `$rationale`
+ *     explicitly under `.strict()` so it is ignored at runtime without
+ *     opening the door to unknown-key passthrough. Operator-authored
+ *     override templates can include or omit the field freely; any
+ *     other unknown top-level key fails parse with an actionable error
+ *     (AUDIT-20260530-02).
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
