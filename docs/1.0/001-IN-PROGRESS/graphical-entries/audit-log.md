@@ -3408,7 +3408,7 @@ Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (codex). F
 ### AUDIT-20260530-24 — indentation regression on `CancelOptions.cascade` (3-space indent slipped through)
 
 Finding-ID: AUDIT-20260530-24 (cross-model: AUDIT-BARRAGE-claude-02-P7small)
-Status:     open
+Status:     fixed-f283f9b
 Severity:   low
 Surface:    `packages/core/src/entry/cancel.ts` — `interface CancelOptions { ... }`
 

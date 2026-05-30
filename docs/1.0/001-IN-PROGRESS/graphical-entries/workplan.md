@@ -934,17 +934,17 @@ Closes AUDIT-20260530-23 (cross-model: AUDIT-BARRAGE-codex-01-P7small). Surface:
 
 Closes AUDIT-20260530-24 (cross-model: AUDIT-BARRAGE-claude-02-P7small). Surface: `packages/core/src/entry/cancel.ts` — `interface CancelOptions { ... }`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-24 (cross-model: AUDIT-BARRAGE-claude-02-P7small)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — N/A: whitespace-only diff; no behavioral assertion possible. Existing 9-test cancel-cascade suite continues to pass.
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — N/A per Step 1.
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes — `npm --workspace @deskwork/core test -- --run test/entry/cancel-cascade.test.ts` reports 9/9.
+- [x] Step 5: commit with `Closes AUDIT-20260530-24 (cross-model: AUDIT-BARRAGE-claude-02-P7small)` in subject — `f283f9b`.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1) — N/A; whitespace-only diff.
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix) — full cancel-cascade suite green.
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step — `fixed-f283f9b`.
 
 
 ## Phase 8: Annotation model extension — threads + screenshot attachments + spatial anchors + disposition-trace affordance  ·  [#309](https://github.com/audiocontrol-org/deskwork/issues/309)
