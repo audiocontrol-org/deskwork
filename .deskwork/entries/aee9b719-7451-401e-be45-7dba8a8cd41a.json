@@ -4,9 +4,12 @@
   "title": "Hygiene",
   "keywords": [],
   "source": "manual",
-  "currentStage": "Final",
-  "iterationByStage": {},
+  "currentStage": "Published",
+  "iterationByStage": {
+    "Final": 2
+  },
   "artifactPath": "docs/1.0/001-IN-PROGRESS/hygiene/prd.md",
   "createdAt": "2026-05-28T17:05:36.256Z",
-  "updatedAt": "2026-05-28T17:11:13.034Z"
+  "updatedAt": "2026-05-29T08:45:34.846Z",
+  "datePublished": "2026-05-29T00:00:00.000Z"
 }

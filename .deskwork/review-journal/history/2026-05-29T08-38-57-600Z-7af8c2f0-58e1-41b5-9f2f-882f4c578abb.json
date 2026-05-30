@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:38:57.600Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "address",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "commentId": "00d4cc66-f5d0-4aef-b254-6820fbb69835",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": "Worktree-base path locked to auto-detect from `git worktree list --porcelain` prefix; --worktree-base overrides. No project-config-file coupling. PRD Configuration locked + Workplan Task 1 Step 4 locked.",
+    "id": "0acada4b-a9bc-4895-ae7d-4e25cac873ec",
+    "createdAt": "2026-05-29T08:38:57.600Z"
+  }
+}

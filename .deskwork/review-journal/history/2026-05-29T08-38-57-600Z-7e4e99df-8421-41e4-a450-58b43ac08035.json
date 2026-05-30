@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:38:57.600Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "address",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "commentId": "1ee8cb85-7e05-48c1-98a9-90f317af1519",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": "Default --threshold-count locked to 3 (must satisfy ≥3 of the 9 criteria). PRD Configuration + Acceptance + Workplan locked.",
+    "id": "257e3cfb-3541-480f-bb29-bca7609f49f5",
+    "createdAt": "2026-05-29T08:38:57.600Z"
+  }
+}

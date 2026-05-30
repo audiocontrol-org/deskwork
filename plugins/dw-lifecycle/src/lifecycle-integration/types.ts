@@ -18,7 +18,8 @@ export interface HygieneObservation {
   readonly category:
     | 'commit-marker'
     | 'workplan-tbd-introduced'
-    | 'issue-filed-this-session';
+    | 'issue-filed-this-session'
+    | 'worktree-stale';
   readonly sha?: string;
   readonly subject?: string;
   readonly markerText?: string;
@@ -31,12 +32,20 @@ export interface HygieneObservation {
   readonly issueState?: 'OPEN' | 'CLOSED';
   readonly path?: string;
   readonly lineNumber?: number;
+  // Set on `worktree-stale` observations: the absolute worktree path,
+  // its pinned branch (null on detached HEAD), and the count of staleness
+  // signals that held.
+  readonly worktreePath?: string;
+  readonly worktreeBranch?: string | null;
+  readonly staleSignalCount?: number;
 }
 
 export interface NextSessionRecommendation {
   readonly resumeTask: string | null;
   readonly triageItems: readonly string[];
   readonly addressTbdItems: readonly string[];
+  /** Worktrees flagged as stale this session; surfaces a dismantle suggestion. */
+  readonly dismantleCandidates: readonly string[];
 }
 
 export interface SessionEndHygieneReport {

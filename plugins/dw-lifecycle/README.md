@@ -155,18 +155,20 @@ Install-side, the helper refuses to clobber existing files by default:
 
 ## Hygiene — permanent debt burndown
 
-The `/dw-lifecycle:hygiene*` skill family ships UNIX-style verbs that surface and burn down three classes of permanent debt across a project: stale GitHub issues, workplan TBD/defer markers, and parked branches. The family is operator-triggered (no continuous polling) and integrates with the natural feature-lifecycle waypoints (session-end captures observations, complete enforces a no-bare-TBDs gate, release closes shipped-in-this-version issues).
+The `/dw-lifecycle:hygiene*` skill family ships UNIX-style verbs that surface and burn down four classes of permanent debt across a project: stale GitHub issues, workplan TBD/defer markers, parked branches, and stale worktrees. The family is operator-triggered (no continuous polling) and integrates with the natural feature-lifecycle waypoints (session-end captures observations, complete enforces a no-bare-TBDs gate, release closes shipped-in-this-version issues).
 
-### The six core verbs
+### The core verbs
 
 | Skill | Purpose | Mutation? |
 |---|---|---|
-| `/dw-lifecycle:debt-report` | Cross-source snapshot (GitHub issues bucketed by label/age/stale-since-last-comment; workplan TBD totals per in-progress feature; parked-branch list with ahead/behind). Markdown + JSON output. | Read-only |
+| `/dw-lifecycle:debt-report` | Cross-source snapshot of three streams (GitHub issues bucketed by label/age/stale-since-last-comment; workplan TBD totals per in-progress feature; parked-branch list with ahead/behind). Markdown + JSON output. | Read-only |
+| `/dw-lifecycle:worktree-report` | Fourth-stream read for stale + orphan worktrees. Surfaces nine per-criterion staleness signals (branch fully merged, PR merged/closed, feature-doc complete, no recent commits, branch gone from origin, working tree clean, commits on origin, prunable, orphan-directory) + a verdict + a recommended disposition (keep / dismantle / archive-then-dismantle / prune-orphan / operator-triage). Markdown + JSON output. | Read-only |
 | `/dw-lifecycle:triage-issues` | Operator-triggered batched-proposal cycle for stale GitHub issues. Two verbs (`propose` + `apply`); intermediate JSON file as the contract. Four disposition shapes. | gh write |
 | `/dw-lifecycle:promote-deferrals` | Scan a target workplan for TBD/defer/follow-up/out-of-scope markers; per-item propose promote-to-issue OR inline-wontfix; the wontfix path enforces a substantive-reason validator (≥40 chars, no gaming phrases). | gh write + workplan edit |
 | `/dw-lifecycle:archive-branch` | Preserve a parked branch as `archived/<branch>-<date>` annotated tag, push, delete local + remote. All-or-nothing pre-flight gate. | git write + push |
+| `/dw-lifecycle:dismantle-worktrees` | Batched propose+apply for stale + orphan worktrees. Composes with `:archive-branch` via `--archive-first` (per-item decision `archive-then-dismantle`). Safety rails: refuses on current/main worktree, dirty tree without substantive reason, local-only commits without substantive reason, force-push divergence, external path. | git write (+ optional push via archive) |
 | `/dw-lifecycle:close-shipped` | Walk four evidence sources (commit-log + audit-log + tooling-feedback + workplan-checkbox) between two release tags; comment + label matching issues with `pending-verification`. Does NOT close — closure waits for operator verification. | gh write |
-| Lifecycle wiring | `session-end` captures hygiene observations + writes a next-session recommendation block; `session-start` displays the prior recommendation (no fresh scan); `complete` refuses on bare TBDs before merge (with `--skip-tbd-gate --reason "<text>"` override). | Mixed |
+| Lifecycle wiring | `session-end` captures hygiene observations (commit markers + workplan TBDs + issues filed + stale worktrees) + writes a next-session recommendation block; `session-start` displays the prior recommendation (no fresh scan); `complete` refuses on bare TBDs before merge (with `--skip-tbd-gate --reason "<text>"` override). | Mixed |
 
 ### Operational pattern
 
@@ -198,6 +200,14 @@ dw-lifecycle promote-deferrals apply --from-file .dw-lifecycle/promote-deferrals
 
 # Archive a parked branch (annotated tag preserved; branch deleted local + remote):
 dw-lifecycle archive-branch feature/studio-bridge --rationale "Security gap on auth bridge; tag preserves work."
+
+# Find stale + orphan worktrees:
+dw-lifecycle worktree-report
+
+# Dismantle stale worktrees (batched proposal cycle):
+dw-lifecycle dismantle-worktrees propose
+# operator fills in per-worktree decisions
+dw-lifecycle dismantle-worktrees apply --proposal .dw-lifecycle/dismantle-worktrees/proposals-*.json
 ```
 
 ### Cross-references

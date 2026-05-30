@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:38:57.600Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "address",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "commentId": "0935d651-46b6-4beb-b41a-3b9603021be9",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": "Default staleness threshold locked to 30 days (mirrors parked-branches). PRD § Phase 11 Configuration + Acceptance criteria rewritten.",
+    "id": "ff276e48-564d-48e6-8d8d-febde0f4cc58",
+    "createdAt": "2026-05-29T08:38:57.600Z"
+  }
+}

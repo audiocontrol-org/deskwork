@@ -14,6 +14,9 @@
 #   5. dw-lifecycle promote-deferrals propose ..-> writes proposal JSON
 #   6. dw-lifecycle close-shipped --dry-run     -> four-source merge runs
 #   7. dw-lifecycle archive-branch --dry-run    -> preflight passes
+#   8. dw-lifecycle worktree-report --json      -> JSON scan parses
+#   9. dw-lifecycle dismantle-worktrees propose -> writes proposal JSON
+#  10. dw-lifecycle dismantle-worktrees apply   -> all-skip round-trip exits 0
 #
 # Exits 0 on full success with "OK" on the last line. Exits 1 with a
 # specific error otherwise.
@@ -326,5 +329,85 @@ g commit -q -m "Parked work"
 g checkout -q main
 "$DW_BIN" archive-branch feature/smoke-parked --dry-run --rationale "Smoke test: preserve work via annotated tag." --compare-ref main >/dev/null 2>&1 \
   || fail "archive-branch --dry-run failed (non-zero exit)"
+
+# -------- 5. Phase 11 worktree verbs --------
+
+# Create a worktree-base directory containing a sibling worktree of the
+# fixture repo. `--worktree-base <path>` directs the scan there directly
+# (auto-detect skipped). `--threshold-count 1` lowers the bar so the
+# fixture worktree picks up at least one staleness signal and ends up
+# in the propose set; current/main verdicts always override regardless
+# of threshold.
+WTREE_BASE="$FIXTURE/worktrees"
+mkdir -p "$WTREE_BASE"
+g worktree add -q -b feature/smoke-wtree "$WTREE_BASE/smoke-wtree" main
+
+echo "== smoke-hygiene: worktree-report --json =="
+WTREE_JSON="$FIXTURE/worktree-report.json"
+"$DW_BIN" worktree-report --json --worktree-base "$WTREE_BASE" --threshold-count 1 \
+    > "$WTREE_JSON" 2>/dev/null \
+  || fail "worktree-report --json failed (non-zero exit)"
+python3 -c "
+import json, sys
+data = json.loads(open('$WTREE_JSON').read())
+assert isinstance(data.get('entries'), list), 'entries must be a list'
+assert 'days_threshold' in data, 'days_threshold field missing'
+assert 'worktree_base' in data, 'worktree_base field missing'
+" || fail "worktree-report --json emitted unexpected shape"
+
+echo "== smoke-hygiene: dismantle-worktrees propose =="
+"$DW_BIN" dismantle-worktrees propose \
+    --worktree-base "$WTREE_BASE" --threshold-count 1 \
+    >/dev/null 2>&1 || true
+DW_DIR="$FIXTURE/.dw-lifecycle/dismantle-worktrees"
+test -d "$DW_DIR" \
+  || fail "dismantle-worktrees propose did not create $DW_DIR"
+DW_PROPOSAL_COUNT="$(find "$DW_DIR" -name 'proposals-*.json' 2>/dev/null | wc -l | tr -d '[:space:]')"
+if [ "$DW_PROPOSAL_COUNT" = "0" ]; then
+  fail "dismantle-worktrees propose did not write a proposal file"
+fi
+DW_PROPOSAL="$(find "$DW_DIR" -name 'proposals-*.json' 2>/dev/null | head -n1)"
+
+# Edit the proposal so every entry has decision=skip + a substantive
+# reason. The apply step's all-or-nothing validation requires both
+# fields; skip routes through the dispatch but never actually removes a
+# worktree, which keeps the smoke idempotent.
+python3 - "$DW_PROPOSAL" <<'PY'
+import json, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+data = json.loads(p.read_text())
+# The proposal schema uses `items` for the per-worktree entries.
+items = data.get('items', [])
+if not items:
+    sys.exit('smoke-hygiene: proposal has no items to disposition')
+for item in items:
+    item['decision'] = 'skip'
+    item['reason'] = (
+        'smoke-hygiene: skip-disposition all items to verify the apply '
+        'round-trip without mutating the fixture worktrees.'
+    )
+p.write_text(json.dumps(data, indent=2))
+PY
+
+echo "== smoke-hygiene: dismantle-worktrees apply (all-skip) =="
+"$DW_BIN" dismantle-worktrees apply --proposal "$DW_PROPOSAL" \
+    >/dev/null 2>&1 \
+  || fail "dismantle-worktrees apply (all-skip) failed (non-zero exit)"
+
+# The sibling worktree must still be on disk + still registered with
+# git after the all-skip apply. Anything else means apply mutated state
+# it was told to leave alone.
+test -d "$WTREE_BASE/smoke-wtree" \
+  || fail "dismantle-worktrees apply with decision=skip removed a worktree"
+g worktree list --porcelain | grep -q "$WTREE_BASE/smoke-wtree" \
+  || fail "dismantle-worktrees apply with decision=skip unregistered a worktree from git"
+
+# Local cleanup of the fixture worktree (the FIXTURE-level trap handles
+# the tmpdir, but a registered worktree leaves the parent repo with a
+# dangling admin entry until the trap fires; explicit removal keeps the
+# smoke leak-free even if the operator overrode SMOKE_HYGIENE_TMPDIR).
+g worktree remove --force "$WTREE_BASE/smoke-wtree" >/dev/null 2>&1 || true
+g branch -D feature/smoke-wtree >/dev/null 2>&1 || true
 
 echo "OK"

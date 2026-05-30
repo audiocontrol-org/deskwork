@@ -3181,14 +3181,77 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - workplan /Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:700 — markers: out-of-scope — ### Phase 12 — Out of Scope (deferred to Design B / Design C per ROADMAP)
 - workplan /Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:860 — markers: defer — - [ ] Step 1: Add section to `.claude/rules/agent-discipline.md` titled "Audit findings: scope-don't-defer + TDD enforcement". Names the default-is-promote shape; cites the operator's verbatim framing
 - workplan /Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:868 — markers: out-of-scope — ### Phase 13 — Out of Scope
+
+## 2026-05-29: Phase 11 — stale worktree discovery + dismantle (Tasks 1–4 shipped)
+### Feature: hygiene
+### Worktree: hygiene
+
+**Goal:** extend the hygiene feature with a mechanism to find + dismantle stale worktrees. Drive PRD capture → operator iteration → publish → file issue → implement → ship to main.
+
+**Accomplished:**
+
+- **PRD capture + iteration cycle.** Authored Phase 11 PRD addition (~95 LOC) capturing 9 staleness signals, 7 safety rails, 3 verb-shape directions, edge cases, configuration, and 7 open questions for operator iteration. Operator left 7 marginalia in the studio against v1; iterated to v2 addressing all 7 (Option A verb shape; 30-day threshold; 3-of-9 signals; opt-in `--archive-first`; auto-detected worktree-base; rejected `:dismantle-all-shipped` shortcut; cross-machine cleanup out of scope). Published PRD via `deskwork publish` (`#246` divergence captured). Filed [#356](https://github.com/audiocontrol-org/deskwork/issues/356) with task breakdown + acceptance gates.
+- **Task 1 — `/dw-lifecycle:worktree-report`.** Read-only sibling of `:debt-report`. 6 modules (types, staleness, scan, git-probes, gh-pr-state, feature-doc, formatters) all under 300 LOC. CLI subcommand wired with all flags. SKILL.md authored mirroring `:debt-report`. 32 vitest tests cover every staleness signal + every overriding verdict + threshold-count behavior + canonical signal ordering + porcelain parser variants + auto-detect base + corrupt + orphan happy paths. Commit `fb94325`.
+- **Task 2 — `/dw-lifecycle:dismantle-worktrees propose|apply`.** Batched-proposal pattern matching `:triage-issues` + `:promote-deferrals`. 6 modules (types, preflight, dismantle, propose, apply, index). All-or-nothing validation; per-worktree best-effort dispatch. Substantive-reason validator reused from `promote-deferrals`. Composition with `:archive-branch` via `--archive-first` (order: remove worktree first, then archive — preflight refuses on checked-out branches). 20 vitest tests cover every safety-rail refusal + every dispatch route. Commit `2ff389e`.
+- **Task 3 — Lifecycle integration.** `session-end-hygiene` extended with a fourth observation stream (`worktree-stale`); `dismantleCandidates` added to `NextSessionRecommendation`; markdown renderer emits the new observation rows + "- Dismantle stale worktrees:" recommendation line. `agent-discipline.md` § "Closure is a structural step" rewritten to name worktrees as the fourth structural-closure stream + cross-link to [#347](https://github.com/audiocontrol-org/deskwork/issues/347). `session-start-recommendation` needs no code change (does textual read of the markdown block). Step 3 (complete-gate worktree suggestion) deferred to polish.
+- **Task 4 — Documentation.** Plugin README hygiene-family section: "three classes" → "four classes" of permanent debt; core-verbs table grows with `:worktree-report` + `:dismantle-worktrees`; quick-reference shell snippets include the new verbs. Task 4 Step 3 (burndown sheet update) deferred — closure rule is authoritative.
+- **Shipped on main.** Seven commits landed via rebase + push: `245a235` PRD extension, `f1851f2` iterate v2, `e1cfb4a` publish + issue file, `fb94325` Task 1, `2ff389e` Task 2, `2715edd` gitignore, `cf7e988` Tasks 3+4. Pre-commit hooks caught two clone groups during implementation; both extracted into shared modules (`subcommands/lib/parse-flag-value.ts`, `process-probes.ts`, `build-worktree-opts.ts`) before commit.
+
+**Didn't Work:**
+
+- **scope-widen between tasks.** The implement SKILL's auto-invocation requires a baseline `scope-manifest.yaml` from `scope-inventory`; the hygiene feature never ran scope-inventory. Skipped per the SKILL's silent-fallback shape. Tracked as a "hygiene feature didn't opt into the scope-discovery audit loop" observation; future feature setups should consider running `scope-inventory` once at setup time.
+- **Initial orphan-detection over-eager.** First implementation flagged 38 false-positive "orphans" — every sibling git project under the auto-detected `/Users/orion/work/` base. Fixed via the `.git`-file-shape signal: only flag paths whose `.git` exists as a FILE (gitdir: pointer to admin dir), not as a DIRECTORY (which signals a sibling standalone repo). Post-fix: 0 false positives, 4–5 actual stale candidates surfaced cleanly.
+- **`/deskwork:approve` for Final → Published.** The SKILL prescribes `deskwork approve` but `core/approve.ts` refuses Final → Published with [#246](https://github.com/audiocontrol-org/deskwork/issues/246)'s documented error pointing at `publish` as the right verb. Used `deskwork publish` since the SKILL's intent matched. Divergence already captured in `docs/1.0/burndown/operator-triage.md` § #246.
+
+**Course Corrections:**
+
+- **[PROCESS]** Auto mode flagged force-push to `feature/hygiene` after rebase — rule says force-push needs explicit authorization. Operator confirmed authorization was implicit in "get our changes into main." Used `--force-with-lease` (safer form) and pushed; documented in the session journal earlier.
+- **[PROCESS]** Operator authorized in-session override of the orchestrator-vs-implementation-session rule via `AskUserQuestion`. Session was already in the feature worktree; the session-isolation half of the rule was relaxed for this one-time pass.
+- **[COMPLEXITY]** `scan.ts` was 541 LOC after initial implementation — over the 300–500 line cap. Split into 4 modules (`scan.ts`, `git-probes.ts`, `gh-pr-state.ts`, `feature-doc.ts`) before commit. All files under 300 LOC post-split.
+
+**Quantitative:**
+
+- Messages: ~100 (estimate including the audit + burndown + Phase 11 arc)
+- Commits this session: 7 (Phase 11) + earlier audit/closure/burndown commits in the same continuous session
+- Issues closed via repo-wide audit: 68 of 178 → 110 remaining; per-feature burndown sheets at `docs/1.0/burndown/`
+- Issues filed this session: #356 (Phase 11), plus 4 unrelated by other tools (#357, #358, #359, #360)
+- Tests added: 52 worktree-related (32 + 20)
+- Full plugin suite: 1947 of 1948 pass (1 pre-existing unrelated flake)
+- Files changed across Phase 11: ~35
+
+**Insights:**
+
+- **The PRD iteration loop closes a real gap.** Operator left 7 specific marginalia in the studio and got back a v2 PRD addressing each one verbatim. The mechanical `--dispositions` flag on `deskwork iterate` made the per-comment disposition trail durable.
+- **Dogfooding closes its own loops.** Live smoke against the operator's `~/work/` set surfaced the orphan-detection false-positive immediately; the test fixture would never have caught it. The first run produced 38 false orphans; the second run (after the `.git`-file-shape signal) produced 0. The smoke also showed the closure-rule cascade work — `feature/studio-bridge` (the example the rule explicitly mentions as parked-by-operator-decision) appears in the report with the expected `dismantle` disposition (0 commits ahead of main).
+- **Phase 11 closes the #347 failure mode at its source.** The "stale-branch sessions silently re-implement shipped work" mode the operator captured at #347 is structurally prevented by `:worktree-report` + `:dismantle-worktrees`: every shipped feature's worktree gets a structural prompt to dismantle, instead of relying on the operator to remember. The session-end-hygiene integration ensures the recommendation surfaces at every session boundary.
+
+### Hygiene observations
+
+- workplan docs/1.0/001-IN-PROGRESS/hygiene/workplan.md:335 — markers: out-of-scope — `- **No \`:dismantle-all-shipped\` shortcut** (rejected per PRD Out of Scope).` *(intentional Out-of-Scope annotation, not actionable TBD; flagged as a known scanner false-positive)*
+- workplan docs/1.0/001-IN-PROGRESS/hygiene/workplan.md:336 — markers: out-of-scope — `- **No cross-machine cleanup** (out of scope per PRD Out of Scope).` *(same as above)*
 - issue #360 [OPEN] filed this session: perf(graphical-entries): group cancel --cascade runs regenerateCalendar N+1 times
 - issue #359 [OPEN] filed this session: feat(graphical-entries): record cascadeFrom on stage-transition events emitted by group cancel --cascade
 - issue #358 [OPEN] filed this session: writeSidecar serializes raw input, not Zod-validated result.data — retired/unknown fields can persist to disk
 - issue #357 [OPEN] filed this session: doctor --check (validateCalendarSidecar) reads hardcoded .deskwork/calendar.md, ignores per-site calendarPath — false-clean for custom-calendarPath adopters
 - issue #356 [OPEN] filed this session: Phase 11: Stale worktree discovery + dismantle (hygiene extension)
 
-### Next session recommendation (hygiene)
+### Next session recommendation (scope-discovery)
 
 - Resume: Phase 13 Task 2 (implement-loop refusal gate) — Phase 13 Task 1 landed + reviewed + on `feature/scope-discovery`. Task 2 augments `/dw-lifecycle:implement` to refuse advancing while any feature audit-log has `Status: open`. Plan in the workplan; the `open-findings-gate.ts` pure-function + the `subcommands/implement.ts` wiring + the refusal-message tests.
 - Triage: #360, #359, #358, #357, #356 (the five new GH issues from this session — all `graphical-entries`/hygiene scope, not `scope-discovery` directly; route to those features' workplans when the operator picks them up).
 - Address TBD markers: line 700 (Phase 12 out-of-scope — legitimate scope-cut; leave); line 860 (Phase 13 Task 6 Step 1 defer marker is intentional task-step text, not a scope deferral); line 868 (Phase 13 out-of-scope — legitimate scope-cut; leave). All three are workplan section structure, not actual TBD residue — no action needed.
+
+### Hygiene observations (stale worktrees)
+
+- worktree `/Users/orion/work/deskwork-work/deskwork-dw-lifecycle` `feature/deskwork-dw-lifecycle` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/deskwork-triage` `feature/deskwork-triage` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/scope-discovery` `feature/scope-discovery` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/studio-bridge` `feature/studio-bridge` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/visual-verification-gate` `feature/visual-verification-gate` — 3 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: Phase 11 Task 5 — extend `scripts/smoke-hygiene.sh` with a worktree-verbs round-trip fixture. Then Task 6 (operator-driven dogfood batched-proposal cycle).
+- Triage: #356 (Phase 11 umbrella); #357/#358 (calendarPath + Zod-validation drift in core); #359/#360 (graphical-entries cascade perf + provenance). The four unrelated bugs were filed by other tooling during this session and need their own dispositions.
+- Address TBD markers: lines 335 + 336 are Out-of-Scope annotations from the Phase 11 PRD — false-positive from the scanner, leave as-is.
+- Dismantle stale worktrees: 5 candidates surfaced — `deskwork-dw-lifecycle`, `deskwork-triage`, `scope-discovery`, `studio-bridge`, `visual-verification-gate`. The Phase 11 verbs are now shipped on main; the operator can run `dw-lifecycle dismantle-worktrees propose` followed by per-worktree disposition decisions then `apply` to burn this set down. `studio-bridge` is the operator's explicit "leave parked until security gap closes" exception per `agent-discipline.md` § "studio-bridge" — set decision `skip` on that one.

@@ -47,6 +47,8 @@ import { sessionEndHygiene } from './subcommands/session-end-hygiene.js';
 import { sessionStartRecommendation } from './subcommands/session-start-recommendation.js';
 import { completeGate } from './subcommands/complete-gate.js';
 import { completeParentClosure } from './subcommands/complete-parent-closure.js';
+import { worktreeReport } from './subcommands/worktree-report.js';
+import { dismantleWorktrees } from './subcommands/dismantle-worktrees.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -108,6 +110,8 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'session-start-recommendation': sessionStartRecommendation,
   'complete-gate': completeGate,
   'complete-parent-closure': completeParentClosure,
+  'worktree-report': worktreeReport,
+  'dismantle-worktrees': dismantleWorktrees,
 };
 
 // Deprecation hints printed alongside the subcommand list in `--help`.

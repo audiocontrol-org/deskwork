@@ -1,6 +1,6 @@
 // session-end hygiene capture.
 //
-// Walks three sources to produce a per-session observation set + a forward
+// Walks four sources to produce a per-session observation set + a forward
 // recommendation block:
 //
 //   1. git log subjects in the range <sessionStartSha>..HEAD (or the last
@@ -8,24 +8,31 @@
 //      commit subject mentioning a hygiene-relevant token.
 //   2. workplan markers in the feature workplan — any line that carries a
 //      TBD-style marker (coalesced per line so a multi-marker line emits
-//      one observation listing every matched marker).
-//   3. issues filed by the current user inside the session boundary —
-//      surfaced via `gh issue list --json number,title,state` with a
-//      `created:>=<iso>` search where `<iso>` is the committer date of
-//      `--session-start-sha`. When the SHA is absent, fall back to the
-//      committer date of the merge-base of HEAD with origin/main, and if
-//      that is also unavailable, to the committer date of HEAD~10. The
-//      fallback boundary is documented inline so it is never "today."
+//      one observation listing every matched marker). Filtered to lines
+//      INTRODUCED BY THE SESSION DIFF (`git diff --unified=0
+//      <boundarySha>..HEAD -- <workplan>`) so pre-existing prose doesn't
+//      re-fire every session. The whole-file scan is the fallback when
+//      no session boundary is resolvable (greenfield repos / fixtures).
+//   3. issues actually touched by the session — derived from `#NNN`
+//      references in `git log <boundarySha>..HEAD` commit subjects + bodies,
+//      then `gh issue view <N>` per unique number. The session-boundary SHA
+//      is the priority-ordered fallback: --session-start-sha → merge-base
+//      with origin/main → HEAD~10. The pre-Phase-12 implementation queried
+//      `gh issue list --author @me --search "created:>=<iso>"` which swept
+//      in same-user issues filed from other branches in the same time
+//      window (the #340-shaped scoping bug closed at #361 / Phase 12).
+//   4. stale worktrees in the operator's worktree-base directory (Phase 11).
 //
 // The captured observations feed a small markdown block that gets appended
 // to the journal entry under `### Hygiene observations` followed by the
 // `### Next session recommendation (hygiene)` heading. The recommendation
 // is intentionally lightweight: the operator can edit it before commit.
 
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { scanSingleWorkplanFile } from '../debt-report/workplan-tbd.js';
 import type { WorkplanMarkerKey } from '../debt-report/types.js';
+import { runWorktreeReport } from '../worktree-report/scan.js';
 import type {
   HygieneObservation,
   NextSessionRecommendation,
@@ -33,6 +40,11 @@ import type {
   RunGit,
   SessionEndHygieneReport,
 } from './types.js';
+import {
+  addedLineNumbersInRange,
+  extractIssueRefsFromRange,
+  resolveSessionBoundarySha,
+} from './session-range.js';
 
 // Commit-subject token list. Matches case-insensitively as whole words where
 // the token has natural word boundaries; the `[debt: #NNN]` and
@@ -76,7 +88,24 @@ function range(
 }
 
 function readCommits(runGit: RunGit, sessionStartSha: string | null): readonly CommitRow[] {
-  const out = runGit(['log', '--format=%H%x09%s', ...range(sessionStartSha)]);
+  // Defensive posture matches `scanIssuesThisSession`: if the supplied SHA
+  // is dangling (force-push / rebase / stale SHA from a prior session on a
+  // different branch), `git log <bad-sha>..HEAD` exits non-zero and the
+  // exception would crash the entire `captureSessionEndHygiene` pass. Try
+  // the requested range first; on failure, retry with the `HEAD~10`
+  // fallback. If THAT also fails (truly broken repo), surface zero rows
+  // instead of throwing.
+  let out: string;
+  try {
+    out = runGit(['log', '--format=%H%x09%s', ...range(sessionStartSha)]);
+  } catch {
+    if (sessionStartSha === null) return [];
+    try {
+      out = runGit(['log', '--format=%H%x09%s', ...range(null)]);
+    } catch {
+      return [];
+    }
+  }
   const rows: CommitRow[] = [];
   for (const line of out.split('\n')) {
     if (line.length === 0) continue;
@@ -143,14 +172,36 @@ const MARKER_DISPLAY: Readonly<Record<WorkplanMarkerKey, string>> = {
 // whose `markerText` lists every matched marker; the line's text excerpt
 // is shared by all samples (by construction in the scanner) so the first
 // sample's `text` is authoritative.
+//
+// Phase 12: when a session boundary is resolvable, the per-line samples are
+// filtered to lines INTRODUCED BY THE SESSION DIFF (`git diff --unified=0
+// <boundarySha>..HEAD -- <workplan>`). Pre-existing prose stops re-firing
+// every session. When no boundary is resolvable (greenfield repos, fixtures
+// without git), the whole-file scan is the fallback so pre-Phase-12
+// behavior is preserved.
 function scanWorkplanTbds(
   args: SessionEndHygieneArgs,
 ): readonly HygieneObservation[] {
   const path = workplanPathFor(args);
   if (!existsSync(path)) return [];
   const result = scanSingleWorkplanFile(path);
+
+  // Best-effort session-diff filter. Compute the set of added/modified
+  // lines via `git diff --unified=0 <boundarySha>..HEAD -- <relPath>`. When
+  // either the boundary or the diff cannot be computed, fall back to the
+  // whole-file scan (sessionDiffLines = null).
+  let sessionDiffLines: Set<number> | null = null;
+  const boundary = resolveSessionBoundarySha(args.runGit, args.sessionStartSha);
+  if (boundary.ok) {
+    const relPath = relative(args.projectRoot, path);
+    sessionDiffLines = addedLineNumbersInRange(args.runGit, boundary.sha, relPath);
+  }
+
   const groups = new Map<number, { markers: Set<WorkplanMarkerKey>; text: string }>();
   for (const sample of result.samples) {
+    if (sessionDiffLines !== null && !sessionDiffLines.has(sample.lineNumber)) {
+      continue;
+    }
     const existing = groups.get(sample.lineNumber);
     if (existing === undefined) {
       groups.set(sample.lineNumber, {
@@ -194,97 +245,50 @@ function isRawIssue(value: unknown): value is RawIssue {
   );
 }
 
-// Result of a git invocation that the caller is willing to fail. Carries
-// the reason on the failure branch so a downstream diagnostic can name
-// WHICH step failed and with what message instead of collapsing every
-// failure mode onto an indistinguishable `null`.
-type GitAttempt =
-  | { readonly ok: true; readonly value: string }
-  | { readonly ok: false; readonly reason: string };
-
-// Run a git command that may fail (missing SHA, missing remote ref, etc.)
-// and return a discriminated outcome instead of throwing. The reason
-// string preserves the upstream error message so the session-boundary
-// resolver can surface WHICH fallback failed and why when every step
-// exhausts.
-function tryGit(runGit: RunGit, args: readonly string[]): GitAttempt {
+// Look up a single issue via `gh issue view <N> --json number,title,state`
+// and emit one observation. Returns null when the gh call fails or returns
+// a malformed payload — the caller continues with the next ref instead of
+// aborting the whole scan (best-effort per-issue dispatch).
+function viewIssue(
+  runGh: RunGh,
+  issueNumber: number,
+): HygieneObservation | null {
+  let raw: string;
   try {
-    return { ok: true, value: runGit(args).trim() };
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    return { ok: false, reason };
+    raw = runGh(['issue', 'view', String(issueNumber), '--json', 'number,title,state']);
+  } catch {
+    return null;
   }
+  if (raw.trim().length === 0) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isRawIssue(parsed)) return null;
+  const upper = parsed.state?.toUpperCase();
+  const issueState: 'OPEN' | 'CLOSED' | undefined =
+    upper === 'OPEN' ? 'OPEN' : upper === 'CLOSED' ? 'CLOSED' : undefined;
+  return {
+    category: 'issue-filed-this-session',
+    issueNumber: parsed.number,
+    issueTitle: parsed.title,
+    issueState,
+  };
 }
 
-// Result of the session-boundary resolution. On success, carries the ISO
-// timestamp; on failure, carries per-fallback reason strings so the caller
-// can surface a one-line diagnostic to stderr naming WHICH steps were
-// tried and why each failed.
-type BoundaryResolution =
-  | { readonly ok: true; readonly iso: string }
-  | {
-      readonly ok: false;
-      readonly shaReason: string | null;
-      readonly mergeBaseReason: string;
-      readonly headReason: string;
-    };
-
-// Resolve the session-boundary ISO-8601 committer-date timestamp.
-//
-// Priority order (each step that yields a non-empty string wins):
-//   1. The committer date of `--session-start-sha`.
-//   2. The committer date of the merge-base of HEAD with origin/main.
-//   3. The committer date of HEAD~10 (last-10-commits fallback, mirrored
-//      from the commit-scanner's FALLBACK_RECENT_COMMITS).
-//
-// Returns a failure object when every step fails. The caller treats that
-// as "no usable boundary; skip the gh query" — better than emitting a
-// calendar-date query that re-introduces the bug this method exists to
-// close — AND surfaces a one-line stderr diagnostic so the operator can
-// tell the failure mode apart from "no issues filed this session."
-function resolveSessionBoundaryIso(
-  runGit: RunGit,
-  sessionStartSha: string | null,
-): BoundaryResolution {
-  let shaReason: string | null = null;
-  if (sessionStartSha !== null) {
-    const fromSha = tryGit(runGit, ['show', '-s', '--format=%cI', sessionStartSha]);
-    if (fromSha.ok && fromSha.value.length > 0) {
-      return { ok: true, iso: fromSha.value };
-    }
-    shaReason = fromSha.ok ? 'empty-output' : fromSha.reason;
-  }
-  const mergeBase = tryGit(runGit, ['merge-base', 'HEAD', 'origin/main']);
-  let mergeBaseReason: string;
-  if (mergeBase.ok && mergeBase.value.length > 0) {
-    const fromMergeBase = tryGit(runGit, ['show', '-s', '--format=%cI', mergeBase.value]);
-    if (fromMergeBase.ok && fromMergeBase.value.length > 0) {
-      return { ok: true, iso: fromMergeBase.value };
-    }
-    mergeBaseReason = fromMergeBase.ok
-      ? 'merge-base resolved but committer-date empty'
-      : `merge-base resolved but committer-date lookup failed: ${fromMergeBase.reason}`;
-  } else {
-    mergeBaseReason = mergeBase.ok ? 'empty-output' : mergeBase.reason;
-  }
-  const fromHead = tryGit(runGit, ['show', '-s', '--format=%cI', `HEAD~${FALLBACK_RECENT_COMMITS}`]);
-  if (fromHead.ok && fromHead.value.length > 0) {
-    return { ok: true, iso: fromHead.value };
-  }
-  const headReason = fromHead.ok ? 'empty-output' : fromHead.reason;
-  return { ok: false, shaReason, mergeBaseReason, headReason };
-}
-
+// Walk `git log <boundarySha>..HEAD`, parse `#NNN` refs from commit
+// subjects + bodies, then `gh issue view <N>` per unique ref. The
+// commit-range derivation is the authoritative record of what the session
+// touched — replaces the pre-Phase-12 `gh issue list --author @me
+// --search "created:>=<iso>"` which swept in same-user issues filed from
+// other branches in the time window (the #340-shaped scoping bug).
 function scanIssuesThisSession(
   args: SessionEndHygieneArgs,
 ): readonly HygieneObservation[] {
-  const resolution = resolveSessionBoundaryIso(args.runGit, args.sessionStartSha);
+  const resolution = resolveSessionBoundarySha(args.runGit, args.sessionStartSha);
   if (!resolution.ok) {
-    // Every fallback step exhausted. Empty issue list is still a valid
-    // outcome (the caller renders "no issues need disposition" downstream)
-    // but the operator needs to be able to tell THIS case apart from a
-    // session that genuinely filed zero issues — emit a one-line stderr
-    // diagnostic naming WHICH fallbacks were tried and the last error.
     const shaPart =
       resolution.shaReason !== null
         ? `sha=${resolution.shaReason}`
@@ -294,44 +298,17 @@ function scanIssuesThisSession(
     );
     return [];
   }
-  const sinceIso = resolution.iso;
-  let raw: string;
-  try {
-    raw = args.runGh([
-      'issue',
-      'list',
-      '--author',
-      '@me',
-      '--state',
-      'all',
-      '--search',
-      `created:>=${sinceIso}`,
-      '--json',
-      'number,title,state',
-    ]);
-  } catch {
-    return [];
-  }
-  if (raw.trim().length === 0) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed)) return [];
+  const refs = extractIssueRefsFromRange(args.runGit, resolution.sha);
+  if (refs.size === 0) return [];
+  // Sort numerically so the observation order is stable across runs (the
+  // commit-walk yields refs in commit order, which is fine for emission but
+  // produces flaky test ordering when the same ref appears in multiple
+  // commits).
+  const sortedRefs = Array.from(refs).sort((a, b) => a - b);
   const observations: HygieneObservation[] = [];
-  for (const entry of parsed) {
-    if (!isRawIssue(entry)) continue;
-    const upper = entry.state?.toUpperCase();
-    const issueState: 'OPEN' | 'CLOSED' | undefined =
-      upper === 'OPEN' ? 'OPEN' : upper === 'CLOSED' ? 'CLOSED' : undefined;
-    observations.push({
-      category: 'issue-filed-this-session',
-      issueNumber: entry.number,
-      issueTitle: entry.title,
-      issueState,
-    });
+  for (const ref of sortedRefs) {
+    const observation = viewIssue(args.runGh, ref);
+    if (observation !== null) observations.push(observation);
   }
   return observations;
 }
@@ -342,9 +319,20 @@ function recommend(
 ): NextSessionRecommendation {
   const triageItems: string[] = [];
   const addressTbdItems: string[] = [];
+  const dismantleCandidates: string[] = [];
   let resumeTask: string | null = null;
 
   for (const obs of observations) {
+    if (obs.category === 'worktree-stale' && obs.worktreePath !== undefined) {
+      const branchLabel = obs.worktreeBranch !== undefined && obs.worktreeBranch !== null
+        ? ` (\`${obs.worktreeBranch}\`)`
+        : '';
+      const signalLabel = obs.staleSignalCount !== undefined
+        ? ` — ${obs.staleSignalCount} of 9 signals`
+        : '';
+      dismantleCandidates.push(`${obs.worktreePath}${branchLabel}${signalLabel}`);
+      continue;
+    }
     if (obs.category === 'issue-filed-this-session') {
       // Forward-looking Triage line carries OPEN issues only. CLOSED-this-
       // session issues stay in the observations block as historical signal
@@ -382,7 +370,7 @@ function recommend(
     }
   }
 
-  return { resumeTask, triageItems, addressTbdItems };
+  return { resumeTask, triageItems, addressTbdItems, dismantleCandidates };
 }
 
 function renderMarkdownBlock(
@@ -403,6 +391,14 @@ function renderMarkdownBlock(
       } else if (obs.category === 'issue-filed-this-session') {
         const badge = obs.issueState === 'CLOSED' ? ' [CLOSED]' : obs.issueState === 'OPEN' ? ' [OPEN]' : '';
         lines.push(`- issue #${obs.issueNumber ?? ''}${badge} filed this session: ${obs.issueTitle ?? ''}`);
+      } else if (obs.category === 'worktree-stale') {
+        const branchLabel = obs.worktreeBranch !== undefined && obs.worktreeBranch !== null
+          ? ` \`${obs.worktreeBranch}\``
+          : '';
+        const signalLabel = obs.staleSignalCount !== undefined
+          ? ` — ${obs.staleSignalCount} of 9 staleness signals`
+          : '';
+        lines.push(`- worktree \`${obs.worktreePath ?? ''}\`${branchLabel}${signalLabel}`);
       }
     }
   }
@@ -424,8 +420,55 @@ function renderMarkdownBlock(
   } else {
     lines.push('- Address TBD markers: (no bare TBD markers introduced this session)');
   }
+  if (recommendation.dismantleCandidates.length > 0) {
+    lines.push(`- Dismantle stale worktrees: ${recommendation.dismantleCandidates.join('; ')}`);
+  } else {
+    lines.push('- Dismantle stale worktrees: (no stale worktrees flagged)');
+  }
   lines.push('');
   return lines.join('\n');
+}
+
+function readDirSafe(path: string): readonly string[] {
+  try { return readdirSync(path); } catch { return []; }
+}
+function statDirSafe(path: string): boolean {
+  try { return statSync(path).isDirectory(); } catch { return false; }
+}
+function pathExistsSafe(path: string): boolean {
+  try { statSync(path); return true; } catch { return false; }
+}
+
+function scanWorktreeStaleness(args: SessionEndHygieneArgs): readonly HygieneObservation[] {
+  let report;
+  try {
+    report = runWorktreeReport({
+      projectRoot: args.projectRoot,
+      daysThreshold: 30,
+      thresholdCount: 3,
+      allowExternal: false,
+      now: args.now,
+      runGit: args.runGit,
+      runGh: args.runGh,
+      readDir: readDirSafe,
+      statDir: statDirSafe,
+      pathExists: pathExistsSafe,
+    });
+  } catch {
+    return [];
+  }
+  const observations: HygieneObservation[] = [];
+  for (const entry of report.entries) {
+    if (entry.verdict !== 'stale' && entry.verdict !== 'orphan') continue;
+    const heldCount = entry.signals.filter((s) => s.held).length;
+    observations.push({
+      category: 'worktree-stale',
+      worktreePath: entry.path,
+      worktreeBranch: entry.branch,
+      staleSignalCount: heldCount,
+    });
+  }
+  return observations;
 }
 
 export function captureSessionEndHygiene(
@@ -435,10 +478,12 @@ export function captureSessionEndHygiene(
   const commitObservations = scanCommitMarkers(rows);
   const workplanObservations = scanWorkplanTbds(args);
   const issueObservations = scanIssuesThisSession(args);
+  const worktreeObservations = scanWorktreeStaleness(args);
   const observations: readonly HygieneObservation[] = [
     ...commitObservations,
     ...workplanObservations,
     ...issueObservations,
+    ...worktreeObservations,
   ];
   const recommendation = recommend(observations, args);
   const markdownBlock = renderMarkdownBlock(observations, recommendation);

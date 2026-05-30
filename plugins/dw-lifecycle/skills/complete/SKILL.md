@@ -19,6 +19,8 @@ dw-lifecycle complete-gate --slug <slug> --workplan <feature-dir>/workplan.md
 
    On refusal (any bare TBD found), the helper prints the bare-TBD locations to stderr and exits 2. Suggested remediation: `dw-lifecycle promote-deferrals propose --workplan <feature-dir>/workplan.md` to promote each marker to a tracked issue, or annotate inline with `(wontfix: <substantive reason ≥40 chars>)`.
 
+   On a clean pass, the helper prints `OK` on stdout followed by a **post-merge dismantle hint** pointing at `dw-lifecycle dismantle-worktrees propose --worktree-base <auto-detected>`. This is the fourth structural-closure stream per `.claude/rules/agent-discipline.md` § "Closure is a structural step" — the operator about to merge their feature is the most expensive miss point for the stale-worktree cleanup. The hint is informational, never blocking; it silently skips when the worktree-base cannot be auto-detected (e.g. fresh-clone single-worktree layouts).
+
    **Override** (operator sign-off required). Add `--skip-tbd-gate --reason "<substantive text ≥40 chars>"`. The reason is validated through the substantive-reason validator (≥40 chars, no gaming phrases). When the override fires, also pass `--journal-override-file <path>` to emit the override entry markdown; append it via `dw-lifecycle journal-append --file <path>` so the override reason lives in `DEVELOPMENT-NOTES.md` under `### Hygiene override`.
 
 4. **Phase-parent closure gate (recommended, not blocking).** Walk the closing feature's GitHub issue tree and propose closure for parent issues whose children are all closed. Two verbs (mirrors the triage-issues batched-proposal pattern):
