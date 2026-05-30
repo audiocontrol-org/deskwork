@@ -156,3 +156,59 @@ describe('nextTaskNumberFactory', () => {
     expect(factory({}, 0)).toBe('99.1');
   });
 });
+
+/**
+ * AUDIT-20260530-02 regression: pre-fix, `PHASE_HEADING_RE` only
+ * matched `## Phase N` literally. Adopter workplans using `## Milestone N`
+ * or `## Sprint N` (PROJECT-MANAGEMENT.md sanctions all three terms)
+ * threw `AutoPositionError`, which `promote-findings --auto` maps to
+ * exit 2 — a STOP-the-loop event per the unconditional implement-hook
+ * contract. The fix: accept any of the three sanctioned heading words.
+ */
+describe('computeAutoPosition — sanctioned heading vocabulary (AUDIT-20260530-02)', () => {
+  it('accepts `## Milestone N: ...` headings', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Milestone 3: current',
+      '',
+      '### Task 3.1: pending',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.phaseNumber).toBe(3);
+    expect(pos.phaseHeading).toBe('## Milestone 3: current');
+  });
+
+  it('accepts `## Sprint N: ...` headings', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Sprint 2: current',
+      '',
+      '### Task 2.1: pending',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.phaseNumber).toBe(2);
+    expect(pos.phaseHeading).toBe('## Sprint 2: current');
+  });
+
+  it('still rejects workplans with no Phase/Milestone/Sprint heading at all', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Section 1: not a phase',
+      '',
+      '### Task 1: pending',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    expect(() => computeAutoPosition(wp)).toThrow(/Phase|Milestone|Sprint/i);
+  });
+});

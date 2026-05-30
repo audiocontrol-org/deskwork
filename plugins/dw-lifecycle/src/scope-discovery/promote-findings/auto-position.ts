@@ -34,8 +34,13 @@
  * (no phase means no valid anchor; we won't invent one).
  */
 
-const PHASE_HEADING_RE = /^##\s+Phase\b/i;
-const PHASE_NUMBER_RE = /^##\s+Phase\s+(\d+)/i;
+// Per AUDIT-20260530-02: accept the heading vocabulary
+// `Phase | Milestone | Sprint` (the three terms PROJECT-MANAGEMENT.md
+// sanctions). Pre-fix, only `Phase` matched, so adopter workplans
+// using the other two sanctioned terms would hard-stop the
+// unconditional implement-hook at the first auto-promote.
+const PHASE_HEADING_RE = /^##\s+(?:Phase|Milestone|Sprint)\b/i;
+const PHASE_NUMBER_RE = /^##\s+(?:Phase|Milestone|Sprint)\s+(\d+)/i;
 const TASK_HEADING_RE = /^###\s+Task\s+(\d+)(?:\.(\d+))?\s*:/i;
 const UNCHECKED_CHECKBOX_RE = /^- \[ \]/;
 
@@ -149,7 +154,7 @@ export function computeAutoPosition(workplanText: string): AutoPosition {
   const phases = collectPhases(lines);
   if (phases.length === 0) {
     throw new AutoPositionError(
-      'workplan has no parseable `## Phase N: ...` headings; auto-position requires at least one phase as an insertion anchor. Add a phase or use --task-number with the propose/apply flow.',
+      'workplan has no parseable `## Phase N: ...` / `## Milestone N: ...` / `## Sprint N: ...` headings; auto-position requires at least one such heading as an insertion anchor. Add one of the three (PROJECT-MANAGEMENT.md-sanctioned) or use --task-number with the propose/apply flow.',
     );
   }
   const taskHeadings = collectTaskHeadings(lines);
