@@ -36,6 +36,7 @@ Finding-ID: AUDIT-20260529-01
 Status:     verified-2026-05-29
 Severity:   informational
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts + session-range.ts
+Tracks-Issue: 361
 
 Track 2 reviewer (feature-dev:code-reviewer) verified all six spec compliance items in #361:
 
@@ -56,6 +57,7 @@ Finding-ID: AUDIT-20260529-02
 Status:     fixed-d8e08f0
 Severity:   medium
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts:90
+Tracks-Issue: 361
 
 Track 3 reviewer surfaced a defensive-posture asymmetry: `scanIssuesThisSession` handled an invalid `sessionStartSha` gracefully via `resolveSessionBoundarySha`'s `rev-parse --verify` probe, but `readCommits` passed the SHA directly into `git log <sha>..HEAD`. On a dangling ref (force-push / rebase / stale SHA from a prior session), `git log` exits non-zero, the exception propagates through `captureSessionEndHygiene`, and the entire hygiene capture aborts before the issue scan runs.
 
@@ -75,6 +77,7 @@ Finding-ID: AUDIT-20260529-03
 Status:     fixed-d8e08f0
 Severity:   low
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/walk.ts:162
+Tracks-Issue: 361
 
 Track 3 reviewer flagged a stale code comment: `walk.ts:162` says "the diagnostic pattern mirrors session-end-hygiene.ts's `resolveSessionBoundaryIso` error handling." That function was deleted in commit `8841be9` (replaced by `resolveSessionBoundarySha` in `session-range.ts`). A future contributor following the breadcrumb would find nothing.
 
@@ -90,6 +93,7 @@ Finding-ID: AUDIT-20260529-04
 Status:     fixed-d8e08f0
 Severity:   low
 Surface:    docs/1.0/001-IN-PROGRESS/hygiene/workplan.md:424
+Tracks-Issue: 361
 
 Track 3 reviewer flagged a stale provenance note in the Phase 12 workplan implementation notes: it claimed "the no-SHA fallback path lives in `resolveSessionBoundaryIso` and stays as-is." Both claims are now wrong — the function was deleted/renamed, and the no-SHA fallback was materially changed (now SHA-based, not committer-date-based).
 
@@ -138,6 +142,7 @@ Finding-ID: AUDIT-20260529-06
 Status:     verified-2026-05-29
 Severity:   informational
 Surface:    scripts/smoke-hygiene.sh (worktree-section, lines 333–411)
+Tracks-Issue: 356
 
 Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's small-routine carve-out) verified the smoke extension is technically correct, the assertions are falsifiable, cleanup is leak-free under both default-mktemp and `SMOKE_HYGIENE_TMPDIR` paths, and the new section is stylistically consistent with the pre-existing smoke structure.
 
@@ -153,6 +158,7 @@ Finding-ID: AUDIT-20260529-07
 Status:     verified-2026-05-29
 Severity:   high
 Surface:    plugins/dw-lifecycle/src/archive-branch/preflight.ts (`assertTagDoesNotExist`)
+Tracks-Issue: 364
 
 **Verified 2026-05-29 against installed v0.27.0** — created a tmp worktree (`feature/v0270-verify` with one ahead-commit), ran `dw-lifecycle dismantle-worktrees propose --worktree-base <tmp> --threshold-count 1`, set `decision=archive-then-dismantle` + substantive reason, ran `apply`. Result: `Applied 1, skipped 0, failed 0. applied: <path> [archive-then-dismantle] (tag: archived/feature-v0270-verify-2026-05-29)`. Pre-fix this would have reported `Tag already exists` and aborted the archive step; post-fix the preflight passes through correctly. Test artifacts cleaned up (tag deleted locally + on origin; tmp worktree-base removed).
 
@@ -178,6 +184,7 @@ Finding-ID: AUDIT-20260529-08
 Status:     fixed-pending-verification
 Severity:   informational
 Surface:    plugins/dw-lifecycle/src/lifecycle-integration/ + .claude/rules/agent-discipline.md + docs/1.0/burndown/dw-lifecycle.md
+Tracks-Issue: 361
 
 Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's small-routine-change carve-out) verified the rename. Found one legitimate stale-reference cluster the workplan Step 5 audit scope missed:
 
@@ -198,6 +205,7 @@ Finding-ID: AUDIT-20260529-09
 Status:     fixed-pending-verification
 Severity:   informational
 Surface:    plugins/dw-lifecycle/src/close-shipped/commit-scanner.ts + SKILL.md + 2 test files
+Tracks-Issue: 366
 
 Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's medium-routine carve-out) verified the Phase 13 / #366 fix and reported two doc-accuracy findings — both applied as a follow-up commit:
 

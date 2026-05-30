@@ -524,19 +524,19 @@ Light fix: add a project-level config knob that opts adopters with this conventi
 
 Light fix: add an optional per-entry field `tracks_issue: NNN`. The walker prefers this field; body scrape becomes a fallback only when the field is absent. Mirrors how the workplan-checkbox walker's `· [#NNN](url)` back-fill is the canonical signal.
 
-- [ ] Step 1: Update `audit-log-walker.ts` to parse an optional `tracks_issue: NNN` line from each AUDIT entry (sits alongside the existing `Status:` / `Severity:` / `Surface:` fields). The walker reads this field first; only when absent does it fall through to body fix-keyword scraping.
-- [ ] Step 2: Update existing AUDIT entries in `docs/1.0/001-IN-PROGRESS/hygiene/audit-log.md` to add the `Tracks-Issue:` field where appropriate. Entries that are pure review observations (no specific issue) leave the field absent.
-- [ ] Step 3: Vitest coverage. New cases:
+- [x] Step 1: Update `audit-log-walker.ts` to parse an optional `Tracks-Issue: NNN` line from each AUDIT entry (sits alongside the existing `Status:` / `Severity:` / `Surface:` fields). The walker reads this field first; only when absent does it fall through to body fix-keyword scraping. (Also fixed an under-the-cover bug: the splitter only recognized `### entry-name` boundaries but this project's audit-log uses `## AUDIT-NNN —` at top level — the splitter was treating the whole file as one giant entry, which is how the false-positive `#50` was leaking from AUDIT-09's body into the entire file's match set. Splitter now accepts `## ` OR `### ` as entry boundaries.)
+- [x] Step 2: Updated all 9 existing AUDIT entries in `docs/1.0/001-IN-PROGRESS/hygiene/audit-log.md` with `Tracks-Issue:` fields — #361 for Phase 12 work, #356 for Phase 11 Task 5 review, #364 for the runGit-contract bug, #366 for Phase 13.
+- [x] Step 3: Vitest coverage. 3 new cases in `close-shipped-audit-log-walker.test.ts`:
   - (a) Entry with `Tracks-Issue: 200` + body mentioning `Closes #100` → surfaces #200 only.
   - (b) Entry without `Tracks-Issue` field + body `Closes #100` → surfaces #100 (back-compat).
-  - (c) Entry with prose-cited test fixture `Closes #50` and `Tracks-Issue: 200` → surfaces only #200, not #50.
-- [ ] Step 4: SKILL.md prose for `close-shipped` updated to describe the audit-log walker's new precedence (per-entry `Tracks-Issue` field > body scrape).
+  - (c) Entry with prose-cited test fixture `Closes #50` and `Tracks-Issue: 366` → surfaces only #366, not #50.
+- [x] Step 4: SKILL.md prose for `close-shipped` updated — Source-(b) table row names `Tracks-Issue` as canonical with body-scrape fallback; new paragraph explains the precedence + the splitter's `##` / `###` heading-level support.
 
 **Acceptance Criteria:**
 
-- [ ] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` against an installed release-after-this-fix does NOT surface `#50` from the audit-log walker.
-- [ ] Existing AUDIT entries with explicit `Tracks-Issue:` fields are honored; entries without the field still use the body-scrape fallback (no breakage for adopters who haven't migrated).
-- [ ] Vitest coverage for the 3 cases above passes; full plugin suite green.
+- [x] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` against an installed release-after-this-fix does NOT surface `#50` from the audit-log walker. (Verified locally on this branch — pre-Task-2 dry-run had `#50 sources: audit-log`; post-Task-2 it's gone. `#361` now also shows audit-log as a second source via its `Tracks-Issue: 361` field on entries 02/03/04.)
+- [x] Existing AUDIT entries with explicit `Tracks-Issue:` fields are honored; entries without the field still use the body-scrape fallback (no breakage for adopters who haven't migrated). (Test case (b) confirms back-compat.)
+- [x] Vitest coverage for the 3 cases above passes; full plugin suite green. (2344 / 2344 plugin tests pass.)
 
 **Provenance (Phase 14):**
 

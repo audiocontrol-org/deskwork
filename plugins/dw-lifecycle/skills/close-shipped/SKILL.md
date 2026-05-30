@@ -49,11 +49,13 @@ Each source is independent and contributes findings keyed by issue number; the m
 | Source | Walks | "Fixed" signal | Issue association |
 |---|---|---|---|
 | (a) commit-log | `git log <from-tag>..<to-tag>` | GitHub fix-keyword in commit subject/body | the issue number cited (`Closes #NNN` / `Fixes #NNN` / `Resolves #NNN`) |
-| (b) audit-log | every `docs/<v>/<inProgress>/<slug>/audit-log.md` | a `Status: fixed-<sha>` entry whose SHA is reachable in the range | issue number in the entry body (Closes/Fixes/Refs prose, fallback inline `#NNN`) |
+| (b) audit-log | every `docs/<v>/<inProgress>/<slug>/audit-log.md` | a `Status: fixed-<sha>` entry whose SHA is reachable in the range | `Tracks-Issue: NNN` field (canonical), fallback to body prose (Closes/Fixes/Refs, inline `#NNN`) |
 | (c) tooling-feedback | every `docs/<v>/<inProgress>/<slug>/tooling-feedback.md` | a TF entry's `Status: Closed | <sha>` whose SHA is reachable in the range | `Promoted to issue: #NNN` / `Tracked at: #NNN` / inline `#NNN` |
 | (d) workplan-checkbox | every `docs/<v>/<inProgress>/<slug>/workplan.md` | a `[x]` task line carrying a `· [#NNN](url)` back-fill | the issue number in the back-fill |
 
 Reachability for sources (b) and (c) uses `git merge-base --is-ancestor <sha> <toTag>` AND the inverse check that the SHA is NOT already in `<fromTag>` — both must hold. Source (d) has no SHA association; the checkbox itself is the "fixed" signal.
+
+**Audit-log entry-tracked issue (Phase 14 / [#369](https://github.com/audiocontrol-org/deskwork/issues/369)):** each audit-log entry can carry an explicit `Tracks-Issue: NNN` line alongside the other entry fields (`Finding-ID:` / `Status:` / `Severity:` / `Surface:`). When present, the walker treats this as the canonical issue for the entry and IGNORES body fix-keyword text — which may be prose-cited as a code example or descriptive narrative rather than a claim. When absent, the walker falls back to body-scrape so pre-Phase-14 entries keep working without migration. The splitter recognizes both `## entry-name` and `### entry-name` heading conventions so adopters who organize audit-logs as a flat list (`## AUDIT-NNN — ...`) get the same per-entry parsing as adopters who nest entries under date headers (`## DATE` parent + `### entry-name` children).
 
 Features that do not ship audit-log.md / tooling-feedback.md / workplan.md contribute zero findings from the missing source(s) — no error.
 
