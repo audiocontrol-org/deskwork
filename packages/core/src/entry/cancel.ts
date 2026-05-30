@@ -30,7 +30,7 @@ interface CancelOptions {
    * Non-group entries (no `members[]` array, or empty) ignore this
    * flag — there's nothing to cascade into.
    */
-   readonly cascade?: boolean;
+  readonly cascade?: boolean;
 }
 
 interface CancelledMember {
