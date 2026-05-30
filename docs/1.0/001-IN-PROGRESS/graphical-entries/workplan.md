@@ -849,17 +849,17 @@ Closes AUDIT-20260530-18 (cross-model: AUDIT-BARRAGE-claude-05-P4). Surface: `pa
 
 Closes AUDIT-20260530-19 (cross-model: AUDIT-BARRAGE-claude-06-P4). Surface: `packages/core/src/calendar/render.ts:130-145`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-19 (cross-model: AUDIT-BARRAGE-claude-06-P4)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/core/test/calendar/render.test.ts` :: `AUDIT-20260530-19 — no-projectRoot path loads editorial preset from bundled resource` block (2 tests). The bug here was duplication-with-manual-sync rather than a runtime failure, so the regression locks in the contract that the no-projectRoot path uses `editorial.json`'s order/stages directly — future drift in editorial.json now propagates automatically and any unexpected divergence between with/without-projectRoot fails the suite.
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — the duplication itself was the bug. The "MUST stay in sync" comment + Phase-8 deferral with no issue link violated the "Just for now is bullshit" rule. The new tests pass against the fix; the prior `EDITORIAL_FALLBACK` constant would have also passed (it was hand-copied to match editorial.json) — that's the failure mode: silent drift potential, not active drift.
+- [x] Step 3: implement the fix — `packages/core/src/calendar/render.ts`: replace `EDITORIAL_FALLBACK` constant with `loadEditorialPreset()` memoized loader reading `../pipelines/editorial.json` via `dirname(fileURLToPath(import.meta.url))` (mirrors the `PLUGIN_DEFAULTS_DIR` mechanic in `pipelines/loader.ts`). Build's `cp src/pipelines/*.json dist/pipelines/` keeps the resource reachable in both source-mode and built-mode. Loader Zod-validates via `PipelineTemplateSchema`; result cached so subsequent calls are O(1).
+- [x] Step 4: confirm test passes — `npm --workspace @deskwork/core test` 828/828 green (was 826; +2 new). Full workspace 1896/1896 green.
+- [x] Step 5: commit with `Closes AUDIT-20260530-19 (cross-model: AUDIT-BARRAGE-claude-06-P4)` in subject — `00fb2bc`. Also includes `keep-with-reason` disposition for new clone group `f0c41a1155b2` (the loader's Zod-error formatter is the same idiom shared with `lanes/loader.ts` and `pipelines/loader.ts` — three members of the parallel-readers symmetry already dispositioned `keep-with-reason` at the pairwise level).
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/calendar/render.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-00fb2bc` via the close-shipped-audit-findings step
 
 
 ### Task 7.35 (fix-finding-AUDIT-20260530-20 (cross-model: AUDIT-BARRAGE-claude-07-P4 + AUDIT-BARRAGE-codex-01-P4)): AUDIT-20260530-20 — `induct` CLI still editorial-narrow (Phase 4 "verbs are univ…

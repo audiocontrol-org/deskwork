@@ -3351,7 +3351,7 @@ Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). 
 ### AUDIT-20260530-19 — `EDITORIAL_FALLBACK` duplicates `editorial.json` with manual "keep in sync" + Phase-8 deferral
 
 Finding-ID: AUDIT-20260530-19 (cross-model: AUDIT-BARRAGE-claude-06-P4)
-Status:     open
+Status:     fixed-00fb2bc
 Severity:   low
 Surface:    `packages/core/src/calendar/render.ts:130-145`
 
