@@ -798,17 +798,17 @@ Closes AUDIT-20260530-15 (cross-model: AUDIT-BARRAGE-claude-02-P4 + AUDIT-BARRAG
 
 Closes AUDIT-20260530-16 (cross-model: AUDIT-BARRAGE-claude-03-P4). Surface: `packages/core/src/iterate/iterate.ts:99-106`, `packages/core/test/iterate/iterate.test.ts:141`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-16 (cross-model: AUDIT-BARRAGE-claude-03-P4)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/core/test/iterate/iterate.test.ts` :: "refuses to iterate an editorial Final entry (locked-stage gate, DESKWORK-STATE-MACHINE.md Commandment II)". Pins iterate refusal on Final with error-message regex (`locked stage "Final".*editorial.*induct`) AND asserts the iteration counter does NOT advance.
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — the spec-conformant Phase-4 behavior IS the refusal; AUDIT-16 flagged the lack of test coverage, not a runtime bug. Outcome A per dispatch-instructions decision tree: confirmed against DESKWORK-STATE-MACHINE.md (verb iterate § "When it can be invoked" explicitly lists Final as a refuse-stage; Commandment I cites it as a legitimate stage-gate example). Test passes against current implementation; a future drift that removes the locked-stage check or empties editorial's `lockedStages` would fail the suite.
+- [x] Step 3: implement the fix — no code change needed; the Phase-4 implementation is already spec-conformant. The "fix" is locking the spec-derived behavior in tests so a future refactor can't silently undo it. Existing iterate.ts docstring at lines 70-79 already documents the locked-stage behavior.
+- [x] Step 4: confirm test passes — `npm --workspace @deskwork/core test` 829/829 green (was 828; +1 new).
+- [x] Step 5: commit with `Closes AUDIT-20260530-16 (cross-model: AUDIT-BARRAGE-claude-03-P4)` in subject — `fe21786`.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/iterate/iterate.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-fe21786` via the close-shipped-audit-findings step
 
 
 ### Task 7.32 (fix-finding-AUDIT-20260530-17 (cross-model: AUDIT-BARRAGE-claude-04-P4)): AUDIT-20260530-17 — `regenerateCalendar` couples per-entry transitions to validi…
