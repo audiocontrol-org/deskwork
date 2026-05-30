@@ -3099,7 +3099,7 @@ Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (codex). F
 ### AUDIT-20260529-41 — popover left margin (22px) misaligned with WCAG-widened tab (24px) — off-by-2px drift
 
 Finding-ID: AUDIT-20260529-41 (cross-model: AUDIT-BARRAGE-claude-04)
-Status:     open
+Status:     fixed-2274781
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:349` (`.er-row-member-popover { margin: 0 0 0 22px }`) vs `:250` (`.er-row-member-tab { width: 24px }`) and `:320` (`.has-member-tab .er-row-fg { padding-left: 28px }`)
 
