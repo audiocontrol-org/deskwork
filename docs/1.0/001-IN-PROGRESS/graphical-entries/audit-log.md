@@ -3045,7 +3045,7 @@ Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). 
 ### AUDIT-20260529-37 — composed view has silent-drop vectors beyond AUDIT-35 (stage-not-in-template + partial-load lane configs)
 
 Finding-ID: AUDIT-20260529-37 (cross-model: AUDIT-BARRAGE-claude-02)
-Status:     open
+Status:     fixed-fafc0e2
 Severity:   medium
 Surface:    `packages/studio/src/pages/entry-review/members-section.ts:99-150` (`bucketMembersByLane`), `packages/studio/src/pages/entry-review/data.ts:188-210` (`loadGroupMembersBundle`)
 
