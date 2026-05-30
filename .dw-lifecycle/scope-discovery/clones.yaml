@@ -1,4 +1,4 @@
-generated_at: 2026-05-30T08:48:57.721Z
+generated_at: 2026-05-30T09:06:16.586Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -249,6 +249,14 @@ clones:
       - packages/core/src/calendar.ts:92:101
     disposition: pending
     reason: null
+  - id: f0c41a1155b2
+    lines: 7
+    members:
+      - packages/core/src/calendar/render.ts:265:271
+      - packages/core/src/lanes/loader.ts:130:136
+      - packages/core/src/pipelines/loader.ts:235:241
+    disposition: keep-with-reason
+    reason: Renderer editorial-preset-from-bundle loader mirrors the lanes/loader + pipelines/loader Zod-validate idiom by design (third member of the parallel-readers symmetry; extracting a shared helper would couple calendar evolution to pipeline+lane evolution); extends keep-with-reason on prior clone b223f2def90d.
   - id: "800396267262"
     lines: 28
     members:
@@ -398,13 +406,6 @@ clones:
       - packages/core/src/pipelines/loader.ts:225:233
     disposition: keep-with-reason
     reason: "lanes/loader mirrors pipelines/loader by workplan design: JSON-read+Zod-validate+id-match-filename idiom across two parallel module-shaped readers; extracting a shared helper would couple lane evolution to pipeline evolution"
-  - id: b223f2def90d
-    lines: 7
-    members:
-      - packages/core/src/lanes/loader.ts:130:136
-      - packages/core/src/pipelines/loader.ts:235:241
-    disposition: keep-with-reason
-    reason: second half of the lanes/loader vs pipelines/loader mirroring (Zod-validate + id-mismatch refusal); same rationale as c20b4e4f0469
   - id: 93e1ae2c9a27
     lines: 15
     members:

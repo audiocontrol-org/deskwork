@@ -32,10 +32,13 @@
  * stage-not-in-template entries remain visible inline.
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Entry } from '../schema/entry.ts';
 import { loadPipelineTemplate } from '../pipelines/loader.ts';
 import { listLaneConfigs, loadLaneConfig } from '../lanes/loader.ts';
-import type { PipelineTemplate } from '../pipelines/types.ts';
+import { PipelineTemplateSchema, type PipelineTemplate } from '../pipelines/types.ts';
 
 const HEADER = '# Editorial Calendar\n\n';
 const TABLE_HEADER = '| UUID | Slug | Title | Description | Keywords | Source | Updated |\n|------|------|------|------|------|------|------|\n';
@@ -208,28 +211,69 @@ function loadLaneContexts(projectRoot: string | undefined): LaneContext[] {
 }
 
 /**
- * Editorial fallback used when no lane configs are present (legacy /
- * migration-window). Synthesized in-memory so the renderer doesn't
- * require the editorial preset to be discoverable via `loadPipelineTemplate`
- * — necessary for the test fixtures that exercise `renderCalendar`
- * without a project root.
- *
- * IMPORTANT: this constant duplicates `packages/core/src/pipelines/
- * editorial.json` and the two MUST stay in sync. If the editorial
- * preset's stage list ever changes, update this fallback in lockstep.
- * Phase 8 enforces lane presence at the doctor layer; once doctor
- * refuses to load entries without a `lane` field, the renderer's
- * no-project-root path is no longer reachable and this constant can
- * be deleted in favor of always loading via `loadPipelineTemplate`.
+ * Path to the bundled editorial preset JSON resolved relative to THIS
+ * module's location (works in both source-mode (tsx) and built-mode
+ * (node dist/)). The build script copies `src/pipelines/*.json` into
+ * `dist/pipelines/`, and the `dist/calendar/` compiled module sits at
+ * the same `../pipelines/` depth as the source module. Mirrors the
+ * `PLUGIN_DEFAULTS_DIR` mechanic in `pipelines/loader.ts`.
  */
-const EDITORIAL_FALLBACK: PipelineTemplate = {
-  id: 'editorial',
-  name: 'Editorial',
-  description: 'Long-form writing pipeline (editorial fallback).',
-  linearStages: ['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published'],
-  lockedStages: ['Final'],
-  offPipelineStages: ['Blocked', 'Cancelled'],
-};
+const EDITORIAL_PRESET_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'pipelines',
+  'editorial.json',
+);
+
+/**
+ * Cached editorial preset template. Lazily loaded on first call to
+ * `loadEditorialPreset` to avoid the readFileSync + JSON.parse +
+ * Zod validation on cold-import in code paths that never use it.
+ */
+let cachedEditorialPreset: PipelineTemplate | undefined;
+
+/**
+ * Load the editorial preset template from the bundled `editorial.json`
+ * resource. Used as the fallback stage vocabulary when no lane configs
+ * are present (legacy / migration-window — the test fixtures that
+ * exercise `renderCalendar` without a project root rely on this) AND
+ * as the orphan-lane stage vocabulary when entries reference deleted
+ * or unknown lane ids (AUDIT-20260530-14).
+ *
+ * Previously this lived as an in-line `EDITORIAL_FALLBACK` constant
+ * that hardcoded the editorial preset's stage list with a "MUST stay
+ * in sync with editorial.json" comment + a Phase-8 deletion deferral
+ * with no issue link (AUDIT-20260530-19, "Just for now is bullshit"
+ * violation). Loading the JSON directly removes the duplication and
+ * the manual sync burden — `editorial.json` is the single source of
+ * truth, and a future stage-list change to the preset propagates here
+ * automatically. The Phase-8 deletion-of-this-fallback path is also
+ * gone: there is no duplication left to delete.
+ *
+ * Memoized via `cachedEditorialPreset` so the readFileSync + JSON.parse
+ * + Zod validation only happen on the first call per process.
+ *
+ * Throws if the bundled `editorial.json` is missing or fails Zod
+ * validation (the preset ships with the package — both are
+ * impossible-by-construction at runtime; the explicit throw documents
+ * the boundary).
+ */
+function loadEditorialPreset(): PipelineTemplate {
+  if (cachedEditorialPreset !== undefined) return cachedEditorialPreset;
+  const raw = readFileSync(EDITORIAL_PRESET_PATH, 'utf8');
+  const parsed: unknown = JSON.parse(raw);
+  const result = PipelineTemplateSchema.safeParse(parsed);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('\n');
+    throw new Error(
+      `Bundled editorial preset at ${EDITORIAL_PRESET_PATH} failed Zod validation:\n${issues}`,
+    );
+  }
+  cachedEditorialPreset = result.data;
+  return cachedEditorialPreset;
+}
 
 /**
  * Render the editorial calendar as markdown.
@@ -270,7 +314,7 @@ export function renderCalendar(entries: Entry[], projectRoot?: string): string {
     // the renderer's hardcoded 8-stage list happened to be exactly the
     // editorial 8 stages but mis-aligned with the parser's 7-stage
     // legacy list) now flow through cleanly.
-    md += renderStageSections(entries, EDITORIAL_FALLBACK);
+    md += renderStageSections(entries, loadEditorialPreset());
     md += `## Distribution\n\n*reserved for shortform DistributionRecords — separate model*\n`;
     return md;
   }
@@ -304,7 +348,7 @@ export function renderCalendar(entries: Entry[], projectRoot?: string): string {
     // distinct unbucketed headline lets the operator distinguish
     // unrecognized-stage-in-lane from unrecognized-stage-in-unassigned
     // when diagnosing.
-    md += renderStageSections(orphanLane, EDITORIAL_FALLBACK, '(unrecognized stage in unassigned)');
+    md += renderStageSections(orphanLane, loadEditorialPreset(), '(unrecognized stage in unassigned)');
   }
 
   md += `## Distribution\n\n*reserved for shortform DistributionRecords — separate model*\n`;
