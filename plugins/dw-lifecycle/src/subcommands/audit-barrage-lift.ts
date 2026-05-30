@@ -174,7 +174,10 @@ async function resolveFeatureRoot(rootDir: string, slug: string): Promise<string
   if (!existsSync(docsRoot)) return null;
   let topEntries: ReadonlyArray<string>;
   try {
-    topEntries = await readdir(docsRoot);
+    // Per AUDIT-20260530-06: sort lexicographically (see same fix in
+    // workplan-aware-gate.ts) so the gate and the lift always pick the
+    // same version dir when a slug exists under multiple.
+    topEntries = [...(await readdir(docsRoot))].sort();
   } catch {
     return null;
   }

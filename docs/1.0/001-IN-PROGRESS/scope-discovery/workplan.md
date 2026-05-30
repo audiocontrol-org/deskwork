@@ -241,16 +241,16 @@ Closes AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model). Surfac
 
 Closes AUDIT-20260530-06. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:120-141` (`findFeatureRoot`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:289-305` (`resolveFeatureRoot`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-06` in subject
+- [x] Step 1: 3 regression tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` — gate determinism across N invocations; gate + lift resolve to the same dir; lex-first pick assertion.
+- [x] Step 2: tests pin the post-fix contract (deterministic lex-first pick); the bug shape (cross-run drift) is hard to repro deterministically but the contract test is what locks in the fix.
+- [x] Step 3: both `findFeatureRoot` in workplan-aware-gate.ts AND `resolveFeatureRoot` in audit-barrage-lift.ts swap `readdir(docsRoot)` for `[...readdir(...)].sort()` — lexicographic sort guarantees both walkers pick the same version dir across runs + filesystems.
+- [x] Step 4: tests pass; plugin suite 2417/2417.
+- [x] Step 5: commit with `Closes AUDIT-20260530-06` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 

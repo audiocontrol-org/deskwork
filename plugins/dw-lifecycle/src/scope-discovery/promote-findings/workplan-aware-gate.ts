@@ -112,7 +112,12 @@ async function findFeatureRoot(
   }
   let topEntries: ReadonlyArray<string>;
   try {
-    topEntries = await readdir(docsRoot);
+    // Per AUDIT-20260530-06: sort lexicographically so the same slug
+    // under multiple version dirs resolves deterministically across
+    // runs + filesystems. Pre-fix this iterated readdir order, which
+    // could differ between the gate and the lift, causing a silent
+    // split-brain where the two verbs read/write different audit-logs.
+    topEntries = [...(await readdir(docsRoot))].sort();
   } catch {
     return { root: undefined, versionsChecked: [] };
   }
