@@ -149,4 +149,124 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
     expect(md).toContain('# Lane: (unassigned)');
     expect(md).toContain('legacy-one');
   });
+
+  // AUDIT-20260530-14: the multi-lane renderer used to silently drop
+  // entries whose `currentStage` was not in their lane's template (or
+  // not in the editorial-fallback stage list for orphan entries). Both
+  // are the exact #247 silent-drop failure mode reintroduced on the
+  // canonical calendar SSOT. The unbucketed-tail surface (mirror of
+  // `bucketMembersByLane` in `members-bucketing.ts`) keeps the entry
+  // visible in the rendered output.
+  describe('AUDIT-20260530-14 — unbucketed entries surface in tail', () => {
+    it('surfaces an entry whose currentStage is not in its lane template (valid lane, out-of-template stage)', async () => {
+      await mkdir(join(projectRoot, '.deskwork', 'lanes'), { recursive: true });
+      // Visual lane bound to the visual template (stages: Sketched,
+      // Iterating, Approved, Shipped + Blocked/Cancelled/Archived).
+      await writeFile(
+        join(projectRoot, '.deskwork', 'lanes', 'mockups.json'),
+        JSON.stringify({
+          id: 'mockups',
+          name: 'Mockups',
+          pipelineTemplate: 'visual',
+          contentDir: 'mockups',
+        }),
+      );
+      // Entry bound to the valid lane but carrying a stage the
+      // template does NOT declare (legacy stage, operator-renamed
+      // template, etc.).
+      await writeSidecar(
+        projectRoot,
+        entry('legacy-stage-entry', 'NonExistentStage', { lane: 'mockups' }),
+      );
+
+      await regenerateCalendar(projectRoot);
+      const md = await readFile(join(projectRoot, '.deskwork', 'calendar.md'), 'utf8');
+
+      // The entry MUST appear in the rendered calendar — pre-fix it
+      // vanished silently because `bucketize` only created buckets for
+      // template-known stages.
+      expect(md).toContain('legacy-stage-entry');
+      // It surfaces under the per-lane unbucketed-tail headline.
+      expect(md).toContain('## (unrecognized stage)');
+      // The raw `currentStage` is shown so the operator can diagnose.
+      expect(md).toContain('NonExistentStage');
+      // And it lives under the correct lane section.
+      expect(md).toContain('# Lane: Mockups');
+    });
+
+    it('surfaces an orphan entry whose currentStage is not in the editorial fallback (deleted-visual-lane / non-editorial stage)', async () => {
+      await mkdir(join(projectRoot, '.deskwork', 'lanes'), { recursive: true });
+      // Configure a single editorial lane; the entry will reference a
+      // non-existent visual lane id, so it becomes an orphan that
+      // routes through `EDITORIAL_FALLBACK`. Pre-fix, an orphan at a
+      // non-editorial stage (`Sketched`) silently vanished from the
+      // "(unassigned)" section because no editorial-fallback bucket
+      // existed for it.
+      await writeFile(
+        join(projectRoot, '.deskwork', 'lanes', 'default.json'),
+        JSON.stringify({
+          id: 'default',
+          name: 'Default',
+          pipelineTemplate: 'editorial',
+          contentDir: 'docs',
+        }),
+      );
+      // Entry references a lane id whose config does NOT exist on disk
+      // (simulating a deleted lane). At a non-editorial stage so it
+      // can't match any editorial-fallback bucket.
+      await writeSidecar(
+        projectRoot,
+        entry('orphan-at-sketched', 'Sketched', { lane: 'deleted-visual' }),
+      );
+
+      await regenerateCalendar(projectRoot);
+      const md = await readFile(join(projectRoot, '.deskwork', 'calendar.md'), 'utf8');
+
+      // The entry MUST appear in the rendered calendar.
+      expect(md).toContain('orphan-at-sketched');
+      // It surfaces under the orphan-lane unbucketed-tail headline
+      // (distinct from the per-lane one so operators can diagnose).
+      expect(md).toContain('## (unrecognized stage in unassigned)');
+      // The raw `currentStage` is shown so the operator can diagnose.
+      expect(md).toContain('Sketched');
+      // And it lives under the "(unassigned)" lane section.
+      expect(md).toContain('# Lane: (unassigned)');
+    });
+
+    it('does NOT emit unbucketed-tail sections when every entry has a template-known stage in a valid lane', async () => {
+      await mkdir(join(projectRoot, '.deskwork', 'lanes'), { recursive: true });
+      await writeFile(
+        join(projectRoot, '.deskwork', 'lanes', 'default.json'),
+        JSON.stringify({
+          id: 'default',
+          name: 'Default',
+          pipelineTemplate: 'editorial',
+          contentDir: 'docs',
+        }),
+      );
+      await writeFile(
+        join(projectRoot, '.deskwork', 'lanes', 'mockups.json'),
+        JSON.stringify({
+          id: 'mockups',
+          name: 'Mockups',
+          pipelineTemplate: 'visual',
+          contentDir: 'mockups',
+        }),
+      );
+
+      await writeSidecar(projectRoot, entry('post-a', 'Drafting', { lane: 'default' }));
+      await writeSidecar(projectRoot, entry('icon-set', 'Iterating', { lane: 'mockups' }));
+
+      await regenerateCalendar(projectRoot);
+      const md = await readFile(join(projectRoot, '.deskwork', 'calendar.md'), 'utf8');
+
+      // Happy-path regression: no unbucketed-tail headlines appear.
+      expect(md).not.toContain('## (unrecognized stage)');
+      expect(md).not.toContain('## (unrecognized stage in unassigned)');
+      // Existing behavior holds: entries appear under their lane's
+      // template-known sections.
+      expect(md).toContain('post-a');
+      expect(md).toContain('icon-set');
+    });
+  });
 });

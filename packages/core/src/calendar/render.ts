@@ -18,6 +18,18 @@
  * shape unchanged — the output is a single set of `## <Stage>`
  * sections in the editorial template's order, identical to pre-Phase-4
  * output.
+ *
+ * AUDIT-20260530-14: the multi-lane path silently dropped entries
+ * whose `currentStage` was not in their lane's template (legacy stage,
+ * template-edit that removed a stage, deleted-visual-lane orphan at a
+ * non-editorial stage). Mirror of AUDIT-20260529-37 in the entry-review
+ * composed view but on the canonical calendar SSOT — bigger blast
+ * radius because every reconciliation downstream of the calendar
+ * trusts the SSOT. `bucketize` now returns an `unbucketed` tail
+ * alongside the stage-keyed buckets; `renderStageSections` emits an
+ * `## (unrecognized stage)` section per lane (and
+ * `## (unrecognized stage in unassigned)` for the orphan lane) so
+ * stage-not-in-template entries remain visible inline.
  */
 
 import type { Entry } from '../schema/entry.ts';
@@ -50,6 +62,41 @@ function renderStageSection(stage: string, bucket: readonly Entry[]): string {
 }
 
 /**
+ * Render a row that surfaces an entry whose `currentStage` did not
+ * route into any template-known bucket. The raw `currentStage` value
+ * is shown so the operator can diagnose (legacy stage, template-edit
+ * that dropped a stage, operator typo, etc.).
+ */
+function renderUnbucketedRow(e: Entry): string {
+  return `| ${e.uuid} | ${escapePipe(e.slug)} | ${escapePipe(e.title)} | ${escapePipe(e.description ?? '')} | ${escapePipe(e.keywords.join(', '))} | ${escapePipe(e.source)} | ${e.updatedAt} | ${escapePipe(e.currentStage)} |`;
+}
+
+const UNBUCKETED_TABLE_HEADER = '| UUID | Slug | Title | Description | Keywords | Source | Updated | currentStage |\n|------|------|------|------|------|------|------|------|\n';
+
+/**
+ * Render the unbucketed-tail section for entries whose `currentStage`
+ * is not present in the template's stage list. Mirrors AUDIT-20260529-37
+ * (the members-section unbucketed-tail precedent at
+ * `packages/studio/src/pages/entry-review/members-bucketing.ts`) so
+ * stage-not-in-template entries surface inline rather than silently
+ * vanishing from the canonical calendar SSOT.
+ *
+ * Headline names the bucket so AUDIT-20260530-14 cannot regress
+ * silently — entries appear with their offending `currentStage` shown.
+ */
+function renderUnbucketedSection(
+  headline: string,
+  bucket: readonly Entry[],
+): string {
+  if (bucket.length === 0) return '';
+  let section = `## ${headline}\n\n`;
+  section += UNBUCKETED_TABLE_HEADER;
+  for (const e of bucket) section += renderUnbucketedRow(e) + '\n';
+  section += '\n';
+  return section;
+}
+
+/**
  * Produce the full ordered stage list for a template:
  * `linearStages` then `offPipelineStages` (in declaration order). The
  * concatenation is the calendar's section order; the existing
@@ -62,35 +109,78 @@ function templateStageOrder(template: PipelineTemplate): readonly string[] {
 }
 
 /**
+ * Result of bucketing entries by their `currentStage`. Carries the
+ * stage-keyed buckets PLUS an `unbucketed` tail for entries whose
+ * `currentStage` is not in the template's stage list.
+ *
+ * Mirrors `BucketingResult` from
+ * `packages/studio/src/pages/entry-review/members-bucketing.ts` (the
+ * AUDIT-20260529-37 precedent at the entry-review composed view).
+ * Per AUDIT-20260530-14 the same shape is required here at the
+ * canonical calendar SSOT so stage-not-in-template entries no longer
+ * silently disappear.
+ */
+interface BucketingResult {
+  readonly byStage: ReadonlyMap<string, readonly Entry[]>;
+  readonly unbucketed: readonly Entry[];
+}
+
+/**
  * Bucket entries by their `currentStage`, ignoring lane membership.
  * Used by the single-lane render path. Lane-aware rendering uses a
  * pre-filtered entry list per lane.
+ *
+ * Per AUDIT-20260530-14: entries whose `currentStage` is not in
+ * `stages` are collected into the `unbucketed` tail so they remain
+ * visible in the canonical calendar SSOT. Pre-fix they were silently
+ * dropped (`byStage.get(e.currentStage)` returned `undefined` → never
+ * pushed), reintroducing the exact #247 silent-drop failure mode on
+ * the multi-lane path.
  */
-function bucketize(entries: readonly Entry[], stages: readonly string[]): Map<string, Entry[]> {
+function bucketize(entries: readonly Entry[], stages: readonly string[]): BucketingResult {
   const byStage = new Map<string, Entry[]>();
+  const known = new Set<string>(stages);
+  const unbucketed: Entry[] = [];
   for (const stage of stages) byStage.set(stage, []);
   for (const e of entries) {
+    if (!known.has(e.currentStage)) {
+      unbucketed.push(e);
+      continue;
+    }
     const bucket = byStage.get(e.currentStage);
-    if (bucket) bucket.push(e);
+    // Defensive: known.has(...) above guarantees byStage.get(...) returns
+    // a defined bucket here (the for-stage initialization above seeds
+    // every entry of `known`). The guard keeps the type narrowing
+    // explicit and matches strict-mode expectations.
+    if (bucket !== undefined) bucket.push(e);
   }
-  return byStage;
+  return { byStage, unbucketed };
 }
 
 /**
  * Render a single set of stage sections (no lane header). Used by the
- * legacy single-lane / migration-window path.
+ * legacy single-lane / migration-window path AND by every per-lane
+ * block in the multi-lane path.
+ *
+ * Per AUDIT-20260530-14: the `unbucketed` tail is rendered as an
+ * explicit `## (unrecognized stage)` section so stage-not-in-template
+ * entries remain visible in the rendered output. `unbucketedHeadline`
+ * lets callers distinguish per-lane (`(unrecognized stage)`) from the
+ * orphan-lane case (`(unrecognized stage in unassigned)`).
  */
 function renderStageSections(
   entries: readonly Entry[],
   template: PipelineTemplate,
+  unbucketedHeadline: string = '(unrecognized stage)',
 ): string {
   const stages = templateStageOrder(template);
-  const byStage = bucketize(entries, stages);
+  const { byStage, unbucketed } = bucketize(entries, stages);
   let out = '';
   for (const stage of stages) {
     const bucket = byStage.get(stage) ?? [];
     out += renderStageSection(stage, bucket);
   }
+  out += renderUnbucketedSection(unbucketedHeadline, unbucketed);
   return out;
 }
 
@@ -194,7 +284,15 @@ export function renderCalendar(entries: Entry[], projectRoot?: string): string {
 
   if (orphanLane.length > 0) {
     md += `# Lane: (unassigned)\n\n`;
-    md += renderStageSections(orphanLane, EDITORIAL_FALLBACK);
+    // Per AUDIT-20260530-14: orphan entries route through the editorial
+    // fallback's stage list. An orphan entry at a non-editorial stage
+    // (e.g. a deleted-visual-lane entry at `Sketched`/`Iterating`) has
+    // no matching editorial bucket and would silently vanish from the
+    // "(unassigned)" section as well as from its lane section. The
+    // distinct unbucketed headline lets the operator distinguish
+    // unrecognized-stage-in-lane from unrecognized-stage-in-unassigned
+    // when diagnosing.
+    md += renderStageSections(orphanLane, EDITORIAL_FALLBACK, '(unrecognized stage in unassigned)');
   }
 
   md += `## Distribution\n\n*reserved for shortform DistributionRecords — separate model*\n`;
