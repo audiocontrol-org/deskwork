@@ -49,7 +49,7 @@ export class AutoPositionError extends Error {
 }
 
 export interface AutoPosition {
-  /** Full `## Phase ...` heading line text (trimmed). */
+  /** Full `## Phase ...` / `## Milestone ...` / `## Sprint ...` heading line text (trimmed). */
   readonly phaseHeading: string;
   /**
    * 1-based "insert-after-this-line" anchor consumed by `insertTaskBlock`.
@@ -59,11 +59,21 @@ export interface AutoPosition {
    */
   readonly insertAfterLine: number;
   /**
-   * Highest existing task minor number for the chosen phase. The
-   * task-number factory uses this to assign sequential `X.(M+1)`,
-   * `X.(M+2)`, ... values to new fix-finding tasks.
+   * Per AUDIT-20260530-03: the prevailing task-numbering convention
+   * in the chosen phase. `flat` = tasks shaped `### Task N:` with no
+   * minor segment (e.g. the scope-discovery workplan's `Task 1..6`
+   * under `Phase 15`); `hierarchical` = tasks shaped `### Task X.Y:`
+   * where X matches the phase number (e.g. fixture workplans with
+   * `Task 15.1`, `Task 15.2` under `Phase 15`). Empty phase falls
+   * back to `hierarchical`.
    */
-  readonly currentMaxMinorInPhase: number;
+  readonly convention: 'flat' | 'hierarchical';
+  /**
+   * Highest existing task number (whole int for flat, minor int for
+   * hierarchical) in the chosen phase. `nextTaskNumberFactory` adds
+   * `1 + idx` to this seed.
+   */
+  readonly currentMaxNumberInPhase: number;
   /** Major number parsed from `phaseHeading` (e.g. `15` from "## Phase 15: ..."). */
   readonly phaseNumber: number;
 }
@@ -178,29 +188,63 @@ export function computeAutoPosition(workplanText: string): AutoPosition {
     anchorLine = phaseSpan.lastLine;
   }
 
-  let currentMaxMinorInPhase = 0;
-  for (const t of taskHeadings) {
-    if (t.major !== phaseSpan.phaseNumber) continue;
-    if (t.minor > currentMaxMinorInPhase) currentMaxMinorInPhase = t.minor;
+  // Per AUDIT-20260530-03: detect the prevailing task-numbering
+  // convention WITHIN the chosen phase. A task `### Task N:` with no
+  // minor parses as major=N/minor=0 — these are "flat" tasks. Tasks
+  // `### Task X.Y:` with explicit minor are "hierarchical". When the
+  // phase contains ≥1 hierarchical task whose major equals the
+  // phase number, hierarchical wins; otherwise the convention is
+  // flat. Empty phase defaults to hierarchical (`<phase>.1`).
+  const tasksInPhase = taskHeadings.filter(
+    (t) => t.line >= phaseSpan.headingLine && t.line <= phaseSpan.lastLine,
+  );
+  let convention: 'flat' | 'hierarchical' = 'hierarchical';
+  let currentMaxNumberInPhase = 0;
+  const hierarchicalTasks = tasksInPhase.filter(
+    (t) => t.minor > 0 && t.major === phaseSpan.phaseNumber,
+  );
+  if (hierarchicalTasks.length > 0) {
+    convention = 'hierarchical';
+    for (const t of hierarchicalTasks) {
+      if (t.minor > currentMaxNumberInPhase) currentMaxNumberInPhase = t.minor;
+    }
+  } else if (tasksInPhase.length > 0) {
+    convention = 'flat';
+    for (const t of tasksInPhase) {
+      if (t.major > currentMaxNumberInPhase) currentMaxNumberInPhase = t.major;
+    }
   }
 
   return {
     phaseHeading: phaseSpan.heading,
     insertAfterLine: anchorLine,
-    currentMaxMinorInPhase,
+    convention,
+    currentMaxNumberInPhase,
     phaseNumber: phaseSpan.phaseNumber,
   };
 }
 
 /**
  * Build the task-number callback the existing `applyProposal` flow
- * expects. Each new fix-finding task gets `<phase>.<currentMax + 1 + idx>`,
- * so the numbering doesn't collide with any pre-existing task in the
- * phase.
+ * expects. Per AUDIT-20260530-03, the rendered number matches the
+ * phase's prevailing convention:
+ *
+ *   - `flat` → `${currentMax + 1 + idx}` (continues the phase's flat
+ *     `Task 1, Task 2, …` sequence).
+ *   - `hierarchical` → `${phaseNumber}.${currentMax + 1 + idx}` (the
+ *     pre-AUDIT-03 behavior, retained for workplans whose phases use
+ *     `Task <phase>.<minor>` numbering).
+ *
+ * Either way, the numbering doesn't collide with existing tasks in
+ * the phase.
  */
 export function nextTaskNumberFactory(
   position: AutoPosition,
 ): (item: unknown, idx: number) => string {
+  if (position.convention === 'flat') {
+    return (_item, idx) =>
+      `${position.currentMaxNumberInPhase + 1 + idx}`;
+  }
   return (_item, idx) =>
-    `${position.phaseNumber}.${position.currentMaxMinorInPhase + 1 + idx}`;
+    `${position.phaseNumber}.${position.currentMaxNumberInPhase + 1 + idx}`;
 }

@@ -190,16 +190,16 @@ Closes AUDIT-20260530-02. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 
 Closes AUDIT-20260530-03. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:182-191` (`nextTaskNumberFactory`), `auto-position.ts:153-157` (`currentMaxMinorInPhase`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-03` in subject
+- [x] Step 1: 3 failing tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` (flat-convention detection + numbering; hierarchical preservation; empty-phase default).
+- [x] Step 2: confirmed tests fail against pre-fix code (red phase).
+- [x] Step 3: `AutoPosition` gains `convention: 'flat' | 'hierarchical'` + `currentMaxNumberInPhase` (renamed from `currentMaxMinorInPhase`); `computeAutoPosition` detects convention by inspecting tasks within the chosen phase; `nextTaskNumberFactory` emits `<N>` for flat, `<phase>.<N>` for hierarchical.
+- [x] Step 4: tests pass; plugin suite 2406/2406.
+- [x] Step 5: commit with `Closes AUDIT-20260530-03` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 

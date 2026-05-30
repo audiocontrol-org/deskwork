@@ -89,7 +89,7 @@ describe('computeAutoPosition', () => {
 
   it('reports the highest existing minor number for the chosen phase', () => {
     const pos = computeAutoPosition(WORKPLAN_WITH_UNCHECKED_IN_PHASE_15);
-    expect(pos.currentMaxMinorInPhase).toBe(3);
+    expect(pos.currentMaxNumberInPhase).toBe(3);
   });
 
   it('falls back to end of LAST phase when no unchecked tasks remain', () => {
@@ -134,11 +134,12 @@ describe('computeAutoPosition', () => {
 });
 
 describe('nextTaskNumberFactory', () => {
-  it('assigns sequential <phase>.<max+1>, <max+2>, ...', () => {
+  it('assigns sequential <phase>.<max+1>, <max+2>, ... in hierarchical convention', () => {
     const factory = nextTaskNumberFactory({
       phaseHeading: '## Phase 15: x',
       insertAfterLine: 42,
-      currentMaxMinorInPhase: 5,
+      convention: 'hierarchical',
+      currentMaxNumberInPhase: 5,
       phaseNumber: 15,
     });
     expect(factory({}, 0)).toBe('15.6');
@@ -146,11 +147,12 @@ describe('nextTaskNumberFactory', () => {
     expect(factory({}, 2)).toBe('15.8');
   });
 
-  it('starts at <phase>.1 when the phase has no existing tasks', () => {
+  it('starts at <phase>.1 when the phase has no existing tasks (hierarchical default)', () => {
     const factory = nextTaskNumberFactory({
       phaseHeading: '## Phase 99: fresh',
       insertAfterLine: 100,
-      currentMaxMinorInPhase: 0,
+      convention: 'hierarchical',
+      currentMaxNumberInPhase: 0,
       phaseNumber: 99,
     });
     expect(factory({}, 0)).toBe('99.1');
@@ -210,5 +212,79 @@ describe('computeAutoPosition — sanctioned heading vocabulary (AUDIT-20260530-
       '',
     ].join('\n');
     expect(() => computeAutoPosition(wp)).toThrow(/Phase|Milestone|Sprint/i);
+  });
+});
+
+/**
+ * AUDIT-20260530-03 regression: pre-fix, `nextTaskNumberFactory`
+ * always emitted `<phase>.<minor>`. On the actual scope-discovery
+ * workplan (which uses flat `Task 1:`, `Task 2:` numbering under
+ * `## Phase 15`), the auto-promote produced incoherent `Task 15.1`
+ * interleaved with `Task 1..6`. The helper should detect the
+ * prevailing task-numbering convention in the chosen phase and match
+ * it.
+ */
+describe('computeAutoPosition + nextTaskNumberFactory — convention detection (AUDIT-20260530-03)', () => {
+  it('detects flat convention when tasks in the phase use `Task N:` (no minor)', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Phase 15: current',
+      '',
+      '### Task 1: First',
+      '',
+      '- [x] Step 1.',
+      '',
+      '### Task 2: Second',
+      '',
+      '- [x] Step 1.',
+      '',
+      '### Task 3: Third (pending)',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.convention).toBe('flat');
+    const factory = nextTaskNumberFactory(pos);
+    // Highest existing flat number in the phase is 3; next fix-tasks
+    // are Task 4, Task 5, ... — NOT Task 15.1.
+    expect(factory({}, 0)).toBe('4');
+    expect(factory({}, 1)).toBe('5');
+  });
+
+  it('detects hierarchical convention when tasks use `Task <phase>.<minor>:`', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Phase 15: current',
+      '',
+      '### Task 15.1: First',
+      '',
+      '- [x] Step 1.',
+      '',
+      '### Task 15.2: Second (pending)',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.convention).toBe('hierarchical');
+    const factory = nextTaskNumberFactory(pos);
+    expect(factory({}, 0)).toBe('15.3');
+    expect(factory({}, 1)).toBe('15.4');
+  });
+
+  it('falls back to hierarchical when the phase has no existing tasks', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Phase 99: fresh',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.convention).toBe('hierarchical');
+    const factory = nextTaskNumberFactory(pos);
+    expect(factory({}, 0)).toBe('99.1');
   });
 });
