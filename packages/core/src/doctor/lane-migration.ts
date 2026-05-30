@@ -24,6 +24,20 @@
  * Idempotent: running twice produces no further changes (the second
  * pass sees every sidecar already carries `lane` and `artifactKind`,
  * so no writes / journal events fire).
+ *
+ * Corrupt-vs-absent (AUDIT-20260530-15): the sidecar walk treats
+ * filesystem ENOENT (a file that vanished between `readdir` and
+ * `readFile`) as a benign race — skip the entry, do NOT report it as
+ * corrupt. Every other failure (JSON parse, schema validation,
+ * non-ENOENT I/O) is treated as corruption: the sidecar's filename
+ * lands in `LaneMigrationResult.skippedCorrupt` AND the entry counts
+ * toward `entriesExamined`, so the doctor's report distinguishes
+ * data-corruption from a clean read. Same root cause as
+ * AUDIT-20260529-39 in entry-review/data.ts; the precedent there
+ * (commit d7f1ea7) used existsSync to pre-distinguish missing from
+ * corrupt. Here we attempt the read and inspect the thrown error's
+ * `code` instead — equivalent in semantics, one syscall cheaper, no
+ * TOCTOU window between the existence probe and the actual read.
  */
 
 import { readFile, readdir } from 'node:fs/promises';
@@ -35,6 +49,20 @@ import { appendJournalEvent } from '../journal/append.ts';
 import { bootstrapDefaultLaneIfMissing } from '../lanes/bootstrap.ts';
 import type { ArtifactKind } from '../lanes/types.ts';
 
+/**
+ * Extract the `code` property Node attaches to filesystem-origin
+ * Errors (e.g. `ENOENT`, `EACCES`). Returns `undefined` when the
+ * value isn't an `Error` or doesn't carry a string `code`. Used by
+ * the migration walk to distinguish ENOENT (benign race) from every
+ * other I/O failure (treated as corruption).
+ */
+function fsErrorCode(err: unknown): string | undefined {
+  if (!(err instanceof Error)) return undefined;
+  if (!('code' in err)) return undefined;
+  const code = err.code;
+  return typeof code === 'string' ? code : undefined;
+}
+
 export interface LaneMigrationResult {
   /** Whether the `default` lane was created by this run. */
   readonly defaultLaneCreated: boolean;
@@ -44,8 +72,22 @@ export interface LaneMigrationResult {
   readonly entriesLaneBackfilled: number;
   /** Number of sidecars back-filled with a derived `artifactKind`. */
   readonly entriesArtifactKindBackfilled: number;
-  /** Total number of sidecars examined. */
+  /**
+   * Total number of sidecars examined — INCLUDES sidecars that failed
+   * parse / schema validation (those land in `skippedCorrupt`). The
+   * count reflects what the migration looked at; it does not silently
+   * drop bad apples.
+   */
   readonly entriesExamined: number;
+  /**
+   * Filenames (basename within `.deskwork/entries/`) of sidecars that
+   * exist on disk but failed to load: malformed JSON, schema
+   * validation failure, or non-ENOENT I/O error. Surfaced as an
+   * explicit list per AUDIT-20260530-15 so the doctor can report the
+   * corruption rather than silently skip. Empty array means every
+   * `.json` parsed + validated cleanly.
+   */
+  readonly skippedCorrupt: readonly string[];
   /** True when this was a dry run (no disk writes). */
   readonly dryRun: boolean;
 }
@@ -132,6 +174,7 @@ export async function migrateLaneMembership(
       entriesLaneBackfilled: 0,
       entriesArtifactKindBackfilled: 0,
       entriesExamined: 0,
+      skippedCorrupt: [],
       dryRun,
     };
   }
@@ -139,24 +182,53 @@ export async function migrateLaneMembership(
   let laneBackfilled = 0;
   let artifactKindBackfilled = 0;
   let examined = 0;
+  const skippedCorrupt: string[] = [];
   for (const name of names) {
     if (!name.endsWith('.json')) continue;
     const path = join(dir, name);
+
+    // Examined counter increments BEFORE the parse guards — every
+    // `.json` the walker considers counts toward what was examined,
+    // even if it fails parse / schema (AUDIT-20260530-15). Pre-fix
+    // the counter sat after the guards, so corrupt sidecars vanished
+    // from both the count AND any error report.
+    examined++;
+
+    // Read the sidecar. ENOENT here means the file vanished between
+    // the `readdir` snapshot and this `readFile` — a benign race;
+    // skip silently. Every other I/O failure (permissions, disk,
+    // etc.) is corruption-shaped: record the filename so the doctor
+    // can surface it.
     let raw: string;
     try {
       raw = await readFile(path, 'utf8');
-    } catch {
+    } catch (err) {
+      if (fsErrorCode(err) === 'ENOENT') {
+        // File disappeared between readdir + readFile. Roll the
+        // examined counter back — the file isn't really there.
+        examined--;
+        continue;
+      }
+      skippedCorrupt.push(name);
       continue;
     }
+
+    // Parse + schema-validate. JSON parse errors AND schema failures
+    // are both treated as corruption; they share the same operator
+    // disposition (fix the sidecar, re-run the migration).
     let parsed: Entry;
     try {
-      const result = EntrySchema.safeParse(JSON.parse(raw));
-      if (!result.success) continue;
+      const json: unknown = JSON.parse(raw);
+      const result = EntrySchema.safeParse(json);
+      if (!result.success) {
+        skippedCorrupt.push(name);
+        continue;
+      }
       parsed = result.data;
     } catch {
+      skippedCorrupt.push(name);
       continue;
     }
-    examined++;
 
     const needsLane = parsed.lane === undefined;
     const derivedKind = parsed.artifactKind ?? deriveArtifactKindFromPath(parsed.artifactPath);
@@ -212,6 +284,7 @@ export async function migrateLaneMembership(
     entriesLaneBackfilled: laneBackfilled,
     entriesArtifactKindBackfilled: artifactKindBackfilled,
     entriesExamined: examined,
+    skippedCorrupt,
     dryRun,
   };
 }

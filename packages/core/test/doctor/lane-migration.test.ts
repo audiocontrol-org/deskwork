@@ -169,4 +169,56 @@ describe('migrateLaneMembership', () => {
     expect(result.entriesLaneBackfilled).toBe(0);
     expect(result.entriesArtifactKindBackfilled).toBe(0);
   });
+
+  // AUDIT-20260530-15: distinguish corrupt sidecars from absent ones
+  // instead of silently skipping. Same root cause as AUDIT-20260529-39
+  // in entry-review/data.ts. The migration counts every `.json`
+  // examined (corrupt sidecars too) and surfaces the corrupt list on
+  // the result so the operator can triage rather than have the doctor
+  // pretend nothing was there.
+  it('surfaces malformed-JSON sidecars in skippedCorrupt and still migrates siblings', async () => {
+    const u1 = '11111111-1111-4111-8111-111111111111';
+    const u2 = '22222222-2222-4222-8222-222222222222';
+    // Well-formed sibling.
+    await writeSidecar(root, entry(u1, 'doc-a', { artifactPath: 'docs/doc-a/index.md' }));
+    // Malformed JSON sibling — direct write bypasses sidecar helpers.
+    await writeFile(join(root, '.deskwork', 'entries', `${u2}.json`), 'not-json');
+
+    const result = await migrateLaneMembership(root);
+
+    // The well-formed sibling is still migrated (one bad apple doesn't
+    // block the run).
+    expect(result.entriesLaneBackfilled).toBe(1);
+    expect(result.entriesArtifactKindBackfilled).toBe(1);
+    // Both files were examined — the corrupt one is not silently
+    // dropped from the count.
+    expect(result.entriesExamined).toBe(2);
+    // The corrupt sidecar is reported by filename so the operator
+    // sees what needs fixing.
+    expect(result.skippedCorrupt).toContain(`${u2}.json`);
+    expect(result.skippedCorrupt).toHaveLength(1);
+
+    // The well-formed sibling carries lane + kind.
+    const after1 = await readSidecar(root, u1);
+    expect(after1.lane).toBe('default');
+    expect(after1.artifactKind).toBe('markdown');
+  });
+
+  it('surfaces schema-invalid sidecars in skippedCorrupt', async () => {
+    const u1 = '11111111-1111-4111-8111-111111111111';
+    const u2 = '22222222-2222-4222-8222-222222222222';
+    await writeSidecar(root, entry(u1, 'doc-a', { artifactPath: 'docs/doc-a/index.md' }));
+    // JSON-parseable but missing required fields (e.g. no `uuid`).
+    await writeFile(
+      join(root, '.deskwork', 'entries', `${u2}.json`),
+      JSON.stringify({ slug: 'orphan', title: 'orphan' }),
+    );
+
+    const result = await migrateLaneMembership(root);
+
+    expect(result.entriesLaneBackfilled).toBe(1);
+    expect(result.entriesExamined).toBe(2);
+    expect(result.skippedCorrupt).toContain(`${u2}.json`);
+    expect(result.skippedCorrupt).toHaveLength(1);
+  });
 });
