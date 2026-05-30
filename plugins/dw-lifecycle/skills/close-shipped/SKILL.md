@@ -48,7 +48,7 @@ Each source is independent and contributes findings keyed by issue number; the m
 
 | Source | Walks | "Fixed" signal | Issue association |
 |---|---|---|---|
-| (a) commit-log | `git log <from-tag>..<to-tag>` | reference shape in commit subject/body | the issue number cited (Closes/Fixes/Refs/parens/plain `#NNN`) |
+| (a) commit-log | `git log <from-tag>..<to-tag>` | GitHub fix-keyword in commit subject/body | the issue number cited (`Closes #NNN` / `Fixes #NNN` / `Resolves #NNN`) |
 | (b) audit-log | every `docs/<v>/<inProgress>/<slug>/audit-log.md` | a `Status: fixed-<sha>` entry whose SHA is reachable in the range | issue number in the entry body (Closes/Fixes/Refs prose, fallback inline `#NNN`) |
 | (c) tooling-feedback | every `docs/<v>/<inProgress>/<slug>/tooling-feedback.md` | a TF entry's `Status: Closed | <sha>` whose SHA is reachable in the range | `Promoted to issue: #NNN` / `Tracked at: #NNN` / inline `#NNN` |
 | (d) workplan-checkbox | every `docs/<v>/<inProgress>/<slug>/workplan.md` | a `[x]` task line carrying a `· [#NNN](url)` back-fill | the issue number in the back-fill |
@@ -68,20 +68,23 @@ Per-issue, the merge layer surfaces:
 
 ### Commit-log scan (source a)
 
-`git log <from-tag>..<to-tag>` produces the commit list. The scanner recognizes six reference shapes:
+`git log <from-tag>..<to-tag>` produces the commit list. The scanner recognizes ONLY GitHub's own auto-close grammar — three fix-keyword verbs that match how GitHub itself decides which issues a commit closes:
 
 | Verb | Pattern | Example |
 |---|---|---|
-| closes | `Closes #NNN` / `Closed #NNN` (case-insensitive) | `Closes #123` |
-| fixes | `Fixes #NNN` / `Fixed #NNN` | `Fixes #45` |
-| resolves | `Resolves #NNN` / `Resolved #NNN` | `Resolves #99` |
-| refs | `Refs #NNN` / `Ref: #NNN` | `Refs #88` |
-| parens | `(#NNN)` (GitHub-PR-merge convention) | `feat(area): subject (#7)` |
-| plain | `#NNN` with word boundaries | `see also #12` |
+| closes | `Closes #NNN` / `Close #NNN` / `Closed #NNN` (case-insensitive; optional `:` / `#` separator) | `Closes #123` |
+| fixes | `Fixes #NNN` / `Fix #NNN` / `Fixed #NNN` | `Fixes #45` |
+| resolves | `Resolves #NNN` / `Resolve #NNN` / `Resolved #NNN` | `Resolves #99` |
+
+**Not extracted:** bare `#NNN` mentions, `Refs #NNN` citations, and `(#NNN)` end-of-subject PR-merge markers. These are references / PR-numbers, not fix-shipping signals. The Phase 13 / [#366](https://github.com/audiocontrol-org/deskwork/issues/366) narrowing dropped them after the v0.27.0 dogfood surfaced false-positive `pending-verification` comments on adjacent / cross-linked / PR-merge issues. Adopters who want PR-number tracking or bare-mention sweeps can compose a separate walker on top of the raw commit stream.
+
+**PR-merge commit subjects (`^Merge pull request #N from <branch>`) are dropped entirely** — the merge ceremony's PR-number isn't a fix signal, and the actual fix commits travel inside the merge as their own scanned records.
 
 URLs in commit messages are stripped before pattern matching so `/pull/NNN` and `/issues/NNN` path segments are not mis-extracted as `#NNN`.
 
 References are deduplicated per issue across all scanned commits. The contributing-commits list per issue is preserved so the comment body names every commit that mentioned the issue.
+
+**Comma-separated lists** (`Closes #10, #11, #12.`) only surface the explicitly-verb-prefixed issue (`#10`) — `#11` and `#12` are bare mentions per GitHub's own grammar. Adopters who close multiple issues from one commit need to repeat the verb: `Closes #10, closes #11, closes #12`.
 
 ### Apply step (per issue)
 

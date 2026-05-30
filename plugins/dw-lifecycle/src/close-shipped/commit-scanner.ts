@@ -2,19 +2,29 @@
 //
 // Reads `git log <from-tag>..<to-tag>` via the injected RunGit callback,
 // parses each commit into {sha, subject, body}, and extracts referenced
-// GitHub issue numbers. The scanner recognizes five reference shapes:
+// GitHub issue numbers. The scanner recognizes ONLY GitHub's own auto-
+// close grammar — three fix-keyword shapes:
 //
-//   plain    -- `#NNN` (with word boundaries)
-//   closes   -- `Closes #NNN` / `Closed #NNN` (case-insensitive)
-//   fixes    -- `Fixes #NNN` / `Fixed #NNN`
-//   resolves -- `Resolves #NNN` / `Resolved #NNN`
-//   refs     -- `Refs #NNN` / `Ref: #NNN`
-//   parens   -- `(#NNN)` (GitHub-PR-merge convention at end of subjects)
+//   closes   -- `Closes #NNN` / `Close #NNN` / `Closed #NNN` (case-insensitive)
+//   fixes    -- `Fixes #NNN` / `Fix #NNN` / `Fixed #NNN`
+//   resolves -- `Resolves #NNN` / `Resolve #NNN` / `Resolved #NNN`
 //
-// Self-references (the same issue number embedded in a URL within the
-// commit message) are skipped -- when a PR merge message contains
-// `https://github.com/owner/repo/pull/123`, the `/pull/123` segment must
-// not be misread as a `#123` reference.
+// Bare `#NNN` mentions, `Refs #NNN` citations, and `(#NNN)` end-of-subject
+// PR-merge markers are NOT extracted as fix-shipping signals — they're
+// references or PR-numbers, not claims that the commit fixed the issue.
+// This aligns close-shipped's semantic with GitHub's own auto-close
+// grammar (Phase 13 / #366; pre-fix scanner was permissive and produced
+// false-positive verification comments on adjacent / cross-linked /
+// PR-merge issues).
+//
+// Self-references (issue numbers embedded in URLs within the commit
+// message) are skipped — `https://github.com/owner/repo/pull/123`'s
+// `/pull/123` segment must not be misread as `#123`.
+//
+// PR-merge commits whose subject matches `^Merge pull request #N from `
+// are dropped entirely — the merge ceremony's PR-number isn't a fix
+// signal, and the actual fix commits travel inside the merge as their
+// own scanned records.
 //
 // Deduplication groups multiple commits per issue. Verbs are accumulated
 // per group so the operator-facing dry-run output can show the strongest
@@ -119,6 +129,12 @@ interface PatternEntry {
 // Patterns are evaluated in order. Each captures one named group `n` --
 // the issue number. The `gi` flag is set so they can be matched globally
 // + case-insensitively.
+//
+// Phase 13 / #366 narrowed the pattern set to GitHub's auto-close grammar
+// only. `refs` / `parens` / `plain` are no longer extracted — they were
+// the false-positive surface that produced misleading "Shipped in
+// v<X>" comments on referenced / cross-linked / PR-merge issues during
+// the v0.27.0 dogfood.
 const PATTERNS: readonly PatternEntry[] = [
   {
     verb: 'closes',
@@ -132,21 +148,12 @@ const PATTERNS: readonly PatternEntry[] = [
     verb: 'resolves',
     pattern: /(?<!\w)(?:resolves?|resolved)\s*[:#]?\s*#(?<n>\d+)/gi,
   },
-  {
-    verb: 'refs',
-    pattern: /(?<!\w)(?:refs?|ref)\s*[:#]?\s*#(?<n>\d+)/gi,
-  },
-  {
-    verb: 'parens',
-    pattern: /\(#(?<n>\d+)\)/g,
-  },
-  {
-    // Plain `#NNN` -- runs LAST so verb-prefixed shapes claim their issue
-    // numbers first and the plain pattern picks up the rest.
-    verb: 'plain',
-    pattern: /(?<![\w/])#(?<n>\d+)\b/g,
-  },
 ];
+
+// PR-merge commit subjects (`Merge pull request #N from <branch>`) are
+// dropped entirely — see file-header rationale. The pattern is anchored
+// at the subject start; bodies + non-prefixed subjects are unaffected.
+const MERGE_PR_SUBJECT_RE = /^Merge pull request #\d+ from /;
 
 interface ExtractedMatch {
   readonly issue: number;
@@ -165,6 +172,12 @@ interface ExtractedMatch {
 export function extractReferencesFromCommit(
   commit: ScannedCommit,
 ): readonly CommitIssueReference[] {
+  // PR-merge commits never contribute fix-shipped signals. The actual
+  // fix commits travel inside the merge as their own records; the merge
+  // ceremony is bookkeeping.
+  if (MERGE_PR_SUBJECT_RE.test(commit.subject)) {
+    return [];
+  }
   const text = `${commit.subject}\n${commit.body}`;
   const stripped = stripIssueLikeUrls(text);
   const matches: ExtractedMatch[] = [];

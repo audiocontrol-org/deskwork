@@ -469,26 +469,23 @@ Operator decisions (locked in during definition):
 
 ### Task 1: Narrow the commit-log walker to GitHub fix-keyword shapes (Light fix per #366)
 
-- [ ] Step 1: In `plugins/dw-lifecycle/src/close-shipped/` (commit-log walker module — likely the issue-extraction regex feeding into the per-source merge), replace the current any-mention match with a fix-keyword match. The verbs to accept (case-insensitive):
-  - `Closes #N`, `Closes: #N`, `Closed #N`, `Close #N`
-  - `Fixes #N`, `Fixes: #N`, `Fixed #N`, `Fix #N`
-  - `Resolves #N`, `Resolves: #N`, `Resolved #N`, `Resolve #N`
-  - GitHub's own auto-close grammar is the spec — match what GitHub itself recognizes; nothing more, nothing less.
-- [ ] Step 2: Filter PR-merge commit subjects unconditionally. The pattern `^Merge pull request #\d+ from ` always matches as `Merge` verb but yields a PR number, not a fix-shipped signal. Drop these matches regardless of fix-keyword presence.
-- [ ] Step 3: Vitest coverage. New cases:
+- [x] Step 1: In `plugins/dw-lifecycle/src/close-shipped/commit-scanner.ts`, replaced the permissive 6-verb pattern set (`closes` / `fixes` / `resolves` / `refs` / `parens` / `plain`) with GitHub's own auto-close grammar — only `closes` / `fixes` / `resolves` survive. The type `ReferenceVerb` stays wide for back-compat (the grouping function + strength map still accept the dropped verbs), but the PATTERNS array no longer produces them.
+- [x] Step 2: Added `MERGE_PR_SUBJECT_RE = /^Merge pull request #\d+ from /` and an early-return guard at the top of `extractReferencesFromCommit`. Merge-commit subjects (the GitHub `Merge pull request #PR from owner/branch` shape) drop the whole commit's contribution — neither the PR number nor any body fix-keyword refs surface. The argument: the actual fix commits travel inside the merge as their own scanned records.
+- [x] Step 3: Vitest coverage. Five new acceptance cases land at `close-shipped-commit-scanner.test.ts`:
   - (a) commit subject `feat: close #501 — actually fixes thing` → ref #501 surfaces (Closes verb).
-  - (b) commit body `Fixes #502\n\nLonger body...` → ref #502 surfaces (Fixes verb).
-  - (c) commit subject `feat(x): scoping #503 into workplan` → ref #503 does NOT surface (bare mention, no fix verb).
-  - (d) commit subject `Merge pull request #504 from foo/bar` → no PR-number ref surfaces (PR-merge shape).
-  - (e) commit body markdown link `[#505](https://...)` paired with `Resolves #505` → still surfaces (verb takes precedence over markdown shape).
-- [ ] Step 4: SKILL.md update for `close-shipped` — adopter-facing prose names the fix-keyword shape (replaces the prior any-mention wording).
+  - (b) commit body `Fixes #502\n\nLonger body.` → ref #502 surfaces (Fixes verb).
+  - (c) commit subject `feat(x): scoping #503 into workplan` → ref #503 does NOT surface (bare mention).
+  - (d) commit subject `Merge pull request #504 from foo/bar` → no ref surfaces (PR-merge shape).
+  - (e) commit body markdown link `[#505](https://...)` paired with `Resolves #505` → ref #505 surfaces (verb takes precedence; URL stripped pre-match).
+  Existing tests updated: `plain` / `refs` / `parens` extraction tests inverted to assert NO match (with comments explaining the Phase 13 narrowing). Comma-separated `Closes #10, #11, #12.` now surfaces only `#10` (aligning with GitHub's strict grammar — each issue needs its own verb prefix).
+- [x] Step 4: SKILL.md update for `close-shipped` — replaced the 6-verb table with the 3-verb fix-keyword table + explicit "Not extracted" prose for `plain` / `refs` / `parens` + the PR-merge-subject drop + the comma-list grammar note. Cites #366 + the v0.27.0 dogfood as the change rationale.
 
 **Acceptance Criteria:**
 
-- [ ] `dw-lifecycle close-shipped --from-tag <vA> --to-tag <vB> --dry-run` only surfaces issues whose commits carry an explicit fix-keyword reference.
-- [ ] PR-merge commit subjects (`Merge pull request #PR from ...`) never produce a candidate.
-- [ ] Vitest coverage for the five cases above passes; full plugin suite stays green.
-- [ ] Re-running `close-shipped --from-tag v0.26.5 --to-tag v0.27.0` against an installed release-after-this-fix surfaces ONLY the 3 real candidates (#356, #361, #364) from the v0.27.0 dogfood — drops #351, #352, #353, #355, #362, #365.
+- [x] `dw-lifecycle close-shipped --from-tag <vA> --to-tag <vB> --dry-run` only surfaces issues whose commits carry an explicit fix-keyword reference. (Vitest coverage confirms.)
+- [x] PR-merge commit subjects (`Merge pull request #PR from ...`) never produce a candidate. (Phase 13 (d) test + unconditional `MERGE_PR_SUBJECT_RE` filter at top of `extractReferencesFromCommit`.)
+- [x] Vitest coverage for the five cases above passes; full plugin suite stays green. (2336/2336 pass; 4 close-shipped-subcommand fixtures updated to use fix-keyword shapes since the old parens-style fixtures relied on the dropped permissive matching.)
+- [ ] Re-running `close-shipped --from-tag v0.26.5 --to-tag v0.27.0` against an installed release-after-this-fix surfaces ONLY the 3 real candidates (#356, #361, #364) from the v0.27.0 dogfood — drops #351, #352, #353, #355, #362, #365. *(Verification deferred until the rebuilt walker ships in a release the operator installs — per the project's verify-in-installed-release rule.)*
 
 **Provenance:**
 
