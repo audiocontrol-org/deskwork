@@ -780,7 +780,7 @@ The tests miss this because their fixtures use `### Task 99.1: Fix ... (fix-find
 ### AUDIT-20260530-08 — Lexicographic version-dir sort fixes split-brain but picks the semantically-wrong (older) version and still never errors on ambiguity
 
 Finding-ID: AUDIT-20260530-08
-Status:     open
+Status:     fixed-6bc39e57574baca67d517b967e4dc45e6c2e33d1
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120`, `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180`
 
@@ -793,7 +793,7 @@ The AUDIT-20260530-06 fix replaces `await readdir(docsRoot)` with `[...(await re
 ### AUDIT-20260530-09 — `feature-root-determinism.test.ts` "resolve to the SAME version dir" test asserts nothing meaningful — it does not test the split-brain it's named for
 
 Finding-ID: AUDIT-20260530-09
-Status:     open
+Status:     fixed-6bc39e57574baca67d517b967e4dc45e6c2e33d1
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` (the `'audit-barrage-lift + workplan-aware-gate resolve to the SAME version dir'` case)
 
