@@ -3060,7 +3060,7 @@ Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). 
 ### AUDIT-20260529-38 — member card + list-row lane-accent CSS keys on `data-template-id` attribute the markup never emits
 
 Finding-ID: AUDIT-20260529-38 (cross-model: AUDIT-BARRAGE-claude-03)
-Status:     open
+Status:     fixed-5234182
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/css/entry-review-members.css:262-265,318-321`, `packages/studio/src/pages/entry-review/members-section.ts:152-167` (`renderMemberStageCard`), `:200-235` (`renderListRow`)
 
