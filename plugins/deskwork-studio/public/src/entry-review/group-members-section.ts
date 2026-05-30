@@ -125,10 +125,22 @@ function wireMemberRowCopy(section: HTMLElement): void {
 
 /**
  * Initialize the Members section on page load. Idempotent — calling
- * twice has no visible effect because `applyMode` reads the section's
- * current `data-view-mode` if no override is stored.
+ * twice is a true no-op for listener attachment because of the
+ * module-level `wired` guard below.
+ *
+ * Per AUDIT-20260529-42: pre-fix the three `wire*` helpers called
+ * `addEventListener` unconditionally on every invocation. The
+ * docstring's "calling twice has no visible effect" claim was true
+ * for `applyMode` (it reads current state) but FALSE for the wire
+ * helpers — a second call accumulated duplicate listeners, so a
+ * single click would fire each handler twice. The fix mirrors the
+ * sibling `row-member-tab.ts` precedent: a module-level
+ * `let wired = false` guard short-circuits the second invocation.
  */
+let wired = false;
+
 export function initGroupMembersSection(): void {
+  if (wired) return;
   const section = document.querySelector<HTMLElement>('[data-members-section]');
   if (section === null) return;
   const groupUuid = section.dataset.groupUuid;
@@ -147,4 +159,9 @@ export function initGroupMembersSection(): void {
   wireToggle(section, groupUuid);
   wireEmptyStateCta(section);
   wireMemberRowCopy(section);
+  // Flip the guard ONLY after every wire-helper has attached its
+  // listener — early-flipping risks leaving the surface half-wired
+  // if a wire-helper throws. The current helpers don't throw, but
+  // the post-flip ordering keeps the guard robust to future changes.
+  wired = true;
 }
