@@ -49,10 +49,8 @@ import { html, unsafe, type RawHtml } from '../html.ts';
 import { stageGlyph } from '../dashboard/swimlane-stage-glyph.ts';
 import { isGroupEntry, isPopulatedGroupEntry } from '@deskwork/core/groups';
 import type { Entry } from '@deskwork/core/schema/entry';
-import type {
-  StrictLaneConfig,
-  StrictPipelineTemplate,
-} from '@deskwork/core/lanes';
+import type { StrictLaneConfig } from '@deskwork/core/lanes';
+import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
 
 export type MembersViewMode = 'composed' | 'list';
 
