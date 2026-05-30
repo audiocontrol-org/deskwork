@@ -117,6 +117,7 @@ export function nextStage(s: string): Stage | null {
 }
 
 import { z } from 'zod';
+import { LANE_ID_REGEX } from '../lanes/types.ts';
 
 /**
  * Editorial-pipeline stage enum — kept as a back-compat export. New
@@ -169,7 +170,17 @@ export const EntrySchema = z.object({
   // migration window; doctor's lane-migration step back-fills the
   // field and then doctor enforces presence. Identifies the
   // `.deskwork/lanes/<lane>.json` config the entry lives under.
-  lane: z.string().min(1).optional(),
+  //
+  // Bound to `LANE_ID_REGEX` per AUDIT-20260530-07: a malformed
+  // sidecar (`lane: "../../secrets"`) used to parse cleanly and flow
+  // straight into `loadLaneConfig` at the next read. The regex closes
+  // the path-traversal vector at the schema layer so consumers
+  // (doctor, calendar render, studio) can't even see the malformed
+  // value.
+  lane: z.string().regex(
+    LANE_ID_REGEX,
+    'lane id must be kebab-case [a-z0-9-], starting with [a-z0-9]',
+  ).optional(),
 
   // Artifact-kind classification (Phase 3 Task 3.2.1). Optional
   // during the migration window for the same reason. Mirrors the

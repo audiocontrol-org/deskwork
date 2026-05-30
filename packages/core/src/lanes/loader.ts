@@ -243,9 +243,14 @@ export function listLaneConfigs(
   if (!existsSync(dir)) {
     return [];
   }
+  // Non-canonical basenames (uppercase, dotfiles, underscored, ids
+  // beginning with a hyphen) are filtered OUT per AUDIT-20260530-07.
+  // The picker never returns ids the loader would refuse, and stray
+  // non-canonical `.json` files do not appear as bogus lane ids.
   const basenames = readdirSync(dir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => basename(entry, '.json'))
+    .filter((id) => LANE_ID_REGEX.test(id))
     .sort();
   if (includeArchived) {
     return basenames;
