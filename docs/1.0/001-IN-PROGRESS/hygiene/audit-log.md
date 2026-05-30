@@ -150,9 +150,11 @@ Verification: Track 1 was running the smoke script end-to-end (exits `OK`, all t
 ## AUDIT-20260529-07 — Phase 11 Task 6 dogfood: archive-branch preflight runGit-contract bug
 
 Finding-ID: AUDIT-20260529-07
-Status:     fixed-pending-verification
+Status:     verified-2026-05-29
 Severity:   high
 Surface:    plugins/dw-lifecycle/src/archive-branch/preflight.ts (`assertTagDoesNotExist`)
+
+**Verified 2026-05-29 against installed v0.27.0** — created a tmp worktree (`feature/v0270-verify` with one ahead-commit), ran `dw-lifecycle dismantle-worktrees propose --worktree-base <tmp> --threshold-count 1`, set `decision=archive-then-dismantle` + substantive reason, ran `apply`. Result: `Applied 1, skipped 0, failed 0. applied: <path> [archive-then-dismantle] (tag: archived/feature-v0270-verify-2026-05-29)`. Pre-fix this would have reported `Tag already exists` and aborted the archive step; post-fix the preflight passes through correctly. Test artifacts cleaned up (tag deleted locally + on origin; tmp worktree-base removed).
 
 Phase 11 Task 6 dogfood surfaced a real runGit-contract bug in `archive-branch`'s preflight: `assertTagDoesNotExist` ran `runGit(['rev-parse', '--verify', 'refs/tags/<tag>'])` and assumed THROW-on-failure semantics (exception fires when the tag doesn't exist → tag absent → preflight passes). The standalone `archive-branch` subcommand wires that throwing contract. But `dismantle-worktrees apply` calls `applyArchive` with `runGitStdout` from `subcommands/lib/process-probes.ts` — a SWALLOWING runner that catches `execFileSync` failures and returns `''`. Under that runner, the `try` block always completes silently, `exists = true` is set unconditionally, and every `archive-then-dismantle` decision false-fails before any archive tag is created.
 
@@ -167,6 +169,54 @@ Recovery: ran `dw-lifecycle archive-branch <branch>` standalone for each of the 
 Promoted to [#364](https://github.com/audiocontrol-org/deskwork/issues/364) for visibility + the Medium fix (unifying the runGit contracts) + the Heavy fix (auditing every `runGitStdout` consumer for the same latent bug shape).
 
 Verification status: `fixed-pending-verification` per the project's "issue closure requires verification in a formally-installed release" rule. The Light fix is committed; the regression test passes. Verification = re-running `dismantle-worktrees apply` with `archive-then-dismantle` decisions against a real worktree-base AFTER the fix ships in an installed release.
+
+---
+
+## AUDIT-20260529-08 — Phase 12 Task 2 (commit 918c029) — label rename review
+
+Finding-ID: AUDIT-20260529-08
+Status:     fixed-pending-verification
+Severity:   informational
+Surface:    plugins/dw-lifecycle/src/lifecycle-integration/ + .claude/rules/agent-discipline.md + docs/1.0/burndown/dw-lifecycle.md
+
+Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's small-routine-change carve-out) verified the rename. Found one legitimate stale-reference cluster the workplan Step 5 audit scope missed:
+
+1. `agent-discipline.md:536` — present-tense table row describing the current `session-end-hygiene` output used the pre-rename "filed this session" wording. Fixed in this commit's follow-up edit.
+2. `burndown/dw-lifecycle.md:54` — sentence describing Phase 12's change quoted the pre-rename detector name in present tense. Fixed by renaming the present-tense reference to `"issues referenced this session"` AND adding a historical-framing clause (`renamed from "issues filed this session" as part of Task 2`) that documents the rename without re-introducing the old wording as a current claim.
+
+Track 1 (load-bearing verification): 2331/2331 plugin tests pass; smoke-hygiene OK end-to-end.
+
+Other reviewer-confirmed clean: zero stale refs in `.ts` files, JSDoc accuracy on `types.ts:28`, comment accuracy on `session-end-hygiene.ts:337-343` (`CLOSED-but-referenced` semantic), session-end-hygiene.ts file size stayed at 499 (at cap, not over), no `any`/`as Type`/`@ts-ignore`. Test-rigor gap noted (no string-assertion of "referenced this session" connector phrase — pre-existing gap, not introduced by this commit; low risk because OPEN/CLOSED partition test + markdown-headings test cover the rendering path).
+
+Verification status `fixed-pending-verification` per the project's "issue closure requires verification in a formally-installed release" rule. The label-rename ships in the next v0.28.x or v0.29.0 release; full verification is the same dogfood pass that already lives in the Phase 12 Task 2 acceptance criteria.
+
+---
+
+## AUDIT-20260529-09 — Phase 13 Task 1 (commit 5f620b1) — close-shipped fix-keyword filter
+
+Finding-ID: AUDIT-20260529-09
+Status:     fixed-pending-verification
+Severity:   informational
+Surface:    plugins/dw-lifecycle/src/close-shipped/commit-scanner.ts + SKILL.md + 2 test files
+
+Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's medium-routine carve-out) verified the Phase 13 / #366 fix and reported two doc-accuracy findings — both applied as a follow-up commit:
+
+1. **Stale test comment** at `close-shipped-commit-scanner.test.ts:185` — comment said "Plain reference in subject + Closes in body -> closes wins" but plain references no longer extract at all post-Phase-13. The test's behavior assertions are still correct; the comment misled readers about the verb-strength selection mechanism. Rewrote to reflect the post-Phase-13 reality: "Bare `#50` in subject is dropped post-Phase-13; the `Closes #50` in the body is the only fix-shipping signal."
+
+2. **SKILL.md URL-stripping claim imprecise** at line 83 — said "URLs in commit messages are stripped before pattern matching." Technically misleading: PR-merge commits are dropped before URL stripping runs (the early-return fires first). Rewrote: "For non-merge commits, URLs are stripped before pattern matching... PR-merge commits are dropped entirely before any URL stripping or pattern matching — the early-return path means the merge-subject AND its body never reach the URL-stripping step."
+
+Reviewer confirmed clean on the substantive change:
+
+- `MERGE_PR_SUBJECT_RE = /^Merge pull request #\d+ from /` correctly matches GitHub's standard merge-commit subject; doesn't mis-match `Merge branch ...` or non-standard variants.
+- `ReferenceVerb` dead-code entries (the `plain`/`refs`/`parens` cases in the strength map) are well-contained as a back-compat carve-out for handcrafted test inputs.
+- Comma-list grammar (`Closes #10, #11, #12.` surfacing only `#10`) aligns with GitHub's own auto-close grammar — GitHub requires verb-per-issue per official docs.
+- Other walkers (audit-log, tooling-feedback) use their own pattern lists via `extractIssueFromBody` and were correctly not touched by this commit.
+- File size cap clean (`commit-scanner.ts` stays well under 500 lines).
+- No `any`/`as Type`/`@ts-ignore` introduced.
+
+Track 1 (load-bearing verification): 2336/2336 plugin tests pass; smoke-hygiene OK end-to-end.
+
+Verification status `fixed-pending-verification` per the project's "issue closure requires verification in a formally-installed release" rule. Acceptance is re-running `close-shipped --from-tag v0.26.5 --to-tag v0.27.0` post-install and confirming only the 3 real candidates (#356, #361, #364) from the v0.27.0 dogfood land — not the 6 false positives (#351, #352, #353, #355, #362, #365).
 
 ---
 

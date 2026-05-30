@@ -201,7 +201,7 @@ Closes three semantic + rendering bugs in `session-end-hygiene` surfaced during 
 - [x] Step 2: Filter CLOSED issues from the `### Next session recommendation` block's `Triage:` line. The observations block can still cite closed issues (they're relevant signal for the just-completed session); the recommendation line is forward-looking and must list OPEN issues only.
 - [x] Step 3: Coalesce per-line workplan-TBD observations. Group samples by `lineNumber` so a multi-marker line emits ONE entry naming all matched markers, not one entry per marker keyword.
 - [x] Step 4: Vitest coverage — session-scope-filter test (given `--session-start-sha <sha>`, gh query string contains `created:>=<iso>`, not `created:<today>`); closed-filter test (gh response with 1 open + 1 closed issue → recommendation lists only the open one); per-line-coalescing test (fixture with one line matching 4 markers → exactly one observation entry naming all 4).
-- [ ] Step 5: Post-v0.26.1 install, re-run `/dw-lifecycle:session-end` against this same hygiene workplan and confirm the observations block is signal-only.
+- [x] Step 5: Post-v0.26.1 install, re-run `/dw-lifecycle:session-end` against this same hygiene workplan and confirm the observations block is signal-only. (Verified against installed **v0.27.0** 2026-05-29: ran `dw-lifecycle session-end-hygiene --slug hygiene --session-start-sha 2dcda6a`. The "issues filed this session" block reported only issues REFERENCED in this session's commits — same-user-time-window noise is gone. Signal-only per Phase 6 § contract.)
 
 **Acceptance Criteria:**
 - [x] `/dw-lifecycle:session-end` carries the hygiene-observations + next-session-recommendation block; lands in `DEVELOPMENT-NOTES.md`. (Landed via the `session-end-hygiene` subcommand + updated SKILL.md.)
@@ -311,7 +311,7 @@ Operator decisions (locked in during definition):
 
 ### Task 5: Tests + verification
 
-- [ ] Step 1: First real release (v0.26.2 carrying #342 fix + Phase 10 ship) uses the new workflow. Verify the workflow run succeeds end-to-end.
+- [x] Step 1: First real release (v0.26.2 carrying #342 fix + Phase 10 ship) uses the new workflow. Verify the workflow run succeeds end-to-end. (v0.26.2 shipped successfully via the workflow per recent release-tag log. v0.27.0 re-validated the workflow end-to-end on 2026-05-29: ran 46s, OIDC publish + assert-published + marketplace smoke all clean.)
 - [ ] Step 2: Post-verification: if any glitches surface, file follow-up issues + close [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project's "Issue closure requires verification in a formally-installed release" rule.
 
 **Acceptance Criteria:**
@@ -319,7 +319,7 @@ Operator decisions (locked in during definition):
 - [x] `publishConfig: { access: public, provenance: true }` added to `packages/core`, `packages/cli`, `packages/studio` package.json files.
 - [x] `/release` skill SKILL.md updated: Pause 3 collapses into tag-message-only; Pause 4 collapses to push + workflow-watch (marketplace-smoke moves to CI); `--skip-publish-wait` flag documented; `make publish` recovery path documented.
 - [x] `RELEASING.md` documents the one-time npm-side trusted-publisher setup per package + the recovery path.
-- [ ] First real release uses the new workflow and succeeds end-to-end. Verification step closes [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project rule.
+- [x] First real release uses the new workflow and succeeds end-to-end. (v0.26.2 + v0.27.0 both shipped via the workflow without glitches.) Verification step closes [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project rule. *(Closure step deferred to the operator's call.)*
 
 ## Phase 11: Stale worktree discovery + dismantle  ·  [#356](https://github.com/audiocontrol-org/deskwork/issues/356)
 
@@ -421,7 +421,32 @@ Operator decisions (locked in during definition):
 - [x] `dw-lifecycle session-end-hygiene --slug <s> --session-start-sha <sha>` reports only issues referenced (`#NNN`) by a commit in `<sha>..HEAD`, not every same-user issue in the time window.
 - [x] "Address TBD markers" reports markers introduced by the session diff, not pre-existing whole-file prose.
 - [x] Vitest coverage for the four cases above passes; full plugin suite remains green. (1952 / 1952 tests pass; 5 new commit-range / session-diff acceptance cases land in `lifecycle-session-end-hygiene.test.ts`.)
-- [ ] Re-running `dw-lifecycle session-end-hygiene` against this hygiene session at the time of #361's fix produces a signal-only block (no merge-range / same-user noise). *(Verification deferred until the rebuilt helper ships in a release the operator installs — per the project's "issue closure requires verification in a formally-installed release" rule.)*
+- [x] Re-running `dw-lifecycle session-end-hygiene` against this hygiene session at the time of #361's fix produces a signal-only block (no merge-range / same-user noise). (Verified against installed **v0.27.0** 2026-05-29.)
+- [x] Rendered prose matches the Medium-fix semantic. Task 1 changed the data source from "issues FILED in the time window" to "issues TOUCHED by session commits" but kept the pre-fix label `filed this session` everywhere in the renderer. Adopters reading the block see closed-long-ago / prior-session issues annotated as "filed this session" because their numbers appear in this session's commit prose. The labels need to track the new semantic. *(Resolved by Task 2 below.)*
+
+### Task 2: Rename label from `filed` to `referenced` to match the Medium-fix semantic
+
+**Background:** Task 1 landed the data-source half of the #361 fix — the scanner now derives candidates from `git log <boundarySha>..HEAD` `#NNN` refs instead of the same-user `gh issue list --search "created:>=<iso>"` sweep. That correctly excludes the merge-range noise the original bug surfaced. But the renderer (and the observation `category`, and the markdown templates, and the test-assertion text) still calls the result `filed this session` — wording inherited from when the data actually represented filed-in-window issues. Under the new semantic, an issue gets listed because its number appears in a session commit's subject OR body — i.e. the session TOUCHED / REFERENCED it. Issues closed weeks before the session, prior-session-filed issues, and parent-tracker issues all surface accurately under the new contract but get a label that lies about their nature. Operator running session-end against this hygiene session at v0.27.0 saw #340 (closed weeks ago) + #347 (filed prior session) + #356 (filed when Phase 11 started) all listed as `filed this session` because Phase 11/12 workplan-scoping commit bodies referenced them.
+
+- [x] Step 1: Rename the observation category in `plugins/dw-lifecycle/src/lifecycle-integration/types.ts`: `'issue-filed-this-session'` → `'issue-referenced-this-session'`. Single source-of-truth string. (Done — `types.ts:21` literal updated + JSDoc comment rewritten to match the new commit-range semantic.)
+- [x] Step 2: Update every emit + filter site in `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts` to the new category name. Sites: `scanIssuesThisSession` emit (line ~274), `recommend`'s Triage filter (line ~336), markdown renderer's issue branch (line ~391–393), "no issues..." default fallback line (line ~416). Switch the user-facing prose from `filed this session` to `referenced this session` in BOTH the per-issue line and the empty-Triage default. (Done — all 4 sites updated; one nearby comment clarified `CLOSED-but-referenced` semantic.)
+- [x] Step 3: Update tests in `plugins/dw-lifecycle/src/__tests__/lifecycle-session-end-hygiene.test.ts` — change every `category === 'issue-filed-this-session'` filter and every assertion text mentioning `filed this session` to the new shape. Keep the test SHAPE identical (we're only renaming). (Done — 7 filter sites updated via `replace_all`. No assertion-text strings hit `filed this session`.)
+- [x] Step 4: SKILL.md update for `session-end` — replace `issues filed this session by the current GitHub user` with `issues referenced (#NNN) by commits in the session range`. The "by the current GitHub user" wording is also stale post-Medium-fix; drop it. (Done — verified SKILL.md was already updated during Task 1 and carries the accurate wording.)
+- [x] Step 5: Audit the rest of the codebase + docs for `filed this session` references. Grep + judgment call per hit: rendered prose → rename; documentation prose that DESCRIBES the historical behavior → leave (it's accurate historically). (Done — `session-range.ts:64` comment updated. Final `grep -rn "filed this session"` against `plugins/dw-lifecycle/src + skills` returns zero hits.)
+
+**Acceptance Criteria:**
+
+- [x] `category === 'issue-referenced-this-session'` is the only spelling in `lifecycle-integration/` source + tests.
+- [x] The markdown block renders `- issue #N [STATE] referenced this session: <title>` and the empty-Triage fallback says `(no issues referenced this session need disposition)`.
+- [ ] Re-running `dw-lifecycle session-end-hygiene --slug hygiene --session-start-sha 2dcda6a` against this hygiene session after the fix emits a block whose prose matches the listed issues' actual nature. *(Verification deferred until the rebuilt helper ships in a release the operator installs — per the project's verify-in-installed-release rule.)*
+- [x] No regression in the data-source half — same set of issues surfaces, just with the corrected label.
+- [x] Vitest + smoke pass; clone gate stays clean. (2331 / 2331 plugin tests pass — up from 1954 because the v0.28.0 merge brought in scope-discovery's audit-barrage + Phase 13 + Phase 14 coverage.)
+
+**Provenance:**
+
+- Surfaced during the v0.27.0 dogfood verification: ran `dw-lifecycle session-end-hygiene --slug hygiene --session-start-sha 2dcda6a` and noticed the labels said `filed this session` for 4 issues the session did NOT file (it only referenced them). Operator asked "have we fixed #361?" — the core same-user-in-window sweep was fixed; the prose was not. Captured during the v0.27.0 + v0.28.0 sync session.
+- Sub-bug of [#361](https://github.com/audiocontrol-org/deskwork/issues/361) — the prose-half of the same fix. Tracked here rather than a new issue because the existing #361 isn't fully resolved until both halves ship.
+- Cross-link: the close-shipped `pending-verification` comment on #361 was edited to point at this Task 2 so the operator doesn't close #361 prematurely on the v0.27.0 install-verify pass.
 
 **Implementation notes:**
 
@@ -437,3 +462,34 @@ Operator decisions (locked in during definition):
 - Promoted to [#361](https://github.com/audiocontrol-org/deskwork/issues/361) per the agent-discipline rule's "recurring cross-session pattern → promote" trigger.
 - Code path: `session-end-hygiene.ts` `scanIssuesThisSession` (commit-range walker + per-issue `gh issue view`) + `session-range.ts` `resolveSessionBoundarySha` (priority-ordered SHA fallback). The pre-Phase-12 `resolveSessionBoundaryIso` is deleted; the boundary is now the SHA itself, not a committer-date detour.
 - Adjacent infrastructure friction surfaced in the same dogfood (TF-003 + TF-004, promoted to [#362](https://github.com/audiocontrol-org/deskwork/issues/362) — `wrap-prompt` / `validate-return` round-trip ergonomics) is dw-lifecycle infra, not hygiene-feature work; not in scope for this phase.
+
+## Phase 13: close-shipped commit-log walker fix-keyword filter  ·  [#366](https://github.com/audiocontrol-org/deskwork/issues/366)
+
+**Deliverable:** `dw-lifecycle close-shipped`'s commit-log walker matches only GitHub fix-keyword forms (`Closes #N`, `Fixes #N`, `Resolves #N`) instead of any `#NNN` mention. Drops the false-positive `pending-verification` comments that landed on adjacent / cross-linked / PR-merge-commit issues during the v0.27.0 dogfood. Closes [#366](https://github.com/audiocontrol-org/deskwork/issues/366); originating tooling-feedback entry is `TF-003` in this feature's `tooling-feedback.md`.
+
+### Task 1: Narrow the commit-log walker to GitHub fix-keyword shapes (Light fix per #366)
+
+- [x] Step 1: In `plugins/dw-lifecycle/src/close-shipped/commit-scanner.ts`, replaced the permissive 6-verb pattern set (`closes` / `fixes` / `resolves` / `refs` / `parens` / `plain`) with GitHub's own auto-close grammar — only `closes` / `fixes` / `resolves` survive. The type `ReferenceVerb` stays wide for back-compat (the grouping function + strength map still accept the dropped verbs), but the PATTERNS array no longer produces them.
+- [x] Step 2: Added `MERGE_PR_SUBJECT_RE = /^Merge pull request #\d+ from /` and an early-return guard at the top of `extractReferencesFromCommit`. Merge-commit subjects (the GitHub `Merge pull request #PR from owner/branch` shape) drop the whole commit's contribution — neither the PR number nor any body fix-keyword refs surface. The argument: the actual fix commits travel inside the merge as their own scanned records.
+- [x] Step 3: Vitest coverage. Five new acceptance cases land at `close-shipped-commit-scanner.test.ts`:
+  - (a) commit subject `feat: close #501 — actually fixes thing` → ref #501 surfaces (Closes verb).
+  - (b) commit body `Fixes #502\n\nLonger body.` → ref #502 surfaces (Fixes verb).
+  - (c) commit subject `feat(x): scoping #503 into workplan` → ref #503 does NOT surface (bare mention).
+  - (d) commit subject `Merge pull request #504 from foo/bar` → no ref surfaces (PR-merge shape).
+  - (e) commit body markdown link `[#505](https://...)` paired with `Resolves #505` → ref #505 surfaces (verb takes precedence; URL stripped pre-match).
+  Existing tests updated: `plain` / `refs` / `parens` extraction tests inverted to assert NO match (with comments explaining the Phase 13 narrowing). Comma-separated `Closes #10, #11, #12.` now surfaces only `#10` (aligning with GitHub's strict grammar — each issue needs its own verb prefix).
+- [x] Step 4: SKILL.md update for `close-shipped` — replaced the 6-verb table with the 3-verb fix-keyword table + explicit "Not extracted" prose for `plain` / `refs` / `parens` + the PR-merge-subject drop + the comma-list grammar note. Cites #366 + the v0.27.0 dogfood as the change rationale.
+
+**Acceptance Criteria:**
+
+- [x] `dw-lifecycle close-shipped --from-tag <vA> --to-tag <vB> --dry-run` only surfaces issues whose commits carry an explicit fix-keyword reference. (Vitest coverage confirms.)
+- [x] PR-merge commit subjects (`Merge pull request #PR from ...`) never produce a candidate. (Phase 13 (d) test + unconditional `MERGE_PR_SUBJECT_RE` filter at top of `extractReferencesFromCommit`.)
+- [x] Vitest coverage for the five cases above passes; full plugin suite stays green. (2336/2336 pass; 4 close-shipped-subcommand fixtures updated to use fix-keyword shapes since the old parens-style fixtures relied on the dropped permissive matching.)
+- [ ] Re-running `close-shipped --from-tag v0.26.5 --to-tag v0.27.0` against an installed release-after-this-fix surfaces ONLY the 3 real candidates (#356, #361, #364) from the v0.27.0 dogfood — drops #351, #352, #353, #355, #362, #365. *(Verification deferred until the rebuilt walker ships in a release the operator installs — per the project's verify-in-installed-release rule.)*
+
+**Provenance:**
+
+- Surfaced via the v0.27.0 dogfood: ran `dw-lifecycle close-shipped --from-tag v0.26.5 --to-tag v0.27.0` against the operator's actual repo immediately after release. 9 candidates surfaced; 6 were false positives whose commits merely referenced the issue numbers in body context (back-fill links, adjacent-friction acknowledgements, the PR-merge commit itself).
+- Original tooling-feedback entry: `docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md` TF-003.
+- Promoted to [#366](https://github.com/audiocontrol-org/deskwork/issues/366) per the agent-discipline rule's "architectural / recurring-pattern → promote" trigger.
+- The Medium fix (operator-curation propose|apply split mirroring `triage-issues`) and the Heavy fix (per-source confidence scoring across all four evidence walkers) are scoped in the GH issue body for follow-up. This phase ships only the Light fix; Medium + Heavy are tracked as follow-ups under [#366](https://github.com/audiocontrol-org/deskwork/issues/366).
