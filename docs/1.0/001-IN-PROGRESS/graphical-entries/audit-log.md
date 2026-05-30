@@ -3224,7 +3224,7 @@ Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude + 
 ### AUDIT-20260530-08 — `StrictLaneConfig` / `StrictPipelineTemplate` aliases are no-op; comments misdescribe Zod `.passthrough()`
 
 Finding-ID: AUDIT-20260530-08 (cross-model: AUDIT-BARRAGE-claude-02-P3)
-Status:     open
+Status:     fixed-16917db
 Severity:   medium
 Surface:    `packages/core/src/lanes/types.ts:69-78`, `packages/core/src/pipelines/types.ts:137-161`
 
