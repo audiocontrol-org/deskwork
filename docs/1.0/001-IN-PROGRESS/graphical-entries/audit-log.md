@@ -3384,7 +3384,7 @@ Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). 
 ### AUDIT-20260530-22 — partial cascade failure leaves `calendar.md` persistently stale (7.2.7 single-regen regression)
 
 Finding-ID: AUDIT-20260530-22 (cross-model: AUDIT-BARRAGE-claude-01-P7small)
-Status:     open
+Status:     fixed-8296171
 Severity:   medium
 Surface:    `packages/core/src/entry/cancel.ts` (public `cancelEntry` wrapper)
 

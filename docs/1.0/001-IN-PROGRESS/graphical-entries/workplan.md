@@ -900,17 +900,17 @@ Closes AUDIT-20260530-21 (cross-model: AUDIT-BARRAGE-claude-08-P4). Surface: `pa
 
 Closes AUDIT-20260530-22 (cross-model: AUDIT-BARRAGE-claude-01-P7small). Surface: `packages/core/src/entry/cancel.ts` (public `cancelEntry` wrapper).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-22 (cross-model: AUDIT-BARRAGE-claude-01-P7small)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/core/test/entry/cancel-cascade.test.ts` :: `partial-cascade throw still regenerates calendar in the finally (AUDIT-20260530-22)` (uses AUDIT-23's narrowed catch as the throw seam).
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — verified via `git stash` of the cancel.ts wrapper change; test fails with `expected regenerateCalendar to be called 1 times, but got 0 times`.
+- [x] Step 3: implement the fix — `try { return await cancelEntryWithoutCalendarRegen(...); } finally { await regenerateCalendar(...); }`.
+- [x] Step 4: confirm test passes — `npm --workspace @deskwork/core test -- --run test/entry/cancel-cascade.test.ts` 14/14 green; full @deskwork/core suite 824/824.
+- [x] Step 5: commit with `Closes AUDIT-20260530-22 (cross-model: AUDIT-BARRAGE-claude-01-P7small)` in subject — `8296171`.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/entry/cancel-cascade.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step — `fixed-8296171`.
 
 
 ### Task 7.38 (fix-finding-AUDIT-20260530-23 (cross-model: AUDIT-BARRAGE-codex-01-P7small)): AUDIT-20260530-23 — cascade catch swallows write/journal failures as "skipped me…
