@@ -27,6 +27,8 @@ The structural problem: **we are re-deriving fix-ship semantics from prose, in f
 
 Replace the per-walker decision logic with **mechanical narrowing + agent judgment + operator-curated propose | apply**. The mechanical step is intentionally permissive (extract every `#NNN` mention regardless of context); the agent reads a per-candidate evidence bundle and renders a verdict; the operator reviews the verdicts in a batched-proposal JSON before any GitHub mutations land.
 
+The dispatch primitive is the **Agent tool from within the agent's Claude Code session**, not a subprocess pool or an SDK direct call. `/dw-lifecycle:close-shipped` is a dw-lifecycle skill; skills are invoked from inside a Claude Code session; every other dw-lifecycle skill that needs agent judgment (`/dw-lifecycle:review`, `/dw-lifecycle:implement`) already follows this shape — SKILL.md prose tells the agent (Claude) to dispatch sub-agents via the Agent tool. close-shipped joins the same pattern. CLI helpers stay pure-mechanical (walk sources, assemble bundles, validate proposals, dispatch gh mutations); the SKILL.md prose orchestrates the Agent-tool dispatches between those helper calls.
+
 ## Architecture
 
 ```
@@ -34,10 +36,13 @@ Replace the per-walker decision logic with **mechanical narrowing + agent judgme
         ┌── commit-log mention scan                           │                           │
         │                                                     │   per-candidate           │
         ├── PR description scan                               │   evidence bundle         │
-walk ───┤                                                ─►   │   {issue, commits,        ├──► agent dispatch (parallel)
-range   ├── audit-log Tracks-Issue + body mention                │    pr, audit, workplan}   │     │
-        │                                                     │                           │     │   verdict + reason
-        └── workplan-checkbox back-fill                          └───────────────────────────┘     ▼
+walk ───┤                                                ─►   │   {issue, commits,        ├──► Agent-tool dispatch
+range   ├── audit-log Tracks-Issue + body mention             │    pr, audit, workplan}   │     (parallel, single
+        │                                                     │                           │      message, multiple
+        └── workplan-checkbox back-fill                       └───────────────────────────┘      tool_use blocks)
+                                                                                                    │
+                                                                                                    │   verdict + reason
+                                                                                                    ▼
                                                                                             proposals-<ts>.json
                                                                                                   │
                                                                                                   ▼
@@ -47,17 +52,26 @@ range   ├── audit-log Tracks-Issue + body mention                │    pr
                                                                                             apply (gh comment + label)
 ```
 
-**Step 1 — Narrow (mechanical, permissive):** walk the four sources in the tag range; extract every `#NNN` mention regardless of verb, position, or context. The output is the candidate issue set: every issue number that appears anywhere in the release's evidence corpus. No grammar to maintain; no false-negative risk from convention mismatch.
+The split between mechanical CLI helpers and skill-prose orchestration:
 
-**Step 2 — Bundle (mechanical):** for each candidate issue, collect the evidence the agent will read. Five components per bundle — see § Evidence bundle below.
+**Mechanical CLI helpers (pure, replayable, testable):**
 
-**Step 3 — Dispatch (agent, parallel):** one agent invocation per candidate, dispatched in parallel via `child_process.spawn` subprocess pattern (same shape as `scope-discovery/audit-barrage/spawn-cli.ts`). The default invocation is `claude -p` with the prompt on stdin; the project-level config knob can swap to `codex exec` or `gemini` for adopters using a different default agent CLI. The prompt is a strict-JSON classification task with three possible verdicts (`shipped` / `not-shipped` / `uncertain`) plus a one-sentence reason. See § Prompt below. Standalone-CLI design — works whether or not the operator is invoking `dw-lifecycle close-shipped propose` from inside Claude Code.
+- `dw-lifecycle close-shipped scan --from-tag vA --to-tag vB` — walks all 4 sources permissively, extracts every `#NNN` mention, assembles per-candidate evidence bundles, emits the bundle set as JSON to stdout. No agent, no judgment. Fully deterministic.
+- `dw-lifecycle close-shipped propose --bundles <path> --verdicts <path>` — takes the bundle JSON + a verdict JSON (one verdict per candidate), composes the `proposals-<timestamp>.json` and the markdown summary table. No agent, no judgment.
+- `dw-lifecycle close-shipped apply --proposal <path>` — pre-validates every item has a non-empty decision; dispatches `gh issue comment` + `gh issue edit --add-label` per effectively-shipped row; records per-item outcome. No agent.
 
-**Step 4 — Propose (write):** all verdicts land in a `proposals-<timestamp>.json` file under `.dw-lifecycle/close-shipped/`. The CLI prints a markdown table summarizing the verdicts for operator scanning. See § Proposal JSON below.
+**SKILL.md prose (orchestration; the agent runs this):**
 
-**Step 5 — Operator review:** the operator fills in a `decision` field per item (`accept-verdict` / `override-shipped` / `override-not-shipped` / `skip`). This is the disposition gate.
+1. Run `dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB>` → JSON bundle set
+2. If the bundle set's candidate count exceeds the configured threshold (default 50), surface the count to the operator and confirm before continuing
+3. **For each bundle, dispatch an Agent in parallel.** Single message with multiple `Agent({...})` tool_use blocks (one per candidate). Each agent gets the bundle as prompt input + the prompt template from § Prompt below. The general-purpose subagent type is appropriate — this is a classification task, not a specialized one.
+4. Collect the verdicts (one per candidate) into a `verdicts-<timestamp>.json` file
+5. Run `dw-lifecycle close-shipped propose --bundles <path> --verdicts <path>` → writes the proposal JSON + prints the markdown table
+6. Report the markdown table to the operator. Stop. The operator reviews the proposal file out-of-band.
+7. (Operator re-invokes the skill in apply mode after filling in decisions.)
+8. Run `dw-lifecycle close-shipped apply --proposal <path>` → applies the operator-approved mutations
 
-**Step 6 — Apply (mechanical):** the operator runs `close-shipped apply --proposal <path>`. Pre-validation: every item must have a non-empty decision. For each effectively-shipped row: post the `pending-verification` comment + add the label via `gh`. Per-item dispatch is best-effort; partial failures recorded.
+The Agent-tool dispatch in step 3 is the same pattern used by `/dw-lifecycle:review` (parallel dispatch of code-reviewer agents) and `/dw-lifecycle:implement` (sequential dispatch of implementer + reviewer agents). No new dispatch infrastructure; no subprocess pool; no SDK package; no `ANTHROPIC_API_KEY` env requirement. The model in use is whatever the operator's Claude Code session is configured with.
 
 ## Evidence bundle
 
@@ -97,11 +111,13 @@ workplan_backfills:              # `[x]` task lines whose `· [#N](url)` link ma
 
 **Truncation rules:** text fields use trailing `…` if over cap. Caps chosen for token budget: issue body 1k, commit body 500, PR body 1k, audit-log body 500. Numbers and structural fields never truncate.
 
-**Total per-candidate budget:** ~2-5K tokens (high-end when the issue has many commits + a PR + multiple audit-log entries). For 20-30 candidates per release: ~50-150K tokens total agent input.
+**Total per-candidate budget:** ~2-5K tokens (high-end when the issue has many commits + a PR + multiple audit-log entries). For 20-30 candidates per release: ~50-150K tokens total agent input across all dispatches.
 
-**Bundle assembly is mechanical.** Same code path for every candidate; no per-source decision logic. The judgment moves out of the assembly step and into the agent dispatch.
+**Bundle assembly is mechanical.** Same code path for every candidate; no per-source decision logic. The judgment moves out of the assembly step and into the Agent dispatches.
 
 ## Prompt
+
+The SKILL.md prose composes one prompt per candidate by substituting the bundle's fields into this template, then dispatches via `Agent({subagent_type: 'general-purpose', prompt: <composed>})`:
 
 ```
 You are evaluating whether a GitHub issue's fix was shipped in a specific release range.
@@ -157,7 +173,7 @@ Return strict JSON only:
 ```
 
 **Field semantics:**
-- `agent_verdict` ∈ {`shipped`, `not-shipped`, `uncertain`, `error`}. `error` is the failure path when the agent dispatch fails or the response can't be JSON-parsed.
+- `agent_verdict` ∈ {`shipped`, `not-shipped`, `uncertain`, `error`}. `error` is the failure path when the dispatched agent's response can't be JSON-parsed.
 - `agent_reason` is the agent's one-sentence text.
 - `evidence_summary` is a mechanical summary of bundle contents (commit count + audit-log entry count + PR linkage) — useful for the operator's table scan.
 - `decision` is empty after propose. Operator fills with one of `accept-verdict` / `override-shipped` / `override-not-shipped` / `skip`. `accept-verdict` means "go with whatever `agent_verdict` says" (so `shipped` triggers apply, `not-shipped` skips, `uncertain` skips with a warning). The two override values are operator's manual call. `skip` means "don't touch this issue regardless of verdict."
@@ -176,18 +192,15 @@ Return strict JSON only:
 
 **Partial-failure recording in apply:** per-item gh mutation runs in best-effort mode. Failed items get recorded in the run summary (`applied`, `skipped`, `failed` buckets); exit code 0 if at least one apply succeeded; exit code 1 if every approved item failed; exit code 2 only on pre-validation failure.
 
-## Cost shape
+## Cost + parallelism shape
 
-| Knob | Value | Rationale |
-|---|---|---|
-| Model | `claude-haiku-4.5` | Classification task; Haiku tier is appropriate. Cheaper alternatives possible (gpt-4o-mini, gemini-flash) but Haiku is the project's existing default. |
-| Parallelism | up to 10 concurrent | Via `child_process.spawn` subprocess pool (audit-barrage pattern); bounded to avoid rate-limit churn. |
-| Estimated cost per release | $0.05–$0.20 | 20-30 candidates × ~3K input + ~50 output × Haiku rates. Trivial compared to operator time. |
-| Sync vs async | Sync (propose blocks) | Operator runs `close-shipped propose`, waits ~30-60s, gets the proposal file. Mental model matches `triage-issues propose`. |
-| Progress UX | `Agent pass: 5/22…` stderr | Operator sees the dispatch run, knows it's not hung. |
-| Error path | `agent_verdict: "error"` + error message | Per-item; operator can override individually. No retry on dispatch failure (operator decides whether to re-propose). |
+The dispatch is the Agent tool from inside the agent's own session, so:
 
-**Cost ceiling:** if a release ever produces >50 candidates, the propose step prompts the operator with the count before dispatching — gives an opportunity to bail out cheaply on a release that grew past the expected size.
+- **Model:** whatever the operator's Claude Code session is using. The skill doesn't pick. Operators who run Sonnet for everything pay Sonnet rates per dispatch; operators on Haiku pay less. No model knob; no SDK configuration; no environment variables to set.
+- **Parallelism:** all candidates dispatch in a single message containing N parallel `Agent({...})` tool_use blocks. Claude Code runs them concurrently; the operator sees them complete asynchronously. For 20-30 candidates per release, this fans out in one round-trip — typically completes in 30-90s wall-clock depending on per-agent latency.
+- **Cost shape:** dominated by the bundle prompts (issue body + commits + PR + audit-log + workplan, truncated). At 2-5K tokens per candidate × 20-30 candidates × whatever model rate the session is paying.
+- **Candidate-count threshold:** the SKILL.md prose surfaces a confirmation prompt to the operator when the bundle set has more than 50 candidates (default; configurable). This gives an opportunity to bail out cheaply on a release that grew past the expected size before any agent dispatches fire.
+- **Error path:** if the dispatched agent's response can't be JSON-parsed (malformed verdict, refusal, timeout), the SKILL.md prose records `agent_verdict: "error"` + the raw response excerpt in the verdict JSON. The operator can override per item in the proposal.
 
 ## What replaces, what stays
 
@@ -203,17 +216,19 @@ Return strict JSON only:
 - Reachability checks for audit-log SHA references (`isReachable` / `isAncestor`).
 - gh comment/edit mechanics (`buildEvidenceCommentBody`, `gh issue comment`, `gh issue edit`).
 - Release-notes-body emission (`release-notes.ts`).
-- Project-config file (`scanner-config.ts`) — repurposed as the cost-ceiling knob's home (e.g. `propose_confirm_threshold: 50`).
+- Project-config file (`scanner-config.ts`) — repurposed as the candidate-count threshold's home (e.g. `candidate_confirm_threshold: 50`).
 
-**New:**
-- `bundle.ts` — assembles per-candidate evidence bundles from the 4 source signals.
-- `agent-dispatcher.ts` — wraps `child_process.spawn` for per-candidate CLI agent dispatch; pool-bounded parallelism; handles error recording. Models the existing `scope-discovery/audit-barrage/spawn-cli.ts` contract.
-- `propose.ts` — orchestrates narrow → bundle → dispatch → write proposal JSON.
-- `apply.ts` — rewritten to consume the proposal JSON; pre-validation gate; per-item gh dispatch.
+**New (all pure CLI helpers):**
+- `bundle.ts` — assembles per-candidate evidence bundles from the 4 source signals; pure function over the bundle inputs.
+- `scan-subcommand.ts` — CLI verb that walks the tag range, calls `bundle.ts`, emits the bundle set as JSON.
+- `propose-subcommand.ts` — CLI verb that takes bundles JSON + verdicts JSON, composes the proposal JSON + markdown table.
+- `apply.ts` — rewritten to consume the proposal JSON; pre-validation gate; per-item gh dispatch. (The file name stays; the body is new.)
+
+**Notably NOT new:** no subprocess pool, no SDK client, no API-key handling, no model-router, no agent-dispatcher module. The dispatch happens in the SKILL.md prose using the Agent tool that's already part of the agent's runtime.
 
 ## Migration
 
-**Phase 14 ships first** in an upcoming release (the configurable-parens knob + Tracks-Issue field land before this redesign, since they're already implemented on `feature/hygiene`). The redesign is **additive**: new `propose | apply` verbs land in a subsequent version; the existing single-command `close-shipped <flags>` path stays as a legacy fallback for one release cycle past the redesign ship, then deprecates with a notice pointing at the new shape.
+**Phase 14 ships first** in an upcoming release (the configurable-parens knob + Tracks-Issue field land before this redesign, since they're already implemented on `feature/hygiene`). The redesign is **additive**: new `scan | propose | apply` verbs land in a subsequent version; the existing single-command `close-shipped <flags>` path stays as a legacy fallback for one release cycle past the redesign ship, then deprecates with a notice pointing at the new shape.
 
 **Sunset path:**
 1. v0.X.Y ships the redesign as the new default. Old single-command flow available behind `--legacy` flag.
@@ -224,42 +239,44 @@ This gives adopters ~3 release cycles to migrate from the prose-grammar config k
 
 ## Testing
 
-**Mechanical paths (narrowing + bundle assembly + apply gate):**
+**Mechanical paths (scan + bundle assembly + propose + apply):**
 - Vitest unit + integration tests against fixture project trees + mocked `gh` stub.
 - Coverage parity with current close-shipped tests (every walker path → bundle entry; every proposal-JSON shape → apply outcome).
+- The `scan` CLI verb's output is deterministic given the input tree; snapshot-test against fixture repos.
+- The `propose` CLI verb's output is deterministic given bundles + verdicts; snapshot-test.
+- The `apply` CLI verb's gh-call sequence is mockable; assert the exact gh argv per decision shape.
 
-**Agent dispatch:**
-- Stub the agent dispatcher in unit tests; assert per-candidate prompt content matches the expected bundle.
-- Integration test: run agent dispatcher against a fixture bundle with `claude-haiku` (live, opt-in via env var); assert verdict shape is JSON-parseable + verdict ∈ valid set.
-- Cost gate: tests confirm bundle-size truncation rules + ceiling enforcement (`propose_confirm_threshold`).
+**Agent-dispatch path:**
+- Not directly testable in vitest — the dispatch is in SKILL.md prose calling the Agent tool, not in TypeScript code. Instead, the SKILL.md prose itself is what gets reviewed for correctness during the `/dw-lifecycle:review` cycle.
+- The bundle JSON shape is what the agent sees; the truncation + assembly rules are what vitest covers.
+- Live verification: run the SKILL.md flow end-to-end against the v0.27.0..v0.28.1 range from this very project once the redesign ships. Expected: the agent correctly identifies #356 / #361 / #364 / #366 as shipped; correctly rejects back-fill docs commits (#353 / #355) + cross-references (#340 / #347) + the PR self-reference (#365).
 
 **End-to-end smoke:**
-- Extend `scripts/smoke-hygiene.sh` (local-only, per project rule) with a propose → fill → apply round-trip against a fixture repo + canned agent responses.
-
-**Live verification gate:**
-- Same convention as Phase 14: re-run against the v0.27.0..v0.28.1 range after the redesign ships in an installed release. Expected: the agent correctly identifies #356 / #361 / #364 / #366 as shipped; correctly rejects back-fill docs commits + prose-cited fixture mentions.
+- Extend `scripts/smoke-hygiene.sh` (local-only, per project rule) with a `scan → propose → apply` round-trip against a fixture repo + canned verdicts JSON. The smoke doesn't exercise the agent dispatch (that's the SKILL.md prose); it exercises the CLI-helper boundaries.
 
 ## Acceptance criteria
 
-- [ ] `dw-lifecycle close-shipped propose --from-tag <vA> --to-tag <vB>` walks the 4 sources permissively, assembles per-candidate evidence bundles, dispatches one agent per candidate in parallel, and writes a proposal JSON.
+- [ ] `dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB>` walks the 4 sources permissively + emits the bundle set as JSON to stdout.
+- [ ] `dw-lifecycle close-shipped propose --bundles <path> --verdicts <path>` writes a proposal JSON + prints a markdown table.
 - [ ] `dw-lifecycle close-shipped apply --proposal <path>` validates every item has a non-empty decision, dispatches gh comment + label per effectively-shipped row, records per-item success/failure.
-- [ ] Run against v0.27.0..v0.28.1: agent correctly identifies #356, #361, #364, #366 as shipped (genuine fixes); correctly rejects #353, #355 (back-fill docs commits), #340/#347/etc. (already-closed / cross-reference).
-- [ ] Cost per release ≤ $0.50 at default settings; cost-ceiling prompt fires when candidate count > 50.
+- [ ] SKILL.md prose covers the `scan → Agent-tool parallel dispatch → propose → operator review → apply` orchestration end-to-end.
+- [ ] Live verification against v0.27.0..v0.28.1: agent correctly identifies #356, #361, #364, #366 as shipped (genuine fixes); correctly rejects #353, #355 (back-fill docs commits), #340/#347/etc. (already-closed / cross-reference), #365 (PR self-reference).
+- [ ] Candidate-count threshold (default 50) surfaces a confirmation before the parallel Agent dispatch fires.
 - [ ] Vitest unit + integration tests for the mechanical paths; full plugin suite stays green.
 - [ ] Legacy `--legacy` flag preserves the old single-command behavior for one release cycle.
-- [ ] SKILL.md prose names the new flow + the agent dispatch + the proposal/apply gate + the legacy-flag sunset.
+- [ ] SKILL.md prose names the new flow + the Agent-tool dispatch + the proposal/apply gate + the legacy-flag sunset.
 
 ## Open questions
 
-- **Multi-model barrage?** The audit-barrage feature dispatches multiple CLI tools in parallel (claude + codex + gemini) for stronger judgment. For close-shipped, this could be a future cost-vs-confidence tradeoff. Out of scope for the initial ship; tracked as a follow-up if the single-model verdicts prove insufficient in practice.
 - **Diff content in the bundle?** Diff stats (file count + line counts) are in. Full diff body is out. If the agent can't render confident verdicts from prose-only evidence, this is the next escalation.
+- **Multi-model judgment?** A future variant could dispatch multiple agents per candidate (different subagent_types or different models within a session) and reconcile their verdicts. Out of scope for v1.
 - **Cross-release issue tracking?** Some issues take multiple releases to fully fix. The current close-shipped contract is per-release-range, and that stays. An issue closed across two releases will surface for verification in both — the operator can decide to verify-and-close after the second.
 
 ## Risks
 
-- **Agent verdict drift.** Same input → different verdict run-to-run, since LLMs aren't deterministic. Mitigation: the strict-JSON output schema + the propose|apply gate (operator can re-run propose if a verdict looks wrong; the second pass is cheap).
-- **Cost overrun.** A release with 100+ candidates could spike costs. Mitigation: the `propose_confirm_threshold` knob fires a confirmation prompt before dispatch; operator can bail out cheaply.
-- **Agent unavailable.** If the agent dispatcher fails (network, rate-limit, model deprecation), every per-candidate verdict becomes `agent_verdict: "error"`. The operator falls back to overriding each item by hand. Slower but functional.
+- **Agent verdict drift.** Same input → different verdict run-to-run, since LLMs aren't deterministic. Mitigation: the strict-JSON output schema + the propose|apply gate (operator can re-run propose if a verdict looks wrong; the second pass is cheap; the SKILL.md prose makes re-running explicit).
+- **Bundle prompt cost spike.** A release with 100+ candidates could spike token usage at the session's model rate. Mitigation: the candidate-count threshold knob fires a confirmation prompt before dispatch; operator can bail out cheaply.
+- **Agent dispatch returns malformed JSON.** If the dispatched agent's response can't be JSON-parsed on the first try, the SKILL.md prose re-dispatches once with a short "your previous response was not valid JSON; return only the verdict JSON" correction. If the second response also fails to parse, the verdict for that candidate becomes `agent_verdict: "error"` with the raw response excerpt captured. Operator can override individually in the proposal.
 - **Legacy-flag adoption drift.** Adopters who pin `--legacy` permanently never migrate. Mitigation: the deprecation stderr in v0.X.(Y+1) names the removal version; the v0.X.(Y+2) removal forces the migration.
 
 ## Cross-references
@@ -267,4 +284,4 @@ This gives adopters ~3 release cycles to migrate from the prose-grammar config k
 - Originating discomfort: v0.28.1 install verification surfaced Phase 14's documented limitations (back-fill docs commits whose subject ends in `(#NNN)` still produce false-positives; prose-cited fixture text inside audit-log entries was leaking before the splitter heading-level fix). Operator pushback after the verification surfaced the structural concern: parsing prose to infer fix-ship semantics is an unbounded patching cycle.
 - Phase 14 / [#369](https://github.com/audiocontrol-org/deskwork/issues/369) — the prose-grammar fixes this design supersedes.
 - Phase 13 Medium fix tracked under [#366](https://github.com/audiocontrol-org/deskwork/issues/366) — the operator-curation `propose | apply` shape is part of this design.
-- Existing `scope-discovery/audit-barrage/` (shipped in v0.28.0) — the `child_process.spawn`-based CLI dispatch pattern this design reuses; specifically `spawn-cli.ts` for the stdin-closed subprocess shape with `claude -p` / `codex exec` / `gemini` support.
+- **Existing dw-lifecycle pattern this design follows:** `/dw-lifecycle:review` (parallel dispatch of `feature-dev:code-reviewer` agents via the Agent tool) and `/dw-lifecycle:implement` (sequential dispatch of implementer + reviewer agents via the Agent tool). SKILL.md prose composes prompts, dispatches Agent tool calls, collects results; CLI helpers stay pure-mechanical.
