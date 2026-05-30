@@ -34,13 +34,14 @@
  */
 
 import { existsSync } from 'node:fs';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 import { repoRoot } from '../repo.js';
 import {
   extractBarrageFindings,
   type ExtractedFinding,
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
+import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
 
 export interface AuditBarrageLiftCliOptions {
   readonly featureSlug: string;
@@ -293,8 +294,12 @@ export async function runAuditBarrageLift(
   }
 
   const reader = args.read ?? ((p: string) => readFile(p, 'utf8'));
-  const writer =
-    args.write ?? ((p: string, c: string) => writeFile(p, c, 'utf8'));
+  // Per AUDIT-20260530-04: the audit-log is precious historical
+  // record under the project's preservation rule. Use the atomic
+  // temp-file+rename pattern so a crash mid-write leaves either the
+  // old file or the new file, never a truncated one. Tests still
+  // supply their own write seam.
+  const writer = args.write ?? atomicWriteFile;
 
   const auditLogText = await reader(auditLogPath);
   const highest = highestExistingNn(auditLogText, opts.date);

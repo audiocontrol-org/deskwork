@@ -207,16 +207,16 @@ Closes AUDIT-20260530-03. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 
 Closes AUDIT-20260530-04. Surface: `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:333-340`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-04` in subject
+- [x] Step 1: 5 failing tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (writes content, no leak, overwrite, error-path cleanup, same-dir).
+- [x] Step 2: confirmed tests fail against pre-fix code (helper didn't exist; red phase).
+- [x] Step 3: NEW `atomic-write-file.ts` helper implements the temp-file + atomic-rename pattern; `audit-barrage-lift.ts` default writer swaps from `writeFile(...)` to `atomicWriteFile`. Test injections via `args.write` still bypass when supplied.
+- [x] Step 4: tests pass; plugin suite 2411/2411.
+- [x] Step 5: commit with `Closes AUDIT-20260530-04` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 

@@ -1,4 +1,4 @@
-generated_at: 2026-05-30T07:35:32.667Z
+generated_at: 2026-05-30T08:01:04.400Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1140,18 +1140,18 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:187:195
     disposition: keep-with-reason
     reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
-  - id: 00d9079a6fe2
+  - id: 7d882bc319d3
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:284:293
-      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:299
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:290
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 5057f7f0a8f2
     lines: 19
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:376:394
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:337:355
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:342:360
       - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
@@ -1168,36 +1168,29 @@ clones:
   - id: 044582e5231a
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:101:109
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:102:110
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:83:90
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 808397c61b8b
     lines: 10
     members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:120:129
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:121:130
       - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:147:156
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 2fb54234f46e
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:128:134
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:129:135
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:110:116
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 36c8124846df
     lines: 10
     members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:180:189
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:181:190
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:147:156
-    disposition: ignore-with-justification
-    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
-  - id: 76af44b0d65f
-    lines: 10
-    members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:290:299
-      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:290
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 4295f8a2a16b
