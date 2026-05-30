@@ -3167,7 +3167,7 @@ Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). 
 ### AUDIT-20260530-03 — `PLUGIN_DEFAULTS_DIR` doubles as module directory AND preset registry (stray `.json` becomes phantom template)
 
 Finding-ID: AUDIT-20260530-03 (cross-model: AUDIT-BARRAGE-claude-03-P2)
-Status:     open
+Status:     fixed-d5303ed
 Severity:   low
 Surface:    `packages/core/src/pipelines/loader.ts:31`, `:148-159`, `:180-189`
 
