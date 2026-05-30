@@ -1,0 +1,17 @@
+Loaded cached credentials.
+Loading extension: nanobanana
+API returned invalid content (empty or unparsable JSON) after all retries. Full report available at: /var/folders/sk/jzwspmzn1g17x97x7s7l_dch0000gn/T/gemini-client-error-generateJson-invalid-content-2026-05-30T06-33-50-708Z.json
+[Routing] ClassifierStrategy failed: Error: Failed to generate JSON content: Retry attempts exhausted
+    at BaseLlmClient.generateJson (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/core/baseLlmClient.js:71:19)
+    at async ClassifierStrategy.route (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/routing/strategies/classifierStrategy.js:126:34)
+    at async CompositeStrategy.route (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/routing/strategies/compositeStrategy.js:30:34)
+    at async ModelRouterService.route (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/routing/modelRouterService.js:44:24)
+    at async GeminiClient.sendMessageStream (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/core/client.js:373:30)
+    at async file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/dist/src/nonInteractiveCli.js:188:34
+    at async main (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/dist/src/gemini.js:361:9)
+Attempt 1 failed: You have exhausted your capacity on this model.. Retrying after 10000ms...
+Attempt 2 failed: You have exhausted your capacity on this model.. Retrying after 10000ms...
+Error when talking to Gemini API Full report available at: /var/folders/sk/jzwspmzn1g17x97x7s7l_dch0000gn/T/gemini-client-error-Turn.run-sendMessageStream-2026-05-30T06-34-12-057Z.json
+[API Error: You have exhausted your capacity on this model.]
+An unexpected critical error occurred:
+[object Object]

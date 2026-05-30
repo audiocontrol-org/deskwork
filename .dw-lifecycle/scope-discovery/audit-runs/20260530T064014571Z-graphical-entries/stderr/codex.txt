@@ -1,0 +1,2749 @@
+Reading additional input from stdin...
+OpenAI Codex v0.133.0
+--------
+workdir: /Users/orion/work/deskwork-work/graphical-entries
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e779c-a33c-7131-bf35-a94c9681b22c
+--------
+user
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface bugs, design issues, missed edge cases, and code-quality concerns in the work product captured in the diff below.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+graphical-entries
+
+## Feature scope (workplan / PRD summary)
+
+Phase 7 small surfaces of graphical-entries — three commits not yet barraged:
+
+1. Task 7.1 — EntrySidecar members[] schema delta. Adds members: z.array(z.string().uuid()).optional() to EntrySchema. The semantic: a group entry is structurally an Entry with a members[] field; no separate Group entity. artifactPath remains optional (groups may or may not have a content body). Schema-additive; no migration. 7 schema tests cover regular/group/empty-members/with-artifactPath/metadata-only/non-UUID rejection/non-array rejection. Review actions in the same commit pair fix doc-comment anchors + sibling tests (AUDIT-12/13/14 already-closed).
+
+2. Task 7.2.7 — cancelEntry walker/wrapper split (closes #360). Pre-fix: cascade --cascade recursively invoked cancelEntry, calling regenerateCalendar once per invocation = N+1 calendar.md writes on a group with N cascaded members. Fix: split into private walker cancelEntryWithoutCalendarRegen (per-entry transition + journal append + sidecar write; cascade walk recurses into walker) and public cancelEntry wrapper (calls walker once, then regenerateCalendar once at the cascade boundary). vi.spyOn-based regenerate-count assertion at packages/core/test/entry/cancel-cascade.test.ts. Behavior-preserving for single-entry cancel; cascade now O(N+K) where K is total entries.
+
+3. Task 7.2.8 — cascadeFrom metadata on stage-transition events (closes #359). Adds metadata.cascadeFrom: z.string().uuid().optional() to StageTransitionEvent. Group cancel --cascade now populates the originating group's UUID on every cascaded member's event. Top-level originator semantic: opts.cascadeFrom ?? sidecar.uuid threading preserves the top-level UUID across transitive cascades (single-hop audit trail). Non-cascade cancels and the originator's own event do NOT carry cascadeFrom.
+
+Audit focus: schema invariants on the new fields; cascade semantics edge cases (recursive groups, mixed-skip cases, missing members); journal-event correctness; metadata threading correctness; no silent fallbacks; type-safety; behavior preservation for non-cascade cancel.
+
+## Commit subjects in the audited range
+
+05b6091 docs(graphical-entries): Task 7.1 review actions — AUDIT-12/13/14 + Task 7.5.5 + last-element test
+e47ed3e feat(graphical-entries): Phase 7 Task 7.1 — EntrySidecar members[] schema delta
+cbc53ae fix(graphical-entries): Step 7.2.7 review actions — AUDIT-22/26 + scope 23/24 (#363)
+5ffcf19 docs(graphical-entries): backfill AUDIT-20260529-18 Status sha (4e3b911)
+4e3b911 perf(graphical-entries): Step 7.2.7 — cancelEntry walker/wrapper split (closes 360, AUDIT-18)
+605bd85 docs(graphical-entries): record Step 7.2.8 review pass (AUDIT-28 informational)
+c0bc111 docs(graphical-entries): backfill AUDIT-20260529-27 Status sha (e311698)
+e311698 feat(graphical-entries): Step 7.2.8 - cascadeFrom metadata on cascade stage-transition events (closes 359)
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+takes a `LaneBucket` shape that's bound to the dashboard's lane
+machinery + focus state, which doesn't apply to the scoped
+group-member-set view). Instead, `members-section.ts` rebuilds the
+swim CHROME — `.er-members-swim` (header), `.er-members-stage`
+(per-stage row), `.er-members-card` (per-member card) — using the
+same press-check tokens and the same `stageGlyph()` lookup so the
+visual signature matches Phase 5 without coupling the entry-review
+surface to dashboard internals. The compositor walks the same
+`template.linearStages` + `template.offPipelineStages` sequence the
+dashboard swim does, so empty stages render with the same
+`is-empty` modifier the dashboard convention names.
+
+**Pull-tab affordance class** — `.er-row-member-tab` mirrors the
+`.er-outline-tab` / `.er-marginalia-tab` shape per the
+`.claude/rules/affordance-placement.md` § "Reference patterns in
+this codebase" mandate. Vertical text via `writing-mode:
+vertical-rl`, left-edge anchored, kraft accent color so it reads
+distinct from stage (red-pencil) or action (proof-blue). The
+expanded state inverts the colors (kraft fill, paper text) — same
+inversion pattern the marginalia-tab uses on activation.
+
+**Structural decisions made along the way**
+
+1. `members` query param on the entry-review route — added to
+   `EntryReviewQuery` and routed through `server.ts`'s
+   `c.req.query('members')`. Default = composed per the picked
+   direction; client controller flips + persists per-group via
+   localStorage.
+2. Missing-member rows — render as `.er-member-row--missing`
+   instead of silently dropping. The doctor `group-member-missing`
+   rule (Task 7.5.2) is the loud signal; the surface mirrors the
+   same finding inline so operators see the broken reference
+   without leaving the page.
+3. Lane-stack (mobile) NOT wired with the pull-tab in this commit —
+   the mobile lane-stack uses the list-body chrome, not the kanban
+   `.er-row-shell`, so a sibling rendering pass against the list-body
+   chrome is required. Track 2's spec-compliance review flagged this
+   as HIGH because the picked Direction 1 mockup is mobile-first.
+   Tracked as Step 7.3.5 in the workplan + GitHub issue #371; the
+   feature is NOT closeout-ready until that step lands. Per the
+   project's discipline rule, deferrals get both workplan + issue
+   recording — see Track 2 review actions for the resolution path.
+4. `loadLaneConfig` failures during member loading swallow rather
+   than crash — a member with a stale lane id surfaces in the
+   composed view as "unrouted" (rendered with the raw lane id) and
+   in the list view's per-row meta. The list-mode test does NOT
+   exercise this branch; the empty-members fallback test exercises
+   the no-lane-resolution path indirectly through the bare-id
+   default lane setup.
+5. The composed view's `data-template-id` attribute drives the
+   lane-accent color via CSS — no per-lane `class="lane-<id>"`
+   coupling for non-default templates. This avoids the "we forgot
+   to teach the CSS about lane X" failure mode the dashboard hit
+   in pre-Task-5.2 days.
+
+Workplan deltas + closing — Task 7.3.1, 7.3.2, 7.3.3, 7.3.4 ticked;
+Task 7.4.1, 7.4.2, 7.4.3 ticked. Phase 7's remaining tasks (7.5
+doctor rules + 7.6 studio group-management page + 7.7 iterate
+semantics on groups + 7.8 integration tests) are explicitly out of
+scope for this dispatch and remain open. Phase 7 parent issue (#306)
+stays open until those tasks land. No GitHub `Closes` keyword on
+the commit.
+
+`Status` backfilled to `fixed-b642cd6` in the immediately-following
+docs commit per the established two-commit pattern. (Note: the
+backfill commit `3d670f5` originally wrote a markdown table format
+that did NOT match the canonical `Status: fixed-<sha>` grep contract
+— that's been corrected at the AUDIT-29 header above as part of the
+Track 2 review actions; see AUDIT-30 below.)
+
+### AUDIT-20260529-30 — review-action: cancelled `unsafe(laneClass)` HTML-injection risk in renderListRow
+
+Finding-ID: AUDIT-20260529-30
+Status:     fixed-cc45787
+Severity:   medium
+Surface:    `packages/studio/src/pages/entry-review/members-section.ts:217-228`
+
+`renderListRow` wrapped the lane-class composition in `unsafe(...)`,
+bypassing the html-template's escaping. `member.lane` is Zod-typed as
+`z.string().min(1)` (`packages/core/src/schema/entry.ts:172`) — NOT
+regex-bound to the canonical lane-id charset. A malformed sidecar
+with `lane: 'x" onclick="alert(1)'` would have broken out of the
+class attribute when rendered.
+
+Resolution: import `LANE_ID_REGEX` from `@deskwork/core/lanes` and
+validate the lane id before composing the class. If it fails the
+regex, fall back to `lane-unrouted` (same shape the loader uses for
+genuinely-missing lane configs). The `unsafe(...)` wrapper is now
+safe because the input is regex-validated against the canonical
+charset.
+
+Track 3 finding #1 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-31 — review-action: pull-tab width 22px failed WCAG 2.5.8 (24x24 minimum)
+
+Finding-ID: AUDIT-20260529-31
+Status:     fixed-cc45787
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:250`
+
+`.er-row-member-tab` was 22px wide. WCAG 2.2 SC 2.5.8 (Target Size
+Minimum, AA) requires 24x24 CSS pixels. The horizontal axis failed
+by 2px. The spacing exception did not apply because the row
+foreground is the immediate right neighbor at 4px clearance, well
+under 24px.
+
+Resolution: widened the tab from 22px to 24px; adjusted
+`.er-row-shell.has-member-tab .er-row-fg`'s `padding-left` from 26px
+to 28px to preserve the row's content layout. Both axes now meet
+the WCAG floor.
+
+Track 3 finding #2 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-32 — review-action: kraft-on-paper-2 text contrast 3.58:1 failed WCAG 1.4.3 AA
+
+Finding-ID: AUDIT-20260529-32
+Status:     fixed-cc45787
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:275-304`
+
+`.er-row-member-tab-label` and `.er-row-member-tab-count` text used
+`var(--er-kraft)` (#8A7250) on `var(--er-paper-2)` (#ECE6D4),
+computed contrast ratio approx 3.58:1. The label is 0.5625rem (~9px)
+small text. WCAG 2.1 SC 1.4.3 AA requires 4.5:1 for small text; the
+text failed by ~0.92.
+
+Resolution: changed the resting-state label color to
+`var(--er-ink-soft)` (#3A3530) on `var(--er-paper-2)` = 9.79:1; the
+count badge text to `var(--er-ink)` (#1A1614) on `var(--er-paper)` =
+14.91:1. Increased label font-size from 0.5625rem to 0.625rem
+(~10px) and weight from 600 to 700. The kraft accent is preserved
+through the count badge's border + the expanded-state background
+flip, so the affordance still reads as a kraft "belonging-to"
+affordance overall. Expanded-state contrast (paper on kraft, ~3.84:1)
+left as-is because the expanded state is transient and the primary
+information delivered is in the popover content, not the tab label
+which the operator only sees while engaging the tap.
+
+Track 3 finding #3 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-33 — review-action: AUDIT-29 used non-canonical Status format (broke queue-check grep)
+
+Finding-ID: AUDIT-20260529-33
+Status:     fixed-cc45787
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:2728-2732`
+
+The AUDIT-29 entry as originally written (b642cd6) used a markdown
+table format `| fixed (b642cd6) |` for the Status field. Every
+prior audit entry follows the canonical `Status:     fixed-<sha>`
+field-format documented in the file's header and grep-anchored by
+the canonical queue check `grep -nE "^Status:[[:space:]]+fixed-"`.
+The non-canonical entry would NOT have surfaced in the standard
+triage queue.
+
+Resolution: rewrote the AUDIT-29 header block to use the canonical
+`Finding-ID / Status / Severity / Surface` field-format. The
+queue-check grep contract is preserved.
+
+Track 2 finding #2 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-34 — review-action-deferred: mobile lane-stack missing pull-tab (Track 2 HIGH; deferred to #371)
+
+Finding-ID: AUDIT-20260529-34
+Status:     acknowledged-2026-05-29-issue-#371
+Severity:   high
+Surface:    `packages/studio/src/pages/dashboard/swimlane-shell.ts:258-271`, `packages/studio/src/pages/dashboard/lane-stack-card.ts`, `packages/studio/src/pages/dashboard/swimlane-list-body.ts`
+
+Track 2's spec-compliance review of b642cd6 flagged HIGH: the
+implementation wires the kraft pull-tab into the desktop kanban
+swim path only. The mobile lane-stack rendering (the primary
+viewport per the brief's "mobile-first" stance and the picked
+Direction 1 mockup) does NOT render the affordance. A mobile
+operator cannot discover that an entry belongs to a group.
+
+The implementer's audit-log narrative framed this as a "future
+operator need" — exactly the "Just for now is bullshit" pattern
+the discipline rule names. Resolution: filed
+[#371](https://github.com/audiocontrol-org/deskwork/issues/371)
+with the deferral rationale + scoped Step 7.3.5 into the workplan
+per the discipline rule's two-track recording requirement. The
+audit-log narrative for AUDIT-29 has been amended to surface the
+deferral path.
+
+Phase 7 closeout is BLOCKED on Step 7.3.5 landing (mobile lane-stack
++ desktop list-mode-body pull-tab parity). Track 2 finding #1 + #5
+from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-35 — review-action-deferred: composed view silently drops unrouted members (Track 3 #4; deferred)
+
+Finding-ID: AUDIT-20260529-35
+Status:     acknowledged-2026-05-29-issue-#372
+Severity:   low
+Surface:    `packages/studio/src/pages/entry-review/members-section.ts:99-119`
+
+`bucketMembersByLane` skips members whose `lane === undefined` AND
+members whose `lane` is not in `laneConfigsById`. In list view they
+still render (with `lane-unrouted` styling); in composed view they
+vanish with no visible count discrepancy on the toggle. The operator
+cannot tell composed view shows fewer entries unless they cross-check
+totals. Tracked at
+[#372](https://github.com/audiocontrol-org/deskwork/issues/372)
+with the recommended unrouted-indicator design.
+
+### AUDIT-20260529-36 — popover renders visible at rest on every member row (cascade order defeats `hidden`)
+
+Finding-ID: AUDIT-20260529-36 (cross-model: AUDIT-BARRAGE-claude-01)
+Status:     fixed-ffce4ba
+Severity:   high
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:347-354`, `packages/studio/src/pages/dashboard/section.ts:50` (`renderMemberPopover`)
+
+`renderMemberPopover` emits `<div class="er-row-member-popover" data-row-member-popover hidden>`, and the client controller toggles visibility via `popover.hidden = !expanded` (`row-member-tab.ts` `setRowExpanded`). The intended design is collapsed-at-rest, expanded-on-tap. But the CSS rule `.er-row-member-popover { display: block; ... }` (same specificity 0,1,0 as `[hidden] { display: none }`, declared later by origin) WINS. The `hidden` attribute is inert; every member row's popover paints at all times.
+
+The integration test (`dashboard-member-row-badge.test.ts`) only asserts `toContain('er-row-member-popover')` against the rendered HTML string — it never checks computed visibility. The test suite is green while the surface is functionally broken.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: drive visibility from the row-shell state class (e.g. `.er-row-shell:not(.is-member-expanded) .er-row-member-popover { display: none }` + `.er-row-shell.is-member-expanded .er-row-member-popover { display: block }`), AND extend the test to assert computed visibility via DOM (not string-contains) before declaring fixed. Per `.claude/rules/ui-verification.md`, the fix needs a live Playwright check before closing.
+
+### AUDIT-20260529-37 — composed view has silent-drop vectors beyond AUDIT-35 (stage-not-in-template + partial-load lane configs)
+
+Finding-ID: AUDIT-20260529-37 (cross-model: AUDIT-BARRAGE-claude-02)
+Status:     fixed-fafc0e2
+Severity:   medium
+Surface:    `packages/studio/src/pages/entry-review/members-section.ts:99-150` (`bucketMembersByLane`), `packages/studio/src/pages/entry-review/data.ts:188-210` (`loadGroupMembersBundle`)
+
+AUDIT-35 acknowledged composed view silently drops members with `lane === undefined` or a lane absent from `laneConfigsById`. Two additional silent-drop vectors are NOT covered:
+
+1. In `bucketMembersByLane`, a member is bucketed under `stageMap.get(member.currentStage)`, but the emitted `byStage` only walks `template.linearStages + template.offPipelineStages`. Any member whose `currentStage` is not in its lane's template (a legacy stage, or a custom-template omission) is pushed into `stageMap` but never read back — it vanishes from composed view AND from `memberCount`, so the swim-head count is wrong with no "missing" indicator. The same member renders fine in list view, producing an invisible composed↔list discrepancy distinct from AUDIT-35.
+
+2. In `loadGroupMembersBundle`, the load order is `laneConfigsById.set(strict.id, strict)` BEFORE `loadPipelineTemplate(...)`. If the template load throws, the `catch { continue }` fires — but the lane config is already in `laneConfigsById` while its template is absent from `templatesById`. Back in `bucketMembersByLane`, members of that lane pass the `laneConfigsById.has(member.lane)` guard, get bucketed, then hit `const template = templatesById.get(...); if (template === undefined) continue;` — dropping EVERY member of that lane from composed view, silently, and invisible in list view.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: (a) only `laneConfigsById.set` after the template successfully resolves (move the set inside the try, below the template load); (b) in `bucketMembersByLane`, emit an "unbucketed members" tail (mirroring list view's unrouted styling) so stage/template mismatches surface rather than disappear.
+
+### AUDIT-20260529-38 — member card + list-row lane-accent CSS keys on `data-template-id` attribute the markup never emits
+
+Finding-ID: AUDIT-20260529-38 (cross-model: AUDIT-BARRAGE-claude-03)
+Status:     fixed-5234182
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/css/entry-review-members.css:262-265,318-321`, `packages/studio/src/pages/entry-review/members-section.ts:152-167` (`renderMemberStageCard`), `:200-235` (`renderListRow`)
+
+AUDIT-29 structural-decision #5 claimed: "The composed view's `data-template-id` attribute drives the lane-accent color via CSS — no per-lane `class="lane-<id>"` coupling for non-default templates. This avoids the 'we forgot to teach the CSS about lane X' failure mode."
+
+The claim holds only for the swim HEAD (`.er-members-swim` carries `data-template-id`, and CSS at entry-review-members.css:218-241 keys on it). It is FALSE for the cards and list rows. `renderMemberStageCard` emits `<a class="er-members-card lane-${member.lane ?? 'default'}">` with NO `data-template-id`, and `renderListRow` emits `<li class="er-member-row lane-<id>">` likewise with no `data-template-id`. Yet the CSS includes `.er-members-card[data-template-id="editorial"]` (line 263) and `.er-member-row[data-template-id="editorial"]` (line 319) — dead selectors that NEVER match.
+
+Functional consequence: a lane using the `editorial` template but whose id is NOT the literal `default` (e.g. an `essays` or `articles` lane) gets a proof-blue swim head but FADED cards and list rows, because the only card/row accent rules that fire are the hardcoded `.lane-default` / `.lane-mockups` literals. The accent is inconsistent within a single swim block, and the exact "forgot to teach CSS about lane X" failure mode #5 said it avoided is reintroduced one level down.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: emit `data-template-id="${bucket.template.id}"` on the card `<a>` and the list `<li>` (the data is already in scope via the bucket/template), so the template-keyed accent rules actually drive the color; the literal `.lane-<id>` rules can be retired.
+
+### AUDIT-20260529-39 — corrupt member sidecars misreported as missing (silent fallback violation)
+
+Finding-ID: AUDIT-20260529-39 (cross-model: AUDIT-BARRAGE-codex-01)
+Status:     fixed-d7f1ea7
+Severity:   medium
+Surface:    `packages/studio/src/pages/entry-review/data.ts:176-183` (`loadGroupMembersBundle`)
+
+`loadGroupMembersBundle` catches every `readSidecar` failure and records the UUID as missing. That conflates a genuinely absent sidecar with schema parse failures, permission errors, malformed JSON, or other storage bugs. The result is an inline "missing" row instead of an explicit render/load failure, which violates the project's "no silent fallbacks" discipline (`.claude/CLAUDE.md` § "Error Handling") and can hide data corruption from the operator.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (codex). Fix path: distinguish not-found errors from other `readSidecar` failures. Only absent sidecars should enter `missingMemberUuids`; validation, parse, and I/O failures should propagate with an actionable message (either throwing or surfacing as a distinct "corrupt" row class so the operator can distinguish the two states).
+
+### AUDIT-20260529-40 — missing-member rows lose declared insertion order (list-mode contract violation)
+
+Finding-ID: AUDIT-20260529-40 (cross-model: AUDIT-BARRAGE-codex-02)
+Status:     fixed-b01eb21
+Severity:   medium
+Surface:    `packages/studio/src/pages/entry-review/data.ts:176-183`, `packages/studio/src/pages/entry-review/members-section.ts:263-271` (`renderListBody`)
+
+The loader splits resolved members and missing UUIDs into separate arrays; `renderListBody` renders all resolved rows BEFORE all missing rows. A group declared as `[missing-a, real-b, missing-c]` displays as `[real-b, missing-a, missing-c]`, even though the brief's acceptance criterion says list mode preserves `group.members[]` insertion order.
+
+This matters because the group membership list is operator-authored ordering — the operator's expectation is that members render in the order they added them, regardless of resolution state.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (codex). Fix path: introduce an ordered member-item structure that carries either `{kind: "resolved", entry}` or `{kind: "missing", uuid}` per original UUID position; `renderListBody` walks that sequence directly so insertion order is preserved end-to-end.
+
+### AUDIT-20260529-41 — popover left margin (22px) misaligned with WCAG-widened tab (24px) — off-by-2px drift
+
+Finding-ID: AUDIT-20260529-41 (cross-model: AUDIT-BARRAGE-claude-04)
+Status:     fixed-2274781
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:349` (`.er-row-member-popover { margin: 0 0 0 22px }`) vs `:250` (`.er-row-member-tab { width: 24px }`) and `:320` (`.has-member-tab .er-row-fg { padding-left: 28px }`)
+
+AUDIT-31 widened `.er-row-member-tab` from 22px to 24px and bumped `.er-row-shell.has-member-tab .er-row-fg` padding-left from 26px to 28px to keep the foreground clear of the tab. The popover's left offset was NOT updated in lockstep: `.er-row-member-popover` still has `margin: 0 0 0 22px`. The popover now starts 2px inside the 24px tab column rather than flush with the row foreground, producing a small but visible left-edge misalignment.
+
+The cross-rule drift the WCAG-fix commit introduced by touching the tab width without sweeping the dependent offsets. The 22/24/28 magic numbers should be derived from a single `--er-member-tab-width` token to prevent this class of regression.
+
+Note: somewhat MOOT until AUDIT-20260529-36 is fixed, since the popover currently renders unconditionally — the misalignment is hidden behind the always-visible popover bug.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: align popover left margin with the tab column (24px) or the foreground inset (28px), and extract `--er-member-tab-width` as a token.
+
+### AUDIT-20260529-42 — `initGroupMembersSection` wire helpers re-attach listeners on every call (docstring lies)
+
+Finding-ID: AUDIT-20260529-42 (cross-model: AUDIT-BARRAGE-claude-05)
+Status:     fixed-90be5c3
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/src/entry-review/group-members-section.ts:104-150` (`initGroupMembersSection`, `wireToggle`, `wireEmptyStateCta`, `wireMemberRowCopy`)
+
+The `initGroupMembersSection` docblock states "Idempotent — calling twice has no visible effect." That is true for `applyMode` (it reads current state) but NOT for the three `wire*` helpers: `wireToggle`, `wireEmptyStateCta`, and `wireMemberRowCopy` each call `addEventListener` unconditionally on every invocation. There is no module-level `wired` guard analogous to the one in the sibling `row-member-tab.ts` (which correctly guards with `let wired = false`).
+
+If `initPressCheckSurface` ever runs twice (re-init after a partial DOM swap, or a future refresh path), the section accumulates duplicate listeners — clicking a member row would fire `copyOrShowFallback` twice (two clipboard writes + two toasts), and the toggle would double-write localStorage.
+
+LOW severity because the current single call site doesn't trigger it, but the docstring asserts a property the code doesn't have.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: mirror the `row-member-tab.ts` pattern with a module-level `wired = false` guard, OR bind via a `dataset` sentinel on the section element so re-init is a genuine no-op.
+
+## Diff under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+index c4f506a..f1ce900 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+@@ -2172,3 +2172,120 @@ mismatch found.
+ The dual-viewport verification gap noted in the AUDIT-10 commit body
+ (`e228e26`) is closed. The audit-log open-count remains 0 after this
+ audit cycle.
++
++## 2026-05-29 (session 2) audit: Phase 7 Task 7.1 — EntrySidecar members[] schema delta
++
++Audit scope: one commit, `e47ed3e`. Risk classification: routine
++(purely additive optional field on `EntrySchema`; 7 new tests; no
++runtime call sites consume the new field yet — group readers land in
++Tasks 7.2 / 7.3 / 7.5).
++
++Track 1 verification (controller, this session):
++
++- `npm --workspace @deskwork/core test`: 723/723 pass (716 → 723, +7
++  new schema tests for `members[]`).
++- `npm --workspace @deskwork/cli test`: 327/327 pass, 0 regressions.
++- `npm --workspace @deskwork/studio test`: 933/933 pass, 0 regressions.
++- `npm --workspace @deskwork/core --workspace @deskwork/cli --workspace
++  @deskwork/studio run build`: exit 0.
++- `dw-lifecycle check-clones --gate-mode`: 0 NEW, 0 DROPPED.
++
++Track 2 spec-compliance: parallel `code-reviewer` agent against the
++workplan + PRD. Pass; only informational observations (PRD-sketch
++field-ordering vs. impl placement; pre-existing `artifactPath`
++optionality vs. PRD sketch — both no-action).
++
++Track 3 code-quality: parallel `code-reviewer` agent against the diff.
++Pass; three informational observations recorded below.
++
++### AUDIT-20260529-12 — doc-comments reference future workplan task numbers (phase-number rot risk)
++
++Finding-ID: AUDIT-20260529-12
++Status:     informational
++Severity:   low
++Surface:    `packages/core/src/schema/entry.ts:196,198-209`
++
++The new inline doc-comments on `EntrySchema.members` and on the
++`artifactPath` paragraph mention future workplan task numbers by
++ordinal: "Task 7.5.1", "Task 7.5.2", "Task 7.7.2", "Tasks 7.2.3 /
++7.2.4". A future reordering of the Phase 7 workplan (whether by an
++operator-driven extend, a phase split, or a renumber) would leave
++the comments referencing tasks that no longer exist at those
++addresses, silently rotting the cross-reference.
++
++Disposition: PUSH-BACK on the literal "remove the task numbers"
++recommendation. The doc-comments already pair every task-number
++reference with a behavior anchor — e.g. "Task 7.5.1's
++`group-recursive` rule", "Task 7.7.2's iterate-side refusal",
++"Tasks 7.2.3 / 7.2.4 — the `/deskwork:group` CLI's concern". The
++behavior anchors are stable under renumbering (the rule name and
++the CLI's role survive a workplan-renumber). A future reader who
++greps for `group-recursive` lands in the right place regardless of
++whether Phase 7 is still "Phase 7" by then.
++
++Rationale to keep the task-number references: they ARE meaningful
++right now — Phase 7 is the next several commits, and a contributor
++reading `entry.ts` while picking up Task 7.5 or 7.7 benefits from
++the literal back-pointer. The rot horizon is the duration of this
++feature branch; the cost of rot is small (a confused reader has to
++re-grep). Removing them prematurely would harm readers walking the
++in-progress feature today.
++
++No code change. Informational record of the design tradeoff.
++
++### AUDIT-20260529-13 — schema permits both `members: undefined` and `members: []` (dual representation)
++
++Finding-ID: AUDIT-20260529-13
++Status:     acknowledged-2026-05-29-task-7.5.5
++Severity:   low
++Surface:    `packages/core/src/schema/entry.ts:209`
++
++The schema accepts BOTH `members: undefined` (field absent) and
++`members: []` (empty array) as valid shapes for a "regular entry"
++(non-group). Both shapes round-trip cleanly through `EntrySchema.parse`;
++the test at `packages/core/test/schema/entry.test.ts:259-277`
++explicitly verifies the empty-array case parses. The inline
++doc-comment at `entry.ts:198-209` flags the dual representation
++("entries without `members` (or with `members: []`) are regular
++entries").
++
++Downstream consequence: any downstream group-ness check MUST use a
++length-check (`entry.members && entry.members.length > 0`) rather than
++a presence-check (`!!entry.members`). The presence-check would wrongly
++classify an entry with `members: []` as a group.
++
++Disposition: acknowledged. Defer the on-disk normalization to a new
++Task 7.5.5 doctor rule (`group-empty-members-array` informational
++rule) — the schema layer is the wrong place to normalize, because
++forcing one shape at the schema layer would either reject legitimate
++data on read (bad) or silently mutate data on read (worse). The
++doctor layer is where canonical-shape conventions live in this
++codebase.
++
++Workplan annotation: Task 7.5 now carries Step 7.5.5 referencing this
++audit ID; no Task 7.1 change.
++
++### AUDIT-20260529-14 — non-UUID-rejection test asserted only first-element-invalid; last-element case untested
++
++Finding-ID: AUDIT-20260529-14
++Status:     open
++Severity:   low
++Surface:    `packages/core/test/schema/entry.test.ts:322-336`
++
++The existing non-UUID-rejection test asserts `members: ['not-a-uuid',
++'<valid-uuid>']` fails. It does NOT prove the validator walks every
++element — a (hypothetical) short-circuiting Zod implementation that
++only checked the first element would pass both this assertion AND
++the implementation-correct version. The test's intent is "every
++element is validated", but its assertion only proves "first
++element is validated."
++
++Fix: a sibling test where the invalid UUID is the LAST element. Cheap
++(~12 lines), low-value individually, but a free win that hardens the
++contract against future refactors of the validation code.
++
++Resolution: a sibling test added at
++`packages/core/test/schema/entry.test.ts:338-360` titled "rejects
++members[] entries that are not UUIDs (last element invalid)" —
++mirrors the existing first-element test with the order swapped.
++Lands in the same commit as this audit-log entry.
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+index 381dc42..b498281 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+@@ -348,9 +348,9 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
+ 
+ ### Task 7.1: Schema delta — members[] on entry
+ 
+-- [ ] Step 7.1.1: Extend `EntrySidecar` schema with `members?: string[]` (array of member entry UUIDs).
+-- [ ] Step 7.1.2: Entries with non-empty `members[]` are groups; otherwise they're regular entries. No separate "group" entity — same schema, same code paths, plus the `members` field.
+-- [ ] Step 7.1.3: Optional `artifactPath` on group entries: when set, the group has a content body (e.g. `manifesto.md`); when absent, the group is metadata-only.
++- [x] Step 7.1.1: Extend `EntrySidecar` schema with `members?: string[]` (array of member entry UUIDs). — implemented as `members: z.array(z.string().uuid()).optional()` on `EntrySchema` (`packages/core/src/schema/entry.ts`); 7 new schema tests at `packages/core/test/schema/entry.test.ts` cover regular / group / empty-members / with-artifactPath / metadata-only-group / non-UUID-rejection / non-array-rejection.
++- [x] Step 7.1.2: Entries with non-empty `members[]` are groups; otherwise they're regular entries. No separate "group" entity — same schema, same code paths, plus the `members` field. — invariant documented inline in `entry.ts` next to the new `members` field; no separate Group type introduced.
++- [x] Step 7.1.3: Optional `artifactPath` on group entries: when set, the group has a content body (e.g. `manifesto.md`); when absent, the group is metadata-only. — pre-existing optional `artifactPath` field carries the group's content body when present; both shapes (with + without) covered by tests; semantic noted in the inline doc-comment, with the iterate-side refusal scheduled in Task 7.7.2.
+ 
+ ### Task 7.2: `/deskwork:group` skill family
+ 
+@@ -380,6 +380,7 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
+ - [ ] Step 7.5.2: `group-member-missing` rule: a member UUID doesn't resolve. Repair: prompts to remove the dangling reference.
+ - [ ] Step 7.5.3: `group-all-members-cancelled` informational rule: every member is in `Cancelled`; surface for operator review (cancel the group, remove cancelled members, or leave as-is).
+ - [ ] Step 7.5.4: Doctor builds a UUID → lane index once per run for efficient member-lookup-across-lanes per PRD § Risks mitigation.
++- [ ] Step 7.5.5: `group-empty-members-array` informational rule. The schema permits both `members: undefined` and `members: []` for non-group entries (Task 7.1 deliberately left this dual representation; both shapes parse). Doctor surfaces every sidecar where `members === []` and offers a write-time normalization to remove the empty array, so downstream length-vs-presence checks converge on one canonical shape on disk. Surfaced as `informational`, not `error` — operator chooses whether to normalize. (Closes audit-log AUDIT-20260529-13; see Track 3 code-quality review of `e47ed3e`.)
+ 
+ ### Task 7.6: Studio group-management page
+ 
+diff --git a/packages/core/src/schema/entry.ts b/packages/core/src/schema/entry.ts
+index 644e6fa..1272c47 100644
+--- a/packages/core/src/schema/entry.ts
++++ b/packages/core/src/schema/entry.ts
+@@ -185,8 +185,29 @@ export const EntrySchema = z.object({
+   // ingest-journal lookup. When absent (legacy entries pre-Phase 30
+   // migration data fixes), consumers fall back to the slug+stage
+   // heuristic.
++  //
++  // Per Phase 7 Task 7.1.3, this same field carries the optional
++  // content body for GROUP entries (entries whose `members` field
++  // below is non-empty). When a group sets `artifactPath`, the group
++  // has its own editable artifact (e.g. `manifesto.md`) and the
++  // `/deskwork:iterate` verb operates on that file. When absent, the
++  // group is metadata-only and `iterate` refuses with a
++  // "metadata-only" message per Task 7.7.2.
+   artifactPath: z.string().optional(),
+ 
++  // Group membership (Phase 7 Task 7.1.1). Optional array of member
++  // entry UUIDs. The schema's invariant per Task 7.1.2: entries with
++  // a non-empty `members[]` ARE groups; entries without `members` (or
++  // with `members: []`) are regular entries. There is no separate
++  // "group" entity — same schema, same code paths, plus this field.
++  // Doctor's `group-recursive` rule (Task 7.5.1) refuses members
++  // whose own `members[]` is non-empty (recursive groups out of scope
++  // for v1); `group-member-missing` (Task 7.5.2) refuses dangling
++  // member UUIDs. Per PRD § Group lifecycle, members are an ORDERED
++  // array — the array's order is preserved; insertion semantics are
++  // the `/deskwork:group` CLI's concern (Tasks 7.2.3 / 7.2.4).
++  members: z.array(z.string().uuid()).optional(),
++
+   // Distribution (deferred — shortform model)
+   shortformWorkflows: z.record(z.string(), z.string()).optional(),
+ 
+diff --git a/packages/core/test/schema/entry.test.ts b/packages/core/test/schema/entry.test.ts
+index 8c76138..ec838e5 100644
+--- a/packages/core/test/schema/entry.test.ts
++++ b/packages/core/test/schema/entry.test.ts
+@@ -200,4 +200,174 @@ describe('EntrySchema', () => {
+     };
+     expect(EntrySchema.safeParse(valid).success).toBe(true);
+   });
++
++  // Phase 7 Task 7.1 — members[] schema delta. Per the workplan:
++  //   - 7.1.1: extend EntrySidecar with `members?: string[]` (array of
++  //     member entry UUIDs).
++  //   - 7.1.2: invariant — entries with non-empty `members[]` are
++  //     groups; absent or empty means a regular entry. No separate
++  //     "group" entity; same schema, same code paths.
++  //   - 7.1.3: group entries can optionally carry `artifactPath`
++  //     (content body present) or omit it (metadata-only group). Both
++  //     shapes must parse.
++
++  it('accepts an entry without a members field (regular entry; backward-compat)', () => {
++    const valid: Entry = {
++      uuid: '550e8400-e29b-41d4-a716-446655440020',
++      slug: 'regular',
++      title: 'Regular Entry',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Ideas',
++      iterationByStage: {},
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    const result = EntrySchema.safeParse(valid);
++    expect(result.success).toBe(true);
++    if (result.success) {
++      expect(result.data.members).toBeUndefined();
++    }
++  });
++
++  it('accepts a group entry with non-empty members[] (Step 7.1.1)', () => {
++    const valid: Entry = {
++      uuid: '550e8400-e29b-41d4-a716-446655440021',
++      slug: 'visual-redesign-group',
++      title: 'Visual Redesign Group',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Drafting',
++      iterationByStage: {},
++      members: [
++        '550e8400-e29b-41d4-a716-446655440100',
++        '550e8400-e29b-41d4-a716-446655440101',
++      ],
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    const result = EntrySchema.safeParse(valid);
++    expect(result.success).toBe(true);
++    if (result.success) {
++      expect(result.data.members).toEqual([
++        '550e8400-e29b-41d4-a716-446655440100',
++        '550e8400-e29b-41d4-a716-446655440101',
++      ]);
++    }
++  });
++
++  it('accepts a group entry with empty members[] (semantically equivalent to no members)', () => {
++    const valid: Entry = {
++      uuid: '550e8400-e29b-41d4-a716-446655440022',
++      slug: 'empty-group',
++      title: 'Empty Group',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Ideas',
++      iterationByStage: {},
++      members: [],
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    const result = EntrySchema.safeParse(valid);
++    expect(result.success).toBe(true);
++    if (result.success) {
++      expect(result.data.members).toEqual([]);
++    }
++  });
++
++  it('accepts a group entry with artifactPath (Step 7.1.3 — group has content body)', () => {
++    const valid: Entry = {
++      uuid: '550e8400-e29b-41d4-a716-446655440023',
++      slug: 'manifesto-group',
++      title: 'Manifesto Group',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Drafting',
++      iterationByStage: {},
++      members: ['550e8400-e29b-41d4-a716-446655440102'],
++      artifactPath: 'docs/manifesto.md',
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    const result = EntrySchema.safeParse(valid);
++    expect(result.success).toBe(true);
++    if (result.success) {
++      expect(result.data.artifactPath).toBe('docs/manifesto.md');
++      expect(result.data.members).toEqual(['550e8400-e29b-41d4-a716-446655440102']);
++    }
++  });
++
++  it('accepts a group entry without artifactPath (Step 7.1.3 — metadata-only group)', () => {
++    const valid: Entry = {
++      uuid: '550e8400-e29b-41d4-a716-446655440024',
++      slug: 'metadata-only-group',
++      title: 'Metadata-Only Group',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Ideas',
++      iterationByStage: {},
++      members: ['550e8400-e29b-41d4-a716-446655440103'],
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    const result = EntrySchema.safeParse(valid);
++    expect(result.success).toBe(true);
++    if (result.success) {
++      expect(result.data.artifactPath).toBeUndefined();
++      expect(result.data.members).toHaveLength(1);
++    }
++  });
++
++  it('rejects members[] entries that are not UUIDs (first element invalid)', () => {
++    const invalid = {
++      uuid: '550e8400-e29b-41d4-a716-446655440025',
++      slug: 'bad-member-id',
++      title: 'Bad Member ID',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Ideas',
++      iterationByStage: {},
++      members: ['not-a-uuid', '550e8400-e29b-41d4-a716-446655440104'],
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    expect(EntrySchema.safeParse(invalid).success).toBe(false);
++  });
++
++  it('rejects members[] entries that are not UUIDs (last element invalid)', () => {
++    // Sibling of the prior test; proves the validator walks every
++    // element rather than short-circuiting on the first. Caught as a
++    // coverage gap in the Track 3 code-quality review of e47ed3e —
++    // see audit-log AUDIT-20260529-14.
++    const invalid = {
++      uuid: '550e8400-e29b-41d4-a716-446655440027',
++      slug: 'bad-last-member-id',
++      title: 'Bad Last Member ID',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Ideas',
++      iterationByStage: {},
++      members: ['550e8400-e29b-41d4-a716-446655440106', 'not-a-uuid'],
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    expect(EntrySchema.safeParse(invalid).success).toBe(false);
++  });
++
++  it('rejects members when it is not an array', () => {
++    const invalid = {
++      uuid: '550e8400-e29b-41d4-a716-446655440026',
++      slug: 'members-wrong-type',
++      title: 'Members Wrong Type',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Ideas',
++      iterationByStage: {},
++      members: '550e8400-e29b-41d4-a716-446655440105',
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    expect(EntrySchema.safeParse(invalid).success).toBe(false);
++  });
+ });
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+index c618235..86b8c21 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+@@ -2406,10 +2406,10 @@ already correct (line 44 explicitly states this). The
+ `cascadeFrom`-on-event feature is captured in the follow-up issue
+ filed alongside this audit entry.
+ 
+-### AUDIT-20260529-18 — `regenerateCalendar` runs N+1 times per cascade (medium, deferred)
++### AUDIT-20260529-18 — `regenerateCalendar` runs N+1 times per cascade (medium, fixed)
+ 
+ Finding-ID: AUDIT-20260529-18
+-Status:     acknowledged-2026-05-29-issue-#360
++Status:     fixed-4e3b911
+ Severity:   medium
+ Surface:    `packages/core/src/entry/cancel.ts:225`
+ 
+@@ -2429,6 +2429,24 @@ review-action commit. Filed as a follow-up GitHub issue against the
+ graphical-entries milestone; the issue body has the recommended
+ refactor shape.
+ 
++Resolution: Step 7.2.7 (graphical-entries workplan) lands the
++walker / wrapper split. `cancelEntryWithoutCalendarRegen` (private)
++performs the per-entry transition + journal append + sidecar write
++WITHOUT calling `regenerateCalendar`; the cascade walk recurses
++into the walker directly rather than re-entering the public
++wrapper. The public `cancelEntry` is now a thin boundary that
++delegates to the walker for the head entry (which itself walks all
++members) and then calls `regenerateCalendar` exactly ONCE. The new
++test file `packages/core/test/entry/cancel-cascade.test.ts`
++asserts the call-count invariant via
++`vi.spyOn(regenerateModule, 'regenerateCalendar')` across four
++scenarios (single-entry, 3-member cascade, mixed-skip cascade,
++non-group with cascade flag) — each expects exactly one call where
++the pre-fix shape produced N+1 / 2 / 2 respectively. All existing
++CLI cascade tests (`packages/cli/test/cancel-cascade.test.ts`)
++still pass; the `CancelResult` shape, refusals, and per-entry
++journal semantics are behavior-preserved.
++
+ ### AUDIT-20260529-19 — create→list round-trip test gap (medium)
+ 
+ Finding-ID: AUDIT-20260529-19
+@@ -2478,3 +2496,102 @@ against both populated and declared-empty groups; refuses against
+ entries without the `members` field at all (regular entries)." The
+ header was also expanded to document the empty-vs-absent semantic
+ distinction.
++
++### AUDIT-20260529-22 — cancel-cascade test docblock named `vi.mock` but code uses `vi.spyOn` (low)
++
++Finding-ID: AUDIT-20260529-22
++Status:     fixed-pending-sha
++Severity:   low
++Surface:    `packages/core/test/entry/cancel-cascade.test.ts:15`
++
++The header docblock of the new cascade-regenerate-count test
++described the seam as `vi.mock('@/calendar/regenerate', ...)`, but
++the implementation at line 102 uses `vi.spyOn(regenerateModule,
++'regenerateCalendar')` — different vitest APIs producing the same
++observable outcome here, but a misleading doc/code drift for a
++future reader.
++
++Resolution: docblock rewritten to describe the actual
++`vi.spyOn(regenerateModule, ...)` mechanism + the namespace-import
++requirement that makes the spy attach to the same binding `cancel.ts`
++consumes (a destructured import would bypass the spy).
++
++### AUDIT-20260529-23 — recursive-cascade not exercised by Step 7.2.7 tests (medium; deferred to #363)
++
++Finding-ID: AUDIT-20260529-23
++Status:     acknowledged-2026-05-29-issue-#363
++Severity:   medium
++Surface:    `packages/core/test/entry/cancel-cascade.test.ts:95`
++
++The walker recursively invokes itself when a cascaded member is
++itself a group (`cancel.ts:198-205`), and the result-flattening
++logic on lines 212-217 handles nested `cascadedMembers` /
++`skippedMembers` arrays. None of the four cascade tests exercise
++this path — they only test flat 3-member groups. Doctor's
++`group-recursive` rule (Task 7.5.1, not yet shipped) will refuse
++recursive groups at lint time, but the cancel code path still has
++to behave correctly when one exists.
++
++Disposition: medium. Test-coverage shortfall, not an active bug
++(walker's recursive behavior is correct by code reading). Filed at
++[#363](https://github.com/audiocontrol-org/deskwork/issues/363)
++with the regression-test shape spelled out.
++
++### AUDIT-20260529-24 — `priorStage` not asserted for cascaded members (low; deferred to #363)
++
++Finding-ID: AUDIT-20260529-24
++Status:     acknowledged-2026-05-29-issue-#363
++Severity:   low
++Surface:    `packages/core/test/entry/cancel-cascade.test.ts:119`
++
++The cascade test asserts `currentStage === 'Cancelled'` for the
++head + cascaded members but does NOT assert `priorStage` is
++preserved on the cascaded members. The legacy single-entry test
++(`cancel.test.ts:31`) covers `priorStage` for the head entry only.
++A regression that dropped `priorStage` writing in the walker (or
++wrote it incorrectly) would not be caught.
++
++Disposition: low. Test-coverage shortfall folded into the same
++[#363](https://github.com/audiocontrol-org/deskwork/issues/363)
++follow-up as AUDIT-20260529-23 since both extend the same test
++file.
++
++### AUDIT-20260529-25 — wider concurrent-read window during cascade (informational)
++
++Finding-ID: AUDIT-20260529-25
++Status:     informational
++Severity:   informational
++Surface:    `packages/core/src/entry/cancel.ts:138-274`
++
++Pre-fix: cascade produced N "narrow" inconsistency windows —
++between member-K's sidecar write and its individual regenerate, a
++concurrent reader could see member-K's sidecar but stale
++`calendar.md`. Post-fix: there is ONE inconsistency window that's
++WIDER — between the head's sidecar write and the final regenerate
++at line 274, a concurrent reader can see up to N+1 newly-written
++sidecars + a stale `calendar.md`. Window count is net-better (1 vs
++N), but per-window scope is larger.
++
++Disposition: informational only. For this project's deployment
++model (single-operator, batch operations) this is a non-issue.
++Recording so the trade-off is explicit and not an unstated
++regression.
++
++### AUDIT-20260529-26 — recursive walker call's forced `cascade: true` undocumented (low)
++
++Finding-ID: AUDIT-20260529-26
++Status:     fixed-pending-sha
++Severity:   low
++Surface:    `packages/core/src/entry/cancel.ts:198-205`
++
++When a cascaded member is itself a group, the recursive walker
++call passed `cascade: true` unconditionally — so once cascade is
++opted into at the top, the entire subtree is cascaded. The
++docblock mentioned the recursive behavior in passing but didn't
++explicitly call out the forced-cascade-on-the-call invariant.
++
++Resolution: three-line code comment added directly above the
++recursive walker call documenting the forced cascade and the
++`group-recursive` rule that normally prevents the shape but
++doesn't relieve the cancel code path from behaving correctly when
++one exists.
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+index eef2a91..00aa41c 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+@@ -364,14 +364,15 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
+ Schema delta: `archivedAt?: string` added to `EntrySchema` (`packages/core/src/schema/entry.ts`) — forward-compat field used by `group archive` (Task 7.2.1) AND settable on regular entries via the same Entry-writer path (mirrors the `LaneConfig.archivedAt` pattern shipped in Task 6.1). 5 new schema tests at `packages/core/test/schema/entry.test.ts` cover absent / present / on-non-group / rejected-malformed-datetime / rejected-non-string.
+ 
+ **Test count deltas (Task 7.2):**
+-- `@deskwork/core`: 723 → 755 (+32) — schema delta (+5), groups operations integration suite (+27).
++- `@deskwork/core`: 723 → 759 (+36) — schema delta (+5), groups operations integration suite (+27), cancel cascade regenerate-count assertions (+4, Step 7.2.7).
+ - `@deskwork/cli`: 327 → 400 (+73) — per-verb suites (list/show/create/update/add-member/remove-member/archive+restore) + cancel-cascade.test.ts.
+ - `@deskwork/studio`: 933 (unchanged — no studio surface changes in this task; Tasks 7.3 / 7.4 / 7.6 own that).
+ 
+ **Task 7.2 review-action follow-ups (must land before Phase 7 closeout per `.claude/rules/agent-discipline.md` "Just for now is bullshit"):**
+ 
+-- [ ] Step 7.2.7: cascade `regenerateCalendar` N+1 perf fix — split `cancelEntry` into a private walker + public wrapper so the calendar regenerate fires once at the cascade boundary instead of N+1 times. Tracked by [#360](https://github.com/audiocontrol-org/deskwork/issues/360) (AUDIT-20260529-18 deferral from Task 7.2 code-quality review of `15dd424`). Affects `packages/core/src/entry/cancel.ts:225`; existing cascade tests pass behaviorally but a regenerate-count assertion is the missing coverage. Defer-rationale: a structural refactor of `cancelEntry` is bigger than the Task 7.2 review-action commit could absorb without confusing the audit narrative.
++- [x] Step 7.2.7: cascade `regenerateCalendar` N+1 perf fix — split `cancelEntry` into a private walker + public wrapper so the calendar regenerate fires once at the cascade boundary instead of N+1 times. Tracked by [#360](https://github.com/audiocontrol-org/deskwork/issues/360) (AUDIT-20260529-18 deferral from Task 7.2 code-quality review of `15dd424`). — Private walker `cancelEntryWithoutCalendarRegen` extracted in `packages/core/src/entry/cancel.ts` to do the per-entry transition + journal append + sidecar write WITHOUT calling `regenerateCalendar`; the public `cancelEntry` wrapper now calls the walker (which recurses into itself for each member) and then invokes `regenerateCalendar` exactly ONCE at the cascade boundary. The cascade walk no longer re-enters the public wrapper. New TDD-first test seam in `packages/core/test/entry/cancel-cascade.test.ts` uses `vi.spyOn(regenerateModule, 'regenerateCalendar')` to assert call counts: single-entry cancel = 1, 3-member cascade = 1 (was 4 pre-fix), mixed-skip cascade = 1 (was 2 pre-fix), non-group with cascade flag = 1. Refusals, `CancelResult` shape, journal events, and `cascadedMembers` / `skippedMembers` arrays are unchanged. Core test count: 755 → 759 (+4 regenerate-count assertions).
+ - [ ] Step 7.2.8: record `cascadeFrom` on stage-transition events emitted by cascade — extend `StageTransitionEvent` (`packages/core/src/schema/journal-events.ts`) with optional `metadata.cascadeFrom`; populate it in `cancel.ts`'s cascade walk; restore the journal-events docblock paragraph claiming the linkage. Tracked by [#359](https://github.com/audiocontrol-org/deskwork/issues/359) (AUDIT-20260529-17 follow-up from Task 7.2 code-quality review of `15dd424`). Audit-trail enhancement — without it, cascade journal events are indistinguishable from single-entry cancels post-scrollback. Defer-rationale: scope-creep above what the original Task 7.2 spec required; appropriately filed for operator scope decision.
++- [ ] Step 7.2.9: extend cancel-cascade test coverage — add recursive-cascade regression test (3-level group nesting) AND per-member `priorStage` assertions to close test-coverage gaps surfaced by Step 7.2.7's Track 3 code-quality review (AUDIT-20260529-23 + AUDIT-20260529-24). Tracked by [#363](https://github.com/audiocontrol-org/deskwork/issues/363). Both gaps are coverage shortfalls, not active bugs: walker behavior is correct by code reading but missing tests would not catch future regressions in (a) nested-cascade `cascadedMembers` flattening, (b) per-member `priorStage` writes. Defer-rationale: the trivial AUDIT-22 / AUDIT-26 fixes from the Step 7.2.7 review landed in the same commit; widening the test suite to seed multi-level fixtures is its own commit-sized change.
+ 
+ ### Task 7.3: Group review surface — Members section
+ 
+diff --git a/packages/core/src/entry/cancel.ts b/packages/core/src/entry/cancel.ts
+index ab20b1a..a6c951c 100644
+--- a/packages/core/src/entry/cancel.ts
++++ b/packages/core/src/entry/cancel.ts
+@@ -30,7 +30,7 @@ interface CancelOptions {
+    * Non-group entries (no `members[]` array, or empty) ignore this
+    * flag — there's nothing to cascade into.
+    */
+-  readonly cascade?: boolean;
++   readonly cascade?: boolean;
+ }
+ 
+ interface CancelledMember {
+@@ -80,22 +80,23 @@ interface CancelResult {
+ const CANCEL_STAGE = 'Cancelled';
+ 
+ /**
+- * Move an entry to the template's cancel destination (canonically
+- * `Cancelled`). Records priorStage on the sidecar so a later
+- * `inductEntry` can return it to the linear pipeline if the decision
+- * is reversed.
++ * Internal cascade walker (Step 7.2.7, graphical-entries, GitHub
++ * #360 / AUDIT-20260529-18).
+  *
+- * Refuses:
+- *   - terminal linear stage (e.g. `Published` for editorial) — already
+- *     shipped; cancellation is meaningless.
+- *   - any off-pipeline stage (e.g. `Blocked`, `Cancelled`, `Archived`)
+- *     — entry is already off-pipeline.
+- *   - unknown stages — surfaces the template's allowed stage list.
++ * Does everything the public `cancelEntry` did before the walker /
++ * wrapper split EXCEPT call `regenerateCalendar` — the wrapper is
++ * responsible for the single boundary regenerate. Used by the
++ * cascade walk to recursively cancel every member without N+1
++ * calendar regenerations.
+  *
+- * Requires the template's `offPipelineStages` to include `Cancelled`.
+- * Templates that omit it raise a configuration error.
++ * Behaviour-preserving: same refusals, same `CancelResult` shape
++ * (including `cascadedMembers` / `skippedMembers` arrays when
++ * `cascade === true`), same journal events fired per entry. The
++ * only externally-observable difference is that `calendar.md` is
++ * NOT rewritten by this function; the caller must invoke
++ * `regenerateCalendar` itself to keep the calendar in sync.
+  */
+-export async function cancelEntry(
++async function cancelEntryWithoutCalendarRegen(
+   projectRoot: string,
+   opts: CancelOptions,
+ ): Promise<CancelResult> {
+@@ -148,11 +149,15 @@ export async function cancelEntry(
+   // the caller explicitly opted in via `cascade: true`. Per the
+   // universal-verb-no-cascade rule (Commandment II + PRD § Group
+   // lifecycle), cancel does NOT propagate to members by default.
+-  // When the flag IS set, we walk `members[]` and call back into
+-  // `cancelEntry` recursively for each — recursive groups would
+-  // cascade transitively, though doctor's `group-recursive` rule
+-  // (Task 7.5.1) refuses that shape; the cascade here is the
+-  // operator-visible behaviour the flag promises.
++  // When the flag IS set, we walk `members[]` and call THIS walker
++  // (not the public wrapper) recursively for each — recursive
++  // groups would cascade transitively, though doctor's
++  // `group-recursive` rule (Task 7.5.1) refuses that shape; the
++  // cascade here is the operator-visible behaviour the flag
++  // promises. Step 7.2.7 moved the recursive call from the public
++  // `cancelEntry` to this walker so calendar regeneration fires
++  // exactly once at the cascade boundary (the public wrapper)
++  // rather than N+1 times.
+   const cascadedMembers: CancelledMember[] = [];
+   const skippedMembers: SkippedMember[] = [];
+   if (
+@@ -190,7 +195,11 @@ export async function cancelEntry(
+           });
+           continue;
+         }
+-        const memberResult = await cancelEntry(projectRoot, {
++        // The recursive walker call unconditionally forces `cascade: true`:
++        // top-level opt-in propagates through the entire subtree (doctor's
++        // `group-recursive` rule normally refuses recursive groups, but
++        // the cancel path still has to behave correctly when one exists).
++        const memberResult = await cancelEntryWithoutCalendarRegen(projectRoot, {
+           uuid: memberUuid,
+           cascade: true,
+           ...(opts.reason !== undefined && { reason: opts.reason }),
+@@ -221,8 +230,6 @@ export async function cancelEntry(
+     }
+   }
+ 
+-  // #148: keep calendar.md in sync after every transition.
+-  await regenerateCalendar(projectRoot);
+   const result: CancelResult = {
+     entryId: sidecar.uuid,
+     fromStage: from,
+@@ -232,3 +239,42 @@ export async function cancelEntry(
+   };
+   return result;
+ }
++
++/**
++ * Move an entry to the template's cancel destination (canonically
++ * `Cancelled`). Records priorStage on the sidecar so a later
++ * `inductEntry` can return it to the linear pipeline if the decision
++ * is reversed.
++ *
++ * Refuses:
++ *   - terminal linear stage (e.g. `Published` for editorial) — already
++ *     shipped; cancellation is meaningless.
++ *   - any off-pipeline stage (e.g. `Blocked`, `Cancelled`, `Archived`)
++ *     — entry is already off-pipeline.
++ *   - unknown stages — surfaces the template's allowed stage list.
++ *
++ * Requires the template's `offPipelineStages` to include `Cancelled`.
++ * Templates that omit it raise a configuration error.
++ *
++ * Public-wrapper structure (Step 7.2.7, graphical-entries, GitHub
++ * #360 / AUDIT-20260529-18): delegates the per-entry transition (and
++ * the recursive cascade walk) to the internal
++ * `cancelEntryWithoutCalendarRegen` walker, then calls
++ * `regenerateCalendar` exactly ONCE at the cascade boundary. Prior
++ * to the split the recursive cascade re-entered the public wrapper,
++ * triggering N+1 calendar regenerations on a group with N cascaded
++ * members. The result shape, refusals, and per-entry journal
++ * semantics are unchanged.
++ */
++export async function cancelEntry(
++  projectRoot: string,
++  opts: CancelOptions,
++): Promise<CancelResult> {
++  const result = await cancelEntryWithoutCalendarRegen(projectRoot, opts);
++  // #148: keep calendar.md in sync after every transition.
++  // Step 7.2.7 boundary: a single regenerate covers the head entry
++  // AND every cascaded member, because the walker does not call
++  // regenerateCalendar itself.
++  await regenerateCalendar(projectRoot);
++  return result;
++}
+diff --git a/packages/core/test/entry/cancel-cascade.test.ts b/packages/core/test/entry/cancel-cascade.test.ts
+new file mode 100644
+index 0000000..a290618
+--- /dev/null
++++ b/packages/core/test/entry/cancel-cascade.test.ts
+@@ -0,0 +1,198 @@
++/**
++ * `cancelEntry` cascade — regenerate-count assertion (Step 7.2.7,
++ * graphical-entries, GitHub #360 / AUDIT-20260529-18).
++ *
++ * Pre-fix behaviour: `cancelEntry` called `regenerateCalendar` once
++ * per invocation; the cascade path recursively invoked `cancelEntry`
++ * for every member, producing N+1 regenerate calls on a group with
++ * N cascaded members.
++ *
++ * Post-fix behaviour: the walker (`cancelEntryWithoutCalendarRegen`)
++ * does the per-entry transition; the public `cancelEntry` wrapper
++ * calls `regenerateCalendar` exactly once at the cascade boundary,
++ * for both single-entry and cascade invocations.
++ *
++ * The seam: `vi.spyOn(regenerateModule, 'regenerateCalendar')` wraps
++ * the live export with a counter without replacing the implementation,
++ * so calendar.md still gets written and downstream code that observes
++ * calendar.md continues to function. We import the module as a
++ * namespace (`import * as regenerateModule from ...`) so the spy
++ * attaches to the same binding cancel.ts consumes — a destructured
++ * import would bypass the spy.
++ */
++
++import {
++  describe,
++  it,
++  expect,
++  beforeEach,
++  afterEach,
++  vi,
++} from 'vitest';
++import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { cancelEntry } from '@/entry/cancel';
++import { writeSidecar } from '@/sidecar/write';
++import { readSidecar } from '@/sidecar/read';
++import * as regenerateModule from '@/calendar/regenerate';
++
++const groupUuid = '550e8400-e29b-41d4-a716-446655440a01';
++const memberA = '550e8400-e29b-41d4-a716-446655440a02';
++const memberB = '550e8400-e29b-41d4-a716-446655440a03';
++const memberC = '550e8400-e29b-41d4-a716-446655440a04';
++const soloUuid = '550e8400-e29b-41d4-a716-446655440a05';
++
++async function seedProjectScaffold(projectRoot: string): Promise<void> {
++  await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
++  await mkdir(join(projectRoot, '.deskwork', 'lanes'), { recursive: true });
++  await writeFile(
++    join(projectRoot, '.deskwork', 'config.json'),
++    JSON.stringify({
++      version: 1,
++      sites: {
++        main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' },
++      },
++      defaultSite: 'main',
++    }),
++    'utf-8',
++  );
++  await writeFile(
++    join(projectRoot, '.deskwork', 'lanes', 'default.json'),
++    JSON.stringify({
++      id: 'default',
++      name: 'Default',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    }),
++    'utf-8',
++  );
++}
++
++interface SeedOpts {
++  readonly currentStage?: string;
++  readonly members?: readonly string[];
++}
++
++async function seedEntry(
++  projectRoot: string,
++  uuid: string,
++  slug: string,
++  opts: SeedOpts = {},
++): Promise<void> {
++  await writeSidecar(projectRoot, {
++    uuid,
++    slug,
++    title: slug,
++    keywords: [],
++    source: 'manual',
++    currentStage: opts.currentStage ?? 'Drafting',
++    iterationByStage: {},
++    lane: 'default',
++    ...(opts.members !== undefined && { members: opts.members }),
++    createdAt: '2026-05-29T10:00:00.000Z',
++    updatedAt: '2026-05-29T10:00:00.000Z',
++  });
++}
++
++describe('cancelEntry — regenerate-count contract (#360 / Step 7.2.7)', () => {
++  let projectRoot: string;
++  let regenerateSpy: ReturnType<typeof vi.spyOn>;
++
++  beforeEach(async () => {
++    projectRoot = await mkdtemp(join(tmpdir(), 'dw-cancel-regen-'));
++    await seedProjectScaffold(projectRoot);
++    regenerateSpy = vi.spyOn(regenerateModule, 'regenerateCalendar');
++  });
++
++  afterEach(async () => {
++    regenerateSpy.mockRestore();
++    await rm(projectRoot, { recursive: true, force: true });
++  });
++
++  it('single-entry cancel calls regenerateCalendar exactly once', async () => {
++    await seedEntry(projectRoot, soloUuid, 'solo', { currentStage: 'Drafting' });
++
++    const result = await cancelEntry(projectRoot, { uuid: soloUuid });
++
++    expect(result.toStage).toBe('Cancelled');
++    expect(regenerateSpy).toHaveBeenCalledTimes(1);
++  });
++
++  it('cascade cancel on a 3-member group calls regenerateCalendar exactly once', async () => {
++    await seedEntry(projectRoot, memberA, 'm-a', { currentStage: 'Drafting' });
++    await seedEntry(projectRoot, memberB, 'm-b', { currentStage: 'Outlining' });
++    await seedEntry(projectRoot, memberC, 'm-c', { currentStage: 'Planned' });
++    await seedEntry(projectRoot, groupUuid, 'cascade-group', {
++      currentStage: 'Drafting',
++      members: [memberA, memberB, memberC],
++    });
++
++    const result = await cancelEntry(projectRoot, {
++      uuid: groupUuid,
++      cascade: true,
++    });
++
++    // All four entries transitioned to Cancelled
++    expect(result.toStage).toBe('Cancelled');
++    expect((await readSidecar(projectRoot, groupUuid)).currentStage).toBe('Cancelled');
++    expect((await readSidecar(projectRoot, memberA)).currentStage).toBe('Cancelled');
++    expect((await readSidecar(projectRoot, memberB)).currentStage).toBe('Cancelled');
++    expect((await readSidecar(projectRoot, memberC)).currentStage).toBe('Cancelled');
++
++    // The contract under test: ONE regenerate call for the whole cascade.
++    // Pre-fix: 4 calls (1 per cancel invocation, recursive).
++    expect(regenerateSpy).toHaveBeenCalledTimes(1);
++
++    // CancelResult shape preserved
++    expect(result.cascadedMembers?.map((m) => m.slug).sort()).toEqual([
++      'm-a',
++      'm-b',
++      'm-c',
++    ]);
++    expect(result.skippedMembers).toEqual([]);
++  });
++
++  it('cascade cancel with mixed skips still calls regenerateCalendar exactly once', async () => {
++    // memberA already Cancelled (off-pipeline skip),
++    // memberB Published (terminal skip),
++    // memberC Drafting (proper cascade target).
++    await seedEntry(projectRoot, memberA, 'm-a-already', { currentStage: 'Cancelled' });
++    await seedEntry(projectRoot, memberB, 'm-b-pub', { currentStage: 'Published' });
++    await seedEntry(projectRoot, memberC, 'm-c-draft', { currentStage: 'Drafting' });
++    await seedEntry(projectRoot, groupUuid, 'mixed-group', {
++      currentStage: 'Drafting',
++      members: [memberA, memberB, memberC],
++    });
++
++    const result = await cancelEntry(projectRoot, {
++      uuid: groupUuid,
++      cascade: true,
++    });
++
++    expect(result.toStage).toBe('Cancelled');
++    expect(result.cascadedMembers?.map((m) => m.slug)).toEqual(['m-c-draft']);
++    expect(result.skippedMembers).toHaveLength(2);
++
++    // The skips never recursed into cancelEntry, so pre-fix this was
++    // 2 calls (one for the head, one for memberC's recursive call).
++    // Post-fix: still 1 call.
++    expect(regenerateSpy).toHaveBeenCalledTimes(1);
++  });
++
++  it('cascade cancel on a non-group entry calls regenerateCalendar exactly once', async () => {
++    await seedEntry(projectRoot, soloUuid, 'plain-with-cascade-flag', {
++      currentStage: 'Drafting',
++    });
++
++    const result = await cancelEntry(projectRoot, {
++      uuid: soloUuid,
++      cascade: true,
++    });
++
++    expect(result.toStage).toBe('Cancelled');
++    expect(result.cascadedMembers).toEqual([]);
++    expect(result.skippedMembers).toEqual([]);
++    expect(regenerateSpy).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+index 04f85fa..a42420b 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+@@ -2595,3 +2595,132 @@ recursive walker call documenting the forced cascade and the
+ `group-recursive` rule that normally prevents the shape but
+ doesn't relieve the cancel code path from behaving correctly when
+ one exists.
++
++### AUDIT-20260529-27 — Step 7.2.8 shipped: `metadata.cascadeFrom` on cascade `stage-transition` events (feature; closes #359)
++
++Finding-ID: AUDIT-20260529-27
++Status:     fixed-e311698
++Severity:   medium (audit-trail enhancement)
++Surface:    `packages/core/src/schema/journal-events.ts:65-94`,
++            `packages/core/src/entry/cancel.ts:99-260`
++
++Step 7.2.8 (graphical-entries) shipped the `metadata.cascadeFrom`
++feature originally tracked by AUDIT-20260529-17 + filed at #359.
++Without it, cascade-cancel journal events were
++indistinguishable from single-entry cancels once the operator's
++terminal scrollback was gone — the only durable cascade audit
++trail was the cancel-time stdout JSON.
++
++Resolution:
++
++  - **Schema.** `StageTransitionEvent.metadata` was tightened from
++    the generic `z.record(z.string(), z.unknown()).optional()` to a
++    typed `z.object({ cascadeFrom: z.string().uuid().optional() })
++    .passthrough().optional()`. The `.passthrough()` preserves
++    forward-compat for future metadata-bag enhancements without a
++    schema churn; the typed `cascadeFrom` makes the field part of
++    the parsed `JournalEvent` shape consumers can read without
++    casting through `unknown`. A docblock above the new field
++    fully specifies the contract: originator's event omits
++    `cascadeFrom`; cascaded members carry the TOP-LEVEL
++    originator's UUID (not the nearest parent), so transitively-
++    cascaded events trace back to the cascade invocation in a
++    single hop.
++
++  - **Walker threading.** `cancelEntryWithoutCalendarRegen` was
++    refactored to accept an internal `WalkerOptions` shape that
++    augments the public `CancelOptions` with a `cascadeFrom?: string`
++    field. The public `cancelEntry` wrapper never sets it (the
++    originator is not a cascadee); the recursive walker call DOES
++    set it, threading `opts.cascadeFrom ?? sidecar.uuid` so the
++    top-level originator's UUID propagates through every level of
++    the cascade subtree.
++
++  - **Docblock restored.** The pre-AUDIT-20260529-17 docblock
++    paragraph above the group-* event kinds was restored — it now
++    correctly claims the linkage and references the
++    `StageTransitionEvent` field's contract. The `cancelEntry`
++    docblock at `cancel.ts:243-273` and the new walker `WalkerOptions`
++    docblock explain the originator-semantic decision; the cancel
++    `SKILL.md` safety-rule bullet (line 44) was rewritten to surface
++    the feature to operators.
++
++  - **Tests.** Five new `cancel-cascade.test.ts` cases assert the
++    contract end-to-end (write → read → schema-parse → assert):
++    (a) non-cascade cancel: no `cascadeFrom`; (b) `--cascade` on a
++    non-group: no `cascadeFrom` (no recursion fires); (c) `--cascade`
++    on a 2-member group: members carry `cascadeFrom = group UUID`,
++    originator does not; (d) recursive (nested) group cascade:
++    transitively-cascaded events carry the TOP-LEVEL originator's
++    UUID, NOT the nearest parent; (e) cascade with skipped members:
++    skipped entries emit no `stage-transition` event at all, cascaded
++    member's event carries `cascadeFrom`.
++
++Core test count: 759 → 764 (+5 cascadeFrom contract cases).
++
++### AUDIT-20260529-28 — Step 7.2.8 review pass — Track 2 + Track 3 findings consolidated (informational, no actionable items)
++
++Finding-ID: AUDIT-20260529-28
++Status:     informational
++Severity:   informational
++Surface:    `e311698` (Step 7.2.8 commit, closes #359)
++
++Per-commit Track 2 (spec compliance) + Track 3 (code quality)
++review pass on Step 7.2.8 produced ZERO blocking findings and ZERO
++fix-now or defer-to-issue items. Track 2 confirmed all 12
++acceptance-criteria checkpoints pass (schema delta typed correctly
++with `.passthrough()`, cascade populates `metadata.cascadeFrom` on
++cascaded members, non-cascade does not populate, top-level
++originator semantic verified via the recursive-cascade test's
++`.not.toBe(nestedGroup)` assertion, docblock restored on group-*
++events, workplan + audit-log updated, no IOU markers, no
++attribution).
++
++Track 3 surfaced six informational observations; all dispositioned
++acknowledge:
++
++1. **No compile-time test that public `CancelOptions` rejects
++   `cascadeFrom`** — low. `WalkerOptions` (private, internal)
++   extends `CancelOptions` with the field; not exported. External
++   callers cannot pass it through `cancelEntry()` in practice. No
++   type-level test guards against a future export-widening refactor,
++   but the boundary is structurally enforced today.
++
++2. **`journal-events.test.ts` has no passthrough fixture** — low.
++   The schema delta tightens `metadata` from a free-form record to
++   `z.object({ cascadeFrom: ... }).passthrough().optional()`. The
++   cancel-cascade test exercises write→read→parse round-trip for
++   the new field; the unit-level schema test does not include an
++   arbitrary-unknown-metadata-key fixture. No on-disk legacy events
++   exist (no prior code path wrote metadata to stage-transition
++   events), so no failures today; adding a passthrough fixture would
++   lock the forward-compat contract.
++
++3. **`cascadeFrom` UUID validation could over-constrain future
++   non-entry cascade sources** — informational. `z.string().uuid()`
++   is correct for v1 (only group entries cascade). Future
++   cascade sources (project-level cascades, lane-level cascades,
++   batch-by-query) would need either a schema relaxation
++   (`z.string().min(1)`) or a tagged-union shape. Docblock matches
++   the schema's current contract.
++
++4. **Recursive originator threading verified correct** —
++   informational. `opts.cascadeFrom ?? sidecar.uuid` at the
++   recursive call preserves the top-level UUID across transitive
++   cascades. Implementation matches the documented "single-hop audit
++   trail" intent.
++
++5. **Empty-members group as a cascaded member correctly handled** —
++   informational. The cascade-iteration condition short-circuits
++   members-empty re-iteration; the walker still fires on it as a
++   member, so its own event carries `cascadeFrom`. Matches intent.
++
++6. **Schema `.passthrough()` is forward-compatible** —
++   informational. Future metadata keys can be added without schema
++   churn. Pattern consistent with `LaneMigrationEvent.details`'s
++   free-form record.
++
++Disposition: review pass complete; no commit needed to address
++findings. Recording the consolidated observation for the
++release-time close-shipped scanner and for future readers tracing
++the review trail of Step 7.2.8.
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+index 00aa41c..4277cbb 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+@@ -371,7 +371,7 @@ Schema delta: `archivedAt?: string` added to `EntrySchema` (`packages/core/src/s
+ **Task 7.2 review-action follow-ups (must land before Phase 7 closeout per `.claude/rules/agent-discipline.md` "Just for now is bullshit"):**
+ 
+ - [x] Step 7.2.7: cascade `regenerateCalendar` N+1 perf fix — split `cancelEntry` into a private walker + public wrapper so the calendar regenerate fires once at the cascade boundary instead of N+1 times. Tracked by [#360](https://github.com/audiocontrol-org/deskwork/issues/360) (AUDIT-20260529-18 deferral from Task 7.2 code-quality review of `15dd424`). — Private walker `cancelEntryWithoutCalendarRegen` extracted in `packages/core/src/entry/cancel.ts` to do the per-entry transition + journal append + sidecar write WITHOUT calling `regenerateCalendar`; the public `cancelEntry` wrapper now calls the walker (which recurses into itself for each member) and then invokes `regenerateCalendar` exactly ONCE at the cascade boundary. The cascade walk no longer re-enters the public wrapper. New TDD-first test seam in `packages/core/test/entry/cancel-cascade.test.ts` uses `vi.spyOn(regenerateModule, 'regenerateCalendar')` to assert call counts: single-entry cancel = 1, 3-member cascade = 1 (was 4 pre-fix), mixed-skip cascade = 1 (was 2 pre-fix), non-group with cascade flag = 1. Refusals, `CancelResult` shape, journal events, and `cascadedMembers` / `skippedMembers` arrays are unchanged. Core test count: 755 → 759 (+4 regenerate-count assertions).
+-- [ ] Step 7.2.8: record `cascadeFrom` on stage-transition events emitted by cascade — extend `StageTransitionEvent` (`packages/core/src/schema/journal-events.ts`) with optional `metadata.cascadeFrom`; populate it in `cancel.ts`'s cascade walk; restore the journal-events docblock paragraph claiming the linkage. Tracked by [#359](https://github.com/audiocontrol-org/deskwork/issues/359) (AUDIT-20260529-17 follow-up from Task 7.2 code-quality review of `15dd424`). Audit-trail enhancement — without it, cascade journal events are indistinguishable from single-entry cancels post-scrollback. Defer-rationale: scope-creep above what the original Task 7.2 spec required; appropriately filed for operator scope decision.
++- [x] Step 7.2.8: record `cascadeFrom` on stage-transition events emitted by cascade — extend `StageTransitionEvent` (`packages/core/src/schema/journal-events.ts`) with optional `metadata.cascadeFrom`; populate it in `cancel.ts`'s cascade walk; restore the journal-events docblock paragraph claiming the linkage. Tracked by [#359](https://github.com/audiocontrol-org/deskwork/issues/359) (AUDIT-20260529-17 follow-up from Task 7.2 code-quality review of `15dd424`). — Schema delta: `metadata` tightened to `z.object({ cascadeFrom: z.string().uuid().optional() }).passthrough().optional()` so the field is part of the typed `JournalEvent` shape (consumers can read without casting through `unknown`) while `.passthrough()` preserves forward-compat for future metadata-bag additions. Walker delta: `cancelEntryWithoutCalendarRegen` accepts a new internal `WalkerOptions` augmentation with `cascadeFrom?: string`; the public `cancelEntry` wrapper never sets it (originator is not a cascadee); the recursive walker call threads `opts.cascadeFrom ?? sidecar.uuid` so the TOP-LEVEL originator's UUID propagates through every transitive level (single-hop audit lookup, not nearest-parent). Docblock restored above `StageTransitionEvent` + above the group-* event kinds + cancel SKILL.md safety-rule bullet rewritten to surface the feature. Five new `cancel-cascade.test.ts` cases assert end-to-end (write → schema-parse → assert) the originator-omits / cascaded-members-carry-top-level-uuid / recursive-cascade-tracks-top-level / skipped-members-emit-no-event contracts. Core test count: 759 → 764 (+5). See AUDIT-20260529-27. Closes #359.
+ - [ ] Step 7.2.9: extend cancel-cascade test coverage — add recursive-cascade regression test (3-level group nesting) AND per-member `priorStage` assertions to close test-coverage gaps surfaced by Step 7.2.7's Track 3 code-quality review (AUDIT-20260529-23 + AUDIT-20260529-24). Tracked by [#363](https://github.com/audiocontrol-org/deskwork/issues/363). Both gaps are coverage shortfalls, not active bugs: walker behavior is correct by code reading but missing tests would not catch future regressions in (a) nested-cascade `cascadedMembers` flattening, (b) per-member `priorStage` writes. Defer-rationale: the trivial AUDIT-22 / AUDIT-26 fixes from the Step 7.2.7 review landed in the same commit; widening the test suite to seed multi-level fixtures is its own commit-sized change.
+ 
+ ### Task 7.3: Group review surface — Members section
+diff --git a/packages/core/src/entry/cancel.ts b/packages/core/src/entry/cancel.ts
+index a6c951c..982efa9 100644
+--- a/packages/core/src/entry/cancel.ts
++++ b/packages/core/src/entry/cancel.ts
+@@ -79,9 +79,32 @@ interface CancelResult {
+  */
+ const CANCEL_STAGE = 'Cancelled';
+ 
++/**
++ * Internal walker options. Augments the public `CancelOptions` with
++ * one cascade-internal field — `cascadeFrom` — that the public
++ * wrapper does NOT expose:
++ *
++ *   - `cascadeFrom`: when set, the walker attaches it to the
++ *     `stage-transition` event's `metadata.cascadeFrom` so the
++ *     event records the originating (top-level) group's UUID. Set
++ *     by the recursive cascade walker call only; unset on the
++ *     originator's own walker invocation (the top-level entry's
++ *     event is the cascade source, not a cascadee).
++ *
++ * Per Step 7.2.8 (#359) the originator semantic is the TOP-LEVEL
++ * cascade invoker — `cascadeFrom` does NOT track the nearest parent
++ * on transitively-cascaded entries. This keeps the audit trail
++ * single-hop ("which top-level cascade caused this cancel?") rather
++ * than requiring a walk through the journal to reconstruct.
++ */
++interface WalkerOptions extends CancelOptions {
++  readonly cascadeFrom?: string;
++}
++
+ /**
+  * Internal cascade walker (Step 7.2.7, graphical-entries, GitHub
+- * #360 / AUDIT-20260529-18).
++ * #360 / AUDIT-20260529-18; metadata.cascadeFrom field added in
++ * Step 7.2.8 / #359).
+  *
+  * Does everything the public `cancelEntry` did before the walker /
+  * wrapper split EXCEPT call `regenerateCalendar` — the wrapper is
+@@ -95,10 +118,16 @@ const CANCEL_STAGE = 'Cancelled';
+  * only externally-observable difference is that `calendar.md` is
+  * NOT rewritten by this function; the caller must invoke
+  * `regenerateCalendar` itself to keep the calendar in sync.
++ *
++ * Step 7.2.8 addition: when invoked with `cascadeFrom` set, the
++ * walker attaches it to the `stage-transition` event's
++ * `metadata.cascadeFrom` so cascaded events carry the originating
++ * group's UUID. The top-level wrapper call leaves `cascadeFrom`
++ * unset (it IS the originator).
+  */
+ async function cancelEntryWithoutCalendarRegen(
+   projectRoot: string,
+-  opts: CancelOptions,
++  opts: WalkerOptions,
+ ): Promise<CancelResult> {
+   const sidecar = await readSidecar(projectRoot, opts.uuid);
+   const template = resolveEntryStrictTemplate(sidecar, projectRoot);
+@@ -143,6 +172,17 @@ async function cancelEntryWithoutCalendarRegen(
+     from,
+     to: CANCEL_STAGE,
+     ...(opts.reason !== undefined && { reason: opts.reason }),
++    // Per Step 7.2.8 (#359): attach `metadata.cascadeFrom` only when
++    // the walker was invoked from a cascade — i.e. on cascaded
++    // members, not on the originator's own event. The public
++    // `cancelEntry` wrapper never passes `cascadeFrom`, so the
++    // originator's event omits the field. The recursive walker
++    // calls below threads the TOP-LEVEL originator's UUID (not the
++    // nearest parent) so transitively-cascaded events still trace
++    // back to the cascade invocation in a single hop.
++    ...(opts.cascadeFrom !== undefined && {
++      metadata: { cascadeFrom: opts.cascadeFrom },
++    }),
+   });
+ 
+   // Member cascade (Phase 7 Task 7.2 Step 7.2.6). Only fires when
+@@ -199,9 +239,19 @@ async function cancelEntryWithoutCalendarRegen(
+         // top-level opt-in propagates through the entire subtree (doctor's
+         // `group-recursive` rule normally refuses recursive groups, but
+         // the cancel path still has to behave correctly when one exists).
++        //
++        // Per Step 7.2.8 (#359): pass the TOP-LEVEL originator's UUID
++        // through `cascadeFrom` so every cascaded member's event
++        // records the cascade source as a single-hop back-link. If
++        // THIS walker invocation was itself cascaded (transitive
++        // case), we propagate the inherited `opts.cascadeFrom`;
++        // otherwise we ARE the originator and pass our own
++        // `sidecar.uuid` (the top-level group whose cancel started
++        // the cascade).
+         const memberResult = await cancelEntryWithoutCalendarRegen(projectRoot, {
+           uuid: memberUuid,
+           cascade: true,
++          cascadeFrom: opts.cascadeFrom ?? sidecar.uuid,
+           ...(opts.reason !== undefined && { reason: opts.reason }),
+         });
+         cascadedMembers.push({
+diff --git a/packages/core/src/schema/journal-events.ts b/packages/core/src/schema/journal-events.ts
+index e134654..273675f 100644
+--- a/packages/core/src/schema/journal-events.ts
++++ b/packages/core/src/schema/journal-events.ts
+@@ -62,6 +62,21 @@ const ReviewStateChangeEvent = z.object({
+   to: ReviewStateEnum.nullable(),
+ });
+ 
++/**
++ * `metadata.cascadeFrom` (Step 7.2.8, graphical-entries, GitHub #359):
++ * when a `stage-transition` event is emitted for a cascaded member of
++ * a group cancel `--cascade` walk, `metadata.cascadeFrom` carries the
++ * UUID of the originating (top-level) group whose cascade invocation
++ * propagated to this entry. The originator's OWN event does NOT carry
++ * `cascadeFrom` — only the cascaded members' events do. The field is
++ * the top-level originator's UUID even on transitively-cascaded entries
++ * (recursive groups), so audit consumers can answer "which cascade
++ * invocation caused this cancel?" with a single field read.
++ *
++ * `metadata` is `.passthrough()` so future enhancement to the metadata
++ * bag doesn't require a schema-level enumeration churn; consumers MAY
++ * record additional keys without invalidating existing events.
++ */
+ const StageTransitionEvent = z.object({
+   kind: z.literal('stage-transition'),
+   at: z.string().datetime(),
+@@ -69,7 +84,12 @@ const StageTransitionEvent = z.object({
+   from: StageStringSchema,
+   to: StageStringSchema,
+   reason: z.string().optional(),
+-  metadata: z.record(z.string(), z.unknown()).optional(),
++  metadata: z
++    .object({
++      cascadeFrom: z.string().uuid().optional(),
++    })
++    .passthrough()
++    .optional(),
+ });
+ 
+ /**
+@@ -346,13 +366,16 @@ const PipelineDeleteEvent = z.object({
+  *
+  * Group `cancel` propagation (`--cascade`) emits one
+  * `stage-transition` event per affected entry (including the group
+- * itself) per the universal-cancel verb's event shape. The cascade
+- * does NOT record per-member `cascadeFrom` linkage today — the
+- * audit trail of which cancels were part of a cascade is currently
+- * only reachable via the cancel-time stdout JSON result's
+- * `cascadedMembers[]` / `skippedMembers[]` arrays. See the cancel
+- * SKILL.md for the rationale and a tracking pointer for the
+- * cascadeFrom-on-event enhancement.
++ * itself) per the universal-cancel verb's event shape. Per Step
++ * 7.2.8 (graphical-entries, #359), each cascaded member's event
++ * carries `metadata.cascadeFrom` set to the originating (top-level)
++ * group's UUID — see `StageTransitionEvent` above for the field's
++ * full contract. The originator's own event omits the field. The
++ * cancel-time stdout JSON result's `cascadedMembers[]` /
++ * `skippedMembers[]` arrays remain the canonical per-invocation
++ * summary; the per-event `cascadeFrom` is the durable journal-level
++ * back-link an auditor can grep for after the operator's terminal
++ * scrollback is gone.
+  */
+ const GroupCreateEvent = z.object({
+   kind: z.literal('group-create'),
+diff --git a/packages/core/test/entry/cancel-cascade.test.ts b/packages/core/test/entry/cancel-cascade.test.ts
+index a290618..bb1e658 100644
+--- a/packages/core/test/entry/cancel-cascade.test.ts
++++ b/packages/core/test/entry/cancel-cascade.test.ts
+@@ -29,13 +29,36 @@ import {
+   afterEach,
+   vi,
+ } from 'vitest';
+-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
++import { mkdtemp, rm, mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
+ import { tmpdir } from 'node:os';
+ import { join } from 'node:path';
+ import { cancelEntry } from '@/entry/cancel';
+ import { writeSidecar } from '@/sidecar/write';
+ import { readSidecar } from '@/sidecar/read';
+ import * as regenerateModule from '@/calendar/regenerate';
++import { JournalEventSchema, type JournalEvent } from '@/schema/journal-events';
++
++/**
++ * Read every journal event written under the project's history dir
++ * and return only `stage-transition` kinds. Re-parses through the
++ * schema so the assertions exercise the new `metadata.cascadeFrom`
++ * field's contract end-to-end (write -> read -> parse -> assert).
++ */
++async function readStageTransitionEvents(
++  projectRoot: string,
++): Promise<JournalEvent[]> {
++  const dir = join(projectRoot, '.deskwork', 'review-journal', 'history');
++  const names = await readdir(dir);
++  const events: JournalEvent[] = [];
++  for (const name of names) {
++    const raw = await readFile(join(dir, name), 'utf-8');
++    const parsed = JournalEventSchema.parse(JSON.parse(raw));
++    if (parsed.kind === 'stage-transition') {
++      events.push(parsed);
++    }
++  }
++  return events;
++}
+ 
+ const groupUuid = '550e8400-e29b-41d4-a716-446655440a01';
+ const memberA = '550e8400-e29b-41d4-a716-446655440a02';
+@@ -196,3 +219,186 @@ describe('cancelEntry — regenerate-count contract (#360 / Step 7.2.7)', () =>
+     expect(regenerateSpy).toHaveBeenCalledTimes(1);
+   });
+ });
++
++/**
++ * Step 7.2.8 (#359): `metadata.cascadeFrom` linkage on cascaded
++ * `stage-transition` events. The cascade walker attaches the
++ * originating (top-level) group's UUID to every cascaded member's
++ * event; the originator's own event omits the field; non-cascade
++ * cancels do not populate it. Recursive (transitive) cascades record
++ * the TOP-LEVEL originator's UUID, NOT the nearest parent — single-
++ * hop audit traceability is the contract.
++ */
++describe('cancelEntry — metadata.cascadeFrom contract (#359 / Step 7.2.8)', () => {
++  let projectRoot: string;
++  const memberD = '550e8400-e29b-41d4-a716-446655440b01';
++  const memberE = '550e8400-e29b-41d4-a716-446655440b02';
++  const nestedGroup = '550e8400-e29b-41d4-a716-446655440b03';
++  const nestedMember = '550e8400-e29b-41d4-a716-446655440b04';
++
++  beforeEach(async () => {
++    projectRoot = await mkdtemp(join(tmpdir(), 'dw-cancel-cascadefrom-'));
++    await seedProjectScaffold(projectRoot);
++  });
++
++  afterEach(async () => {
++    await rm(projectRoot, { recursive: true, force: true });
++  });
++
++  it('non-cascade cancel does NOT populate metadata.cascadeFrom', async () => {
++    await seedEntry(projectRoot, soloUuid, 'solo', { currentStage: 'Drafting' });
++
++    await cancelEntry(projectRoot, { uuid: soloUuid });
++
++    const events = await readStageTransitionEvents(projectRoot);
++    expect(events).toHaveLength(1);
++    const evt = events[0];
++    if (evt.kind !== 'stage-transition') throw new Error('unexpected kind');
++    expect(evt.entryId).toBe(soloUuid);
++    expect(evt.metadata?.cascadeFrom).toBeUndefined();
++  });
++
++  it('--cascade on a non-group entry does NOT populate metadata.cascadeFrom (no recursion fires)', async () => {
++    await seedEntry(projectRoot, soloUuid, 'solo-cascaded', {
++      currentStage: 'Drafting',
++    });
++
++    await cancelEntry(projectRoot, { uuid: soloUuid, cascade: true });
++
++    const events = await readStageTransitionEvents(projectRoot);
++    expect(events).toHaveLength(1);
++    const evt = events[0];
++    if (evt.kind !== 'stage-transition') throw new Error('unexpected kind');
++    expect(evt.entryId).toBe(soloUuid);
++    expect(evt.metadata?.cascadeFrom).toBeUndefined();
++  });
++
++  it('--cascade on a group: members carry metadata.cascadeFrom = group UUID; group itself does NOT', async () => {
++    await seedEntry(projectRoot, memberD, 'm-d', { currentStage: 'Drafting' });
++    await seedEntry(projectRoot, memberE, 'm-e', { currentStage: 'Outlining' });
++    await seedEntry(projectRoot, groupUuid, 'cascadefrom-group', {
++      currentStage: 'Drafting',
++      members: [memberD, memberE],
++    });
++
++    await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
++
++    const events = await readStageTransitionEvents(projectRoot);
++    expect(events).toHaveLength(3);
++
++    const byEntry = new Map<string, JournalEvent>();
++    for (const evt of events) {
++      if (evt.kind === 'stage-transition') byEntry.set(evt.entryId, evt);
++    }
++
++    const groupEvt = byEntry.get(groupUuid);
++    const memberDEvt = byEntry.get(memberD);
++    const memberEEvt = byEntry.get(memberE);
++    if (
++      groupEvt?.kind !== 'stage-transition'
++      || memberDEvt?.kind !== 'stage-transition'
++      || memberEEvt?.kind !== 'stage-transition'
++    ) {
++      throw new Error('expected three stage-transition events');
++    }
++
++    // Originator: cascadeFrom MUST be absent (the group IS the source).
++    expect(groupEvt.metadata?.cascadeFrom).toBeUndefined();
++
++    // Cascaded members: cascadeFrom MUST equal the originating group's UUID.
++    expect(memberDEvt.metadata?.cascadeFrom).toBe(groupUuid);
++    expect(memberEEvt.metadata?.cascadeFrom).toBe(groupUuid);
++  });
++
++  it('--cascade on a recursive (nested) group: transitively-cascaded events carry the TOP-LEVEL originator UUID, not the nearest parent', async () => {
++    // Build: groupUuid -> nestedGroup -> nestedMember.
++    // Doctor's group-recursive rule normally refuses this shape, but
++    // the cancel walker still has to behave correctly when one exists
++    // — per the docblock at cancel.ts:198. Per Step 7.2.8 the
++    // top-level originator semantic means nestedMember's event MUST
++    // reference groupUuid, NOT nestedGroup.
++    await seedEntry(projectRoot, nestedMember, 'nested-member', {
++      currentStage: 'Drafting',
++    });
++    await seedEntry(projectRoot, nestedGroup, 'nested-group', {
++      currentStage: 'Drafting',
++      members: [nestedMember],
++    });
++    await seedEntry(projectRoot, groupUuid, 'top-level-group', {
++      currentStage: 'Drafting',
++      members: [nestedGroup],
++    });
++
++    await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
++
++    const events = await readStageTransitionEvents(projectRoot);
++    expect(events).toHaveLength(3);
++
++    const byEntry = new Map<string, JournalEvent>();
++    for (const evt of events) {
++      if (evt.kind === 'stage-transition') byEntry.set(evt.entryId, evt);
++    }
++
++    const topEvt = byEntry.get(groupUuid);
++    const nestedGroupEvt = byEntry.get(nestedGroup);
++    const nestedMemberEvt = byEntry.get(nestedMember);
++    if (
++      topEvt?.kind !== 'stage-transition'
++      || nestedGroupEvt?.kind !== 'stage-transition'
++      || nestedMemberEvt?.kind !== 'stage-transition'
++    ) {
++      throw new Error('expected three stage-transition events');
++    }
++
++    // Top-level originator: cascadeFrom omitted.
++    expect(topEvt.metadata?.cascadeFrom).toBeUndefined();
++
++    // Nested group: cascaded by groupUuid, so cascadeFrom === groupUuid.
++    expect(nestedGroupEvt.metadata?.cascadeFrom).toBe(groupUuid);
++
++    // Nested member: transitively cascaded. The contract demands the
++    // TOP-LEVEL originator UUID, NOT the nearest parent (nestedGroup).
++    expect(nestedMemberEvt.metadata?.cascadeFrom).toBe(groupUuid);
++    expect(nestedMemberEvt.metadata?.cascadeFrom).not.toBe(nestedGroup);
++  });
++
++  it('--cascade on a group with skipped members: skipped entries emit NO stage-transition event (cascadeFrom not applicable)', async () => {
++    // memberD already Cancelled (off-pipeline skip), memberE Drafting
++    // (proper cascade target). The skipped member must not produce a
++    // stage-transition event at all; the cascaded member's event
++    // carries cascadeFrom.
++    await seedEntry(projectRoot, memberD, 'm-d-already', {
++      currentStage: 'Cancelled',
++    });
++    await seedEntry(projectRoot, memberE, 'm-e-draft', {
++      currentStage: 'Drafting',
++    });
++    await seedEntry(projectRoot, groupUuid, 'mixed-skip-group', {
++      currentStage: 'Drafting',
++      members: [memberD, memberE],
++    });
++
++    await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
++
++    const events = await readStageTransitionEvents(projectRoot);
++    // Two events: group + memberE. memberD was skipped (no event).
++    expect(events).toHaveLength(2);
++
++    const byEntry = new Map<string, JournalEvent>();
++    for (const evt of events) {
++      if (evt.kind === 'stage-transition') byEntry.set(evt.entryId, evt);
++    }
++    expect(byEntry.has(memberD)).toBe(false);
++
++    const groupEvt = byEntry.get(groupUuid);
++    const memberEEvt = byEntry.get(memberE);
++    if (
++      groupEvt?.kind !== 'stage-transition'
++      || memberEEvt?.kind !== 'stage-transition'
++    ) {
++      throw new Error('expected group + memberE events');
++    }
++    expect(groupEvt.metadata?.cascadeFrom).toBeUndefined();
++    expect(memberEEvt.metadata?.cascadeFrom).toBe(groupUuid);
++  });
++});
+diff --git a/plugins/deskwork/skills/cancel/SKILL.md b/plugins/deskwork/skills/cancel/SKILL.md
+index 5faf155..eb5fc8e 100644
+--- a/plugins/deskwork/skills/cancel/SKILL.md
++++ b/plugins/deskwork/skills/cancel/SKILL.md
+@@ -41,5 +41,5 @@ Mark an entry as Cancelled — formally abandoned. Like Blocked but signals inte
+ 
+ ### Safety rules
+ 
+-- **Cancel is irreversible-by-default but recoverable via `/deskwork:induct`.** Cancel records `priorStage` on the sidecar so a later `induct` can return the entry to its previous linear stage. The cascade does NOT record per-member `cascadeFrom` linkage today; restoring a cascade requires re-inducting each member individually.
++- **Cancel is irreversible-by-default but recoverable via `/deskwork:induct`.** Cancel records `priorStage` on the sidecar so a later `induct` can return the entry to its previous linear stage. Each cascaded member's `stage-transition` event additionally carries `metadata.cascadeFrom` set to the originating (top-level) group's UUID — see `journal-events.ts` `StageTransitionEvent` for the field's contract — so the audit trail of "which cascade caused this cancel?" survives past terminal scrollback. Restoring a cascade still requires re-inducting each member individually.
+ - **`--cascade` does not enforce recursion checks.** A group whose member is itself a group is rejected by doctor's `group-recursive` rule (Phase 7 Task 7.5.1) at audit time; the CLI deliberately does NOT enforce recursion at cancel time. If a recursive group somehow exists on disk, the cascade walks transitively — every nested group + every nested member is cancelled.
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...). Use `blocking` only for issues that would break the feature's stated goals in obvious ways; `high` for correctness bugs adopters will hit; `medium` for design issues that compound over time; `low` for hygiene; `informational` for context you think the operator should see but isn't itself a bug.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
+
+codex
+I’ll review the actual files around the diff so the findings are anchored to current line numbers, not just the pasted patch context.
+exec
+/bin/zsh -lc "nl -ba packages/core/src/entry/cancel.ts | sed -n '1,340p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+     1	import { readSidecar } from '../sidecar/read.ts';
+     2	import { writeSidecar } from '../sidecar/write.ts';
+     3	import { appendJournalEvent } from '../journal/append.ts';
+     4	import { regenerateCalendar } from '../calendar/regenerate.ts';
+     5	import type { Entry } from '../schema/entry.ts';
+     6	import { resolveEntryStrictTemplate } from '../lanes/resolve.ts';
+     7	import {
+     8	  assertStageInTemplate,
+     9	  isOffPipelineStageInTemplate,
+    10	  terminalLinearStage,
+    11	} from '../pipelines/helpers.ts';
+    12	
+    13	interface CancelOptions {
+    14	  readonly uuid: string;
+    15	  readonly reason?: string;
+    16	  /**
+    17	   * Phase 7 Task 7.2 Step 7.2.6 (graphical-entries). When `true`,
+    18	   * cancel cascades to every entry in `members[]` (recursively if any
+    19	   * member is itself a group, though doctor's `group-recursive` rule
+    20	   * disallows that shape per v1). The cascade is a best-effort
+    21	   * walk — members already off-pipeline (Cancelled / Blocked / etc.)
+    22	   * are SKIPPED rather than refused, so cascading on a partially-
+    23	   * cancelled group still cancels the remainder.
+    24	   *
+    25	   * Default behaviour (no `cascade`): the group's OWN stage flips to
+    26	   * Cancelled; members are untouched. Per the universal-verb-no-
+    27	   * cascade rule (DESKWORK-STATE-MACHINE.md Commandment II + PRD §
+    28	   * Group lifecycle edge cases), cancel is opt-in.
+    29	   *
+    30	   * Non-group entries (no `members[]` array, or empty) ignore this
+    31	   * flag — there's nothing to cascade into.
+    32	   */
+    33	   readonly cascade?: boolean;
+    34	}
+    35	
+    36	interface CancelledMember {
+    37	  readonly entryId: string;
+    38	  readonly slug: string;
+    39	  readonly fromStage: string;
+    40	}
+    41	
+    42	interface SkippedMember {
+    43	  readonly entryId: string;
+    44	  readonly slug: string;
+    45	  readonly reason: string;
+    46	}
+    47	
+    48	interface CancelResult {
+    49	  readonly entryId: string;
+    50	  /**
+    51	   * Per Phase 4 (graphical-entries) the verb is lane-template-aware.
+    52	   * `toStage` is whichever off-pipeline stage the template carries as
+    53	   * its cancel destination — `Cancelled` is the reserved name and is
+    54	   * present in every preset; operator-authored templates that drop it
+    55	   * fail at runtime with a configuration error.
+    56	   */
+    57	  readonly fromStage: string;
+    58	  readonly toStage: string;
+    59	  /**
+    60	   * Members the cascade actually transitioned to Cancelled. Empty
+    61	   * when `cascade !== true` or when the entry has no members.
+    62	   */
+    63	  readonly cascadedMembers?: readonly CancelledMember[];
+    64	  /**
+    65	   * Members the cascade SKIPPED (already off-pipeline, or terminal
+    66	   * stage). Surfaced so the CLI / operator can audit what was passed
+    67	   * over. Empty when `cascade !== true`.
+    68	   */
+    69	  readonly skippedMembers?: readonly SkippedMember[];
+    70	}
+    71	
+    72	/**
+    73	 * The reserved off-pipeline stage name for cancellations. Per
+    74	 * DESKWORK-STATE-MACHINE.md and the PipelineTemplate schema's
+    75	 * `linearStages.includes('Cancelled')` refinement, `Cancelled` is
+    76	 * never a linear stage; templates that include `Cancelled` MUST list
+    77	 * it under `offPipelineStages`. The verb checks the bound template's
+    78	 * off-pipeline list at runtime to surface configuration drift.
+    79	 */
+    80	const CANCEL_STAGE = 'Cancelled';
+    81	
+    82	/**
+    83	 * Internal walker options. Augments the public `CancelOptions` with
+    84	 * one cascade-internal field — `cascadeFrom` — that the public
+    85	 * wrapper does NOT expose:
+    86	 *
+    87	 *   - `cascadeFrom`: when set, the walker attaches it to the
+    88	 *     `stage-transition` event's `metadata.cascadeFrom` so the
+    89	 *     event records the originating (top-level) group's UUID. Set
+    90	 *     by the recursive cascade walker call only; unset on the
+    91	 *     originator's own walker invocation (the top-level entry's
+    92	 *     event is the cascade source, not a cascadee).
+    93	 *
+    94	 * Per Step 7.2.8 (#359) the originator semantic is the TOP-LEVEL
+    95	 * cascade invoker — `cascadeFrom` does NOT track the nearest parent
+    96	 * on transitively-cascaded entries. This keeps the audit trail
+    97	 * single-hop ("which top-level cascade caused this cancel?") rather
+    98	 * than requiring a walk through the journal to reconstruct.
+    99	 */
+   100	interface WalkerOptions extends CancelOptions {
+   101	  readonly cascadeFrom?: string;
+   102	}
+   103	
+   104	/**
+   105	 * Internal cascade walker (Step 7.2.7, graphical-entries, GitHub
+   106	 * #360 / AUDIT-20260529-18; metadata.cascadeFrom field added in
+   107	 * Step 7.2.8 / #359).
+   108	 *
+   109	 * Does everything the public `cancelEntry` did before the walker /
+   110	 * wrapper split EXCEPT call `regenerateCalendar` — the wrapper is
+   111	 * responsible for the single boundary regenerate. Used by the
+   112	 * cascade walk to recursively cancel every member without N+1
+   113	 * calendar regenerations.
+   114	 *
+   115	 * Behaviour-preserving: same refusals, same `CancelResult` shape
+   116	 * (including `cascadedMembers` / `skippedMembers` arrays when
+   117	 * `cascade === true`), same journal events fired per entry. The
+   118	 * only externally-observable difference is that `calendar.md` is
+   119	 * NOT rewritten by this function; the caller must invoke
+   120	 * `regenerateCalendar` itself to keep the calendar in sync.
+   121	 *
+   122	 * Step 7.2.8 addition: when invoked with `cascadeFrom` set, the
+   123	 * walker attaches it to the `stage-transition` event's
+   124	 * `metadata.cascadeFrom` so cascaded events carry the originating
+   125	 * group's UUID. The top-level wrapper call leaves `cascadeFrom`
+   126	 * unset (it IS the originator).
+   127	 */
+   128	async function cancelEntryWithoutCalendarRegen(
+   129	  projectRoot: string,
+   130	  opts: WalkerOptions,
+   131	): Promise<CancelResult> {
+   132	  const sidecar = await readSidecar(projectRoot, opts.uuid);
+   133	  const template = resolveEntryStrictTemplate(sidecar, projectRoot);
+   134	  const from = sidecar.currentStage;
+   135	
+   136	  assertStageInTemplate(template, from, 'cancelEntry');
+   137	
+   138	  // Templates without `Cancelled` in offPipelineStages cannot host the
+   139	  // cancel verb. The schema permits this (cancel-free templates are a
+   140	  // valid experiment); the verb refuses at runtime with a clear error.
+   141	  if (!template.offPipelineStages.includes(CANCEL_STAGE)) {
+   142	    throw new Error(
+   143	      `Cannot cancel: pipeline template "${template.id}" does not include "${CANCEL_STAGE}" ` +
+   144	        `in offPipelineStages. The cancel verb requires the template to reserve "${CANCEL_STAGE}" ` +
+   145	        `as its cancellation destination. ` +
+   146	        `Available off-pipeline stages: ${template.offPipelineStages.join(', ') || '(none)'}.`,
+   147	    );
+   148	  }
+   149	
+   150	  const terminal = terminalLinearStage(template);
+   151	  if (from === terminal) {
+   152	    throw new Error(
+   153	      `Cannot cancel: entry is at terminal stage "${from}" of pipeline "${template.id}".`,
+   154	    );
+   155	  }
+   156	  if (isOffPipelineStageInTemplate(template, from)) {
+   157	    throw new Error(`Cannot cancel: entry is already ${from} (off-pipeline).`);
+   158	  }
+   159	
+   160	  const at = new Date().toISOString();
+   161	  const updated: Entry = {
+   162	    ...sidecar,
+   163	    currentStage: CANCEL_STAGE,
+   164	    priorStage: from,
+   165	    updatedAt: at,
+   166	  };
+   167	  await writeSidecar(projectRoot, updated);
+   168	  await appendJournalEvent(projectRoot, {
+   169	    kind: 'stage-transition',
+   170	    at,
+   171	    entryId: sidecar.uuid,
+   172	    from,
+   173	    to: CANCEL_STAGE,
+   174	    ...(opts.reason !== undefined && { reason: opts.reason }),
+   175	    // Per Step 7.2.8 (#359): attach `metadata.cascadeFrom` only when
+   176	    // the walker was invoked from a cascade — i.e. on cascaded
+   177	    // members, not on the originator's own event. The public
+   178	    // `cancelEntry` wrapper never passes `cascadeFrom`, so the
+   179	    // originator's event omits the field. The recursive walker
+   180	    // calls below threads the TOP-LEVEL originator's UUID (not the
+   181	    // nearest parent) so transitively-cascaded events still trace
+   182	    // back to the cascade invocation in a single hop.
+   183	    ...(opts.cascadeFrom !== undefined && {
+   184	      metadata: { cascadeFrom: opts.cascadeFrom },
+   185	    }),
+   186	  });
+   187	
+   188	  // Member cascade (Phase 7 Task 7.2 Step 7.2.6). Only fires when
+   189	  // the caller explicitly opted in via `cascade: true`. Per the
+   190	  // universal-verb-no-cascade rule (Commandment II + PRD § Group
+   191	  // lifecycle), cancel does NOT propagate to members by default.
+   192	  // When the flag IS set, we walk `members[]` and call THIS walker
+   193	  // (not the public wrapper) recursively for each — recursive
+   194	  // groups would cascade transitively, though doctor's
+   195	  // `group-recursive` rule (Task 7.5.1) refuses that shape; the
+   196	  // cascade here is the operator-visible behaviour the flag
+   197	  // promises. Step 7.2.7 moved the recursive call from the public
+   198	  // `cancelEntry` to this walker so calendar regeneration fires
+   199	  // exactly once at the cascade boundary (the public wrapper)
+   200	  // rather than N+1 times.
+   201	  const cascadedMembers: CancelledMember[] = [];
+   202	  const skippedMembers: SkippedMember[] = [];
+   203	  if (
+   204	    opts.cascade === true
+   205	    && Array.isArray(sidecar.members)
+   206	    && sidecar.members.length > 0
+   207	  ) {
+   208	    for (const memberUuid of sidecar.members) {
+   209	      try {
+   210	        const memberSidecar = await readSidecar(projectRoot, memberUuid);
+   211	        const memberTemplate = resolveEntryStrictTemplate(
+   212	          memberSidecar,
+   213	          projectRoot,
+   214	        );
+   215	        const memberTerminal = terminalLinearStage(memberTemplate);
+   216	        // Members already off-pipeline (or at terminal) are skipped
+   217	        // — refusing would abort the cascade mid-walk, leaving the
+   218	        // group partially cancelled which is exactly the failure
+   219	        // mode the cascade exists to avoid.
+   220	        if (memberSidecar.currentStage === memberTerminal) {
+   221	          skippedMembers.push({
+   222	            entryId: memberUuid,
+   223	            slug: memberSidecar.slug,
+   224	            reason: `at terminal stage "${memberTerminal}"`,
+   225	          });
+   226	          continue;
+   227	        }
+   228	        if (
+   229	          isOffPipelineStageInTemplate(memberTemplate, memberSidecar.currentStage)
+   230	        ) {
+   231	          skippedMembers.push({
+   232	            entryId: memberUuid,
+   233	            slug: memberSidecar.slug,
+   234	            reason: `already off-pipeline (${memberSidecar.currentStage})`,
+   235	          });
+   236	          continue;
+   237	        }
+   238	        // The recursive walker call unconditionally forces `cascade: true`:
+   239	        // top-level opt-in propagates through the entire subtree (doctor's
+   240	        // `group-recursive` rule normally refuses recursive groups, but
+   241	        // the cancel path still has to behave correctly when one exists).
+   242	        //
+   243	        // Per Step 7.2.8 (#359): pass the TOP-LEVEL originator's UUID
+   244	        // through `cascadeFrom` so every cascaded member's event
+   245	        // records the cascade source as a single-hop back-link. If
+   246	        // THIS walker invocation was itself cascaded (transitive
+   247	        // case), we propagate the inherited `opts.cascadeFrom`;
+   248	        // otherwise we ARE the originator and pass our own
+   249	        // `sidecar.uuid` (the top-level group whose cancel started
+   250	        // the cascade).
+   251	        const memberResult = await cancelEntryWithoutCalendarRegen(projectRoot, {
+   252	          uuid: memberUuid,
+   253	          cascade: true,
+   254	          cascadeFrom: opts.cascadeFrom ?? sidecar.uuid,
+   255	          ...(opts.reason !== undefined && { reason: opts.reason }),
+   256	        });
+   257	        cascadedMembers.push({
+   258	          entryId: memberUuid,
+   259	          slug: memberSidecar.slug,
+   260	          fromStage: memberResult.fromStage,
+   261	        });
+   262	        // Nested cascades from the recursive call appear in
+   263	        // `memberResult.cascadedMembers` — flatten them into the
+   264	        // top-level list so the caller sees one cascade summary
+   265	        // rather than a nested tree.
+   266	        if (memberResult.cascadedMembers !== undefined) {
+   267	          cascadedMembers.push(...memberResult.cascadedMembers);
+   268	        }
+   269	        if (memberResult.skippedMembers !== undefined) {
+   270	          skippedMembers.push(...memberResult.skippedMembers);
+   271	        }
+   272	      } catch (err) {
+   273	        const detail = err instanceof Error ? err.message : String(err);
+   274	        skippedMembers.push({
+   275	          entryId: memberUuid,
+   276	          slug: '(unresolved)',
+   277	          reason: `read failed: ${detail}`,
+   278	        });
+   279	      }
+   280	    }
+   281	  }
+   282	
+   283	  const result: CancelResult = {
+   284	    entryId: sidecar.uuid,
+   285	    fromStage: from,
+   286	    toStage: CANCEL_STAGE,
+   287	    ...(opts.cascade === true && { cascadedMembers }),
+   288	    ...(opts.cascade === true && { skippedMembers }),
+   289	  };
+   290	  return result;
+   291	}
+   292	
+   293	/**
+   294	 * Move an entry to the template's cancel destination (canonically
+   295	 * `Cancelled`). Records priorStage on the sidecar so a later
+   296	 * `inductEntry` can return it to the linear pipeline if the decision
+   297	 * is reversed.
+   298	 *
+   299	 * Refuses:
+   300	 *   - terminal linear stage (e.g. `Published` for editorial) — already
+   301	 *     shipped; cancellation is meaningless.
+   302	 *   - any off-pipeline stage (e.g. `Blocked`, `Cancelled`, `Archived`)
+   303	 *     — entry is already off-pipeline.
+   304	 *   - unknown stages — surfaces the template's allowed stage list.
+   305	 *
+   306	 * Requires the template's `offPipelineStages` to include `Cancelled`.
+   307	 * Templates that omit it raise a configuration error.
+   308	 *
+   309	 * Public-wrapper structure (Step 7.2.7, graphical-entries, GitHub
+   310	 * #360 / AUDIT-20260529-18): delegates the per-entry transition (and
+   311	 * the recursive cascade walk) to the internal
+   312	 * `cancelEntryWithoutCalendarRegen` walker, then calls
+   313	 * `regenerateCalendar` exactly ONCE at the cascade boundary. Prior
+   314	 * to the split the recursive cascade re-entered the public wrapper,
+   315	 * triggering N+1 calendar regenerations on a group with N cascaded
+   316	 * members. The result shape, refusals, and per-entry journal
+   317	 * semantics are unchanged.
+   318	 */
+   319	export async function cancelEntry(
+   320	  projectRoot: string,
+   321	  opts: CancelOptions,
+   322	): Promise<CancelResult> {
+   323	  const result = await cancelEntryWithoutCalendarRegen(projectRoot, opts);
+   324	  // #148: keep calendar.md in sync after every transition.
+   325	  // Step 7.2.7 boundary: a single regenerate covers the head entry
+   326	  // AND every cascaded member, because the walker does not call
+   327	  // regenerateCalendar itself.
+   328	  await regenerateCalendar(projectRoot);
+   329	  return result;
+   330	}
+
+exec
+/bin/zsh -lc "nl -ba packages/core/src/schema/journal-events.ts | sed -n '55,110p;340,390p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+    55	// event of this kind should be rejected in code review.
+    56	const ReviewStateChangeEvent = z.object({
+    57	  kind: z.literal('review-state-change'),
+    58	  at: z.string().datetime(),
+    59	  entryId: z.string().uuid(),
+    60	  stage: StageStringSchema,
+    61	  from: ReviewStateEnum.nullable(),
+    62	  to: ReviewStateEnum.nullable(),
+    63	});
+    64	
+    65	/**
+    66	 * `metadata.cascadeFrom` (Step 7.2.8, graphical-entries, GitHub #359):
+    67	 * when a `stage-transition` event is emitted for a cascaded member of
+    68	 * a group cancel `--cascade` walk, `metadata.cascadeFrom` carries the
+    69	 * UUID of the originating (top-level) group whose cascade invocation
+    70	 * propagated to this entry. The originator's OWN event does NOT carry
+    71	 * `cascadeFrom` — only the cascaded members' events do. The field is
+    72	 * the top-level originator's UUID even on transitively-cascaded entries
+    73	 * (recursive groups), so audit consumers can answer "which cascade
+    74	 * invocation caused this cancel?" with a single field read.
+    75	 *
+    76	 * `metadata` is `.passthrough()` so future enhancement to the metadata
+    77	 * bag doesn't require a schema-level enumeration churn; consumers MAY
+    78	 * record additional keys without invalidating existing events.
+    79	 */
+    80	const StageTransitionEvent = z.object({
+    81	  kind: z.literal('stage-transition'),
+    82	  at: z.string().datetime(),
+    83	  entryId: z.string().uuid(),
+    84	  from: StageStringSchema,
+    85	  to: StageStringSchema,
+    86	  reason: z.string().optional(),
+    87	  metadata: z
+    88	    .object({
+    89	      cascadeFrom: z.string().uuid().optional(),
+    90	    })
+    91	    .passthrough()
+    92	    .optional(),
+    93	});
+    94	
+    95	/**
+    96	 * Phase 34a: entry-keyed annotation event. Distinct from `AnnotationEvent`
+    97	 * (which uses the lighter `AnnotationSchema` and is keyed on
+    98	 * `(entryId, stage, version)`), this event carries the full
+    99	 * `DraftAnnotation` shape used by the longform review surface, keyed
+   100	 * on `entryId` only. The two stores intentionally do not interoperate
+   101	 * — see `entry/annotations.ts` and the api.ts header for the split
+   102	 * contract.
+   103	 */
+   104	const EntryAnnotationEvent = z.object({
+   105	  kind: z.literal('entry-annotation'),
+   106	  at: z.string().datetime(),
+   107	  entryId: z.string().uuid(),
+   108	  annotation: DraftAnnotationSchema,
+   109	});
+   110	
+   340	    reassignedLanes: z.array(z.object({
+   341	      laneId: z.string().min(1),
+   342	      from: z.string().min(1),
+   343	      to: z.string().min(1),
+   344	    })),
+   345	  }),
+   346	});
+   347	
+   348	/**
+   349	 * Phase 7 Task 7.2 (graphical-entries): group-lifecycle events emitted
+   350	 * by the `/deskwork:group` verb family. Each event carries `entryId`
+   351	 * (the group's UUID — groups are themselves entries) and a per-kind
+   352	 * `details` payload.
+   353	 *
+   354	 * The six kinds mirror the six mutating verbs that operate on
+   355	 * groups specifically (cancel uses the universal `stage-transition`
+   356	 * event — `/deskwork:cancel` is a universal verb, see DESKWORK-STATE-
+   357	 * MACHINE.md Commandment II):
+   358	 *
+   359	 *   - `group-create`        — a new group entry was created.
+   360	 *   - `group-update`        — group metadata (title) was mutated.
+   361	 *   - `group-add-member`    — a member UUID was appended (or inserted
+   362	 *                             at an explicit index) to `members[]`.
+   363	 *   - `group-remove-member` — a member UUID was removed from `members[]`.
+   364	 *   - `group-archive`       — `archivedAt` was set on the group entry.
+   365	 *   - `group-restore`       — `archivedAt` was cleared.
+   366	 *
+   367	 * Group `cancel` propagation (`--cascade`) emits one
+   368	 * `stage-transition` event per affected entry (including the group
+   369	 * itself) per the universal-cancel verb's event shape. Per Step
+   370	 * 7.2.8 (graphical-entries, #359), each cascaded member's event
+   371	 * carries `metadata.cascadeFrom` set to the originating (top-level)
+   372	 * group's UUID — see `StageTransitionEvent` above for the field's
+   373	 * full contract. The originator's own event omits the field. The
+   374	 * cancel-time stdout JSON result's `cascadedMembers[]` /
+   375	 * `skippedMembers[]` arrays remain the canonical per-invocation
+   376	 * summary; the per-event `cascadeFrom` is the durable journal-level
+   377	 * back-link an auditor can grep for after the operator's terminal
+   378	 * scrollback is gone.
+   379	 */
+   380	const GroupCreateEvent = z.object({
+   381	  kind: z.literal('group-create'),
+   382	  at: z.string().datetime(),
+   383	  entryId: z.string().uuid(),
+   384	  details: z.object({
+   385	    slug: z.string().min(1),
+   386	    lane: z.string().min(1),
+   387	    artifactPath: z.string().optional(),
+   388	  }),
+   389	});
+   390	
+
+exec
+/bin/zsh -lc "nl -ba packages/core/test/entry/cancel-cascade.test.ts | sed -n '1,430p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+     1	/**
+     2	 * `cancelEntry` cascade — regenerate-count assertion (Step 7.2.7,
+     3	 * graphical-entries, GitHub #360 / AUDIT-20260529-18).
+     4	 *
+     5	 * Pre-fix behaviour: `cancelEntry` called `regenerateCalendar` once
+     6	 * per invocation; the cascade path recursively invoked `cancelEntry`
+     7	 * for every member, producing N+1 regenerate calls on a group with
+     8	 * N cascaded members.
+     9	 *
+    10	 * Post-fix behaviour: the walker (`cancelEntryWithoutCalendarRegen`)
+    11	 * does the per-entry transition; the public `cancelEntry` wrapper
+    12	 * calls `regenerateCalendar` exactly once at the cascade boundary,
+    13	 * for both single-entry and cascade invocations.
+    14	 *
+    15	 * The seam: `vi.spyOn(regenerateModule, 'regenerateCalendar')` wraps
+    16	 * the live export with a counter without replacing the implementation,
+    17	 * so calendar.md still gets written and downstream code that observes
+    18	 * calendar.md continues to function. We import the module as a
+    19	 * namespace (`import * as regenerateModule from ...`) so the spy
+    20	 * attaches to the same binding cancel.ts consumes — a destructured
+    21	 * import would bypass the spy.
+    22	 */
+    23	
+    24	import {
+    25	  describe,
+    26	  it,
+    27	  expect,
+    28	  beforeEach,
+    29	  afterEach,
+    30	  vi,
+    31	} from 'vitest';
+    32	import { mkdtemp, rm, mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
+    33	import { tmpdir } from 'node:os';
+    34	import { join } from 'node:path';
+    35	import { cancelEntry } from '@/entry/cancel';
+    36	import { writeSidecar } from '@/sidecar/write';
+    37	import { readSidecar } from '@/sidecar/read';
+    38	import * as regenerateModule from '@/calendar/regenerate';
+    39	import { JournalEventSchema, type JournalEvent } from '@/schema/journal-events';
+    40	
+    41	/**
+    42	 * Read every journal event written under the project's history dir
+    43	 * and return only `stage-transition` kinds. Re-parses through the
+    44	 * schema so the assertions exercise the new `metadata.cascadeFrom`
+    45	 * field's contract end-to-end (write -> read -> parse -> assert).
+    46	 */
+    47	async function readStageTransitionEvents(
+    48	  projectRoot: string,
+    49	): Promise<JournalEvent[]> {
+    50	  const dir = join(projectRoot, '.deskwork', 'review-journal', 'history');
+    51	  const names = await readdir(dir);
+    52	  const events: JournalEvent[] = [];
+    53	  for (const name of names) {
+    54	    const raw = await readFile(join(dir, name), 'utf-8');
+    55	    const parsed = JournalEventSchema.parse(JSON.parse(raw));
+    56	    if (parsed.kind === 'stage-transition') {
+    57	      events.push(parsed);
+    58	    }
+    59	  }
+    60	  return events;
+    61	}
+    62	
+    63	const groupUuid = '550e8400-e29b-41d4-a716-446655440a01';
+    64	const memberA = '550e8400-e29b-41d4-a716-446655440a02';
+    65	const memberB = '550e8400-e29b-41d4-a716-446655440a03';
+    66	const memberC = '550e8400-e29b-41d4-a716-446655440a04';
+    67	const soloUuid = '550e8400-e29b-41d4-a716-446655440a05';
+    68	
+    69	async function seedProjectScaffold(projectRoot: string): Promise<void> {
+    70	  await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
+    71	  await mkdir(join(projectRoot, '.deskwork', 'lanes'), { recursive: true });
+    72	  await writeFile(
+    73	    join(projectRoot, '.deskwork', 'config.json'),
+    74	    JSON.stringify({
+    75	      version: 1,
+    76	      sites: {
+    77	        main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' },
+    78	      },
+    79	      defaultSite: 'main',
+    80	    }),
+    81	    'utf-8',
+    82	  );
+    83	  await writeFile(
+    84	    join(projectRoot, '.deskwork', 'lanes', 'default.json'),
+    85	    JSON.stringify({
+    86	      id: 'default',
+    87	      name: 'Default',
+    88	      pipelineTemplate: 'editorial',
+    89	      contentDir: 'docs',
+    90	    }),
+    91	    'utf-8',
+    92	  );
+    93	}
+    94	
+    95	interface SeedOpts {
+    96	  readonly currentStage?: string;
+    97	  readonly members?: readonly string[];
+    98	}
+    99	
+   100	async function seedEntry(
+   101	  projectRoot: string,
+   102	  uuid: string,
+   103	  slug: string,
+   104	  opts: SeedOpts = {},
+   105	): Promise<void> {
+   106	  await writeSidecar(projectRoot, {
+   107	    uuid,
+   108	    slug,
+   109	    title: slug,
+   110	    keywords: [],
+   111	    source: 'manual',
+   112	    currentStage: opts.currentStage ?? 'Drafting',
+   113	    iterationByStage: {},
+   114	    lane: 'default',
+   115	    ...(opts.members !== undefined && { members: opts.members }),
+   116	    createdAt: '2026-05-29T10:00:00.000Z',
+   117	    updatedAt: '2026-05-29T10:00:00.000Z',
+   118	  });
+   119	}
+   120	
+   121	describe('cancelEntry — regenerate-count contract (#360 / Step 7.2.7)', () => {
+   122	  let projectRoot: string;
+   123	  let regenerateSpy: ReturnType<typeof vi.spyOn>;
+   124	
+   125	  beforeEach(async () => {
+   126	    projectRoot = await mkdtemp(join(tmpdir(), 'dw-cancel-regen-'));
+   127	    await seedProjectScaffold(projectRoot);
+   128	    regenerateSpy = vi.spyOn(regenerateModule, 'regenerateCalendar');
+   129	  });
+   130	
+   131	  afterEach(async () => {
+   132	    regenerateSpy.mockRestore();
+   133	    await rm(projectRoot, { recursive: true, force: true });
+   134	  });
+   135	
+   136	  it('single-entry cancel calls regenerateCalendar exactly once', async () => {
+   137	    await seedEntry(projectRoot, soloUuid, 'solo', { currentStage: 'Drafting' });
+   138	
+   139	    const result = await cancelEntry(projectRoot, { uuid: soloUuid });
+   140	
+   141	    expect(result.toStage).toBe('Cancelled');
+   142	    expect(regenerateSpy).toHaveBeenCalledTimes(1);
+   143	  });
+   144	
+   145	  it('cascade cancel on a 3-member group calls regenerateCalendar exactly once', async () => {
+   146	    await seedEntry(projectRoot, memberA, 'm-a', { currentStage: 'Drafting' });
+   147	    await seedEntry(projectRoot, memberB, 'm-b', { currentStage: 'Outlining' });
+   148	    await seedEntry(projectRoot, memberC, 'm-c', { currentStage: 'Planned' });
+   149	    await seedEntry(projectRoot, groupUuid, 'cascade-group', {
+   150	      currentStage: 'Drafting',
+   151	      members: [memberA, memberB, memberC],
+   152	    });
+   153	
+   154	    const result = await cancelEntry(projectRoot, {
+   155	      uuid: groupUuid,
+   156	      cascade: true,
+   157	    });
+   158	
+   159	    // All four entries transitioned to Cancelled
+   160	    expect(result.toStage).toBe('Cancelled');
+   161	    expect((await readSidecar(projectRoot, groupUuid)).currentStage).toBe('Cancelled');
+   162	    expect((await readSidecar(projectRoot, memberA)).currentStage).toBe('Cancelled');
+   163	    expect((await readSidecar(projectRoot, memberB)).currentStage).toBe('Cancelled');
+   164	    expect((await readSidecar(projectRoot, memberC)).currentStage).toBe('Cancelled');
+   165	
+   166	    // The contract under test: ONE regenerate call for the whole cascade.
+   167	    // Pre-fix: 4 calls (1 per cancel invocation, recursive).
+   168	    expect(regenerateSpy).toHaveBeenCalledTimes(1);
+   169	
+   170	    // CancelResult shape preserved
+   171	    expect(result.cascadedMembers?.map((m) => m.slug).sort()).toEqual([
+   172	      'm-a',
+   173	      'm-b',
+   174	      'm-c',
+   175	    ]);
+   176	    expect(result.skippedMembers).toEqual([]);
+   177	  });
+   178	
+   179	  it('cascade cancel with mixed skips still calls regenerateCalendar exactly once', async () => {
+   180	    // memberA already Cancelled (off-pipeline skip),
+   181	    // memberB Published (terminal skip),
+   182	    // memberC Drafting (proper cascade target).
+   183	    await seedEntry(projectRoot, memberA, 'm-a-already', { currentStage: 'Cancelled' });
+   184	    await seedEntry(projectRoot, memberB, 'm-b-pub', { currentStage: 'Published' });
+   185	    await seedEntry(projectRoot, memberC, 'm-c-draft', { currentStage: 'Drafting' });
+   186	    await seedEntry(projectRoot, groupUuid, 'mixed-group', {
+   187	      currentStage: 'Drafting',
+   188	      members: [memberA, memberB, memberC],
+   189	    });
+   190	
+   191	    const result = await cancelEntry(projectRoot, {
+   192	      uuid: groupUuid,
+   193	      cascade: true,
+   194	    });
+   195	
+   196	    expect(result.toStage).toBe('Cancelled');
+   197	    expect(result.cascadedMembers?.map((m) => m.slug)).toEqual(['m-c-draft']);
+   198	    expect(result.skippedMembers).toHaveLength(2);
+   199	
+   200	    // The skips never recursed into cancelEntry, so pre-fix this was
+   201	    // 2 calls (one for the head, one for memberC's recursive call).
+   202	    // Post-fix: still 1 call.
+   203	    expect(regenerateSpy).toHaveBeenCalledTimes(1);
+   204	  });
+   205	
+   206	  it('cascade cancel on a non-group entry calls regenerateCalendar exactly once', async () => {
+   207	    await seedEntry(projectRoot, soloUuid, 'plain-with-cascade-flag', {
+   208	      currentStage: 'Drafting',
+   209	    });
+   210	
+   211	    const result = await cancelEntry(projectRoot, {
+   212	      uuid: soloUuid,
+   213	      cascade: true,
+   214	    });
+   215	
+   216	    expect(result.toStage).toBe('Cancelled');
+   217	    expect(result.cascadedMembers).toEqual([]);
+   218	    expect(result.skippedMembers).toEqual([]);
+   219	    expect(regenerateSpy).toHaveBeenCalledTimes(1);
+   220	  });
+   221	});
+   222	
+   223	/**
+   224	 * Step 7.2.8 (#359): `metadata.cascadeFrom` linkage on cascaded
+   225	 * `stage-transition` events. The cascade walker attaches the
+   226	 * originating (top-level) group's UUID to every cascaded member's
+   227	 * event; the originator's own event omits the field; non-cascade
+   228	 * cancels do not populate it. Recursive (transitive) cascades record
+   229	 * the TOP-LEVEL originator's UUID, NOT the nearest parent — single-
+   230	 * hop audit traceability is the contract.
+   231	 */
+   232	describe('cancelEntry — metadata.cascadeFrom contract (#359 / Step 7.2.8)', () => {
+   233	  let projectRoot: string;
+   234	  const memberD = '550e8400-e29b-41d4-a716-446655440b01';
+   235	  const memberE = '550e8400-e29b-41d4-a716-446655440b02';
+   236	  const nestedGroup = '550e8400-e29b-41d4-a716-446655440b03';
+   237	  const nestedMember = '550e8400-e29b-41d4-a716-446655440b04';
+   238	
+   239	  beforeEach(async () => {
+   240	    projectRoot = await mkdtemp(join(tmpdir(), 'dw-cancel-cascadefrom-'));
+   241	    await seedProjectScaffold(projectRoot);
+   242	  });
+   243	
+   244	  afterEach(async () => {
+   245	    await rm(projectRoot, { recursive: true, force: true });
+   246	  });
+   247	
+   248	  it('non-cascade cancel does NOT populate metadata.cascadeFrom', async () => {
+   249	    await seedEntry(projectRoot, soloUuid, 'solo', { currentStage: 'Drafting' });
+   250	
+   251	    await cancelEntry(projectRoot, { uuid: soloUuid });
+   252	
+   253	    const events = await readStageTransitionEvents(projectRoot);
+   254	    expect(events).toHaveLength(1);
+   255	    const evt = events[0];
+   256	    if (evt.kind !== 'stage-transition') throw new Error('unexpected kind');
+   257	    expect(evt.entryId).toBe(soloUuid);
+   258	    expect(evt.metadata?.cascadeFrom).toBeUndefined();
+   259	  });
+   260	
+   261	  it('--cascade on a non-group entry does NOT populate metadata.cascadeFrom (no recursion fires)', async () => {
+   262	    await seedEntry(projectRoot, soloUuid, 'solo-cascaded', {
+   263	      currentStage: 'Drafting',
+   264	    });
+   265	
+   266	    await cancelEntry(projectRoot, { uuid: soloUuid, cascade: true });
+   267	
+   268	    const events = await readStageTransitionEvents(projectRoot);
+   269	    expect(events).toHaveLength(1);
+   270	    const evt = events[0];
+   271	    if (evt.kind !== 'stage-transition') throw new Error('unexpected kind');
+   272	    expect(evt.entryId).toBe(soloUuid);
+   273	    expect(evt.metadata?.cascadeFrom).toBeUndefined();
+   274	  });
+   275	
+   276	  it('--cascade on a group: members carry metadata.cascadeFrom = group UUID; group itself does NOT', async () => {
+   277	    await seedEntry(projectRoot, memberD, 'm-d', { currentStage: 'Drafting' });
+   278	    await seedEntry(projectRoot, memberE, 'm-e', { currentStage: 'Outlining' });
+   279	    await seedEntry(projectRoot, groupUuid, 'cascadefrom-group', {
+   280	      currentStage: 'Drafting',
+   281	      members: [memberD, memberE],
+   282	    });
+   283	
+   284	    await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
+   285	
+   286	    const events = await readStageTransitionEvents(projectRoot);
+   287	    expect(events).toHaveLength(3);
+   288	
+   289	    const byEntry = new Map<string, JournalEvent>();
+   290	    for (const evt of events) {
+   291	      if (evt.kind === 'stage-transition') byEntry.set(evt.entryId, evt);
+   292	    }
+   293	
+   294	    const groupEvt = byEntry.get(groupUuid);
+   295	    const memberDEvt = byEntry.get(memberD);
+   296	    const memberEEvt = byEntry.get(memberE);
+   297	    if (
+   298	      groupEvt?.kind !== 'stage-transition'
+   299	      || memberDEvt?.kind !== 'stage-transition'
+   300	      || memberEEvt?.kind !== 'stage-transition'
+   301	    ) {
+   302	      throw new Error('expected three stage-transition events');
+   303	    }
+   304	
+   305	    // Originator: cascadeFrom MUST be absent (the group IS the source).
+   306	    expect(groupEvt.metadata?.cascadeFrom).toBeUndefined();
+   307	
+   308	    // Cascaded members: cascadeFrom MUST equal the originating group's UUID.
+   309	    expect(memberDEvt.metadata?.cascadeFrom).toBe(groupUuid);
+   310	    expect(memberEEvt.metadata?.cascadeFrom).toBe(groupUuid);
+   311	  });
+   312	
+   313	  it('--cascade on a recursive (nested) group: transitively-cascaded events carry the TOP-LEVEL originator UUID, not the nearest parent', async () => {
+   314	    // Build: groupUuid -> nestedGroup -> nestedMember.
+   315	    // Doctor's group-recursive rule normally refuses this shape, but
+   316	    // the cancel walker still has to behave correctly when one exists
+   317	    // — per the docblock at cancel.ts:198. Per Step 7.2.8 the
+   318	    // top-level originator semantic means nestedMember's event MUST
+   319	    // reference groupUuid, NOT nestedGroup.
+   320	    await seedEntry(projectRoot, nestedMember, 'nested-member', {
+   321	      currentStage: 'Drafting',
+   322	    });
+   323	    await seedEntry(projectRoot, nestedGroup, 'nested-group', {
+   324	      currentStage: 'Drafting',
+   325	      members: [nestedMember],
+   326	    });
+   327	    await seedEntry(projectRoot, groupUuid, 'top-level-group', {
+   328	      currentStage: 'Drafting',
+   329	      members: [nestedGroup],
+   330	    });
+   331	
+   332	    await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
+   333	
+   334	    const events = await readStageTransitionEvents(projectRoot);
+   335	    expect(events).toHaveLength(3);
+   336	
+   337	    const byEntry = new Map<string, JournalEvent>();
+   338	    for (const evt of events) {
+   339	      if (evt.kind === 'stage-transition') byEntry.set(evt.entryId, evt);
+   340	    }
+   341	
+   342	    const topEvt = byEntry.get(groupUuid);
+   343	    const nestedGroupEvt = byEntry.get(nestedGroup);
+   344	    const nestedMemberEvt = byEntry.get(nestedMember);
+   345	    if (
+   346	      topEvt?.kind !== 'stage-transition'
+   347	      || nestedGroupEvt?.kind !== 'stage-transition'
+   348	      || nestedMemberEvt?.kind !== 'stage-transition'
+   349	    ) {
+   350	      throw new Error('expected three stage-transition events');
+   351	    }
+   352	
+   353	    // Top-level originator: cascadeFrom omitted.
+   354	    expect(topEvt.metadata?.cascadeFrom).toBeUndefined();
+   355	
+   356	    // Nested group: cascaded by groupUuid, so cascadeFrom === groupUuid.
+   357	    expect(nestedGroupEvt.metadata?.cascadeFrom).toBe(groupUuid);
+   358	
+   359	    // Nested member: transitively cascaded. The contract demands the
+   360	    // TOP-LEVEL originator UUID, NOT the nearest parent (nestedGroup).
+   361	    expect(nestedMemberEvt.metadata?.cascadeFrom).toBe(groupUuid);
+   362	    expect(nestedMemberEvt.metadata?.cascadeFrom).not.toBe(nestedGroup);
+   363	  });
+   364	
+   365	  it('--cascade on a group with skipped members: skipped entries emit NO stage-transition event (cascadeFrom not applicable)', async () => {
+   366	    // memberD already Cancelled (off-pipeline skip), memberE Drafting
+   367	    // (proper cascade target). The skipped member must not produce a
+   368	    // stage-transition event at all; the cascaded member's event
+   369	    // carries cascadeFrom.
+   370	    await seedEntry(projectRoot, memberD, 'm-d-already', {
+   371	      currentStage: 'Cancelled',
+   372	    });
+   373	    await seedEntry(projectRoot, memberE, 'm-e-draft', {
+   374	      currentStage: 'Drafting',
+   375	    });
+   376	    await seedEntry(projectRoot, groupUuid, 'mixed-skip-group', {
+   377	      currentStage: 'Drafting',
+   378	      members: [memberD, memberE],
+   379	    });
+   380	
+   381	    await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
+   382	
+   383	    const events = await readStageTransitionEvents(projectRoot);
+   384	    // Two events: group + memberE. memberD was skipped (no event).
+   385	    expect(events).toHaveLength(2);
+   386	
+   387	    const byEntry = new Map<string, JournalEvent>();
+   388	    for (const evt of events) {
+   389	      if (evt.kind === 'stage-transition') byEntry.set(evt.entryId, evt);
+   390	    }
+   391	    expect(byEntry.has(memberD)).toBe(false);
+   392	
+   393	    const groupEvt = byEntry.get(groupUuid);
+   394	    const memberEEvt = byEntry.get(memberE);
+   395	    if (
+   396	      groupEvt?.kind !== 'stage-transition'
+   397	      || memberEEvt?.kind !== 'stage-transition'
+   398	    ) {
+   399	      throw new Error('expected group + memberE events');
+   400	    }
+   401	    expect(groupEvt.metadata?.cascadeFrom).toBeUndefined();
+   402	    expect(memberEEvt.metadata?.cascadeFrom).toBe(groupUuid);
+   403	  });
+   404	});
+
+exec
+/bin/zsh -lc "nl -ba packages/core/src/schema/entry.ts | sed -n '180,225p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+   180	  targetVersion: z.string().optional(),
+   181	  datePublished: z.string().datetime().optional(),
+   182	
+   183	  // Explicit on-disk artifact path (relative to contentDir). Set by
+   184	  // `add` / `outline` / `induct` at creation time, and by migration's
+   185	  // ingest-journal lookup. When absent (legacy entries pre-Phase 30
+   186	  // migration data fixes), consumers fall back to the slug+stage
+   187	  // heuristic.
+   188	  //
+   189	  // Per Phase 7 Task 7.1.3, this same field carries the optional
+   190	  // content body for GROUP entries (entries whose `members` field
+   191	  // below is non-empty). When a group sets `artifactPath`, the group
+   192	  // has its own editable artifact (e.g. `manifesto.md`) and the
+   193	  // `/deskwork:iterate` verb operates on that file. When absent, the
+   194	  // group is metadata-only and `iterate` refuses with a
+   195	  // "metadata-only" message per Task 7.7.2.
+   196	  artifactPath: z.string().optional(),
+   197	
+   198	  // Group membership (Phase 7 Task 7.1.1). Optional array of member
+   199	  // entry UUIDs. The schema's invariant per Task 7.1.2: entries with
+   200	  // a non-empty `members[]` ARE groups; entries without `members` (or
+   201	  // with `members: []`) are regular entries. There is no separate
+   202	  // "group" entity — same schema, same code paths, plus this field.
+   203	  // Doctor's `group-recursive` rule (Task 7.5.1) refuses members
+   204	  // whose own `members[]` is non-empty (recursive groups out of scope
+   205	  // for v1); `group-member-missing` (Task 7.5.2) refuses dangling
+   206	  // member UUIDs. Per PRD § Group lifecycle, members are an ORDERED
+   207	  // array — the array's order is preserved; insertion semantics are
+   208	  // the `/deskwork:group` CLI's concern (Tasks 7.2.3 / 7.2.4).
+   209	  members: z.array(z.string().uuid()).optional(),
+   210	
+   211	  // Soft-archive marker (Phase 7 Task 7.2). When present, the entry
+   212	  // is considered "archived" — listings hide it by default, dashboard
+   213	  // / studio renderers skip it, but the sidecar JSON stays on disk
+   214	  // along with any artifact / scrapbook / journal history. Restore
+   215	  // strips the field. The value is an ISO datetime carrying the
+   216	  // moment the archive verb ran; the truthiness of the field is the
+   217	  // boolean signal, the datetime is the audit trail.
+   218	  //
+   219	  // Set by `/deskwork:group archive <slug>` (Task 7.2.1); also
+   220	  // settable on regular (non-group) entries via the same Entry-writer
+   221	  // path — the field is forward-compat across entry shapes, matching
+   222	  // the lane-archive pattern shipped in Task 6.1 (`LaneConfig.archivedAt`).
+   223	  // Per PRD line 323: "Soft-archive is the default for lanes and
+   224	  // groups (preserves history, hides from active dashboards)." The
+   225	  // universal `induct` / `iterate` / `approve` / `cancel` verbs
+
+codex
+I found one concrete cancellation-path issue while reading the implementation: the cascade loop’s broad `try/catch` now also covers recursive writes and journal appends, not just member lookup. I’m checking whether there is a second distinct issue worth reporting before I finalize.
+codex
+### Cascade catch swallows write/journal failures as skipped members
+
+Finding-ID: AUDIT-BARRAGE-codex-01  
+Status:     open  
+Severity:   medium  
+Surface:    `packages/core/src/entry/cancel.ts:209-279`
+
+The cascade loop wraps member lookup, template resolution, and the recursive `cancelEntryWithoutCalendarRegen(...)` call in one broad `try/catch`. That means failures from the recursive transition path are converted into a skipped member with `slug: '(unresolved)'` and `reason: read failed: ...`, even when the failure was not a read failure.
+
+This can hide serious state corruption. For example, the recursive walker writes the member sidecar at `cancel.ts:167` and then appends the journal event at `cancel.ts:168-186`; if the journal append fails, the catch at `272-279` reports the member as skipped even though its sidecar may already be `Cancelled`. The public wrapper then still regenerates the calendar at `328`, leaving a cancelled entry with no durable `stage-transition` event and a result object that claims it was skipped.
+
+A reasonable fix is to narrow the recoverable catch to the specific missing-member/read case the cascade intentionally treats as skippable, and let template/config/write/journal errors propagate with an actionable error. If the product wants distinct recoverable cases beyond missing sidecars, they should be classified explicitly instead of all being labeled `read failed`.
+tokens used
+48,013
