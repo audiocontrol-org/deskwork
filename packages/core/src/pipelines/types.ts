@@ -52,6 +52,24 @@ import { z } from 'zod';
 import { stageNameToFilesystemToken } from './stage-token.ts';
 
 /**
+ * Canonical pipeline id charset: kebab-case starting with `[a-z0-9]`,
+ * allowing `[a-z0-9-]` thereafter. Re-exported here so the schema can
+ * bind it without depending on `./loader.ts` (which already depends on
+ * this module). The single source of truth for the regex value lives
+ * in `./loader.ts` — see `PIPELINE_ID_REGEX` there.
+ *
+ * Mirrors `LANE_ID_REGEX` over in `lanes/types.ts`. Pipeline ids end up
+ * as JSON filenames under `.deskwork/pipelines/` and `dist/pipelines/`,
+ * so the same character restrictions and path-traversal exposure apply.
+ *
+ * Schema-binding closes AUDIT-20260530-01: an operator who authors a
+ * non-canonical id INSIDE a template's JSON (matching the filename
+ * basename so the loader's id-mismatch check passes) used to slide
+ * through `z.string().min(1)`. The regex catches it at parse time.
+ */
+const PIPELINE_ID_REGEX_FOR_SCHEMA = /^[a-z0-9][a-z0-9-]*$/;
+
+/**
  * Cross-field invariant helper: every entry in `subset` exists in
  * `superset`. Used by lockedStages-subset-of-linearStages.
  */
@@ -93,7 +111,10 @@ function uniqueStringArray(label: string, minLength: number) {
 }
 
 export const PipelineTemplateSchema = z.object({
-  id: z.string().min(1, 'id must be a non-empty string'),
+  id: z.string().regex(
+    PIPELINE_ID_REGEX_FOR_SCHEMA,
+    'pipeline id must be kebab-case [a-z0-9-], starting with [a-z0-9]',
+  ),
   name: z.string().min(1, 'name must be a non-empty string'),
   description: z.string().min(1, 'description must be a non-empty string'),
   linearStages: uniqueStringArray('linearStages', 1),

@@ -323,29 +323,45 @@ describe('pipelines-page — `/dev/pipelines`', () => {
     expect(r.html).toContain('<code>broken</code>');
   });
 
-  it('renders Zod / loader error messages with HTML-escaped output (XSS regression)', async () => {
-    // The id-mismatch error message embeds the JSON's `id` field
-    // verbatim ("declares id "<value>" but was loaded as ..."). A
-    // future refactor that swapped `html\`\`` for `unsafe(html\`\`)`
-    // around the error-message render would let an attacker inject
-    // markup via a project-controlled override file. This test asserts
-    // the escaping survives the current render path.
+  it('rejects an injected `id` payload at the schema layer (XSS regression / AUDIT-20260530-01)', async () => {
+    // The id-mismatch error message used to embed the JSON's `id` field
+    // verbatim ("declares id "<value>" but was loaded as ..."). A future
+    // refactor that swapped `html\`\`` for `unsafe(html\`\`)` around
+    // that error-message render would have let an attacker inject markup
+    // via a project-controlled override file.
+    //
+    // Post-AUDIT-20260530-01, the schema-level `PIPELINE_ID_REGEX`
+    // rejects the non-canonical id BEFORE the id-mismatch error path
+    // ever fires. The payload therefore never reaches the rendered
+    // HTML — neither raw nor HTML-escaped. The XSS vector is closed at
+    // a higher layer than the original escaping fix.
+    //
+    // The test asserts two observable properties:
+    //   1. The error row still renders for the offending file (the
+    //      operator must see WHY the override failed to load).
+    //   2. The payload's literal characters (raw OR escaped) do NOT
+    //      appear anywhere in the rendered HTML — proof the schema-
+    //      level reject fires before any render path consumes the id.
     const payload = '<img src=x onerror=alert(1)>';
     writePipelineOverride(root, 'xss-attempt', {
       id: payload,
       name: 'XSS',
-      description: 'tries to inject markup via id-mismatch path',
+      description: 'tries to inject markup via the id field',
       linearStages: ['A'],
       offPipelineStages: [],
     });
     const app2 = createApp({ projectRoot: root, config: makeConfig() });
     const r = await getHtml(app2, '/dev/pipelines');
-    // The error row appears.
+    // The error row appears (the operator sees the failed override).
     expect(r.html).toMatch(/data-pipeline-id="xss-attempt"[^>]*data-pipeline-error/);
-    // The escaped payload appears.
-    expect(r.html).toContain('&lt;img');
-    // The RAW payload does NOT appear (which would mean unescaped output).
+    // The RAW payload does NOT appear (would indicate unescaped output).
     expect(r.html).not.toContain('<img src=x onerror=alert(1)>');
+    // The ESCAPED payload also does NOT appear (would indicate the
+    // payload reached the render path, which it must not).
+    expect(r.html).not.toContain('&lt;img');
+    // Belt-and-suspenders: no fragment of the attack reaches the page.
+    expect(r.html).not.toContain('onerror');
+    expect(r.html).not.toContain('alert(1)');
   });
 
   it('error row dependents list names the lanes referencing the broken template', async () => {

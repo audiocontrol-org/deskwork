@@ -248,6 +248,12 @@ export function loadPipelineTemplate(id: string, projectRoot: string): PipelineT
  * basenames (without the extension). Missing directory is treated as
  * empty — neither the project nor the plugin defaults directory is
  * required to exist for enumeration to succeed.
+ *
+ * Basenames that fail `PIPELINE_ID_REGEX` are filtered OUT (per
+ * AUDIT-20260530-01). The picker never returns ids the loader would
+ * refuse, and stray non-canonical `.json` files (e.g. an upper-case
+ * `Notes.json` an operator dropped into the directory) do not appear
+ * as bogus template ids.
  */
 function listJsonBasenames(dir: string): string[] {
   if (!existsSync(dir)) {
@@ -255,7 +261,8 @@ function listJsonBasenames(dir: string): string[] {
   }
   return readdirSync(dir)
     .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => basename(entry, '.json'));
+    .map((entry) => basename(entry, '.json'))
+    .filter((id) => PIPELINE_ID_REGEX.test(id));
 }
 
 /**
