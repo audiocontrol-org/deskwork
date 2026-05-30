@@ -64,7 +64,7 @@ describe('renderSwimlane — AUDIT-20260528-07 stage DOM-id uniqueness', () => {
     // hyphen, producing duplicate `id="lane-test-lane-stage-qa-review"`
     // attributes on the rendered article.
     const bucket = makeBucket(['QA Review', 'QA_Review']);
-    const html = renderSwimlane(bucket, 'd', false).__raw;
+    const html = renderSwimlane(bucket, 'd', false, new Map()).__raw;
     // Gather every id attribute value on the rendered output.
     const idMatches = html.match(/\sid="([^"]+)"/g) ?? [];
     const idValues = idMatches.map((m) => m.replace(/^\sid="(.+)"$/, '$1'));

@@ -294,6 +294,7 @@ export function createApp(ctx: StudioContext): Hono {
         {
           version: c.req.query('v') ?? null,
           stage: c.req.query('stage') ?? null,
+          members: c.req.query('members') ?? null,
         },
         getIndex,
       );

@@ -2724,3 +2724,167 @@ Disposition: review pass complete; no commit needed to address
 findings. Recording the consolidated observation for the
 release-time close-shipped scanner and for future readers tracing
 the review trail of Step 7.2.8.
+
+### AUDIT-20260529-29 — Phase 7 Tasks 7.3 + 7.4 shipped: group review surface + member-of pull-tab (feature)
+
+| Status         | Date       | Category | Severity | Phase | Driver              |
+|----------------|------------|----------|----------|-------|---------------------|
+| fixed-pending-sha | 2026-05-29 | feature  | n/a      | 7     | implementer dispatch |
+
+Implementation of Phase 7 Tasks 7.3 (group review surface — Members
+section) + 7.4 (multi-lane composed view) per the accepted design at
+`docs/studio-design/ACCEPTED/2026-05-29-group-review-surface/` —
+Direction B (composed-default with list-toggle) for the group review
+surface + Direction 1 (pull-tab on row edge) for the member-of badge
+on dashboard rows.
+
+**Files created**
+
+- `packages/studio/src/pages/entry-review/members-section.ts` — the
+  Members section renderer; `renderMembersSection(input)` returns the
+  populated composed/list view OR the empty-state CTA OR `''` per the
+  four-shape contract documented in the module's docblock.
+- `plugins/deskwork-studio/public/css/entry-review-members.css` —
+  press-check styling for the section (paper / kraft / proof-blue
+  token vocabulary; no new tokens).
+- `plugins/deskwork-studio/public/src/entry-review/group-members-section.ts`
+  — client controller for the composed↔list toggle (localStorage
+  persistence keyed on the group UUID), the empty-state CTA
+  clipboard-copy, and the per-member-row URL clipboard-copy.
+- `plugins/deskwork-studio/public/src/dashboard/row-member-tab.ts` —
+  client controller for the row `.er-row-member-tab` toggle +
+  popover back-link clipboard-copy.
+- `packages/studio/test/entry-review-group-members-section-list.test.ts`
+  — list-mode rendering integration test (real sidecars, real lane
+  configs, real templates).
+- `packages/studio/test/entry-review-group-members-section-composed.test.ts`
+  — composed-mode rendering integration test (multi-lane scoped
+  composition + `is-empty` stage assertion).
+- `packages/studio/test/dashboard-member-row-badge.test.ts` — dashboard
+  row badge integration test (solo + multi-parent + non-member).
+- `packages/studio/test/entry-review-group-empty-members.test.ts` —
+  empty-state CTA + artifactPath-fallback integration test (2 cases).
+
+**Files modified**
+
+- `packages/core/src/groups/index.ts` — barrel now exports
+  `isPopulatedGroupEntry` (was previously implementation-internal
+  under `./types.ts`).
+- `packages/studio/src/pages/entry-review/data.ts` —
+  `loadEntryReviewData` returns `groupMembers: GroupMembersBundle |
+  null`; new `loadGroupMembersBundle` resolves member sidecars +
+  lane configs + pipeline templates for populated groups. Missing
+  members surface as `missingMemberUuids`, not silently dropped.
+- `packages/studio/src/pages/entry-review/index.ts` — accepts
+  `?members=<mode>` query string; wires the new section after the
+  `er-draft-frame` body via `renderEntryMembersSection`; adds the
+  new CSS to the page's CSS list.
+- `packages/studio/src/server.ts` — threads `?members=` from the
+  request to the entry-review query.
+- `packages/studio/src/pages/dashboard/data.ts` — `loadDashboardData`
+  now builds `parentsByMemberUuid: ReadonlyMap<string, readonly
+  Entry[]>` in one pass over the sidecar set.
+- `packages/studio/src/pages/dashboard/swimlane-shell.ts` — accepts
+  `parentsByMemberUuid` in its input; threads through to
+  `renderSwimlane`. The mobile `renderLaneStack` does NOT receive
+  the index — it uses the list-body chrome, not the kanban
+  `.er-row-shell`; a comment names the asymmetry explicitly so the
+  next reader doesn't read it as an IOU.
+- `packages/studio/src/pages/dashboard/swimlane-card.ts` —
+  `renderSwimlane` + `renderStageCol` accept and thread
+  `parentsByMemberUuid` to `renderRow`.
+- `packages/studio/src/pages/dashboard/section.ts` — `renderRow`
+  accepts `parentsByMemberUuid` (default = empty map for back-compat);
+  new local helpers `renderMemberTab` + `renderMemberPopover` emit
+  the kraft-color pull-tab on the row's left edge + the inline
+  popover listing every parent group. The shell carries
+  `.has-member-tab` when at least one parent exists (CSS uses it to
+  inset the row's foreground for the 22px tab column).
+- `packages/studio/src/pages/dashboard.ts` — passes
+  `data.parentsByMemberUuid` into `renderSwimlanesShell`.
+- `plugins/deskwork-studio/public/css/dashboard-row-affordances.css`
+  — appended `.er-row-member-tab`, `.er-row-member-popover`,
+  `.er-row-member-link` rules; mirrors `.er-marginalia-tab` /
+  `.er-outline-tab` shape per `.claude/rules/affordance-placement.md`.
+- `plugins/deskwork-studio/public/src/entry-review-client.ts` —
+  invokes `initGroupMembersSection()` from the press-check init.
+- `plugins/deskwork-studio/public/src/editorial-studio-client.ts` —
+  invokes `initRowMemberTab()` from the dashboard init.
+- `packages/studio/test/dashboard-swimlane-card-unit.test.ts` —
+  threaded the new `parentsByMemberUuid` empty-map arg into the
+  `renderSwimlane` call so the existing AUDIT-20260528-07 test
+  keeps compiling against the widened signature.
+
+**Test count delta** — studio suite 933 → 938 tests passing (+5
+across the four new files: 1 list, 1 composed, 1 member-row-badge,
+2 empty-members). Core suite unchanged (764 passing — the only
+core-side delta is the `isPopulatedGroupEntry` re-export, which
+trades a private subpath import for the barrel; no behavior
+change).
+
+**Phase 5 swimlane reuse pattern** — the composed view does NOT
+re-instantiate the Phase 5 swimlane primitive (`renderSwimlane`
+takes a `LaneBucket` shape that's bound to the dashboard's lane
+machinery + focus state, which doesn't apply to the scoped
+group-member-set view). Instead, `members-section.ts` rebuilds the
+swim CHROME — `.er-members-swim` (header), `.er-members-stage`
+(per-stage row), `.er-members-card` (per-member card) — using the
+same press-check tokens and the same `stageGlyph()` lookup so the
+visual signature matches Phase 5 without coupling the entry-review
+surface to dashboard internals. The compositor walks the same
+`template.linearStages` + `template.offPipelineStages` sequence the
+dashboard swim does, so empty stages render with the same
+`is-empty` modifier the dashboard convention names.
+
+**Pull-tab affordance class** — `.er-row-member-tab` mirrors the
+`.er-outline-tab` / `.er-marginalia-tab` shape per the
+`.claude/rules/affordance-placement.md` § "Reference patterns in
+this codebase" mandate. Vertical text via `writing-mode:
+vertical-rl`, left-edge anchored, kraft accent color so it reads
+distinct from stage (red-pencil) or action (proof-blue). The
+expanded state inverts the colors (kraft fill, paper text) — same
+inversion pattern the marginalia-tab uses on activation.
+
+**Structural decisions made along the way**
+
+1. `members` query param on the entry-review route — added to
+   `EntryReviewQuery` and routed through `server.ts`'s
+   `c.req.query('members')`. Default = composed per the picked
+   direction; client controller flips + persists per-group via
+   localStorage.
+2. Missing-member rows — render as `.er-member-row--missing`
+   instead of silently dropping. The doctor `group-member-missing`
+   rule (Task 7.5.2) is the loud signal; the surface mirrors the
+   same finding inline so operators see the broken reference
+   without leaving the page.
+3. Lane-stack (mobile) intentionally NOT wired with the pull-tab —
+   the mobile lane-stack uses the list-body chrome, not the kanban
+   `.er-row-shell`. A bare comment in `swimlane-shell.ts` names the
+   asymmetry so future readers don't read it as an IOU. If/when
+   the operator surfaces a need for the mobile-row member-of
+   discoverability, a sibling rendering pass against the list-body
+   chrome will land it.
+4. `loadLaneConfig` failures during member loading swallow rather
+   than crash — a member with a stale lane id surfaces in the
+   composed view as "unrouted" (rendered with the raw lane id) and
+   in the list view's per-row meta. The list-mode test does NOT
+   exercise this branch; the empty-members fallback test exercises
+   the no-lane-resolution path indirectly through the bare-id
+   default lane setup.
+5. The composed view's `data-template-id` attribute drives the
+   lane-accent color via CSS — no per-lane `class="lane-<id>"`
+   coupling for non-default templates. This avoids the "we forgot
+   to teach the CSS about lane X" failure mode the dashboard hit
+   in pre-Task-5.2 days.
+
+Workplan deltas + closing — Task 7.3.1, 7.3.2, 7.3.3, 7.3.4 ticked;
+Task 7.4.1, 7.4.2, 7.4.3 ticked. Phase 7's remaining tasks (7.5
+doctor rules + 7.6 studio group-management page + 7.7 iterate
+semantics on groups + 7.8 integration tests) are explicitly out of
+scope for this dispatch and remain open. Phase 7 parent issue (#306)
+stays open until those tasks land. No GitHub `Closes` keyword on
+the commit.
+
+`Status: fixed-pending-sha` will be updated to the commit's actual
+SHA in the immediately-following docs commit per the established
+two-commit pattern.

@@ -9,7 +9,7 @@
  * dashboard, doctor's group-* rules, the per-verb CLI handlers).
  */
 
-export { isArchivedEntry, isGroupEntry } from './types.ts';
+export { isArchivedEntry, isGroupEntry, isPopulatedGroupEntry } from './types.ts';
 
 // Phase 7 Task 7.2 — group CRUD operations consumed by the CLI
 // `group` verb. Each named export is the per-verb core function.

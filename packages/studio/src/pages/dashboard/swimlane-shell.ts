@@ -45,6 +45,7 @@ import { renderFocusStrip } from './swimlane-focus-strip.ts';
 import { renderSwimlane, renderSwimStub } from './swimlane-card.ts';
 import { renderLaneStack } from './lane-stack-card.ts';
 import type { LaneBucket, LaneBucketsResult } from './lane-data.ts';
+import type { Entry } from '@deskwork/core/schema/entry';
 
 export interface SwimlaneShellInput {
   readonly lanes: LaneBucketsResult;
@@ -66,6 +67,14 @@ export interface SwimlaneShellInput {
    * override that via localStorage (post-DOMContentLoaded).
    */
   readonly focusFromUrl: readonly string[] | null;
+  /**
+   * Member UUID → ordered list of parent group entries. Threaded
+   * through to `renderRow` so each member row renders its
+   * `.er-row-member-tab` pull-tab + parent-list popover (Phase 7
+   * Task 7.3 — Direction 1). Absent entries indicate the row is not
+   * a member of any populated group (no tab rendered).
+   */
+  readonly parentsByMemberUuid: ReadonlyMap<string, readonly Entry[]>;
 }
 
 /**
@@ -162,7 +171,7 @@ function countTotal(lanes: LaneBucketsResult): number {
  * the dashboard renders a sane empty state instead of crashing.
  */
 export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
-  const { lanes, defaultSite, focusFromUrl, projectRoot } = input;
+  const { lanes, defaultSite, focusFromUrl, projectRoot, parentsByMemberUuid } = input;
   const projectKey = projectKeyHash(projectRoot);
   const laneIds = Array.from(lanes.byLane.keys());
   if (laneIds.length === 0) {
@@ -211,7 +220,7 @@ export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
       const swimHidden = !row.inFocus;
       const stubHidden = row.inFocus;
       return (
-        renderSwimlane(bucket, defaultSite, swimHidden).__raw
+        renderSwimlane(bucket, defaultSite, swimHidden, parentsByMemberUuid).__raw
         + renderSwimStub(row, stubHidden).__raw
       );
     })
@@ -250,6 +259,11 @@ export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
   // alongside the desktop bay-shell body; CSS gates which one paints
   // at any given viewport. The bay-head (focus strip, sheet trigger)
   // remains the cross-viewport chrome — both shells share it.
+  // Mobile lane-stack (`renderLaneStack`) uses the list-body chrome
+  // rather than the kanban `.er-row-shell` from section.ts, so the
+  // member-of pull-tab affordance isn't rendered there. Only the
+  // desktop swim path (kanban grid) carries the parentsByMemberUuid
+  // index per the accepted Direction 1 mockup (Phase 7 Task 7.3).
   const laneStackRaw = renderLaneStack(lanes.byLane, focused, defaultSite).__raw;
 
   return unsafe(html`

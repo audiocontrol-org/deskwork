@@ -152,6 +152,7 @@ function renderStageCol(
   glyph: string,
   isOffPipeline: boolean,
   isLocked: boolean,
+  parentsByMemberUuid: ReadonlyMap<string, readonly Entry[]>,
 ): RawHtml {
   // Empty columns also pick up `er-section--empty` for back-compat
   // with the legacy compact-empty assertion (#112). The class lives
@@ -202,7 +203,7 @@ function renderStageCol(
     ? unsafe(html`<div class="empty-state" data-empty-stage-msg>${emptyHint}</div>`)
     : unsafe(
       entries
-        .map((e, i) => renderRow(e, i, template, defaultSite).__raw)
+        .map((e, i) => renderRow(e, i, template, defaultSite, parentsByMemberUuid).__raw)
         .join(''),
     );
 
@@ -383,6 +384,7 @@ export function renderSwimlane(
   bucket: LaneBucket,
   defaultSite: string,
   focusHidden: boolean,
+  parentsByMemberUuid: ReadonlyMap<string, readonly Entry[]>,
 ): RawHtml {
   const { lane, template } = bucket;
   const lockedSet = new Set<string>(template.lockedStages ?? []);
@@ -397,6 +399,7 @@ export function renderSwimlane(
         stageGlyph(stage),
         false,
         lockedSet.has(stage),
+        parentsByMemberUuid,
       ).__raw,
     ),
     ...template.offPipelineStages.map((stage) =>
@@ -413,6 +416,7 @@ export function renderSwimlane(
         // so this is always false. Pass it explicitly to keep the
         // signature parallel.
         false,
+        parentsByMemberUuid,
       ).__raw,
     ),
   ].join('');

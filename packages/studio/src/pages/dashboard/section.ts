@@ -12,6 +12,61 @@ import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
 import { renderRowActions, renderRowDrawer, renderRowMenu } from './affordances.ts';
 
 /**
+ * Render the "Member of: N groups" pull-tab on the row's LEFT edge
+ * (Phase 7 Task 7.3 — Direction 1: pull-tab on row edge). Returns ''
+ * when the entry isn't a member of any populated group.
+ *
+ * Per `.claude/rules/affordance-placement.md`: the tab lives ON the
+ * row it affects, mirroring the `.er-marginalia-tab` /
+ * `.er-outline-tab` precedent. Vertical orientation (writing-mode
+ * vertical-rl) + edge-anchored placement + kraft accent.
+ *
+ * Tap → row enters `.is-expanded`; the inline popover below the row
+ * surfaces every parent group as a clipboard-copy link.
+ */
+function renderMemberTab(parents: readonly Entry[]): RawHtml {
+  if (parents.length === 0) return unsafe('');
+  return unsafe(html`
+    <button class="er-row-member-tab" type="button"
+      data-row-member-tab
+      data-parent-count="${parents.length}"
+      aria-expanded="false"
+      aria-label="Member of ${parents.length} ${parents.length === 1 ? 'group' : 'groups'}; tap to list parents">
+      <span class="er-row-member-tab-label" aria-hidden="true">Member</span>
+      <span class="er-row-member-tab-count" aria-hidden="true">${parents.length}</span>
+    </button>`);
+}
+
+function renderMemberPopover(parents: readonly Entry[]): RawHtml {
+  if (parents.length === 0) return unsafe('');
+  const linksRaw = parents
+    .map((parent) => {
+      const href = `/dev/editorial-review/entry/${parent.uuid}`;
+      const backLink = `Member of [${parent.title}](${href})`;
+      return html`
+        <a class="er-row-member-link"
+          href="${href}"
+          target="_blank"
+          rel="noopener"
+          data-parent-uuid="${parent.uuid}"
+          data-back-link="${backLink}">
+          <span class="er-row-member-link-name">${parent.title}</span>
+          <span class="er-row-member-link-slug">${parent.slug}</span>
+          <span class="er-row-member-link-open" aria-hidden="true">↪</span>
+        </a>`;
+    })
+    .join('');
+  const headLabel = parents.length === 1
+    ? 'Member of 1 group'
+    : `Member of ${parents.length} groups`;
+  return unsafe(html`
+    <div class="er-row-member-popover" data-row-member-popover hidden>
+      <div class="er-row-member-popover-head">${headLabel}</div>
+      ${unsafe(linksRaw)}
+    </div>`);
+}
+
+/**
  * Render one entry as a single dashboard row. Carries inline:
  *   - slug (linked to the review surface)
  *   - title
@@ -29,6 +84,7 @@ export function renderRow(
   index: number,
   template: StrictPipelineTemplate,
   defaultSite: string,
+  parentsByMemberUuid: ReadonlyMap<string, readonly Entry[]> = new Map(),
 ): RawHtml {
   const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
   const search = [entry.slug, entry.title, entry.keywords.join(' ')].join(' ').toLowerCase();
@@ -58,10 +114,18 @@ export function renderRow(
   // probe code targets `.er-calendar-row` so the legacy class stays
   // on `.er-row-fg`, but the canonical attribute carriers are on the
   // shell. Test selectors should prefer `[data-row-shell]`.
+  // Phase 7 Task 7.3 Direction 1 — Member-of pull-tab on the row's
+  // LEFT edge when the entry is a member of one or more populated
+  // groups. The tab + popover are siblings of `.er-row-fg`; CSS
+  // anchors the tab at the row's left edge and reveals the popover
+  // when the row carries `.is-member-expanded`.
+  const parents = parentsByMemberUuid.get(entry.uuid) ?? [];
+  const memberClass = parents.length > 0 ? ' has-member-tab' : '';
   return unsafe(html`
-    <div class="er-row-shell" data-row-shell data-search="${search}"${depthAttrs}
+    <div class="er-row-shell${unsafe(memberClass)}" data-row-shell data-search="${search}"${depthAttrs}
       data-stage="${entry.currentStage}"
       data-uuid="${entry.uuid}" data-slug="${entry.slug}">
+      ${renderMemberTab(parents)}
       ${renderRowDrawer(entry, template, defaultSite)}
       <div class="er-row-fg er-calendar-row">
         <span class="er-row-num">№ ${String(index + 1).padStart(2, '0')}</span>
@@ -76,6 +140,7 @@ export function renderRow(
         ${renderRowActions(entry, template, defaultSite)}
       </div>
       ${renderRowMenu(entry, template, defaultSite)}
+      ${renderMemberPopover(parents)}
     </div>`);
 }
 

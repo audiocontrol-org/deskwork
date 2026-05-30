@@ -101,6 +101,7 @@ export async function renderDashboard(
     defaultSite,
     projectRoot: ctx.projectRoot,
     focusFromUrl,
+    parentsByMemberUuid: data.parentsByMemberUuid,
   });
 
   // v7 architecture (Step 2.2.9 — studio-mobile-first): the Desk absorbs

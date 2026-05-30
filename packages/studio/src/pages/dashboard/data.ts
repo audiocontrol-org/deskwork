@@ -20,6 +20,7 @@ import { listOpen } from '@deskwork/core/review/pipeline';
 import type { DraftWorkflowItem } from '@deskwork/core/review/types';
 import type { Platform } from '@deskwork/core/types';
 import type { DeskworkConfig } from '@deskwork/core/config';
+import { isPopulatedGroupEntry } from '@deskwork/core/groups';
 import { loadLaneBuckets, type LaneBucketsResult } from './lane-data.ts';
 import { isLegacyEditorialStage } from './legacy-stage.ts';
 
@@ -68,6 +69,18 @@ export interface DashboardData {
    * eight-stage section renderer for Shortform/Adjacent siblings).
    */
   readonly lanes: LaneBucketsResult;
+  /**
+   * Reverse-lookup index: member UUID → ordered list of parent group
+   * entries. Built once per dashboard render so per-row renderers can
+   * surface the "Member of:" pull-tab without scanning every entry per
+   * row (Phase 7 Task 7.3 — Direction 1 picked).
+   *
+   * Only populated groups (`isPopulatedGroupEntry`) contribute; entries
+   * that aren't members of any group have NO entry in this map (the
+   * row renderer treats absent + empty as the same "render no tab"
+   * signal).
+   */
+  readonly parentsByMemberUuid: ReadonlyMap<string, readonly Entry[]>;
 }
 
 function bucketize(entries: readonly Entry[]): Map<Stage, Entry[]> {
@@ -143,6 +156,35 @@ export function bucketizeShortform(
   return out;
 }
 
+/**
+ * Build the member→parents reverse-lookup index from the loaded
+ * sidecar set (Phase 7 Task 7.3 Step 7.3.3). One pass over `entries`:
+ * for every populated group, push its sidecar into the per-member
+ * accumulator. Iteration order of the resulting Map's values is the
+ * order in which parents were encountered (groups are scanned in
+ * sidecar-load order); operators don't rely on this ordering yet
+ * (no spec calls for a "primary parent" notion), so the encounter
+ * order is the canonical surface order.
+ */
+function buildParentsIndex(
+  entries: readonly Entry[],
+): ReadonlyMap<string, readonly Entry[]> {
+  const index = new Map<string, Entry[]>();
+  for (const entry of entries) {
+    if (!isPopulatedGroupEntry(entry)) continue;
+    const members = entry.members ?? [];
+    for (const memberUuid of members) {
+      const arr = index.get(memberUuid);
+      if (arr === undefined) {
+        index.set(memberUuid, [entry]);
+      } else {
+        arr.push(entry);
+      }
+    }
+  }
+  return index;
+}
+
 export async function loadDashboardData(
   projectRoot: string,
   config: DeskworkConfig,
@@ -156,5 +198,13 @@ export async function loadDashboardData(
   // legacy projects without `.deskwork/lanes/` participate in the
   // new model without explicit operator setup.
   const lanes = await loadLaneBuckets(projectRoot, config, entries);
-  return { entries, byStage, shortformWorkflows, shortformByPlatform, lanes };
+  const parentsByMemberUuid = buildParentsIndex(entries);
+  return {
+    entries,
+    byStage,
+    shortformWorkflows,
+    shortformByPlatform,
+    lanes,
+    parentsByMemberUuid,
+  };
 }

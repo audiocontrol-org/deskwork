@@ -1,0 +1,482 @@
+/*
+ * entry-review-members.css — Members section on the entry-keyed
+ * press-check surface (Phase 7 Tasks 7.3 + 7.4 — Direction B).
+ *
+ * Mirrors the accepted mockup at
+ *   docs/studio-design/ACCEPTED/2026-05-29-group-review-surface/mockups/direction-B-composed-default.html
+ *
+ * All tokens reference --er-* from editorial-review.css. No new tokens.
+ * Composed view reuses the swim chrome scoped to the group's member
+ * set; list view falls back to a flat per-member row list.
+ *
+ * Per DESIGN-STANDARDS.md § press-check vocabulary: paper tones for
+ * surface, red-pencil for stage glyphs, mono caps for kickers + meta,
+ * italic display for titles. No rubber-stamp surfacing; stages render
+ * as glyph + name + count only.
+ */
+
+[data-review-ui="entry-review"] .er-members-section {
+  background: var(--er-paper);
+  border-top: 1px solid var(--er-paper-3);
+  padding: 18px 20px 28px;
+  margin-top: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+[data-review-ui="entry-review"] .er-members-section--empty {
+  padding: 40px 24px 56px;
+}
+
+[data-review-ui="entry-review"] .er-members-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+
+[data-review-ui="entry-review"] .er-members-head-title {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.1rem;
+  color: var(--er-red-pencil);
+  letter-spacing: -0.005em;
+}
+
+/* Toggle pill — segmented radio control inside the section head */
+
+[data-review-ui="entry-review"] .er-members-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  background: var(--er-paper-2);
+  overflow: hidden;
+}
+
+[data-review-ui="entry-review"] .er-members-toggle-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--er-font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-ink-soft);
+  background: transparent;
+  border: 0;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  /* WCAG 2.2 SC 2.5.8 minimum target size — 24×24 baseline. */
+  min-height: 24px;
+}
+
+[data-review-ui="entry-review"] .er-members-toggle-cell + .er-members-toggle-cell {
+  border-left: 1px solid var(--er-paper-3);
+}
+
+[data-review-ui="entry-review"] .er-members-toggle-cell.is-active {
+  background: var(--er-paper);
+  color: var(--er-proof-blue);
+}
+
+[data-review-ui="entry-review"] .er-members-toggle-cell:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+[data-review-ui="entry-review"] .er-members-toggle-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+[data-review-ui="entry-review"] .er-members-toggle-label {
+  font-weight: 600;
+}
+
+/* ---------- Composed view (Direction B default) ---------- */
+
+[data-review-ui="entry-review"] .er-members-composed {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+[data-review-ui="entry-review"] .er-members-composed-empty {
+  padding: 18px 12px;
+  text-align: center;
+  font-family: var(--er-font-mono);
+  font-size: 0.6875rem;
+  color: var(--er-faded);
+  letter-spacing: 0.06em;
+  font-style: italic;
+}
+
+[data-review-ui="entry-review"] .er-members-swim {
+  border: 1px solid var(--er-paper-3);
+  background: var(--er-paper);
+}
+
+[data-review-ui="entry-review"] .er-members-swim-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--er-paper-2);
+  border-bottom: 1px solid var(--er-paper-3);
+  border-left: 3px solid var(--er-faded);
+}
+
+[data-review-ui="entry-review"] .er-members-swim-name {
+  font-family: var(--er-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--er-ink-soft);
+}
+
+[data-review-ui="entry-review"] .er-members-swim-count {
+  font-family: var(--er-font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  color: var(--er-faded);
+  text-transform: uppercase;
+}
+
+/* Lane-accent variants — feature/editorial lanes pick up proof-blue;
+ * mockup/visual lanes pick up kraft. Other lanes inherit faded until a
+ * design decision pins their accent (per swimlane-stage-glyph.ts's
+ * "no fallback" convention — neutrals are documented, not placeholders). */
+
+[data-review-ui="entry-review"] .er-members-swim.lane-default .er-members-swim-head,
+[data-review-ui="entry-review"] .er-members-swim[data-template-id="editorial"] .er-members-swim-head {
+  border-left-color: var(--er-proof-blue);
+}
+
+[data-review-ui="entry-review"] .er-members-swim.lane-default .er-members-swim-name,
+[data-review-ui="entry-review"] .er-members-swim[data-template-id="editorial"] .er-members-swim-name {
+  color: var(--er-proof-blue);
+}
+
+[data-review-ui="entry-review"] .er-members-swim[data-template-id="visual"] .er-members-swim-head,
+[data-review-ui="entry-review"] .er-members-swim.lane-mockups .er-members-swim-head {
+  border-left-color: var(--er-kraft);
+}
+
+[data-review-ui="entry-review"] .er-members-swim[data-template-id="visual"] .er-members-swim-name,
+[data-review-ui="entry-review"] .er-members-swim.lane-mockups .er-members-swim-name {
+  color: var(--er-kraft);
+}
+
+[data-review-ui="entry-review"] .er-members-swim-stages {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-review-ui="entry-review"] .er-members-stage {
+  border-bottom: 1px dashed var(--er-paper-3);
+  padding: 8px 12px 10px;
+}
+
+[data-review-ui="entry-review"] .er-members-stage:last-child {
+  border-bottom: 0;
+}
+
+[data-review-ui="entry-review"] .er-members-stage-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+[data-review-ui="entry-review"] .er-members-stage-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-red-pencil);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+[data-review-ui="entry-review"] .er-members-stage-name {
+  font-family: var(--er-font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-ink-soft);
+  font-weight: 500;
+}
+
+[data-review-ui="entry-review"] .er-members-stage-count {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.625rem;
+  color: var(--er-faded);
+}
+
+[data-review-ui="entry-review"] .er-members-stage.is-empty .er-members-stage-glyph,
+[data-review-ui="entry-review"] .er-members-stage.is-empty .er-members-stage-name,
+[data-review-ui="entry-review"] .er-members-stage.is-empty .er-members-stage-count {
+  color: var(--er-faded);
+}
+
+[data-review-ui="entry-review"] .er-members-stage-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+[data-review-ui="entry-review"] .er-members-card {
+  padding: 8px 10px;
+  background: var(--er-paper-2);
+  border-left: 2px solid var(--er-faded);
+  border-radius: 1px;
+  display: grid;
+  grid-template-columns: 1fr 20px;
+  gap: 8px;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+}
+
+[data-review-ui="entry-review"] .er-members-card:hover {
+  background: var(--er-paper);
+  border-left-width: 3px;
+}
+
+[data-review-ui="entry-review"] .er-members-card:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+[data-review-ui="entry-review"] .er-members-card.lane-default,
+[data-review-ui="entry-review"] .er-members-card[data-template-id="editorial"] {
+  border-left-color: var(--er-proof-blue);
+}
+
+[data-review-ui="entry-review"] .er-members-card.lane-mockups {
+  border-left-color: var(--er-kraft);
+}
+
+[data-review-ui="entry-review"] .er-members-card-title {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: var(--er-ink);
+  letter-spacing: -0.005em;
+}
+
+[data-review-ui="entry-review"] .er-members-card-slug {
+  font-family: var(--er-font-mono);
+  font-size: 0.625rem;
+  color: var(--er-faded);
+  margin-top: 2px;
+}
+
+[data-review-ui="entry-review"] .er-members-card-open {
+  font-family: var(--er-font-mono);
+  font-size: 0.95rem;
+  color: var(--er-proof-blue);
+  text-align: center;
+}
+
+/* ---------- List view (toggle target) ---------- */
+
+[data-review-ui="entry-review"] .er-members-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+[data-review-ui="entry-review"] .er-member-row {
+  border-bottom: 1px dashed var(--er-paper-3);
+  border-left: 2px solid var(--er-faded);
+  background: var(--er-paper);
+}
+
+[data-review-ui="entry-review"] .er-member-row:last-child {
+  border-bottom: 0;
+}
+
+[data-review-ui="entry-review"] .er-member-row.lane-default,
+[data-review-ui="entry-review"] .er-member-row[data-template-id="editorial"] {
+  border-left-color: var(--er-proof-blue);
+}
+
+[data-review-ui="entry-review"] .er-member-row.lane-mockups {
+  border-left-color: var(--er-kraft);
+}
+
+[data-review-ui="entry-review"] .er-member-row--missing {
+  border-left-color: var(--er-red-pencil);
+  background: var(--er-paper-2);
+  opacity: 0.7;
+}
+
+[data-review-ui="entry-review"] .er-member-row-link {
+  display: block;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: inherit;
+}
+
+[data-review-ui="entry-review"] .er-member-row-link:hover {
+  background: var(--er-paper-2);
+}
+
+[data-review-ui="entry-review"] .er-member-row-link:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+[data-review-ui="entry-review"] .er-member-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--er-font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-bottom: 4px;
+}
+
+[data-review-ui="entry-review"] .er-member-row-lane {
+  color: var(--er-ink-soft);
+  font-weight: 600;
+}
+
+[data-review-ui="entry-review"] .er-member-row-sep {
+  color: var(--er-paper-3);
+}
+
+[data-review-ui="entry-review"] .er-member-row-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-red-pencil);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+[data-review-ui="entry-review"] .er-member-row-stage {
+  color: var(--er-ink-soft);
+  font-weight: 500;
+}
+
+[data-review-ui="entry-review"] .er-member-row-title {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.05rem;
+  color: var(--er-ink);
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+}
+
+[data-review-ui="entry-review"] .er-member-row-slug {
+  font-family: var(--er-font-mono);
+  font-size: 0.6875rem;
+  color: var(--er-faded);
+  margin-top: 4px;
+}
+
+/* ---------- Empty-state CTA ---------- */
+
+[data-review-ui="entry-review"] .er-members-empty-state {
+  padding: 40px 24px;
+  text-align: center;
+}
+
+[data-review-ui="entry-review"] .er-members-empty-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-faded);
+  font-size: 2.4rem;
+  line-height: 1;
+  margin-bottom: 18px;
+}
+
+[data-review-ui="entry-review"] .er-members-empty-head {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 1.15rem;
+  color: var(--er-ink-soft);
+  margin-bottom: 8px;
+}
+
+[data-review-ui="entry-review"] .er-members-empty-desc {
+  font-family: var(--er-font-mono);
+  font-size: 0.6875rem;
+  color: var(--er-faded);
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  margin-bottom: 24px;
+  text-transform: lowercase;
+}
+
+[data-review-ui="entry-review"] .er-members-empty-desc code {
+  font-family: var(--er-font-mono);
+  background: var(--er-paper-2);
+  padding: 1px 4px;
+  border-radius: 1px;
+}
+
+[data-review-ui="entry-review"] .er-members-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--er-red-pencil);
+  color: var(--er-paper);
+  font-family: var(--er-font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  user-select: none;
+  min-height: 36px;
+}
+
+[data-review-ui="entry-review"] .er-members-empty-cta:hover {
+  background: #9C2B23;
+}
+
+[data-review-ui="entry-review"] .er-members-empty-cta:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 2px;
+}
+
+[data-review-ui="entry-review"] .er-members-empty-cta-plus {
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+[data-review-ui="entry-review"] .er-members-empty-cta-label {
+  font-weight: 600;
+}
+
+/* ---------- Desktop tweaks (wider viewport) ---------- */
+
+@media (min-width: 56rem) {
+  [data-review-ui="entry-review"] .er-members-composed {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  [data-review-ui="entry-review"] .er-members-swim {
+    flex: 1 1 320px;
+    min-width: 280px;
+  }
+}

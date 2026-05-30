@@ -32,6 +32,17 @@ import {
   type IterationContent,
 } from '@deskwork/core/iterate/history';
 import { listEntryAnnotations } from '@deskwork/core/entry/annotations';
+import { readSidecar } from '@deskwork/core/sidecar';
+import { isPopulatedGroupEntry } from '@deskwork/core/groups';
+import {
+  listLaneConfigs,
+  loadLaneConfig,
+  type StrictLaneConfig,
+} from '@deskwork/core/lanes';
+import {
+  loadPipelineTemplate,
+  type StrictPipelineTemplate,
+} from '@deskwork/core/pipelines';
 import type { Entry, Stage } from '@deskwork/core/schema/entry';
 
 const VALID_STAGES: ReadonlySet<Stage> = new Set<Stage>([
@@ -47,6 +58,26 @@ function parseStageParam(raw: string | null | undefined): Stage | undefined {
 }
 import type { CalendarEntry } from '@deskwork/core/types';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
+
+/**
+ * When the entry is a populated group (Phase 7 Task 7.3 + 7.4), the
+ * loader resolves each member sidecar plus the lane configs + pipeline
+ * templates the members span. Members are returned in the original
+ * `group.members[]` insertion order. Missing-member UUIDs (sidecar
+ * didn't resolve) are returned separately so the surface can render a
+ * "missing" row inline rather than silently dropping.
+ *
+ * `laneConfigsById` iterates in operator-configured lane order (per
+ * `listLaneConfigs`) — the same order the dashboard uses — so the
+ * composed view's per-lane block ordering is consistent across
+ * surfaces.
+ */
+export interface GroupMembersBundle {
+  readonly members: readonly Entry[];
+  readonly missingMemberUuids: readonly string[];
+  readonly laneConfigsById: ReadonlyMap<string, StrictLaneConfig>;
+  readonly templatesById: ReadonlyMap<string, StrictPipelineTemplate>;
+}
 
 export interface EntryReviewData {
   readonly entry: Entry;
@@ -65,6 +96,13 @@ export interface EntryReviewData {
   /** The matching CalendarEntry, when present. Drives index-bound
    *  scrapbook resolution; null falls back to slug-template paths. */
   readonly calendarEntry: CalendarEntry | null;
+  /**
+   * Resolved group member bundle. `null` when the entry is not a
+   * populated group (no `members` array OR `members.length === 0`).
+   * Phase 7 Tasks 7.3 + 7.4. Loaded only when the group has members
+   * — pay-for-what-you-use per the project's "no fallback" rule.
+   */
+  readonly groupMembers: GroupMembersBundle | null;
 }
 
 export interface LoadOptions {
@@ -115,6 +153,83 @@ function parseVersionParam(raw: string | null | undefined): number | null {
   return parsed;
 }
 
+/**
+ * Resolve each member UUID to a sidecar; collect lane configs +
+ * pipeline templates for every lane the resolved members span.
+ *
+ * Missing-member sidecars are NOT silently dropped — they surface in
+ * `missingMemberUuids` so the renderer can show a "missing" row. This
+ * mirrors the doctor `group-member-missing` rule's intent (Task 7.5.2)
+ * at the studio surface.
+ *
+ * Lane configs are loaded for every member's lane (deduped). The
+ * resulting Map iterates in the operator-configured lane order from
+ * `listLaneConfigs` — the same order the dashboard's swimlane uses —
+ * so per-lane composed blocks render in a stable, operator-recognizable
+ * sequence.
+ */
+async function loadGroupMembersBundle(
+  projectRoot: string,
+  group: Entry,
+): Promise<GroupMembersBundle> {
+  const uuids = group.members ?? [];
+  const members: Entry[] = [];
+  const missing: string[] = [];
+  for (const uuid of uuids) {
+    try {
+      const sidecar = await readSidecar(projectRoot, uuid);
+      members.push(sidecar);
+    } catch {
+      // Sidecar didn't resolve — surface as missing rather than crash.
+      missing.push(uuid);
+    }
+  }
+
+  // Lane configs + templates: load only what the resolved members
+  // actually use. Iterate in operator-configured lane order.
+  const usedLaneIds = new Set<string>();
+  for (const m of members) {
+    if (m.lane !== undefined) usedLaneIds.add(m.lane);
+  }
+  const laneConfigsById = new Map<string, StrictLaneConfig>();
+  const templatesById = new Map<string, StrictPipelineTemplate>();
+  if (usedLaneIds.size > 0) {
+    // Lane configs may not all exist on disk (legacy / mis-set). Skip
+    // missing ones — they show up in the members section as
+    // unrouted (lane label = the raw id).
+    const allLaneIds = listLaneConfigs(projectRoot);
+    for (const laneId of allLaneIds) {
+      if (!usedLaneIds.has(laneId)) continue;
+      try {
+        const config = loadLaneConfig(laneId, projectRoot);
+        const strict: StrictLaneConfig = {
+          id: config.id,
+          name: config.name,
+          pipelineTemplate: config.pipelineTemplate,
+          contentDir: config.contentDir,
+        };
+        laneConfigsById.set(strict.id, strict);
+        if (!templatesById.has(strict.pipelineTemplate)) {
+          const tpl = loadPipelineTemplate(strict.pipelineTemplate, projectRoot);
+          templatesById.set(strict.pipelineTemplate, tpl);
+        }
+      } catch {
+        // Lane / template failed to resolve. Skip — the member row
+        // surfaces as unrouted (lane label = its raw id) instead of
+        // crashing the surface render.
+        continue;
+      }
+    }
+  }
+
+  return {
+    members,
+    missingMemberUuids: missing,
+    laneConfigsById,
+    templatesById,
+  };
+}
+
 export async function loadEntryReviewData(
   ctx: StudioContext,
   entryId: string,
@@ -124,6 +239,9 @@ export async function loadEntryReviewData(
   const iterations = await listEntryIterations(ctx.projectRoot, entryId);
   const annotations = await listEntryAnnotations(ctx.projectRoot, entryId);
   const { site, calendarEntry } = findEntrySite(ctx, entryId);
+  const groupMembers = isPopulatedGroupEntry(resolved.entry)
+    ? await loadGroupMembersBundle(ctx.projectRoot, resolved.entry)
+    : null;
 
   // Historical-version handling. Only swap the markdown when both the
   // version param resolves and the journal has content for it. Stage
@@ -165,5 +283,6 @@ export async function loadEntryReviewData(
     annotations,
     site,
     calendarEntry,
+    groupMembers,
   };
 }

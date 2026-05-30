@@ -8,6 +8,7 @@
 import { copyOrShowFallback } from './clipboard.ts';
 import { initComposeChip } from './dashboard/compose-chip.ts';
 import { initRowActions } from './dashboard/row-actions.ts';
+import { initRowMemberTab } from './dashboard/row-member-tab.ts';
 import { initStageTiles } from './dashboard/stage-tiles.ts';
 import { initSwimlane } from './dashboard/swimlane.ts';
 import { initSwimlaneCollapse } from './dashboard/swimlane-collapse.ts';
@@ -541,6 +542,8 @@ function init(): void {
   // module-level singleton state.
   initSwimlanePresets();
   initRowActions();
+  // Phase 7 Task 7.3 Direction 1 — row "Member of:" pull-tab toggle.
+  initRowMemberTab();
   initMastheadPopover();
   // Phase 6 Task 6.3: lanes-page controller (idempotent — no-op
   // when [data-lanes-container] is absent on the dashboard).

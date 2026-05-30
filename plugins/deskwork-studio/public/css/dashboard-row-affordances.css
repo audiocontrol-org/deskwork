@@ -222,3 +222,172 @@
     margin: 0.25rem 0.7rem;
   }
 }
+
+/* -------------------------------------------------------------------
+ * Member-of pull-tab (Phase 7 Task 7.3 — Direction 1).
+ *
+ * Vertical kraft-color tab anchored to the row's LEFT edge when the
+ * entry is a member of one or more populated groups. Mirrors the
+ * `.er-outline-tab` / `.er-marginalia-tab` precedent — a stowed-state
+ * affordance that lives ON the row it affects (per
+ * `.claude/rules/affordance-placement.md`).
+ *
+ * Tap → row carries `.is-member-expanded`; CSS reveals the popover.
+ * The popover lists every parent group as a clipboard-copy link. The
+ * client controller wires the toggle + clipboard handlers.
+ *
+ * The tab carries no media-query gate — desktop + mobile both render
+ * it when applicable (chrome doesn't pay for what doesn't apply, but
+ * when it DOES apply the discoverability signal is uniform across
+ * viewport classes).
+ * ----------------------------------------------------------------- */
+
+.er-row-member-tab {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--er-paper-2);
+  border: 0;
+  border-right: 1px solid var(--er-paper-3);
+  cursor: pointer;
+  user-select: none;
+  padding: 0;
+  z-index: 6;
+  /* WCAG 2.2 SC 2.5.8 minimum target size 24x24 — the row's height
+   * provides the vertical dimension (≥44 in standard rows). */
+  min-height: 24px;
+}
+
+.er-row-member-tab:hover {
+  background: var(--er-paper);
+}
+
+.er-row-member-tab:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+.er-row-member-tab-label {
+  font-family: var(--er-font-mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--er-kraft);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-weight: 600;
+}
+
+.er-row-member-tab-count {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--er-font-mono);
+  font-size: 0.55rem;
+  color: var(--er-kraft);
+  background: var(--er-paper);
+  border: 1px solid var(--er-kraft);
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Row shells that carry the member tab inset their main content so
+ * the tab's 22px column doesn't overlap the row foreground. The class
+ * is added server-side when parents.length > 0; non-member rows keep
+ * their original padding. */
+.er-row-shell.has-member-tab .er-row-fg {
+  padding-left: 26px;
+}
+
+/* Expanded state — popover visible, tab color inverts to kraft. */
+.er-row-shell.is-member-expanded .er-row-member-tab {
+  background: var(--er-kraft);
+  border-right-color: var(--er-kraft);
+}
+
+.er-row-shell.is-member-expanded .er-row-member-tab-label {
+  color: var(--er-paper);
+}
+
+.er-row-shell.is-member-expanded .er-row-member-tab-count {
+  background: var(--er-kraft);
+  color: var(--er-paper);
+  border-color: var(--er-paper);
+}
+
+.er-row-shell.is-member-expanded {
+  background: var(--er-paper-2);
+}
+
+/* Popover — inline reveal below the row foreground when expanded. */
+.er-row-member-popover {
+  display: block;
+  margin: 0 0 0 22px;
+  padding: 10px 14px 12px;
+  background: var(--er-paper);
+  border-top: 1px solid var(--er-paper-3);
+  border-left: 3px solid var(--er-kraft);
+}
+
+.er-row-member-popover-head {
+  font-family: var(--er-font-mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-kraft);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.er-row-member-link {
+  display: grid;
+  grid-template-columns: 1fr auto 20px;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  color: var(--er-ink);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+}
+
+.er-row-member-link:hover {
+  border-bottom-color: var(--er-paper-3);
+}
+
+.er-row-member-link:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 2px;
+}
+
+.er-row-member-link-name {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--er-ink);
+}
+
+.er-row-member-link-slug {
+  font-size: 0.625rem;
+  color: var(--er-faded);
+  letter-spacing: 0.04em;
+}
+
+.er-row-member-link-open {
+  color: var(--er-proof-blue);
+  font-size: 0.9rem;
+  text-align: center;
+}
