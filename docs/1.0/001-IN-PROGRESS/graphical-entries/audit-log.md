@@ -3178,7 +3178,7 @@ Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). 
 ### AUDIT-20260530-04 — verify `dist/pipelines/*.json` actually ships in the `@deskwork/core` published tarball
 
 Finding-ID: AUDIT-20260530-04 (cross-model: AUDIT-BARRAGE-claude-04-P2)
-Status:     open
+Status:     fixed-c99e6d1
 Severity:   medium
 Surface:    `packages/core/package.json:214-215` (`build`/`prepack` cp step) — `files` whitelist (not in diff; needs inspection)
 
