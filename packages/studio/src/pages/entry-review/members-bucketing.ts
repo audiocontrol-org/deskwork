@@ -16,12 +16,12 @@
  */
 
 import type { Entry } from '@deskwork/core/schema/entry';
-import type { StrictLaneConfig } from '@deskwork/core/lanes';
-import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
+import type { LaneConfig } from '@deskwork/core/lanes';
+import type { PipelineTemplate } from '@deskwork/core/pipelines';
 
 export interface LaneScopedBucket {
-  readonly lane: StrictLaneConfig;
-  readonly template: StrictPipelineTemplate;
+  readonly lane: LaneConfig;
+  readonly template: PipelineTemplate;
   /** Stage → members-of-this-group-in-this-lane-at-this-stage. */
   readonly byStage: ReadonlyMap<string, readonly Entry[]>;
   readonly memberCount: number;
@@ -72,8 +72,8 @@ export interface BucketingResult {
  */
 export function bucketMembersByLane(
   members: readonly Entry[],
-  laneConfigsById: ReadonlyMap<string, StrictLaneConfig>,
-  templatesById: ReadonlyMap<string, StrictPipelineTemplate>,
+  laneConfigsById: ReadonlyMap<string, LaneConfig>,
+  templatesById: ReadonlyMap<string, PipelineTemplate>,
 ): BucketingResult {
   // First pass: route members into per-lane stage maps, collecting
   // anyone the bucketer can't place into `unbucketed`.

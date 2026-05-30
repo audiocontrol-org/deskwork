@@ -37,11 +37,11 @@ import { isPopulatedGroupEntry } from '@deskwork/core/groups';
 import {
   listLaneConfigs,
   loadLaneConfig,
-  type StrictLaneConfig,
+  type LaneConfig,
 } from '@deskwork/core/lanes';
 import {
   loadPipelineTemplate,
-  type StrictPipelineTemplate,
+  type PipelineTemplate,
 } from '@deskwork/core/pipelines';
 import type { Entry, Stage } from '@deskwork/core/schema/entry';
 
@@ -118,8 +118,8 @@ export interface GroupMembersBundle {
   readonly missingMemberUuids: readonly string[];
   readonly corruptMemberUuids: readonly string[];
   readonly orderedMembers: readonly MemberItem[];
-  readonly laneConfigsById: ReadonlyMap<string, StrictLaneConfig>;
-  readonly templatesById: ReadonlyMap<string, StrictPipelineTemplate>;
+  readonly laneConfigsById: ReadonlyMap<string, LaneConfig>;
+  readonly templatesById: ReadonlyMap<string, PipelineTemplate>;
 }
 
 export interface EntryReviewData {
@@ -283,8 +283,8 @@ async function loadGroupMembersBundle(
   for (const m of members) {
     if (m.lane !== undefined) usedLaneIds.add(m.lane);
   }
-  const laneConfigsById = new Map<string, StrictLaneConfig>();
-  const templatesById = new Map<string, StrictPipelineTemplate>();
+  const laneConfigsById = new Map<string, LaneConfig>();
+  const templatesById = new Map<string, PipelineTemplate>();
   if (usedLaneIds.size > 0) {
     // Lane configs may not all exist on disk (legacy / mis-set). Skip
     // missing ones — they show up in the members section as
@@ -294,7 +294,7 @@ async function loadGroupMembersBundle(
       if (!usedLaneIds.has(laneId)) continue;
       try {
         const config = loadLaneConfig(laneId, projectRoot);
-        const strict: StrictLaneConfig = {
+        const strict: LaneConfig = {
           id: config.id,
           name: config.name,
           pipelineTemplate: config.pipelineTemplate,

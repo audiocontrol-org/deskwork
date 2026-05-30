@@ -21,10 +21,10 @@
 import { describe, it, expect } from 'vitest';
 import { renderSwimlane } from '@/pages/dashboard/swimlane-card.ts';
 import type { LaneBucket } from '@/pages/dashboard/lane-data.ts';
-import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
-import type { StrictLaneConfig } from '@deskwork/core/lanes';
+import type { PipelineTemplate } from '@deskwork/core/pipelines';
+import type { LaneConfig } from '@deskwork/core/lanes';
 
-function makeTemplate(stages: readonly string[]): StrictPipelineTemplate {
+function makeTemplate(stages: readonly string[]): PipelineTemplate {
   return {
     id: 'test-collide',
     description: 'Test template covering stage-token-collision DOM ids',
@@ -34,7 +34,7 @@ function makeTemplate(stages: readonly string[]): StrictPipelineTemplate {
   };
 }
 
-function makeLane(): StrictLaneConfig {
+function makeLane(): LaneConfig {
   return {
     id: 'test-lane',
     name: 'Test Lane',

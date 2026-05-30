@@ -8,7 +8,7 @@
 
 import { html, unsafe, type RawHtml } from '../html.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
-import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
+import type { PipelineTemplate } from '@deskwork/core/pipelines';
 import { renderRowActions, renderRowDrawer, renderRowMenu } from './affordances.ts';
 
 /**
@@ -82,7 +82,7 @@ function renderMemberPopover(parents: readonly Entry[]): RawHtml {
 export function renderRow(
   entry: Entry,
   index: number,
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   defaultSite: string,
   parentsByMemberUuid: ReadonlyMap<string, readonly Entry[]> = new Map(),
 ): RawHtml {

@@ -32,10 +32,12 @@
  *
  * The on-disk JSON additionally permits a top-level `"$rationale"`
  * string field as the JSON-with-comments workaround (matching the
- * PipelineTemplate convention). The loader passes the field through
- * the schema via `.passthrough()` and ignores it at runtime; it exists
- * so operator-authored lane configs can carry inline documentation
- * that survives `jq` / `cat` inspection.
+ * PipelineTemplate convention). The schema declares `$rationale`
+ * explicitly and uses `.strict()` so unknown top-level keys fail parse
+ * with an actionable error naming the offending key — mirrors the
+ * PipelineTemplate AUDIT-20260530-02 fix. Operator-authored lane
+ * configs can carry inline documentation under `$rationale`; anything
+ * else at the top level is rejected.
  */
 
 import { z } from 'zod';
@@ -78,30 +80,24 @@ export const LaneConfigSchema = z.object({
   pipelineTemplate: z.string().min(1, 'pipelineTemplate must be a non-empty string'),
   contentDir: z.string().min(1, 'contentDir must be a non-empty string'),
   archivedAt: z.string().datetime().optional(),
-}).passthrough();
+  // Sole explicitly-declared "extra" key — the comments-in-JSON
+  // workaround that mirrors PipelineTemplateSchema (AUDIT-20260530-02).
+  // Declared so `.strict()` admits it; anything else at the top level
+  // is rejected.
+  $rationale: z.string().optional(),
+}).strict();
 
 /**
  * The type inferred from the Zod schema. Equivalent to the PRD's
  * `LaneConfig` interface — the schema is the source of truth and the
  * inferred type tracks it without manual duplication.
  *
- * Note: `passthrough()` widens the inferred type to allow arbitrary
- * extra keys; runtime callers should treat the named fields as the
- * contract and ignore any extras.
+ * The schema is `.strict()`, so the inferred type lists exactly the
+ * declared keys: `id`, `name`, `pipelineTemplate`, `contentDir`,
+ * `archivedAt` (optional), `$rationale` (optional). Unknown top-level
+ * keys fail parse at the schema layer (AUDIT-20260530-08 fix).
  */
 export type LaneConfig = z.infer<typeof LaneConfigSchema>;
-
-/**
- * Narrower projection of `LaneConfig` exposing only the named fields
- * the runtime contract documents. Mirrors `StrictPipelineTemplate` —
- * downstream consumers that index named fields should accept this
- * strict type so typos like `lane.pipelineTemlpate` fail at compile
- * time rather than silently resolving to `unknown`.
- */
-export type StrictLaneConfig = Pick<
-  LaneConfig,
-  'id' | 'name' | 'pipelineTemplate' | 'contentDir' | 'archivedAt'
->;
 
 /**
  * The four artifact kinds the lane-aware entry model recognizes:

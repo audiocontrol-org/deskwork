@@ -9,8 +9,9 @@
  * declare its own `linearStages` and `offPipelineStages`.
  *
  * The helpers below are the template-driven equivalents. They accept a
- * resolved `StrictPipelineTemplate` (the loader's narrow return type)
- * plus a stage string, and answer the membership / successor question
+ * resolved `PipelineTemplate` (the loader's return type — `.strict()`
+ * schema means the inferred type lists exactly the declared keys) plus
+ * a stage string, and answer the membership / successor question
  * relative to THAT template's vocabulary. The legacy editorial-narrow
  * helpers remain in `../schema/entry.ts` for the migration window and
  * are marked `@deprecated`; new code should use these.
@@ -33,7 +34,7 @@
  *     verb code branches uniformly.
  */
 
-import type { StrictPipelineTemplate } from './types.ts';
+import type { PipelineTemplate } from './types.ts';
 
 /**
  * True when `stage` is one of the template's linear-pipeline stages.
@@ -41,7 +42,7 @@ import type { StrictPipelineTemplate } from './types.ts';
  * like `approve` move an entry through this list in order.
  */
 export function isLinearPipelineStageInTemplate(
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   stage: string,
 ): boolean {
   return template.linearStages.includes(stage);
@@ -54,7 +55,7 @@ export function isLinearPipelineStageInTemplate(
  * the linear flow.
  */
 export function isOffPipelineStageInTemplate(
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   stage: string,
 ): boolean {
   return template.offPipelineStages.includes(stage);
@@ -67,7 +68,7 @@ export function isOffPipelineStageInTemplate(
  * content can't change while awaiting publish.
  */
 export function isLockedStageInTemplate(
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   stage: string,
 ): boolean {
   return template.lockedStages?.includes(stage) ?? false;
@@ -79,7 +80,7 @@ export function isLockedStageInTemplate(
  * time before any state mutation.
  */
 export function isKnownStageInTemplate(
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   stage: string,
 ): boolean {
   return (
@@ -98,7 +99,7 @@ export function isKnownStageInTemplate(
  * pipeline case should consult `isOffPipelineStageInTemplate` first.
  */
 export function nextStageInTemplate(
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   stage: string,
 ): string | null {
   const idx = template.linearStages.indexOf(stage);
@@ -123,7 +124,7 @@ export function nextStageInTemplate(
  * entry's `currentStage` before any state mutation.
  */
 export function assertStageInTemplate(
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   stage: string,
   context: string,
 ): void {
@@ -145,7 +146,7 @@ export function assertStageInTemplate(
  * `linearStages`. The terminal stage is the publish target; entries
  * graduate to it via `publish`, not `approve`.
  */
-export function terminalLinearStage(template: StrictPipelineTemplate): string {
+export function terminalLinearStage(template: PipelineTemplate): string {
   // The schema guarantees `linearStages` is non-empty.
   return template.linearStages[template.linearStages.length - 1];
 }
@@ -159,7 +160,7 @@ export function terminalLinearStage(template: StrictPipelineTemplate): string {
  * `Final`. For visual: terminal is `Shipped`; this returns `Approved`.
  */
 export function preTerminalLinearStage(
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
 ): string | null {
   if (template.linearStages.length < 2) return null;
   return template.linearStages[template.linearStages.length - 2];

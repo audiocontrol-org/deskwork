@@ -76,7 +76,7 @@ import type { LaneRailRow } from './swimlane-rail.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
 import {
   stageNameToFilesystemToken,
-  type StrictPipelineTemplate,
+  type PipelineTemplate,
 } from '@deskwork/core/pipelines';
 
 /**
@@ -145,7 +145,7 @@ function stageEmptyHint(stage: string, templateId: string): string {
  */
 function renderStageCol(
   laneId: string,
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   stage: string,
   entries: readonly Entry[],
   defaultSite: string,

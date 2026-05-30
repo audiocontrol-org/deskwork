@@ -44,8 +44,8 @@ import {
 } from '@/pages/entry-review/members-section.ts';
 import type { MemberItem } from '@/pages/entry-review/data.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
-import type { StrictLaneConfig } from '@deskwork/core/lanes';
-import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
+import type { LaneConfig } from '@deskwork/core/lanes';
+import type { PipelineTemplate } from '@deskwork/core/pipelines';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -86,7 +86,7 @@ function makeEntry(
   } as Entry;
 }
 
-function makeEditorialTemplate(): StrictPipelineTemplate {
+function makeEditorialTemplate(): PipelineTemplate {
   // Mirror the editorial template's structure used elsewhere in the
   // studio tests — linear pipeline + off-pipeline stages. The actual
   // stage list is not under test here; we only need the template
@@ -96,7 +96,7 @@ function makeEditorialTemplate(): StrictPipelineTemplate {
     name: 'Editorial',
     linearStages: ['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published'],
     offPipelineStages: ['Blocked', 'Cancelled'],
-  } as StrictPipelineTemplate;
+  } as PipelineTemplate;
 }
 
 function makeRenderInput(): RenderMembersSectionInput {
@@ -116,7 +116,7 @@ function makeRenderInput(): RenderMembersSectionInput {
     currentStage: 'Drafting',
     lane: 'essays',
   });
-  const laneConfig: StrictLaneConfig = {
+  const laneConfig: LaneConfig = {
     id: 'essays',
     name: 'Essays',
     pipelineTemplate: 'editorial',

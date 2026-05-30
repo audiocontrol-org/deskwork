@@ -48,7 +48,7 @@
 import { html, unsafe, type RawHtml } from '../html.ts';
 import { scrapbookViewerUrl } from '../../components/scrapbook-item.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
-import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
+import type { PipelineTemplate } from '@deskwork/core/pipelines';
 
 /** A single verb the operator can invoke from a row. */
 interface Verb {
@@ -102,7 +102,7 @@ type StageCategory =
  */
 function classifyStage(
   stage: string,
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
 ): StageCategory {
   if (template.offPipelineStages.includes(stage)) {
     return { kind: 'offPipeline' };
@@ -160,7 +160,7 @@ function classifyStage(
  */
 function verbsForStage(
   stage: string,
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   entry: Entry,
   defaultSite: string,
 ): {
@@ -369,7 +369,7 @@ function renderMenuItem(verb: Verb): string {
  */
 function renderMenu(
   stage: string,
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   menu: readonly Verb[],
 ): string {
   const category = classifyStage(stage, template);
@@ -418,7 +418,7 @@ function renderMenu(
  */
 export function renderRowActions(
   entry: Entry,
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   defaultSite: string,
 ): RawHtml {
   // Per Phase 5 Task 5.2: the template-aware verb dispatch covers
@@ -449,7 +449,7 @@ export function renderRowActions(
  */
 export function renderRowDrawer(
   entry: Entry,
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   defaultSite: string,
 ): RawHtml {
   const { drawer } = verbsForStage(entry.currentStage, template, entry, defaultSite);
@@ -462,7 +462,7 @@ export function renderRowDrawer(
  */
 export function renderRowMenu(
   entry: Entry,
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
   defaultSite: string,
 ): RawHtml {
   const { menu } = verbsForStage(entry.currentStage, template, entry, defaultSite);

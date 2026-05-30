@@ -17,7 +17,7 @@
  *     introduces explicit ordering via `.deskwork/lane-order.json`).
  *
  *   - Each `LaneBucket` carries the resolved `LaneConfig`,
- *     `StrictPipelineTemplate`, and an ordered map of
+ *     `PipelineTemplate`, and an ordered map of
  *     `stage → Entry[]`. The map iterates `linearStages` first (in
  *     template order) then `offPipelineStages` (also in template
  *     order). Empty stages still get a Map entry so the renderer can
@@ -43,11 +43,10 @@ import {
   listLaneConfigs,
   loadLaneConfig,
   type LaneConfig,
-  type StrictLaneConfig,
 } from '@deskwork/core/lanes';
 import {
   loadPipelineTemplate,
-  type StrictPipelineTemplate,
+  type PipelineTemplate,
 } from '@deskwork/core/pipelines';
 import type { Entry } from '@deskwork/core/schema/entry';
 import type { DeskworkConfig } from '@deskwork/core/config';
@@ -60,8 +59,8 @@ import type { DeskworkConfig } from '@deskwork/core/config';
 const DEFAULT_LANE_ID = 'default';
 
 export interface LaneBucket {
-  readonly lane: StrictLaneConfig;
-  readonly template: StrictPipelineTemplate;
+  readonly lane: LaneConfig;
+  readonly template: PipelineTemplate;
   /**
    * Stage → entries map. Iteration order:
    *   1. `template.linearStages` (in declared order).
@@ -112,15 +111,15 @@ export interface LaneBucketsResult {
  * cast required.
  */
 interface LaneBucketBuilder {
-  readonly lane: StrictLaneConfig;
-  readonly template: StrictPipelineTemplate;
+  readonly lane: LaneConfig;
+  readonly template: PipelineTemplate;
   readonly byStage: Map<string, Entry[]>;
   unbucketed: Entry[];
   entryCount: number;
 }
 
 function buildEmptyStageMap(
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
 ): Map<string, Entry[]> {
   const out = new Map<string, Entry[]>();
   for (const stage of template.linearStages) out.set(stage, []);
@@ -128,13 +127,25 @@ function buildEmptyStageMap(
   return out;
 }
 
-function strictifyLane(lane: LaneConfig): StrictLaneConfig {
-  return {
+/**
+ * Project a loaded `LaneConfig` down to the runtime-contract fields
+ * (id / name / pipelineTemplate / contentDir / archivedAt). Drops the
+ * documentation-only `$rationale` field that the schema permits on
+ * disk. Per AUDIT-20260530-08 the `Pick<>` alias is gone, so the
+ * return type is `LaneConfig` itself; the function survives as a
+ * runtime-side projection.
+ */
+function strictifyLane(lane: LaneConfig): LaneConfig {
+  const projected: LaneConfig = {
     id: lane.id,
     name: lane.name,
     pipelineTemplate: lane.pipelineTemplate,
     contentDir: lane.contentDir,
   };
+  if (lane.archivedAt !== undefined) {
+    projected.archivedAt = lane.archivedAt;
+  }
+  return projected;
 }
 
 /**
@@ -193,7 +204,7 @@ async function resolveAllLanes(
     const site = config.sites[defaultSiteId];
     if (site !== undefined) {
       const template = loadPipelineTemplate('editorial', projectRoot);
-      const lane: StrictLaneConfig = {
+      const lane: LaneConfig = {
         id: DEFAULT_LANE_ID,
         name: 'Default',
         pipelineTemplate: 'editorial',

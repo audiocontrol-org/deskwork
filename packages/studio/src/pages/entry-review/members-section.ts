@@ -49,8 +49,8 @@ import { html, unsafe, type RawHtml } from '../html.ts';
 import { stageGlyph } from '../dashboard/swimlane-stage-glyph.ts';
 import { isGroupEntry, isPopulatedGroupEntry } from '@deskwork/core/groups';
 import type { Entry } from '@deskwork/core/schema/entry';
-import { LANE_ID_REGEX, type StrictLaneConfig } from '@deskwork/core/lanes';
-import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
+import { LANE_ID_REGEX, type LaneConfig } from '@deskwork/core/lanes';
+import type { PipelineTemplate } from '@deskwork/core/pipelines';
 import {
   bucketMembersByLane,
   type BucketingResult,
@@ -91,13 +91,13 @@ export interface RenderMembersSectionInput {
    * Lane configs keyed by lane id; the section needs the lane's display
    * name + template binding to render the swim-head correctly.
    */
-  readonly laneConfigsById: ReadonlyMap<string, StrictLaneConfig>;
+  readonly laneConfigsById: ReadonlyMap<string, LaneConfig>;
   /**
    * Resolved pipeline templates keyed by template id (NOT lane id). The
    * section uses each lane's `pipelineTemplate` field to look up the
    * template once and walk its `linearStages` + `offPipelineStages`.
    */
-  readonly templatesById: ReadonlyMap<string, StrictPipelineTemplate>;
+  readonly templatesById: ReadonlyMap<string, PipelineTemplate>;
   /** Initial view mode rendered server-side (client may flip post-load). */
   readonly initialViewMode: MembersViewMode;
 }
@@ -224,7 +224,7 @@ function renderComposedBody(result: BucketingResult): RawHtml {
 
 function renderListRow(
   member: Entry,
-  laneConfigsById: ReadonlyMap<string, StrictLaneConfig>,
+  laneConfigsById: ReadonlyMap<string, LaneConfig>,
 ): RawHtml {
   const reviewLink = `/dev/editorial-review/entry/${member.uuid}`;
   const laneId = member.lane;
@@ -317,7 +317,7 @@ function renderCorruptRow(uuid: string): RawHtml {
  */
 function renderListBody(
   orderedMembers: readonly MemberItem[],
-  laneConfigsById: ReadonlyMap<string, StrictLaneConfig>,
+  laneConfigsById: ReadonlyMap<string, LaneConfig>,
 ): RawHtml {
   const rowsRaw = orderedMembers
     .map((item) => {

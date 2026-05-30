@@ -13,7 +13,6 @@ export {
   ArtifactKindSchema,
   LANE_ID_REGEX,
   type LaneConfig,
-  type StrictLaneConfig,
   type ArtifactKind,
 } from './types.ts';
 

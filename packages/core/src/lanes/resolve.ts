@@ -33,7 +33,6 @@ import {
 } from '../pipelines/index.ts';
 import { loadLaneConfig } from './loader.ts';
 import type { Entry } from '../schema/entry.ts';
-import type { StrictPipelineTemplate } from '../pipelines/types.ts';
 
 /**
  * Resolve the pipeline template that governs an entry's lifecycle.
@@ -49,10 +48,9 @@ import type { StrictPipelineTemplate } from '../pipelines/types.ts';
  *
  * @param entry - The entry sidecar.
  * @param projectRoot - Absolute path to the project root.
- * @returns The resolved pipeline template (wide type — accepts the
- *   schema's `.passthrough()` extras like `$rationale`). Verb code
- *   that reads named fields should narrow to `StrictPipelineTemplate`
- *   via the assignment site's type annotation.
+ * @returns The resolved pipeline template. The schema is `.strict()`,
+ *   so the inferred type lists exactly the declared keys; consumers
+ *   read named fields directly.
  * @throws When `entry.lane` is set but the lane config or its bound
  *   template fail to resolve. Bubbles the loader's error message so
  *   the operator sees the offending lane / template id and the file
@@ -73,14 +71,16 @@ export function resolveEntryTemplate(
 }
 
 /**
- * Narrow `resolveEntryTemplate` to `StrictPipelineTemplate`. Equivalent
- * to assigning the wide return type to a `StrictPipelineTemplate`
- * variable — exists as a named helper for verb code that consumes the
- * narrow surface explicitly.
+ * Back-compat alias of `resolveEntryTemplate`. Pre-AUDIT-20260530-08
+ * this returned a distinct `StrictPipelineTemplate` type; the alias
+ * has been deleted (it was a no-op `Pick<>` over the same keys). This
+ * function is preserved as a named helper for callers that prefer the
+ * "strict" verb-routing-side framing in their call site, but the
+ * return type is `PipelineTemplate` — the same value either way.
  */
 export function resolveEntryStrictTemplate(
   entry: Entry,
   projectRoot: string,
-): StrictPipelineTemplate {
+): PipelineTemplate {
   return resolveEntryTemplate(entry, projectRoot);
 }

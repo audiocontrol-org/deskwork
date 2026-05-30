@@ -33,7 +33,7 @@ import {
   renderRowMenu,
 } from '../src/pages/dashboard/affordances.ts';
 import { loadPipelineTemplate } from '@deskwork/core/pipelines';
-import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
+import type { PipelineTemplate } from '@deskwork/core/pipelines';
 import type { Entry } from '@deskwork/core/schema/entry';
 
 // Resolve every template via the public loader against an empty
@@ -41,14 +41,14 @@ import type { Entry } from '@deskwork/core/schema/entry';
 // presets in `packages/core/src/pipelines/*.json`. No fixture-disk
 // JSON authoring required.
 const tmpRoot = mkdtempSync(join(tmpdir(), 'dw-affordances-tests-'));
-const editorial: StrictPipelineTemplate = loadPipelineTemplate('editorial', tmpRoot);
-const visual: StrictPipelineTemplate = loadPipelineTemplate('visual', tmpRoot);
-const featureDoc: StrictPipelineTemplate = loadPipelineTemplate(
+const editorial: PipelineTemplate = loadPipelineTemplate('editorial', tmpRoot);
+const visual: PipelineTemplate = loadPipelineTemplate('visual', tmpRoot);
+const featureDoc: PipelineTemplate = loadPipelineTemplate(
   'feature-doc',
   tmpRoot,
 );
-const qaPlan: StrictPipelineTemplate = loadPipelineTemplate('qa-plan', tmpRoot);
-const blogPost: StrictPipelineTemplate = loadPipelineTemplate('blog-post', tmpRoot);
+const qaPlan: PipelineTemplate = loadPipelineTemplate('qa-plan', tmpRoot);
+const blogPost: PipelineTemplate = loadPipelineTemplate('blog-post', tmpRoot);
 
 // Vitest's per-file lifecycle — tear the tmp root down after every
 // test in this file has resolved its templates above. Templates are
@@ -398,7 +398,7 @@ describe('Commandment III — no review-state labels in template-aware row chrom
   });
 
   it('visual + qa-plan + feature-doc + blog-post row chrome carries no review-state tokens', () => {
-    const cases: Array<[StrictPipelineTemplate, string]> = [
+    const cases: Array<[PipelineTemplate, string]> = [
       [visual, 'Sketched'],
       [visual, 'Approved'],
       [visual, 'Shipped'],

@@ -23,10 +23,7 @@
 import type { Entry } from '../schema/entry.ts';
 import { loadPipelineTemplate } from '../pipelines/loader.ts';
 import { listLaneConfigs, loadLaneConfig } from '../lanes/loader.ts';
-import type {
-  PipelineTemplate,
-  StrictPipelineTemplate,
-} from '../pipelines/types.ts';
+import type { PipelineTemplate } from '../pipelines/types.ts';
 
 const HEADER = '# Editorial Calendar\n\n';
 const TABLE_HEADER = '| UUID | Slug | Title | Description | Keywords | Source | Updated |\n|------|------|------|------|------|------|------|\n';
@@ -60,7 +57,7 @@ function renderStageSection(stage: string, bucket: readonly Entry[]): string {
  * Final / Published / Blocked / Cancelled`, which matches this
  * concatenation exactly for the editorial preset.
  */
-function templateStageOrder(template: StrictPipelineTemplate): readonly string[] {
+function templateStageOrder(template: PipelineTemplate): readonly string[] {
   return [...template.linearStages, ...template.offPipelineStages];
 }
 
@@ -85,7 +82,7 @@ function bucketize(entries: readonly Entry[], stages: readonly string[]): Map<st
  */
 function renderStageSections(
   entries: readonly Entry[],
-  template: StrictPipelineTemplate,
+  template: PipelineTemplate,
 ): string {
   const stages = templateStageOrder(template);
   const byStage = bucketize(entries, stages);
@@ -100,7 +97,7 @@ function renderStageSections(
 interface LaneContext {
   readonly id: string;
   readonly name: string;
-  readonly template: StrictPipelineTemplate;
+  readonly template: PipelineTemplate;
 }
 
 /**
@@ -135,7 +132,7 @@ function loadLaneContexts(projectRoot: string | undefined): LaneContext[] {
  * no-project-root path is no longer reachable and this constant can
  * be deleted in favor of always loading via `loadPipelineTemplate`.
  */
-const EDITORIAL_FALLBACK: StrictPipelineTemplate = {
+const EDITORIAL_FALLBACK: PipelineTemplate = {
   id: 'editorial',
   name: 'Editorial',
   description: 'Long-form writing pipeline (editorial fallback).',

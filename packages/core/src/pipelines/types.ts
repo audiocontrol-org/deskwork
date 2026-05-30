@@ -211,25 +211,3 @@ function uniqueTokens(stages: readonly string[]): boolean {
  */
 export type PipelineTemplate = z.infer<typeof PipelineTemplateSchema>;
 
-/**
- * Narrower projection of `PipelineTemplate` exposing only the
- * stage-shape fields the runtime verb-routing contract reads. Drops
- * `$rationale` (documentation-only on disk; never consulted by verbs).
- *
- * The runtime VALUES are the same — `PipelineTemplate` and
- * `StrictPipelineTemplate` describe the same JSON. The only difference
- * is the type-level surface: `StrictPipelineTemplate` excludes the
- * documentation-only fields so verb code doesn't accidentally read
- * them.
- *
- * Convention: loader functions return `PipelineTemplate`. Functions
- * whose parameter is the resolved template and which only need the
- * stage shape declare `StrictPipelineTemplate`; pass a
- * `PipelineTemplate` to such a function with no conversion (the wide
- * type is assignable to the narrow one through structural subtyping
- * at the property set).
- */
-export type StrictPipelineTemplate = Pick<
-  PipelineTemplate,
-  'id' | 'name' | 'description' | 'linearStages' | 'lockedStages' | 'offPipelineStages'
->;

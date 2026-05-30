@@ -9,9 +9,9 @@ import {
   terminalLinearStage,
   preTerminalLinearStage,
 } from '@/pipelines/helpers';
-import type { StrictPipelineTemplate } from '@/pipelines/types';
+import type { PipelineTemplate } from '@/pipelines/types';
 
-const editorial: StrictPipelineTemplate = {
+const editorial: PipelineTemplate = {
   id: 'editorial',
   name: 'Editorial',
   description: 'edt',
@@ -20,7 +20,7 @@ const editorial: StrictPipelineTemplate = {
   offPipelineStages: ['Blocked', 'Cancelled'],
 };
 
-const visual: StrictPipelineTemplate = {
+const visual: PipelineTemplate = {
   id: 'visual',
   name: 'Visual',
   description: 'vis',
@@ -80,7 +80,7 @@ describe('pipeline helpers', () => {
     });
 
     it('returns false when template has no lockedStages', () => {
-      const lockless: StrictPipelineTemplate = {
+      const lockless: PipelineTemplate = {
         id: 'lockless',
         name: 'lockless',
         description: 'd',
@@ -157,7 +157,7 @@ describe('pipeline helpers', () => {
     });
 
     it('returns null for preTerminal when only one linear stage', () => {
-      const single: StrictPipelineTemplate = {
+      const single: PipelineTemplate = {
         id: 'single',
         name: 's',
         description: 'd',
