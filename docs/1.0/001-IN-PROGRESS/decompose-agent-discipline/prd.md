@@ -3,7 +3,7 @@ slug: decompose-agent-discipline
 title: decompose-agent-discipline
 targetVersion: "1.0"
 date: 2026-05-30
-parentIssue: 
+parentIssue:
 deskwork:
   id: 38410ae2-0e2a-4d09-84b4-f441b38c1e59
 ---
