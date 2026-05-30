@@ -3338,7 +3338,7 @@ Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). 
 ### AUDIT-20260530-18 — `deriveArtifactKindFromPath` writes wrong `artifactKind` for multi-file HTML mockups
 
 Finding-ID: AUDIT-20260530-18 (cross-model: AUDIT-BARRAGE-claude-05-P4)
-Status:     open
+Status:     fixed-edb8122
 Severity:   medium
 Surface:    `packages/core/src/doctor/lane-migration.ts:deriveArtifactKindFromPath`; test acknowledgement at `packages/core/test/doctor/lane-migration.test.ts:131-138`
 
