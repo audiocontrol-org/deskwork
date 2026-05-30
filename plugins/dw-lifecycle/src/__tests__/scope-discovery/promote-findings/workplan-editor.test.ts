@@ -293,6 +293,54 @@ describe('insertTaskBlock — idempotency on partial-apply re-run', () => {
     });
     expect(second.newContent).toBe(first.newContent);
   });
+
+  /**
+   * AUDIT-20260530-13 regression: pre-fix, `findingsAlreadyInserted`
+   * stored canonical IDs (via the AUDIT-07 fix), but the comparison
+   * `!alreadyInserted.has(ins.findingId)` used the full proposal-side
+   * findingId — which for cross-model items carries the trailing
+   * annotation. The set never matched it; the filter never removed
+   * the duplicate; the re-run double-inserted.
+   */
+  it('skips a cross-model finding whose canonical marker is already in the workplan (AUDIT-20260530-13)', async () => {
+    const wp = workplanFixture();
+    const first = await insertTaskBlock({
+      workplanPath: '/tmp/t.md',
+      insertions: [
+        {
+          findingId:
+            'AUDIT-20260601-08 (claude-06 + codex-02; cross-model)',
+          taskBlock:
+            '### Task 13.2 (fix-finding-AUDIT-20260601-08): cross-model one',
+          phaseHeading: '## Phase 13: Audit-finding lifecycle',
+          insertAfterLine: 7,
+        },
+      ],
+      read: makeRead(wp),
+    });
+    // Workplan now has `fix-finding-AUDIT-20260601-08` (canonical
+    // marker only, per the renderer fix). Re-run with the SAME
+    // proposal-side findingId (full cross-model form) — pre-fix this
+    // double-inserted because the comparison was `(full).has(canonical)`.
+    const second = await insertTaskBlock({
+      workplanPath: '/tmp/t.md',
+      insertions: [
+        {
+          findingId:
+            'AUDIT-20260601-08 (claude-06 + codex-02; cross-model)',
+          taskBlock:
+            '### Task 13.2 (fix-finding-AUDIT-20260601-08): cross-model DUP',
+          phaseHeading: '## Phase 13: Audit-finding lifecycle',
+          insertAfterLine: 7,
+        },
+      ],
+      read: makeRead(first.newContent),
+    });
+    // Idempotent: exactly one occurrence of the marker; no -DUP body.
+    const occurrences = (second.newContent.match(/fix-finding-AUDIT-20260601-08/g) ?? []).length;
+    expect(occurrences).toBe(1);
+    expect(second.newContent).not.toContain('cross-model DUP');
+  });
 });
 
 describe('insertTaskBlock — deterministic order when insertAfterLine values are equal', () => {

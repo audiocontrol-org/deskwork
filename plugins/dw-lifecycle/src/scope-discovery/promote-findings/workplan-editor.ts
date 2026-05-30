@@ -143,9 +143,19 @@ export async function insertTaskBlock(
   // `(fix-finding-<id>):` marker in the workplan. This is the recovery
   // path for partial-apply (workplan write succeeded; audit-log write
   // failed) — re-running apply should be a no-op on the workplan side.
+  //
+  // Per AUDIT-20260530-13: canonicalize the proposal-side `ins.findingId`
+  // before the lookup. `findingsAlreadyInserted` stores canonical IDs
+  // (via the AUDIT-07 marker regex), but cross-model proposal items
+  // carry the full Finding-ID like
+  // `AUDIT-20260601-08 (claude-06 + codex-02; cross-model)`. Pre-fix
+  // the comparison was `(canonical-set).has(full-form)` → always
+  // false → double-insert on cross-model re-run.
   const alreadyInserted = findingsAlreadyInserted(content);
+  const canonicalOf = (id: string): string =>
+    /\bAUDIT-\d{8}-\d+/.exec(id)?.[0] ?? id;
   const todo = args.insertions.filter(
-    (ins) => !alreadyInserted.has(ins.findingId),
+    (ins) => !alreadyInserted.has(canonicalOf(ins.findingId)),
   );
 
   if (todo.length === 0) {

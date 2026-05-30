@@ -236,16 +236,16 @@ Closes AUDIT-20260530-12. Surface: plugins/dw-lifecycle/src/scope-discovery/prom
 
 Closes AUDIT-20260530-13. Surface: plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-editor.ts:120-149; plugins/dw-lifecycle/src/scope-discovery/promote-findings/apply.ts:150-155; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:57-63.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-13` in subject
+- [x] Step 1: cross-model idempotency test added in `workplan-editor.test.ts` — insert a finding whose proposal-side `findingId` carries the full cross-model annotation; re-insert; assert exactly one marker occurrence + no DUP body.
+- [x] Step 2: confirmed test failed pre-fix (the `.has(ins.findingId)` lookup got the full-form, but the set had canonical-only).
+- [x] Step 3: `insertTaskBlock` canonicalizes `ins.findingId` (via local `canonicalOf` extracting the `AUDIT-YYYYMMDD-NN` prefix) before the `alreadyInserted.has(...)` check.
+- [x] Step 4: tests pass; plugin suite 2423/2423.
+- [x] Step 5: commit with `Closes AUDIT-20260530-13` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-editor.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-editor.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
