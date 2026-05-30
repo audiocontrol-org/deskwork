@@ -90,14 +90,18 @@ export function normalizeSeverity(raw: string): NormalizedSeverity {
   if (CANONICAL_SEVERITIES.has(lowered as NormalizedSeverity)) {
     return lowered as NormalizedSeverity;
   }
-  // Per AUDIT-20260530-01: an unknown-severity fallback to
-  // `informational` (rank 0) actively defeats the feature's purpose —
-  // it buries `critical` (the most likely model deviation) AND a
-  // cross-model `critical` agreement collapses to rank 0 via
-  // max-of-cluster. The safer fallback is `high`: "fail toward
-  // attention, not away from it." Empty severity (malformed model
-  // output / missing field) is also treated as `high` because a
-  // missing severity field is itself a signal the operator should see.
+  // Per AUDIT-20260530-11: distinguish "non-canonical token"
+  // (e.g. `critical`, `urgent` — a model JUDGMENT in non-canonical
+  // vocabulary) from "empty/whitespace severity" (a parse artifact
+  // — the model didn't supply a severity at all). The first should
+  // fall back to `high` per AUDIT-20260530-01 ("fail toward
+  // attention"); the second to `medium` so a malformed empty-severity
+  // finding doesn't inflate a cross-model cluster's max-of-cluster
+  // severity by masquerading as a model-asserted high. Medium is
+  // surfaced but not top-of-queue.
+  if (lowered.length === 0) {
+    return 'medium';
+  }
   return 'high';
 }
 

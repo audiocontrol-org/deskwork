@@ -84,20 +84,26 @@ describe('normalizeSeverity — case + canonical-set mapping', () => {
   });
 
   /**
-   * AUDIT-20260530-01 regression: pre-fix, normalizeSeverity mapped
-   * every non-canonical value to `informational` — the LOWEST rank.
-   * That buried `critical` (the most likely model deviation) at the
-   * bottom of the triage queue, and a cross-model `critical`
-   * agreement collapsed to `informational` via max-of-cluster rank-0.
-   * Post-fix: unknown values fall back to `high` — "fail toward
-   * attention, not away from it." Empty severity (malformed model
-   * output) is also treated as `high` because a missing severity
-   * field is itself a signal the operator should see.
+   * AUDIT-20260530-01 regression (refined by AUDIT-20260530-11):
+   * non-canonical TOKENS like `critical` fall back to `high` ("fail
+   * toward attention" — the original AUDIT-01 contract).
+   * EMPTY/whitespace-only severity is qualitatively different — it's
+   * a parse artifact (malformed model output, missing field) rather
+   * than a model judgment of impact. Per AUDIT-11, mapping it to
+   * `high` would inflate cross-model cluster severity via max-of-
+   * cluster. Empty falls back to `medium` — surfaced but not at
+   * top-of-queue.
    */
-  it("falls back to 'high' on unknown values (AUDIT-20260530-01)", () => {
+  it("non-canonical tokens fall back to 'high' (AUDIT-20260530-01)", () => {
     expect(normalizeSeverity('critical')).toBe('high');
-    expect(normalizeSeverity('')).toBe('high');
     expect(normalizeSeverity('???')).toBe('high');
+    expect(normalizeSeverity('CRITICAL')).toBe('high');
+  });
+
+  it("empty/whitespace severity falls back to 'medium' (AUDIT-20260530-11)", () => {
+    expect(normalizeSeverity('')).toBe('medium');
+    expect(normalizeSeverity('   ')).toBe('medium');
+    expect(normalizeSeverity('\t')).toBe('medium');
   });
 });
 

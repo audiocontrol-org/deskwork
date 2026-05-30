@@ -202,16 +202,16 @@ Closes AUDIT-20260530-10. Surface: `plugins/dw-lifecycle/src/scope-discovery/uti
 
 Closes AUDIT-20260530-11. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:90-101`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-11` in subject
+- [x] Step 1: new test asserting `normalizeSeverity('')` → `'medium'`, `normalizeSeverity('   ')` → `'medium'`, `'\t'` → `'medium'`. Existing AUDIT-01 test now scoped to non-empty non-canonical tokens (`critical`, `???`, `CRITICAL`).
+- [x] Step 2: confirmed empty-severity test failed pre-fix (was returning `'high'`).
+- [x] Step 3: `normalizeSeverity` branches: empty → `'medium'` (parse-artifact bucket); non-empty non-canonical → `'high'` (model-judgment bucket).
+- [x] Step 4: tests pass; plugin suite 2419/2419.
+- [x] Step 5: commit with `Closes AUDIT-20260530-11` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
