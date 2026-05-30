@@ -3417,3 +3417,963 @@ Surface:    `packages/core/src/entry/cancel.ts` — `interface CancelOptions { .
 Pure-whitespace change with no functional purpose: `readonly cascade?: boolean;` indented with 3 spaces instead of the surrounding 2-space indentation. Signals formatting is not enforced on this file's edit path.
 
 Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (claude). Fix: restore 2-space indentation; consider format-on-commit enforcement.
+
+<!-- ===========================================================
+     Audit-barrage sweep — 2026-05-30 — 7 retroactive barrages
+     ===========================================================
+     P5 (3 sub-runs), P6 (3 sub-runs), P7 T7.2 (1 run).
+     70 raw findings lifted (consolidation deferred — each model
+     finding gets its own AUDIT entry; cross-model agreement is
+     noted in Finding-ID where detectable from titles/surfaces.
+     Run dirs:
+       20260530T114826429Z-graphical-entries (P5-1)
+       20260530T115127432Z-graphical-entries (P5-2)
+       20260530T115517132Z-graphical-entries (P5-3)
+       20260530T115914439Z-graphical-entries (P6-1)
+       20260530T120247811Z-graphical-entries (P6-2)
+       20260530T120643794Z-graphical-entries (P6-3)
+       20260530T121000611Z-graphical-entries (P7T7.2)
+     -->
+
+### AUDIT-20260530-25 — [P5-1 claude] Lane-bucket `unbucketed` entries are silently dropped from the rendered dashboard while inflating every entry count
+
+Finding-ID: AUDIT-20260530-25 (cross-model: AUDIT-BARRAGE-claude-P5-1)
+Status:     open
+Severity:   high
+Surface:    `packages/studio/src/pages/dashboard/swimlane-card.ts` (`renderSwimlane`, the stage-column assembly ~lines after "const stagesRaw"), `packages/studio/src/pages/dashboard/lane-data.ts` (`LaneBucket.unbucketed` + `loadLaneBuckets` entryCount math)
+
+`loadLaneBuckets` captures entries whose `currentStage` is not in the lane's resolved template into `bucket.unbucketed`, and folds them into `entryCount`: `let total = unbucketed.length; for (const stageBucket of builder.byStage.values()) total += stageBucket.length; finalByLane.set(id, freezeBucket(builder, unbucketed, total))`. But `renderSwimlane` only renders columns for `template.linearStages` + `template.offPipelineStages` — it never reads `bucket.unbucketed`. The list-body (`swimlane-list-body.ts:renderListBody`) walks the same template stages and likewise never renders unbucketed entries. The result: an entry sitting in a valid-but-out-of-template stage (reachable since Phase 3 widened `currentStage` to an arbitrary non-empty string — stale stage, typo, mid-migration drift) **vanishes from the dashboard entirely**, while the swim-head meta (`${bucket.entryCount} entries`), the focus chip count, the rail row count, and the swim-compact strip all show the inflated total. The operator reads "5 entries" but sees 4 cards, with no visible indicator of the discrepancy.
+
+This is the same failure shape the prior audit log calls out as a regression of #247 / AUDIT-20260530-14 ("renderer silently drops entries whose currentStage isn't in their lane's template"), now on the canonical studio dashboard surface. The `lane-data.ts` docstring actively misdescribes the behavior: *"the dashboard surfaces it instead of crashing — the operator sees the count and can run doctor."* The count is surfaced but the entries are not, and there is no "unbucketed" / "unrecognized stage" affordance anywhere in the render. Contrast with `unroutedEntries`, which at least gets a `${n} unrouted · ` token in `swimlane-shell.ts:metaRaw` — unbucketed gets nothing. The integration test (`dashboard-swimlane.test.ts`) only seeds entries in valid stages, so it cannot catch this. Fix: render `bucket.unbucketed` into an explicit `(unrecognized stage)` tail section per swim (mirroring the unrouted treatment), or — at minimum — surface the per-lane unbucketed count distinctly so the count never silently exceeds the visible cards.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-26 — [P5-1 claude] No clear-on-version-bump for swimlane localStorage state — schema drift silently persists stale per-operator state
+
+Finding-ID: AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)
+Status:     open
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts` (`STORAGE_KEY_PREFIX`, `resolveProjectKey`, `readStoredObjectMap`) and the four key suffixes in `swimlane.ts` / `swimlane-collapse.ts` / `swimlane-view-toggle.ts`
+
+The audit scope explicitly names "client-state persistence + restore (localStorage corruption resilience; clear-on-version-bump)" as a focus. Corruption resilience is handled well — every reader (`readStoredObjectMap`, `readStoredSet`, `readStoredLanes`, `readStoredStages`) wraps `JSON.parse` in try/catch and validates the parsed shape, degrading to an empty collection on any failure. But there is **no version segment in the storage keys and no clear-on-version-bump mechanism**. Keys are `deskwork:dashboard:<projectKey>:<suffix>` with no schema-version component anywhere in `swimlane-storage.ts`.
+
+This matters because the corruption guards only protect against *shape* changes (an array becoming an object, an unknown value type). They do not protect against *semantic* drift within a stable shape — e.g., if a future release changes how `view-mode` values map, or repurposes the `stage-collapse` `Record<laneId, string[]>`, the old data parses cleanly and is silently honored, restoring stale or wrong state for every returning operator. Since this is per-operator browser state that survives plugin upgrades indefinitely, there is no natural eviction. The fix is a version token in the key prefix (e.g. `deskwork:dashboard:v1:<projectKey>:<suffix>`) bumped whenever a value's semantics change, so an upgrade starts from clean defaults rather than reinterpreting prior-version state. The absence is auditable here precisely because the operator listed it as expected.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-27 — [P5-1 claude] Rail eye-toggle `.r-eye-btn` is a 14px-wide interactive target with no min-height — below WCAG 2.5.8 while every sibling affordance was sized to 24×24
+
+Finding-ID: AUDIT-20260530-27 (cross-model: AUDIT-BARRAGE-claude-P5-1)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/css/dashboard-swimlane.css` (`.rail-lane .r-eye-btn` rule: `width: 14px; ... padding: 0;`)
+
+The diff is otherwise meticulous about WCAG 2.2 SC 2.5.8 target-size minimums — `.collapse-chev` is `min-width: 24px; min-height: 24px`, `.view-toggle .vt-cell` is `min-height: 24px`, `.swim-compose` is `min-height: 26px` (30px mobile), `.lb-overflow` is `min-width: 24px; min-height: 24px`. But the rail visibility toggle, promoted in the F6 a11y fix from a `<span>` to a real focusable `<button class="r-eye-btn">`, is styled `width: 14px; ... padding: 0;` with no min-height — well under the 24×24 floor. It is a distinct interactive control (its own click handler in `swimlane.ts:bindRailEyeToggles`, with `stopPropagation` so it does not share the row's focus-toggle gesture), so it is independently subject to the target-size rule.
+
+The WCAG 2.5.8 spacing exception (a 24px-diameter undisturbed circle around the target) is the only thing that might save it, and that depends on the eye glyph being far enough from the row's other clickable region — but the whole `.rail-lane` row is itself `role="button"` and clickable, so the eye button sits *inside* another target rather than in clear space, which the spacing exception does not cover. Given the F6 fix deliberately made this a real button for keyboard/AT access, sizing it to 24×24 (min-width/min-height + centered glyph, matching the `.collapse-chev` pattern already in the same file) finishes the job. Low severity because it is reachable and operable, just below the measured-target threshold the rest of the feature honors.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-28 — [P5-1 codex] Compose chip copies an invalid command for stage names with spaces
+
+Finding-ID: AUDIT-20260530-28 (cross-model: AUDIT-BARRAGE-codex-P5-1)
+Status:     open
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:90-98; packages/studio/src/pages/dashboard/swimlane-card.ts:297-307
+
+The copied command is assembled as `/deskwork:add <SLUG> --lane ${laneId} --stage ${firstStage}` with no argument quoting or escaping. That works for the current preset first stages (`Ideas`, `Sketched`, `Drafted`, etc.), but pipeline templates allow arbitrary non-empty stage strings, including names with spaces. A custom lane whose first stage is `QA Review` would copy `/deskwork:add <SLUG> --lane qa --stage QA Review`, which a normal argv parser reads as stage `QA` plus an extra `Review` token.
+
+The server puts the raw first stage in `data-first-stage` at `swimlane-card.ts:303-307`, and the client serializes that value directly at `swimlane-compose.ts:90-98`. Fix by using the same command-argument quoting convention the slash-command parser expects, and add a regression with a custom template whose first linear stage contains whitespace and shell-sensitive characters.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-29 — [P5-1 codex] Dashboard localStorage has no schema/version segment despite version-bump reset being in scope
+
+Finding-ID: AUDIT-20260530-29 (cross-model: AUDIT-BARRAGE-codex-P5-1)
+Status:     open
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:21-27; plugins/deskwork-studio/public/src/dashboard/swimlane.ts:64-69; plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:60-65; plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:68-70
+
+The audit scope explicitly calls out “clear-on-version-bump,” but all persisted dashboard keys are stable forever under `deskwork:dashboard:<projectKey>:<suffix>`. The readers tolerate malformed JSON, but they do not distinguish old valid shapes from current valid shapes. If the meaning of `:focus`, `:visibility`, `:lane-collapse`, `:stage-collapse`, or `:view-mode` changes, old operator state continues to apply silently.
+
+This is most visible in `STORAGE_KEY_PREFIX = 'deskwork:dashboard:'`; every controller appends only project key and suffix. A reasonable fix is to add a storage schema version to the prefix or store a version sentinel and clear the known swimlane keys when it mismatches. Tests should seed an older-version key and assert the controller ignores or removes it while preserving current-version state.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-30 — [P5-1 codex] Re-running swimlane initializers stacks duplicate event listeners with stale state closures
+
+Finding-ID: AUDIT-20260530-30 (cross-model: AUDIT-BARRAGE-codex-P5-1)
+Status:     open
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/editorial-studio-client.ts:527-530; plugins/deskwork-studio/public/src/dashboard/swimlane.ts:469-490; plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:464-477; plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:292-312; plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:270-282
+
+`init()` calls four swimlane controllers, and each controller unconditionally binds listeners to existing DOM nodes. `initSwimlane` also replaces `activeState` at lines 480-481, while previously bound handlers still close over their older `state` object. The same shape exists in collapse, view-toggle, and compose: re-invocation binds again without a module guard or per-element sentinel.
+
+Current page boot may call these once, but the code already introduces `reapply*FromStorage` paths and singleton state for client-side refresh-style operations. If a partial DOM re-init calls any initializer twice, clicks can fire multiple handlers and mutate different closure-captured state objects. Fix with per-controller idempotence: a module-level wired guard for whole-page singletons, or `dataset` sentinels per bound element when dynamic DOM replacement is expected.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-31 — [P5-1 gemini] The stage ID slugification logic in `renderStageCol` (and implicitly in `renderListGroup` through shared stage name derivation) still uses `stage.toLowerCase().replace(/[^a-z0-9-]+/g, '-')`. This can lead to DOM ID collisions when a single lane has distinct stage names that slugify to the same value (e.g., `QA Review` and `QA_Review` both become `qa-review`). This issue is explicitly flagged as AUDIT-20260528-07 in the provided `audit-log.md` and remains unfixed in this diff. The proposed fix in AUDIT-20260528-07 is to use `stageNameToFilesystemToken(stage)` or a dedicated DOM-token helper, neither of which is implemented or used in `swimlane-card.ts`.
+
+Finding-ID: AUDIT-20260530-31 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
+Status:     open
+Severity:   medium
+Surface:    `packages/studio/src/pages/dashboard/swimlane-card.ts:127`
+
+The stage ID slugification logic in `renderStageCol` (and implicitly in `renderListGroup` through shared stage name derivation) still uses `stage.toLowerCase().replace(/[^a-z0-9-]+/g, '-')`. This can lead to DOM ID collisions when a single lane has distinct stage names that slugify to the same value (e.g., `QA Review` and `QA_Review` both become `qa-review`). This issue is explicitly flagged as AUDIT-20260528-07 in the provided `audit-log.md` and remains unfixed in this diff. The proposed fix in AUDIT-20260528-07 is to use `stageNameToFilesystemToken(stage)` or a dedicated DOM-token helper, neither of which is implemented or used in `swimlane-card.ts`.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/gemini.md`.
+
+### AUDIT-20260530-32 — [P5-1 gemini] The list-view overflow affordance (`.lb-overflow`) is rendered as a `<span>` with `role="button"` and `tabindex="0"` inside an `<a>` element (`.lb-row`). This makes it a focusable and semantically interactive control. However, the accompanying comment explicitly states, "Task 5.1C / 5.2 wires a click handler to the affordance; the markup ships with `role="button"` + `tabindex="0"` + `aria-label` so the semantics are correct at the affordance level even when no handler is bound." This creates an operator-discipline trap (per the prompt's definition): a user can focus and attempt to activate this "button," but it will be inert until a future task implements its behavior. Interactive elements should not be focusable if they perform no action, as this leads to a confusing and frustrating user experience. This issue is explicitly flagged as AUDIT-20260528-08 in `audit-log.md` and remains unfixed.
+
+Finding-ID: AUDIT-20260530-32 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
+Status:     open
+Severity:   medium
+Surface:    `packages/studio/src/pages/dashboard/swimlane-list-body.ts:109`
+
+The list-view overflow affordance (`.lb-overflow`) is rendered as a `<span>` with `role="button"` and `tabindex="0"` inside an `<a>` element (`.lb-row`). This makes it a focusable and semantically interactive control. However, the accompanying comment explicitly states, "Task 5.1C / 5.2 wires a click handler to the affordance; the markup ships with `role="button"` + `tabindex="0"` + `aria-label` so the semantics are correct at the affordance level even when no handler is bound." This creates an operator-discipline trap (per the prompt's definition): a user can focus and attempt to activate this "button," but it will be inert until a future task implements its behavior. Interactive elements should not be focusable if they perform no action, as this leads to a confusing and frustrating user experience. This issue is explicitly flagged as AUDIT-20260528-08 in `audit-log.md` and remains unfixed.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/gemini.md`.
+
+### AUDIT-20260530-33 — [P5-1 gemini] The logic for the "All" focus chip in `bindFocusChips` contains an unconditional `state.focused.clear()` before conditionally re-populating `state.focused`. This means that if all visible lanes are already focused (`isAlreadyAll` is true), clicking the "All" chip will still clear the `state.focused` set and leave no lanes focused. This directly contradicts the expected behavior in AUDIT-20260528-09, which states, "Expected: clicking `All` restores or keeps every visibility-on lane focused. Actual: when every visible lane is already focused, clicking `All` leaves the focus set empty." The suggested fix was to make "All" idempotently select all visible lanes, which the current implementation does not achieve.
+
+Finding-ID: AUDIT-20260530-33 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
+Status:     open
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane.ts:251-254`
+
+The logic for the "All" focus chip in `bindFocusChips` contains an unconditional `state.focused.clear()` before conditionally re-populating `state.focused`. This means that if all visible lanes are already focused (`isAlreadyAll` is true), clicking the "All" chip will still clear the `state.focused` set and leave no lanes focused. This directly contradicts the expected behavior in AUDIT-20260528-09, which states, "Expected: clicking `All` restores or keeps every visibility-on lane focused. Actual: when every visible lane is already focused, clicking `All` leaves the focus set empty." The suggested fix was to make "All" idempotently select all visible lanes, which the current implementation does not achieve.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/gemini.md`.
+
+### AUDIT-20260530-34 — [P5-1 gemini] The mobile dashboard lane-stack/lane-head variant, specified in `docs/studio-design/ACCEPTED/2026-05-27-multi-lane-dashboard-d3-press-bay/brief.md:14` as a "vertical lane-stack of accordion sections on mobile," appears to be incompletely implemented. While `workplan.md` marks Step 5.1B.4 as completed and the CSS (`dashboard-swimlane.css`) includes media queries for mobile, the implementation primarily adapts the desktop swim markup using CSS (`flex-direction: column` for `.stage-grid`). The audit finding AUDIT-20260528-10 points out this discrepancy, stating "mobile gets desktop swim markup adapted by CSS while the 5.1B workplan text marks the lane-head mobile variant as shipped." The "accordion sections" and a distinct "lane-head" renderer path for mobile seem absent, suggesting a gap between the accepted design and the delivered implementation.
+
+Finding-ID: AUDIT-20260530-34 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:231` (and related mobile rendering)
+
+The mobile dashboard lane-stack/lane-head variant, specified in `docs/studio-design/ACCEPTED/2026-05-27-multi-lane-dashboard-d3-press-bay/brief.md:14` as a "vertical lane-stack of accordion sections on mobile," appears to be incompletely implemented. While `workplan.md` marks Step 5.1B.4 as completed and the CSS (`dashboard-swimlane.css`) includes media queries for mobile, the implementation primarily adapts the desktop swim markup using CSS (`flex-direction: column` for `.stage-grid`). The audit finding AUDIT-20260528-10 points out this discrepancy, stating "mobile gets desktop swim markup adapted by CSS while the 5.1B workplan text marks the lane-head mobile variant as shipped." The "accordion sections" and a distinct "lane-head" renderer path for mobile seem absent, suggesting a gap between the accepted design and the delivered implementation.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/gemini.md`.
+
+### AUDIT-20260530-35 — [P5-1 gemini] The `tooling-feedback.md` explicitly lists TF-008, TF-009, and TF-010 as `Open` issues related to the scope-discovery tooling. While these are not directly bugs in the feature under audit, they represent acknowledged friction points with the development tooling. The resolution paths for TF-008 and TF-009 are documented as updates to `GRAMMAR_INSTRUCTION` (documentation-only fixes), and TF-010 is an upstream stub (#318). It's important for the operator to note that these tooling-related issues persist and might affect agent performance or developer experience, even if they don't block the feature's functional correctness.
+
+Finding-ID: AUDIT-20260530-35 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
+Status:     open
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/tooling-feedback.md`
+
+The `tooling-feedback.md` explicitly lists TF-008, TF-009, and TF-010 as `Open` issues related to the scope-discovery tooling. While these are not directly bugs in the feature under audit, they represent acknowledged friction points with the development tooling. The resolution paths for TF-008 and TF-009 are documented as updates to `GRAMMAR_INSTRUCTION` (documentation-only fixes), and TF-010 is an upstream stub (#318). It's important for the operator to note that these tooling-related issues persist and might affect agent performance or developer experience, even if they don't block the feature's functional correctness.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/gemini.md`.
+
+### AUDIT-20260530-36 — [P5-2 claude] Template-aware verb dispatch recomputes `classifyStage` + rebuilds the full verb set 4× per row
+
+Finding-ID: AUDIT-20260530-36 (cross-model: AUDIT-BARRAGE-claude-P5-2)
+Status:     open
+Severity:   low
+Surface:    `packages/studio/src/pages/dashboard/affordances.ts:178` (`verbsForStage`), `:370` (`renderMenu`), `:419-475` (`renderRowActions` / `renderRowDrawer` / `renderRowMenu`)
+
+`renderRow` (`section.ts:62-78`) calls `renderRowDrawer`, `renderRowActions`, and `renderRowMenu` for every entry. Each of those calls `verbsForStage`, which (a) calls `classifyStage` and (b) constructs the *entire* verb object set (`iterate`, `approve`, `block`, `induct`, `cancel`, `view`, `scrapbook`, `inductForward`) from scratch — even though each caller consumes only one of the three returned views. `renderRowMenu` is worse: it calls `verbsForStage` (one `classifyStage`) and then `renderMenu` (a second `classifyStage` on the same stage+template). Net per row: `classifyStage` runs ~4×, `verbsForStage` rebuilds ~7 verb objects 3×.
+
+This is wasted allocation that scales linearly with entry count (a 100-entry dashboard does ~300 `verbsForStage` invocations) and, more importantly, spreads the categorization decision across two functions that must agree. A reasonable fix: classify once in `renderRow`, thread the `StageCategory` (or the resolved verb set) into the three sub-renderers, and have `renderMenu` accept the already-computed category rather than re-deriving it. Low severity — correctness is unaffected — but it's a duplicated-source-of-truth + redundant-work pattern worth collapsing before more renderers consume the verb set.
+
+Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115127432Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-37 — [P5-2 claude] `classifyStage` throw converts a single out-of-template entry into a whole-dashboard 500
+
+Finding-ID: AUDIT-20260530-37 (cross-model: AUDIT-BARRAGE-claude-P5-2)
+Status:     open
+Severity:   medium
+Surface:    `packages/studio/src/pages/dashboard/affordances.ts:99-107` (throw), `packages/studio/src/pages/dashboard/swimlane-card.ts:186-193` (`renderStageCol` body map)
+
+`classifyStage` throws when a stage is absent from both `linearStages` and `offPipelineStages`. That throw now propagates through `renderRow`, which is invoked inside `entries.map((e, i) => renderRow(e, i, template, defaultSite).__raw).join('')` in `renderStageCol`. A throw on any single entry aborts the entire `.map`, the whole `renderSwimlane`, and therefore the whole `/dev/editorial-studio` page render (HTTP 500) — not just the offending row.
+
+Pre-5.2, `renderRowActions`/`renderRowDrawer`/`renderRowMenu` early-returned `unsafe('')` for non-editorial stages (the `isLegacyEditorialStage` guard), so an unknown stage produced an empty-chrome row, never a crash. The new dispatch removes that guard and replaces "render nothing" with "throw." Whether an out-of-template `currentStage` can actually reach `renderStageCol` depends on `loadLaneBuckets`/`bucketize` (not in this diff) filtering entries to template stages — but this is exactly the AUDIT-20260530-14 shape (entries carrying a `currentStage` not in their lane's template) on the dashboard surface. If that data-layer filtering is the only thing standing between a stale sidecar and a 500, the coupling is fragile. The no-fallback rule wants a loud failure, but a loud *per-entry* failure (skip the row, surface a diagnostic) is preferable to taking down the operator's entire dashboard. Recommend catching at the `renderStageCol` map boundary and rendering an explicit "unrecognized stage" row, mirroring the calendar renderer's `(unrecognized stage)` tail from AUDIT-14's fix. There is no test seeding an entry whose stage is outside its lane template to pin this path.
+
+Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115127432Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-38 — [P5-2 claude] Mobile lane-sheet focus-trap contract is unverified — no test asserts Tab is contained
+
+Finding-ID: AUDIT-20260530-38 (cross-model: AUDIT-BARRAGE-claude-P5-2)
+Status:     open
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:60-90`, `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:1-30` (coverage docblock)
+
+The audit scope explicitly names "mobile-sheet a11y (focus trap, scrim, dismiss)." The controller implements scrim (backdrop), three dismiss paths (trigger/backdrop/Escape), focus-into-sheet on open (`focusFirstSheetTarget`), and focus-return-to-trigger on close. It does **not** implement an explicit focus trap, and delegates open/close mechanics to `createSlideUpSheet` (`../mobile-shell/sheet-controller.ts`, not in this diff). The new test suite's own coverage list enumerates open/close/escape/backdrop/row-activation/eye-button/focus-return — but there is no assertion that Tab/Shift+Tab is contained within the sheet while it is open.
+
+A bottom sheet rendered over a dimmed scrim with a `max-height: 70vh` panel is the canonical case where Tab can silently walk focus into the page content behind the scrim — a WCAG 2.4.3 (Focus Order) / 2.1.2 (No Keyboard Trap, inverse) concern. Either the shared `createSlideUpSheet` traps focus (in which case this diff should have a regression test asserting it, since the sheet is a new consumer) or it does not (in which case the sheet ships without the trap the audit scope requires). As-is, the contract is unverified for a surface the audit flags by name. Add a test that opens the sheet, Tabs from the last focusable element, and asserts focus wraps to the first sheet element rather than escaping to `document.body` / background rows — and if the shared controller doesn't trap, add the trap.
+
+Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115127432Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-39 — [P5-2 claude] `EDITORIAL_STAGE_EMPTY_HINTS` hardcodes editorial pipeline knowledge in the studio — sibling of AUDIT-20260530-19
+
+Finding-ID: AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2)
+Status:     open
+Severity:   low
+Surface:    `packages/studio/src/pages/dashboard/swimlane-card.ts:84-115` (`EDITORIAL_STAGE_EMPTY_HINTS` + `stageEmptyHint`)
+
+The empty-state copy map gates on `templateId === 'editorial'` and hardcodes the eight editorial stage names (`Ideas`/`Planned`/`Outlining`/`Drafting`/`Final`/`Published`/`Blocked`/`Cancelled`) with bespoke strings, falling through to `Nothing in ${stage.toLowerCase()}.` otherwise. This duplicates the editorial pipeline's stage vocabulary inside the studio layer — the same drift hazard AUDIT-20260530-19 flagged for `EDITORIAL_FALLBACK` duplicating `editorial.json`. If `editorial.json` ever renames or adds a linear stage, this map silently desyncs: the renamed stage gets the generic `Nothing in <stage>.` fallback while the operator (and the `dashboard.test.ts` assertions that pin these verbatim phrasings) expect the editorial copy.
+
+It's low severity because the editorial template is stable and the fallback is benign, but it's a hardcoded coupling between the studio render layer and a core preset that the "collection model is renderer-independent" principle wants to avoid. A cleaner shape would source the per-stage hint from the template definition itself (an optional `emptyHint` per stage in the pipeline JSON) so each template — not just editorial — carries its own empty-state copy without a studio-side special case. At minimum, note the editorial.json ↔ studio-map coupling so a future stage rename touches both.
+
+Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115127432Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-40 — [P5-2 claude] Mobile sheet open/closed state is tracked redundantly across a body attribute and a container class that must be kept in sync by hand
+
+Finding-ID: AUDIT-20260530-40 (cross-model: AUDIT-BARRAGE-claude-P5-2)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:62-86`, `plugins/deskwork-studio/public/css/dashboard-swimlane.css` (`body[data-lane-sheet-open] .lane-sheet-backdrop` vs `.lane-sheet-container.is-open .lane-rail`)
+
+The sheet's visual state is driven by two independent flags that the CSS keys off separately: the backdrop reveal uses `body[data-lane-sheet-open]` (set by the shared `createSlideUpSheet` controller), while the rail's slide-up uses `.lane-sheet-container.is-open` (set by the local `openSheet`/`onClose`). Keeping them coherent depends on every state transition going through both: `openSheet` adds `.is-open` *and* calls `sheetController.open()`; `onClose` removes `.is-open` when the controller fires its close. If the shared controller ever closes the sheet through a path that doesn't invoke the supplied `onClose` (e.g. an internal auto-dismiss, a future resize handler, or a second `close()` that early-returns before firing callbacks), the body attribute and the container class diverge — backdrop fades but the panel stays slid-up, or vice-versa, with no single source of truth to reconcile them.
+
+This is a fragility/coupling note, not a confirmed bug (the current callbacks keep them in sync), but routing one piece of state through two mechanisms across two files is the kind of seam that breaks silently on the next change. Preferring a single state signal — e.g. drive both CSS rules off `body[data-lane-sheet-open]`, or off the container class, but not split across both — would remove the hand-sync requirement. The new test suite asserts both the class and the body attribute flip together on the happy paths, but does not exercise any controller-internal close that bypasses `onClose`.
+
+Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115127432Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-41 — [P5-2 codex] Mobile lane sheet opens like a modal but does not trap focus
+
+Finding-ID: AUDIT-20260530-41 (cross-model: AUDIT-BARRAGE-codex-P5-2)
+Status:     open
+Severity:   high
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:54-131; plugins/deskwork-studio/public/src/mobile-shell/sheet-controller.ts:96-123
+
+`initSwimlaneMobileSheet` opens a scrim-backed bottom sheet, moves focus into it, and returns focus to the trigger on close, but it never traps `Tab` / `Shift+Tab` while open. The shared `createSlideUpSheet` controller only toggles the body attribute and handles Escape/scrim/drag close; it also has no focus-trap behavior. Keyboard users can tab out of the open sheet into the page behind the scrim, which violates the stated Task 5.3 audit target for mobile-sheet a11y.
+
+Fix by adding an open-state `keydown` handler for `Tab` that cycles through focusable controls inside `[data-lane-sheet]`, or by extending `createSlideUpSheet` with an opt-in focus-trap contract and enabling it here. Add a jsdom test that opens the lane sheet, presses `Tab` from the last focusable element, and asserts focus wraps inside the sheet.
+
+Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115127432Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-42 — [P5-2 codex] Unbucketed template-stage entries are counted but never rendered
+
+Finding-ID: AUDIT-20260530-42 (cross-model: AUDIT-BARRAGE-codex-P5-2)
+Status:     open
+Severity:   high
+Surface:    packages/studio/src/pages/dashboard/lane-data.ts:266-273; packages/studio/src/pages/dashboard/swimlane-card.ts:391-422
+
+`bucketIntoLanes` explicitly captures entries whose `currentStage` is not in the lane template into `bucket.unbucketed`, and `entryCount` includes those rows. But `renderSwimlane` only renders `template.linearStages` and `template.offPipelineStages`; it never emits `bucket.unbucketed`. The operator sees the lane count include the entry, but the row itself disappears from the stage grid/list chrome.
+
+This recreates the “unknown stage drops content” shape on the studio dashboard, even though the data layer has already preserved the rows. Fix by rendering an explicit unbucketed/unknown-stage tail column or diagnostic row per lane, with a visible label and the affected entries.
+
+Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115127432Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-43 — [P5-2 codex] Held Space repeat on compose/empty CTA still allows page scroll
+
+Finding-ID: AUDIT-20260530-43 (cross-model: AUDIT-BARRAGE-codex-P5-2)
+Status:     open
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:250-262
+
+The new Space handler returns early on `ev.repeat` before calling `preventDefault`. That stops repeated clipboard writes, but held Space keydown repeats can still perform the browser’s default scroll behavior while focus remains on the button. The comment says Space activation suppresses page scroll, but the repeat path does not.
+
+Fix by calling `ev.preventDefault()` for every Space keydown before the repeat guard, then returning on repeat before activation.
+
+Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115127432Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-44 — [P5-3 claude] Save button flashes success even when preset persistence silently fails
+
+Finding-ID: AUDIT-20260530-44 (cross-model: AUDIT-BARRAGE-claude-P5-3)
+Status:     open
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:handleSaveClick` (the `savePresetFromCurrent → renderPresetList → flashSaveConfirm` sequence) + `swimlane-presets-store.ts:writePresets` (the swallowed `try/catch`)
+
+`writePresets` swallows every `localStorage.setItem` failure (`catch { /* localStorage unavailable */ }`), and `savePresetFromCurrent` returns the constructed preset unconditionally regardless of whether the write landed. `handleSaveClick` then calls `renderPresetList` (which re-reads storage via `listPresets`) and `flashSaveConfirm(saveBtn)` (which always paints the green "is-flashing" success state). When the write fails — quota exceeded after many presets, or Safari private-mode `setItem` throwing — the operator sees the green success flash but the new row never appears in the list, because `renderPresetList` re-read storage that never received the preset. The two signals contradict each other.
+
+This is the audit's named "localStorage quota" concern made concrete: there is no quota-aware error path and no cap on preset count, so the failure mode is reachable. A reasonable fix: have `savePresetFromCurrent`/`writePresets` return a boolean success, and gate `flashSaveConfirm` + `renderPresetList` on it — surfacing a visible error (e.g. a red flash + message) when the write failed rather than a false success.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-45 — [P5-3 claude] Presets are never reconciled when a lane is renamed/archived/purged — asymmetry with the drag-order path
+
+Finding-ID: AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3)
+Status:     open
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:applyPreset` + `snapshotCurrentState`; contrast `swimlane-drag.ts:reconcileOrder`
+
+The drag-order controller defends against stale lane ids: `reconcileOrder` (`swimlane-drag.ts`) checks every stored id against the live lane set and collapses to the server order if any stored id is missing. The preset store has no equivalent. `applyPreset` writes `preset.focusedLanes` verbatim into the `:focus` key, including ids for lanes that no longer exist on disk (renamed/archived/purged). `snapshotCurrentState`/`savePresetFromCurrent` likewise persist whatever stale ids are in the focus key. There is no pruning, migration, or validity check anywhere in the preset lifecycle.
+
+This is exactly the audit's "preset migration when lane id changes" concern. The consequence is benign-but-accumulating: presets retain dead lane references indefinitely, and `applyPreset`'s visibility computation (`allLanes.filter(id => !visibleSet.has(id))`) silently drops unknown lanes while focus retains them — producing a focus set referencing nonexistent lanes. A fix should mirror `reconcileOrder`: intersect each preset axis against the live lane set at apply time (and optionally rewrite the stored preset to drop dead ids), so presets self-heal across lane renames the way lane-order already does.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-46 — [P5-3 claude] `applyPreset` does not enforce the hidden⇒not-focused invariant the live controllers maintain
+
+Finding-ID: AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:applyPreset` (visibility write at the `writeJsonOrIgnore(visibilityKey...)` step + focus write at `writeJsonOrIgnore(focusKey..., preset.focusedLanes)`)
+
+`applyPreset` writes `visibleLanes` and `focusedLanes` to storage as two independent verbatim writes. Its own docstring acknowledges the hazard: focus is written last "because the visibility pass … may force-hide a lane that the preset's `focusedLanes` then re-includes." Nothing intersects the two — a preset whose `focusedLanes` contains a lane absent from `visibleLanes` is written through as-is, yielding a stored state where a hidden lane is also focused. In normal interactive operation the swimlane controller keeps these consistent (hiding a lane drops it from focus), so this invalid combination only arises from a hand-edited/migrated/imported preset — but `applyPreset` is precisely the import boundary where the invariant should be re-asserted.
+
+The downstream `reapplyFromStorage` builds state from both keys with no documented intersection, so the invalid combo can paint a lane as both stub-hidden and focus-styled. A fix: at apply time, filter `focusedLanes` to the intersection with the resolved visible set before writing, so the stored state is always internally consistent regardless of preset provenance.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-47 — [P5-3 claude] Deep-link `?preset=<id>` only resolves in the originating browser — silent no-op everywhere else
+
+Finding-ID: AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:savePresetFromCurrent` (id minting: `const id = \`p${now.getTime().toString(36)}\``) + `swimlane-presets.ts:applyDeepLinkPreset`
+
+The deep-link contract (`/dev/editorial-studio?preset=<id>`, PRD Task 5.5) reads the id from the URL and looks it up in localStorage; on miss it is a silent no-op (`applyDeepLinkPreset`: `if (preset === undefined) return;`). But preset ids are minted from a per-browser local timestamp (`p<getTime base36>`) and presets live only in that browser's localStorage. A URL copied to a collaborator, a different machine, or even an incognito window resolves to nothing, with no message explaining why the deep link did nothing.
+
+"Deep-link URL" in the PRD framing implies shareability; the implementation delivers same-browser cold-load rehydration only. This may be acceptable under THESIS Consequence 2 (collaborators see their own local state), but the gap between the "deep-link" label and the actual scope is worth an explicit operator decision and, at minimum, a visible "preset not found" affordance instead of a silent return so the operator isn't left wondering whether the link is broken.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-48 — [P5-3 claude] SSR "no flash-of-empty-content" claim is false for operators who have saved presets
+
+Finding-ID: AUDIT-20260530-48 (cross-model: AUDIT-BARRAGE-claude-P5-3)
+Status:     open
+Severity:   low
+Surface:    `packages/studio/src/pages/dashboard/swimlane-rail.ts:renderPresetSurface` docstring ("re-rendered identically by the client … no flash-of-empty-content") vs `plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:renderPresetList`
+
+The server always renders the preset list with the empty-state child `<span class="preset-empty">No saved presets</span>` because the server has no access to the operator's localStorage. The docstring claims the client "re-renders identically … no flash-of-empty-content." That holds only for an operator with zero presets. An operator who has saved presets gets SSR "No saved presets" on first paint, then `renderPresetList` wipes it (`container.textContent = ''`) and populates the real rows once the client boots — i.e. exactly the empty→populated flash the comment asserts is avoided.
+
+The claim is an overstatement of the SSR/CSR symmetry. Either soften the docstring to scope the no-flash guarantee to the empty case, or accept the flash and document it honestly — the current wording will mislead the next reader into assuming hydration is flash-free in all cases.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-49 — [P5-3 claude] DRY regression: `readJsonArrayOfStrings` re-implements the very reader this diff extracted to dedupe
+
+Finding-ID: AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:readJsonArrayOfStrings` (and the trio `writePresets`/`writeJsonOrIgnore`/`writeStoredOrder` across the three files)
+
+This diff's stated cleanup extracted `readStoredStringArray` into `swimlane-storage.ts` specifically to dedupe the JSON-array read between `swimlane.ts` and `swimlane-drag.ts` (see the new export's docstring). In the same diff, `swimlane-presets-store.ts` imports `readStoredObjectMap` and `STORAGE_KEY_PREFIX` from that module but does **not** use the new `readStoredStringArray` — it defines its own `readJsonArrayOfStrings` doing the identical try/parse/filter logic (just returning `[]` instead of `null` on failure). The same pattern repeats on the write side: `writePresets`, `writeJsonOrIgnore` (presets-store), and `writeStoredOrder` (drag) are three near-identical `try { setItem(JSON.stringify) } catch {}` helpers.
+
+Introducing a fourth copy of the reader in the same changeset that was consolidating copies is a maintainability regression — the next bug fix to the read/parse path now has to be applied in two places that look intentionally unified. Fix: have `readJsonArrayOfStrings` delegate to `readStoredStringArray` (coercing `null → []`), and factor the write-with-swallow helper into `swimlane-storage.ts` so all four call sites share one implementation.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-50 — [P5-3 claude] Test suite never exercises localStorage write-failure / quota for either feature
+
+Finding-ID: AUDIT-20260530-50 (cross-model: AUDIT-BARRAGE-claude-P5-3)
+Status:     open
+Severity:   low
+Surface:    `packages/studio/test/dashboard-swimlane-presets-client.test.ts` + `packages/studio/test/dashboard-swimlane-drag-client.test.ts`
+
+Both new test files assert happy-path persistence (`localStorage.getItem(...)` equals the expected JSON) but neither simulates a `setItem` that throws — the exact failure the production code defends against with swallowed `try/catch` blocks in `writePresets`, `writeJsonOrIgnore`, `writeStoredOrder`, and `writeStoredSet`. Because the catch is silent, the only way to know the fallback behaves as documented ("in-page state still works"; "the operator just loses persistence across reloads") is a test that stubs `setItem` to throw and asserts the DOM reorder/apply still happened without an exception escaping the handler.
+
+This matters specifically because finding-01 shows the swallow currently produces a misleading success flash — a test that drives the throw path would have surfaced that contradiction. Add a case per file that monkeypatches `window.localStorage.setItem` to throw, then asserts (a) no exception propagates out of the drop/save handler and (b) the in-DOM reorder/preset-apply still completed.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-51 — [P5-3 codex] Preset storage write failures are reported as successful saves/applies
+
+Finding-ID: AUDIT-20260530-51 (cross-model: AUDIT-BARRAGE-codex-P5-3)
+Status:     open
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:209-221,349-414; plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:188-205
+
+`writePresets` and `writeJsonOrIgnore` catch every `localStorage.setItem` failure, including quota and private-mode failures, then return normally. `savePresetFromCurrent` still returns a preset, `handleSaveClick` re-renders from storage and flashes success, and `applyPreset` re-reads storage after ignored writes, so a preset load can silently apply stale or partially updated state.
+
+This directly intersects the audit scope's localStorage quota concern. A reasonable fix is to make write helpers return success/failure or throw a typed error, then avoid success UI and avoid reapplying from storage when the requested state was not durably written.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-52 — [P5-3 codex] Workplan marks a scoped server-side preset path as postponed
+
+Finding-ID: AUDIT-20260530-52 (cross-model: AUDIT-BARRAGE-codex-P5-3)
+Status:     open
+Severity:   low
+Surface:    docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:267-271
+
+Task 5.5.2 is checked complete while the line explicitly says the `.deskwork/personal/<operator-id>/focus-presets.json` server-side path is postponed to Phase 6. The project instructions reject open-ended postponement language because it turns scope changes into untracked project debt.
+
+If localStorage-only is the intended Phase 5 contract, the workplan should state that as the accepted scope without a Phase 6 promise. If the file-backed path remains required by the PRD, the task should not be marked complete until that path exists or a tracked issue records the changed scope.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-53 — [P5-3 codex] Stored lane order accepts duplicate IDs and can poison reorder state
+
+Finding-ID: AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3)
+Status:     open
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:53-63; plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts:72-89,371-392
+
+`readStoredStringArray` preserves duplicate strings, and `reconcileOrder` only checks that each stored id exists in the live lane set. A corrupted or manually edited value like `["qa","qa","default"]` passes validation, becomes `state.order`, and can be written back after the next real reorder. DOM appends of the same element are mostly harmless visually, but the controller's order model is no longer a one-to-one lane permutation.
+
+The order reader should validate uniqueness and exact permutation semantics after appending newly added lanes. Duplicate stored ids should be treated like stale ids: discard the stored order and use the live server-rendered order.
+
+Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115517132Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-54 — [P6-1 claude] `pipeline update --rename-stage` writes `<id>-renames.json` into the override dir, which the loader enumerates as a phantom template — breaks `pipeline list` after any rename
+
+Finding-ID: AUDIT-20260530-54 (cross-model: AUDIT-BARRAGE-claude-P6-1)
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/pipelines/operations/update.ts:appendRenameMigration` (writes `${pipelineId}-renames.json` into `pipelineOverridesDir`) vs `packages/core/src/pipelines/loader.ts:listAvailablePipelineTemplates` (`:251`) + `packages/core/src/pipelines/operations/list.ts:listPipelines`
+
+`appendRenameMigration` writes the migration sidecar to `join(pipelineOverridesDir(projectRoot), \`${pipelineId}-renames.json\`)` — i.e. *the same directory* `listAvailablePipelineTemplates` scans for templates. That function returns every `.json` basename in the override dir with no exclusion for the `-renames` suffix, so after a single `pipeline update my-blog --rename-stage X --to-stage Y`, the id `my-blog-renames` is emitted as a pipeline template. `listPipelines` then calls `loadPipelineTemplate('my-blog-renames', …)` for *every* id, which finds `my-blog-renames.json`, reads it, and Zod-validates it against `PipelineTemplateSchema` — it has `pipelineId`/`renames` keys, not `linearStages`, so validation throws. The throw propagates out of `listPipelines`, so **both `pipeline list` and `pipeline list --full` break for the whole project after any rename**. `customize pipeline`'s `listAvailable` picker is polluted identically, and `pipeline show my-blog-renames` resolves to a confusing schema error.
+
+This is the same class as AUDIT-20260530-03 (stray `.json` becomes phantom template) but it is *guaranteed* on every rename rather than hypothetical, and the `update.test.ts` rename tests never run `pipeline list` afterward so it shipped untested. Fix: store the migration sidecar outside the enumerated namespace (e.g. `.deskwork/pipelines/.renames/<id>.json` or a single non-`.json` index), OR have `listJsonBasenames`/`listAvailablePipelineTemplates` skip the `-renames.json` suffix, AND add a regression test that runs `pipeline list` after a rename.
+
+---
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-55 — [P6-1 claude] `pipeline delete --reassign-lanes-to ""` (empty string) bypasses the dependent-lane refusal and orphans every dependent lane
+
+Finding-ID: AUDIT-20260530-55 (cross-model: AUDIT-BARRAGE-claude-P6-1)
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/pipelines/operations/delete.ts:deletePipeline` (refusal guard, validation guard, rebind loop)
+
+The dependent-lane refusal is gated on `dependents.length > 0 && opts.reassignLanesTo === undefined`, while validation and the rebind loop are both gated on `opts.reassignLanesTo !== undefined && opts.reassignLanesTo.length > 0`. An empty-string value (`--reassign-lanes-to ""`, or `--reassign-lanes-to=`, or an unset shell variable) sets `reassignLanesTo === ''`, which is **neither `undefined` nor length-`> 0`**. Trace with one dependent lane: the refusal check is `true && ('' === undefined)` → `false` (no refusal); the validation block is `('' !== undefined) && (0 > 0)` → `false` (no `loadPipelineTemplate` check); the rebind loop is skipped for the same reason; then `unlinkSync(path)` fires. The override is deleted and the dependent lanes are left pointing at a now-missing `pipelineTemplate` — exactly the data-integrity failure the guard exists to prevent, executed silently with exit 0.
+
+The sibling `lane move --to ""` path is incidentally protected (`assertSafeLaneId('')` fails the regex), and `lane create --content-dir ""` is caught by the schema's `min(1)` — `delete`'s reassign value is the one operator-controlled flag that reaches a destructive `unlinkSync` without an empty-string guard. Fix: normalize empty-string flags to `undefined` at the CLI boundary, or change the guards to `opts.reassignLanesTo == null || opts.reassignLanesTo.length === 0` so an empty reassign target is treated as "no target" and the dependent-lane refusal fires. Add a refusal test for `--reassign-lanes-to ''` with a dependent lane.
+
+---
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-56 — [P6-1 claude] `appendRenameMigration` is non-atomic and silently discards a corrupt renames file, contradicting the append-only audit-trail promise
+
+Finding-ID: AUDIT-20260530-56 (cross-model: AUDIT-BARRAGE-claude-P6-1)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/pipelines/operations/update.ts:appendRenameMigration` (read + `writeFileSync` direct), and `plugins/deskwork/skills/pipeline/SKILL.md` Safety-rules ("migration sidecar is append-only … deleting it loses the audit trail")
+
+Every other write in this feature uses the tmp+rename atomic pattern (`lanes/operations/commit.ts`, `pipelines/operations/commit.ts`), but `appendRenameMigration` does a direct `writeFileSync(path, …)` — a crash mid-write truncates `<id>-renames.json`. Worse, on the read side the function catches a `JSON.parse` failure and sets `parsed = null`, after which `RenameMigrationSchema.safeParse(null)` fails and it falls back to `{ pipelineId, renames: [] }` — **silently discarding the entire prior rename history** on any corruption. The SKILL.md tells the operator this file is the append-only audit trail that doctor (Task 6.5) will consume for affected-entry remediation, but the code itself will reset it to empty without surfacing the loss, defeating the remediation path the rename feature exists to enable.
+
+There is also an ordering hazard: the rename is committed by `commitPipelineTemplate` first, then `appendRenameMigration` runs synchronously; if it throws (disk full, permissions), the template is already renamed on disk but no migration record exists and the journal event never fires. Fix: write the renames file via the same tmp+rename helper, and on a corrupt existing file refuse/throw with the path (or quarantine it) rather than silently starting fresh — losing the audit trail is the exact "silent fallback" the project's no-fallback rule prohibits.
+
+---
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-57 — [P6-1 claude] `listLanes` / `listPipelines` throw on a single malformed config, breaking the entire list command — undermining the loader's deliberate graceful-degradation contract
+
+Finding-ID: AUDIT-20260530-57 (cross-model: AUDIT-BARRAGE-claude-P6-1)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/lanes/operations/list.ts:listLanes` (N+1 `loadLaneConfig`), `packages/core/src/pipelines/operations/list.ts:listPipelines` (N+1 `loadPipelineTemplate`), vs `packages/core/src/lanes/loader.ts:listLaneConfigs` + `isArchivedOnDisk`
+
+`listLaneConfigs` was deliberately written to tolerate corrupt files — its `isArchivedOnDisk` helper catches parse errors and returns `false` so "a malformed lane still appears in the list" (the `broken.json` test at `loader.test.ts:285` asserts `['broken', 'default']`). But the operation layer immediately undoes that: `listLanes` maps every returned id through `loadLaneConfig(id)`, which throws on the malformed lane, so `lane list` fails wholesale and the operator can't see *any* of their lanes — the opposite of what the loader's graceful degradation was protecting. `listPipelines` has the identical shape via `loadPipelineTemplate`, and this is also the propagation vector for finding -01 (the phantom `-renames` template). This is the same coupling shape as the already-dispositioned AUDIT-20260530-17 (one bad lane file breaks an operation for the whole project), surfacing on the read path.
+
+Fix: have `listLanes`/`listPipelines` collect per-id load failures into the result (e.g. a `malformed: {id, error}[]` channel the CLI surfaces) rather than letting the first corrupt file abort the enumeration — so `lane list` shows the healthy lanes plus a flagged-broken section. Add a `lane list` test with one corrupt lane JSON present asserting the healthy lanes still emit.
+
+---
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-58 — [P6-1 claude] `lane move` of a pre-migration entry (no `lane` field) fails confusingly when no `default` lane config exists
+
+Finding-ID: AUDIT-20260530-58 (cross-model: AUDIT-BARRAGE-claude-P6-1)
+Status:     open
+Severity:   low
+Surface:    `packages/core/src/lanes/operations/move.ts:moveEntryToLane` (`sourceLaneId = sidecar.lane ?? DEFAULT_LANE_ID`, then `loadLaneConfig(sourceLaneId, projectRoot)`)
+
+The docblock states an entry without a `lane` field "is treated as belonging to the `default` lane (matches the doctor's lane-back-fill default)." But the very next use of `sourceLaneId` is `loadLaneConfig('default', projectRoot)`, which throws `Lane config "default" not found` if the project never created a `default` lane (a real migration-window state, since lanes are project-owned with no plugin defaults). The error surfaced to the operator is about a *missing default lane config*, not about the entry they asked to move, and the `sourceLane` is only consumed for `sourceContentDir` resolution. An operator moving a freshly-ingested pre-lane entry into a new lane gets a confusing failure pointing at the wrong object.
+
+Fix: when `sidecar.lane` is undefined and no `default` lane exists, either fall back to the project's configured `contentDir` for the source path, or refuse with a message naming the *entry* and instructing the operator to run lane back-fill (doctor) first. No test covers the no-`default`-lane move path.
+
+---
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-59 — [P6-1 claude] Rollback-test silently no-ops (returns "pass") when it cannot simulate the write failure — the contract goes unverified on root/CI sandboxes
+
+Finding-ID: AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1)
+Status:     open
+Severity:   low
+Surface:    `packages/cli/test/lane/move.test.ts:264-280` ("rolls back artifact + scrapbook when writeSidecar fails")
+
+The test chmods the entries dir to `0o555`, then pre-flights a write; if the write *succeeds* (running as root, common in CI sandboxes) it `return`s early — which Vitest records as a passing test, not a skip. So the move-rollback path (the headline data-safety fix from AUDIT-20260528-42) is silently unverified in exactly the environments most likely to run as root, and the green checkmark misrepresents coverage. Per the project's UI-verification ethos ("a passing test of the wrong assertions is worse than no test"), a test that can't exercise its contract should announce that, not pass quietly.
+
+Fix: call Vitest's `ctx.skip()` (or `it.skipIf`) on the can't-simulate branch so the run reports SKIPPED with a reason, rather than a bare `return` that reads as a pass. Optionally drive the failure deterministically by mocking `writeSidecar` to throw instead of relying on filesystem permissions.
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-60 — [P6-1 codex] Pipeline template rename/archive/restore/purge are missing
+
+Finding-ID: AUDIT-20260530-60 (cross-model: AUDIT-BARRAGE-codex-P6-1)
+Status:     open
+Severity:   blocking
+Surface:    `packages/cli/src/commands/pipeline.ts:5-15`, `packages/cli/src/commands/pipeline.ts:80-136`, `packages/core/src/pipelines/operations/index.ts:11-28`, `plugins/deskwork/skills/pipeline/SKILL.md:13-25`
+
+The audited feature scope says Task 6.2 ships the `/deskwork:pipeline` family with `list/show/create/update/archive/restore/purge/rename`, and specifically that rename migrates lane `pipelineTemplate` bindings from the old id to the new id atomically. The implementation exposes only `list | show | create | update | delete`; there is no pipeline-id `rename`, no soft archive/restore, and no purge verb matching the lane lifecycle.
+
+This is not just naming drift. The only “rename” implemented is `update --rename-stage`, which changes stage labels and writes a stage-rename sidecar. It does not rename the template id or migrate lanes bound to the old template id. A reasonable fix is to add the missing pipeline lifecycle verbs and core operations, including a template-id rename path that writes the new override, migrates every dependent lane config, removes the old override, and rolls back on partial failure.
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-61 — [P6-1 codex] Stage-rename sidecar is enumerated as a fake pipeline template
+
+Finding-ID: AUDIT-20260530-61 (cross-model: AUDIT-BARRAGE-codex-P6-1)
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/pipelines/operations/update.ts:410-459`, `packages/core/src/pipelines/loader.ts:251-260`, `packages/core/src/pipelines/operations/list.ts:38-40`
+
+`appendRenameMigration` writes `<projectRoot>/.deskwork/pipelines/<id>-renames.json` next to real template override files. `listAvailablePipelineTemplates` enumerates every `*.json` basename in `.deskwork/pipelines`, and `listPipelines` immediately calls `loadPipelineTemplate(id, projectRoot)` for each returned id.
+
+After the first successful `deskwork pipeline update my-blog --rename-stage ...`, `deskwork pipeline list --full` will discover `my-blog-renames` as a template id and try to parse the migration sidecar as a `PipelineTemplate`. That fails schema validation or id matching, so a successful rename poisons the template picker. Store migration files outside the template override directory, or make the enumerator ignore sidecar filenames with a strict template-file index.
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-62 — [P6-1 codex] `remove-stage` misses legacy default-lane entries
+
+Finding-ID: AUDIT-20260530-62 (cross-model: AUDIT-BARRAGE-codex-P6-1)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/pipelines/operations/update.ts:367-395`
+
+`refuseRemoveStageWhenReferenced` skips every sidecar whose `entry.lane` is `undefined`. That conflicts with the lane migration convention used elsewhere in this diff: `lane move` treats missing `lane` as the migration-window `default` lane. If a project has a `default` lane bound to `my-blog` and legacy entries without a `lane` field at `currentStage: "Review"`, `pipeline update my-blog --remove-stage Review` will allow the stage removal even though those entries still occupy it.
+
+The refusal check should resolve missing `entry.lane` the same way the rest of the lane-aware code does: treat it as `default`, load that lane, and only skip when the entry truly cannot be associated with the mutated template. Add a regression test with a default-lane entry whose sidecar lacks `lane`.
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-63 — [P6-1 codex] `delete --reassign-lanes-to` can leave a partial rebind
+
+Finding-ID: AUDIT-20260530-63 (cross-model: AUDIT-BARRAGE-codex-P6-1)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/pipelines/operations/delete.ts:179-222`
+
+The batch reassign path commits each dependent lane one by one, then unlinks the pipeline override, then appends the journal event. If a later lane write fails, earlier lanes remain rebound while the old pipeline still exists. If `unlinkSync` fails, all lane reassignments may already be on disk. If `appendJournalEvent` fails after unlink, the template is gone and lanes are rebound without the lifecycle event.
+
+Each individual lane write is atomic, but the multi-file operation is not. Since this command is explicitly a batch mutation, it needs transaction-style rollback or a staging order with compensating writes: preserve original lane configs, restore already-reassigned lanes on failure, and avoid deleting the template until the reassign set is known to be durable.
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-64 — [P6-1 codex] `lane move` trusts sidecar paths when moving files
+
+Finding-ID: AUDIT-20260530-64 (cross-model: AUDIT-BARRAGE-codex-P6-1)
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/lanes/operations/move.ts:210-231`, `packages/core/src/schema/entry.ts:213-218`
+
+`lane move` builds filesystem paths with `join(sourceContentDir, sidecar.artifactPath)` and `join(targetContentDir, sidecar.artifactPath)` without verifying that the resolved paths stay under the lane content directories. `EntrySchema` leaves `artifactPath` as an unconstrained optional string. A malformed sidecar with `artifactPath: "../outside.md"` can make the move operate outside the lane content tree. The scrapbook path has the same shape through `sidecar.slug`.
+
+This is the same class of path-boundary issue that the diff hardens for lane ids and `contentDir`, but the entry-controlled relative paths remain unchecked at the move boundary. Resolve both source and target paths, compare them against the resolved content directories, and refuse any artifact or scrapbook path that escapes.
+
+Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-65 — [P6-2 claude] Pipelines data layer re-reads + re-parses every lane file once per template (O(templates × lanes) redundant IO)
+
+Finding-ID: AUDIT-20260530-65 (cross-model: AUDIT-BARRAGE-claude-P6-2)
+Status:     open
+Severity:   high
+Surface:    `packages/studio/src/pages/pipelines/data.ts` — `loadPipelinesPageData` (loop), `findReferencingLanes`, `readLanePipelineTemplate`
+
+`loadPipelinesPageData` loops over every enumerated template id and calls `findReferencingLanes(projectRoot, id, laneIds)` inside the loop. `findReferencingLanes` walks **all** lane ids and calls `readLanePipelineTemplate` for each — which does `existsSync` + `readFileSync` + `JSON.parse` on the lane's JSON every time. So for N templates and M lanes, the page performs N×M file reads and N×M `JSON.parse` calls, re-reading and re-parsing the *same* M lane files once per template. With the 5 shipped presets plus overrides and a non-trivial lane count this is hundreds-to-thousands of synchronous reads on the cold-path render, all redundant.
+
+The audit scope explicitly names "page-render performance on large lane/pipeline lists." This is the concrete offender. The fix is a single pass: read each lane's `pipelineTemplate` once into a `Map<laneId, templateId>` (or `Map<templateId, laneId[]>`) before the template loop, then index into it per template — turning N×M disk reads into M. The current shape also blocks the event loop with synchronous `readFileSync` repeated across the same files.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-66 — [P6-2 claude] `/dev/lanes` hard-fails the entire page on one malformed lane config, where `/dev/pipelines` degrades gracefully
+
+Finding-ID: AUDIT-20260530-66 (cross-model: AUDIT-BARRAGE-claude-P6-2)
+Status:     open
+Severity:   medium
+Surface:    `packages/studio/src/pages/lanes/data.ts` — `loadLanesPageData` loop (`loadLaneConfig(id, projectRoot)` with no try/catch); `packages/studio/src/server.ts:/dev/lanes` route
+
+`loadLanesPageData` calls `loadLaneConfig(id, projectRoot)` directly in its loop with no error handling; the docstring even states "Throws if any lane config is malformed." The route handler is `async (c) => c.html(await renderLanesPage(ctx))` with no catch, so a single corrupt/invalid lane JSON makes the **whole** `/dev/lanes` page throw (500) — the operator can't see *any* lane, including the healthy ones, and can't use the page to triage the broken one.
+
+This is the exact opposite of the deliberate design on the sibling pipelines page, which surfaces malformed templates as inline error rows + a banner ("this id exists but won't load — fix it") specifically so one bad file doesn't blind the operator. The two pages were built in the same task pair and should share that robustness posture. The lanes page should collect per-lane load failures into an error-row list (mirroring `PipelineErrorRow`) instead of letting the first throw kill the render. This interacts with the still-open AUDIT-07 charset gap in `loadLaneConfig`: any lane whose stored id/path the loader rejects becomes a total-page outage here.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-67 — [P6-2 claude] Corrupt/unreadable lane JSON is silently dropped from `referencingLanes`, so the pipelines Delete gate can under-count dependents
+
+Finding-ID: AUDIT-20260530-67 (cross-model: AUDIT-BARRAGE-claude-P6-2)
+Status:     open
+Severity:   medium
+Surface:    `packages/studio/src/pages/pipelines/data.ts` — `readLanePipelineTemplate` (returns `null` on `readFile`/`JSON.parse` failure), `findReferencingLanes`, consumed by `renderDeleteButton` in `pipelines/table.ts`
+
+`readLanePipelineTemplate` returns `null` whenever the lane file is missing, unreadable, unparseable, or the `pipelineTemplate` field isn't a string — and `findReferencingLanes` treats `null` as "no reference here." Consequence: a lane whose JSON is corrupt but which *does* reference template X is silently excluded from X's `referencingLanes`. The pipelines table then renders an **active** Delete button for X (`renderDeleteButton` gates the disabled variant on `referencingLanes.length > 0`), telling the operator X is safe to delete when a real (if broken) dependent still points at it.
+
+This is the same silent-skip class flagged repeatedly on this feature (AUDIT-15 lane-migration, AUDIT-23 cascade catch) — a `catch { return null }` that converts "I couldn't read this" into "this doesn't reference anything," which is a fallback that hides a failure mode per the project's no-silent-fallback rule. The comment claims "the lanes page surfaces the lane-side defect," but the Delete-gate decision is made here on incomplete data regardless of what the other page shows. Fix: distinguish missing (ENOENT → genuinely no reference) from parse/read failure, and either count the unreadable lane as an unknown-dependent (so the gate stays conservative) or surface it explicitly.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-68 — [P6-2 claude] Lanes page never emits `data-project-key`, so archived-section persistence is not project-scoped despite the docstring — and the test masks the gap
+
+Finding-ID: AUDIT-20260530-68 (cross-model: AUDIT-BARRAGE-claude-P6-2)
+Status:     open
+Severity:   medium
+Surface:    `packages/studio/src/pages/lanes.ts` (`<main ... data-lanes-container>`); `plugins/deskwork-studio/public/src/lanes/lanes-page.ts` — `archivedOpenKey`/`initArchivedSection` via `resolveProjectKey(container)`; `packages/studio/test/lanes/lanes-page-client.test.ts` (`container.dataset.projectKey = 'test-proj'`)
+
+`initArchivedSection` builds its localStorage key from `resolveProjectKey(container)`, and the docstring claims the open state is "Namespaces by project key … so two operators sharing a machine but working on different projects don't see each other's collapse state." But the server-rendered lanes container (`<main class="er-container lanes-container" data-lanes-container>`) carries **no** `data-project-key` attribute. The two client tests that exercise persistence set `container.dataset.projectKey = 'test-proj'` by hand before calling `initLanesPage`, then assert the key `deskwork:lanes:test-proj:archived-open` — i.e. they inject the attribute the real page never emits, so the project-scoping promise is asserted against a fixture the server doesn't produce.
+
+On the real page, `resolveProjectKey` will fall back to whatever its no-attribute default is, so every project on the machine shares one archived-open key — the exact cross-project bleed the docstring says it prevents. This is a client/server contract gap papered over by a test that builds the missing attribute itself (the TDD-blind-spot pattern). Fix: emit `data-project-key` on the lanes container the same way the dashboard does, and add an integration assertion against the server-rendered markup (not a hand-built fixture) that the attribute is present.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-69 — [P6-2 claude] Edit-form diff-emit trims the live value but not `data-current`, producing a spurious `--flag` when the stored value has surrounding whitespace
+
+Finding-ID: AUDIT-20260530-69 (cross-model: AUDIT-BARRAGE-claude-P6-2)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/src/lanes/lanes-page.ts` — `readFieldValue` (`el?.value.trim()`), `readFieldCurrent` (`el?.dataset.current` — untrimmed), `buildUpdateCommand`
+
+`readFieldValue` trims the live input value; `readFieldCurrent` reads `dataset.current` raw. `buildUpdateCommand` then emits a flag when `values.x !== values.xCurrent && values.x.length > 0`. If the persisted `data-current` for a field carries leading/trailing whitespace (most plausibly `contentDir`), the untouched form compares trimmed-live (`"docs"`) against untrimmed-current (`" docs "`), they differ, and the builder emits `--content-dir "docs"` even though the operator changed nothing — silently "normalizing" the value via a command the operator didn't intend to scope.
+
+Low severity because lane names/dirs rarely carry surrounding whitespace, but the asymmetry is a latent correctness bug in the very diff-emit logic AUDIT-61 was added to make consistent. Fix: trim both sides (or neither) so the comparison is apples-to-apples; if normalization-on-save is desired it should be explicit, not a side effect of one side being trimmed.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-70 — [P6-2 claude] No XSS regression test feeds an operator-controlled name/contentDir through the server render — the stated audit focus is entirely uncovered
+
+Finding-ID: AUDIT-20260530-70 (cross-model: AUDIT-BARRAGE-claude-P6-2)
+Status:     open
+Severity:   low
+Surface:    `packages/studio/src/pages/lanes/edit-form.ts` (`value="${row.name}"`, `data-current="${row.name}"`, `data-current="${row.contentDir}"`); `packages/studio/src/pages/pipelines/view-panel.ts`/`table.ts`; `packages/studio/test/lanes/*` + `test/pipelines/*`
+
+Lane `name`/`contentDir` and pipeline `name`/`description` are the only genuinely free-text operator-controlled values reaching markup, and several land in *double-quoted attribute context* (`value="${row.name}"`, `data-current="${row.name}"`). The feature's entire XSS safety therefore rests on the `html` tagged template escaping `"` (and `<`/`>`/`&`) in attribute context — but `html.ts` is not in this diff, and **none** of the four new test files exercises it: every assertion uses benign ids/names like `editorial`, `docs`, `mockups`. The audit scope explicitly names "XSS via lane/pipeline name in rendered markup" and "clipboard-builder XSS," yet there is zero coverage feeding e.g. a lane named `"><img src=x onerror=alert(1)>` through `renderLanesPage`/`renderPipelinesPage` and asserting the payload is escaped.
+
+This is a coverage gap, not a confirmed vuln — but for the one threat the audit centers on, the suite proves only that well-behaved input renders correctly. Add an integration test that writes a lane/template whose name + contentDir contain `"`, `<`, `>`, and `onerror=` and asserts the rendered HTML contains the escaped forms (and that the `data-current`/`value` attributes can't be broken out of). That test also pins the `html.ts` contract this feature silently depends on.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-71 — [P6-2 claude] View and Edit panels are rendered in full (5 sub-forms + stage chips/checkboxes) for every pipeline row even though every panel ships hidden
+
+Finding-ID: AUDIT-20260530-71 (cross-model: AUDIT-BARRAGE-claude-P6-2)
+Status:     open
+Severity:   low
+Surface:    `packages/studio/src/pages/pipelines/table.ts` — `renderHealthyRow` (always emits `renderViewPanel(row)` + `renderEditForm(row, …)`); `edit-form.ts`, `view-panel.ts`
+
+Every healthy template row eagerly server-renders both a full View panel (stage-flow chips for all linear + off-pipeline stages) and a full Edit panel (five `<details>` sub-forms, including a checkbox per `linearStage` in the set-locked op), all emitted with `hidden` and only revealed client-side. Page weight scales as template_count × (5 sub-forms + per-stage controls), so a project with many overrides pays the full DOM cost up front for panels the operator may never open. Combined with finding -01's redundant lane IO, the pipelines page render cost grows multiplicatively on exactly the "large list" case the audit scope calls out.
+
+Low severity (correctness is fine; this is render-weight), but worth noting because the structure forecloses the cheap mitigation. If/when this bites, the panels are good candidates for lazy hydration (render the row, build the panel on first toggle) — the client controller already owns the toggle path, so the panel HTML doesn't need to exist until first open.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-72 — [P6-2 claude] `classifyLoadError` substring matching can misclassify a Zod message as `missing`
+
+Finding-ID: AUDIT-20260530-72 (cross-model: AUDIT-BARRAGE-claude-P6-2)
+Status:     open
+Severity:   informational
+Surface:    `packages/studio/src/pages/pipelines/data.ts` — `classifyLoadError`
+
+`classifyLoadError` branches on `message.includes('not found') || message.includes('not valid JSON')` and, inside that branch, returns `'missing'` for anything not containing `'not valid JSON'`. Any loader error whose message merely *contains* the substring `not found` — including a future Zod or id-mismatch message phrased that way — is then mislabeled `missing` ("File not found"), which is the one kind the comment itself says "should not happen for ids returned by the enumerator." The verbatim `message` is preserved and shown, so the operator still sees the truth; only the one-line `kind` hint can be wrong.
+
+Informational because the impact is a cosmetically-wrong category label, and the code comment already flags the coupling to the loader's exact strings. If the kind label is to be relied on (e.g. for differential UI), classification should key off a structured discriminant from the loader (an error subclass or code) rather than English substrings.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-73 — [P6-2 codex] Required-field copy builders can copy placeholder commands
+
+Finding-ID: AUDIT-20260530-73 (cross-model: AUDIT-BARRAGE-codex-P6-2)
+Status:     open
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:95-103,182-189`; `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:88-102,205-228`
+
+The New Lane and New Pipeline builders render placeholders (`<id>`, `<template>`, `<path>`, `<stages>`) when required fields are empty, but the Copy handlers still copy that preview verbatim. That means an operator can click Copy on an incomplete form and paste `/deskwork:lane create <id> ...` or `/deskwork:pipeline create <id> --shape <stages>`, which is not a valid, relevant command and is especially risky if pasted into a shell.
+
+Reasonable fix: disable the Copy button while required fields are blank or invalid, surface a short inline validation message, and keep the placeholder only as a preview shape.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-74 — [P6-2 codex] Set-locked builder advertises a CLI-refused empty lock command
+
+Finding-ID: AUDIT-20260530-74 (cross-model: AUDIT-BARRAGE-codex-P6-2)
+Status:     open
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:157-163`; `packages/studio/test/pipelines/pipelines-page-client.test.ts:214-238`
+
+`buildSetLockedCommand` turns an empty checkbox selection into `--set-locked ""`, and the test explicitly asserts that shape. The CLI’s `splitStageList` refuses an empty comma-separated stage list, so the studio presents a command that looks like “clear all locks” but will fail when pasted.
+
+Reasonable fix: either add a supported CLI clear-locks behavior, or make the UI refuse empty selection with an inline message instead of copying a doomed command.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-75 — [P6-2 codex] Page init is not actually idempotent
+
+Finding-ID: AUDIT-20260530-75 (cross-model: AUDIT-BARRAGE-codex-P6-2)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:167-189,193-221,240-289,322-344,347-364`; `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:141-174,177-231,240-267,294-347,350-367`
+
+Both controllers describe init as idempotent, but every init path calls `addEventListener` unconditionally. A second `initLanesPage()` or `initPipelinesPage()` call on the same DOM attaches duplicate input, toggle, and copy handlers; copy buttons can write/flash twice and toggle handlers can perform redundant state changes.
+
+Reasonable fix: add a module-level or container-level wired guard, or mark each wired element with a dataset sentinel before attaching listeners.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-76 — [P6-2 codex] Lanes and pipelines pages mark Dashboard as the current page
+
+Finding-ID: AUDIT-20260530-76 (cross-model: AUDIT-BARRAGE-codex-P6-2)
+Status:     open
+Severity:   low
+Surface:    `packages/studio/src/pages/lanes.ts:76-80`; `packages/studio/src/pages/pipelines.ts:72-75`; `packages/studio/src/pages/chrome.ts:63-67`
+
+Both new pages call `renderEditorialFolio('dashboard', ...)`, and `renderEditorialFolio` maps that to `aria-current="page"` on the Dashboard link. On `/dev/lanes` and `/dev/pipelines`, assistive tech is told the Dashboard link is the current page, which is incorrect link semantics.
+
+Reasonable fix: extend the folio active key set for `lanes` and `pipelines`, or pass a no-current key for these pages until they have explicit nav entries.
+
+Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-77 — [P6-3 claude] Delete-refusal message lists entry UUIDs but instructs a slug-based `lane move` command
+
+Finding-ID: AUDIT-20260530-77 (cross-model: AUDIT-BARRAGE-claude-P6-3)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:290-309` (delete dependency check + refusal message)
+
+In the `delete` branch, `dependents` is built as `sidecars.filter((entry) => entry.lane === laneId).map((entry) => entry.uuid)` (line ~292), so the sample interpolated into the refusal message is a list of **UUIDs**. But the same message then tells the operator: *"Move each entry to another lane with `deskwork lane move <slug> --to <other>`"* (line ~305). The operator is handed UUIDs and instructed to act with slugs. They cannot paste the listed identifiers into the suggested command.
+
+This also diverges from the sibling surface the rule claims to mirror. The integration test for `lane purge` (`packages/cli/test/custom-pipeline-lane-integration.test.ts:294-297`) asserts the purge refusal names `first-post` / `second-post` — i.e. **slugs**. So `lane purge` refuses with slugs while this doctor rule refuses with UUIDs, for the identical "entries reference this lane" condition. Two repair surfaces for the same guard speak two different identifier vocabularies.
+
+Fix: map dependents to `entry.slug` (with UUID as a tiebreaker if slugs can collide) so the listed names match both the `lane move <slug>` instruction and the `purge.ts` precedent. The test at `lane-config-missing-template.test.ts:267` asserting `result.message` contains the bound UUID would need to switch to asserting the slug — which is the correct contract anyway.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-78 — [P6-3 claude] Entry-binding guard can false-negative on corrupt sidecars, orphaning entries on delete
+
+Finding-ID: AUDIT-20260530-78 (cross-model: AUDIT-BARRAGE-claude-P6-3)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:280-300` (`readAllSidecars` dependency check)
+
+The delete safety guard depends entirely on `readAllSidecars(ctx.projectRoot)` enumerating every entry that references the lane. Per the established codebase pattern flagged in AUDIT-20260530-15 (sidecar walkers `catch { continue }` and silently skip unparseable files), if `readAllSidecars` swallows corrupt/unparseable sidecars, an entry whose sidecar references the doomed lane but fails to parse will **not** appear in `dependents`. The guard then sees zero dependents and the `unlinkSync(laneFilePath)` (line ~315) proceeds, leaving a corrupt entry bound to a now-deleted lane — exactly the orphan condition the guard exists to prevent.
+
+This is the false-negative branch the audit focus calls out ("entry-binding detection … false negatives"). It matters more here than in a normal read path because the consequence is destructive (lane file deleted) and irreversible from the doctor's perspective.
+
+Fix: verify `readAllSidecars`' error handling. If it silently skips corrupt files, the delete branch must surface the count of unreadable sidecars and refuse (or warn) rather than treat "couldn't parse" as "doesn't reference the lane." A safe guard fails closed, not open. The 4-scenario test suite has no corrupt-sidecar-bound case to pin this.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-79 — [P6-3 claude] Lane mutation lands on disk before the journal append; an append failure leaves no audit record
+
+Finding-ID: AUDIT-20260530-79 (cross-model: AUDIT-BARRAGE-claude-P6-3)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:243-262` (set-template) and `:314-333` (delete)
+
+Both repair actions mutate disk first, then append the journal event. In `set-template`: `atomicWriteLaneJson(...)` (line ~246) runs, then `await appendJournalEvent(...)` (line ~252). In `delete`: `unlinkSync(laneFilePath)` (line ~315), then `await appendJournalEvent(...)` (line ~324). If the journal append throws after the file mutation, the rebind/delete has already landed but no `lane-config-repair` event records it — the audit trail the new `LaneConfigRepairEvent` schema exists to provide is silently absent. For the delete case this is worse: the lane file is gone with zero durable record that the doctor removed it.
+
+This is the same partial-success shape as AUDIT-20260530-13 (`bootstrapDefaultLaneIfMissing` writing the lane before its migration event), surfacing in a new file. The set-template path is recoverable (re-running audit shows it's now clean), but the delete path loses the only evidence the action occurred.
+
+Fix: at minimum, if the journal append fails after a delete, the `RepairResult` should report the file was deleted but the audit record could not be written (so the operator knows), rather than letting the append error propagate as an opaque throw out of `apply`. Consider ordering or a compensating note.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-80 — [P6-3 claude] Audit scans archived lanes at severity=error, producing persistent noise for intentionally-retired lanes
+
+Finding-ID: AUDIT-20260530-80 (cross-model: AUDIT-BARRAGE-claude-P6-3)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:165` (`listLaneConfigs(ctx.projectRoot, { includeArchived: true })`)
+
+`audit()` enumerates lanes with `includeArchived: true`, so a soft-archived lane whose `pipelineTemplate` no longer resolves emits a `severity: 'error'` finding. Archiving is the soft-delete path; deleting the custom pipeline a since-archived lane was bound to is a normal, intentional sequence. After that, `doctor` reports a permanent error on a lane the operator already retired, and the only offered repairs are "rebind it" or "delete it" — neither of which the operator necessarily wants for a lane they archived precisely to stop thinking about.
+
+An archived lane carrying a dangling template reference is not an active-pipeline defect; it's a frozen historical record. Surfacing it at `error` conflates "this active lane is broken" with "this retired lane references a template that's since been removed."
+
+Fix: either exclude archived lanes from this rule's scan (`includeArchived: false`), or emit a lower severity (`warning`/`info`) for archived lanes while keeping `error` for active ones. The header comment justifies the first-site gating in detail but is silent on why archived lanes are in scope at all.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-81 — [P6-3 claude] `laneFilePath` is persisted as an absolute path in the journal event and finding details
+
+Finding-ID: AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3)
+Status:     open
+Severity:   low
+Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:200-210` (finding.details), `:324-329` (journal event); `packages/core/src/schema/journal-events.ts:228` (`laneFilePath: z.string().min(1)`)
+
+The rule computes `laneFilePath = laneConfigPath(ctx.projectRoot, laneId)` (absolute) and stores it both in `finding.details.laneFilePath` and in the persisted `lane-config-repair` journal event's `details.laneFilePath`. The user-facing message correctly uses `relative(ctx.projectRoot, laneFilePath)` (line ~196, and again at the delete success line ~331) — but the persisted/structured values are absolute. The journal is an append-only on-disk record; embedding an absolute path makes the audit trail machine-specific. A project moved/cloned to a different absolute root carries journal events pointing at a path that no longer exists, and the value isn't reproducible across the team.
+
+The test at `lane-config-missing-template.test.ts:97-99` and `:217` pins the absolute value, so this is intentional, not accidental — but it's the same non-portability the project flags elsewhere.
+
+Fix: store the project-relative path in `details.laneFilePath` (the message already derives relative for display); keep absolute only for transient logging if needed. The lane is already identified by `laneId`, which is the portable key.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-82 — [P6-3 claude] Integration test silently depends on a prebuilt `node_modules/.bin/deskwork` with no build step
+
+Finding-ID: AUDIT-20260530-82 (cross-model: AUDIT-BARRAGE-claude-P6-3)
+Status:     open
+Severity:   low
+Surface:    `packages/cli/test/custom-pipeline-lane-integration.test.ts:46-47, 60-69`
+
+`deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork')` and every `spawnSync` invokes it as a real subprocess. `assertDeskworkBinPresent()` checks the bin *exists*, but not that it reflects current source — if the bin dispatches to a stale `dist/` (or to a workspace symlink that points at un-rebuilt output), the test validates yesterday's CLI while reporting green. There's no `npm run build` precondition and no assertion that the resolved binary is current. The audit focus names "integration test reliability"; this is the silent-stale-state vector. In CI without a guaranteed build-before-test ordering, this either fails confusingly (bin absent) or passes against stale code.
+
+Fix: document the build precondition in the test header (it currently only documents the spawn semantics), or have the test assert the bin's resolution path is the workspace symlink rather than a stale standalone copy. At minimum the `assertDeskworkBinPresent` error should mention the build requirement, not just `npm install`.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-83 — [P6-3 claude] Integration test bypasses the entry-creation CLI, weakening the "add 2 entries" + "state-intact" claims
+
+Finding-ID: AUDIT-20260530-83 (cross-model: AUDIT-BARRAGE-claude-P6-3)
+Status:     open
+Severity:   low
+Surface:    `packages/cli/test/custom-pipeline-lane-integration.test.ts:130-152` (`writeSidecarFile`), workplan step 6.6.1
+
+Step 6.6.1's acceptance criterion is "add 2 entries," but the test hand-writes sidecar JSON directly (`writeSidecarFile`, line ~130) rather than driving `deskwork add`/`ingest`. Because the lane archive/restore/purge operations only touch the lane file, the byte-equivalence assertion at lines 318-330 (`finalBytes === sidecarPreBytes.get(...)`) is close to tautological: nothing in the exercised lane lifecycle ever writes a sidecar, so "bytes unchanged" would hold even if entry binding were completely broken. The test proves "lane ops don't touch sidecars" (worth having) but is presented as end-to-end entry-state verification, which it only weakly is.
+
+Fix: either create the entries through the real CLI so the entry-creation path is genuinely covered, or scope the test's claim in the header to "lane-lifecycle operations do not mutate pre-existing sidecars" rather than implying it verifies entry creation. The current header (lines 1-23) claims "the full surface implicated by … acceptance criteria," which overstates what's exercised.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-84 — [P6-3 claude] `spawnSync` calls have no timeout; a hung CLI stalls the suite until vitest's global timeout
+
+Finding-ID: AUDIT-20260530-84 (cross-model: AUDIT-BARRAGE-claude-P6-3)
+Status:     open
+Severity:   low
+Surface:    `packages/cli/test/custom-pipeline-lane-integration.test.ts:99-108` (`pipeline`), `:111-120` (`lane`)
+
+Both subprocess helpers call `spawnSync(deskworkBin, [...], { encoding: 'utf-8' })` with no `timeout` option. If any CLI invocation deadlocks (e.g. waiting on stdin, or a future interactive prompt sneaks into a verb), the test blocks until vitest's outer timeout rather than failing fast with a diagnostic naming the offending command. The audit focus calls out "subprocess timing" — a per-call `timeout` plus an explicit `r.signal === 'SIGTERM'` assertion is the standard guard for subprocess-driven tests.
+
+Fix: pass `{ encoding: 'utf-8', timeout: 30_000 }` to each `spawnSync` and surface a clear error when `r.signal` indicates a timeout kill, so a hang is attributable to the specific verb rather than the whole suite.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-85 — [P6-3 codex] Repair can mutate lane state without recording the repair event
+
+Finding-ID: AUDIT-20260530-85 (cross-model: AUDIT-BARRAGE-codex-P6-3)
+Status:     open
+Severity:   medium
+Surface:    packages/core/src/doctor/rules/lane-config-missing-template.ts:303-320 and packages/core/src/doctor/rules/lane-config-missing-template.ts:364-381
+
+Both repair actions perform the filesystem mutation before appending the `lane-config-repair` journal event. In `set-template`, the lane JSON is rewritten at lines 303-304, then `appendJournalEvent` is awaited at lines 314-320 with no catch or compensation. In `delete`, the lane file is unlinked at lines 364-366, then the journal event is appended at lines 376-381.
+
+If journal append fails, the operator gets a thrown repair failure after the lane was already rebound or deleted, and there is no durable audit record for the state change. This is worse for delete because the lane file is already gone. A reasonable fix is to make these repair operations transactional enough for this repository’s filesystem model: restore the prior lane JSON if `set-template` journal append fails, and use a staged delete path or compensating restore for delete so “applied” and “journaled” cannot diverge silently.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-86 — [P6-3 codex] Rebind prompt can offer templates that cannot actually be selected
+
+Finding-ID: AUDIT-20260530-86 (cross-model: AUDIT-BARRAGE-codex-P6-3)
+Status:     open
+Severity:   medium
+Surface:    packages/core/src/doctor/rules/lane-config-missing-template.ts:214-229 and packages/core/src/doctor/rules/lane-config-missing-template.ts:287-299
+
+The prompt choices are built directly from `listAvailablePipelineTemplates(ctx.projectRoot)` at lines 214-229. The apply path then separately revalidates the selected template with `loadPipelineTemplate` at lines 287-299 and can reject the same choice the prompt just offered.
+
+That creates a bad repair loop when a project contains a malformed or otherwise unresolvable pipeline override whose filename is still enumerable. The operator sees it as a valid rebind target, selects it, and then gets an apply failure. Since Task 6.5 specifically calls for a prompt plan with per-template rebind choices, the choices should be only templates that resolve cleanly. Filter the available ids through `loadPipelineTemplate` before constructing `set-template-*` choices, while keeping the apply-time validation for races between planning and application.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-87 — [P6-3 codex] CLI subprocess integration test can hang indefinitely
+
+Finding-ID: AUDIT-20260530-87 (cross-model: AUDIT-BARRAGE-codex-P6-3)
+Status:     open
+Severity:   medium
+Surface:    packages/cli/test/custom-pipeline-lane-integration.test.ts:86-104
+
+The new integration test wraps the real CLI with `spawnSync` in `pipeline()` and `lane()`, but neither call sets a timeout. If the CLI blocks on unexpected I/O, a stuck child process, or a regression that waits for input, the test process can hang instead of failing with a bounded diagnostic. That also means `afterEach` cleanup at lines 156-157 may never run for the tmp project.
+
+Because this test is intentionally exercising real subprocesses, it needs a timeout per invocation and should surface `r.error`, `r.signal`, stdout, and stderr in the failure path. A small helper-level timeout is enough to keep the end-to-end coverage reliable in local and CI runs.
+
+Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120643794Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-88 — [P7T7.2 claude] SKILL.md error-handling catalog contradicts the shipped refusal messages AND re-asserts the pre-AUDIT-15 "non-empty members = group" semantic
+
+Finding-ID: AUDIT-20260530-88 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)
+Status:     open
+Severity:   medium
+Surface:    `plugins/deskwork/skills/group/SKILL.md` (Error handling section, `show`/`update` bullets) vs `packages/core/src/groups/operations/show.ts:54-60` and `packages/core/src/groups/operations/update.ts:48-54`
+
+The new SKILL.md error catalog documents the `show`/`update` non-group refusal as: `Cannot show group "<slug>": entry has no members. Per the Task 7.1.2 invariant, only entries with a non-empty members[] are groups.` and `update ... Refused with the same "entry has no members" shape as show`. But the actual code throws `Cannot show group "<slug>": entry is not a group (no \`members\` field on the sidecar)...` (show.ts) / `Cannot update group "<slug>": entry is not a group (no \`members\` field on the sidecar)...` (update.ts). The `show.test.ts` and `update.test.ts` assert `/entry is not a group/`, confirming the code — so the SKILL.md is the drifted artifact. An adopter grepping the documented error string will not find it.
+
+Worse than a string mismatch: the quoted SKILL.md sentence *"only entries with a non-empty members[] are groups"* directly re-asserts the exact pre-fix semantic that AUDIT-20260529-15 reversed. That whole fix established that `members: []` IS a group (declared-empty marker) and `members`-absent is the regular entry. The SKILL.md header and `update`-description (fixed by AUDIT-20260529-21) now say the right thing, but the error catalog still carries the old, contradictory framing. The two halves of the same SKILL.md disagree about the core predicate. Note also the catalog inconsistency the doc fails to capture: `show`/`update` emit "entry is not a group", while `add-member`/`remove-member`/`archive`/`restore` emit "entry has no `members` field" — two distinct message families the catalog conflates. Fix: rewrite the `show`/`update` catalog bullets to quote the literal `entry is not a group (no \`members\` field...)` text and drop the "non-empty members[] are groups" clause.
+
+---
+
+Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T121000611Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-89 — [P7T7.2 claude] `showGroup` member-enrichment swallows corrupt-sidecar parse/config errors as `missing: true` (same class as AUDIT-23, new surface)
+
+Finding-ID: AUDIT-20260530-89 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/groups/operations/show.ts:66-78` (the per-member `try { readSidecar } catch { ...missing: true }` loop)
+
+The member-enrichment loop wraps `readSidecar(projectRoot, memberUuid)` in a bare `catch {}` that pushes `{ uuid, missing: true }` for ANY failure. `readSidecar` throws on three distinct conditions: (a) the sidecar file genuinely doesn't exist (dangling UUID — the case `missing: true` is meant for), (b) the file exists but is corrupt JSON / fails `EntrySchema` validation, and (c) a lower-level IO error. Cases (b) and (c) are reported identically to (a) — a member whose sidecar is on disk but corrupt is mislabeled as a dangling reference.
+
+This is the same swallow-corruption shape that AUDIT-20260530-23 narrowed in `cancel.ts` (now using an `existsSync` probe so only the genuinely-absent case is recoverable and parse/config/IO errors propagate). `show.ts` did not get the same treatment. The downstream consequence is concrete: doctor's `group-member-missing` rule (Task 7.5.2) acts on `missing: true` members and "prompts to remove the dangling reference" — so a corrupt-but-recoverable member sidecar surfaces as missing, and the operator's repair path is to *delete the reference to it*, compounding the data loss. Fix: mirror the cancel.ts pattern — probe `existsSync(sidecarPath(projectRoot, memberUuid))` first; only the absent case yields `missing: true`; let parse/validation/IO errors propagate so corruption surfaces loudly rather than masquerading as a dangling UUID.
+
+---
+
+Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T121000611Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-90 — [P7T7.2 claude] `isPopulatedGroupEntry` is defined and documented as downstream public API but not barrel-exported — unreachable via `@deskwork/core/groups`
+
+Finding-ID: AUDIT-20260530-90 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)
+Status:     open
+Severity:   low
+Surface:    `packages/core/src/groups/types.ts:46-49` (definition + doc) vs `packages/core/src/groups/index.ts:11` (`export { isArchivedEntry, isGroupEntry } from './types.ts';`)
+
+`isPopulatedGroupEntry` is defined in `types.ts` with a doc-comment that explicitly names its future consumers: *"used downstream by the multi-lane composed view in Task 7.4 + the informational `group-all-members-cancelled` doctor rule in Task 7.5.3 — both should skip empty groups."* But the package barrel `groups/index.ts` only re-exports `isArchivedEntry` and `isGroupEntry`. The predicate is therefore unreachable through the documented public module path `@deskwork/core/groups`; a Task 7.4/7.5.3 consumer would either have to deep-import `groups/types.ts` (bypassing the barrel contract every other group symbol follows) or re-derive the check inline.
+
+In this diff the function has zero call sites, so it is effectively dead code that the doc-comment advertises as the canonical way to express "group with ≥1 member." That's an invitation for the exact failure the predicate exists to prevent: a future implementer who can't see it via the barrel will write `entry.members.length > 0` inline, re-fragmenting the semantic the two-predicate design was meant to centralize. Fix: add `isPopulatedGroupEntry` to the `groups/index.ts` export (and `groups/operations`/barrel as appropriate), or remove the function + the forward-referencing doc until a consumer lands.
+
+---
+
+Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T121000611Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-91 — [P7T7.2 claude] Inconsistent exit codes for a bad `--at` argument: out-of-range exits 1, malformed exits 2
+
+Finding-ID: AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)
+Status:     open
+Severity:   low
+Surface:    `packages/cli/src/commands/group.ts:233-245` (handleAddMember `--at` parse) and `packages/core/src/groups/operations/add-member.ts:124-135` (out-of-range throw)
+
+The CLI parses `--at` and rejects non-integer / negative values via `fail(..., 2)` (exit 2 = usage error). But a syntactically-valid-but-out-of-range index (e.g. `--at 5` on a 2-member group) passes the CLI gate and is rejected only by the core operation, which throws a plain `Error` routed through `fail(...)` with the default exit 1. The tests encode this split: `refuses --at <negative>` and `refuses --at <not-an-integer>` assert `code === 2`, while `refuses --at <out-of-range>` asserts only `code !== 0` (it is actually 1).
+
+From an operator's or scripting perspective, `--at -1`, `--at 1.5`, and `--at 5` are all "the `--at` argument is bad" — but they yield exit 2, 2, and 1 respectively. A script branching on exit code to distinguish "usage error, fix my invocation" (2) from "runtime/state error" (1) will misclassify the out-of-range case. The range check is arguably a usage error too (the operator supplied an invalid argument value), so the cleaner contract is exit 2 for all three. Fix: either validate the upper bound at the CLI layer against the resolved group's member count and `fail(..., 2)`, or accept the split explicitly and document that out-of-range is a state-dependent (exit-1) condition because the valid range isn't known until the group is read.
+
+---
+
+I walked the new group operations module, the CLI dispatcher, the cancel cascade (noting its on-disk state already carries the AUDIT-22/23 fixes, so I did not re-report those), the `archivedAt` schema delta, and the journal-event additions. I confirmed `source: z.string()` accepts the new `'group-create'` value (no validation break), the `lane` field's `LANE_ID_REGEX` binding closes the traversal vector, the `--at` integer parse is sound, and there is no HTML/XSS surface in this diff (the CLI emits JSON; studio surfaces are later tasks). The four findings above are the ones worth triage; the strongest are the SKILL.md error-catalog drift (#1) and the `showGroup` corrupt-sidecar swallow (#2).
+
+Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T121000611Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-92 — [P7T7.2 codex] `isPopulatedGroupEntry` is implemented but not exported from the public groups entrypoint
+
+Finding-ID: AUDIT-20260530-92 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/groups/index.ts:11`, `packages/core/src/groups/types.ts:39-45`
+
+`isPopulatedGroupEntry` is introduced in `types.ts` as the predicate consumers should use when they need "group AND has at least one member", and the docblock names downstream use cases. But the package-facing barrel only exports `isArchivedEntry` and `isGroupEntry`. Since `packages/core/package.json` exposes `./groups` as the public subpath, downstream code cannot import the populated predicate from `@deskwork/core/groups` without reaching into internals.
+
+This is a composition trap for the next group surfaces: they either duplicate the predicate, use the looser `isGroupEntry` by mistake, or import an internal path. Fix is to export `isPopulatedGroupEntry` from `packages/core/src/groups/index.ts` next to `isGroupEntry`.
+
+Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T121000611Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-93 — [P7T7.2 codex] Group mutators can commit sidecar changes without the required group journal event
+
+Finding-ID: AUDIT-20260530-93 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/groups/operations/create.ts:106-121`, `packages/core/src/groups/operations/update.ts:84-94`, `packages/core/src/groups/operations/add-member.ts:126-145`, `packages/core/src/groups/operations/remove-member.ts:72-89`, `packages/core/src/groups/operations/archive.ts:68-77`, `packages/core/src/groups/operations/archive.ts:104-109`
+
+Every group mutator writes the sidecar before appending its `group-*` journal event. If the journal write fails after the sidecar write, the on-disk group state is changed with no audit event, despite the feature explicitly adding six group event kinds for mutating-verb audit completeness.
+
+This matters most for `add-member` / `remove-member` and archive/restore, where the journal is the only durable explanation of why the membership or visibility changed. A reasonable fix is to make the write+journal sequence transactional enough for this filesystem model: write a recoverable pending record, or perform a compensating sidecar restore/delete when `appendJournalEvent` fails, and add a test that forces journal append failure after sidecar write.
+
+Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T121000611Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-94 — [P7T7.2 codex] Extra positional arguments are silently ignored by group subcommands
+
+Finding-ID: AUDIT-20260530-94 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)
+Status:     open
+Severity:   medium
+Surface:    `packages/cli/src/commands/group.ts:151-163`, `packages/cli/src/commands/group.ts:182-213`, `packages/cli/src/commands/group.ts:221-248`, `packages/cli/src/commands/group.ts:274-296`, `packages/cli/src/commands/group.ts:302-318`, `packages/cli/src/commands/group.ts:324-340`
+
+The handlers only check minimum positional counts. `show`, `create`, `update`, `add-member`, `remove-member`, `archive`, and `restore` all accept extra positionals and discard them. For example, `deskwork group <root> archive group-a group-b` archives only `group-a`; `group create slug accidental --lane default` creates `slug` and ignores `accidental`.
+
+This is a CLI correctness issue because these verbs mutate state and the project convention prefers explicit refusal over hiding operator typos. The handlers should require exact arity per verb, with `create` still accepting optional values only through flags.
+
+Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T121000611Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-95 — [P7T7.2 codex] Group skill documentation still describes the superseded empty-members doctor rule and stale refusal text
+
+Finding-ID: AUDIT-20260530-95 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork/skills/group/SKILL.md:53`, `plugins/deskwork/skills/group/SKILL.md:58-66`
+
+The skill header and workplan now define `members: []` as the canonical declared-empty group state, and the workplan renames Task 7.5.5 to `group-stale-empty-members`. But the group skill default section still says Doctor’s `group-empty-members-array` rule surfaces the “dual representation” for normalization. Its error catalog also says non-group `show` / `update` refusals use the old “entry has no members” / “non-empty members[]” wording, while the implementation now refuses on absence of the `members` field.
+
+This is documentation drift on the operator-facing skill. The fix is to align the skill with the implemented semantics: `members: []` is not a normalization target, and non-group refusal text should mention “no `members` field” rather than “no members” or “non-empty members[]”.
+
+Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T121000611Z-graphical-entries/codex.md`.
