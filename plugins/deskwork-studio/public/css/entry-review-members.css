@@ -254,12 +254,19 @@
   outline-offset: -2px;
 }
 
+/* Per AUDIT-20260529-38: the card accent keys on `data-template-id`
+   (emitted by `renderMemberStageCard`) so ANY lane bound to the
+   editorial / visual template picks up the correct color regardless
+   of its literal id. The retained `.lane-default` / `.lane-mockups`
+   class selectors remain as a fallback for the canonical-named
+   lanes (e.g. demo data without a configured template). */
 [data-review-ui="entry-review"] .er-members-card.lane-default,
 [data-review-ui="entry-review"] .er-members-card[data-template-id="editorial"] {
   border-left-color: var(--er-proof-blue);
 }
 
-[data-review-ui="entry-review"] .er-members-card.lane-mockups {
+[data-review-ui="entry-review"] .er-members-card.lane-mockups,
+[data-review-ui="entry-review"] .er-members-card[data-template-id="visual"] {
   border-left-color: var(--er-kraft);
 }
 
@@ -308,12 +315,19 @@
   border-bottom: 0;
 }
 
+/* Per AUDIT-20260529-38: the row accent keys on `data-template-id`
+   (emitted by `renderListRow` from the row's resolved lane config)
+   so ANY lane bound to the editorial / visual template picks up the
+   correct color regardless of its literal id. The retained
+   `.lane-default` / `.lane-mockups` class selectors remain as a
+   fallback for the canonical-named lanes. */
 [data-review-ui="entry-review"] .er-member-row.lane-default,
 [data-review-ui="entry-review"] .er-member-row[data-template-id="editorial"] {
   border-left-color: var(--er-proof-blue);
 }
 
-[data-review-ui="entry-review"] .er-member-row.lane-mockups {
+[data-review-ui="entry-review"] .er-member-row.lane-mockups,
+[data-review-ui="entry-review"] .er-member-row[data-template-id="visual"] {
   border-left-color: var(--er-kraft);
 }
 

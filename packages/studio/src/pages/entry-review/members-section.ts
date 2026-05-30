@@ -102,12 +102,22 @@ export interface RenderMembersSectionInput {
   readonly initialViewMode: MembersViewMode;
 }
 
-function renderMemberStageCard(member: Entry): RawHtml {
+function renderMemberStageCard(
+  member: Entry,
+  templateId: string,
+): RawHtml {
+  // Per AUDIT-20260529-38: emit `data-template-id` on the card so the
+  // template-keyed accent rules in entry-review-members.css actually
+  // fire. Pre-fix the card only carried `lane-${id}` literals; the
+  // template-attribute selector the CSS declared was dead. Any lane
+  // bound to the editorial template (NOT named `default`) lost its
+  // proof-blue accent because no selector matched.
   const reviewLink = `/dev/editorial-review/entry/${member.uuid}`;
   return unsafe(html`
     <a class="er-members-card lane-${member.lane ?? 'default'}"
       href="${reviewLink}"
       data-member-uuid="${member.uuid}"
+      data-template-id="${templateId}"
       title="Open ${member.title}">
       <div class="er-members-card-body">
         <div class="er-members-card-title">${member.title}</div>
@@ -129,7 +139,7 @@ function renderComposedLane(bucket: LaneScopedBucket): RawHtml {
       const emptyClass = isEmpty ? ' is-empty' : '';
       const cardsRaw = isEmpty
         ? ''
-        : entries.map((m) => renderMemberStageCard(m).__raw).join('');
+        : entries.map((m) => renderMemberStageCard(m, bucket.template.id).__raw).join('');
       const glyph = stageGlyph(stage);
       return html`
         <div class="er-members-stage${unsafe(emptyClass)}" data-stage="${stage}">
@@ -229,9 +239,19 @@ function renderListRow(
     laneId !== undefined && LANE_ID_REGEX.test(laneId)
       ? `lane-${laneId}`
       : 'lane-unrouted';
+  // Per AUDIT-20260529-38: emit `data-template-id` on the row so the
+  // template-keyed accent rules in entry-review-members.css actually
+  // fire. The template id is derived from the row's resolved lane
+  // config (`pipelineTemplate` field); when the lane is unrouted or
+  // its config didn't resolve, the attribute is omitted and the row
+  // falls back to the faded literal accent (same behavior as a
+  // declared-but-unaccented lane).
+  const templateAttr = laneConfig !== undefined
+    ? unsafe(` data-template-id="${laneConfig.pipelineTemplate}"`)
+    : unsafe('');
   const glyph = stageGlyph(member.currentStage);
   return unsafe(html`
-    <li class="er-member-row ${unsafe(laneClass)}" data-member-uuid="${member.uuid}">
+    <li class="er-member-row ${unsafe(laneClass)}"${templateAttr} data-member-uuid="${member.uuid}">
       <a class="er-member-row-link" href="${reviewLink}"
         data-member-copy
         data-member-href="${reviewLink}"
