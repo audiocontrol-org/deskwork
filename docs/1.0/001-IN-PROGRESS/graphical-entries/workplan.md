@@ -815,17 +815,17 @@ Closes AUDIT-20260530-16 (cross-model: AUDIT-BARRAGE-claude-03-P4). Surface: `pa
 
 Closes AUDIT-20260530-17 (cross-model: AUDIT-BARRAGE-claude-04-P4). Surface: `packages/core/src/calendar/render.ts:111-121` (`loadLaneContexts`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-17 (cross-model: AUDIT-BARRAGE-claude-04-P4)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-17 (cross-model: AUDIT-BARRAGE-claude-04-P4)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/calendar/regenerate-lane-error-tolerant.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-165e7a7` via the close-shipped-audit-findings step
 
 
 ### Task 7.33 (fix-finding-AUDIT-20260530-18 (cross-model: AUDIT-BARRAGE-claude-05-P4)): AUDIT-20260530-18 — `deriveArtifactKindFromPath` writes wrong `artifactKind` for…

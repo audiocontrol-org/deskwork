@@ -3327,7 +3327,7 @@ Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). 
 ### AUDIT-20260530-17 — `regenerateCalendar` couples per-entry transitions to validity of unrelated lane files
 
 Finding-ID: AUDIT-20260530-17 (cross-model: AUDIT-BARRAGE-claude-04-P4)
-Status:     open
+Status:     fixed-165e7a7
 Severity:   medium
 Surface:    `packages/core/src/calendar/render.ts:111-121` (`loadLaneContexts`)
 
