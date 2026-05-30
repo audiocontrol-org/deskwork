@@ -105,6 +105,9 @@ export function assembleBundles(args: AssembleArgs): readonly CandidateBundle[] 
 
   // Step 4: PR mentions attach to every issue the PR description references.
   const prIssues = args.pr === null ? new Set<number>() : extractMentions(args.pr.body);
+  for (const issue of prIssues) {
+    ensure(issue);
+  }
 
   // Step 5: compose bundles.
   const out: CandidateBundle[] = [];
