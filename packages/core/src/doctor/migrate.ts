@@ -241,10 +241,20 @@ function countIterationsByStage(events: JournalEvent[]): Record<string, number> 
  * preserves the editorial-narrow output type for the migration's
  * editorial-only call sites.
  *
- * Per Phase 3 the journal-event `from` field is now any non-empty
- * string; we narrow back to `Stage` via an explicit type guard. Off-
- * vocabulary values (lane-specific stages that happen to appear in the
- * journal) fall through to the default.
+ * Per Phase 3 the journal-event `from` field is widened to
+ * `StageStringSchema` (any non-empty stage string, lane-template-
+ * driven). The migration explicitly is NOT lane-aware — it walks the
+ * pre-lanes calendar.md — so a non-editorial `from` value in the
+ * journal is a data shape the migration must not silently tolerate.
+ *
+ * Per AUDIT-20260530-12: pre-fix the loop wrapped the return in
+ * `isEditorialStage(e.from)` and let non-editorial values fall
+ * through to the default; the silent skip produced wrong prior-stage
+ * data without surfacing the unhandled value. The fix REFUSES non-
+ * editorial `from` with an actionable error naming the offending
+ * value, so the operator sees the boundary violation and can either
+ * (a) repair the journal or (b) abandon the editorial-migration code
+ * path entirely if the project has graduated to lane-aware data.
  */
 function isEditorialStage(value: string): value is Stage {
   return (
@@ -261,6 +271,20 @@ function inferPriorStageFromJournal(events: JournalEvent[]): Stage {
       if (isEditorialStage(e.from)) {
         return e.from;
       }
+      // Non-editorial `from` on a stage-transition event the migration
+      // would otherwise consult. The legacy single-pipeline migration
+      // is editorial-only by construction; tolerating a non-editorial
+      // value here would silently produce wrong prior-stage data.
+      // Refuse loudly per AUDIT-20260530-12.
+      throw new Error(
+        `inferPriorStageFromJournal: refusing non-editorial from value `
+        + `"${e.from}" on stage-transition event for entry `
+        + `"${e.entryId}" (at ${e.at}). This migration is editorial-`
+        + `only — non-editorial stage values indicate the project has `
+        + `already graduated to lane-aware data and the legacy migration `
+        + `path is not the right tool. Repair the journal entry or skip `
+        + `the legacy migration.`,
+      );
     }
   }
   return 'Drafting'; // safe default when no transition history is available
