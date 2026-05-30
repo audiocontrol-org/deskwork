@@ -16,12 +16,24 @@
  * the new file fully written, never a torn state.
  */
 
-import { writeFile, rename, unlink } from 'node:fs/promises';
+import { writeFile, rename as fsRename, unlink } from 'node:fs/promises';
 import { dirname, basename, join } from 'node:path';
+
+export interface AtomicWriteFileOpts {
+  /**
+   * Optional rename seam. Default: `fs.promises.rename`. Tests inject
+   * a failing rename to exercise the cleanup branch (per
+   * AUDIT-20260530-10 — pre-fix the "rename fails" test actually
+   * tested the write-fail path because there was no way to inject
+   * a real rename failure).
+   */
+  readonly rename?: (source: string, target: string) => Promise<void>;
+}
 
 export async function atomicWriteFile(
   filePath: string,
   content: string,
+  opts: AtomicWriteFileOpts = {},
 ): Promise<void> {
   const dir = dirname(filePath);
   const base = basename(filePath);
@@ -31,19 +43,20 @@ export async function atomicWriteFile(
   // tooling can match it via the `.tmp-` infix.
   const rand = Math.random().toString(36).slice(2, 10);
   const tmpPath = join(dir, `${base}.tmp-${process.pid}-${Date.now()}-${rand}`);
+  // Per AUDIT-20260530-10: no try/catch around the write — the
+  // pre-fix try/catch was a no-op (catch + immediately re-throw with
+  // no added behavior). If the temp-file write fails (parent dir
+  // missing, permissions, disk-full), let the error propagate
+  // directly. The meaningful cleanup is only in the rename catch.
+  await writeFile(tmpPath, content, 'utf8');
+  const renameFn = opts.rename ?? fsRename;
   try {
-    await writeFile(tmpPath, content, 'utf8');
-  } catch (writeErr) {
-    // The temp-file write failed (typically: target directory doesn't
-    // exist, permissions, disk-full). No rename has happened. Bubble.
-    throw writeErr;
-  }
-  try {
-    await rename(tmpPath, filePath);
+    await renameFn(tmpPath, filePath);
   } catch (renameErr) {
-    // rename failed (rare; same-filesystem cross-device fallback hit,
-    // or target dir vanished). Clean up the temp file so we don't
-    // leak orphaned `.tmp-*` artifacts next to precious files.
+    // rename failed (rare in practice; cross-device-link, target dir
+    // vanished mid-operation, EPERM on a locked target). Clean up the
+    // temp file so we don't leak `.tmp-*` artifacts next to the
+    // precious file.
     await unlink(tmpPath).catch(() => {
       // Already gone, or unlink itself failed; the rename error is
       // the more actionable one to surface.

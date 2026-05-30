@@ -48,18 +48,35 @@ describe('atomicWriteFile — AUDIT-20260530-04 regression', () => {
     expect(readFileSync(target, 'utf8')).toBe('replacement\n');
   });
 
-  it('cleans up the temp file if the rename itself somehow fails', async () => {
-    // We can't easily simulate a rename failure cross-platform; this
-    // case is the documented contract: catch + cleanup + re-throw.
-    // The unit test is a smoke that writing to a non-writable parent
-    // throws AND doesn't leak the temp file in a recoverable place.
+  it('fails fast when the write step fails (non-existent parent dir)', async () => {
+    // Pre-AUDIT-10 this test was named "cleans up if rename fails"
+    // but the body actually exercised the WRITE-failure path (write
+    // to non-existent parent throws BEFORE any rename). Renamed to
+    // match what it tests; the rename-failure cleanup branch is now
+    // covered by the separate test below using an injected seam.
     const target = join(workDir, 'does-not-exist', 'subdir', 'file.md');
     await expect(atomicWriteFile(target, 'x\n')).rejects.toBeDefined();
-    // The temp file would have been created next to the FINAL target,
-    // which itself is in a non-existent dir — so the temp file write
-    // throws BEFORE the rename. No leak in workDir.
     const entries = readdirSync(workDir);
     const leaks = entries.filter((e) => /file\.md\.tmp-/.test(e));
+    expect(leaks).toEqual([]);
+  });
+
+  it('cleans up the temp file when rename fails (AUDIT-20260530-10 — real coverage of the rename-cleanup branch)', async () => {
+    const target = join(workDir, 'rename-fail-target.md');
+    // Pre-existing content survives — the rename never happens.
+    writeFileSync(target, 'original\n', 'utf8');
+    // Inject a rename that throws. The helper's rename-catch block
+    // unlinks the temp file before re-throwing.
+    const failingRename = (): Promise<void> =>
+      Promise.reject(new Error('synthetic rename failure'));
+    await expect(
+      atomicWriteFile(target, 'new content\n', { rename: failingRename }),
+    ).rejects.toThrow(/synthetic rename failure/);
+    // Target file unchanged (original content preserved).
+    expect(readFileSync(target, 'utf8')).toBe('original\n');
+    // No leaked `.tmp-*` artifacts next to the target.
+    const entries = readdirSync(workDir);
+    const leaks = entries.filter((e) => /rename-fail-target\.md\.tmp-/.test(e));
     expect(leaks).toEqual([]);
   });
 
