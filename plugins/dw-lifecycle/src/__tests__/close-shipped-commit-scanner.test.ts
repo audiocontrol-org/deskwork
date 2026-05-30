@@ -287,6 +287,72 @@ describe('extractReferencesFromCommit', () => {
     expect(refs.length).toBe(0);
   });
 
+  // --- Phase 14 Task 1: configurable end-of-subject parens (#369) ---
+
+  it('Phase 14 (a): end-of-subject `(#42)` with knob=true surfaces #42 as parens verb', () => {
+    // The deskwork project's commit-message convention uses end-of-subject
+    // `(#NNN)` to name fix-shipping commits. Adopters with this convention
+    // opt in via `.dw-lifecycle/close-shipped-config.yaml`. The knob ONLY
+    // re-enables the parens shape — body parens and mid-subject parens
+    // stay dropped regardless.
+    const refs = extractReferencesFromCommit(
+      mkCommit('feat(area): subject (#42)'),
+      { treatEndOfSubjectParensAsFixMarker: true },
+    );
+    expect(refs.length).toBe(1);
+    const first = refs[0];
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    expect(first.issue).toBe(42);
+    expect(first.verb).toBe('parens');
+  });
+
+  it('Phase 14 (b): end-of-subject `(#42)` with knob=false does NOT surface (Phase 13 strict)', () => {
+    const refs = extractReferencesFromCommit(
+      mkCommit('feat(area): subject (#42)'),
+      { treatEndOfSubjectParensAsFixMarker: false },
+    );
+    expect(refs.length).toBe(0);
+  });
+
+  it('Phase 14 (b2): omitted config still applies Phase 13 strict behavior (back-compat)', () => {
+    // No config argument at all — preserves the pre-Phase-14 call sites
+    // until they're threaded through; default is the strict Phase 13
+    // behavior so nothing surfaces.
+    const refs = extractReferencesFromCommit(mkCommit('feat(area): subject (#42)'));
+    expect(refs.length).toBe(0);
+  });
+
+  it('Phase 14 (c): mid-subject `(#42)` does NOT surface regardless of knob', () => {
+    // Anchor is end-of-subject only; back-fill / cite shapes that put
+    // parens mid-subject stay dropped under both modes.
+    const onWithKnob = extractReferencesFromCommit(
+      mkCommit('feat(area): subject (#42) trailing text'),
+      { treatEndOfSubjectParensAsFixMarker: true },
+    );
+    expect(onWithKnob.length).toBe(0);
+    const offWithKnob = extractReferencesFromCommit(
+      mkCommit('feat(area): subject (#42) trailing text'),
+      { treatEndOfSubjectParensAsFixMarker: false },
+    );
+    expect(offWithKnob.length).toBe(0);
+  });
+
+  it('Phase 14 (d): body `Closes #43` + end-of-subject `(#42)` with knob=true surfaces both', () => {
+    // Body fix-keyword still works; the parens knob adds the subject ref
+    // on top. Each issue gets its own strongest-verb record.
+    const commit = mkCommit('feat(area): subject (#42)', 'Closes #43.');
+    const refs = extractReferencesFromCommit(commit, {
+      treatEndOfSubjectParensAsFixMarker: true,
+    });
+    const issues = refs.map((r) => r.issue).sort((a, b) => a - b);
+    expect(issues).toEqual([42, 43]);
+    const r42 = refs.find((r) => r.issue === 42);
+    const r43 = refs.find((r) => r.issue === 43);
+    expect(r42?.verb).toBe('parens');
+    expect(r43?.verb).toBe('closes');
+  });
+
   it('Phase 13 (e): markdown link `[#505](https://...)` paired with `Resolves #505` surfaces #505', () => {
     // Markdown link `[#505](https://...)` is a body citation. The Resolves
     // verb elsewhere in the body is what claims the fix-shipped signal.

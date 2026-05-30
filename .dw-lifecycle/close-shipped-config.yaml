@@ -1,0 +1,20 @@
+# Project-level config for `dw-lifecycle close-shipped`.
+#
+# Phase 14 / #369: the deskwork project's commit-message convention uses
+# end-of-subject `(#NNN)` to name fix-shipping commits (e.g.
+# `feat(dw-lifecycle): Phase 11 Task 1 — /dw-lifecycle:worktree-report (#356)`).
+# Phase 13 dropped this shape from extraction because the same pattern
+# also appears in back-fill / docs commits that merely cite an issue
+# number (e.g. `docs: back-fill (#353) link in workplan`). The strict
+# behavior aligns with GitHub's own auto-close grammar but loses our
+# fix-naming convention.
+#
+# This file opts the project back into the parens shape, ANCHORED to
+# end-of-subject only. Mid-subject parens (the back-fill / cite shape)
+# and body parens stay dropped. The convention-aware match recovers the
+# fix-shipping signal without re-introducing the false positives that
+# motivated Phase 13.
+#
+# Adopters whose convention uses explicit fix verbs (Closes / Fixes /
+# Resolves) leave this file absent and get the Phase 13 strict behavior.
+treat_end_of_subject_parens_as_fix_marker: true

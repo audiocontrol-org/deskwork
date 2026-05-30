@@ -86,6 +86,28 @@ References are deduplicated per issue across all scanned commits. The contributi
 
 **Comma-separated lists** (`Closes #10, #11, #12.`) only surface the explicitly-verb-prefixed issue (`#10`) — `#11` and `#12` are bare mentions per GitHub's own grammar. Adopters who close multiple issues from one commit need to repeat the verb: `Closes #10, closes #11, closes #12`.
 
+#### Project-convention adapter: end-of-subject parens (Phase 14 / [#369](https://github.com/audiocontrol-org/deskwork/issues/369))
+
+Many projects mark fix-shipping commits with `subject (#NNN)` — end-of-subject parens — instead of explicit `Closes` / `Fixes` / `Resolves` verbs. The deskwork project itself uses this convention. Phase 13's strict behavior dropped the shape because the same pattern appears in back-fill / cite commits that don't actually close the issue.
+
+Adopters whose convention uses end-of-subject parens can opt back in via `.dw-lifecycle/close-shipped-config.yaml`:
+
+```yaml
+treat_end_of_subject_parens_as_fix_marker: true
+```
+
+When the knob is `true`:
+
+- `feat(area): subject (#42)` — surfaces #42 (verb `parens`). End-of-subject anchor satisfied.
+- `feat(area): subject (#42) trailing text` — does NOT surface. Parens not at end.
+- `feat(area): subject` body `Closes #43` — `#43` still surfaces via the regular `Closes` verb; the parens knob is additive.
+
+When the file is absent or the knob is `false`, Phase 13's strict behavior holds — only `Closes` / `Fixes` / `Resolves` count.
+
+Adopters who use GitHub's auto-close grammar literally should leave the file absent. Adopters whose convention uses the parens shape (or who want to recover from a historical commit corpus that used it) should opt in. The trade-off: the knob relaxes GitHub-strict grammar in exchange for project-convention support; mid-subject and body parens stay dropped under both modes so the back-fill / cite false positives don't return.
+
+**Known limitation:** the end-of-subject anchor catches genuine fix commits AND back-fill docs commits whose subject happens to end in `(#NNN)`. The pre-fix shape `docs(scope): back-fill parent issue (#NNN)` still surfaces under the knob — the anchor can't distinguish `feat(scope): fix (#NNN)` from `docs(scope): back-fill (#NNN)` mechanically. Adopters who care can either (a) put back-fill issue refs MID-subject (`docs(scope): back-fill (#NNN) link in workplan`) so the anchor skips them, (b) curate the dry-run output before apply, or (c) wait for the Phase 13 Medium follow-up under [#366](https://github.com/audiocontrol-org/deskwork/issues/366) — the operator-curation `propose | apply` split is the architectural answer.
+
 ### Apply step (per issue)
 
 For each issue in the deduplicated list:

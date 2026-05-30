@@ -504,23 +504,19 @@ Operator decisions (locked in during definition):
 
 Light fix: add a project-level config knob that opts adopters with this convention back into the parens shape, ONLY for end-of-subject matches (mid-subject and body parens stay dropped — those are usually cites, not fix-shipping signals).
 
-- [ ] Step 1: Add `.dw-lifecycle/close-shipped-config.yaml` schema + loader (`plugins/dw-lifecycle/src/close-shipped/config-loader.ts`). Single field: `treat_end_of_subject_parens_as_fix_marker: boolean` (default `false`). When the file is absent, defaults hold; when the file exists, the loader returns the parsed config. Resolves relative to the project root.
-- [ ] Step 2: Update `commit-scanner.ts` to take a `ScannerConfig` argument. When `treat_end_of_subject_parens_as_fix_marker` is `true`, add the parens pattern back to `PATTERNS` but ANCHOR it at end-of-subject only (`/\(#(\d+)\)\s*$/`). Body parens stay dropped regardless. Mid-subject parens (`subject (#42) trailing text`) stay dropped regardless. The new shape is end-of-subject-only.
-- [ ] Step 3: Thread the config through `scanCommits` / `scanAndGroup` / the subcommand orchestration. The CLI subcommand reads the config at startup; tests pass the config explicitly.
-- [ ] Step 4: Vitest coverage. New cases:
-  - (a) `feat: subject (#42)` with config knob `true` → surfaces #42 (verb `parens`).
-  - (b) Same input with config knob `false` (or no config file) → does NOT surface (Phase 13 strict behavior).
-  - (c) `feat: subject (#42) trailing text` (parens not at end) → does NOT surface regardless of knob.
-  - (d) `Closes #43` body with `feat: subject (#42)` subject and knob=true → both #42 and #43 surface (parens for subject, closes for body).
-- [ ] Step 5: SKILL.md update for `close-shipped` — document the new config file + knob + the trade-off (relaxes GitHub's strict grammar in exchange for project-convention support). Include an example `.dw-lifecycle/close-shipped-config.yaml` snippet for adopters whose convention matches.
-- [ ] Step 6: Ship the deskwork project's own `close-shipped-config.yaml` set to `true` — this project uses the convention.
+- [x] Step 1: Add `.dw-lifecycle/close-shipped-config.yaml` schema + loader (`plugins/dw-lifecycle/src/close-shipped/scanner-config.ts`). Single field: `treat_end_of_subject_parens_as_fix_marker: boolean` (default `false`). When the file is absent, defaults hold; when the file exists, the loader returns the parsed config. Resolves relative to the project root.
+- [x] Step 2: Update `commit-scanner.ts` to take a `ScannerConfig` argument. When `treat_end_of_subject_parens_as_fix_marker` is `true`, add an end-of-subject parens matcher (`END_OF_SUBJECT_PARENS_RE = /\(#(\d+)\)\s*$/`). The matcher runs on the STRIPPED SUBJECT alone so the `$` anchor is end-of-subject, not end-of-record. Body parens and mid-subject parens stay dropped.
+- [x] Step 3: Thread the config through `scanAndGroup` / the subcommand orchestration. The CLI subcommand calls `loadScannerConfig(projectRoot)` at startup; tests pass the config explicitly.
+- [x] Step 4: Vitest coverage. 5 new cases land in `close-shipped-commit-scanner.test.ts` covering Phase 14 (a) through (d) plus a back-compat case verifying omitted-config still defaults to strict.
+- [x] Step 5: SKILL.md update for `close-shipped` — documents the new config file + knob + the trade-off (relaxes GitHub's strict grammar in exchange for project-convention support). Includes example YAML snippet + the explicit limitation note about back-fill docs commits whose subject happens to end in `(#NNN)`.
+- [x] Step 6: Ship the deskwork project's own `close-shipped-config.yaml` set to `true` — this project uses the convention.
 
 **Acceptance Criteria:**
 
-- [ ] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` from THIS project (with the new config file shipped) surfaces `#356`, `#361`, `#364` from the v0.27.0 dogfood range.
-- [ ] Still does NOT surface `#353`, `#355` (mid-subject parens in docs commits — drop-rule preserves them).
-- [ ] An adopter WITHOUT the config file (or with knob `false`) gets the Phase 13 strict behavior.
-- [ ] Vitest coverage for the 4 cases above passes; full plugin suite green.
+- [x] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` from THIS project (with the new config file shipped) surfaces `#356`, `#361`, `#364` from the v0.27.0 dogfood range. (Live-tested against the real range; all 3 surface via verb `parens`.)
+- [ ] ~~Still does NOT surface `#353`, `#355`~~ — **corrected during implementation**: `dc92137 docs(scope-discovery): back-fill Phase 13 parent issue (#355)` and `4b5487d docs(scope-discovery): back-fill Phase 12 issue link (#353)` both end in `(#NNN)` so the end-of-subject anchor matches them. The pre-implementation criterion assumed all back-fill commits placed parens mid-subject; that's not how they were actually written. Operationalized as a documented limitation in `close-shipped/SKILL.md` — adopters who care can curate the dry-run output, convert back-fill subjects to mid-subject parens, or wait for the Phase 13 Medium follow-up (operator-curation propose | apply split) under [#366](https://github.com/audiocontrol-org/deskwork/issues/366).
+- [x] An adopter WITHOUT the config file (or with knob `false`) gets the Phase 13 strict behavior. (Vitest cases (b) and (b2) confirm.)
+- [x] Vitest coverage for the cases above passes; full plugin suite stays green.
 
 ### Task 2: Audit-log walker entry-tracked vs prose-cited disambiguation
 

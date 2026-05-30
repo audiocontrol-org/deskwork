@@ -10,6 +10,7 @@ import {
   CommitScanError,
   scanAndGroup,
 } from '../close-shipped/commit-scanner.js';
+import { loadScannerConfig } from '../close-shipped/scanner-config.js';
 import { mergeAll } from '../close-shipped/merger.js';
 import { buildReleaseNotesBody } from '../close-shipped/release-notes.js';
 import {
@@ -321,12 +322,18 @@ export function runCloseShipped(args: RunCloseShippedArgs): number {
 
   const repo = opts.repo ?? detectRepo();
 
+  // Phase 14 / #369: load the project-level scanner config. Defaults to
+  // strict Phase 13 behavior; adopters opt into end-of-subject parens
+  // matching by shipping `.dw-lifecycle/close-shipped-config.yaml`.
+  const scannerConfig = loadScannerConfig(projectRoot);
+
   let scan;
   try {
     scan = scanAndGroup({
       fromTag: resolved.fromTag,
       toTag: resolved.toTag,
       runGit,
+      config: scannerConfig,
     });
   } catch (err) {
     if (err instanceof CommitScanError) {
