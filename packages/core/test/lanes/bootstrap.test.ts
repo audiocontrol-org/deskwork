@@ -161,6 +161,32 @@ describe('bootstrapDefaultLaneIfMissing', () => {
     expect(existsSync(laneConfigPath(projectRoot, 'default'))).toBe(false);
   });
 
+  /**
+   * AUDIT-20260530-10 regression: the docblock pre-fix said "no
+   * readable config → no-config", but the code only guarded
+   * existsSync — a CORRUPT config made readConfig throw. The fix
+   * locks the corrupt-config-throws contract by clarifying the doc
+   * (says "absent", adds @throws note) and this test asserts the
+   * loud failure mode survives any future re-wording of the
+   * function.
+   */
+  it('throws when .deskwork/config.json exists but is malformed JSON (AUDIT-20260530-10)', async () => {
+    const dir = join(projectRoot, '.deskwork');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'config.json'), '{not-valid-json', 'utf8');
+
+    let captured: unknown;
+    try {
+      await bootstrapDefaultLaneIfMissing(projectRoot);
+    } catch (err) {
+      captured = err;
+    }
+    expect(captured).toBeInstanceOf(Error);
+    // The thrown error MUST come from the config-parse failure (loud,
+    // actionable) — not from the bootstrap silently returning no-config.
+    expect(existsSync(laneConfigPath(projectRoot, 'default'))).toBe(false);
+  });
+
   it('integration smoke: pre-feature project → first invocation → default lane exists + loadable', async () => {
     // Mirrors the workplan's Task 3.5.2 acceptance criterion: a
     // pre-feature project's first invocation lands the default lane

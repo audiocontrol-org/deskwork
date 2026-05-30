@@ -12,9 +12,18 @@
  *   - If `.deskwork/lanes/default.json` already exists, returns
  *     `{ created: false, reason: 'already-exists' }` without
  *     side-effects.
- *   - If the project has no readable `.deskwork/config.json` (e.g.
- *     never installed), returns `{ created: false, reason:
+ *   - If the project has no `.deskwork/config.json` on disk (file
+ *     ABSENT — never installed), returns `{ created: false, reason:
  *     'no-config' }` — there's no legacy site to migrate from.
+ *   - If `.deskwork/config.json` is PRESENT but malformed or fails
+ *     schema validation, this function THROWS (per
+ *     AUDIT-20260530-10). The pre-fix docblock said "no readable
+ *     config → no-config", which suggested corrupt configs would
+ *     fall through to the same code path as absent ones — they do
+ *     not. Loud failure is intentional: a project that has tried to
+ *     install but corrupted its config should not have the bootstrap
+ *     silently no-op on it; the error surfaces the config bug where
+ *     the operator can fix it.
  *   - Otherwise, writes `.deskwork/lanes/default.json` with:
  *       id: 'default'
  *       name: 'Default'
@@ -51,14 +60,23 @@ export type BootstrapResult =
 /**
  * Bootstrap a `default` lane bound to `editorial` from the project's
  * legacy `sites.<defaultSite>.contentDir`, if no default lane exists
- * yet. Returns a structured result identifying what happened — never
- * throws on the "nothing to do" cases (already-exists, no-config), so
- * callers can invoke this unconditionally at install-flow boundaries.
+ * yet. Returns a structured result identifying what happened —
+ * `already-exists` and `no-config` (config ABSENT) are the two
+ * non-throwing "nothing to do" branches, so callers can invoke this
+ * unconditionally at install-flow boundaries.
  *
  * @param projectRoot - Absolute path to the project root.
- * @throws Only on filesystem-write failure or if the assembled lane
- *   config somehow fails its own schema validation (defensive guard
- *   against future schema drift; should not happen in practice).
+ * @throws When `.deskwork/config.json` is PRESENT but malformed or
+ *   fails schema validation — the read+parse failure bubbles up
+ *   intentionally so the operator sees the config-side bug.
+ *   AUDIT-20260530-10 locks this in: pre-fix the docblock said "no
+ *   readable config → no-config", which suggested corrupt configs
+ *   would fall through to no-config; they don't.
+ * @throws When the config declares `defaultSite` but no matching
+ *   `sites.<id>` entry exists (operator-fixable config bug).
+ * @throws On filesystem-write failure or if the assembled lane config
+ *   somehow fails its own schema validation (defensive guard against
+ *   future schema drift; should not happen in practice).
  */
 export async function bootstrapDefaultLaneIfMissing(
   projectRoot: string,
