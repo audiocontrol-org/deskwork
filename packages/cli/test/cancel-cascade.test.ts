@@ -231,7 +231,7 @@ describe('deskwork cancel --cascade', () => {
     };
     expect(parsed.cascadedMembers.map((m) => m.slug)).toEqual(['m-a-present']);
     expect(parsed.skippedMembers).toHaveLength(1);
-    expect(parsed.skippedMembers[0].reason).toMatch(/read failed/);
+    expect(parsed.skippedMembers[0].reason).toMatch(/sidecar not found/);
   });
 
   it('--cascade is a no-op on non-group entries (no members[])', () => {
