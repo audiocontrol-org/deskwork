@@ -861,3 +861,38 @@ Surface:    docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:167-271; docs/1
 The diff flips AUDIT-20260530-01 through AUDIT-20260530-07 to `fixed-<sha>` in the audit log, but every corresponding workplan task still has an unchecked acceptance criterion saying the audit-log status must be flipped. Examples are lines 167-169, 184-186, 201-203, and the same pattern continues through line 271.
 
 Because `findUncheckedTasksInOrder` treats any task block with a `- [ ]` checkbox as unchecked, these completed fix tasks still look unfinished to workplan consumers even though the audit log says they are fixed. That can make next-task pickup or live verification operate on stale fix tasks before the real remaining work. Mark those acceptance criteria checked wherever the audit-log status was flipped, or keep the audit-log status open until the workplan task is actually complete.
+
+## 2026-05-30 — audit-barrage lift (20260530T183745619Z-scope-discovery)
+
+### AUDIT-20260530-15 — Duplicated feature-root resolution across gate and lift is the structural root of the split-brain class — the diff patches both copies in lockstep instead of extracting one
+
+Finding-ID: AUDIT-20260530-15 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120` (`findFeatureRoot`) and `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180` (`resolveFeatureRoot`)
+
+The version-dir resolution logic exists as **two independent copies**. This diff changes both from `[...(await readdir(docsRoot))].sort()` to `[...(await readdir(docsRoot))].sort().reverse()` — byte-for-byte identical edits in two files, with identical comments. That is precisely the failure shape AUDIT-06 (split-brain) and AUDIT-08 (wrong-version pick) keep re-surfacing: the gate and the lift must agree on which `docs/<version>/.../<slug>` they resolve, and the only thing keeping them in agreement is a developer remembering to mirror every change across both functions.
+
+The split-brain *class* of bug isn't closed by making the two copies currently identical — it's closed by making them the same function. The next maintainer who improves one walker (e.g. lands the semver-aware sort the comment promises) and forgets the other re-introduces exactly the cross-verb divergence AUDIT-06 named. The fix is to extract a single `resolveFeatureRoot(docsRoot, slug)` helper (returning the chosen dir + the list of candidate versions for the ambiguity check) and have both the gate and the lift call it. As long as the logic is duplicated, every future audit of this surface has to re-verify that both copies are in sync — a recurring tax the abstraction would eliminate.
+
+### AUDIT-20260530-16 — Phase 15 workplan now mixes flat (`Task 6-12`) and hierarchical (`Task 5.2-5.7`) fix-task numbering, with the flat fix-tasks ordered physically before `Task 4` — the AUDIT-03 incoherence persists in shipped docs
+
+Finding-ID: AUDIT-20260530-16
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:151-271`
+
+In the workplan hunk, the round-2 fix-tasks for AUDIT-08…14 are numbered **flat** (`### Task 6` … `### Task 12`) and appear *physically above* `### Task 4: Skill-prose convention template` and the round-1 fix-tasks, which use **hierarchical** numbering (`### Task 5.2` … `### Task 5.7`). The resulting file order is `Task 6,7,8,9,10,11,12, 4, 5.2,5.3,5.4,5.5,5.6,5.7, 5` — non-monotonic and using two numbering conventions in the same `## Phase 15`. This is the exact symptom AUDIT-03 ("flat vs hierarchical numbering incoherence") named, and AUDIT-12 explicitly traced it to "round-2's auto-promote landing at the same Phase 5 anchor as round 1."
+
+This diff only flips the checkboxes inside those task blocks (`[ ]→[x]`); it leaves the incoherent ordering and the mixed-convention numbering in place, so the broken workplan ships. The workplan-aware gate keys on *position order* rather than the printed numbers, so the gate itself still functions — the harm is operator legibility and the credibility of the "next N tasks" framing the whole phase rests on (a human reading `Task 12` before `Task 4` cannot trust the numbering to reflect work order). The convention-detection fix (AUDIT-03/AUDIT-12) evidently does not repair a workplan that *already* contains a mixed-convention region; either the existing fix-tasks should be renumbered into one monotonic scheme, or the auto-positioner should refuse to interleave a second numbering convention into a phase that already established one.
+
+### AUDIT-20260530-17 — Workplan closure ticking is best-effort after the audit-log write, so AUDIT-14 can recur on any workplan write failure
+
+Finding-ID: AUDIT-20260530-17
+Status:     open
+Severity:   medium
+Surface:    plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:403-463
+
+`runApplyAuditFlips` writes the audit-log status first, then separately tries to tick the matching workplan checkbox. If the workplan read/write fails, lines 456-463 only emit a warning and still return success, leaving the audit-log at `fixed-<sha>` while the workplan task remains unchecked.
+
+That is the exact stale-state shape AUDIT-20260530-14 was fixing: `findUncheckedTasksInOrder` will continue to treat the completed fix task as unfinished. Since this command now owns both sides of the state transition, the workplan-side update should either be part of the required apply operation with a non-zero exit on failure, or the command should avoid flipping the audit-log when it cannot also update the corresponding workplan closure criterion.
