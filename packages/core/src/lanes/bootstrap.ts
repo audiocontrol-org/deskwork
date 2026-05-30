@@ -45,7 +45,7 @@
  * not to second-guess it.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { readConfig, configPath } from '../config.ts';
 import { appendJournalEvent } from '../journal/append.ts';
@@ -132,18 +132,42 @@ export async function bootstrapDefaultLaneIfMissing(
   mkdirSync(dirname(targetPath), { recursive: true });
   writeFileSync(targetPath, JSON.stringify(validated.data, null, 2) + '\n', 'utf8');
 
-  await appendJournalEvent(projectRoot, {
-    kind: 'lane-migration',
-    at: new Date().toISOString(),
-    migration: 'default-lane-from-legacy-site',
-    source: `sites.${defaultSiteId}`,
-    target: 'lanes.default',
-    details: {
-      legacySiteId: defaultSiteId,
-      contentDir: site.contentDir,
-      pipelineTemplate: 'editorial',
-    },
-  });
+  // Compensating-write per AUDIT-20260530-13: if the journal append
+  // fails, unlink the just-created lane file so the next invocation
+  // can retry from a clean state. Without rollback, the project would
+  // be left with a lane file + no migration audit record; subsequent
+  // invocations return `already-exists` and never re-attempt the
+  // missing journal event. The unlink-then-rethrow shape mirrors the
+  // compensating-write pattern used elsewhere in the project.
+  try {
+    await appendJournalEvent(projectRoot, {
+      kind: 'lane-migration',
+      at: new Date().toISOString(),
+      migration: 'default-lane-from-legacy-site',
+      source: `sites.${defaultSiteId}`,
+      target: 'lanes.default',
+      details: {
+        legacySiteId: defaultSiteId,
+        contentDir: site.contentDir,
+        pipelineTemplate: 'editorial',
+      },
+    });
+  } catch (err) {
+    // Best-effort cleanup: if the unlink itself fails (e.g. the file
+    // was unlinked from under us between the write and the rollback)
+    // we rethrow the journal error rather than the cleanup error,
+    // because the journal failure is the actionable root cause.
+    try {
+      unlinkSync(targetPath);
+    } catch {
+      // Swallow the unlink-side error so the journal-append error
+      // surfaces clean. The post-condition the rollback guards (no
+      // orphaned lane file) is best-effort under disk contention;
+      // any residual file shows up at the next bootstrap invocation,
+      // which the already-exists path handles.
+    }
+    throw err;
+  }
 
   return { created: true, path: targetPath, lane: validated.data };
 }

@@ -187,6 +187,61 @@ describe('bootstrapDefaultLaneIfMissing', () => {
     expect(existsSync(laneConfigPath(projectRoot, 'default'))).toBe(false);
   });
 
+  /**
+   * AUDIT-20260530-13 regression: writes default.json BEFORE
+   * appending the lane-migration journal event. If journal append
+   * fails after the write, the project is left with a lane file but
+   * no migration audit record; next invocation returns
+   * `already-exists` and never repairs the missing event.
+   *
+   * The fix is a compensating operation: when journal append fails,
+   * unlink the just-created lane file and rethrow. The project
+   * returns to its pre-bootstrap state; the next invocation tries
+   * again from scratch.
+   *
+   * Triggering the failure: the journal-append path writes to
+   * `.deskwork/review-journal/history/`. If we pre-create that path
+   * as a FILE (instead of a directory), mkdir of the dir fails with
+   * ENOTDIR / EEXIST and the bootstrap throws.
+   */
+  it('rolls back the lane file when journal append fails (AUDIT-20260530-13)', async () => {
+    writeConfig(projectRoot, {
+      version: 1,
+      sites: { primary: { contentDir: 'docs', calendarPath: 'docs/cal.md' } },
+      defaultSite: 'primary',
+    });
+    // Pre-create the journal path as a FILE (not directory) to make
+    // mkdir of the journal directory fail. The append code first
+    // `mkdir(... { recursive: true })`s its parent, which throws
+    // ENOTDIR / EEXIST when the path is a non-directory file.
+    const journalParent = join(projectRoot, '.deskwork', 'review-journal');
+    mkdirSync(journalParent, { recursive: true });
+    writeFileSync(join(journalParent, 'history'), 'not-a-dir', 'utf8');
+
+    let captured: unknown;
+    try {
+      await bootstrapDefaultLaneIfMissing(projectRoot);
+    } catch (err) {
+      captured = err;
+    }
+    expect(captured).toBeInstanceOf(Error);
+
+    // Per the fix: the lane file MUST NOT remain on disk after the
+    // failed bootstrap, so a subsequent invocation can retry from
+    // a clean state. Pre-fix this assertion failed — the lane file
+    // was orphaned.
+    expect(existsSync(laneConfigPath(projectRoot, 'default'))).toBe(false);
+
+    // And the next invocation, with the journal-blocker removed,
+    // succeeds and produces a complete bootstrap (lane file + at
+    // least one lane-migration journal event).
+    rmSync(join(journalParent, 'history'), { force: true });
+    const second = await bootstrapDefaultLaneIfMissing(projectRoot);
+    expect(second.created).toBe(true);
+    expect(existsSync(laneConfigPath(projectRoot, 'default'))).toBe(true);
+    expect(readLaneMigrationEvents(projectRoot)).toHaveLength(1);
+  });
+
   it('integration smoke: pre-feature project → first invocation → default lane exists + loadable', async () => {
     // Mirrors the workplan's Task 3.5.2 acceptance criterion: a
     // pre-feature project's first invocation lands the default lane
