@@ -3235,7 +3235,7 @@ Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). 
 ### AUDIT-20260530-09 — `detectArtifactKind` classifies non-existent files as valid artifacts (inconsistent disk contract)
 
 Finding-ID: AUDIT-20260530-09 (cross-model: AUDIT-BARRAGE-claude-03-P3 + AUDIT-BARRAGE-codex-02-P3)
-Status:     open
+Status:     fixed-2b42356
 Severity:   medium
 Surface:    `packages/core/src/lanes/detection.ts:44-77`, `packages/core/test/lanes/detection.test.ts:15-50`
 

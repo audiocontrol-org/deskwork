@@ -679,17 +679,17 @@ Closes AUDIT-20260530-08 (cross-model: AUDIT-BARRAGE-claude-02-P3). Surface: `pa
 
 Closes AUDIT-20260530-09 (cross-model: AUDIT-BARRAGE-claude-03-P3 + AUDIT-BARRAGE-codex-02-P3). Surface: `packages/core/src/lanes/detection.ts:44-77`, `packages/core/test/lanes/detection.test.ts:15-50`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-09 (cross-model: AUDIT-BARRAGE-claude-03-P3 + AUDIT-BARRAGE-codex-02-P3)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-09 (cross-model: AUDIT-BARRAGE-claude-03-P3 + AUDIT-BARRAGE-codex-02-P3)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/lanes/detection.test.ts` (existence-probe describe block) (cited in Step 1)
+- [x] `npx vitest run packages/core/test/lanes/detection.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-2b42356` via the close-shipped-audit-findings step
 
 
 ### Task 7.25 (fix-finding-AUDIT-20260530-10 (cross-model: AUDIT-BARRAGE-claude-04-P3)): AUDIT-20260530-10 — `bootstrap` doc claims "no readable config → no-config" but …
