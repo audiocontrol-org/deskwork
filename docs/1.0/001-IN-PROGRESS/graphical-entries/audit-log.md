@@ -3373,7 +3373,7 @@ Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + 
 ### AUDIT-20260530-21 — `renderCalendar` docstring drift: promises `## Lane:` but emits `# Lane:` (h1)
 
 Finding-ID: AUDIT-20260530-21 (cross-model: AUDIT-BARRAGE-claude-08-P4)
-Status:     open
+Status:     fixed-66f2854
 Severity:   low
 Surface:    `packages/core/src/calendar/render.ts:157-159` (docstring) vs `:194` and `:199` (emit)
 
