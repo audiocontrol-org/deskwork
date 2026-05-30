@@ -510,6 +510,57 @@ describe('cancelEntry — cascade catch narrowing (AUDIT-20260530-23)', () => {
     ).rejects.toThrow(/sidecar schema invalid/);
   });
 
+  it('partial-cascade throw still regenerates calendar in the finally (AUDIT-20260530-22)', async () => {
+    // Pair AUDIT-22 (try/finally on the wrapper) with AUDIT-23 (narrow
+    // catch — corrupt sidecar propagates). Without the finally the
+    // walker's mid-cascade throw would leave calendar.md stale
+    // (healthy members transitioned to Cancelled but never reflected
+    // in the calendar). With the finally the calendar reconciles to
+    // whatever sidecar state actually landed; the throw still
+    // propagates to the caller.
+    const regenerateSpy = vi.spyOn(regenerateModule, 'regenerateCalendar');
+    try {
+      // memberHealthy processes first (transitions to Cancelled);
+      // memberCorrupt throws on read (parse error per AUDIT-23).
+      await seedEntry(projectRoot, memberHealthy, 'm-healthy-finally', {
+        currentStage: 'Drafting',
+      });
+      const corruptPath = join(
+        projectRoot,
+        '.deskwork',
+        'entries',
+        `${memberCorrupt}.json`,
+      );
+      await writeFile(corruptPath, '{ this is not valid json', 'utf-8');
+      await seedEntry(projectRoot, groupUuid, 'partial-cascade-group', {
+        currentStage: 'Drafting',
+        members: [memberHealthy, memberCorrupt],
+      });
+
+      await expect(
+        cancelEntry(projectRoot, { uuid: groupUuid, cascade: true }),
+      ).rejects.toThrow(/sidecar JSON invalid/);
+
+      // The try/finally contract: regenerateCalendar fires exactly
+      // once even on the mid-cascade throw. Pre-fix: zero calls (the
+      // throw aborted the wrapper before the regenerate line).
+      expect(regenerateSpy).toHaveBeenCalledTimes(1);
+
+      // The healthy member that DID process before the throw is in
+      // its Cancelled state on disk; the regenerated calendar must
+      // reflect that — assert the on-disk sidecar AND that the
+      // calendar.md file exists and contains the cancelled member's
+      // slug under the cancelled section.
+      const healthyAfter = await readSidecar(projectRoot, memberHealthy);
+      expect(healthyAfter.currentStage).toBe('Cancelled');
+      const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
+      const calendarText = await readFile(calendarPath, 'utf-8');
+      expect(calendarText).toContain('m-healthy-finally');
+    } finally {
+      regenerateSpy.mockRestore();
+    }
+  });
+
   it('write failure mid-cascade propagates the write error instead of swallowing as skipped', async () => {
     // Drive the write to fail for a specific member by replacing its
     // sidecar file with a directory of the same name AFTER seeding the

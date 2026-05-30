@@ -331,11 +331,23 @@ export async function cancelEntry(
   projectRoot: string,
   opts: CancelOptions,
 ): Promise<CancelResult> {
-  const result = await cancelEntryWithoutCalendarRegen(projectRoot, opts);
+  // Per AUDIT-20260530-22: wrap the walker in try/finally so the
+  // boundary `regenerateCalendar` fires even when the walker throws
+  // mid-cascade (e.g. AUDIT-23's narrowed-catch propagating a corrupt
+  // member's parse error). Without the finally, the group + every
+  // member processed before the failure are already `Cancelled` on
+  // disk but `calendar.md` is never regenerated — PERSISTENT
+  // divergence between sidecar state and the calendar. The throw
+  // still propagates (caller sees the error); the calendar is just
+  // reconciled to whatever sidecar state actually landed.
+  //
   // #148: keep calendar.md in sync after every transition.
   // Step 7.2.7 boundary: a single regenerate covers the head entry
   // AND every cascaded member, because the walker does not call
   // regenerateCalendar itself.
-  await regenerateCalendar(projectRoot);
-  return result;
+  try {
+    return await cancelEntryWithoutCalendarRegen(projectRoot, opts);
+  } finally {
+    await regenerateCalendar(projectRoot);
+  }
 }
