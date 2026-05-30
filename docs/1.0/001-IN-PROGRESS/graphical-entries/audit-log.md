@@ -2898,7 +2898,7 @@ Track 2 review actions; see AUDIT-30 below.)
 ### AUDIT-20260529-30 — review-action: cancelled `unsafe(laneClass)` HTML-injection risk in renderListRow
 
 Finding-ID: AUDIT-20260529-30
-Status:     fixed-pending-sha
+Status:     fixed-cc45787
 Severity:   medium
 Surface:    `packages/studio/src/pages/entry-review/members-section.ts:217-228`
 
@@ -2921,7 +2921,7 @@ Track 3 finding #1 from the per-commit review of b642cd6 + 3d670f5.
 ### AUDIT-20260529-31 — review-action: pull-tab width 22px failed WCAG 2.5.8 (24x24 minimum)
 
 Finding-ID: AUDIT-20260529-31
-Status:     fixed-pending-sha
+Status:     fixed-cc45787
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:250`
 
@@ -2941,7 +2941,7 @@ Track 3 finding #2 from the per-commit review of b642cd6 + 3d670f5.
 ### AUDIT-20260529-32 — review-action: kraft-on-paper-2 text contrast 3.58:1 failed WCAG 1.4.3 AA
 
 Finding-ID: AUDIT-20260529-32
-Status:     fixed-pending-sha
+Status:     fixed-cc45787
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:275-304`
 
@@ -2968,7 +2968,7 @@ Track 3 finding #3 from the per-commit review of b642cd6 + 3d670f5.
 ### AUDIT-20260529-33 — review-action: AUDIT-29 used non-canonical Status format (broke queue-check grep)
 
 Finding-ID: AUDIT-20260529-33
-Status:     fixed-pending-sha
+Status:     fixed-cc45787
 Severity:   low
 Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:2728-2732`
 
