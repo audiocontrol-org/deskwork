@@ -3156,7 +3156,7 @@ Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude + 
 ### AUDIT-20260530-02 — `.passthrough()` on `PipelineTemplateSchema` silently accepts misspelled optional fields
 
 Finding-ID: AUDIT-20260530-02 (cross-model: AUDIT-BARRAGE-claude-02-P2)
-Status:     open
+Status:     fixed-c569a61
 Severity:   medium
 Surface:    `packages/core/src/pipelines/types.ts:107-110` (`.passthrough()`), `:101` (`lockedStages: ...optional()`)
 
