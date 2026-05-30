@@ -2729,7 +2729,7 @@ the review trail of Step 7.2.8.
 
 | Status         | Date       | Category | Severity | Phase | Driver              |
 |----------------|------------|----------|----------|-------|---------------------|
-| fixed-pending-sha | 2026-05-29 | feature  | n/a      | 7     | implementer dispatch |
+| fixed (`b642cd6`) | 2026-05-29 | feature  | n/a      | 7     | implementer dispatch |
 
 Implementation of Phase 7 Tasks 7.3 (group review surface — Members
 section) + 7.4 (multi-lane composed view) per the accepted design at
@@ -2885,6 +2885,5 @@ scope for this dispatch and remain open. Phase 7 parent issue (#306)
 stays open until those tasks land. No GitHub `Closes` keyword on
 the commit.
 
-`Status: fixed-pending-sha` will be updated to the commit's actual
-SHA in the immediately-following docs commit per the established
-two-commit pattern.
+`Status` backfilled to `fixed (`b642cd6`)` in the immediately-following
+docs commit per the established two-commit pattern.
