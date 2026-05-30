@@ -181,8 +181,12 @@ describe('extractReferencesFromCommit', () => {
     expect(refs.length).toBe(0);
   });
 
-  it('picks the strongest verb when the same issue appears multiple times', () => {
-    // Plain reference in subject + Closes in body -> closes wins.
+  it('surfaces only the fix-verb match when the same issue also appears as a bare mention', () => {
+    // Bare `#50` in subject is dropped post-Phase-13; the `Closes #50`
+    // in the body is the only fix-shipping signal. Pre-Phase-13 this
+    // exercised the strongest-verb-wins selection between `plain` and
+    // `closes`; post-Phase-13 the bare mention is silently ignored and
+    // only the verb-prefixed match surfaces.
     const commit = mkCommit('mention #50 in passing', 'Closes #50');
     const refs = extractReferencesFromCommit(commit);
     expect(refs.length).toBe(1);

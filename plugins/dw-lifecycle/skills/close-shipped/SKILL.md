@@ -80,7 +80,7 @@ Per-issue, the merge layer surfaces:
 
 **PR-merge commit subjects (`^Merge pull request #N from <branch>`) are dropped entirely** — the merge ceremony's PR-number isn't a fix signal, and the actual fix commits travel inside the merge as their own scanned records.
 
-URLs in commit messages are stripped before pattern matching so `/pull/NNN` and `/issues/NNN` path segments are not mis-extracted as `#NNN`.
+For non-merge commits, URLs are stripped before pattern matching so `/pull/NNN` and `/issues/NNN` path segments are not mis-extracted as `#NNN`. PR-merge commits are dropped entirely before any URL stripping or pattern matching — the early-return path means the merge-subject AND its body never reach the URL-stripping step.
 
 References are deduplicated per issue across all scanned commits. The contributing-commits list per issue is preserved so the comment body names every commit that mentioned the issue.
 

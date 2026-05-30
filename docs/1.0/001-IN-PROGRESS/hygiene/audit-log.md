@@ -192,6 +192,34 @@ Verification status `fixed-pending-verification` per the project's "issue closur
 
 ---
 
+## AUDIT-20260529-09 — Phase 13 Task 1 (commit 5f620b1) — close-shipped fix-keyword filter
+
+Finding-ID: AUDIT-20260529-09
+Status:     fixed-pending-verification
+Severity:   informational
+Surface:    plugins/dw-lifecycle/src/close-shipped/commit-scanner.ts + SKILL.md + 2 test files
+
+Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's medium-routine carve-out) verified the Phase 13 / #366 fix and reported two doc-accuracy findings — both applied as a follow-up commit:
+
+1. **Stale test comment** at `close-shipped-commit-scanner.test.ts:185` — comment said "Plain reference in subject + Closes in body -> closes wins" but plain references no longer extract at all post-Phase-13. The test's behavior assertions are still correct; the comment misled readers about the verb-strength selection mechanism. Rewrote to reflect the post-Phase-13 reality: "Bare `#50` in subject is dropped post-Phase-13; the `Closes #50` in the body is the only fix-shipping signal."
+
+2. **SKILL.md URL-stripping claim imprecise** at line 83 — said "URLs in commit messages are stripped before pattern matching." Technically misleading: PR-merge commits are dropped before URL stripping runs (the early-return fires first). Rewrote: "For non-merge commits, URLs are stripped before pattern matching... PR-merge commits are dropped entirely before any URL stripping or pattern matching — the early-return path means the merge-subject AND its body never reach the URL-stripping step."
+
+Reviewer confirmed clean on the substantive change:
+
+- `MERGE_PR_SUBJECT_RE = /^Merge pull request #\d+ from /` correctly matches GitHub's standard merge-commit subject; doesn't mis-match `Merge branch ...` or non-standard variants.
+- `ReferenceVerb` dead-code entries (the `plain`/`refs`/`parens` cases in the strength map) are well-contained as a back-compat carve-out for handcrafted test inputs.
+- Comma-list grammar (`Closes #10, #11, #12.` surfacing only `#10`) aligns with GitHub's own auto-close grammar — GitHub requires verb-per-issue per official docs.
+- Other walkers (audit-log, tooling-feedback) use their own pattern lists via `extractIssueFromBody` and were correctly not touched by this commit.
+- File size cap clean (`commit-scanner.ts` stays well under 500 lines).
+- No `any`/`as Type`/`@ts-ignore` introduced.
+
+Track 1 (load-bearing verification): 2336/2336 plugin tests pass; smoke-hygiene OK end-to-end.
+
+Verification status `fixed-pending-verification` per the project's "issue closure requires verification in a formally-installed release" rule. Acceptance is re-running `close-shipped --from-tag v0.26.5 --to-tag v0.27.0` post-install and confirming only the 3 real candidates (#356, #361, #364) from the v0.27.0 dogfood land — not the 6 false positives (#351, #352, #353, #355, #362, #365).
+
+---
+
 ## Clone-detector summary
 
 | Run | Detected | NEW | DROPPED | Notes |
