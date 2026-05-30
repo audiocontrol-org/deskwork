@@ -64,8 +64,19 @@ export interface RenderMembersSectionInput {
   readonly group: Entry;
   /** Resolved members in `group.members[]` order. May be empty. */
   readonly members: readonly Entry[];
-  /** UUIDs from `group.members[]` that didn't resolve to a sidecar. */
+  /**
+   * UUIDs from `group.members[]` whose sidecar file is absent on
+   * disk (ENOENT). Surfaced as "missing" rows.
+   */
   readonly missingMemberUuids: readonly string[];
+  /**
+   * UUIDs from `group.members[]` whose sidecar file is PRESENT on
+   * disk but failed to load (malformed JSON / schema-validation /
+   * I/O failure). Distinct from missing per AUDIT-20260529-39 — the
+   * pre-fix implementation conflated the two, laundering data
+   * corruption as a mere reference gap.
+   */
+  readonly corruptMemberUuids: readonly string[];
   /**
    * Lane configs keyed by lane id; the section needs the lane's display
    * name + template binding to render the swim-head correctly.
@@ -241,15 +252,40 @@ function renderMissingRow(uuid: string): RawHtml {
     </li>`);
 }
 
+/**
+ * AUDIT-20260529-39 — corrupt member row.
+ *
+ * Distinct from `renderMissingRow` because the failure mode is
+ * different: file exists but the read/parse/schema-validation
+ * failed. Operator needs to see this surface independently of the
+ * "sidecar not found" case so data corruption isn't laundered as a
+ * mere reference gap.
+ */
+function renderCorruptRow(uuid: string): RawHtml {
+  return unsafe(html`
+    <li class="er-member-row er-member-row--corrupt" data-corrupt-uuid="${uuid}">
+      <div class="er-member-row-meta">
+        <span class="er-member-row-lane">corrupt</span>
+        <span class="er-member-row-sep" aria-hidden="true">·</span>
+        <span class="er-member-row-glyph" aria-hidden="true">✗</span>
+        <span class="er-member-row-stage">unreadable</span>
+      </div>
+      <div class="er-member-row-title">Member sidecar failed to load</div>
+      <div class="er-member-row-slug">${uuid}</div>
+    </li>`);
+}
+
 function renderListBody(
   members: readonly Entry[],
   missingMemberUuids: readonly string[],
+  corruptMemberUuids: readonly string[],
   laneConfigsById: ReadonlyMap<string, StrictLaneConfig>,
 ): RawHtml {
   const rowsRaw = members.map((m) => renderListRow(m, laneConfigsById).__raw).join('');
+  const corruptRaw = corruptMemberUuids.map((u) => renderCorruptRow(u).__raw).join('');
   const missingRaw = missingMemberUuids.map((u) => renderMissingRow(u).__raw).join('');
   return unsafe(html`
-    <ul class="er-members-list" data-list>${unsafe(rowsRaw)}${unsafe(missingRaw)}</ul>`);
+    <ul class="er-members-list" data-list>${unsafe(rowsRaw)}${unsafe(corruptRaw)}${unsafe(missingRaw)}</ul>`);
 }
 
 function renderToggle(initial: MembersViewMode): RawHtml {
@@ -314,6 +350,7 @@ function renderPopulatedSection(input: RenderMembersSectionInput): RawHtml {
   const listBody = renderListBody(
     input.members,
     input.missingMemberUuids,
+    input.corruptMemberUuids,
     input.laneConfigsById,
   );
   return unsafe(html`

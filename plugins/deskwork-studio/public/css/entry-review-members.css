@@ -323,6 +323,17 @@
   opacity: 0.7;
 }
 
+/* AUDIT-20260529-39 — corrupt sidecar distinct from missing.
+   Same red-pencil family but darker background + thicker left
+   stripe so the operator can tell at a glance that this is
+   data-corruption (file present but unreadable) rather than a
+   referential-integrity gap (file absent). */
+[data-review-ui="entry-review"] .er-member-row--corrupt {
+  border-left: 3px solid var(--er-red-pencil);
+  background: var(--er-paper-3);
+  opacity: 0.85;
+}
+
 [data-review-ui="entry-review"] .er-member-row-link {
   display: block;
   padding: 12px 14px;

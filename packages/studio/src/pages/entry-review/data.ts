@@ -32,7 +32,7 @@ import {
   type IterationContent,
 } from '@deskwork/core/iterate/history';
 import { listEntryAnnotations } from '@deskwork/core/entry/annotations';
-import { readSidecar } from '@deskwork/core/sidecar';
+import { readSidecar, sidecarPath } from '@deskwork/core/sidecar';
 import { isPopulatedGroupEntry } from '@deskwork/core/groups';
 import {
   listLaneConfigs,
@@ -63,9 +63,22 @@ import type { DraftAnnotation } from '@deskwork/core/review/types';
  * When the entry is a populated group (Phase 7 Task 7.3 + 7.4), the
  * loader resolves each member sidecar plus the lane configs + pipeline
  * templates the members span. Members are returned in the original
- * `group.members[]` insertion order. Missing-member UUIDs (sidecar
- * didn't resolve) are returned separately so the surface can render a
- * "missing" row inline rather than silently dropping.
+ * `group.members[]` insertion order.
+ *
+ * Resolution outcomes are partitioned into three distinct buckets per
+ * AUDIT-20260529-39 (no silent fallbacks):
+ *
+ *   - `members` — sidecars that read + validated cleanly.
+ *   - `missingMemberUuids` — sidecar files that don't exist on disk
+ *     (ENOENT). Surfaced as a "missing" row inline so the operator
+ *     sees a referential-integrity gap rather than silent drop.
+ *   - `corruptMemberUuids` — sidecar files that exist on disk but
+ *     failed to load (malformed JSON, schema parse failure, other
+ *     I/O errors). Surfaced as a distinct "corrupt" row so the
+ *     operator can distinguish data-loss / data-corruption from a
+ *     mere missing-reference gap. Conflating the two (the
+ *     pre-AUDIT-39 behavior) violated the project's no-silent-
+ *     fallbacks discipline.
  *
  * `laneConfigsById` iterates in operator-configured lane order (per
  * `listLaneConfigs`) — the same order the dashboard uses — so the
@@ -75,6 +88,7 @@ import type { DraftAnnotation } from '@deskwork/core/review/types';
 export interface GroupMembersBundle {
   readonly members: readonly Entry[];
   readonly missingMemberUuids: readonly string[];
+  readonly corruptMemberUuids: readonly string[];
   readonly laneConfigsById: ReadonlyMap<string, StrictLaneConfig>;
   readonly templatesById: ReadonlyMap<string, StrictPipelineTemplate>;
 }
@@ -157,10 +171,25 @@ function parseVersionParam(raw: string | null | undefined): number | null {
  * Resolve each member UUID to a sidecar; collect lane configs +
  * pipeline templates for every lane the resolved members span.
  *
- * Missing-member sidecars are NOT silently dropped — they surface in
- * `missingMemberUuids` so the renderer can show a "missing" row. This
- * mirrors the doctor `group-member-missing` rule's intent (Task 7.5.2)
- * at the studio surface.
+ * Resolution failures are partitioned into TWO distinct buckets per
+ * AUDIT-20260529-39 (no silent fallbacks):
+ *
+ *   - `missing` — the sidecar file doesn't exist on disk (ENOENT).
+ *     The doctor `group-member-missing` rule (Task 7.5.2) catches
+ *     this case at the project level; the studio surfaces it inline
+ *     as a "missing" row so the operator sees the gap.
+ *   - `corrupt` — the sidecar file exists on disk but failed to
+ *     load (malformed JSON, schema parse failure, permission error,
+ *     other I/O failure). Surfaced as a distinct "corrupt" row so
+ *     data-corruption isn't laundered as a mere reference gap. The
+ *     pre-AUDIT-39 implementation conflated the two — every failure
+ *     ended up as "missing", hiding real corruption from the
+ *     operator.
+ *
+ * The distinction is made by checking sidecar-file existence BEFORE
+ * calling `readSidecar`. File present + read fails ⇒ corrupt; file
+ * absent ⇒ missing. This avoids parsing readSidecar's error-message
+ * shape (fragile cross-package coupling).
  *
  * Lane configs are loaded for every member's lane (deduped). The
  * resulting Map iterates in the operator-configured lane order from
@@ -175,13 +204,29 @@ async function loadGroupMembersBundle(
   const uuids = group.members ?? [];
   const members: Entry[] = [];
   const missing: string[] = [];
+  const corrupt: string[] = [];
   for (const uuid of uuids) {
+    // Distinguish ENOENT-missing from read/parse failure (corrupt)
+    // by file-existence check before the read. existsSync is sync +
+    // cheap (a single stat per UUID) and avoids fragile error-message
+    // matching against readSidecar's internal failure strings.
+    const path = sidecarPath(projectRoot, uuid);
+    if (!existsSync(path)) {
+      missing.push(uuid);
+      continue;
+    }
     try {
       const sidecar = await readSidecar(projectRoot, uuid);
       members.push(sidecar);
-    } catch {
-      // Sidecar didn't resolve — surface as missing rather than crash.
-      missing.push(uuid);
+    } catch (err) {
+      // Sidecar file exists but the read / parse / schema validation
+      // failed. Surface as corrupt — NOT missing — so the operator
+      // sees the corruption inline and can investigate. Log the
+      // underlying error so it surfaces in studio logs for the
+      // operator to triage.
+      const detail = err instanceof Error ? err.message : String(err);
+      console.warn(`entry-review: corrupt member sidecar ${uuid}: ${detail}`);
+      corrupt.push(uuid);
     }
   }
 
@@ -242,6 +287,7 @@ async function loadGroupMembersBundle(
   return {
     members,
     missingMemberUuids: missing,
+    corruptMemberUuids: corrupt,
     laneConfigsById,
     templatesById,
   };
