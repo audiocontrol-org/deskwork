@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://deskwork/dw-lifecycle/schema/audit-barrage-config.yaml.schema.json",
+  "title": "audit-barrage-config.yaml — multi-model audit-barrage CLI battery",
+  "description": "Machine-readable spec of the audit-barrage model config consumed by `dw-lifecycle audit-barrage`. Project-overridable at `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml`; the plugin's shipped default at `plugins/dw-lifecycle/templates/audit-barrage-config.yaml` is the fallback. Each entry registers one CLI tool that fires against the rendered audit prompt in parallel; per-model output is captured under `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/`. The runtime parser (plugins/dw-lifecycle/src/scope-discovery/audit-barrage/config-loader.ts) is the authoritative validator; this schema mirrors its contract for editor autocomplete + inline validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["models"],
+  "properties": {
+    "models": {
+      "description": "The registered model battery. Order is preserved — the orchestrator fires entries in this order (parallel fan-out; order only affects INDEX.md row sequencing). At least one entry required. Entry names must be unique.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/ModelEntry" }
+    }
+  },
+  "definitions": {
+    "ModelEntry": {
+      "description": "One CLI to fire as part of the audit barrage. Per the audit-barrage-cli-notes.md probe, every CLI must (a) be installed + on PATH or referenced by absolute path; (b) accept the prompt as a single argv element; (c) close stdin cleanly without operator interaction.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "binary", "args_template", "timeout_seconds"],
+      "properties": {
+        "name": {
+          "description": "Operator-visible identifier for the model. Used as the per-model filename stem in the run dir (lightly sanitized for filesystem safety) and to filter via the `--models` flag. Must be non-empty. Convention: lowercase kebab-case matches the CLI's own name (`claude`, `codex`, `gemini`).",
+          "type": "string",
+          "minLength": 1
+        },
+        "binary": {
+          "description": "Path or PATH-resolvable name of the CLI binary to spawn. Resolved by `child_process.spawn` against the operator's PATH. Use an absolute path when the binary lives outside PATH or when multiple installs need disambiguation. Must be non-empty.",
+          "type": "string",
+          "minLength": 1
+        },
+        "args_template": {
+          "description": "Whitespace-delimited argv template. MUST contain the literal `{{prompt}}` placeholder, which the spawn helper substitutes with the rendered audit prompt as a single argv element (the substitution happens after the template is split on whitespace, so the prompt itself can contain whitespace without being mangled). Examples from the v1 default battery: `\"-p {{prompt}}\"` (claude), `\"exec {{prompt}}\"` (codex), `\"{{prompt}}\"` (gemini).",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\{\\{prompt\\}\\}"
+        },
+        "timeout_seconds": {
+          "description": "Wall-clock budget in seconds. On expiry, the subprocess is sent SIGTERM, then SIGKILL after a 5-second grace. Must be a positive integer. The v1 default is 300 (5 minutes), which gives 20-60x headroom over measured round-trip times for typical audit prompts.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

@@ -33,6 +33,96 @@ After every implementation step — every commit that adds production code or mo
 
 This rule is paired with the `/frontend-design` rule above. Together they bracket the implementation cycle: **design via /frontend-design → implement → review via /dw-lifecycle:review → integrate or defer**. Skipping either side breaks the loop the operator-validated v0.18 cycle codified.
 
+## Audit findings: scope-don't-defer + TDD enforcement
+
+Phase 13 of scope-discovery operationalizes the anti-deferral discipline this rules file already calls for. The triad mechanizes the discipline so the agent cannot accidentally bypass it:
+
+| Verb / surface | Status transition | Discipline enforced |
+|---|---|---|
+| `/dw-lifecycle:promote-findings` | walks `Status: open` audit-log entries; default disposition is "scope into workplan as TDD-first task block tagged `(fix-finding-AUDIT-<id>)`". The agent CAN ONLY pick that disposition; `acknowledged-<ref>` and `informational` require operator-supplied substantive reasons that pass the validator (≥40 chars; banned-phrase canon). | Filing the finding is not the disposition; scoping into the workplan is. |
+| `dw-lifecycle check-open-findings` (implement-loop gate) | refuses `/dw-lifecycle:implement` task pickup while ≥1 `Status: open` finding exists on the feature. No `--ignore-open-findings` flag in v1; the strictness IS the discipline. | "Broken implementation is not done — it's broken." |
+| `dw-lifecycle check-fix-task-tdd` (commit-msg gate) + `fix-task-tdd-discipline` (doctor rule) | refuses `Closes AUDIT-<id>` commits where the cited workplan task block's test file is missing, empty, or whose vitest exits non-zero. The doctor rule walks every `[x]`-checked fix-finding task across every feature and flags violations. | "TDD principles should apply such that a test that exercises the bug is written before the fix is implemented." |
+| `dw-lifecycle apply-audit-flips` | walks commits, parses `Closes AUDIT-<id>` (subject + comma-separated trailer); proposes `open → fixed-<sha>` flips. Default dry-run; `--apply` writes. | Closing a finding via commit no longer requires a manual status-flip commit. |
+| `dw-lifecycle close-shipped-audit-findings` | walks `git rev-list <from>..<to>`; for each `fixed-<sha>` entry in range, proposes `verified-<date>`. Default dry-run; operator confirms. | Verification still requires the formally-installed-release check; the verb proposes candidates, never auto-flips. |
+| `/dw-lifecycle:re-audit-fixed-findings` + `dw-lifecycle re-audit-fixed-findings` | cross-references a fresh audit-barrage run-dir against existing `fixed-<sha>` entries; proposes `verified-<date>` for entries that don't re-surface; flags re-surfacing entries as fix-did-not-actually-fix. | Empirical re-audit evidence, not just SHA-membership. |
+
+### Operator's verbatim framing (the disciplinary anchor)
+
+> *"Filing a bug report isn't good enough. It MUST BE SCOPED INTO THE WORKPLAN, otherwise it won't get picked up by the implementation loop. Unless there's truly a good reason NOT to fix a problem, it should be relentlessly scoped into the workplan, not relentlessly deferred — ESPECIALLY problems with the implementation underway. A broken implementation is not done — it's broken. And, along with the discipline to scope the fix, TDD principles should apply such that a test that exercises the bug is written before the fix is implemented — and the implementation isn't considered a candidate for completion until tests are green."*
+
+The triad above is the structural mechanization of that framing.
+
+### How this rule pairs with sibling rules
+
+- **`Just for now is bullshit` (above)** — names the implementation-side IOU pathology. The triad is the audit-side counterpart: filed-and-forgotten audit findings are the same shape as code-comment IOUs.
+- **`Use /dw-lifecycle:review after every implementation step` (above)** — produces the findings. The triad ensures they get worked.
+- **`scope-discovery v1 — dogfood feedback via tooling-feedback.md` (below)** — TF closures lift into the audit-log via `/dw-lifecycle:tooling-feedback-import`, then promote-findings routes them into workplans like any other finding.
+
+### How to apply
+
+- Run `dw-lifecycle apply-audit-flips --feature <slug> --since <ref>` after each batch of `Closes AUDIT-<id>` commits to keep the audit-log in sync without manual flips.
+- Let `dw-lifecycle check-fix-task-tdd` run via a commit-msg hook (or invoke it manually before commits) to catch missing tests at the right moment.
+- After a release, run `close-shipped-audit-findings` AND `re-audit-fixed-findings` (they complement, not replace, each other) to graduate `fixed-<sha>` entries to `verified-<date>` with appropriate evidence.
+- Don't manually flip audit-log statuses when the verbs cover it — the verbs are idempotent and report what they would do before writing.
+
+### Cross-references
+
+- Closure triad code: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-flip-from-commit.ts`, `close-shipped-audit-findings.ts`, `cross-reference-audit-run.ts`, `tdd-enforcement.ts`.
+- Doctor rule: `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/fix-task-tdd-discipline.ts`.
+- Commit-msg gate: `plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts`.
+- Promote-findings library: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/` (Phase 13 Task 1 shipped this).
+
+## Audit-barrage: structured cross-model audit
+
+The audit-barrage skill (`/dw-lifecycle:audit-barrage`, CLI `dw-lifecycle audit-barrage` + `dw-lifecycle audit-barrage-render`) fires N installed CLI audit tools (`claude`, `codex`, `gemini`, plus whatever else the operator configures) in parallel against a uniform audit prompt. Each tool's stdout is captured to `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/<model>.md`. The operator walks the run dir during triage and lifts high-signal findings into the canonical feature `audit-log.md` via the same closure workflow `/dw-lifecycle:audit` and `/dw-lifecycle:review` already use.
+
+The barrage is the **third independent audit surface** in this project's audit posture. The first is the in-band self-audit (orchestrator-loop pattern; same model + same context as the implementer); the second is the SDD two-reviewer cycle (`/dw-lifecycle:review` dispatches `feature-dev:code-reviewer` against spec + quality); the third is the audit-barrage (multiple model families running independently). The three are **additive, not substitutable** — the barrage does not replace the in-band self-audit or the SDD cycle; it adds genetic diversity in failure modes.
+
+### When to run
+
+- **After substantive task work lands on the branch.** Sub-agent dispatches that materially change behavior get a barrage pass before the next batch of commits ships.
+- **Before release.** The feature's `audit-log.md` gets a barrage entry between the final commit and `/dw-lifecycle:ship`.
+- **On operator demand.** Triggered explicitly during `/dw-lifecycle:audit`, `/dw-lifecycle:review`, `/dw-lifecycle:complete` walks.
+
+Auto-firing the barrage at lifecycle waypoints (`session-end`, `complete`, `ship` Pause 5) is Design B per `ROADMAP.md` § "Audit-barrage feature shape" — out of scope for v1. v1 is operator-triggered only.
+
+### How to triage findings
+
+1. Read `<run-dir>/INDEX.md` for per-model exit codes, byte counts, timeouts, spawn errors. Spawn errors (`-2`) mean the CLI wasn't installed or wasn't on PATH; investigate before re-running.
+2. Read each `<run-dir>/<model>.md` — the captured stdout of one CLI's audit response in the prompt's canonical finding-block format.
+3. **Cross-reference findings across models.** Findings two or more models flagged independently are cross-model agreement — HIGH-confidence signals. Combine the per-model Finding-IDs in the canonical audit-log entry's header: `Finding-ID: AUDIT-<YYYYMMDD>-NN (claude-name + codex-name; cross-model)`.
+4. **Lift findings into the feature's `audit-log.md`.** Each surfaced finding gets a stable `AUDIT-<YYYYMMDD>-NN` ID + `Status: open` + per-finding fix guidance. Single-model findings still get lifted; the `Finding-ID:` header cites only the originating model.
+5. Treat clean "no findings" reports as signal too — a model that emits a confident "I checked X, Y, Z and they are clean" alongside siblings' findings tells the operator the surface was reviewed.
+
+### Override paths
+
+- Prompt template — `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` (override) → plugin default at `plugins/dw-lifecycle/templates/audit-barrage-prompt.md`. The renderer rejects only unsubstituted EXPECTED_VARS markers; instructional `{{...}}` strings in the body pass through unchanged.
+- Model battery — `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` (override) → plugin default at `plugins/dw-lifecycle/templates/audit-barrage-config.yaml`. The config-loader treats a file with a parseable, non-empty `models:` list as the override; comments-only scaffold falls through to the default. Schema at `scope-discovery/schema/audit-barrage-config.yaml.schema.json` for editor autocomplete.
+
+### Verb pair: render + fire
+
+The two-step workflow split keeps the renderer auditable before model budget is spent:
+
+```
+dw-lifecycle audit-barrage-render --feature <slug> --vars-file <vars.json> --output <prompt.md>
+dw-lifecycle audit-barrage        --feature <slug> --prompt-file <prompt.md>
+```
+
+The vars JSON is a flat `{key: string}` map with these required keys: `feature_slug`, `workplan_summary`, `diff`, `audit_log_excerpt`, `commit_subjects`. The renderer resolves project override vs plugin default; the fire verb resolves the model battery from config.
+
+Operators who hand-compose the prompt can skip the renderer entirely — `--prompt-file` accepts opaque bytes.
+
+### Why it earns its keep
+
+The Phase 12 self-dogfood (audit-barrage feature auditing itself) surfaced 4 cross-model HIGH-confidence findings + 7 single-model findings, ALL of which the in-band self-audit + the SDD review cycle missed (tsc clean; 1966/1966 tests passed; SDD review cycle approved). See `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` § "2026-05-29 — Phase 12 audit-barrage self-dogfood" for the canonical record. The cross-model genetic diversity is the binding signal: when claude + codex independently flag the same root cause from different framings, the finding is overwhelmingly real.
+
+### Cross-references
+
+- Skill prose: [`plugins/dw-lifecycle/skills/audit-barrage/SKILL.md`](../../plugins/dw-lifecycle/skills/audit-barrage/SKILL.md)
+- Roadmap (Design A shipped; Design B + C planned): [`ROADMAP.md`](../../ROADMAP.md) § "Audit-barrage feature shape"
+- CLI invocation contracts (per-CLI flags + auth): [`docs/1.0/001-IN-PROGRESS/scope-discovery/audit-barrage-cli-notes.md`](../../docs/1.0/001-IN-PROGRESS/scope-discovery/audit-barrage-cli-notes.md)
+- Local smoke: [`scripts/smoke-audit-barrage.sh`](../../scripts/smoke-audit-barrage.sh)
+
 ## scope-discovery v1 — dogfood feedback via tooling-feedback.md
 
 For features that exercise scope-discovery (any feature whose `/dw-lifecycle:setup` invokes `/scope-inventory`), the implementation team logs friction surfaces in `docs/<v>/001-IN-PROGRESS/<slug>/tooling-feedback.md` as they go. The log is the v1 ship-gate signal in place of the original ~80% paper-test coverage gate (reframed by operator decision 2026-05-25 when Phase 10 measured 60.9%).

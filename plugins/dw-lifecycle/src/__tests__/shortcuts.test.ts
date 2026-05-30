@@ -20,6 +20,7 @@ const SCHEME_IDS: readonly SchemeId[] = ['A', 'B', 'C'];
 // matching edit here fails this test, which is the point.
 const SCHEME_A_TABLE: ReadonlyArray<readonly [string, string]> = [
   ['audit', 'dwa'],
+  ['audit-barrage', 'dwab'],
   ['implement', 'dwi'],
   ['setup', 'dws'],
   ['ship', 'dwsh'],
@@ -34,12 +35,14 @@ const SCHEME_A_TABLE: ReadonlyArray<readonly [string, string]> = [
   ['install', 'dwin'],
   ['issues', 'dwis'],
   ['pickup', 'dwp'],
+  ['promote-findings', 'dwpf'],
   ['review', 'dwr'],
   ['teardown', 'dwt'],
 ];
 
 const SCHEME_B_TABLE: ReadonlyArray<readonly [string, string]> = [
   ['audit', 'dw-au'],
+  ['audit-barrage', 'dw-ab'],
   ['implement', 'dw-im'],
   ['setup', 'dw-se'],
   ['define', 'dw-de'],
@@ -54,12 +57,13 @@ const SCHEME_B_TABLE: ReadonlyArray<readonly [string, string]> = [
   ['install', 'dw-in'],
   ['issues', 'dw-is'],
   ['pickup', 'dw-pi'],
+  ['promote-findings', 'dw-pf'],
   ['review', 'dw-re'],
   ['teardown', 'dw-te'],
 ];
 
 // Meta-commands intentionally excluded from COMMANDS: the shortcuts
-// skills install shortcuts FOR the 17 lifecycle commands; they are
+// skills install shortcuts FOR the 19 lifecycle commands; they are
 // themselves invoked via the namespaced `/dw-lifecycle:` form (the
 // chicken-and-egg moment), so they get no shim of their own. The
 // scope-discovery verbs (and the install commands that scaffold their
@@ -107,8 +111,8 @@ describe('COMMANDS canonical list', () => {
     expect(expected).toEqual(onDisk);
   });
 
-  it('contains exactly 17 commands (meta-commands tracked separately)', () => {
-    expect(COMMANDS.length).toBe(17);
+  it('contains exactly 19 commands (meta-commands tracked separately)', () => {
+    expect(COMMANDS.length).toBe(19);
     for (const meta of META_COMMANDS) {
       expect(COMMANDS).not.toContain(meta);
     }
@@ -154,13 +158,13 @@ describe('no-duplicates invariant per scheme', () => {
       const scheme = getScheme(sid);
       const entries = scheme.entries();
 
-      it('produces exactly 17 entries', () => {
-        expect(entries.length).toBe(17);
+      it('produces exactly 19 entries', () => {
+        expect(entries.length).toBe(19);
       });
 
-      it('has 17 unique commands', () => {
+      it('has 19 unique commands', () => {
         const commands = new Set(entries.map(([cmd]) => cmd));
-        expect(commands.size).toBe(17);
+        expect(commands.size).toBe(19);
       });
 
       it('entry command set equals the canonical COMMANDS set', () => {
@@ -168,9 +172,9 @@ describe('no-duplicates invariant per scheme', () => {
         expect(entryCommands).toEqual(new Set(COMMANDS));
       });
 
-      it('has 17 unique shim names', () => {
+      it('has 19 unique shim names', () => {
         const shims = new Set(entries.map(([, shim]) => shim));
-        expect(shims.size).toBe(17);
+        expect(shims.size).toBe(19);
       });
     });
   }

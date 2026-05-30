@@ -342,3 +342,368 @@ Fix guidance:
 
 - Update the stale subcommand comment to describe the shipped scanner rather than the pre-port shell.
 - Replace the old stub-era regime-holdout-detector scenarios with post-port expectations that exercise real deprecation findings, so the tests document the current contract instead of the defunct one.
+
+
+## 2026-05-29 — Phase 12 audit-barrage self-dogfood
+
+First audit-barrage run against the audit-barrage feature itself (Tasks 1-3 implementation). The acceptance-signal target was "one barrage run surfaces ≥1 finding that the in-band self-audit + SDD review cycle didn't catch." **Met overwhelmingly: 13 distinct findings across 2 successful models, 4 with cross-model agreement.** ALL of these would have shipped without this audit (1966/1966 tests passed; tsc clean; live 3-CLI round-trip returned PROBE-OK).
+
+Run dir: `.dw-lifecycle/scope-discovery/audit-runs/20260529T061616Z-audit-barrage/` (gitignored — see INDEX.md in worktree).
+
+Per-model durations: claude 195s / 13495 stdout bytes (8 findings + 1 framing finding); codex 28s / 3379 bytes (4 findings); gemini failed (exit 1, "exhausted capacity on this model" — operator-level quota; not an audit-barrage bug).
+
+### Cross-model agreement (HIGH-confidence findings, both models found the same bug)
+
+### AUDIT-20260529-01 — Exit-vs-close event truncation
+
+Finding-ID: AUDIT-20260529-01 (claude-exit-vs-close + codex-stream-error-race; cross-model)
+Status: fixed-08971e4
+Severity: high
+Surface: `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts:128-139`
+
+Fix note (commit `08971e4`): `spawnCliAgainstModel` now settles on `child.on('close', ...)` instead of `'exit'` so stdio pipes have fully drained before the byte-counter snapshot + capture-stream close. Stream `'error'` handlers attached at stream creation so mid-run write failures reject the run instead of crashing the process. New regression test plants 200 lines (~10 KB) of pre-exit stdout via a fake CLI's `process.exit(0)` right after the writes and asserts every byte lands in the on-disk capture.
+
+`spawnCliAgainstModel` finalizes on `child.on('exit', ...)` then immediately ends the capture streams. Per Node semantics, `'exit'` fires when the process ends but its stdio pipes may still have buffered, undelivered data; `'close'` is the event that fires only after all stdio streams have closed. Snapshotting on `'exit'` drops any in-flight stdout chunks — both from the on-disk `<model>.md` capture and from the `stdoutBytes` counter. This is silent data-fidelity loss on the load-bearing path of the whole feature.
+
+Cross-cite: codex independently flagged the same root cause from the error-handler perspective (`stdoutStream.write(chunk)` called before any error handler is attached; if the write stream errors mid-run, the process can crash).
+
+**Fix:** attach completion logic to `child.on('close', ...)` instead; attach stream error handlers immediately after stream creation.
+
+### AUDIT-20260529-02 — args_template validation vs spawn-cli substitution drift
+
+Finding-ID: AUDIT-20260529-02 (claude-args-template-substring-mismatch + codex-placeholder-contract; cross-model)
+Status: fixed-08971e4
+Severity: high
+Surface: `config-loader.ts:200-205`, `schema/audit-barrage-config.yaml.schema.json:38`, `spawn-cli.ts:160-163`
+
+Fix note (commit `08971e4`): chose option (a) — back-compatible intra-token literal replacement via `tok.split('{{prompt}}').join(prompt)`. `args_template: "--prompt={{prompt}}"` now renders `--prompt=<actual-prompt>` at spawn time. Existing adopter configs that put `{{prompt}}` as a standalone token continue to work; embedded forms work too. New tests cover the embedded-form substitution + multiple `{{prompt}}` occurrences in one token.
+
+Config-loader accepts any `args_template` that *contains* `{{prompt}}` as substring; `buildArgs` only substitutes whole-token-equals-`{{prompt}}`. An operator writing `args_template: "--prompt={{prompt}}"` passes both validation + schema, then spawns the CLI with the literal `--prompt={{prompt}}` token and **never receives the rendered prompt**. Silent output-empty run with no error surfaced.
+
+Both models independently identified this exact failure mode (substring validation vs token-exact substitution).
+
+**Fix:** either (a) `buildArgs` does intra-token replace via `tok.split('{{prompt}}').join(prompt)`, or (b) validation tightens to require `{{prompt}}` as a standalone whitespace-delimited token with a clear error message rejecting embedded forms.
+
+### AUDIT-20260529-03 — Exit-code contract drift vs PRD
+
+Finding-ID: AUDIT-20260529-03 (claude-exitcode-vs-prd + codex-exit-contract-drift; cross-model)
+Status: fixed-08971e4
+Severity: medium
+Surface: `audit-barrage.ts:230-237` (`isHealthyModelRun`) + `:222-225` (`deriveBarrageExitCode`); PRD criterion in `types.ts:113-119`
+
+Fix note (commit `08971e4`): relaxed `isHealthyModelRun` to `stdoutBytes > 0 && spawnError === undefined` — non-zero CLI exits and timeouts fall on the healthy side because the captured stdout is still triagable. The `types.ts` JSDoc on `BarrageResult.exitCode` and the `deriveBarrageExitCode` docstring were both updated to match the PRD's "produced output" wording. New tests cover non-zero-exit-with-bytes (healthy), timeout-with-bytes (healthy), and spawn-error (unhealthy regardless of byte count).
+
+PRD says: "CLI exit code: 0 if any model produced output; 1 if all failed." Implementation requires `exitCode === 0 && !timedOut && spawnError === undefined && stdoutBytes > 0`. A model that emits a complete useful response but exits non-zero (rate-limit warnings, partial-completion codes, non-zero-on-findings conventions are all common in LLM CLIs) is classified as "failed" — its findings file still on disk but the run reports exit 1 if it was the only "useful" model. Three subtly different contracts: code + `types.ts` comment + PRD all say different things.
+
+**Fix:** decide which contract is authoritative + align all three. Recommended: relax `isHealthyModelRun` to "produced positive-byte stdout AND was not a spawn error / timeout" (matching the PRD's "produced output" wording).
+
+### AUDIT-20260529-04 — Prompt-renderer is exported but not wired into the verb
+
+Finding-ID: AUDIT-20260529-04 (claude-prompt-renderer-orphaned + codex-prompt-seed-override; cross-model + in-band Finding-001)
+Status: fixed-08971e4
+Severity: high
+Surface: `subcommands/audit-barrage.ts:300-307` (`loadPromptText` reads `--prompt-file` raw); `prompt-renderer.ts` (exported but uncalled at runtime); `install-scope-discovery.ts:84-106` (seeds the override unconditionally)
+
+Fix note (commit `08971e4`): chose option (a) — wired the renderer via a NEW sibling CLI verb `dw-lifecycle audit-barrage-render`. New file `subcommands/audit-barrage-render.ts` takes `--feature <slug>`, `--vars-file <path>` (a JSON map of EXPECTED_VARS → values), `--output <path>` (defaults to stdout). Reads + validates the vars JSON (flat string-map), checks the vars `feature_slug` matches the `--feature` flag, runs the renderer (resolves project override vs plugin default), writes the rendered prompt. Registered in `cli.ts`. Operator workflow now: `audit-barrage-render --vars-file ... --output <prompt>` → `audit-barrage --prompt-file <prompt>`. The unsubstituted-token check was refined in the companion AUDIT-20260529-10 fix. Renderer's seed-scaffold concern is moot now that the seeded comment-only scaffold contains no `{{var}}` markers.
+
+The Task 3 prompt-renderer (`renderAuditBarragePrompt`, `EXPECTED_VARS`, `PROMPT_OVERRIDE_PATH`, `DEFAULT_PROMPT_TEMPLATE_PATH`) is referenced ONLY in `prompt-renderer.ts` and its test — **no runtime caller**. The CLI shim reads `--prompt-file` raw and passes the bytes straight through. The Phase 12 Task 3 acceptance criterion "project-overridable prompt template" is only half-met: config override IS wired (`loadAuditBarrageConfig` is called), but prompt override IS NOT.
+
+Codex independently flagged a related issue: install-scope-discovery unconditionally seeds the override prompt file with literal `{{var}}` markers in instructional prose, which `rejectUnsubstitutedTokens` would reject — making the renderer's failure-loud check fire on its own seeded scaffold.
+
+The operator hit this in-band during the dogfood (Finding-001 — couldn't render the prompt via the renderer because the template's instructional prose contains `{{var}}` strings, so the rejectUnsubstitutedTokens check fires on the template itself). Used a hand-substituted prompt instead.
+
+**Fix:** either (a) wire `renderAuditBarragePrompt` into the verb (CLI takes `--render-vars` or auto-detects + renders) and refine the unsubstituted-token check to only reject `EXPECTED_VARS` that didn't get substituted, OR (b) drop the prompt-renderer entirely + document that the operator hand-composes the prompt + passes it via `--prompt-file`.
+
+### Single-model findings (claude only)
+
+### AUDIT-20260529-05 — Timeout timer leaks on spawn-error path (~305s dangling per uninstalled CLI)
+
+Finding-ID: AUDIT-20260529-05 (claude-timeout-leak-on-spawn-error)
+Status: fixed-08971e4
+Severity: high
+Surface: `spawn-cli.ts:99-110` vs `:118-126`
+
+Fix note (commit `08971e4`): `finish()` now clears BOTH `sigkillTimer` AND `timeoutTimer`; every settle path (spawn-error, close, stream-error) goes through `finish()`. New regression test runs against a nonexistent binary, asserts the run settles in well under a second (no 30s timer dwell), and gives Node a 50ms tick after settle to surface any late timer activity. The change also moves the timer-handle into the closure (declared `let timeoutTimer: NodeJS.Timeout | null = null`) so the stream-error reject path can clear it too.
+
+`clearTimeout(timeoutTimer)` happens ONLY inside the `'exit'` handler. On spawn failure (ENOENT — binary not installed), Node emits `'error'` and never `'exit'`. The error handler calls `finish()` which clears `sigkillTimer` but not `timeoutTimer`. Timer survives ~305 seconds after the run is logically done. The CLI shim's `process.exit()` masks this, but `orchestrateBarrage` is a public library function — any caller that awaits it without forcibly exiting hangs or emits open-handle warnings. Plus the post-finish `child.kill` mutating `timedOut` after the result was reported is a latent race.
+
+The common dogfood case is "not all three CLIs are installed" — this fires on nearly every real run for any audit-barrage adopter who hasn't yet installed all configured models.
+
+**Fix:** move `clearTimeout(timeoutTimer)` into `finish()` alongside the `sigkillTimer` cleanup so every settle path clears both.
+
+### AUDIT-20260529-06 — `--prompt-file` read failure exits 1; config-error exits 2 (inconsistent usage-vs-runtime classification)
+
+Finding-ID: AUDIT-20260529-06 (claude-promptfile-exit-code)
+Status: fixed-08971e4
+Severity: low
+Surface: `audit-barrage.ts:300-308` vs `:285-289`
+
+Fix note (commit `08971e4`): `loadPromptText` now exits 2 on file-read failure to match the config-error path. Both are pre-orchestration input validation; wrapper scripts that key on the exit code now distinguish "the audit ran and all models failed" (exit 1) from "you invoked me wrong" (exit 2).
+
+A missing/unreadable `--prompt-file` is operator-input error of the same class as malformed `--models` filter or bad config — yet exits `1` (the "all models failed" code), while malformed config exits `2`. Wrapper scripts distinguishing "the audit ran and everything failed" from "you invoked me wrong" get the wrong signal.
+
+**Fix:** `loadPromptText` exits 2 on file-read failure (matching the config-error path; both are pre-orchestration input validation).
+
+### AUDIT-20260529-07 — Run-dir timestamp collision risk (second-resolution + recursive mkdir)
+
+Finding-ID: AUDIT-20260529-07 (claude-rundir-collision)
+Status: fixed-08971e4
+Severity: low
+Surface: `run-artifacts.ts:30-37` + `orchestrate-barrage.ts:64`
+
+Fix note (commit `08971e4`): chose millisecond resolution — `encodeTimestamp` now emits `YYYYMMDDTHHMMSSsssZ` (3-digit ms suffix). Two barrages for the same feature in the same wall-clock second land in distinct run dirs. Tests updated to assert the new shape (`/^\d{8}T\d{9}Z$/` regex on `timestamp`; smoke script asserts the new run-dir-name shell glob).
+
+Run-dir name is `<second-resolution-timestamp>-<feature>` + `mkdir({recursive:true})` doesn't error on existing dir. Two barrages for the same feature within the same wall-clock second resolve to the same run dir; the second silently overwrites the first. Project's "database preserves, doesn't delete" ethos says this is the wrong default.
+
+**Fix:** millisecond-resolution timestamp OR detect existing dir + suffix `-2`/`-3`.
+
+### AUDIT-20260529-08 — Misleading comment in `orchestrateBarrage`
+
+Finding-ID: AUDIT-20260529-08 (claude-orchestrate-comment-drift)
+Status: fixed-08971e4
+Severity: low
+Surface: `orchestrate-barrage.ts:71-83`
+
+Fix note (commit `08971e4`): comment replaced with an accurate description — "assemble the BarrageRun, write INDEX.md, return the same record." The deliberate duplication (caller + `writeIndexFile` both derive `<runDir>/INDEX.md`) is now explicitly noted as a composability choice (the helper can be called standalone from tests).
+
+Comment reads "assemble it without the indexPath first, then patch it on after the write so the record we return matches what landed on disk" — but the code does the opposite (computes `indexPath` up front, no post-write patch). `writeIndexFile`'s return value is discarded.
+
+**Fix:** align comment to actual code (or drop the inaccurate "patch on after" framing).
+
+### AUDIT-20260529-09 — Test files for this feature were outside the audited diff (range scoping concern)
+
+Finding-ID: AUDIT-20260529-09 (claude-test-files-outside-range)
+Status: informational
+Severity: low
+Surface: this audit-barrage run's diff scope
+
+The audit prompt's diff excluded `*.test.ts` (I scoped narrowly to the production surface). Claude flagged that the "43 + 27 tests" claim couldn't be verified from the diff alone, and that a green test count is weak evidence for the timing/teardown bugs found above. Actionable: future audit-barrage runs should include the test surface in the diff scope, OR the operator should explicitly acknowledge the scope cut.
+
+### Operator-side in-band findings during the dogfood
+
+### AUDIT-20260529-10 — Renderer's unsubstituted-token rejection over-eager on instructional prose
+
+Finding-ID: AUDIT-20260529-10 (in-band Finding-001; subsumed by AUDIT-20260529-04)
+Status: fixed-08971e4
+Severity: high
+Surface: `prompt-renderer.ts:205-211`
+
+Fix note (commit `08971e4`): `rejectUnsubstitutedTokens` now scans ONLY for unsubstituted EXPECTED_VARS markers, not arbitrary `{{...}}` strings. Template prose that mentions `{{var}}` / `{{name}}` / `{{var_name}}` as documentation of the substitution mechanism passes through unchanged. New tests cover the pass-through path + assert that a surviving DECLARED-var marker still fails loud (declared-var contract preserved).
+
+Operator hit this in-band trying to render the prompt template — the template's instructional prose mentions `{{var}}` / `{{prompt}}` / `{{name}}` / `{{var_name}}` as documentation about the substitution mechanism. `rejectUnsubstitutedTokens` rejects ANY `{{xxx}}` substring, so it rejects the template's own instructional examples. Subsumed by AUDIT-20260529-04; fix lands together.
+
+### AUDIT-20260529-11 — Prompt template's marker triplet pattern triples large vars
+
+Finding-ID: AUDIT-20260529-11 (in-band Finding-002)
+Status: fixed-08971e4
+Severity: medium
+Surface: `templates/audit-barrage-prompt.md`
+
+Fix note (commit `08971e4`): `templates/audit-barrage-prompt.md` redesigned to drop the marker triplet pattern. Each declared var now has exactly ONE substitution site (descriptive markdown section header + bare `{{var}}` line beneath it). A 60 KB `diff` now appears once in the rendered output (60 KB, not 180 KB). New test asserts each value's unique sentinel appears exactly once via `rendered.split(value).length - 1 === 1`. The renderer's substitution machinery did not need to change (already a literal `split().join()` — with one occurrence per var in the template, correct by design).
+
+The template wraps each substitution as:
+```
+<!-- {{var}} -->
+{{var}}
+<!-- {{var}} -->
+```
+
+Substitution replaces all three occurrences (the two HTML comment markers + the bare token), so the value appears in the rendered output 3 times. For small vars (`feature_slug`) this is harmless; for `diff` at 60 KB this triples to 180 KB. The operator's naive `.split().join()` substitution hit this; the prompt-renderer presumably has the same shape (need to verify).
+
+**Fix:** template convention should use a single substitution site (e.g. fenced code block) rather than marker triplets — OR the renderer must be more precise about which occurrences to substitute (only the bare-token line, not the marker comments).
+
+### Acceptance signal verification
+
+**Acceptance signal: ≥1 finding the in-band self-audit + SDD review cycle didn't catch.**
+- In-band self-audit (orchestrator-loop): didn't run formally; the operator's own pre-commit + tsc + test pass equivalent gates.
+- SDD review cycle: the Task 2 + Task 3 dispatches went through `dw-lifecycle wrap-prompt --agent-type typescript-pro` + `dw-lifecycle validate-return`; agents shipped the work; no review-cycle findings surfaced.
+- All 13 audit-barrage findings above were NOVEL — not caught by tsc, tests, or the dispatch-wrapper's response validation.
+
+**Conclusion: acceptance signal met overwhelmingly.** The audit-barrage feature works as designed; its first dogfood against itself surfaced 4 cross-model HIGH-confidence bugs + 9 single-model findings, all of which would have shipped without the audit-barrage's existence.
+
+Next steps (out of scope for Task 6 itself; track separately):
+- Fix AUDIT-20260529-01..05 in a follow-up task before Phase 12 completes (the HIGH findings are blocking-adjacent per claude's framing).
+- AUDIT-20260529-06..09 are polish; fix in follow-ups or surface as GH issues.
+- AUDIT-20260529-10..11 are the prompt-renderer / template design issues uncovered in-band; fold into the Task 4/7 follow-up that wires the renderer properly.
+
+### Closure note (2026-05-29; commit `08971e4`)
+
+All 11 findings now carry `Status: fixed-08971e4` (or `informational` for AUDIT-20260529-09). The follow-up task referenced above ran in the same session as Phase 12 Tasks 4/5/7 — one coherent commit covers every fix + the remaining Phase 12 deliverables.
+
+Awaiting `verified-<date>` on a post-release dogfood re-run (`/dw-lifecycle:audit-barrage` against the post-fix diff to confirm the fixed shapes don't regress and that the new prompt-renderer wiring produces a usable prompt end-to-end).
+
+## 2026-05-29 — deskwork-plugin TF log import (scope-discovery items)
+
+Source: `docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`. Per project rule `.claude/rules/agent-discipline.md` § "scope-discovery v1 — dogfood feedback via tooling-feedback.md", scope-discovery-related TF entries from sibling features import into this audit-log as `AUDIT-YYYYMMDD-NN`. Hygiene-related TF entries (deskwork-plugin TF-001 `session-end-hygiene` scoping bug → [#361](https://github.com/audiocontrol-org/deskwork/issues/361); hygiene-feature TF-001 `validate-return` refactor-cue substring) are claimed by `feature/hygiene` per operator decision 2026-05-29 and are intentionally NOT imported here.
+
+Mapping:
+- TF-002 (DSC · low) → AUDIT-20260529-12
+- TF-003 (MISC · medium) → AUDIT-20260529-13
+- TF-004 (MISC · low) → AUDIT-20260529-14
+- TF-005 (CL · low) → AUDIT-20260529-15
+
+Fix scoping into Phase 14 — Friction-fix sweep (`workplan.md`).
+
+### AUDIT-20260529-12 — orchestrator-turn 3/6 catalog NOTE is constant per-turn noise
+
+Finding-ID: AUDIT-20260529-12
+Status:     fixed-245f8ae
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/orchestrator-turn.ts` (the assembler's `decorateSummaryWithCatalogPresence` decoration site)
+
+Imported from deskwork-plugin TF-002 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`).
+
+Fix note (commit `245f8ae`, 2026-05-29; Phase 14 Task 1): the assembler now threads the prior turn's `catalogPresentCount` (NEW optional field on `TurnHistoryEntry`) into `decorateSummaryWithCatalogPresence`. The NOTE is emitted only when the count is undefined (first turn / legacy state), changed from the prior turn, OR a new `--verbose` flag forces it. The WARNING case (count === 0) stays always-on. Tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/orchestrator-loop/catalog-note-noise.test.ts` cover the 8 scenarios (first-turn, steady-state, count-rise, count-fall, verbose-override, zero-WARNING, full-6/6-no-NOTE, count-persistence). Awaiting `verified-<date>` after a few real dogfood turns confirm the NOTE actually goes quiet on steady state.
+
+Every `dw-lifecycle orchestrator-turn --feature <slug> --skip-judge --skip-auditor` invocation emits the identical stderr summary: `NOTE: only 3/6 catalog files present (anti-patterns.yaml, adopter-manifests.yaml, clones.yaml). 0 new audit entries; 0 wrong-decisions; ...`. The NOTE never changes between turns when the project has a steady-state catalog count and carries no actionable signal — it dilutes the genuinely-variable parts of the summary.
+
+Suggested fix (from TF-002):
+- *Light:* emit the "N/6 catalog files present" NOTE only when the count CHANGES from the last persisted turn (state already lives in `controller-state.json`), or gate behind `--verbose`.
+- *Medium:* if 3/6 is the steady state for a project without the optional catalogs, downgrade from per-turn NOTE to a one-time install-time hint.
+
+Scoped into workplan: Phase 14 Task 1 (fix-finding-AUDIT-20260529-12).
+
+### AUDIT-20260529-13 — dispatch-wrapper wrap-prompt round-trip + grammar false-positives
+
+Finding-ID: AUDIT-20260529-13
+Status:     fixed-8365973
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts`, `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts`
+
+Imported from deskwork-plugin TF-003 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`). Co-tracked with AUDIT-20260529-14 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362).
+
+**Follow-up landed in commit `b5c362e` (Phase 14 Task 2 review integration):** the Track 2 review surfaced that the GRAMMAR_INSTRUCTION prelude's Gotchas item 3 still showed `renderSwimStub` as a FAIL example after Phase 14 Task 2 relaxed the bare-noun match — agents reading the prelude would falsely believe descriptive `stub` trips. The prelude was rewritten to document context-aware behavior (ambiguous nouns require deferral collocation; bare identifiers pass; comment-marker form `TODO`/`FIXME`/`XXX` still trips). See AUDIT-20260529-16.
+
+Fix note (commit `8365973`, 2026-05-29; Phase 14 Task 2 — #362 Medium): widened `SEARCHED_COUNT_NOUN_REGEX` to accept `issues?`/`bugs?`/`findings?`/`errors?`/`warnings?`. Restructured forbidden-phrase matching: ambiguous bare nouns (`stub`, `placeholder`, `pending`, `temporary`, `hack`, `defer`, `deferred`, `todo`, `fixme`, `xxx`) removed from `FORBIDDEN_DEFERRAL_PHRASES`; 6 new context-aware regexes added to `FORBIDDEN_DEFERRAL_REGEXES` for (a) ALL-CAPS comment markers (`TODO`/`FIXME`/`XXX` — case-sensitive), (b) ambiguous noun + deferral collocation (`placeholder for now` / `stub until F3`), (c) deferral verb + ambiguous noun, (d) bare `defer to v2` verb action. Unambiguous deferral phrases (`for now`, `will fix`) stay in PHRASES. Grammar-instruction prelude updated to document the expanded whitelist; rejection examples refreshed. 24 new tests at `dispatch-wrapper-grammar.test.ts`; existing TF-008 noun-whitelist test updated; fixtures' `REGEX_SAMPLE_REASONS` extended to keep parallel with the regex list. Awaiting `verified-<date>` after a few live reviewer dispatches exercise the relaxed grammar end-to-end. Pairs with the Light fix in AUDIT-20260529-14 (already landed at `95927f5`).
+
+Every `/dw-lifecycle:review` reviewer dispatch requires a hand-managed round-trip: `mktemp` a prompt file → Write the prompt body into it → `dw-lifecycle wrap-prompt --prompt-file <path>` → paste the (120+ line) wrapped stdout into the Agent tool. The wrapped suffix's return grammar has three sharp edges that recur per session: the Searched-count noun whitelist (`5 issues found` rejected; must end in `matches`/`hits`/...), mandatory `path:LINE` on every Excluded entry (`:1` sentinel for whole-file), and a forbidden-substring list that collides with ordinary descriptive prose (`stub` / `placeholder` / `pending` in a reason trips the deferral detector even in non-deferral usage).
+
+GH issue: [#362](https://github.com/audiocontrol-org/deskwork/issues/362) (co-files TF-003 + TF-004 with Light / Medium / Heavy fix ladder). Per Phase 13 anti-deferral discipline, the GH issue alone is not a disposition — scoped into workplan below.
+
+Suggested fix (from TF-003 / #362):
+- *Light (companion to AUDIT-20260529-14):* `dispatch-review --prompt-file <p> --agent-type <type>` verb that wraps both legs of the round-trip in one CLI call.
+- *Medium:* word-boundary + context-aware match on forbidden substrings; widen Searched-count noun whitelist (`issues`, `files`, `instances`, ...).
+- *Heavy:* the architectural collapse — operator decision required.
+
+Scoped into workplan: Phase 14 Task 2 (fix-finding-AUDIT-20260529-13) — covers Medium grammar relaxation; Light stdin fix lives in Task 3 below.
+
+### AUDIT-20260529-14 — validate-return has no stdin path
+
+Finding-ID: AUDIT-20260529-14
+Status:     fixed-95927f5
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/validate-return.ts`
+
+Imported from deskwork-plugin TF-004 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`). Co-tracked with AUDIT-20260529-13 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362).
+
+Fix note (commit `95927f5`, 2026-05-29; Phase 14 Task 3): `--response-file -` now reads from stdin via a new `readResponseSource(responseFile, stdin)` helper. UTF-8 bytes accumulated to EOF; empty stdin throws `EmptyStdinError` (CLI surfaces as exit 2 with the message `validate-return: stdin was empty (...). Pipe the response body in or pass a real file path.`). File-path mode unchanged. 7 tests cover the contract; end-to-end smoke verified with `printf | dw-lifecycle validate-return --response-file - --agent-type reviewer --json`. Awaiting `verified-<date>` after the next live reviewer dispatch uses the pipe form end-to-end.
+
+Validating each reviewer return requires writing the agent's Searched / Included / Excluded block to a temp file, then `dw-lifecycle validate-return --response-file <path> --json`. There's no stdin path (`--response-file -`), so the response can't be piped; it must round-trip through a temp file the orchestrator hand-creates.
+
+GH issue: [#362](https://github.com/audiocontrol-org/deskwork/issues/362) (Light fix in the issue's ladder; one-line patch). Per Phase 13 anti-deferral discipline, the GH issue alone is not a disposition — scoped into workplan below.
+
+Suggested fix (from TF-004): accept `--response-file -` (read from stdin). Mirrors the `gh issue create --body-file -` convention already used elsewhere in this project.
+
+Scoped into workplan: Phase 14 Task 3 (fix-finding-AUDIT-20260529-14).
+
+### AUDIT-20260529-15 — clone gate scanned gitignored directories until `gitignore: true` set
+
+Finding-ID: AUDIT-20260529-15
+Status:     verified-2026-05-29
+Severity:   low
+Surface:    `plugins/dw-lifecycle/templates/scope-discovery/.jscpd.json`, scope-discovery's own `.jscpd.json`
+
+Imported from deskwork-plugin TF-005 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`).
+
+Fix originated on `feature/deskwork-plugin` at commit `37683c8` ("fix(38·1): clone gate honors .gitignore — set gitignore:true (#354)"). Cherry-picked onto `feature/scope-discovery` at commit `884851e` to close the cross-branch verification loop without waiting for `feature/deskwork-plugin → main` merge. Sets `"gitignore": true` in the scope-discovery `.jscpd.json` + the adopter template seed; regression at `clone-detector.gitignore.test.ts` (4 tests; 1.2s — gitignored dir skipped, tracked clone still caught). Closes pilot-reported [#354](https://github.com/audiocontrol-org/deskwork/issues/354) (the GH issue stays open per the closure-requires-verified-release rule until verified post-release).
+
+Verified live (2026-05-29): `npx vitest run src/__tests__/scope-discovery/clone-detector.gitignore.test.ts` exits 0 with 4/4 green; pre-commit clone-gate ran cleanly on the cherry-pick commit.
+
+Cross-branch chemistry note: when `feature/deskwork-plugin` eventually merges to main, the `37683c8` patch content will be a duplicate of what `884851e` already applied here. Git resolves by patch ID — no conflict expected.
+
+## 2026-05-29 — Three-track review integration (post-Phase-14 commits)
+
+Track 1: `tsc --noEmit` clean; plugin vitest 2150/2150; `dw-lifecycle check-open-findings --feature scope-discovery` exit 0; `dw-lifecycle check-clones --gate-mode` exit 0 (no NEW groups).
+
+Track 2 (spec-compliance, `feature-dev:code-reviewer` dispatch): 1 finding.
+Track 3 (code-quality, `feature-dev:code-reviewer` dispatch in parallel): 5 findings (4 actionable + 1 informational).
+
+All 5 dispatched through the post-Phase-14 dispatch wrapper. Track 2's first response was REJECTED by the validator (`4 commits reviewed, 1 finding` — comma in the count phrase breaks the modifier regex); response was hand-corrected to a parseable Searched line (`17 files`) and re-validated cleanly. Both responses then validated through the AUDIT-14 stdin pipe (`cat <file> | dw-lifecycle validate-return --response-file - --agent-type reviewer --json`) — dogfooded the AUDIT-13 + AUDIT-14 fixes end-to-end.
+
+Per the agent-discipline rule, the 4 actionable findings landed inline in a follow-up commit; the informational one is recorded as `informational` with no required fix.
+
+### AUDIT-20260529-16 — GRAMMAR_INSTRUCTION prelude Gotchas item 3 stale after Phase 14 Task 2
+
+Finding-ID: AUDIT-20260529-16
+Status:     fixed-b5c362e
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:347-360`
+
+Track 2 review-finding (confidence 82). After Phase 14 Task 2's grammar relaxation, the prelude's Gotchas item 3 still showed `renderSwimStub is the focus-off stub button` as a FAIL example and claimed "the parser's substring match doesn't distinguish proper-noun usage from deferral usage." Post-relaxation, that example PASSES (bare `stub` no longer trips without a deferral collocation). Future agents reading the prelude would over-avoid descriptive `stub` / `placeholder` in Excluded reasons or be surprised when the FAIL example actually passes.
+
+Fix: rewrote item 3 to document context-aware behavior — ambiguous nouns require deferral collocation (`for now`, `until v#`, `until we`, `until the next <unit>`, etc.); descriptive prose passes (`placeholder text shown until the user types`, `renderSwimStub is the focus-off button`, `defer to the spec`). The case-sensitive `TODO`/`FIXME`/`XXX` comment markers are called out explicitly. Updated TF-009 test in `validate-return.test.ts` (the prior assertions about `swim-stub` workaround + `PURPOSE` are stale; new assertions check `context-aware`, `Ambiguous nouns`, `deferral collocation`, `renderSwimStub` example, `defer to the spec` example).
+
+### AUDIT-20260529-17 — open-findings-gate version-candidate list is narrower than the rest of the tool
+
+Finding-ID: AUDIT-20260529-17
+Status:     fixed-b5c362e
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/open-findings-gate.ts:66-69`
+
+Track 3 review-finding. The gate hardcoded two candidate paths (`docs/1.0/001-IN-PROGRESS/<slug>` + `docs/0.x/001-IN-PROGRESS/<slug>`) while `orchestrator-turn.ts:findFeatureDirectory` walks every top-level `docs/*/001-IN-PROGRESS/` dir dynamically. Real features at `docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/` and `docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/` would throw `FeatureRootNotFoundError` instead of returning a gate verdict — disorienting for the operator.
+
+Fix: replaced the hardcoded candidate list with a `findFeatureRoot` walk that `readdir`s every top-level directory under `docs/`, looks for `001-IN-PROGRESS/<slug>`, and returns the first match. Updated `FeatureRootNotFoundError` to report the actual versions walked (not the hardcoded fallback). 4 new test scenarios at `open-findings-gate.test.ts`: docs/0.19.0/, docs/0.16.0/, arbitrary version (`2.0`), mixed-docs case with README.md + 003-COMPLETE/ subdirs to skip. Live smoke confirmed: gate now returns exit 0 for `studio-mobile-first` and `open-issue-tranche-cleanup`.
+
+### AUDIT-20260529-18 — grammar false-negative: ambiguous-noun + intervening modifier slips deferral detection
+
+Finding-ID: AUDIT-20260529-18
+Status:     fixed-b5c362e
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts:144`
+
+Track 3 review-finding. Phase 14 Task 2's ambiguous-noun regex required adjacency between the noun and the deferral collocation: `\b(?:stub|placeholder|...)\s+(?:for\s+now|until|...)\b/i`. The reviewer flagged that an intervening modifier word slips the matcher — `placeholder approach until we figure out the right shape` doesn't trip because `approach` separates `placeholder` from `until`. Same gap for `stub implementation until v2`, `placeholder code path until the next sprint`, etc.
+
+Fix: widened the regex to allow `{0,2}` modifier tokens between the noun and the collocation, AND extended the `until` deferral context to include `until we` + `until the next <sprint|milestone|phase|release|version|cycle|iteration>` (the specific shapes the reviewer flagged as gaps). Kept the descriptive cases passing: `placeholder text shown until the user types` does NOT trip because `the user` is not in the `until` deferral suffix; `stub function tested elsewhere` does NOT trip because there's no deferral collocation. 5 new positive tests + 2 new negative tests at `dispatch-wrapper-grammar.test.ts`.
+
+### AUDIT-20260529-19 — grammar false-positive: `defer to <noun phrase>` trips legitimate idioms
+
+Finding-ID: AUDIT-20260529-19
+Status:     fixed-b5c362e
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts:148`
+
+Track 3 review-finding. Phase 14 Task 2's defer-verb regex included bare `to` in the alternation: `\bdefer(?:red|ring)?\s+(?:to|until|...)\b/i`. This caught the canonical `defer to v2` deferral but also caught legitimate idioms: `defer to the operator` (let the operator decide), `defer to the spec` (rely on the canonical spec), `defer to the existing abstraction` (use the existing code). The pattern is a common natural-English construction agents would use in Excluded reasons.
+
+Fix: narrowed to require a version (`v\d`), phase (`F\d` / `phase \d`), or `the next <unit>` target after `to`: `to\s+(?:v\d|F\d|phase\s+\d|the\s+next\s+(?:milestone|sprint|phase|release|version|cycle|iteration))`. `until` retained as an unambiguous deferral preposition. New tests: 3 positive (`defer to v2`, `defer to F3`, `defer to phase 5`) + 3 negative (`defer to the operator`, `defer to the spec`, `defer to the existing abstraction`) + 1 past-tense regression (`deferred to v2`).
+
+### AUDIT-20260529-20 — whitespace-only stdin surfaces as confusing DispatchRejected instead of EmptyStdinError
+
+Finding-ID: AUDIT-20260529-20
+Status:     fixed-b5c362e
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/validate-return.ts:62`
+
+Track 3 review-finding. Phase 14 Task 3's empty-stdin guard used `body.length === 0`, which only catches truly-empty stdin. A whitespace-only pipe (e.g. `echo "" | dw-lifecycle validate-return --response-file - --agent-type reviewer` — the common operator-typo case) produces a non-empty body of just `\n`, which then fails downstream inside `parseReturn` with a `DispatchRejected` on missing blocks. The operator sees a generic "missing required block(s)" message instead of the actionable `EmptyStdinError` hint to pipe the response body in.
+
+Fix: changed `body.length === 0` to `body.trim().length === 0` — whitespace-only stdin now throws `EmptyStdinError` cleanly. 4 new test scenarios at `validate-return-stdin.test.ts`: newline-only, CRLF-only, multi-newline-with-tab, and a positive case (`'  x  '` with surrounding whitespace passes through with leading/trailing whitespace preserved).
+
+### AUDIT-20260529-21 — assembler does a redundant second `loadLoopState` to read `priorPresentCount`
+
+Finding-ID: AUDIT-20260529-21
+Status:     informational
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/orchestrator-turn.ts:638-651`
+
+Track 3 review-finding (informational). The orchestrator-turn assembler loads `LoopState` independently at the top to read the prior catalog count, and the library `runOrchestratorTurn` ALSO loads `LoopState` internally inside `loop-turn.ts:329`. Two reads of the same file in normal sequential execution. The reviewer flagged it as informational: "not a functional bug in single-process sequential execution" but creates "unnecessary I/O coupling."
+
+Disposition: recorded as informational, no immediate fix. The cleaner refactor (pass `loopStateOverride` from the assembler into the library so the library uses the assembler's pre-loaded state) widens the library's surface for a UI-side concern (NOTE-noise gating) — not appropriate to land alongside the review integration. If/when the assembler grows additional loop-state-dependent decoration that justifies the cost, the refactor follows then. No workplan task; no GH issue.
+
+### Closure note
+
+All 4 actionable findings (AUDIT-20260529-16/17/18/19/20) land in the same review-integration commit. AUDIT-20260529-21 is informational and requires no fix. Plugin suite at 2170/2170 (2150 baseline + 20 new tests). `tsc --noEmit` clean. Smoke-verified end-to-end:
+
+- `dw-lifecycle check-open-findings --feature scope-discovery` → exit 0
+- `dw-lifecycle check-open-findings --feature studio-mobile-first` → exit 0 (NEW: previously would have errored with FeatureRootNotFoundError)
+- `dw-lifecycle check-open-findings --feature open-issue-tranche-cleanup` → exit 0 (NEW)
+
+Awaiting `verified-<date>` on each of -16 through -20 after the next batch of dispatch-wrapper-using or gate-using work confirms no regression.

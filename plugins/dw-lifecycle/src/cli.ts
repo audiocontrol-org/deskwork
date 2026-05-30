@@ -28,11 +28,19 @@ import { installAgentPrompts } from './subcommands/install-agent-prompts.js';
 import { migrateFromPilot } from './subcommands/migrate-from-pilot.js';
 import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-discovery-hooks.js';
 import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
+import { auditBarrage } from './subcommands/audit-barrage.js';
+import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
 import { wrapPrompt } from './subcommands/wrap-prompt.js';
 import { validateReturn } from './subcommands/validate-return.js';
 import { debtReport } from './subcommands/debt-report.js';
 import { triageIssues } from './subcommands/triage-issues.js';
 import { promoteDeferrals } from './subcommands/promote-deferrals.js';
+import { promoteFindings } from './subcommands/promote-findings.js';
+import { checkOpenFindingsCli } from './subcommands/check-open-findings.js';
+import { applyAuditFlipsCli } from './subcommands/apply-audit-flips.js';
+import { closeShippedAuditFindingsCli } from './subcommands/close-shipped-audit-findings.js';
+import { reAuditFixedFindingsCli } from './subcommands/re-audit-fixed-findings.js';
+import { checkFixTaskTddCli } from './subcommands/check-fix-task-tdd.js';
 import { archiveBranch } from './subcommands/archive-branch.js';
 import { closeShipped } from './subcommands/close-shipped.js';
 import { sessionEndHygiene } from './subcommands/session-end-hygiene.js';
@@ -83,11 +91,19 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'migrate-from-pilot': migrateFromPilot,
   'uninstall-scope-discovery-hooks': uninstallScopeDiscoveryHooks,
   'orchestrator-turn': orchestratorTurn,
+  'audit-barrage': auditBarrage,
+  'audit-barrage-render': auditBarrageRender,
   'wrap-prompt': wrapPrompt,
   'validate-return': validateReturn,
   'debt-report': debtReport,
   'triage-issues': triageIssues,
   'promote-deferrals': promoteDeferrals,
+  'promote-findings': promoteFindings,
+  'check-open-findings': checkOpenFindingsCli,
+  'apply-audit-flips': applyAuditFlipsCli,
+  'close-shipped-audit-findings': closeShippedAuditFindingsCli,
+  're-audit-fixed-findings': reAuditFixedFindingsCli,
+  'check-fix-task-tdd': checkFixTaskTddCli,
   'archive-branch': archiveBranch,
   'close-shipped': closeShipped,
   'session-end-hygiene': sessionEndHygiene,

@@ -83,9 +83,15 @@ export class DispatchRejected extends Error {
  * Source: `.claude/rules/agent-discipline.md` §"'Just for now' is bullshit".
  * Substring match is case-insensitive.
  *
- * Entries that include a placeholder like `<n>` are expressed as regex
- * patterns below (FORBIDDEN_DEFERRAL_REGEXES). Plain substrings are
- * matched verbatim against the lowercased reason.
+ * Phase 14 Task 2 (AUDIT-20260529-13) — narrowed to unambiguous deferral
+ * phrases only. Ambiguous nouns (`stub`, `placeholder`, `pending`,
+ * `temporary`, `hack`, `defer`, `deferred`) were previously matched as
+ * bare substrings and tripped on descriptive prose like "the placeholder
+ * tile" or "stub function" — TF-003 friction the reviewer-dispatch loop
+ * hit repeatedly. Those words now require deferral context per
+ * FORBIDDEN_DEFERRAL_REGEXES below. Conventional code-comment markers
+ * (`TODO`, `FIXME`, `XXX`) are also moved to regex with case-sensitive
+ * matching so descriptive prose mentioning the markers doesn't trip.
  */
 export const FORBIDDEN_DEFERRAL_PHRASES: ReadonlyArray<string> = [
   'for now',
@@ -97,16 +103,6 @@ export const FORBIDDEN_DEFERRAL_PHRASES: ReadonlyArray<string> = [
   'will address',
   'address in',
   'eventually',
-  'todo',
-  'fixme',
-  'hack',
-  'xxx',
-  'temporary',
-  'stub',
-  'placeholder',
-  'pending',
-  'defer',
-  'deferred',
   'next pass',
   'next time',
 ];
@@ -134,6 +130,40 @@ export const FORBIDDEN_DEFERRAL_REGEXES: ReadonlyArray<RegExp> = [
   /\blater\s+(?:pass|version|phase|sprint|milestone|iteration|cycle|round)\b/i,
   /\b(?:as|in)\s+(?:a\s+)?follow[-\s]up\b/i,
   /\bfollow[-\s]up\s+(?:issue|ticket|task|pr|commit|change)\b/i,
+  // Phase 14 Task 2 (AUDIT-20260529-13) — conventional code-comment
+  // deferral markers. Case-sensitive on purpose: descriptive prose like
+  // "the todo list" or "we need a checklist of fixme items" should pass;
+  // ALL-CAPS forms are the marker convention this catches.
+  /\bTODO\b/,
+  /\bFIXME\b/,
+  /\bXXX\b/,
+  // Phase 14 Task 2 — ambiguous nouns require deferral context. The
+  // word alone is a descriptive noun in many domains (UI components,
+  // technical scratch space, etc.); only when paired with a deferral
+  // collocation does it signal an IOU.
+  //
+  // AUDIT-20260529-18 (review-finding T3-2): widened with `{0,2}`
+  // modifier tokens between noun and collocation, plus the targeted
+  // `until we` / `until the next <unit>` deferral suffix. Catches
+  // `placeholder approach until we figure out` (1 modifier);
+  // `placeholder code path until the next sprint` (2 modifiers).
+  // Stays narrow enough that descriptive uses like `placeholder text
+  // shown until the user types` do NOT trip (the `until` context is
+  // `the user`, not `we` / `the next <sprint>` / version).
+  /\b(?:stub|placeholder|pending|temporary|hack|hacky|deferred?)(?:\s+[\w-]+){0,2}\s+(?:for\s+now|until\s+(?:v\d|F\d|phase|we\b|the\s+next\s+(?:milestone|sprint|phase|release|version|cycle|iteration))|in\s+(?:v\d|phase|F\d|future)|pending|deferred?|later)\b/i,
+  // "leave/use a <stub|placeholder|...>" followed by deferral verb.
+  /\b(?:leave|leaving|left|use|using|put|added?|adding|insert(?:ed|ing)?)\s+(?:a|an|the)?\s*(?:stub|placeholder|temporary|deferred?)\b\s*(?:in|until|for|pending|to\s+(?:address|fix|handle|come\s+back|revisit)|until\s+we|so\s+we\s+can\s+(?:fix|address|come\s+back))/i,
+  // Bare "defer/deferred" as a verb action — version/phase target.
+  //
+  // AUDIT-20260529-19 (review-finding T3-3): narrowed to require a
+  // version (`v\d`), phase (`F\d` / `phase \d`), or `next <unit>`
+  // marker after `to`. The prior bare `to` blocked legitimate idioms
+  // like `defer to the operator` / `defer to the spec` / `defer to
+  // the existing abstraction`. With this narrowing, `defer to v2` /
+  // `defer to F3` / `defer to phase 5` still trip; `defer to <noun
+  // phrase>` passes. `until` retained as an unambiguous deferral
+  // preposition.
+  /\bdefer(?:red|ring)?\s+(?:to\s+(?:v\d|F\d|phase\s+\d|the\s+next\s+(?:milestone|sprint|phase|release|version|cycle|iteration))|until)\b/i,
 ];
 
 interface ForbiddenMatch {
@@ -216,7 +246,7 @@ function findLastBlockStart(text: string, label: string): number {
  * documentation in dispatch-wrapper.ts.
  */
 const SEARCHED_COUNT_NOUN_REGEX =
-  /^(\d+)\s+(?:[\w-]+\s+){0,3}(?:match(?:es)?|hits?|occurrences?|instances?|call\s+sites?|sites?|files?|results?|references?)\b/i;
+  /^(\d+)\s+(?:[\w-]+\s+){0,3}(?:match(?:es)?|hits?|occurrences?|instances?|call\s+sites?|sites?|files?|results?|references?|issues?|bugs?|findings?|errors?|warnings?)\b/i;
 
 function parseSearchedLine(line: string, rawText: string): SearchedBlock {
   const body = line.replace(/^\s*Searched:\s*/, '');
@@ -235,7 +265,8 @@ function parseSearchedLine(line: string, rawText: string): SearchedBlock {
   if (countMatch === null) {
     throw new DispatchRejected(
       `Malformed Searched: count — expected "<N> <noun>" where <noun> is one of ` +
-        `matches/match/hits/hit/occurrences/instances/sites/call sites/files/results/references ` +
+        `matches/match/hits/hit/occurrences/instances/sites/call sites/files/results/references/` +
+        `issues/bugs/findings/errors/warnings ` +
         `(optionally preceded by up to 3 modifier tokens, e.g. "2 source-emitter call sites"); ` +
         `but got: ${countPart}`,
       [],

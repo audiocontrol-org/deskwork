@@ -25,6 +25,8 @@
  *   anti-patterns.yaml                     (seeded: `anti_patterns: []`)
  *   adopter-manifests.yaml                 (seeded: `adopter_manifests: []`)
  *   deprecation-queue.yaml                 (seeded: `deprecations: []`)
+ *   audit-barrage-prompt.md                (seeded: commented-out pointer)
+ *   audit-barrage-config.yaml              (seeded: commented-out pointer)
  *
  * Exit codes (returned via `main()` for the subcommand shim to forward):
  *   0   install completed (incl. idempotent no-ops).
@@ -82,6 +84,53 @@ const COPY_FILES: ReadonlyArray<{
  * missing-field for any registry that was hand-authored without a real
  * detector run.
  */
+const AUDIT_BARRAGE_PROMPT_SEED = `# Audit-barrage prompt override (project-local)
+#
+# To override the plugin's shipped audit-barrage prompt template, copy
+# the default body from plugins/dw-lifecycle/templates/audit-barrage-prompt.md
+# (in the dw-lifecycle plugin install) into this file and edit. The
+# renderer treats this file's presence as the override signal; when this
+# file is absent, the plugin default is used.
+#
+# This seeded scaffold is a header-only marker so the override path
+# exists at a discoverable location without overriding the default
+# until the operator opts in. The renderer requires the SAME {{var}}
+# substitution markers as the default (feature_slug, workplan_summary,
+# diff, audit_log_excerpt, commit_subjects); missing any will throw at
+# render time.
+#
+# To opt in: replace this file's content with the default's body, then edit.
+`;
+
+const AUDIT_BARRAGE_CONFIG_SEED = `# Audit-barrage model battery override (project-local)
+#
+# To override the plugin's shipped audit-barrage model battery, uncomment
+# + edit the example below. The config-loader treats a file with a
+# parseable, non-empty 'models:' list as the override; when this file is
+# absent OR its 'models:' list is commented out, the plugin default at
+# plugins/dw-lifecycle/templates/audit-barrage-config.yaml is used.
+#
+# Schema: see scope-discovery/schema/audit-barrage-config.yaml.schema.json
+# Default invocations are derived from the live-probed contracts in
+# docs/.../audit-barrage-cli-notes.md.
+#
+# Example override (uncomment + edit to activate):
+#
+# models:
+#   - name: claude
+#     binary: claude
+#     args_template: "-p {{prompt}}"
+#     timeout_seconds: 300
+#   - name: codex
+#     binary: codex
+#     args_template: "exec {{prompt}}"
+#     timeout_seconds: 300
+#   - name: gemini
+#     binary: gemini
+#     args_template: "{{prompt}}"
+#     timeout_seconds: 300
+`;
+
 const SEED_FILES: ReadonlyArray<{
   readonly name: string;
   readonly content: string;
@@ -113,6 +162,27 @@ const SEED_FILES: ReadonlyArray<{
     // is the steady state until that enhancement lands; the doctor's
     // schema-stale rule keys off `schemaVersion: 1` to detect drift.
     content: 'schemaVersion: 1\ndeprecations: []\n',
+  },
+  {
+    name: 'audit-barrage-prompt.md',
+    // Pointer scaffold for the audit-barrage prompt override. The
+    // plugin's shipped default at `plugins/dw-lifecycle/templates/audit-barrage-prompt.md`
+    // is the runtime fallback when this file is absent OR empty-after-
+    // stripping-comments. Operators who want to customize the audit
+    // prompt copy the plugin default's body in here and edit. We seed
+    // a header-only commented marker so the file lives at a discoverable
+    // path without overriding the default until the operator opts in.
+    content: AUDIT_BARRAGE_PROMPT_SEED,
+  },
+  {
+    name: 'audit-barrage-config.yaml',
+    // Pointer scaffold for the audit-barrage model battery override.
+    // The plugin's shipped default at `plugins/dw-lifecycle/templates/audit-barrage-config.yaml`
+    // is the runtime fallback while this file's `models:` list stays
+    // commented-out. To override the default battery, uncomment + edit
+    // the example block below; the config-loader validates each entry
+    // against the schema at scope-discovery/schema/audit-barrage-config.yaml.schema.json.
+    content: AUDIT_BARRAGE_CONFIG_SEED,
   },
 ];
 

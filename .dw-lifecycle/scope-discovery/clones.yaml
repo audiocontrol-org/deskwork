@@ -1,4 +1,4 @@
-generated_at: 2026-05-28T23:33:10.111Z
+generated_at: 2026-05-29T23:29:36.717Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -696,6 +696,34 @@ clones:
       - plugins/dw-lifecycle/src/triage-issues/propose.ts:204:224
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape on purpose. The propose-step finale (proposal-file shape construction, defaultOutputPath ISO-stamp computation, output-path collision check, JSON write) is canonical batched-proposal protocol surface shared across both hygiene skills; promotion to a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 394213e6df18
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:112:122
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:117:127
+    disposition: keep-with-reason
+    reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; cross-skill import would couple dw-lifecycle hygiene canon to scope-discovery anti-deferral contract.
+  - id: 7632ba487d34
+    lines: 15
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:38:52
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:54:68
+    disposition: keep-with-reason
+    reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; clone shifted post-review-fix reordering deferred-to-vN before deferred.
+  - id: 2781f314de77
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:77:83
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:82:88
+    disposition: keep-with-reason
+    reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; cross-skill import would couple dw-lifecycle hygiene canon to scope-discovery anti-deferral contract.
+  - id: 24dde2d5a138
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:88:98
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:99:109
+    disposition: keep-with-reason
+    reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; cross-skill import would couple dw-lifecycle hygiene canon to scope-discovery anti-deferral contract.
   - id: 1801f1b7dd0b
     lines: 8
     members:
@@ -933,7 +961,7 @@ clones:
     lines: 17
     members:
       - plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-queue.ts:134:150
-      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:213
+      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:223
     disposition: pending
     reason: null
   - id: b55096bc507f
@@ -954,21 +982,21 @@ clones:
     lines: 7
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:311:317
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:245:251
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:315:321
     disposition: pending
     reason: null
   - id: 3c6b6627d081
     lines: 14
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:168:181
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:157:112
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:227:112
     disposition: pending
     reason: null
   - id: 92d75db1cad2
     lines: 16
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:187:202
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:170:127
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:240:127
     disposition: pending
     reason: null
   - id: 7698568d0d6c
@@ -982,35 +1010,35 @@ clones:
     lines: 9
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:562:570
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:267:275
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:337:345
     disposition: pending
     reason: null
   - id: 0fbb9fcd1915
     lines: 13
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:158:170
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:228:240
       - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:100:112
     disposition: pending
     reason: null
   - id: 9746ccb605f4
     lines: 15
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:171:185
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:241:255
       - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:113:127
     disposition: pending
     reason: null
   - id: 8c1a1eaa3a28
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:211:219
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:226:234
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:281:289
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:296:304
     disposition: pending
     reason: null
   - id: d063bccc5fe8
     lines: 10
     members:
       - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:111:120
-      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:202:211
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:212:221
     disposition: pending
     reason: null
   - id: 8f81364fec2d
@@ -1076,6 +1104,153 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
+  - id: 11a36455541f
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:103:111
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:103:111
+    disposition: pending
+    reason: null
+  - id: d6607615e28e
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:112:127
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:127
+    disposition: pending
+    reason: null
+  - id: 0d16dcc374e0
+    lines: 20
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:205:224
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:137:156
+    disposition: pending
+    reason: null
+  - id: f65e258cb71f
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:246:254
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:193:201
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:187:195
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: 7d882bc319d3
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:284:293
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:290
+    disposition: pending
+    reason: null
+  - id: b32250765cb8
+    lines: 19
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:376:394
+      - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:144:162
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every subcommand by convention.
+  - id: 69c3cc2125ab
+    lines: 17
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:86:102
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:86:102
+    disposition: pending
+    reason: null
+  - id: 4295f8a2a16b
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:100:108
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:86:93
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + readFile-then-parse-then-validate). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
+  - id: 352c9e64fad0
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:112:119
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:124:131
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:106:113
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:122:129
+    disposition: pending
+    reason: null
+  - id: 05782de08529
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:179:185
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:263:269
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + readFile-then-parse-then-validate). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
+  - id: 378d8c2122e7
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:107:114
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:86:93
+    disposition: keep-with-reason
+    reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
+  - id: ec4640c729a3
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:262:268
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:162:168
+    disposition: keep-with-reason
+    reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
+  - id: a430638c6638
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:75:83
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:57:65
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:88:96
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every subcommand by convention.
+  - id: d641fc42624b
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:78:84
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:113:121
+    disposition: pending
+    reason: null
+  - id: 5542b0b267c1
+    lines: 17
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:105:121
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:111:127
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: d64242911330
+    lines: 22
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:154:175
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:137:158
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: f6b4a78d5804
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:21:31
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:28:38
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: 82a8fb12e17f
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:276:288
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:293
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: e6134a663544
+    lines: 18
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:77:94
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:85:102
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
+  - id: 88b7f7830725
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:95:104
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:102:111
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
   - id: 13b12da5062e
     lines: 28
     members:
@@ -1223,6 +1398,13 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:107:130
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 557060d42ad4
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:378:389
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:321:332
+    disposition: keep-with-reason
+    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
   - id: ec203342fa99
     lines: 12
     members:

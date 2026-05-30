@@ -40,6 +40,13 @@ plugins/*/package-lock.json
 .dw-lifecycle/scope-discovery/pending-audits/
 .dw-lifecycle/scope-discovery/resolved-escalations/
 
+## scope-discovery audit-barrage run artifacts. The audit-barrage CLI
+## verb writes per-run dirs (PROMPT.md / INDEX.md / per-model stdout /
+## stderr/) under this path. Operator triage walks these to lift
+## findings into the canonical audit-log; the raw run artifacts
+## themselves are per-worktree captures, never committed.
+.dw-lifecycle/scope-discovery/audit-runs/
+
 ## scope-discovery synthesizer output. `scope-inventory` writes the
 ## manifest + run-history under the feature's docs dir. Regenerated on
 ## each invocation; never committed.

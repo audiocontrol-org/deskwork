@@ -66,6 +66,7 @@ All commands are under the `/dw-lifecycle:` namespace. Grouped by lifecycle stag
 | `implement` | Walk workplan tasks, update progress, commit at task boundaries; uses `superpowers:subagent-driven-development`, `dispatching-parallel-agents`, `test-driven-development`; opens with `feature-dev:code-architect` for multi-proposal design and `feature-dev:code-explorer` for orientation |
 | `review` | Run the three-track audit/review protocol: controller-side verification re-run, spec-compliance review, code-quality review; persist findings in `audit-log.md` with `superpowers:requesting-code-review` and `receiving-code-review` |
 | `audit` | Synonym of `review`; same three-track protocol and durable audit-log workflow |
+| `audit-barrage` | Fire N installed CLI audit tools (`claude`, `codex`, `gemini`, ...) in parallel against a uniform audit prompt; capture per-model stdout under `.dw-lifecycle/scope-discovery/audit-runs/`; operator triages into the canonical audit-log. Third independent audit surface — additive to `review` and the in-band self-audit. |
 
 ### Ship
 
@@ -100,7 +101,7 @@ All commands are under the `/dw-lifecycle:` namespace. Grouped by lifecycle stag
 
 See [Shortcuts](#shortcuts) below for the schemes, manifest layout, and drift behavior.
 
-Nineteen commands total. Each is a single, composable action — UNIX-style — never a monolithic guided flow. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
+Twenty commands total. Each is a single, composable action — UNIX-style — never a monolithic guided flow. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
 
 ## Shortcuts
 
@@ -214,6 +215,117 @@ dw-lifecycle dismantle-worktrees apply --proposal .dw-lifecycle/dismantle-worktr
 - Design spec: [`docs/superpowers/specs/2026-05-28-hygiene-design.md`](../../docs/superpowers/specs/2026-05-28-hygiene-design.md).
 - Canonical rule the family mechanizes: [`.claude/rules/agent-discipline.md`](../../.claude/rules/agent-discipline.md) § "Just for now is bullshit."
 - Issue-closure rule the `close-shipped` verb honors: [`.claude/rules/agent-discipline.md`](../../.claude/rules/agent-discipline.md) § "Issue closure requires verification in a formally-installed release."
+
+## Audit-finding lifecycle — anti-deferral discipline + closure triad
+
+Phase 13 of scope-discovery ships the mechanization layer that makes audit findings unable to silently rot. Six verbs compose into a closed loop from "finding filed" to "finding verified post-release":
+
+| Verb | Phase 13 ref | Status transition |
+|---|---|---|
+| `/dw-lifecycle:promote-findings` | Task 1 | walks `Status: open`; default-and-only-agent-pickable disposition is "scope into workplan as TDD-first task block tagged `(fix-finding-AUDIT-<id>)`". |
+| `dw-lifecycle check-open-findings` (implement-loop gate) | Task 2 | refuses `/dw-lifecycle:implement` task pickup while any open finding exists on the feature. No bypass flag in v1. |
+| `dw-lifecycle check-fix-task-tdd` + `fix-task-tdd-discipline` doctor rule | Task 3 | refuses `Closes AUDIT-<id>` commits unless the cited workplan task block's test file exists, is non-empty, and (when not `--skip-vitest`) passes. |
+| `dw-lifecycle apply-audit-flips` | Task 4 Step 2 | parses `Closes AUDIT-<id>` (subject + comma-separated trailer); proposes `open → fixed-<sha>` flips. |
+| `dw-lifecycle close-shipped-audit-findings` | Task 4 Step 1 | walks `git rev-list <from>..<to>`; for each `fixed-<sha>` whose SHA prefix is in range, proposes `verified-<date>`. |
+| `/dw-lifecycle:re-audit-fixed-findings` | Task 4 Step 3 | cross-references a fresh audit-barrage run-dir against existing `fixed-<sha>` entries; proposes `verified-<date>` for entries that don't re-surface; flags re-surfacing entries as fix-did-not-actually-fix. |
+
+All verbs default to dry-run; `--apply` performs writes. The audit-log preservation rule is honored throughout (no entries deleted; status changes only; entry bodies preserved verbatim).
+
+### Operational pattern
+
+```bash
+# After review surfaces findings:
+dw-lifecycle promote-findings --feature my-feature --apply
+
+# After each fix commit (or batched):
+dw-lifecycle apply-audit-flips --feature my-feature --since main --apply
+
+# Optional: catch missing tests at commit time
+dw-lifecycle check-fix-task-tdd --commit-msg-file .git/COMMIT_EDITMSG
+
+# After release:
+dw-lifecycle close-shipped-audit-findings --feature my-feature \
+    --from v1.0.0 --to v1.1.0 --apply
+
+# Empirical re-audit (post-release):
+dw-lifecycle audit-barrage --feature my-feature --prompt-file <prompt>
+dw-lifecycle re-audit-fixed-findings --feature my-feature \
+    --run-dir .dw-lifecycle/scope-discovery/audit-runs/<ts>-my-feature --apply
+```
+
+### Cross-references
+
+- Discipline rule: [`.claude/rules/agent-discipline.md`](../../.claude/rules/agent-discipline.md) § "Audit findings: scope-don't-defer + TDD enforcement".
+- Sibling discipline: § "Just for now is bullshit" (implementation-side IOU pathology).
+- Closure rule honored: § "Issue closure requires verification in a formally-installed release".
+
+## Audit-barrage — multi-model parallel auditing
+
+The `/dw-lifecycle:audit-barrage` skill fires N installed CLI audit tools (`claude`, `codex`, `gemini`, plus whatever else the operator configures) in parallel against a uniform audit prompt and captures each tool's stdout to a per-run directory under `.dw-lifecycle/scope-discovery/audit-runs/`. Cross-model genetic diversity surfaces failure modes single-model audits miss; per the Phase 12 self-dogfood (parent [#353](https://github.com/audiocontrol-org/deskwork/issues/353)), one full barrage against an in-flight feature caught 4 cross-model HIGH-confidence findings + 7 single-model findings that the in-band self-audit + the SDD review cycle missed entirely.
+
+This is the **third independent audit surface** in the project's audit posture — additive to the in-band self-audit (orchestrator-loop, same model + same context) and the SDD two-reviewer cycle (`/dw-lifecycle:review`, sub-agent dispatch against spec + quality). The three are NOT substitutable; the barrage adds genetic diversity, not replacement.
+
+### Verb pair
+
+The workflow is intentionally two-step so the operator can inspect the rendered prompt before consuming model budget:
+
+```
+# Step 1: render the audit prompt from a template + a vars JSON
+dw-lifecycle audit-barrage-render \
+    --feature <slug> \
+    --vars-file <vars.json> \
+    --output <prompt.md>
+
+# Step 2: fire the parallel barrage
+dw-lifecycle audit-barrage \
+    --feature <slug> \
+    --prompt-file <prompt.md> \
+    [--models <comma-list>] [--repo-root <path>] [--quiet]
+```
+
+The vars JSON is a flat `{key: string}` map with `feature_slug`, `workplan_summary`, `diff`, `audit_log_excerpt`, and `commit_subjects`. The renderer resolves project override (`.dw-lifecycle/scope-discovery/audit-barrage-prompt.md`) vs plugin default. Operators who hand-compose the prompt skip the renderer and pass any `--prompt-file` directly.
+
+### Run dir + triage
+
+The fire verb writes:
+
+```
+<repo-root>/.dw-lifecycle/scope-discovery/audit-runs/
+└── <YYYYMMDDTHHMMSSsssZ>-<feature>/
+    ├── INDEX.md          — per-model run manifest
+    ├── PROMPT.md         — rendered audit prompt (verbatim)
+    ├── <model>.md        — captured stdout per model
+    └── stderr/<model>.txt
+```
+
+Triage walks `INDEX.md` first (per-model exit codes, byte counts, spawn errors), then each `<model>.md` for the captured findings. Cross-model agreement is the HIGH-confidence signal; findings two+ models flagged independently are lifted into the feature's `audit-log.md` with both per-model cites in the `Finding-ID:` header.
+
+### Override paths
+
+| Override | Path | Effect |
+|---|---|---|
+| Prompt template | `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` | Project-specific audit prompt. Plugin default at `plugins/dw-lifecycle/templates/audit-barrage-prompt.md` is the fallback. |
+| Model battery | `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` | Project-specific CLI list (binary + args template + timeout per model). Plugin default at `plugins/dw-lifecycle/templates/audit-barrage-config.yaml`. Schema for editor autocomplete at `scope-discovery/schema/audit-barrage-config.yaml.schema.json`. |
+
+`install-scope-discovery` seeds both override files as commented scaffolds so the paths exist at discoverable locations without overriding the defaults until the operator opts in.
+
+### Exit codes
+
+| Verb | Code | Meaning |
+|---|---|---|
+| `audit-barrage` | 0 | At least one model produced positive-byte stdout AND was not a spawn failure. Non-zero CLI exits + timeouts fall on this side (captured stdout is still triagable). |
+| `audit-barrage` | 1 | Every model failed (spawn error or zero stdout bytes). |
+| `audit-barrage` | 2 | Usage error (missing flag, unreadable `--prompt-file`, malformed config). |
+| `audit-barrage-render` | 0 | Render succeeded. |
+| `audit-barrage-render` | 1 | Render failed (missing declared var, unsubstituted EXPECTED_VARS marker). |
+| `audit-barrage-render` | 2 | Usage error (missing flag, unreadable / non-JSON vars file, `--feature` doesn't match `vars.feature_slug`). |
+
+### Cross-references
+
+- Skill prose: [`plugins/dw-lifecycle/skills/audit-barrage/SKILL.md`](skills/audit-barrage/SKILL.md)
+- Discipline rule: [`.claude/rules/agent-discipline.md`](../../.claude/rules/agent-discipline.md) § "Audit-barrage: structured cross-model audit"
+- Roadmap (Design A shipped; Design B + C planned): [`ROADMAP.md`](../../ROADMAP.md) § "Audit-barrage feature shape"
+- Local smoke: [`scripts/smoke-audit-barrage.sh`](../../scripts/smoke-audit-barrage.sh)
 
 ## Boundary contract
 

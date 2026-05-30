@@ -328,10 +328,12 @@ with strict-format requirements. Read these before writing the block:
 1. **Searched-count noun whitelist.** The count after the em-dash
    must end in one of: \`matches\`, \`match\`, \`hits\`, \`hit\`,
    \`occurrences\`, \`instances\`, \`sites\`, \`call sites\`,
-   \`files\`, \`results\`, \`references\`. Up to 3 modifier tokens
+   \`files\`, \`results\`, \`references\`, \`issues\`, \`bugs\`,
+   \`findings\`, \`errors\`, \`warnings\`. Up to 3 modifier tokens
    are permitted before the head noun (e.g. \`2 source-emitter call
-   sites\`, \`3 unique occurrences\`). Anything outside this set is
-   rejected — \`5 issues found\`, \`7 places\`, \`4 spots\` all fail.
+   sites\`, \`3 unique occurrences\`, \`5 issues found\`). Anything
+   outside this set is rejected — \`7 places\`, \`4 spots\`,
+   \`3 widgets\` all fail.
 
 2. **Excluded entries require \`path:LINE\`.** Every Excluded
    citation must carry a line number. For whole-file exclusions
@@ -342,20 +344,34 @@ with strict-format requirements. Read these before writing the block:
        are assertions, not production code under review.
    Don't omit \`:LINE\`; the parser rejects.
 
-3. **Forbidden-deferral phrase list collides with project
-   vocabulary.** If a project's canonical class name or function
-   contains a deferral-class word (e.g. \`.swim-stub\` /
-   \`renderSwimStub\` / \`.placeholder-tile\`), describe the
-   affordance's PURPOSE rather than its CANONICAL NAME in the
-   Excluded reason. Example:
-       OK:    Excluded: src/swimlane-card.ts:330 — focus-off
-              compact button for filtered-out lanes (not a stage-
-              bearing body)
-       FAIL:  Excluded: src/swimlane-card.ts:330 — renderSwimStub
-              is the focus-off stub button   ← contains "stub"
-   The parser's substring match doesn't distinguish proper-noun
-   usage from deferral usage; the workaround is to talk about what
-   the code DOES, not what it's CALLED.
+3. **Forbidden-deferral phrase list — context-aware after Phase 14
+   Task 2.** Ambiguous nouns (\`stub\`, \`placeholder\`, \`pending\`,
+   \`temporary\`, \`hack\`, \`defer\`, \`deferred\`) NO LONGER trip on
+   bare appearance — they require a deferral collocation:
+   \`for now\`; \`until v#\` / \`until F#\` / \`until phase #\`;
+   \`until we\` / \`until the next sprint|milestone|phase|release|
+   version|cycle|iteration\`; \`in v#\` / \`in phase\` / \`in F#\` /
+   \`in future\`; \`pending\`; \`later\`. Up to 2 modifier tokens may
+   intervene between the noun and the collocation. The ALL-CAPS
+   comment markers (\`TODO\`, \`FIXME\`, \`XXX\`) are case-sensitive
+   — descriptive lowercase \`todo\` / \`fixme\` passes; the
+   conventional comment-marker form still trips. The bare-defer
+   verb (\`defer to\`) requires a version (\`v#\`), phase (\`F#\` /
+   \`phase #\`), or \`the next <unit>\` target; \`defer to the
+   operator\` / \`defer to the spec\` passes. Examples:
+       PASS:  Excluded: src/input.tsx:42 — placeholder text shown
+              until the user types in the input field
+       PASS:  Excluded: src/swimlane-card.ts:330 — renderSwimStub
+              is the focus-off compact button for filtered-out lanes
+       PASS:  Excluded: src/util.ts:88 — architectural decision;
+              defer to the spec for the canonical answer
+       FAIL:  Excluded: src/input.tsx:42 — placeholder for now until
+              the spec settles    ← contains the \`placeholder ... for now\` shape
+       FAIL:  Excluded: src/util.ts:88 — defer to v2 release
+                                       ← matches \`defer to v<digit>\`
+   Bare deferral phrases (\`for now\`, \`will fix\`, etc.) still
+   trip on substring; the relaxation is specifically for ambiguous
+   nouns and the bare \`defer to\` verb.
 `;
 }
 

@@ -6,6 +6,27 @@ For released history see [GitHub releases](https://github.com/audiocontrol-org/d
 
 ## Recently shipped
 
+### Audit-barrage — multi-model parallel auditing (Design A)
+
+Shipped as Phase 12 of the scope-discovery feature (parent [#353](https://github.com/audiocontrol-org/deskwork/issues/353)).
+
+A pair of CLI verbs — `dw-lifecycle audit-barrage-render` + `dw-lifecycle audit-barrage` — that fire N installed CLI tools (`claude`, `codex`, `gemini`, plus whatever else the operator configures) in parallel against a uniform audit prompt and capture per-model stdout to `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/<model>.md`. The operator walks the run dir during triage and lifts findings into the canonical feature audit-log via the existing closure workflow.
+
+This is the **third independent audit surface** in the project's audit posture. The first is the in-band self-audit (same model + same context); the second is the SDD two-reviewer cycle (`/dw-lifecycle:review`); the third is this audit-barrage (multiple model families running independently). The three are additive — the barrage does NOT replace the other two; it adds genetic diversity in failure modes.
+
+Primitives shipped:
+
+- `dw-lifecycle audit-barrage-render` — pure prompt-rendering verb (template + vars JSON → rendered audit prompt); project-override at `.dw-lifecycle/scope-discovery/audit-barrage-prompt.md` precedes plugin default.
+- `dw-lifecycle audit-barrage` — parallel CLI fan-out verb; model battery loaded from `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` (override) or plugin default; per-model stdout / stderr / exit-code captured under run-dir.
+- `/dw-lifecycle:audit-barrage` skill prose covering invocation workflow + triage steps + override paths.
+- `/dwab` (Scheme A) / `/dw-ab` (Scheme B) / `/dw-audit-barrage` (Scheme C) shortcut via `install-shortcuts`.
+- Schema-validated YAML config at `scope-discovery/schema/audit-barrage-config.yaml.schema.json`.
+- Local smoke `scripts/smoke-audit-barrage.sh` (NOT wired into CI per project rule).
+
+**Acceptance signal met overwhelmingly.** The Phase 12 self-dogfood (audit-barrage feature auditing itself) surfaced 4 cross-model HIGH-confidence findings + 7 single-model findings, ALL of which the in-band self-audit + the SDD review cycle missed. See `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` § "2026-05-29 — Phase 12 audit-barrage self-dogfood" for the canonical record.
+
+Design A primitives are the foundation Design B (lifecycle auto-fire + meta-audit synthesizer) and Design C (continuous background daemon) compose over. See § "Audit-barrage feature shape" below for the long-term arc.
+
 ### Hygiene — recurring debt burndown infrastructure
 
 Shipped across v0.26.0 → v0.26.5 (parent [#323](https://github.com/audiocontrol-org/deskwork/issues/323) closed; all phase issues [#324](https://github.com/audiocontrol-org/deskwork/issues/324)–[#333](https://github.com/audiocontrol-org/deskwork/issues/333) + [#343](https://github.com/audiocontrol-org/deskwork/issues/343) closed).
@@ -34,13 +55,11 @@ Serves as the canonical canary for the scope-discovery protocol. Phase 6 dogfood
 
 Parent: [#301](https://github.com/audiocontrol-org/deskwork/issues/301) (still open).
 
-### Audit-barrage — multi-model parallel auditing
-
-About to enter `/dw-lifecycle:setup`. The next major architectural extension to the scope-discovery protocol. See § "Audit-barrage feature shape" below for the full design. The feature's PRD-iterate cycle through deskwork is the next operator-driven step before implementation begins.
-
 ## Audit-barrage feature shape
 
-The next major architectural extension to the scope-discovery protocol. Goal: replace the operator's manually-run codex audit with an automated battery that fires multiple LLMs against the same work, gives genetic diversity in failure modes, runs out-of-band so the implementation team focuses on features, and removes the audit-quality dependency on operator discipline.
+Design A — operator-triggered audit-barrage skill — shipped as Phase 12 of scope-discovery (parent [#353](https://github.com/audiocontrol-org/deskwork/issues/353)); see "Recently shipped" above for the primitives and acceptance-signal evidence. This section is the long-term arc; Design B and Design C compose over the v1 primitives.
+
+Goal of the family: replace the operator's manually-run codex audit with an automated battery that fires multiple LLMs against the same work, gives genetic diversity in failure modes, runs out-of-band so the implementation team focuses on features, and removes the audit-quality dependency on operator discipline.
 
 ### Motivation
 
@@ -62,12 +81,12 @@ The battery invokes installed CLI tools, NOT model APIs. Three reasons:
 2. **Authentication already configured.** No API-key handling, no rotation, no per-developer secret-store. The operator's existing CLI setup is the auth surface.
 3. **Subprocess orchestration is a well-trodden path.** The plugin already shells out to `gh`, `git`, `npx tsx`, `jscpd`. Adding `claude`, `codex`, `gemini` is the same pattern.
 
-### Design A — operator-triggered audit-barrage skill (v1 milestone)
+### Design A — operator-triggered audit-barrage skill (SHIPPED)
 
-The first shippable shape:
+The first shippable shape. Now live as Phase 12 of scope-discovery. Operator workflow is the verb pair `dw-lifecycle audit-barrage-render` → `dw-lifecycle audit-barrage`:
 
 ```
-/dw-lifecycle:audit-barrage --feature <slug> [--range <vA>..<vB>] [--models <list>]
+/dw-lifecycle:audit-barrage --feature <slug> [--prompt-file <path>] [--models <list>]
 ```
 
 **Behavior:**
@@ -97,9 +116,28 @@ Project-config knob `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` le
 
 **Cost:** the implementation is small (~300 lines of TS + tests + the prompt template + the SKILL.md). Most of the work is testing the subprocess orchestration against real CLI behavior.
 
-### Design B — lifecycle-triggered automation + meta-audit
+### Design A.5 — Phase 13 anti-deferral discipline + closure triad (SHIPPED)
 
-Once Design A is stable and the operator has accumulated cross-model finding patterns, Design B layers. Design B composes over the hygiene feature's just-shipped lifecycle-integration primitives (`session-end-hygiene`, `session-start-recommendation`, `complete-parent-closure`, `close-shipped`) — the auto-fire gates already exist as natural extension points:
+Phase 13 of scope-discovery ships the **anti-deferral mechanization layer** that pairs structurally with Design A. Where Design A produces audit findings (via the cross-model barrage), Design A.5 ensures every open finding gets worked through to completion without manual status-flip discipline:
+
+| Verb | Status transition | Spec |
+|---|---|---|
+| `/dw-lifecycle:promote-findings` | walks `Status: open`; default-and-only-agent-pickable disposition is "scope into workplan as TDD-first task". | Phase 13 Task 1. |
+| `dw-lifecycle check-open-findings` (implement-loop gate) | refuses `/dw-lifecycle:implement` task pickup while any open finding exists. No bypass flag. | Phase 13 Task 2. |
+| `dw-lifecycle check-fix-task-tdd` + `fix-task-tdd-discipline` doctor rule | refuses `Closes AUDIT-<id>` commits without a passing test cited by the matching workplan task block. | Phase 13 Task 3. |
+| `dw-lifecycle apply-audit-flips` | `open → fixed-<sha>` from commit `Closes AUDIT-<id>` references. | Phase 13 Task 4 Step 2. |
+| `dw-lifecycle close-shipped-audit-findings` | `fixed-<sha> → verified-<date>` via release-range SHA membership; default dry-run. | Phase 13 Task 4 Step 1. |
+| `/dw-lifecycle:re-audit-fixed-findings` | `fixed-<sha> → verified-<date>` via empirical re-audit non-surfacing; flags re-surfacing fixes. | Phase 13 Task 4 Step 3. |
+
+**Operator's framing (the anchor):** *"Filing a bug report isn't good enough. It MUST BE SCOPED INTO THE WORKPLAN, otherwise it won't get picked up by the implementation loop. (...) A broken implementation is not done — it's broken. And, along with the discipline to scope the fix, TDD principles should apply such that a test that exercises the bug is written before the fix is implemented."*
+
+Design B builds on this foundation. The auto-fire waypoints Design B adds will route findings through promote-findings → workplan → TDD-enforced implement loop → apply-audit-flips → close-shipped-audit-findings / re-audit-fixed-findings naturally, with no manual disposition steps. Design A.5 is the discipline layer; Design B is the cadence layer on top.
+
+### Design B — lifecycle-triggered automation + meta-audit (NEXT)
+
+Design A's primitives (verb pair `audit-barrage-render` + `audit-barrage`, project-override paths, run-dir conventions, INDEX.md schema, model battery YAML) are the foundation Design B composes over. Design B is the next major architectural extension to the family — it adds (a) automatic firing tied to lifecycle waypoints and (b) a meta-audit synthesizer that compresses the N raw model outputs to a single ranked-findings summary the operator triages instead of the raw runs.
+
+Design B composes additionally over the hygiene feature's lifecycle-integration primitives (`session-end-hygiene`, `session-start-recommendation`, `complete-parent-closure`, `close-shipped`) — the auto-fire gates already exist as natural extension points:
 
 1. **Auto-fire at lifecycle waypoints.** The audit-barrage runs automatically at `/dw-lifecycle:session-end`, `/dw-lifecycle:complete`, and `/release` Pause 5. No explicit operator invocation; the firing is tied to the natural shipping cadence. Each gate already invokes hygiene helpers; the audit-barrage hook lands as a sibling step.
 2. **Meta-audit synthesizer.** After the N raw audit files land, a meta-audit pass runs a SINGLE LLM call against the raw runs with a synthesis prompt: *"rank these findings by confidence × actionability; de-duplicate; flag high-confidence cross-model agreement; emit a single structured findings block."*
