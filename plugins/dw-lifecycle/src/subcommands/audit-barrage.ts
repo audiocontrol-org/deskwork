@@ -45,6 +45,7 @@ const USAGE = [
   '    [--repo-root <path>]',
   '    [--models <comma-list>]',
   '    [--quiet]',
+  '    [--output-run-dir]',
   '    [--help]',
   '',
   '--feature <slug>          The feature directory slug (e.g. `--feature',
@@ -58,6 +59,12 @@ const USAGE = [
   '--models <comma-list>     Comma-separated subset of the configured models.',
   '                          Defaults to every model in the loaded config.',
   '--quiet                   Suppress the stderr summary line.',
+  '--output-run-dir          Print JUST the absolute run-dir path on stdout',
+  '                          (BarrageRun JSON is suppressed). For bash',
+  '                          composition in the /dw-lifecycle:implement',
+  '                          end-of-task hook: RUN_DIR=$(dw-lifecycle',
+  '                          audit-barrage --feature X --prompt-file Y',
+  '                          --output-run-dir).',
   '',
   'Fires the selected CLIs in parallel, captures per-model output into',
   'the run dir, and emits a BarrageRun record as JSON on stdout.',
@@ -78,6 +85,7 @@ export interface ParsedFlags {
   readonly promptFilePath: string;
   readonly modelNames: ReadonlyArray<string> | undefined;
   readonly quiet: boolean;
+  readonly outputRunDir: boolean;
 }
 
 export interface ParseResult {
@@ -105,6 +113,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
   let repoRoot: string | undefined;
   let modelsCsv: string | undefined;
   let quiet = false;
+  let outputRunDir = false;
 
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -113,6 +122,10 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
     }
     if (flag === '--quiet') {
       quiet = true;
+      continue;
+    }
+    if (flag === '--output-run-dir') {
+      outputRunDir = true;
       continue;
     }
     if (
@@ -173,8 +186,34 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       promptFilePath,
       modelNames,
       quiet,
+      outputRunDir,
     },
   };
+}
+
+/**
+ * Render the verb's stdout output. Default mode (outputRunDir=false)
+ * emits the full BarrageRun as pretty-printed JSON — machine-readable
+ * for the skill's triage walk + the existing audit-barrage cycle.
+ *
+ * `outputRunDir=true` swaps stdout to a single line: the absolute path
+ * of the run-dir, terminated by `\n`. This is the bash-composition
+ * shape used by the /dw-lifecycle:implement end-of-task hook (Phase 15
+ * Task 4) — `RUN_DIR=$(dw-lifecycle audit-barrage … --output-run-dir)`
+ * — and avoids forcing the operator's hook script to depend on `jq`.
+ *
+ * Stderr behavior is unchanged regardless of the flag: the one-line
+ * summary still emits unless `--quiet` is set. The two streams remain
+ * independently consumable.
+ */
+export function renderStdoutOutput(
+  run: BarrageRun,
+  outputRunDir: boolean,
+): string {
+  if (outputRunDir) {
+    return `${run.runDir}\n`;
+  }
+  return `${JSON.stringify(run, null, 2)}\n`;
 }
 
 /**
@@ -310,7 +349,7 @@ export async function auditBarrage(args: string[]): Promise<void> {
     exitCode: deriveBarrageExitCode(run),
   };
 
-  process.stdout.write(`${JSON.stringify(run, null, 2)}\n`);
+  process.stdout.write(renderStdoutOutput(run, flags.outputRunDir));
   if (!flags.quiet) {
     process.stderr.write(`${renderSummaryLine(run)}\n`);
   }

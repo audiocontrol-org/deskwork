@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import {
   deriveBarrageExitCode,
   parseFlags,
+  renderStdoutOutput,
   renderSummaryLine,
   resolveModels,
 } from '../../../subcommands/audit-barrage.js';
@@ -146,6 +147,69 @@ describe('parseFlags', () => {
     expect(result.ok).toBe(true);
     if (result.flags === undefined) throw new Error('expected flags');
     expect(result.flags.quiet).toBe(true);
+  });
+
+  it('defaults outputRunDir to false', () => {
+    const result = parseFlags([
+      '--feature',
+      'sample',
+      '--prompt-file',
+      '/tmp/p.txt',
+    ]);
+    expect(result.ok).toBe(true);
+    if (result.flags === undefined) throw new Error('expected flags');
+    expect(result.flags.outputRunDir).toBe(false);
+  });
+
+  it('honors --output-run-dir', () => {
+    const result = parseFlags([
+      '--feature',
+      'sample',
+      '--prompt-file',
+      '/tmp/p.txt',
+      '--output-run-dir',
+    ]);
+    expect(result.ok).toBe(true);
+    if (result.flags === undefined) throw new Error('expected flags');
+    expect(result.flags.outputRunDir).toBe(true);
+  });
+});
+
+describe('renderStdoutOutput', () => {
+  const fixtureRun: BarrageRun = {
+    runId: '20260601T120000Z-demo',
+    runDir: '/abs/path/.dw-lifecycle/scope-discovery/audit-runs/20260601T120000Z-demo',
+    featureSlug: 'demo',
+    startedAt: '2026-06-01T12:00:00Z',
+    completedAt: '2026-06-01T12:01:00Z',
+    results: [],
+  };
+
+  it('default mode: emits BarrageRun as pretty JSON terminated by newline', () => {
+    const out = renderStdoutOutput(fixtureRun, false);
+    expect(out.endsWith('\n')).toBe(true);
+    const parsed: unknown = JSON.parse(out.trim());
+    expect(parsed).toMatchObject({ runId: '20260601T120000Z-demo' });
+  });
+
+  it('--output-run-dir mode: emits ONLY the absolute run-dir path on stdout', () => {
+    const out = renderStdoutOutput(fixtureRun, true);
+    expect(out).toBe(
+      '/abs/path/.dw-lifecycle/scope-discovery/audit-runs/20260601T120000Z-demo\n',
+    );
+  });
+
+  it('--output-run-dir mode: stdout does NOT contain the full JSON payload', () => {
+    const out = renderStdoutOutput(fixtureRun, true);
+    expect(out).not.toMatch(/"results"/);
+    expect(out).not.toMatch(/"featureSlug"/);
+    expect(() => JSON.parse(out.trim())).toThrow();
+  });
+
+  it('--output-run-dir mode: still terminates with a single newline (clean for $() capture)', () => {
+    const out = renderStdoutOutput(fixtureRun, true);
+    expect(out.endsWith('\n')).toBe(true);
+    expect(out.split('\n').filter((s) => s.length > 0).length).toBe(1);
   });
 });
 

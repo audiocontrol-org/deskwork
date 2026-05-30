@@ -1,4 +1,4 @@
-generated_at: 2026-05-30T06:34:42.026Z
+generated_at: 2026-05-30T06:42:40.939Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1200,33 +1200,25 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:86:93
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + readFile-then-parse-then-validate). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
-  - id: 352c9e64fad0
+  - id: f31eeca74f56
     lines: 8
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:112:119
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:124:131
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:106:113
       - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:122:129
-    disposition: pending
-    reason: null
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 05782de08529
     lines: 7
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:179:185
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:263:269
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:302:308
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + readFile-then-parse-then-validate). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
-  - id: 378d8c2122e7
-    lines: 8
-    members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:107:114
-      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:86:93
-    disposition: keep-with-reason
-    reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
   - id: ec4640c729a3
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:262:268
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:301:307
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:162:168
     disposition: keep-with-reason
     reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
