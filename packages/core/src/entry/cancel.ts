@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
@@ -9,6 +10,7 @@ import {
   isOffPipelineStageInTemplate,
   terminalLinearStage,
 } from '../pipelines/helpers.ts';
+import { sidecarPath } from '../sidecar/paths.ts';
 
 interface CancelOptions {
   readonly uuid: string;
@@ -206,76 +208,85 @@ async function cancelEntryWithoutCalendarRegen(
     && sidecar.members.length > 0
   ) {
     for (const memberUuid of sidecar.members) {
-      try {
-        const memberSidecar = await readSidecar(projectRoot, memberUuid);
-        const memberTemplate = resolveEntryStrictTemplate(
-          memberSidecar,
-          projectRoot,
-        );
-        const memberTerminal = terminalLinearStage(memberTemplate);
-        // Members already off-pipeline (or at terminal) are skipped
-        // — refusing would abort the cascade mid-walk, leaving the
-        // group partially cancelled which is exactly the failure
-        // mode the cascade exists to avoid.
-        if (memberSidecar.currentStage === memberTerminal) {
-          skippedMembers.push({
-            entryId: memberUuid,
-            slug: memberSidecar.slug,
-            reason: `at terminal stage "${memberTerminal}"`,
-          });
-          continue;
-        }
-        if (
-          isOffPipelineStageInTemplate(memberTemplate, memberSidecar.currentStage)
-        ) {
-          skippedMembers.push({
-            entryId: memberUuid,
-            slug: memberSidecar.slug,
-            reason: `already off-pipeline (${memberSidecar.currentStage})`,
-          });
-          continue;
-        }
-        // The recursive walker call unconditionally forces `cascade: true`:
-        // top-level opt-in propagates through the entire subtree (doctor's
-        // `group-recursive` rule normally refuses recursive groups, but
-        // the cancel path still has to behave correctly when one exists).
-        //
-        // Per Step 7.2.8 (#359): pass the TOP-LEVEL originator's UUID
-        // through `cascadeFrom` so every cascaded member's event
-        // records the cascade source as a single-hop back-link. If
-        // THIS walker invocation was itself cascaded (transitive
-        // case), we propagate the inherited `opts.cascadeFrom`;
-        // otherwise we ARE the originator and pass our own
-        // `sidecar.uuid` (the top-level group whose cancel started
-        // the cascade).
-        const memberResult = await cancelEntryWithoutCalendarRegen(projectRoot, {
-          uuid: memberUuid,
-          cascade: true,
-          cascadeFrom: opts.cascadeFrom ?? sidecar.uuid,
-          ...(opts.reason !== undefined && { reason: opts.reason }),
-        });
-        cascadedMembers.push({
-          entryId: memberUuid,
-          slug: memberSidecar.slug,
-          fromStage: memberResult.fromStage,
-        });
-        // Nested cascades from the recursive call appear in
-        // `memberResult.cascadedMembers` — flatten them into the
-        // top-level list so the caller sees one cascade summary
-        // rather than a nested tree.
-        if (memberResult.cascadedMembers !== undefined) {
-          cascadedMembers.push(...memberResult.cascadedMembers);
-        }
-        if (memberResult.skippedMembers !== undefined) {
-          skippedMembers.push(...memberResult.skippedMembers);
-        }
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
+      // Per AUDIT-20260530-23: narrow the recoverable-skip case to the
+      // genuinely-absent sidecar. Mirrors AUDIT-39's precedent: use
+      // existsSync() as the precondition probe, then let everything
+      // downstream (readSidecar parse failures, template-resolution
+      // configuration errors, writeSidecar I/O errors, journal-append
+      // errors) propagate so the caller sees real corruption / config
+      // / write failures instead of having them swallowed as "skipped
+      // member: read failed: ...". The narrow skip preserves the
+      // existing "missing member" contract documented in the
+      // SkippedMember interface.
+      if (!existsSync(sidecarPath(projectRoot, memberUuid))) {
         skippedMembers.push({
           entryId: memberUuid,
           slug: '(unresolved)',
-          reason: `read failed: ${detail}`,
+          reason: 'sidecar not found',
         });
+        continue;
+      }
+      const memberSidecar = await readSidecar(projectRoot, memberUuid);
+      const memberTemplate = resolveEntryStrictTemplate(
+        memberSidecar,
+        projectRoot,
+      );
+      const memberTerminal = terminalLinearStage(memberTemplate);
+      // Members already off-pipeline (or at terminal) are skipped
+      // — refusing would abort the cascade mid-walk, leaving the
+      // group partially cancelled which is exactly the failure
+      // mode the cascade exists to avoid.
+      if (memberSidecar.currentStage === memberTerminal) {
+        skippedMembers.push({
+          entryId: memberUuid,
+          slug: memberSidecar.slug,
+          reason: `at terminal stage "${memberTerminal}"`,
+        });
+        continue;
+      }
+      if (
+        isOffPipelineStageInTemplate(memberTemplate, memberSidecar.currentStage)
+      ) {
+        skippedMembers.push({
+          entryId: memberUuid,
+          slug: memberSidecar.slug,
+          reason: `already off-pipeline (${memberSidecar.currentStage})`,
+        });
+        continue;
+      }
+      // The recursive walker call unconditionally forces `cascade: true`:
+      // top-level opt-in propagates through the entire subtree (doctor's
+      // `group-recursive` rule normally refuses recursive groups, but
+      // the cancel path still has to behave correctly when one exists).
+      //
+      // Per Step 7.2.8 (#359): pass the TOP-LEVEL originator's UUID
+      // through `cascadeFrom` so every cascaded member's event
+      // records the cascade source as a single-hop back-link. If
+      // THIS walker invocation was itself cascaded (transitive
+      // case), we propagate the inherited `opts.cascadeFrom`;
+      // otherwise we ARE the originator and pass our own
+      // `sidecar.uuid` (the top-level group whose cancel started
+      // the cascade).
+      const memberResult = await cancelEntryWithoutCalendarRegen(projectRoot, {
+        uuid: memberUuid,
+        cascade: true,
+        cascadeFrom: opts.cascadeFrom ?? sidecar.uuid,
+        ...(opts.reason !== undefined && { reason: opts.reason }),
+      });
+      cascadedMembers.push({
+        entryId: memberUuid,
+        slug: memberSidecar.slug,
+        fromStage: memberResult.fromStage,
+      });
+      // Nested cascades from the recursive call appear in
+      // `memberResult.cascadedMembers` — flatten them into the
+      // top-level list so the caller sees one cascade summary
+      // rather than a nested tree.
+      if (memberResult.cascadedMembers !== undefined) {
+        cascadedMembers.push(...memberResult.cascadedMembers);
+      }
+      if (memberResult.skippedMembers !== undefined) {
+        skippedMembers.push(...memberResult.skippedMembers);
       }
     }
   }

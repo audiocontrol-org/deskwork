@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T09:54:21.273Z
+generated_at: 2026-05-30T08:48:57.721Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -356,13 +356,20 @@ clones:
       - packages/core/src/entry/induct.ts:1:11
     disposition: ignore-with-justification
     reason: Phase 4 verb refactor — shared import block (sidecar/journal/calendar/lane-resolve/pipeline-helpers). Verbs sharing imports is the verb-shape contract, not structural duplication worth extracting.
-  - id: f176f885355a
+  - id: 7bb7a3a2a882
     lines: 13
     members:
       - packages/core/src/entry/block.ts:1:13
-      - packages/core/src/entry/cancel.ts:1:13
-    disposition: pending
-    reason: null
+      - packages/core/src/entry/cancel.ts:2:13
+    disposition: ignore-with-justification
+    reason: verb-module import header symmetry; cancel/block/publish share readSidecar+writeSidecar+journal+calendar+schema+lane-resolve+pipeline-helpers imports as architectural symmetry across the verb family — extraction would harm clarity
+  - id: 7d5ab42c4df4
+    lines: 11
+    members:
+      - packages/core/src/entry/cancel.ts:1:11
+      - packages/core/src/entry/publish.ts:2:12
+    disposition: ignore-with-justification
+    reason: verb-module import header symmetry; cancel/block/publish share readSidecar+writeSidecar+journal+calendar+schema+lane-resolve+pipeline-helpers imports as architectural symmetry across the verb family — extraction would harm clarity
   - id: e56c638702cc
     lines: 13
     members:
@@ -388,14 +395,14 @@ clones:
     lines: 9
     members:
       - packages/core/src/lanes/loader.ts:120:128
-      - packages/core/src/pipelines/loader.ts:183:191
+      - packages/core/src/pipelines/loader.ts:225:233
     disposition: keep-with-reason
     reason: "lanes/loader mirrors pipelines/loader by workplan design: JSON-read+Zod-validate+id-match-filename idiom across two parallel module-shaped readers; extracting a shared helper would couple lane evolution to pipeline evolution"
   - id: b223f2def90d
     lines: 7
     members:
       - packages/core/src/lanes/loader.ts:130:136
-      - packages/core/src/pipelines/loader.ts:193:199
+      - packages/core/src/pipelines/loader.ts:235:241
     disposition: keep-with-reason
     reason: second half of the lanes/loader vs pipelines/loader mirroring (Zod-validate + id-mismatch refusal); same rationale as c20b4e4f0469
   - id: 93e1ae2c9a27
@@ -450,15 +457,15 @@ clones:
   - id: e3dffdccdd78
     lines: 9
     members:
-      - packages/core/src/schema/journal-events.ts:162:170
-      - packages/core/src/schema/journal-events.ts:367:375
+      - packages/core/src/schema/journal-events.ts:189:197
+      - packages/core/src/schema/journal-events.ts:401:409
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: d93b64cd1eae
     lines: 7
     members:
-      - packages/core/src/schema/journal-events.ts:376:382
-      - packages/core/src/schema/journal-events.ts:388:394
+      - packages/core/src/schema/journal-events.ts:410:416
+      - packages/core/src/schema/journal-events.ts:422:428
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 13e80bf116fb
@@ -535,14 +542,14 @@ clones:
   - id: feecb3d2c71e
     lines: 8
     members:
-      - packages/studio/src/pages/dashboard/swimlane-shell.ts:77:84
+      - packages/studio/src/pages/dashboard/swimlane-shell.ts:86:93
       - plugins/deskwork-studio/public/src/dashboard/swimlane.ts:109:116
     disposition: keep-with-reason
     reason: "wire-format symmetry: server parseFocusCsv + client parseCsvNonEmpty parse the same focus CSV on opposite ends of the request boundary; consolidating would require a shared vendored module since server and client bundles are independent"
   - id: 6a86f85c95cd
     lines: 14
     members:
-      - packages/studio/src/pages/entry-review/index.ts:108:121
+      - packages/studio/src/pages/entry-review/index.ts:122:135
       - packages/studio/src/pages/shortform-review.ts:92:105
     disposition: pending
     reason: null
@@ -635,8 +642,8 @@ clones:
   - id: d6093f110268
     lines: 10
     members:
-      - packages/studio/src/server.ts:406:415
-      - packages/studio/src/server.ts:415:424
+      - packages/studio/src/server.ts:407:416
+      - packages/studio/src/server.ts:416:425
     disposition: pending
     reason: null
   - id: 22fbdfa51c64
@@ -726,29 +733,29 @@ clones:
   - id: 14579dae3bdf
     lines: 20
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:116:128
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:148:167
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:117:129
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:149:168
     disposition: pending
     reason: null
   - id: 8a46fe453209
     lines: 17
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:117:128
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:481:497
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:118:129
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:482:498
     disposition: pending
     reason: null
   - id: 82d6dc44c67e
     lines: 11
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:118:128
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:202:212
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:119:129
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:203:213
     disposition: pending
     reason: null
   - id: f0e04e87d0e2
     lines: 7
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:169:175
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:90:96
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:170:176
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:91:97
     disposition: pending
     reason: null
   - id: 7c1800068cfe

@@ -362,6 +362,29 @@ describe('cancelEntry — metadata.cascadeFrom contract (#359 / Step 7.2.8)', ()
     expect(nestedMemberEvt.metadata?.cascadeFrom).not.toBe(nestedGroup);
   });
 
+  it('--cascade with a missing member sidecar: member recorded as skipped (existing contract)', async () => {
+    // memberD does NOT exist on disk — its UUID is in the group's
+    // members[] but no sidecar file was seeded. Per AUDIT-20260530-23's
+    // narrow-the-catch fix, missing sidecar remains a skippable case
+    // (matched up-front via existsSync, not via a broad catch).
+    await seedEntry(projectRoot, memberE, 'm-e-draft', { currentStage: 'Drafting' });
+    await seedEntry(projectRoot, groupUuid, 'missing-member-group', {
+      currentStage: 'Drafting',
+      members: [memberD, memberE],
+    });
+
+    const result = await cancelEntry(projectRoot, { uuid: groupUuid, cascade: true });
+
+    expect(result.toStage).toBe('Cancelled');
+    // memberE cascaded; memberD recorded as skipped (no sidecar).
+    expect(result.cascadedMembers?.map((m) => m.slug)).toEqual(['m-e-draft']);
+    expect(result.skippedMembers).toHaveLength(1);
+    const skipped = result.skippedMembers?.[0];
+    if (skipped === undefined) throw new Error('expected one skipped member');
+    expect(skipped.entryId).toBe(memberD);
+    expect(skipped.reason).toBe('sidecar not found');
+  });
+
   it('--cascade on a group with skipped members: skipped entries emit NO stage-transition event (cascadeFrom not applicable)', async () => {
     // memberD already Cancelled (off-pipeline skip), memberE Drafting
     // (proper cascade target). The skipped member must not produce a
@@ -400,5 +423,126 @@ describe('cancelEntry — metadata.cascadeFrom contract (#359 / Step 7.2.8)', ()
     }
     expect(groupEvt.metadata?.cascadeFrom).toBeUndefined();
     expect(memberEEvt.metadata?.cascadeFrom).toBe(groupUuid);
+  });
+});
+
+/**
+ * AUDIT-20260530-23: cascade catch narrowing. Pre-fix the cascade loop
+ * wrapped the entire per-member chain (readSidecar → resolveTemplate →
+ * recursive walker call → writeSidecar → appendJournalEvent) in one
+ * broad try/catch and converted EVERY thrown error into a skipped
+ * member with `slug: '(unresolved)'` and `reason: 'read failed: ...'`.
+ * That swallowed three distinct corruption modes — corrupt sidecar
+ * JSON, schema-invalid sidecars, and write failures mid-cascade —
+ * masking them as if the member had been gracefully skipped.
+ *
+ * Post-fix the only skippable case is the genuinely-absent sidecar
+ * (existsSync check before any readSidecar call). Every other failure
+ * propagates with the underlying error message intact.
+ */
+describe('cancelEntry — cascade catch narrowing (AUDIT-20260530-23)', () => {
+  let projectRoot: string;
+  const memberCorrupt = '550e8400-e29b-41d4-a716-446655440c01';
+  const memberHealthy = '550e8400-e29b-41d4-a716-446655440c02';
+  const memberWriteFails = '550e8400-e29b-41d4-a716-446655440c03';
+
+  beforeEach(async () => {
+    projectRoot = await mkdtemp(join(tmpdir(), 'dw-cancel-narrow-catch-'));
+    await seedProjectScaffold(projectRoot);
+  });
+
+  afterEach(async () => {
+    await rm(projectRoot, { recursive: true, force: true });
+  });
+
+  it('corrupt member sidecar (invalid JSON) propagates the parse error instead of swallowing as skipped', async () => {
+    // Seed a healthy member alongside the corrupt one so the cascade
+    // has two cancelable targets — pre-fix both would be reported as
+    // "skipped", post-fix the cascade aborts on the corrupt one.
+    await seedEntry(projectRoot, memberHealthy, 'm-healthy', {
+      currentStage: 'Drafting',
+    });
+    // Hand-write a corrupt sidecar (invalid JSON; readSidecar throws
+    // `sidecar JSON invalid at <path>`).
+    const corruptPath = join(
+      projectRoot,
+      '.deskwork',
+      'entries',
+      `${memberCorrupt}.json`,
+    );
+    await writeFile(corruptPath, '{ this is not valid json', 'utf-8');
+    await seedEntry(projectRoot, groupUuid, 'corrupt-member-group', {
+      currentStage: 'Drafting',
+      members: [memberCorrupt, memberHealthy],
+    });
+
+    await expect(
+      cancelEntry(projectRoot, { uuid: groupUuid, cascade: true }),
+    ).rejects.toThrow(/sidecar JSON invalid/);
+  });
+
+  it('schema-invalid member sidecar propagates the schema error instead of swallowing as skipped', async () => {
+    // Sidecar file exists but the JSON, while parsable, fails schema
+    // validation (missing required fields). readSidecar throws
+    // `sidecar schema invalid at <path>: ...`. Pre-fix: silently
+    // skipped; post-fix: propagates.
+    await seedEntry(projectRoot, memberHealthy, 'm-healthy-schema', {
+      currentStage: 'Drafting',
+    });
+    const schemaInvalidPath = join(
+      projectRoot,
+      '.deskwork',
+      'entries',
+      `${memberCorrupt}.json`,
+    );
+    await writeFile(
+      schemaInvalidPath,
+      JSON.stringify({ uuid: memberCorrupt, slug: 'partial' }),
+      'utf-8',
+    );
+    await seedEntry(projectRoot, groupUuid, 'schema-invalid-group', {
+      currentStage: 'Drafting',
+      members: [memberCorrupt, memberHealthy],
+    });
+
+    await expect(
+      cancelEntry(projectRoot, { uuid: groupUuid, cascade: true }),
+    ).rejects.toThrow(/sidecar schema invalid/);
+  });
+
+  it('write failure mid-cascade propagates the write error instead of swallowing as skipped', async () => {
+    // Drive the write to fail for a specific member by replacing its
+    // sidecar file with a directory of the same name AFTER seeding the
+    // group. writeSidecar uses atomic rename (`writeFile <path>.tmp` →
+    // `rename` over the target); the rename onto a directory fails with
+    // EISDIR. Pre-fix that error was caught + recorded as "skipped";
+    // post-fix it propagates.
+    await seedEntry(projectRoot, memberHealthy, 'm-healthy-write', {
+      currentStage: 'Drafting',
+    });
+    await seedEntry(projectRoot, memberWriteFails, 'm-write-fails', {
+      currentStage: 'Drafting',
+    });
+    // Replace the seeded sidecar file with a directory of the same name.
+    const failPath = join(
+      projectRoot,
+      '.deskwork',
+      'entries',
+      `${memberWriteFails}.json`,
+    );
+    await rm(failPath, { force: true });
+    await mkdir(failPath);
+    await seedEntry(projectRoot, groupUuid, 'write-fail-group', {
+      currentStage: 'Drafting',
+      members: [memberWriteFails, memberHealthy],
+    });
+
+    // The chain hits the directory-shaped sidecar at readSidecar time
+    // (read of a directory fails with EISDIR). Pre-fix this would be
+    // swallowed as a skipped member; post-fix the underlying error
+    // propagates with a non-matching skip reason.
+    await expect(
+      cancelEntry(projectRoot, { uuid: groupUuid, cascade: true }),
+    ).rejects.toThrow();
   });
 });
