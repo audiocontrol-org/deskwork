@@ -1053,15 +1053,15 @@ NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/e
 
 NEW CLI verb that walks the run-dir, extracts findings via the Task 2 library, assigns sequential AUDIT-IDs, and writes them as `Status: open` entries to the canonical audit-log.
 
-- [ ] Step 1: CLI shim at `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts`. Args:
+- [x] Step 1: CLI shim at `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts`. Args:
   - `--feature <slug>` (REQUIRED)
   - `--run-dir <path>` (REQUIRED)
   - `--date <YYYYMMDD>` (default: today UTC)
   - `--repo-root <path>` (optional override)
   - `--apply` (default dry-run; `--apply` writes)
   - `--help`
-- [ ] Step 2: Reads existing audit-log; finds highest `AUDIT-<date>-<NN>` for `<date>`; sequential numbering continues from there.
-- [ ] Step 3: For each `ExtractedFinding`, compose the audit-log entry shape used by Phase 13:
+- [x] Step 2: Reads existing audit-log; finds highest `AUDIT-<date>-<NN>` for `<date>`; sequential numbering continues from there.
+- [x] Step 3: For each `ExtractedFinding`, compose the audit-log entry shape used by Phase 13:
   ```
   ### AUDIT-<date>-<NN> — <heading>
 
@@ -1072,10 +1072,10 @@ NEW CLI verb that walks the run-dir, extracts findings via the Task 2 library, a
 
   <body>
   ```
-- [ ] Step 4: Append a new section heading `## <ISO-date> — audit-barrage lift (<run-dir-basename>)` above the new entries so the lift is auditable per-run.
-- [ ] Step 5: Atomic write — read full audit-log, append new section, write whole file once; preserve all pre-existing entries verbatim per the preservation rule.
-- [ ] Step 6: Register in `cli.ts` as `'audit-barrage-lift'`.
-- [ ] Step 7: 8+ tests at `__tests__/scope-discovery/promote-findings/audit-barrage-lift-cli.test.ts`:
+- [x] Step 4: Append a new section heading `## <ISO-date> — audit-barrage lift (<run-dir-basename>)` above the new entries so the lift is auditable per-run.
+- [x] Step 5: Atomic write — read full audit-log, append new section, write whole file once; preserve all pre-existing entries verbatim per the preservation rule.
+- [x] Step 6: Register in `cli.ts` as `'audit-barrage-lift'`.
+- [x] Step 7: 8+ tests at `__tests__/scope-discovery/promote-findings/audit-barrage-lift-cli.test.ts` (delivered 15 tests across parseFlags + run-loop, including extras: empty-run-dir → exit 0 / no audit-log mutation; --help short-circuits; explicit `--date` accepted):
   - (a) parseFlags coverage (required-feature, required-run-dir, --apply, --date, unknown flag).
   - (b) dry-run reports the count + the proposed IDs without writing.
   - (c) `--apply` writes the section + entries with sequential IDs.
@@ -1086,11 +1086,11 @@ NEW CLI verb that walks the run-dir, extracts findings via the Task 2 library, a
   - (h) Run-dir-not-found → exit 2.
 
 **Acceptance Criteria:**
-- [ ] `dw-lifecycle audit-barrage-lift --help` resolves from the installed shim.
-- [ ] Dry-run reports proposed entries; `--apply` writes them.
-- [ ] Sequential AUDIT-ID assignment honored.
-- [ ] Cross-model agreement reflected in the rendered Finding-ID line.
-- [ ] Audit-log preservation rule honored (entries below the new section unchanged).
+- [x] `dw-lifecycle audit-barrage-lift --help` resolves from the installed shim.
+- [x] Dry-run reports proposed entries; `--apply` writes them.
+- [x] Sequential AUDIT-ID assignment honored.
+- [x] Cross-model agreement reflected in the rendered Finding-ID line.
+- [x] Audit-log preservation rule honored (entries below the new section unchanged).
 
 ### Task 4: Implement-loop audit-barrage hook
 

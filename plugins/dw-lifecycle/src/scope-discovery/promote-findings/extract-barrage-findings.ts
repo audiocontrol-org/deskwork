@@ -62,6 +62,7 @@ export type NormalizedSeverity =
 
 export interface RawModelFinding {
   readonly model: string;
+  readonly findingId: string;
   readonly heading: string;
   readonly severity: NormalizedSeverity;
   readonly surface: string;
@@ -75,6 +76,7 @@ export interface ExtractedFinding {
   readonly surface: string;
   readonly body: string;
   readonly sourceModels: readonly string[];
+  readonly sourceFindingIds: readonly string[];
   readonly crossModelAgreement: boolean;
 }
 
@@ -176,6 +178,7 @@ export function parseModelMarkdown(text: string, model: string): RawModelFinding
     const isClean = /-CLEAN$/i.test(findingId);
     findings.push({
       model,
+      findingId,
       heading: block.heading,
       severity: normalizeSeverity(severityRaw),
       surface,
@@ -230,7 +233,11 @@ function clusterFindings(
 }
 
 function mergeCluster(cluster: readonly RawModelFinding[]): ExtractedFinding {
-  const sourceModels = Array.from(new Set(cluster.map((f) => f.model))).sort();
+  const sortedCluster = [...cluster].sort((a, b) =>
+    a.model === b.model ? 0 : a.model < b.model ? -1 : 1,
+  );
+  const sourceModels = Array.from(new Set(sortedCluster.map((f) => f.model)));
+  const sourceFindingIds = sortedCluster.map((f) => f.findingId);
   const representative = cluster[0]!;
   let highestSeverity: NormalizedSeverity = representative.severity;
   for (const f of cluster) {
@@ -244,6 +251,7 @@ function mergeCluster(cluster: readonly RawModelFinding[]): ExtractedFinding {
     surface: representative.surface,
     body: representative.body,
     sourceModels,
+    sourceFindingIds,
     crossModelAgreement: sourceModels.length >= 2,
   };
 }

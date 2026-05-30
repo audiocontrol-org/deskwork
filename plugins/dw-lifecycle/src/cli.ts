@@ -30,6 +30,7 @@ import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-disc
 import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
 import { auditBarrage } from './subcommands/audit-barrage.js';
 import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
+import { auditBarrageLiftCli } from './subcommands/audit-barrage-lift.js';
 import { wrapPrompt } from './subcommands/wrap-prompt.js';
 import { validateReturn } from './subcommands/validate-return.js';
 import { debtReport } from './subcommands/debt-report.js';
@@ -93,6 +94,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'orchestrator-turn': orchestratorTurn,
   'audit-barrage': auditBarrage,
   'audit-barrage-render': auditBarrageRender,
+  'audit-barrage-lift': auditBarrageLiftCli,
   'wrap-prompt': wrapPrompt,
   'validate-return': validateReturn,
   'debt-report': debtReport,

@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T23:29:36.717Z
+generated_at: 2026-05-30T06:34:42.026Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -523,7 +523,7 @@ clones:
     lines: 11
     members:
       - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/check-deprecations-harness.ts:10:20
-      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:36
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:40
     disposition: pending
     reason: null
   - id: 94802334249e
@@ -560,7 +560,7 @@ clones:
     lines: 15
     members:
       - plugins/dw-lifecycle/src/debt-report/index.ts:14:28
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:153:167
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:143:157
     disposition: keep-with-reason
     reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
   - id: a0d4744c1099
@@ -1133,23 +1133,24 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:187:195
     disposition: keep-with-reason
     reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
-  - id: 7d882bc319d3
+  - id: 00d9079a6fe2
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:284:293
-      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:290
-    disposition: pending
-    reason: null
-  - id: b32250765cb8
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:299
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
+  - id: 5057f7f0a8f2
     lines: 19
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:376:394
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:337:355
       - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
-      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:144:162
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
-    disposition: keep-with-reason
-    reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every subcommand by convention.
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 69c3cc2125ab
     lines: 17
     members:
@@ -1157,6 +1158,41 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:86:102
     disposition: pending
     reason: null
+  - id: 044582e5231a
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:101:109
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:83:90
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
+  - id: 9e3aa2d4168b
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:119:129
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:119:129
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
+  - id: 2fb54234f46e
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:128:134
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:110:116
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
+  - id: 36c8124846df
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:180:189
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:147:156
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
+  - id: 76af44b0d65f
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:290:299
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:290
+    disposition: ignore-with-justification
+    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 4295f8a2a16b
     lines: 9
     members:
@@ -1269,35 +1305,35 @@ clones:
     lines: 42
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:103:144
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:89:130
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:79:120
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: b2488178b829
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:166:175
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:146:155
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:136:145
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 17910c70e661
     lines: 7
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:334:340
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:192:198
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:182:188
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 462b9a9ecf0d
     lines: 12
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:383:394
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:221:231
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:211:221
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 913d6ef9c4da
     lines: 8
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:57:64
-      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:38:54
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:38:44
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 31ae172c82fa
@@ -1311,16 +1347,9 @@ clones:
     lines: 23
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:75:97
-      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:48:82
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:48:72
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
-  - id: 9cfccf0a8979
-    lines: 11
-    members:
-      - plugins/dw-lifecycle/src/subcommands/debt-report.ts:39:49
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:35:45
-    disposition: keep-with-reason
-    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
   - id: 0a9bedfbb1cf
     lines: 7
     members:
@@ -1339,63 +1368,63 @@ clones:
     lines: 7
     members:
       - plugins/dw-lifecycle/src/subcommands/issues.ts:40:46
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:149:155
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:139:145
     disposition: keep-with-reason
     reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
   - id: 52b437adb7e8
     lines: 34
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:120:153
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:134:167
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:124:157
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 8e5f16a18cc8
     lines: 13
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:175:187
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:192:204
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:182:194
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 2a9a858b5922
     lines: 28
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:189:216
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:206:233
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:196:223
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 3e0f9e6532b9
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:232:241
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:248:257
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:238:247
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 48c9db6582fb
     lines: 8
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:38:45
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:47:54
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:37:44
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: abc1afffaf43
     lines: 20
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:51:70
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:63:82
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:53:72
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: d290e3525f10
     lines: 18
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:73:90
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:87:104
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:77:94
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 777751b1eafd
     lines: 24
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:91:114
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:107:130
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:97:120
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 557060d42ad4
