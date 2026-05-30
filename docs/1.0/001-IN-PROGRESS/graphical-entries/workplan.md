@@ -947,6 +947,1213 @@ Closes AUDIT-20260530-24 (cross-model: AUDIT-BARRAGE-claude-02-P7small). Surface
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step — `fixed-f283f9b`.
 
 
+### Task 7.40 (fix-finding-AUDIT-20260530-25 (cross-model: AUDIT-BARRAGE-claude-P5-1)): AUDIT-20260530-25 — [P5-1 claude] Lane-bucket `unbucketed` entries are silently …
+
+Closes AUDIT-20260530-25 (cross-model: AUDIT-BARRAGE-claude-P5-1). Surface: `packages/studio/src/pages/dashboard/swimlane-card.ts` (`renderSwimlane`, the stage-column assembly ~lines after "const stagesRaw"), `packages/studio/src/pages/dashboard/lane-data.ts` (`LaneBucket.unbucketed` + `loadLaneBuckets` entryCount math).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-25 (cross-model: AUDIT-BARRAGE-claude-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.41 (fix-finding-AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)): AUDIT-20260530-26 — [P5-1 claude] No clear-on-version-bump for swimlane localSto…
+
+Closes AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts` (`STORAGE_KEY_PREFIX`, `resolveProjectKey`, `readStoredObjectMap`) and the four key suffixes in `swimlane.ts` / `swimlane-collapse.ts` / `swimlane-view-toggle.ts`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.42 (fix-finding-AUDIT-20260530-27 (cross-model: AUDIT-BARRAGE-claude-P5-1)): AUDIT-20260530-27 — [P5-1 claude] Rail eye-toggle `.r-eye-btn` is a 14px-wide in…
+
+Closes AUDIT-20260530-27 (cross-model: AUDIT-BARRAGE-claude-P5-1). Surface: `plugins/deskwork-studio/public/css/dashboard-swimlane.css` (`.rail-lane .r-eye-btn` rule: `width: 14px; ... padding: 0;`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-27 (cross-model: AUDIT-BARRAGE-claude-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.43 (fix-finding-AUDIT-20260530-28 (cross-model: AUDIT-BARRAGE-codex-P5-1)): AUDIT-20260530-28 — [P5-1 codex] Compose chip copies an invalid command for stag…
+
+Closes AUDIT-20260530-28 (cross-model: AUDIT-BARRAGE-codex-P5-1). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:90-98; packages/studio/src/pages/dashboard/swimlane-card.ts:297-307.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-28 (cross-model: AUDIT-BARRAGE-codex-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.44 (fix-finding-AUDIT-20260530-29 (cross-model: AUDIT-BARRAGE-codex-P5-1)): AUDIT-20260530-29 — [P5-1 codex] Dashboard localStorage has no schema/version se…
+
+Closes AUDIT-20260530-29 (cross-model: AUDIT-BARRAGE-codex-P5-1). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:21-27; plugins/deskwork-studio/public/src/dashboard/swimlane.ts:64-69; plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:60-65; plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:68-70.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-29 (cross-model: AUDIT-BARRAGE-codex-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.45 (fix-finding-AUDIT-20260530-30 (cross-model: AUDIT-BARRAGE-codex-P5-1)): AUDIT-20260530-30 — [P5-1 codex] Re-running swimlane initializers stacks duplica…
+
+Closes AUDIT-20260530-30 (cross-model: AUDIT-BARRAGE-codex-P5-1). Surface: plugins/deskwork-studio/public/src/editorial-studio-client.ts:527-530; plugins/deskwork-studio/public/src/dashboard/swimlane.ts:469-490; plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:464-477; plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:292-312; plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:270-282.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-30 (cross-model: AUDIT-BARRAGE-codex-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.46 (fix-finding-AUDIT-20260530-31 (cross-model: AUDIT-BARRAGE-gemini-P5-1)): AUDIT-20260530-31 — [P5-1 gemini] The stage ID slugification logic in `renderSta…
+
+Closes AUDIT-20260530-31 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `packages/studio/src/pages/dashboard/swimlane-card.ts:127`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-31 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.47 (fix-finding-AUDIT-20260530-32 (cross-model: AUDIT-BARRAGE-gemini-P5-1)): AUDIT-20260530-32 — [P5-1 gemini] The list-view overflow affordance (`.lb-overfl…
+
+Closes AUDIT-20260530-32 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `packages/studio/src/pages/dashboard/swimlane-list-body.ts:109`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-32 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.48 (fix-finding-AUDIT-20260530-33 (cross-model: AUDIT-BARRAGE-gemini-P5-1)): AUDIT-20260530-33 — [P5-1 gemini] The logic for the "All" focus chip in `bindFoc…
+
+Closes AUDIT-20260530-33 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane.ts:251-254`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-33 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.49 (fix-finding-AUDIT-20260530-34 (cross-model: AUDIT-BARRAGE-gemini-P5-1)): AUDIT-20260530-34 — [P5-1 gemini] The mobile dashboard lane-stack/lane-head vari…
+
+Closes AUDIT-20260530-34 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:231` (and related mobile rendering).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-34 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.50 (fix-finding-AUDIT-20260530-35 (cross-model: AUDIT-BARRAGE-gemini-P5-1)): AUDIT-20260530-35 — [P5-1 gemini] The `tooling-feedback.md` explicitly lists TF-…
+
+Closes AUDIT-20260530-35 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `docs/1.0/001-IN-PROGRESS/graphical-entries/tooling-feedback.md`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-35 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.51 (fix-finding-AUDIT-20260530-36 (cross-model: AUDIT-BARRAGE-claude-P5-2)): AUDIT-20260530-36 — [P5-2 claude] Template-aware verb dispatch recomputes `class…
+
+Closes AUDIT-20260530-36 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `packages/studio/src/pages/dashboard/affordances.ts:178` (`verbsForStage`), `:370` (`renderMenu`), `:419-475` (`renderRowActions` / `renderRowDrawer` / `renderRowMenu`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-36 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.52 (fix-finding-AUDIT-20260530-37 (cross-model: AUDIT-BARRAGE-claude-P5-2)): AUDIT-20260530-37 — [P5-2 claude] `classifyStage` throw converts a single out-of…
+
+Closes AUDIT-20260530-37 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `packages/studio/src/pages/dashboard/affordances.ts:99-107` (throw), `packages/studio/src/pages/dashboard/swimlane-card.ts:186-193` (`renderStageCol` body map).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-37 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.53 (fix-finding-AUDIT-20260530-38 (cross-model: AUDIT-BARRAGE-claude-P5-2)): AUDIT-20260530-38 — [P5-2 claude] Mobile lane-sheet focus-trap contract is unver…
+
+Closes AUDIT-20260530-38 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:60-90`, `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:1-30` (coverage docblock).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-38 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.54 (fix-finding-AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2)): AUDIT-20260530-39 — [P5-2 claude] `EDITORIAL_STAGE_EMPTY_HINTS` hardcodes editor…
+
+Closes AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `packages/studio/src/pages/dashboard/swimlane-card.ts:84-115` (`EDITORIAL_STAGE_EMPTY_HINTS` + `stageEmptyHint`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.55 (fix-finding-AUDIT-20260530-40 (cross-model: AUDIT-BARRAGE-claude-P5-2)): AUDIT-20260530-40 — [P5-2 claude] Mobile sheet open/closed state is tracked redu…
+
+Closes AUDIT-20260530-40 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:62-86`, `plugins/deskwork-studio/public/css/dashboard-swimlane.css` (`body[data-lane-sheet-open] .lane-sheet-backdrop` vs `.lane-sheet-container.is-open .lane-rail`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-40 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.56 (fix-finding-AUDIT-20260530-41 (cross-model: AUDIT-BARRAGE-codex-P5-2)): AUDIT-20260530-41 — [P5-2 codex] Mobile lane sheet opens like a modal but does n…
+
+Closes AUDIT-20260530-41 (cross-model: AUDIT-BARRAGE-codex-P5-2). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:54-131; plugins/deskwork-studio/public/src/mobile-shell/sheet-controller.ts:96-123.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-41 (cross-model: AUDIT-BARRAGE-codex-P5-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.57 (fix-finding-AUDIT-20260530-42 (cross-model: AUDIT-BARRAGE-codex-P5-2)): AUDIT-20260530-42 — [P5-2 codex] Unbucketed template-stage entries are counted b…
+
+Closes AUDIT-20260530-42 (cross-model: AUDIT-BARRAGE-codex-P5-2). Surface: packages/studio/src/pages/dashboard/lane-data.ts:266-273; packages/studio/src/pages/dashboard/swimlane-card.ts:391-422.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-42 (cross-model: AUDIT-BARRAGE-codex-P5-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.58 (fix-finding-AUDIT-20260530-43 (cross-model: AUDIT-BARRAGE-codex-P5-2)): AUDIT-20260530-43 — [P5-2 codex] Held Space repeat on compose/empty CTA still al…
+
+Closes AUDIT-20260530-43 (cross-model: AUDIT-BARRAGE-codex-P5-2). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:250-262.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-43 (cross-model: AUDIT-BARRAGE-codex-P5-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.59 (fix-finding-AUDIT-20260530-44 (cross-model: AUDIT-BARRAGE-claude-P5-3)): AUDIT-20260530-44 — [P5-3 claude] Save button flashes success even when preset p…
+
+Closes AUDIT-20260530-44 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:handleSaveClick` (the `savePresetFromCurrent → renderPresetList → flashSaveConfirm` sequence) + `swimlane-presets-store.ts:writePresets` (the swallowed `try/catch`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-44 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.60 (fix-finding-AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3)): AUDIT-20260530-45 — [P5-3 claude] Presets are never reconciled when a lane is re…
+
+Closes AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:applyPreset` + `snapshotCurrentState`; contrast `swimlane-drag.ts:reconcileOrder`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.61 (fix-finding-AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3)): AUDIT-20260530-46 — [P5-3 claude] `applyPreset` does not enforce the hidden⇒not-…
+
+Closes AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:applyPreset` (visibility write at the `writeJsonOrIgnore(visibilityKey...)` step + focus write at `writeJsonOrIgnore(focusKey..., preset.focusedLanes)`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.62 (fix-finding-AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3)): AUDIT-20260530-47 — [P5-3 claude] Deep-link `?preset=<id>` only resolves in the …
+
+Closes AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:savePresetFromCurrent` (id minting: `const id = \`p${now.getTime().toString(36)}\``) + `swimlane-presets.ts:applyDeepLinkPreset`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.63 (fix-finding-AUDIT-20260530-48 (cross-model: AUDIT-BARRAGE-claude-P5-3)): AUDIT-20260530-48 — [P5-3 claude] SSR "no flash-of-empty-content" claim is false…
+
+Closes AUDIT-20260530-48 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `packages/studio/src/pages/dashboard/swimlane-rail.ts:renderPresetSurface` docstring ("re-rendered identically by the client … no flash-of-empty-content") vs `plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:renderPresetList`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-48 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.64 (fix-finding-AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3)): AUDIT-20260530-49 — [P5-3 claude] DRY regression: `readJsonArrayOfStrings` re-im…
+
+Closes AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:readJsonArrayOfStrings` (and the trio `writePresets`/`writeJsonOrIgnore`/`writeStoredOrder` across the three files).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.65 (fix-finding-AUDIT-20260530-50 (cross-model: AUDIT-BARRAGE-claude-P5-3)): AUDIT-20260530-50 — [P5-3 claude] Test suite never exercises localStorage write-…
+
+Closes AUDIT-20260530-50 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `packages/studio/test/dashboard-swimlane-presets-client.test.ts` + `packages/studio/test/dashboard-swimlane-drag-client.test.ts`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-50 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.66 (fix-finding-AUDIT-20260530-51 (cross-model: AUDIT-BARRAGE-codex-P5-3)): AUDIT-20260530-51 — [P5-3 codex] Preset storage write failures are reported as s…
+
+Closes AUDIT-20260530-51 (cross-model: AUDIT-BARRAGE-codex-P5-3). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:209-221,349-414; plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:188-205.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-51 (cross-model: AUDIT-BARRAGE-codex-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.67 (fix-finding-AUDIT-20260530-52 (cross-model: AUDIT-BARRAGE-codex-P5-3)): AUDIT-20260530-52 — [P5-3 codex] Workplan marks a scoped server-side preset path…
+
+Closes AUDIT-20260530-52 (cross-model: AUDIT-BARRAGE-codex-P5-3). Surface: docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:267-271.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-52 (cross-model: AUDIT-BARRAGE-codex-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.68 (fix-finding-AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3)): AUDIT-20260530-53 — [P5-3 codex] Stored lane order accepts duplicate IDs and can…
+
+Closes AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:53-63; plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts:72-89,371-392.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.69 (fix-finding-AUDIT-20260530-54 (cross-model: AUDIT-BARRAGE-claude-P6-1)): AUDIT-20260530-54 — [P6-1 claude] `pipeline update --rename-stage` writes `<id>-…
+
+Closes AUDIT-20260530-54 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `packages/core/src/pipelines/operations/update.ts:appendRenameMigration` (writes `${pipelineId}-renames.json` into `pipelineOverridesDir`) vs `packages/core/src/pipelines/loader.ts:listAvailablePipelineTemplates` (`:251`) + `packages/core/src/pipelines/operations/list.ts:listPipelines`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-54 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.70 (fix-finding-AUDIT-20260530-55 (cross-model: AUDIT-BARRAGE-claude-P6-1)): AUDIT-20260530-55 — [P6-1 claude] `pipeline delete --reassign-lanes-to ""` (empt…
+
+Closes AUDIT-20260530-55 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `packages/core/src/pipelines/operations/delete.ts:deletePipeline` (refusal guard, validation guard, rebind loop).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-55 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.71 (fix-finding-AUDIT-20260530-56 (cross-model: AUDIT-BARRAGE-claude-P6-1)): AUDIT-20260530-56 — [P6-1 claude] `appendRenameMigration` is non-atomic and sile…
+
+Closes AUDIT-20260530-56 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `packages/core/src/pipelines/operations/update.ts:appendRenameMigration` (read + `writeFileSync` direct), and `plugins/deskwork/skills/pipeline/SKILL.md` Safety-rules ("migration sidecar is append-only … deleting it loses the audit trail").
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-56 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.72 (fix-finding-AUDIT-20260530-57 (cross-model: AUDIT-BARRAGE-claude-P6-1)): AUDIT-20260530-57 — [P6-1 claude] `listLanes` / `listPipelines` throw on a singl…
+
+Closes AUDIT-20260530-57 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `packages/core/src/lanes/operations/list.ts:listLanes` (N+1 `loadLaneConfig`), `packages/core/src/pipelines/operations/list.ts:listPipelines` (N+1 `loadPipelineTemplate`), vs `packages/core/src/lanes/loader.ts:listLaneConfigs` + `isArchivedOnDisk`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-57 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.73 (fix-finding-AUDIT-20260530-58 (cross-model: AUDIT-BARRAGE-claude-P6-1)): AUDIT-20260530-58 — [P6-1 claude] `lane move` of a pre-migration entry (no `lane…
+
+Closes AUDIT-20260530-58 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `packages/core/src/lanes/operations/move.ts:moveEntryToLane` (`sourceLaneId = sidecar.lane ?? DEFAULT_LANE_ID`, then `loadLaneConfig(sourceLaneId, projectRoot)`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-58 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.74 (fix-finding-AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1)): AUDIT-20260530-59 — [P6-1 claude] Rollback-test silently no-ops (returns "pass")…
+
+Closes AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `packages/cli/test/lane/move.test.ts:264-280` ("rolls back artifact + scrapbook when writeSidecar fails").
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.75 (fix-finding-AUDIT-20260530-60 (cross-model: AUDIT-BARRAGE-codex-P6-1)): AUDIT-20260530-60 — [P6-1 codex] Pipeline template rename/archive/restore/purge …
+
+Closes AUDIT-20260530-60 (cross-model: AUDIT-BARRAGE-codex-P6-1). Surface: `packages/cli/src/commands/pipeline.ts:5-15`, `packages/cli/src/commands/pipeline.ts:80-136`, `packages/core/src/pipelines/operations/index.ts:11-28`, `plugins/deskwork/skills/pipeline/SKILL.md:13-25`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-60 (cross-model: AUDIT-BARRAGE-codex-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.76 (fix-finding-AUDIT-20260530-61 (cross-model: AUDIT-BARRAGE-codex-P6-1)): AUDIT-20260530-61 — [P6-1 codex] Stage-rename sidecar is enumerated as a fake pi…
+
+Closes AUDIT-20260530-61 (cross-model: AUDIT-BARRAGE-codex-P6-1). Surface: `packages/core/src/pipelines/operations/update.ts:410-459`, `packages/core/src/pipelines/loader.ts:251-260`, `packages/core/src/pipelines/operations/list.ts:38-40`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-61 (cross-model: AUDIT-BARRAGE-codex-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.77 (fix-finding-AUDIT-20260530-62 (cross-model: AUDIT-BARRAGE-codex-P6-1)): AUDIT-20260530-62 — [P6-1 codex] `remove-stage` misses legacy default-lane entri…
+
+Closes AUDIT-20260530-62 (cross-model: AUDIT-BARRAGE-codex-P6-1). Surface: `packages/core/src/pipelines/operations/update.ts:367-395`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-62 (cross-model: AUDIT-BARRAGE-codex-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.78 (fix-finding-AUDIT-20260530-63 (cross-model: AUDIT-BARRAGE-codex-P6-1)): AUDIT-20260530-63 — [P6-1 codex] `delete --reassign-lanes-to` can leave a partia…
+
+Closes AUDIT-20260530-63 (cross-model: AUDIT-BARRAGE-codex-P6-1). Surface: `packages/core/src/pipelines/operations/delete.ts:179-222`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-63 (cross-model: AUDIT-BARRAGE-codex-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.79 (fix-finding-AUDIT-20260530-64 (cross-model: AUDIT-BARRAGE-codex-P6-1)): AUDIT-20260530-64 — [P6-1 codex] `lane move` trusts sidecar paths when moving fi…
+
+Closes AUDIT-20260530-64 (cross-model: AUDIT-BARRAGE-codex-P6-1). Surface: `packages/core/src/lanes/operations/move.ts:210-231`, `packages/core/src/schema/entry.ts:213-218`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-64 (cross-model: AUDIT-BARRAGE-codex-P6-1)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.80 (fix-finding-AUDIT-20260530-65 (cross-model: AUDIT-BARRAGE-claude-P6-2)): AUDIT-20260530-65 — [P6-2 claude] Pipelines data layer re-reads + re-parses ever…
+
+Closes AUDIT-20260530-65 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/pipelines/data.ts` — `loadPipelinesPageData` (loop), `findReferencingLanes`, `readLanePipelineTemplate`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-65 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.81 (fix-finding-AUDIT-20260530-66 (cross-model: AUDIT-BARRAGE-claude-P6-2)): AUDIT-20260530-66 — [P6-2 claude] `/dev/lanes` hard-fails the entire page on one…
+
+Closes AUDIT-20260530-66 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/lanes/data.ts` — `loadLanesPageData` loop (`loadLaneConfig(id, projectRoot)` with no try/catch); `packages/studio/src/server.ts:/dev/lanes` route.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-66 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.82 (fix-finding-AUDIT-20260530-67 (cross-model: AUDIT-BARRAGE-claude-P6-2)): AUDIT-20260530-67 — [P6-2 claude] Corrupt/unreadable lane JSON is silently dropp…
+
+Closes AUDIT-20260530-67 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/pipelines/data.ts` — `readLanePipelineTemplate` (returns `null` on `readFile`/`JSON.parse` failure), `findReferencingLanes`, consumed by `renderDeleteButton` in `pipelines/table.ts`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-67 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.83 (fix-finding-AUDIT-20260530-68 (cross-model: AUDIT-BARRAGE-claude-P6-2)): AUDIT-20260530-68 — [P6-2 claude] Lanes page never emits `data-project-key`, so …
+
+Closes AUDIT-20260530-68 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/lanes.ts` (`<main ... data-lanes-container>`); `plugins/deskwork-studio/public/src/lanes/lanes-page.ts` — `archivedOpenKey`/`initArchivedSection` via `resolveProjectKey(container)`; `packages/studio/test/lanes/lanes-page-client.test.ts` (`container.dataset.projectKey = 'test-proj'`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-68 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.84 (fix-finding-AUDIT-20260530-69 (cross-model: AUDIT-BARRAGE-claude-P6-2)): AUDIT-20260530-69 — [P6-2 claude] Edit-form diff-emit trims the live value but n…
+
+Closes AUDIT-20260530-69 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `plugins/deskwork-studio/public/src/lanes/lanes-page.ts` — `readFieldValue` (`el?.value.trim()`), `readFieldCurrent` (`el?.dataset.current` — untrimmed), `buildUpdateCommand`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-69 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.85 (fix-finding-AUDIT-20260530-70 (cross-model: AUDIT-BARRAGE-claude-P6-2)): AUDIT-20260530-70 — [P6-2 claude] No XSS regression test feeds an operator-contr…
+
+Closes AUDIT-20260530-70 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/lanes/edit-form.ts` (`value="${row.name}"`, `data-current="${row.name}"`, `data-current="${row.contentDir}"`); `packages/studio/src/pages/pipelines/view-panel.ts`/`table.ts`; `packages/studio/test/lanes/*` + `test/pipelines/*`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-70 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.86 (fix-finding-AUDIT-20260530-71 (cross-model: AUDIT-BARRAGE-claude-P6-2)): AUDIT-20260530-71 — [P6-2 claude] View and Edit panels are rendered in full (5 s…
+
+Closes AUDIT-20260530-71 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/pipelines/table.ts` — `renderHealthyRow` (always emits `renderViewPanel(row)` + `renderEditForm(row, …)`); `edit-form.ts`, `view-panel.ts`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-71 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.87 (fix-finding-AUDIT-20260530-72 (cross-model: AUDIT-BARRAGE-claude-P6-2)): AUDIT-20260530-72 — [P6-2 claude] `classifyLoadError` substring matching can mis…
+
+Closes AUDIT-20260530-72 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/pipelines/data.ts` — `classifyLoadError`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-72 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.88 (fix-finding-AUDIT-20260530-73 (cross-model: AUDIT-BARRAGE-codex-P6-2)): AUDIT-20260530-73 — [P6-2 codex] Required-field copy builders can copy placehold…
+
+Closes AUDIT-20260530-73 (cross-model: AUDIT-BARRAGE-codex-P6-2). Surface: `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:95-103,182-189`; `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:88-102,205-228`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-73 (cross-model: AUDIT-BARRAGE-codex-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.89 (fix-finding-AUDIT-20260530-74 (cross-model: AUDIT-BARRAGE-codex-P6-2)): AUDIT-20260530-74 — [P6-2 codex] Set-locked builder advertises a CLI-refused emp…
+
+Closes AUDIT-20260530-74 (cross-model: AUDIT-BARRAGE-codex-P6-2). Surface: `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:157-163`; `packages/studio/test/pipelines/pipelines-page-client.test.ts:214-238`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-74 (cross-model: AUDIT-BARRAGE-codex-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.90 (fix-finding-AUDIT-20260530-75 (cross-model: AUDIT-BARRAGE-codex-P6-2)): AUDIT-20260530-75 — [P6-2 codex] Page init is not actually idempotent
+
+Closes AUDIT-20260530-75 (cross-model: AUDIT-BARRAGE-codex-P6-2). Surface: `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:167-189,193-221,240-289,322-344,347-364`; `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:141-174,177-231,240-267,294-347,350-367`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-75 (cross-model: AUDIT-BARRAGE-codex-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.91 (fix-finding-AUDIT-20260530-76 (cross-model: AUDIT-BARRAGE-codex-P6-2)): AUDIT-20260530-76 — [P6-2 codex] Lanes and pipelines pages mark Dashboard as the…
+
+Closes AUDIT-20260530-76 (cross-model: AUDIT-BARRAGE-codex-P6-2). Surface: `packages/studio/src/pages/lanes.ts:76-80`; `packages/studio/src/pages/pipelines.ts:72-75`; `packages/studio/src/pages/chrome.ts:63-67`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-76 (cross-model: AUDIT-BARRAGE-codex-P6-2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.92 (fix-finding-AUDIT-20260530-77 (cross-model: AUDIT-BARRAGE-claude-P6-3)): AUDIT-20260530-77 — [P6-3 claude] Delete-refusal message lists entry UUIDs but i…
+
+Closes AUDIT-20260530-77 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/core/src/doctor/rules/lane-config-missing-template.ts:290-309` (delete dependency check + refusal message).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-77 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.93 (fix-finding-AUDIT-20260530-78 (cross-model: AUDIT-BARRAGE-claude-P6-3)): AUDIT-20260530-78 — [P6-3 claude] Entry-binding guard can false-negative on corr…
+
+Closes AUDIT-20260530-78 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/core/src/doctor/rules/lane-config-missing-template.ts:280-300` (`readAllSidecars` dependency check).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-78 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.94 (fix-finding-AUDIT-20260530-79 (cross-model: AUDIT-BARRAGE-claude-P6-3)): AUDIT-20260530-79 — [P6-3 claude] Lane mutation lands on disk before the journal…
+
+Closes AUDIT-20260530-79 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/core/src/doctor/rules/lane-config-missing-template.ts:243-262` (set-template) and `:314-333` (delete).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-79 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.95 (fix-finding-AUDIT-20260530-80 (cross-model: AUDIT-BARRAGE-claude-P6-3)): AUDIT-20260530-80 — [P6-3 claude] Audit scans archived lanes at severity=error, …
+
+Closes AUDIT-20260530-80 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/core/src/doctor/rules/lane-config-missing-template.ts:165` (`listLaneConfigs(ctx.projectRoot, { includeArchived: true })`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-80 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.96 (fix-finding-AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3)): AUDIT-20260530-81 — [P6-3 claude] `laneFilePath` is persisted as an absolute pat…
+
+Closes AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/core/src/doctor/rules/lane-config-missing-template.ts:200-210` (finding.details), `:324-329` (journal event); `packages/core/src/schema/journal-events.ts:228` (`laneFilePath: z.string().min(1)`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.97 (fix-finding-AUDIT-20260530-82 (cross-model: AUDIT-BARRAGE-claude-P6-3)): AUDIT-20260530-82 — [P6-3 claude] Integration test silently depends on a prebuil…
+
+Closes AUDIT-20260530-82 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/cli/test/custom-pipeline-lane-integration.test.ts:46-47, 60-69`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-82 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.98 (fix-finding-AUDIT-20260530-83 (cross-model: AUDIT-BARRAGE-claude-P6-3)): AUDIT-20260530-83 — [P6-3 claude] Integration test bypasses the entry-creation C…
+
+Closes AUDIT-20260530-83 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/cli/test/custom-pipeline-lane-integration.test.ts:130-152` (`writeSidecarFile`), workplan step 6.6.1.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-83 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.99 (fix-finding-AUDIT-20260530-84 (cross-model: AUDIT-BARRAGE-claude-P6-3)): AUDIT-20260530-84 — [P6-3 claude] `spawnSync` calls have no timeout; a hung CLI …
+
+Closes AUDIT-20260530-84 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/cli/test/custom-pipeline-lane-integration.test.ts:99-108` (`pipeline`), `:111-120` (`lane`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-84 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.100 (fix-finding-AUDIT-20260530-85 (cross-model: AUDIT-BARRAGE-codex-P6-3)): AUDIT-20260530-85 — [P6-3 codex] Repair can mutate lane state without recording …
+
+Closes AUDIT-20260530-85 (cross-model: AUDIT-BARRAGE-codex-P6-3). Surface: packages/core/src/doctor/rules/lane-config-missing-template.ts:303-320 and packages/core/src/doctor/rules/lane-config-missing-template.ts:364-381.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-85 (cross-model: AUDIT-BARRAGE-codex-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.101 (fix-finding-AUDIT-20260530-86 (cross-model: AUDIT-BARRAGE-codex-P6-3)): AUDIT-20260530-86 — [P6-3 codex] Rebind prompt can offer templates that cannot a…
+
+Closes AUDIT-20260530-86 (cross-model: AUDIT-BARRAGE-codex-P6-3). Surface: packages/core/src/doctor/rules/lane-config-missing-template.ts:214-229 and packages/core/src/doctor/rules/lane-config-missing-template.ts:287-299.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-86 (cross-model: AUDIT-BARRAGE-codex-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.102 (fix-finding-AUDIT-20260530-87 (cross-model: AUDIT-BARRAGE-codex-P6-3)): AUDIT-20260530-87 — [P6-3 codex] CLI subprocess integration test can hang indefi…
+
+Closes AUDIT-20260530-87 (cross-model: AUDIT-BARRAGE-codex-P6-3). Surface: packages/cli/test/custom-pipeline-lane-integration.test.ts:86-104.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-87 (cross-model: AUDIT-BARRAGE-codex-P6-3)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.103 (fix-finding-AUDIT-20260530-88 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)): AUDIT-20260530-88 — [P7T7.2 claude] SKILL.md error-handling catalog contradicts …
+
+Closes AUDIT-20260530-88 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `plugins/deskwork/skills/group/SKILL.md` (Error handling section, `show`/`update` bullets) vs `packages/core/src/groups/operations/show.ts:54-60` and `packages/core/src/groups/operations/update.ts:48-54`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-88 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.104 (fix-finding-AUDIT-20260530-89 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)): AUDIT-20260530-89 — [P7T7.2 claude] `showGroup` member-enrichment swallows corru…
+
+Closes AUDIT-20260530-89 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `packages/core/src/groups/operations/show.ts:66-78` (the per-member `try { readSidecar } catch { ...missing: true }` loop).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-89 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.105 (fix-finding-AUDIT-20260530-90 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)): AUDIT-20260530-90 — [P7T7.2 claude] `isPopulatedGroupEntry` is defined and docum…
+
+Closes AUDIT-20260530-90 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `packages/core/src/groups/types.ts:46-49` (definition + doc) vs `packages/core/src/groups/index.ts:11` (`export { isArchivedEntry, isGroupEntry } from './types.ts';`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-90 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.106 (fix-finding-AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)): AUDIT-20260530-91 — [P7T7.2 claude] Inconsistent exit codes for a bad `--at` arg…
+
+Closes AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `packages/cli/src/commands/group.ts:233-245` (handleAddMember `--at` parse) and `packages/core/src/groups/operations/add-member.ts:124-135` (out-of-range throw).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.107 (fix-finding-AUDIT-20260530-92 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)): AUDIT-20260530-92 — [P7T7.2 codex] `isPopulatedGroupEntry` is implemented but no…
+
+Closes AUDIT-20260530-92 (cross-model: AUDIT-BARRAGE-codex-P7T7.2). Surface: `packages/core/src/groups/index.ts:11`, `packages/core/src/groups/types.ts:39-45`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-92 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.108 (fix-finding-AUDIT-20260530-93 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)): AUDIT-20260530-93 — [P7T7.2 codex] Group mutators can commit sidecar changes wit…
+
+Closes AUDIT-20260530-93 (cross-model: AUDIT-BARRAGE-codex-P7T7.2). Surface: `packages/core/src/groups/operations/create.ts:106-121`, `packages/core/src/groups/operations/update.ts:84-94`, `packages/core/src/groups/operations/add-member.ts:126-145`, `packages/core/src/groups/operations/remove-member.ts:72-89`, `packages/core/src/groups/operations/archive.ts:68-77`, `packages/core/src/groups/operations/archive.ts:104-109`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-93 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.109 (fix-finding-AUDIT-20260530-94 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)): AUDIT-20260530-94 — [P7T7.2 codex] Extra positional arguments are silently ignor…
+
+Closes AUDIT-20260530-94 (cross-model: AUDIT-BARRAGE-codex-P7T7.2). Surface: `packages/cli/src/commands/group.ts:151-163`, `packages/cli/src/commands/group.ts:182-213`, `packages/cli/src/commands/group.ts:221-248`, `packages/cli/src/commands/group.ts:274-296`, `packages/cli/src/commands/group.ts:302-318`, `packages/cli/src/commands/group.ts:324-340`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-94 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.110 (fix-finding-AUDIT-20260530-95 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)): AUDIT-20260530-95 — [P7T7.2 codex] Group skill documentation still describes the…
+
+Closes AUDIT-20260530-95 (cross-model: AUDIT-BARRAGE-codex-P7T7.2). Surface: `plugins/deskwork/skills/group/SKILL.md:53`, `plugins/deskwork/skills/group/SKILL.md:58-66`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260530-95 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
 ## Phase 8: Annotation model extension — threads + screenshot attachments + spatial anchors + disposition-trace affordance  ·  [#309](https://github.com/audiocontrol-org/deskwork/issues/309)
 
 **Deliverable:** Threaded replies (`replyTo`), screenshot attachments (`attachments[]`), spatial anchors (`spatialAnchor`), and per-comment disposition-trace affordance (inline diff expansion on "addressed" badge + required free-text disposition reason at iterate time). Cross-cutting; markdown review benefits too. Sidecar storage at `<entryDir>/scrapbook/screenshots/`. Closes #299.
