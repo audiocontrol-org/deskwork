@@ -187,6 +187,17 @@ async function loadGroupMembersBundle(
 
   // Lane configs + templates: load only what the resolved members
   // actually use. Iterate in operator-configured lane order.
+  //
+  // Per AUDIT-20260529-37 (failure B): `laneConfigsById.set` only
+  // fires AFTER the corresponding template successfully resolves. If
+  // we set the lane first and the template load throws, the lane
+  // ends up in `laneConfigsById` while its template is absent from
+  // `templatesById`. Downstream `bucketMembersByLane` would then
+  // pass the lane guard, bucket members under it, and silently drop
+  // the entire bucket when the template lookup returns undefined.
+  // Set-after-template-resolves keeps the two maps in lockstep so
+  // members of a broken-template lane fall into the unbucketed tail
+  // instead of vanishing.
   const usedLaneIds = new Set<string>();
   for (const m of members) {
     if (m.lane !== undefined) usedLaneIds.add(m.lane);
@@ -208,15 +219,21 @@ async function loadGroupMembersBundle(
           pipelineTemplate: config.pipelineTemplate,
           contentDir: config.contentDir,
         };
-        laneConfigsById.set(strict.id, strict);
+        // Load template FIRST; only register the lane once the
+        // template-side load succeeds. If the template load throws,
+        // the lane stays absent from `laneConfigsById` and the
+        // bucketer falls back to unbucketed-rendering for its
+        // members.
         if (!templatesById.has(strict.pipelineTemplate)) {
           const tpl = loadPipelineTemplate(strict.pipelineTemplate, projectRoot);
           templatesById.set(strict.pipelineTemplate, tpl);
         }
+        laneConfigsById.set(strict.id, strict);
       } catch {
         // Lane / template failed to resolve. Skip — the member row
-        // surfaces as unrouted (lane label = its raw id) instead of
-        // crashing the surface render.
+        // surfaces in the composed view's unbucketed tail (and in
+        // list view as unrouted) instead of crashing the render or
+        // silently vanishing.
         continue;
       }
     }

@@ -51,6 +51,11 @@ import { isGroupEntry, isPopulatedGroupEntry } from '@deskwork/core/groups';
 import type { Entry } from '@deskwork/core/schema/entry';
 import { LANE_ID_REGEX, type StrictLaneConfig } from '@deskwork/core/lanes';
 import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
+import {
+  bucketMembersByLane,
+  type BucketingResult,
+  type LaneScopedBucket,
+} from './members-bucketing.ts';
 
 export type MembersViewMode = 'composed' | 'list';
 
@@ -74,74 +79,6 @@ export interface RenderMembersSectionInput {
   readonly templatesById: ReadonlyMap<string, StrictPipelineTemplate>;
   /** Initial view mode rendered server-side (client may flip post-load). */
   readonly initialViewMode: MembersViewMode;
-}
-
-interface LaneScopedBucket {
-  readonly lane: StrictLaneConfig;
-  readonly template: StrictPipelineTemplate;
-  /** Stage → members-of-this-group-in-this-lane-at-this-stage. */
-  readonly byStage: ReadonlyMap<string, readonly Entry[]>;
-  readonly memberCount: number;
-}
-
-/**
- * Bucket members into lane → stage scoped to this group's member set.
- * Members with `entry.lane === undefined` are skipped (the dashboard
- * loudly warns on lane-less entries via `bucketIntoLanes`; here the
- * Members section is a downstream consumer and we don't repeat the
- * warning). Members referencing a lane id that isn't present in
- * `laneConfigsById` are skipped — same routing-failure mode the
- * dashboard's `unrouted` list captures.
- *
- * Lanes are emitted in the operator-configured lane order, which the
- * caller threads in via the iteration order of `laneConfigsById`.
- */
-function bucketMembersByLane(
-  members: readonly Entry[],
-  laneConfigsById: ReadonlyMap<string, StrictLaneConfig>,
-  templatesById: ReadonlyMap<string, StrictPipelineTemplate>,
-): readonly LaneScopedBucket[] {
-  const buckets = new Map<string, Map<string, Entry[]>>();
-  for (const member of members) {
-    if (member.lane === undefined) continue;
-    if (!laneConfigsById.has(member.lane)) continue;
-    let stageMap = buckets.get(member.lane);
-    if (stageMap === undefined) {
-      stageMap = new Map<string, Entry[]>();
-      buckets.set(member.lane, stageMap);
-    }
-    let arr = stageMap.get(member.currentStage);
-    if (arr === undefined) {
-      arr = [];
-      stageMap.set(member.currentStage, arr);
-    }
-    arr.push(member);
-  }
-
-  const out: LaneScopedBucket[] = [];
-  for (const [laneId, lane] of laneConfigsById) {
-    const stageMap = buckets.get(laneId);
-    if (stageMap === undefined) continue;
-    const template = templatesById.get(lane.pipelineTemplate);
-    if (template === undefined) continue;
-    // Emit every template stage so empty columns inside the lane
-    // render with `is-empty` — pipeline shape stays visible per
-    // DESIGN-STANDARDS.md § "Favor structure over scrolling".
-    const byStage = new Map<string, readonly Entry[]>();
-    let memberCount = 0;
-    for (const stage of template.linearStages) {
-      const arr = stageMap.get(stage) ?? [];
-      byStage.set(stage, arr);
-      memberCount += arr.length;
-    }
-    for (const stage of template.offPipelineStages) {
-      const arr = stageMap.get(stage) ?? [];
-      byStage.set(stage, arr);
-      memberCount += arr.length;
-    }
-    out.push({ lane, template, byStage, memberCount });
-  }
-  return out;
 }
 
 function renderMemberStageCard(member: Entry): RawHtml {
@@ -197,16 +134,61 @@ function renderComposedLane(bucket: LaneScopedBucket): RawHtml {
     </div>`);
 }
 
-function renderComposedBody(buckets: readonly LaneScopedBucket[]): RawHtml {
-  if (buckets.length === 0) {
+/**
+ * Render the unbucketed-members tail for the composed view (the
+ * AUDIT-20260529-37 surface). Each member shows its UUID + slug +
+ * title + lane id + stage so the operator can diagnose the routing
+ * failure. Returns '' when there are no unbucketed members.
+ */
+function renderUnbucketedTail(unbucketed: readonly Entry[]): RawHtml {
+  if (unbucketed.length === 0) return unsafe('');
+  const rowsRaw = unbucketed
+    .map((m) => {
+      const reviewLink = `/dev/editorial-review/entry/${m.uuid}`;
+      const laneLabel = m.lane ?? 'no-lane';
+      return html`
+        <a class="er-members-card er-members-card--unbucketed"
+          href="${reviewLink}"
+          data-member-uuid="${m.uuid}"
+          title="Open ${m.title} (member did not route into a lane bucket)">
+          <div class="er-members-card-body">
+            <div class="er-members-card-title">${m.title}</div>
+            <div class="er-members-card-slug">${m.slug}</div>
+            <div class="er-members-card-meta">
+              <span class="er-members-card-meta-lane">lane: ${laneLabel}</span>
+              <span class="er-members-card-meta-sep" aria-hidden="true">·</span>
+              <span class="er-members-card-meta-stage">stage: ${m.currentStage}</span>
+            </div>
+          </div>
+          <span class="er-members-card-open" aria-hidden="true">↪</span>
+        </a>`;
+    })
+    .join('');
+  return unsafe(html`
+    <div class="er-members-stage er-members-stage--unbucketed"
+      data-unbucketed
+      data-stage="unbucketed">
+      <div class="er-members-stage-head">
+        <span class="er-members-stage-glyph" aria-hidden="true">⊘</span>
+        <span class="er-members-stage-name">Unbucketed</span>
+        <span class="er-members-stage-count">${unbucketed.length}</span>
+      </div>
+      <div class="er-members-stage-body">${unsafe(rowsRaw)}</div>
+    </div>`);
+}
+
+function renderComposedBody(result: BucketingResult): RawHtml {
+  const { buckets, unbucketed } = result;
+  if (buckets.length === 0 && unbucketed.length === 0) {
     return unsafe(html`
       <div class="er-members-composed-empty" data-composed-empty>
         <span class="er-members-composed-empty-msg">No members landed in any configured lane.</span>
       </div>`);
   }
   const laneBlocks = buckets.map((b) => renderComposedLane(b).__raw).join('');
+  const unbucketedTail = renderUnbucketedTail(unbucketed).__raw;
   return unsafe(html`
-    <div class="er-members-composed" data-composed>${unsafe(laneBlocks)}</div>`);
+    <div class="er-members-composed" data-composed>${unsafe(laneBlocks)}${unsafe(unbucketedTail)}</div>`);
 }
 
 function renderListRow(
@@ -321,14 +303,14 @@ function renderEmptyStateCta(group: Entry): RawHtml {
 }
 
 function renderPopulatedSection(input: RenderMembersSectionInput): RawHtml {
-  const buckets = bucketMembersByLane(
+  const bucketing = bucketMembersByLane(
     input.members,
     input.laneConfigsById,
     input.templatesById,
   );
   const initial = input.initialViewMode;
   const sectionMode = initial === 'composed' ? 'composed' : 'list';
-  const composedBody = renderComposedBody(buckets);
+  const composedBody = renderComposedBody(bucketing);
   const listBody = renderListBody(
     input.members,
     input.missingMemberUuids,

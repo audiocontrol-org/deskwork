@@ -467,6 +467,38 @@
   font-weight: 600;
 }
 
+/* ---------- Unbucketed tail (AUDIT-20260529-37) ----------
+
+   Members whose lane/template/stage don't compose into a swim-bucket
+   surface inline in a distinct "Unbucketed" stage block — same visual
+   shape as a swim-stage, accented with the red-pencil color so the
+   operator can see the routing failure at a glance (mirrors the
+   list-view `.er-member-row--missing` styling). */
+
+[data-review-ui="entry-review"] .er-members-stage--unbucketed {
+  border-left: 2px solid var(--er-red-pencil);
+  background: var(--er-paper-2);
+  padding: 8px 10px;
+  border-radius: 1px;
+}
+
+[data-review-ui="entry-review"] .er-members-card--unbucketed {
+  border-left-color: var(--er-red-pencil);
+  background: var(--er-paper);
+}
+
+[data-review-ui="entry-review"] .er-members-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-family: var(--er-font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+
 /* ---------- Desktop tweaks (wider viewport) ---------- */
 
 @media (min-width: 56rem) {
