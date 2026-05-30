@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { loadConfig } from '../config.js';
 import { repoRoot } from '../repo.js';
 import {
@@ -20,15 +22,21 @@ import {
 } from '../close-shipped/tag-resolver.js';
 import { walkToolingFeedback } from '../close-shipped/tooling-feedback-walker.js';
 import { walkWorkplans } from '../close-shipped/workplan-walker.js';
+import { runScan } from '../close-shipped/scan.js';
+import { composeProposal, renderMarkdownTable } from '../close-shipped/propose.js';
+import { applyV2, InvalidProposalError } from '../close-shipped/apply-v2.js';
 import type { Config } from '../config.types.js';
 import type {
+  BundleSet,
   CloseShippedOutcome,
   CloseShippedResult,
   CloseShippedSummary,
   IssueReferenceGroup,
   MergedIssueEvidence,
+  Proposal,
   RunGh,
   RunGit,
+  VerdictSet,
 } from '../close-shipped/types.js';
 
 // Subcommand layer for /dw-lifecycle:close-shipped -- argv parsing +
@@ -434,7 +442,270 @@ function parseRevCount(out: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// === Phase 15 verb dispatch (scan | propose | apply) ===
+
+interface ScanCliOptions {
+  readonly fromTag: string | null;
+  readonly toTag: string | null;
+  readonly output: string | null;
+  readonly repo: string | null;
+}
+
+function parseScanArgs(args: readonly string[]): ScanCliOptions {
+  let fromTag: string | null = null;
+  let toTag: string | null = null;
+  let output: string | null = null;
+  let repo: string | null = null;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === undefined) continue;
+    if (a === '--from-tag') {
+      const next = args[++i];
+      if (next === undefined) throw new Error('--from-tag requires a value.');
+      fromTag = next;
+      continue;
+    }
+    if (a === '--to-tag') {
+      const next = args[++i];
+      if (next === undefined) throw new Error('--to-tag requires a value.');
+      toTag = next;
+      continue;
+    }
+    if (a === '--output') {
+      const next = args[++i];
+      if (next === undefined) throw new Error('--output requires a value.');
+      output = next;
+      continue;
+    }
+    if (a === '--repo') {
+      const next = args[++i];
+      if (next === undefined) throw new Error('--repo requires a value.');
+      repo = next;
+      continue;
+    }
+    throw new Error(`Unknown flag for scan: ${a}`);
+  }
+  return { fromTag, toTag, output, repo };
+}
+
+function runScanCli(args: readonly string[]): number {
+  let opts: ScanCliOptions;
+  try {
+    opts = parseScanArgs(args);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`${msg}\n`);
+    return 2;
+  }
+  if (opts.fromTag === null || opts.toTag === null) {
+    process.stderr.write('scan requires --from-tag <vA> --to-tag <vB>\n');
+    return 2;
+  }
+  const fromTag = opts.fromTag;
+  const toTag = opts.toTag;
+  const projectRoot = repoRoot();
+  const config = loadConfig(projectRoot);
+  const scannerConfig = loadScannerConfig(projectRoot);
+  const runGit = defaultRunGit(projectRoot);
+  const runGh = defaultRunGh;
+  let repo: string;
+  try {
+    repo = opts.repo ?? detectRepoFromGit(projectRoot);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`${msg}\n`);
+    return 2;
+  }
+
+  const scanCommitsForRange = () => {
+    const { commits } = scanAndGroup({
+      fromTag,
+      toTag,
+      runGit,
+      config: scannerConfig,
+    });
+    return commits;
+  };
+
+  const walkAuditLogEntriesAdapter = () => {
+    const findings = walkAuditLogs({
+      projectRoot,
+      config,
+      fromTag,
+      toTag,
+      runGit,
+    });
+    return findings.map((f) => ({
+      finding_id: f.findingId,
+      status: `fixed-${f.sha}`,
+      tracks_issue: f.issueNumber,
+      surface: f.entryHeading,
+      body: '',
+    }));
+  };
+
+  const walkWorkplanBackfillsAdapter = () => {
+    const findings = walkWorkplans({ projectRoot, config });
+    return findings.map((f) => ({
+      file: f.workplanPath,
+      line: f.lineNumber,
+      text: f.taskLine,
+    }));
+  };
+
+  const resolvePrForRange = (): null => null;
+
+  const issueInfo = (n: number) => {
+    try {
+      const raw = runGh([
+        'issue',
+        'view',
+        String(n),
+        '--repo',
+        repo,
+        '--json',
+        'number,title,state,body',
+      ]);
+      const data: unknown = JSON.parse(raw);
+      const d = (data ?? {}) as Record<string, unknown>;
+      const title = typeof d.title === 'string' ? d.title : `Issue ${n}`;
+      const state =
+        d.state === 'OPEN' || d.state === 'CLOSED' ? (d.state as 'OPEN' | 'CLOSED') : ('UNKNOWN' as const);
+      const body = typeof d.body === 'string' ? d.body : '';
+      return { number: n, title, state, body, recent_comments: [] };
+    } catch {
+      return {
+        number: n,
+        title: `Issue ${n}`,
+        state: 'UNKNOWN' as const,
+        body: '',
+        recent_comments: [],
+      };
+    }
+  };
+
+  const bundleSet = runScan({
+    fromTag,
+    toTag,
+    repo,
+    now: new Date(),
+    scanCommitsForRange,
+    walkAuditLogEntries: walkAuditLogEntriesAdapter,
+    walkWorkplanBackfills: walkWorkplanBackfillsAdapter,
+    resolvePrForRange,
+    issueInfo,
+    runGit,
+  });
+
+  const out = opts.output;
+  if (out !== null) {
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, JSON.stringify(bundleSet, null, 2));
+    process.stderr.write(`Bundles written: ${out}\n`);
+  } else {
+    process.stdout.write(JSON.stringify(bundleSet, null, 2));
+    process.stdout.write('\n');
+  }
+  return 0;
+}
+
+function runProposeCli(args: readonly string[]): number {
+  let bundlesPath: string | null = null;
+  let verdictsPath: string | null = null;
+  let output: string | null = null;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === undefined) continue;
+    if (a === '--bundles') {
+      bundlesPath = args[++i] ?? null;
+      continue;
+    }
+    if (a === '--verdicts') {
+      verdictsPath = args[++i] ?? null;
+      continue;
+    }
+    if (a === '--output') {
+      output = args[++i] ?? null;
+      continue;
+    }
+    process.stderr.write(`Unknown flag for propose: ${a}\n`);
+    return 2;
+  }
+  if (bundlesPath === null || verdictsPath === null) {
+    process.stderr.write('propose requires --bundles <path> --verdicts <path>\n');
+    return 2;
+  }
+  const bundles: BundleSet = JSON.parse(readFileSync(bundlesPath, 'utf8'));
+  const verdicts: VerdictSet = JSON.parse(readFileSync(verdictsPath, 'utf8'));
+  const proposal = composeProposal(bundles, verdicts);
+  const outputPath =
+    output ??
+    join(
+      process.cwd(),
+      '.dw-lifecycle',
+      'close-shipped',
+      `proposals-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+    );
+  mkdirSync(dirname(outputPath), { recursive: true });
+  writeFileSync(outputPath, JSON.stringify(proposal, null, 2));
+  process.stderr.write(`Proposal written: ${outputPath}\n`);
+  process.stdout.write(renderMarkdownTable(proposal));
+  process.stdout.write('\n');
+  return 0;
+}
+
+function runApplyV2Cli(args: readonly string[]): number {
+  let proposalPath: string | null = null;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === undefined) continue;
+    if (a === '--proposal') {
+      proposalPath = args[++i] ?? null;
+      continue;
+    }
+    process.stderr.write(`Unknown flag for apply: ${a}\n`);
+    return 2;
+  }
+  if (proposalPath === null) {
+    process.stderr.write('apply requires --proposal <path>\n');
+    return 2;
+  }
+  const proposal: Proposal = JSON.parse(readFileSync(proposalPath, 'utf8'));
+  const runGh: RunGh = defaultRunGh;
+  try {
+    const result = applyV2({ proposal, runGh });
+    process.stdout.write(
+      `Applied ${result.applied.length}, skipped ${result.skipped.length}, failed ${result.failed.length}.\n`,
+    );
+    for (const f of result.failed) {
+      process.stderr.write(`failed #${f.issue}: ${f.error}\n`);
+    }
+    if (result.applied.length === 0 && result.failed.length > 0) return 1;
+    return 0;
+  } catch (err) {
+    if (err instanceof InvalidProposalError) {
+      process.stderr.write(`${err.message}\n`);
+      return 2;
+    }
+    throw err;
+  }
+}
+
 export async function closeShipped(rawArgs: string[]): Promise<void> {
+  // Phase 15 verb dispatch — `scan` / `propose` / `apply` keywords route
+  // to the new mechanical-narrowing + agent-dispatch flow. Bare invocation
+  // (no verb keyword) falls through to the legacy single-command flow.
+  const first = rawArgs[0];
+  if (first === 'scan') {
+    process.exit(runScanCli(rawArgs.slice(1)));
+  }
+  if (first === 'propose') {
+    process.exit(runProposeCli(rawArgs.slice(1)));
+  }
+  if (first === 'apply') {
+    process.exit(runApplyV2Cli(rawArgs.slice(1)));
+  }
+
   const opts = parseCloseShippedArgs(rawArgs);
   const root = repoRoot();
   const config = loadConfig(root);
