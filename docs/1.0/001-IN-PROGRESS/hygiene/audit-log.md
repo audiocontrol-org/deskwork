@@ -172,6 +172,26 @@ Verification status: `fixed-pending-verification` per the project's "issue closu
 
 ---
 
+## AUDIT-20260529-08 — Phase 12 Task 2 (commit 918c029) — label rename review
+
+Finding-ID: AUDIT-20260529-08
+Status:     fixed-pending-verification
+Severity:   informational
+Surface:    plugins/dw-lifecycle/src/lifecycle-integration/ + .claude/rules/agent-discipline.md + docs/1.0/burndown/dw-lifecycle.md
+
+Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's small-routine-change carve-out) verified the rename. Found one legitimate stale-reference cluster the workplan Step 5 audit scope missed:
+
+1. `agent-discipline.md:536` — present-tense table row describing the current `session-end-hygiene` output used the pre-rename "filed this session" wording. Fixed in this commit's follow-up edit.
+2. `burndown/dw-lifecycle.md:54` — sentence describing Phase 12's change quoted the pre-rename detector name in present tense. Fixed by renaming the present-tense reference to `"issues referenced this session"` AND adding a historical-framing clause (`renamed from "issues filed this session" as part of Task 2`) that documents the rename without re-introducing the old wording as a current claim.
+
+Track 1 (load-bearing verification): 2331/2331 plugin tests pass; smoke-hygiene OK end-to-end.
+
+Other reviewer-confirmed clean: zero stale refs in `.ts` files, JSDoc accuracy on `types.ts:28`, comment accuracy on `session-end-hygiene.ts:337-343` (`CLOSED-but-referenced` semantic), session-end-hygiene.ts file size stayed at 499 (at cap, not over), no `any`/`as Type`/`@ts-ignore`. Test-rigor gap noted (no string-assertion of "referenced this session" connector phrase — pre-existing gap, not introduced by this commit; low risk because OPEN/CLOSED partition test + markdown-headings test cover the rendering path).
+
+Verification status `fixed-pending-verification` per the project's "issue closure requires verification in a formally-installed release" rule. The label-rename ships in the next v0.28.x or v0.29.0 release; full verification is the same dogfood pass that already lives in the Phase 12 Task 2 acceptance criteria.
+
+---
+
 ## Clone-detector summary
 
 | Run | Detected | NEW | DROPPED | Notes |
