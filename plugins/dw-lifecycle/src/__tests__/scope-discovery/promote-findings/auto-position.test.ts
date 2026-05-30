@@ -288,3 +288,77 @@ describe('computeAutoPosition + nextTaskNumberFactory — convention detection (
     expect(factory({}, 0)).toBe('99.1');
   });
 });
+
+/**
+ * AUDIT-20260530-12 regression: `auto-position.ts` had its own
+ * `TASK_HEADING_RE = /^###\s+Task\s+(\d+)(?:\.(\d+))?\s*:/i` that
+ * `computeAutoPosition` used for both first-unchecked detection and
+ * current-task-number calculation. The AUDIT-20260530-07 fix updated
+ * the TWIN regex in tdd-enforcement.ts but left auto-position behind.
+ * Repeated `promote-findings --auto` runs against a workplan with
+ * previously-inserted fix-tasks (renderer shape: `### Task N (fix-
+ * finding-AUDIT-...): title`) would skip past them and reuse stale
+ * task numbers — the EXACT cause of round-2's auto-promote landing
+ * at the same Phase 5 anchor as round 1.
+ */
+describe('computeAutoPosition — renderer-shaped fix-task headings (AUDIT-20260530-12)', () => {
+  it('recognizes renderer-shaped fix-task headings in the chosen phase', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Phase 15: current',
+      '',
+      '### Task 15.1: original',
+      '',
+      '- [x] step done',
+      '',
+      '### Task 15.2 (fix-finding-AUDIT-20260601-01): renderer-shape fix-task already present',
+      '',
+      '- [ ] Step 1',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    // Hierarchical convention with the highest minor being 2 (from
+    // the renderer-shape task) — pre-fix this returned 1 because the
+    // regex didn't match the renderer-shape heading.
+    expect(pos.convention).toBe('hierarchical');
+    expect(pos.currentMaxNumberInPhase).toBe(2);
+    const factory = nextTaskNumberFactory(pos);
+    expect(factory({}, 0)).toBe('15.3');
+  });
+
+  it('recognizes the cross-model variant `### Task N.M (fix-finding-AUDIT-... (claude-X; cross-model)): title`', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Phase 15: current',
+      '',
+      '### Task 15.3 (fix-finding-AUDIT-20260601-05 (claude-06 + codex-02; cross-model)): cross-model fix',
+      '',
+      '- [ ] Step 1',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.convention).toBe('hierarchical');
+    expect(pos.currentMaxNumberInPhase).toBe(3);
+  });
+
+  it('anchors BEFORE a renderer-shaped unchecked task (not past it)', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Phase 15: current',
+      '',
+      '### Task 15.1 (fix-finding-AUDIT-20260601-01): first',
+      '',
+      '- [ ] Step 1 pending',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    const lines = wp.split('\n');
+    const taskLine = lines.findIndex((l) => l.includes('### Task 15.1')) + 1;
+    // Anchor is right BEFORE the task heading (insertAfterLine =
+    // taskLine - 1, but clamped to >= phase heading).
+    expect(pos.insertAfterLine).toBeLessThan(taskLine);
+  });
+});

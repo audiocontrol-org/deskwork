@@ -41,7 +41,16 @@
 // unconditional implement-hook at the first auto-promote.
 const PHASE_HEADING_RE = /^##\s+(?:Phase|Milestone|Sprint)\b/i;
 const PHASE_NUMBER_RE = /^##\s+(?:Phase|Milestone|Sprint)\s+(\d+)/i;
-const TASK_HEADING_RE = /^###\s+Task\s+(\d+)(?:\.(\d+))?\s*:/i;
+// Per AUDIT-20260530-12: accept the canonical renderer-output shape
+// `### Task N.M (fix-finding-AUDIT-...): title` (and the cross-model
+// variant with nested parens). Capture groups stay on the leading
+// number tokens; the `(?:\s*\([^)]*(?:\([^)]*\)[^)]*)*\))?` chunk
+// absorbs an optional one-level-nested parenthetical between the
+// number and the colon. The twin regex in `tdd-enforcement.ts` was
+// already updated under AUDIT-20260530-07; this fix closes the same
+// gap on the auto-position side.
+const TASK_HEADING_RE =
+  /^###\s+Task\s+(\d+)(?:\.(\d+))?\s*(?:\([^)]*(?:\([^)]*\)[^)]*)*\))?\s*:/i;
 const UNCHECKED_CHECKBOX_RE = /^- \[ \]/;
 
 export class AutoPositionError extends Error {
