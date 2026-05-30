@@ -271,7 +271,7 @@ function viewIssue(
   const issueState: 'OPEN' | 'CLOSED' | undefined =
     upper === 'OPEN' ? 'OPEN' : upper === 'CLOSED' ? 'CLOSED' : undefined;
   return {
-    category: 'issue-filed-this-session',
+    category: 'issue-referenced-this-session',
     issueNumber: parsed.number,
     issueTitle: parsed.title,
     issueState,
@@ -333,10 +333,11 @@ function recommend(
       dismantleCandidates.push(`${obs.worktreePath}${branchLabel}${signalLabel}`);
       continue;
     }
-    if (obs.category === 'issue-filed-this-session') {
-      // Forward-looking Triage line carries OPEN issues only. CLOSED-this-
-      // session issues stay in the observations block as historical signal
-      // but are NOT triageable next session — they are already done.
+    if (obs.category === 'issue-referenced-this-session') {
+      // Forward-looking Triage line carries OPEN issues only. CLOSED-but-
+      // referenced issues stay in the observations block as historical
+      // signal (the session touched their numbers in commit prose) but are
+      // NOT triageable next session — they're already done.
       // Undefined-state issues (malformed gh JSON, schema drift) are also
       // excluded from the Triage line — they still appear in observations
       // with their absent state cited, but the operator-facing forward-
@@ -388,9 +389,9 @@ function renderMarkdownBlock(
         lines.push(`- commit ${obs.sha ?? ''} — \`${obs.markerText ?? ''}\` in subject: ${obs.subject ?? ''}`);
       } else if (obs.category === 'workplan-tbd-introduced') {
         lines.push(`- workplan ${obs.path ?? ''}:${obs.lineNumber ?? ''} — ${obs.markerText ?? ''}`);
-      } else if (obs.category === 'issue-filed-this-session') {
+      } else if (obs.category === 'issue-referenced-this-session') {
         const badge = obs.issueState === 'CLOSED' ? ' [CLOSED]' : obs.issueState === 'OPEN' ? ' [OPEN]' : '';
-        lines.push(`- issue #${obs.issueNumber ?? ''}${badge} filed this session: ${obs.issueTitle ?? ''}`);
+        lines.push(`- issue #${obs.issueNumber ?? ''}${badge} referenced this session: ${obs.issueTitle ?? ''}`);
       } else if (obs.category === 'worktree-stale') {
         const branchLabel = obs.worktreeBranch !== undefined && obs.worktreeBranch !== null
           ? ` \`${obs.worktreeBranch}\``
@@ -413,7 +414,7 @@ function renderMarkdownBlock(
   if (recommendation.triageItems.length > 0) {
     lines.push(`- Triage: ${recommendation.triageItems.join('; ')}`);
   } else {
-    lines.push('- Triage: (no issues filed this session need disposition)');
+    lines.push('- Triage: (no issues referenced this session need disposition)');
   }
   if (recommendation.addressTbdItems.length > 0) {
     lines.push(`- Address TBD markers: ${recommendation.addressTbdItems.join('; ')}`);

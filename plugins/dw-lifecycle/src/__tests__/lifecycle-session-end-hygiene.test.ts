@@ -149,7 +149,7 @@ describe('captureSessionEndHygiene', () => {
       runGh,
       now: new Date('2026-05-28T00:00:00Z'),
     });
-    const issues = report.observations.filter((o) => o.category === 'issue-filed-this-session');
+    const issues = report.observations.filter((o) => o.category === 'issue-referenced-this-session');
     expect(issues).toHaveLength(2);
     expect(issues[0]?.issueNumber).toBe(401);
     expect(issues[1]?.issueNumber).toBe(402);
@@ -263,7 +263,7 @@ describe('captureSessionEndHygiene', () => {
       runGh: failingGh,
       now: new Date('2026-05-28T00:00:00Z'),
     });
-    const issues = report.observations.filter((o) => o.category === 'issue-filed-this-session');
+    const issues = report.observations.filter((o) => o.category === 'issue-referenced-this-session');
     expect(issues).toHaveLength(0);
   });
 
@@ -351,7 +351,7 @@ describe('captureSessionEndHygiene', () => {
       runGh,
       now: new Date('2026-05-28T00:00:00Z'),
     });
-    const issues = report.observations.filter((o) => o.category === 'issue-filed-this-session');
+    const issues = report.observations.filter((o) => o.category === 'issue-referenced-this-session');
     expect(issues).toHaveLength(2);
     expect(report.markdownBlock).toContain('#501');
     expect(report.markdownBlock).toContain('[OPEN]');
@@ -424,7 +424,7 @@ describe('captureSessionEndHygiene', () => {
     expect(report.recommendation.triageItems).toHaveLength(1);
     expect(report.recommendation.triageItems[0]).toContain('#602');
     expect(report.recommendation.triageItems.join(' ')).not.toContain('#601');
-    const issues = report.observations.filter((o) => o.category === 'issue-filed-this-session');
+    const issues = report.observations.filter((o) => o.category === 'issue-referenced-this-session');
     expect(issues.map((i) => i.issueNumber)).toContain(601);
   });
 
@@ -573,7 +573,7 @@ describe('captureSessionEndHygiene', () => {
       now: new Date('2026-05-28T00:00:00Z'),
     });
     expect(seenViews).toEqual([501]);
-    const issues = report.observations.filter((o) => o.category === 'issue-filed-this-session');
+    const issues = report.observations.filter((o) => o.category === 'issue-referenced-this-session');
     expect(issues).toHaveLength(1);
     expect(issues[0]?.issueNumber).toBe(501);
   });
@@ -607,7 +607,7 @@ describe('captureSessionEndHygiene', () => {
       runGh,
       now: new Date('2026-05-28T00:00:00Z'),
     });
-    const issues = report.observations.filter((o) => o.category === 'issue-filed-this-session');
+    const issues = report.observations.filter((o) => o.category === 'issue-referenced-this-session');
     expect(issues).toHaveLength(1);
     expect(issues[0]?.issueNumber).toBe(777);
   });
@@ -712,7 +712,7 @@ describe('captureSessionEndHygiene', () => {
       runGh,
       now: new Date('2026-05-28T00:00:00Z'),
     });
-    const issues = report.observations.filter((o) => o.category === 'issue-filed-this-session');
+    const issues = report.observations.filter((o) => o.category === 'issue-referenced-this-session');
     expect(issues).toHaveLength(0);
     expect(ghWasCalled).toHaveLength(0);
   });

@@ -61,7 +61,7 @@ export type BoundaryShaResolution =
 // Returns a failure object when every step fails. The caller treats that as
 // "no usable boundary; skip the commit-range scan" — and surfaces a one-
 // line stderr diagnostic so the operator can tell the failure mode apart
-// from "no issues filed this session."
+// from "no issues referenced this session."
 export function resolveSessionBoundarySha(
   runGit: RunGit,
   sessionStartSha: string | null,
