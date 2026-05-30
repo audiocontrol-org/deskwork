@@ -3257,7 +3257,7 @@ Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). 
 ### AUDIT-20260530-11 — `StageStringSchema` accepts whitespace-only stage values (`min(1)` is not `trim()`)
 
 Finding-ID: AUDIT-20260530-11 (cross-model: AUDIT-BARRAGE-claude-05-P3)
-Status:     open
+Status:     fixed-242a434
 Severity:   low
 Surface:    `packages/core/src/schema/entry.ts:108`, `packages/core/test/schema/entry.test.ts:75-101`
 
