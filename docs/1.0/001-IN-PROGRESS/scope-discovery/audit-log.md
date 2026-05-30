@@ -854,7 +854,7 @@ That means the recovery path for a cross-model partial apply is still not idempo
 ### AUDIT-20260530-14 — Fixed audit tasks remain unchecked in the workplan
 
 Finding-ID: AUDIT-20260530-14
-Status:     open
+Status:     fixed-49808af899510688b6485077ba9319eed61b9876
 Severity:   medium
 Surface:    docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:167-271; docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:713-768
 

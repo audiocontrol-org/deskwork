@@ -263,7 +263,7 @@ Closes AUDIT-20260530-14. Surface: docs/1.0/001-IN-PROGRESS/scope-discovery/work
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 4: Skill-prose convention template
 
