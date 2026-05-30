@@ -1542,21 +1542,21 @@ Closes AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `pac
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
-### Task 7.75 (fix-finding-AUDIT-20260530-60 (cross-model: AUDIT-BARRAGE-codex-P6-1)): AUDIT-20260530-60 — [P6-1 codex] Pipeline template rename/archive/restore/purge …
+### Task 7.75 (acknowledged-spec-confirmed: AUDIT-20260530-60): Pipeline template archive/restore/purge/rename are not specced
 
-Closes AUDIT-20260530-60 (cross-model: AUDIT-BARRAGE-codex-P6-1). Surface: `packages/cli/src/commands/pipeline.ts:5-15`, `packages/cli/src/commands/pipeline.ts:80-136`, `packages/core/src/pipelines/operations/index.ts:11-28`, `plugins/deskwork/skills/pipeline/SKILL.md:13-25`.
+Closes AUDIT-20260530-60 (cross-model: AUDIT-BARRAGE-codex-P6-1) via acknowledged-spec-confirmed disposition (no code change). Surface: `packages/cli/src/commands/pipeline.ts:5-15`, `packages/cli/src/commands/pipeline.ts:80-136`, `packages/core/src/pipelines/operations/index.ts:11-28`, `plugins/deskwork/skills/pipeline/SKILL.md:13-25`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-60 (cross-model: AUDIT-BARRAGE-codex-P6-1)` in subject
+- [x] Step 1: ~~write failing test~~ — N/A; not a fix-task.
+- [x] Step 2: ~~confirm test fails~~ — N/A.
+- [x] Step 3: ~~implement the fix~~ — N/A; the audit's premise misstated the workplan. Task 6.2's actual spec (workplan.md:304-310 Step 6.2.1) defines `/deskwork:pipeline` as `list / show / create / update (with --add-stage / --rename-stage / --remove-stage / --set-locked / --set-off-pipeline) / delete (with --reassign-lanes-to)`. The verbs the audit names as missing (`archive`, `restore`, `purge`, template-id `rename`) belong to `/deskwork:lane`, not `/deskwork:pipeline`. The asymmetry is intentional: pipelines are reference data (install/edit/delete pattern); lanes are workspace state (archive/restore/purge lifecycle for entries-bearing surfaces).
+- [x] Step 4: ~~confirm test passes~~ — N/A.
+- [x] Step 5: ~~commit with Closes AUDIT~~ — superseded by the audit-log Status flip to `acknowledged-spec-confirmed` (see audit-log entry for the full disposition rationale).
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists — N/A per the disposition above.
+- [x] Test passes — N/A.
+- [x] Audit-log Status flipped to `acknowledged-spec-confirmed` — landed; see audit-log AUDIT-20260530-60 disposition paragraph for the full reasoning (operator decision dated 2026-05-30; if symmetric pipeline lifecycle verbs are wanted in a future phase, file as a new feature task rather than reopening this finding).
 
 
 ### Task 7.76 (fix-finding-AUDIT-20260530-61 (cross-model: AUDIT-BARRAGE-codex-P6-1)): AUDIT-20260530-61 — [P6-1 codex] Stage-rename sidecar is enumerated as a fake pi…

@@ -3893,7 +3893,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). 
 ### AUDIT-20260530-60 — [P6-1 codex] Pipeline template rename/archive/restore/purge are missing
 
 Finding-ID: AUDIT-20260530-60 (cross-model: AUDIT-BARRAGE-codex-P6-1)
-Status:     open
+Status:     acknowledged-spec-confirmed
 Severity:   blocking
 Surface:    `packages/cli/src/commands/pipeline.ts:5-15`, `packages/cli/src/commands/pipeline.ts:80-136`, `packages/core/src/pipelines/operations/index.ts:11-28`, `plugins/deskwork/skills/pipeline/SKILL.md:13-25`
 
@@ -3902,6 +3902,8 @@ The audited feature scope says Task 6.2 ships the `/deskwork:pipeline` family wi
 This is not just naming drift. The only “rename” implemented is `update --rename-stage`, which changes stage labels and writes a stage-rename sidecar. It does not rename the template id or migrate lanes bound to the old template id. A reasonable fix is to add the missing pipeline lifecycle verbs and core operations, including a template-id rename path that writes the new override, migrates every dependent lane config, removes the old override, and rolls back on partial failure.
 
 Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T115914439Z-graphical-entries/codex.md`.
+
+**Disposition (2026-05-30): acknowledged-spec-confirmed.** The audit's premise misstates the workplan. Task 6.2's actual spec (`workplan.md:304-310` Step 6.2.1) defines `/deskwork:pipeline` as `list / show / create / update (with --add-stage / --rename-stage / --remove-stage / --set-locked / --set-off-pipeline) / delete (with --reassign-lanes-to)`. The verbs the audit names as missing (`archive`, `restore`, `purge`, template-id `rename`) were NEVER specced for pipelines — they belong to `/deskwork:lane`, where workspace state needs a soft-archive lifecycle distinct from destructive purge. The asymmetry between lane CRUD and pipeline CRUD is intentional: pipelines are reference data (schema definitions: install / edit / delete pattern), lanes are workspace state (entries-bearing: create / archive / restore / purge lifecycle). The implementation matches the actual workplan. The codex finding's "audited feature scope" wording reflects the audit-barrage dispatch's vars-summary text (which over-extended the lane verb set onto pipelines by mistake), not the canonical workplan. If symmetric archive/restore/purge/rename verbs are wanted for pipelines later (e.g., to soft-deprecate a custom pipeline template without deleting it), that is a forward feature request — file as a new task in a future phase, not a backlog fix here. No code change required; closing per the operator decision dated 2026-05-30.
 
 ### AUDIT-20260530-61 — [P6-1 codex] Stage-rename sidecar is enumerated as a fake pipeline template
 
