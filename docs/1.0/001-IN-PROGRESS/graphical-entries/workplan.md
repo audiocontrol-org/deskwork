@@ -420,6 +420,125 @@ Schema delta: `archivedAt?: string` added to `EntrySchema` (`packages/core/src/s
 - [ ] Recursive groups refused via `group-recursive` doctor rule; dangling members surfaced via `group-member-missing`.
 - [ ] Group review surface renders multi-lane member composition; member entries show "Member of:" badges.
 
+### Task 7.9 (fix-finding-AUDIT-20260529-36 (cross-model: AUDIT-BARRAGE-claude-01)): AUDIT-20260529-36 — popover renders visible at rest on every member row (cascade…
+
+Closes AUDIT-20260529-36 (cross-model: AUDIT-BARRAGE-claude-01). Surface: `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:347-354`, `packages/studio/src/pages/dashboard/section.ts:50` (`renderMemberPopover`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260529-36 (cross-model: AUDIT-BARRAGE-claude-01)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.10 (fix-finding-AUDIT-20260529-37 (cross-model: AUDIT-BARRAGE-claude-02)): AUDIT-20260529-37 — composed view has silent-drop vectors beyond AUDIT-35 (stage…
+
+Closes AUDIT-20260529-37 (cross-model: AUDIT-BARRAGE-claude-02). Surface: `packages/studio/src/pages/entry-review/members-section.ts:99-150` (`bucketMembersByLane`), `packages/studio/src/pages/entry-review/data.ts:188-210` (`loadGroupMembersBundle`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260529-37 (cross-model: AUDIT-BARRAGE-claude-02)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.11 (fix-finding-AUDIT-20260529-38 (cross-model: AUDIT-BARRAGE-claude-03)): AUDIT-20260529-38 — member card + list-row lane-accent CSS keys on `data-templat…
+
+Closes AUDIT-20260529-38 (cross-model: AUDIT-BARRAGE-claude-03). Surface: `plugins/deskwork-studio/public/css/entry-review-members.css:262-265,318-321`, `packages/studio/src/pages/entry-review/members-section.ts:152-167` (`renderMemberStageCard`), `:200-235` (`renderListRow`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260529-38 (cross-model: AUDIT-BARRAGE-claude-03)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.12 (fix-finding-AUDIT-20260529-39 (cross-model: AUDIT-BARRAGE-codex-01)): AUDIT-20260529-39 — corrupt member sidecars misreported as missing (silent fallb…
+
+Closes AUDIT-20260529-39 (cross-model: AUDIT-BARRAGE-codex-01). Surface: `packages/studio/src/pages/entry-review/data.ts:176-183` (`loadGroupMembersBundle`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260529-39 (cross-model: AUDIT-BARRAGE-codex-01)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.13 (fix-finding-AUDIT-20260529-40 (cross-model: AUDIT-BARRAGE-codex-02)): AUDIT-20260529-40 — missing-member rows lose declared insertion order (list-mode…
+
+Closes AUDIT-20260529-40 (cross-model: AUDIT-BARRAGE-codex-02). Surface: `packages/studio/src/pages/entry-review/data.ts:176-183`, `packages/studio/src/pages/entry-review/members-section.ts:263-271` (`renderListBody`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260529-40 (cross-model: AUDIT-BARRAGE-codex-02)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.14 (fix-finding-AUDIT-20260529-41 (cross-model: AUDIT-BARRAGE-claude-04)): AUDIT-20260529-41 — popover left margin (22px) misaligned with WCAG-widened tab …
+
+Closes AUDIT-20260529-41 (cross-model: AUDIT-BARRAGE-claude-04). Surface: `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:349` (`.er-row-member-popover { margin: 0 0 0 22px }`) vs `:250` (`.er-row-member-tab { width: 24px }`) and `:320` (`.has-member-tab .er-row-fg { padding-left: 28px }`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260529-41 (cross-model: AUDIT-BARRAGE-claude-04)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7.15 (fix-finding-AUDIT-20260529-42 (cross-model: AUDIT-BARRAGE-claude-05)): AUDIT-20260529-42 — `initGroupMembersSection` wire helpers re-attach listeners o…
+
+Closes AUDIT-20260529-42 (cross-model: AUDIT-BARRAGE-claude-05). Surface: `plugins/deskwork-studio/public/src/entry-review/group-members-section.ts:104-150` (`initGroupMembersSection`, `wireToggle`, `wireEmptyStateCta`, `wireMemberRowCopy`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260529-42 (cross-model: AUDIT-BARRAGE-claude-05)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
 ## Phase 8: Annotation model extension — threads + screenshot attachments + spatial anchors + disposition-trace affordance  ·  [#309](https://github.com/audiocontrol-org/deskwork/issues/309)
 
 **Deliverable:** Threaded replies (`replyTo`), screenshot attachments (`attachments[]`), spatial anchors (`spatialAnchor`), and per-comment disposition-trace affordance (inline diff expansion on "addressed" badge + required free-text disposition reason at iterate time). Cross-cutting; markdown review benefits too. Sidecar storage at `<entryDir>/scrapbook/screenshots/`. Closes #299.
