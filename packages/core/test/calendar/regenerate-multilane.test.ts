@@ -150,6 +150,60 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
     expect(md).toContain('legacy-one');
   });
 
+  // AUDIT-20260530-21: lock in the h1 lane-header rendering (the
+  // existing tests above check for `# Lane: Default` etc. as substring,
+  // but a substring match for `# Lane:` also matches `## Lane:`. The
+  // docstring on `renderCalendar` had drifted to promise `## Lane:`
+  // while the code emits `# Lane:`. Tests substring-checked the right
+  // string but did not falsify the h1-vs-h2 question. This regression
+  // pins the heading level directly so a future drift toward h2 fails
+  // the suite.
+  it('emits h1 (not h2) lane headers as sibling top-level headings to the calendar masthead', async () => {
+    await mkdir(join(projectRoot, '.deskwork', 'lanes'), { recursive: true });
+    await writeFile(
+      join(projectRoot, '.deskwork', 'lanes', 'default.json'),
+      JSON.stringify({
+        id: 'default',
+        name: 'Default',
+        pipelineTemplate: 'editorial',
+        contentDir: 'docs',
+      }),
+    );
+    await writeSidecar(projectRoot, entry('post-a', 'Drafting', { lane: 'default' }));
+
+    await regenerateCalendar(projectRoot);
+    const md = await readFile(join(projectRoot, '.deskwork', 'calendar.md'), 'utf8');
+
+    // The lane header is at h1 — start-of-line, single hash, space, "Lane:".
+    expect(md).toMatch(/^# Lane: Default$/m);
+    // And it is NOT at h2.
+    expect(md).not.toMatch(/^## Lane: Default$/m);
+    // The masthead is also h1, so lane headers are siblings of it (not
+    // nested under it). This is the deliberate visual choice.
+    expect(md).toMatch(/^# Editorial Calendar$/m);
+  });
+
+  it('emits h1 for the unassigned-lane header (matches the named-lane h1)', async () => {
+    await mkdir(join(projectRoot, '.deskwork', 'lanes'), { recursive: true });
+    await writeFile(
+      join(projectRoot, '.deskwork', 'lanes', 'default.json'),
+      JSON.stringify({
+        id: 'default',
+        name: 'Default',
+        pipelineTemplate: 'editorial',
+        contentDir: 'docs',
+      }),
+    );
+    // Entry with no lane → routes to the "(unassigned)" lane section.
+    await writeSidecar(projectRoot, entry('legacy-one', 'Ideas'));
+
+    await regenerateCalendar(projectRoot);
+    const md = await readFile(join(projectRoot, '.deskwork', 'calendar.md'), 'utf8');
+
+    expect(md).toMatch(/^# Lane: \(unassigned\)$/m);
+    expect(md).not.toMatch(/^## Lane: \(unassigned\)$/m);
+  });
+
   // AUDIT-20260530-14: the multi-lane renderer used to silently drop
   // entries whose `currentStage` was not in their lane's template (or
   // not in the editorial-fallback stage list for orphan entries). Both

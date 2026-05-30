@@ -242,9 +242,21 @@ const EDITORIAL_FALLBACK: PipelineTemplate = {
  *     entries in `Final` and `Cancelled` no longer disappear).
  *
  *   - `renderCalendar(entries, projectRoot)` — lane-aware shape. Reads
- *     every lane config and emits one `## Lane: <name>` block per
- *     lane, with per-lane stage sections drawn from that lane's
- *     template. Multi-lane projects use this mode.
+ *     every lane config and emits one `# Lane: <name>` block per lane
+ *     (h1 — sibling of the `# Editorial Calendar` masthead, NOT nested
+ *     under it), with per-lane stage sections drawn from that lane's
+ *     template. Orphan entries (no `lane` field, or referencing a
+ *     deleted lane id) get a `# Lane: (unassigned)` block at the same
+ *     h1 level. Multi-lane projects use this mode.
+ *
+ * Heading-level note (AUDIT-20260530-21): per-lane blocks are at h1,
+ * intentionally siblings of the calendar masthead rather than nested
+ * h2 children. The calendar file has no single root section under which
+ * lanes would naturally nest — each lane stands alone at the same
+ * level as the masthead. Stage sections within a lane are h2 (`##
+ * <Stage>`). The doctor's UUID scan in
+ * `packages/core/src/doctor/orphan-frontmatter-id.ts` is heading-
+ * agnostic and unaffected by the level choice.
  */
 export function renderCalendar(entries: Entry[], projectRoot?: string): string {
   const laneContexts = loadLaneContexts(projectRoot);
