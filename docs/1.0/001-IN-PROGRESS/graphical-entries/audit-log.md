@@ -3114,7 +3114,7 @@ Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). 
 ### AUDIT-20260529-42 — `initGroupMembersSection` wire helpers re-attach listeners on every call (docstring lies)
 
 Finding-ID: AUDIT-20260529-42 (cross-model: AUDIT-BARRAGE-claude-05)
-Status:     open
+Status:     fixed-90be5c3
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/src/entry-review/group-members-section.ts:104-150` (`initGroupMembersSection`, `wireToggle`, `wireEmptyStateCta`, `wireMemberRowCopy`)
 
