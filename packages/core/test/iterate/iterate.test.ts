@@ -145,6 +145,40 @@ describe('iterateEntry', () => {
     await expect(iterateEntry(projectRoot, { uuid })).rejects.toThrow(/published.*frozen/i);
   });
 
+  // AUDIT-20260530-16: iterate on a Final-stage editorial entry MUST
+  // throw — Final is the editorial preset's `lockedStages` entry
+  // (`packages/core/src/pipelines/editorial.json`), and per
+  // DESKWORK-STATE-MACHINE.md the iterate verb is explicitly NOT
+  // available in Final ("Final locks the content; to iterate, induct
+  // backward to Drafting first"). The spec is canonical. Pre-Phase-4
+  // `iterateEntry` (which had hardcoded refuse-only-on-Published)
+  // permitted iterate on Final; the Phase-4 template-aware refactor
+  // closed the gap correctly. This regression locks in the
+  // spec-conformant behavior so future drift (e.g. a refactor that
+  // removes the locked-stage check or relaxes editorial's
+  // `lockedStages`) fails the suite.
+  it('refuses to iterate an editorial Final entry (locked-stage gate, DESKWORK-STATE-MACHINE.md Commandment II)', async () => {
+    const entry = await setupEntry('Final');
+    entry.iterationByStage = { Ideas: 1, Planned: 1, Outlining: 1, Drafting: 5, Final: 1 };
+    entry.priorStage = 'Drafting';
+    await writeSidecar(projectRoot, entry);
+    await writeFile(
+      join(projectRoot, 'docs', slug, 'index.md'),
+      `---\ndeskwork:\n  id: ${uuid}\n---\n\n# final body — should be locked\n`,
+    );
+
+    // The error message names the locked-stage condition + the induct
+    // recovery path so the operator knows what to do next.
+    await expect(iterateEntry(projectRoot, { uuid })).rejects.toThrow(
+      /locked stage "Final".*editorial.*induct/is,
+    );
+
+    // The iteration counter MUST NOT have advanced (the refusal happens
+    // before any mutation).
+    const reloaded = await readSidecar(projectRoot, uuid);
+    expect(reloaded.iterationByStage.Final).toBe(1);
+  });
+
   // T1 (#222): even at Outlining, iterate reads index.md — NOT the
   // legacy `scrapbook/outline.md`. Per Option B, the document under
   // review is index.md regardless of stage.
