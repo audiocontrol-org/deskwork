@@ -195,7 +195,7 @@ Closes AUDIT-20260530-10. Surface: `plugins/dw-lifecycle/src/scope-discovery/uti
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 9 (fix-finding-AUDIT-20260530-11): AUDIT-20260530-11 — `normalizeSeverity('')` now maps empty/missing severity to `…
@@ -212,7 +212,7 @@ Closes AUDIT-20260530-11. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 10 (fix-finding-AUDIT-20260530-12): AUDIT-20260530-12 — Auto-position still cannot see renderer-shaped fix-task head…
@@ -229,7 +229,7 @@ Closes AUDIT-20260530-12. Surface: plugins/dw-lifecycle/src/scope-discovery/prom
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 11 (fix-finding-AUDIT-20260530-13): AUDIT-20260530-13 — Cross-model workplan idempotency canonicalizes only the exis…
@@ -246,23 +246,23 @@ Closes AUDIT-20260530-13. Surface: plugins/dw-lifecycle/src/scope-discovery/prom
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-editor.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-editor.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 12 (fix-finding-AUDIT-20260530-14): AUDIT-20260530-14 — Fixed audit tasks remain unchecked in the workplan
 
 Closes AUDIT-20260530-14. Surface: docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:167-271; docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:713-768.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-14` in subject
+- [x] Step 1: new test in `apply-audit-flips-cli.test.ts` — fixture workplan with two fix-tasks; apply-audit-flips with --apply asserts both closure-criterion checkboxes flip to `- [x]` AND no `- [ ] Audit-log Status flipped to fixed-` lines remain.
+- [x] Step 2: confirmed test failed pre-fix (apply-audit-flips only touched audit-log).
+- [x] Step 3: `apply-audit-flips` gains `tickClosureCriteria` helper that locates each fix-finding task block by canonical AUDIT-ID and flips the `- [ ] Audit-log Status flipped to \`fixed-` line to `- [x]`. Runs unconditionally on every --apply (including for already-dispositioned entries) so prior runs' missed flips catch up.
+- [x] Step 4: tests pass; plugin suite 2424/2424; live catchup flipped 11 closure criteria for AUDIT-20260530-01..13.
+- [x] Step 5: commit with `Closes AUDIT-20260530-14` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 4: Skill-prose convention template
@@ -285,7 +285,7 @@ Closes AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model). Surfac
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.2 (fix-finding-AUDIT-20260530-02): AUDIT-20260530-02 — `computeAutoPosition` hard-codes `## Phase` headings; non-Ph…
@@ -302,7 +302,7 @@ Closes AUDIT-20260530-02. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.3 (fix-finding-AUDIT-20260530-03): AUDIT-20260530-03 — Auto-position task numbering assumes hierarchical `Task <pha…
@@ -319,7 +319,7 @@ Closes AUDIT-20260530-03. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.4 (fix-finding-AUDIT-20260530-04): AUDIT-20260530-04 — `audit-barrage-lift` writes the canonical audit-log non-atom…
@@ -336,7 +336,7 @@ Closes AUDIT-20260530-04. Surface: `plugins/dw-lifecycle/src/subcommands/audit-b
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.5 (fix-finding-AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model)): AUDIT-20260530-05 — The `--auto` multi-finding insertion path (the feature's pri…
@@ -353,7 +353,7 @@ Closes AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model). Surfac
 
 - [x] Tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` covering the multi-finding path (Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.6 (fix-finding-AUDIT-20260530-06): AUDIT-20260530-06 — Feature-root resolution is non-deterministic when a slug exi…
@@ -370,7 +370,7 @@ Closes AUDIT-20260530-06. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 
 - [x] Tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.7 (fix-finding-AUDIT-20260530-07): AUDIT-20260530-07 — Auto-promoted fix tasks are invisible to the new gate
@@ -387,7 +387,7 @@ Closes AUDIT-20260530-07. Surface: plugins/dw-lifecycle/src/scope-discovery/prom
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 5: 43-scenario adversarial harness
 

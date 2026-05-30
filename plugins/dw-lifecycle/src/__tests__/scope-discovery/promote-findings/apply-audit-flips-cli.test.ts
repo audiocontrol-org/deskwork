@@ -318,4 +318,79 @@ describe('runApplyAuditFlips — dry-run + apply flows', () => {
     expect(exit).toBe(2);
     expect(stderr.text()).toMatch(/not found/);
   });
+
+  /**
+   * AUDIT-20260530-14 regression: when apply-audit-flips writes the
+   * audit-log status `open → fixed-<sha>`, the corresponding workplan
+   * fix-finding task's closure-criterion checkbox stays `- [ ]`.
+   * `findUncheckedTasksInOrder` then still treats the task as
+   * unchecked, even though every action has been completed. Fix:
+   * apply-audit-flips ALSO ticks the closure-criterion checkbox in
+   * the matching workplan task block.
+   */
+  it('ticks the workplan closure-criterion checkbox for each flipped finding (AUDIT-20260530-14)', async () => {
+    const repoRoot = makeRepo('tick-criterion', OPEN_TWO_ENTRIES);
+    const featureDir = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');
+    // Write a workplan with TWO fix-tasks matching the open findings.
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '',
+        '## Phase 13: x',
+        '',
+        '### Task 13.1 (fix-finding-AUDIT-20260529-12): first',
+        '',
+        '- [x] Step 1: write failing test',
+        '- [x] Step 2: confirm fails',
+        '- [x] Step 3: implement',
+        '- [x] Step 4: confirm passes',
+        '- [x] Step 5: commit',
+        '',
+        '**Acceptance Criteria:**',
+        '',
+        '- [x] Failing test exists',
+        '- [x] vitest exits 0',
+        '- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step',
+        '',
+        '### Task 13.2 (fix-finding-AUDIT-20260529-13): second',
+        '',
+        '- [x] Step 1',
+        '- [x] Step 2',
+        '- [x] Step 3',
+        '- [x] Step 4',
+        '- [x] Step 5',
+        '',
+        '**Acceptance Criteria:**',
+        '',
+        '- [x] Failing test',
+        '- [x] vitest exits 0',
+        '- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    const walker: CommitWalker = () => [
+      {
+        sha: 'closesha',
+        message: 'fix: address findings\n\nCloses: AUDIT-20260529-12, AUDIT-20260529-13',
+      },
+    ];
+    const stdout = new CaptureStream();
+    const stderr = new CaptureStream();
+    const exit = await runApplyAuditFlips({
+      opts: { featureSlug: 'demo', apply: true },
+      projectRoot: repoRoot,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+      commitWalker: walker,
+    });
+    expect(exit).toBe(0);
+    const wpAfter = readFileSync(join(featureDir, 'workplan.md'), 'utf8');
+    // Both closure criteria should now be `- [x]`.
+    const checkedClosureLines = (wpAfter.match(/- \[x\] Audit-log Status flipped to `fixed-/g) ?? []).length;
+    expect(checkedClosureLines).toBe(2);
+    const uncheckedClosureLines = (wpAfter.match(/- \[ \] Audit-log Status flipped to `fixed-/g) ?? []).length;
+    expect(uncheckedClosureLines).toBe(0);
+  });
 });

@@ -804,7 +804,7 @@ The split-brain contract IS partially covered by the third test (lex-first pick 
 ### AUDIT-20260530-10 — `atomicWriteFile` wraps `writeFile` in a no-op try/catch and its "rename fails" test actually exercises the write-fail path
 
 Finding-ID: AUDIT-20260530-10
-Status:     open
+Status:     fixed-c6b74da704604a268038b261a1bdd3abb5e04c29
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/atomic-write-file.ts:36-41`, `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (the `'cleans up the temp file if the rename itself somehow fails'` case)
 
@@ -817,7 +817,7 @@ Two hygiene issues in the otherwise-correct AUDIT-04 atomic-write helper:
 ### AUDIT-20260530-11 — `normalizeSeverity('')` now maps empty/missing severity to `high`, conflating a parse artifact with an unknown-but-real severity
 
 Finding-ID: AUDIT-20260530-11
-Status:     open
+Status:     fixed-13b87d9c12c9660ba87dc847aeae849046667f5d
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:90-101`
 
@@ -832,7 +832,7 @@ I walked the seven fix commits (severity fallback, Phase/Milestone/Sprint headin
 ### AUDIT-20260530-12 — Auto-position still cannot see renderer-shaped fix-task headings
 
 Finding-ID: AUDIT-20260530-12
-Status:     open
+Status:     fixed-1f6612a2579795b84021d450dbf4ee00e7a12bbb
 Severity:   high
 Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:44,170-216; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:60-61
 
@@ -843,7 +843,7 @@ This is the same shape that was fixed for the gate in `tdd-enforcement.ts`, but 
 ### AUDIT-20260530-13 — Cross-model workplan idempotency canonicalizes only the existing marker side
 
 Finding-ID: AUDIT-20260530-13
-Status:     open
+Status:     fixed-42e93f47fd2335a00f0bc47d6d32cb50d9517e35
 Severity:   high
 Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-editor.ts:120-149; plugins/dw-lifecycle/src/scope-discovery/promote-findings/apply.ts:150-155; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:57-63
 
