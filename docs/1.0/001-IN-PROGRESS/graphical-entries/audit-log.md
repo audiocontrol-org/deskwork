@@ -3075,7 +3075,7 @@ Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). 
 ### AUDIT-20260529-39 — corrupt member sidecars misreported as missing (silent fallback violation)
 
 Finding-ID: AUDIT-20260529-39 (cross-model: AUDIT-BARRAGE-codex-01)
-Status:     open
+Status:     fixed-d7f1ea7
 Severity:   medium
 Surface:    `packages/studio/src/pages/entry-review/data.ts:176-183` (`loadGroupMembersBundle`)
 
