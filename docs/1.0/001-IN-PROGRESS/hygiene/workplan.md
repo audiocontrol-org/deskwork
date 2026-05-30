@@ -543,3 +543,47 @@ Light fix: add an optional per-entry field `tracks_issue: NNN`. The walker prefe
 - Surfaced during the v0.28.1 install verification (2026-05-30) — Phase 13's strict semantic was correct under GitHub's grammar but the project's convention doesn't match, AND the audit-log walker had a sibling any-mention bug.
 - Promoted to [#369](https://github.com/audiocontrol-org/deskwork/issues/369) per the agent-discipline rule.
 - Sibling consideration: Phase 13's Medium fix (operator-curation `propose|apply` split) tracked under [#366](https://github.com/audiocontrol-org/deskwork/issues/366) is a strictly stronger response — if it ships, the configurable-parens approach here becomes one of several heuristics the operator can override at curation time. Phase 14's Light fix here is the immediate-value path; Phase 13's Medium remains the future architectural change.
+
+## Phase 15: close-shipped redesign — narrow mechanically, judge with Agent tool  ·  [#374](https://github.com/audiocontrol-org/deskwork/issues/374)
+
+**Deliverable:** Replace `close-shipped`'s 4-walker prose-grammar architecture with **mechanical narrowing + Agent-tool dispatch from within the agent's Claude Code session + operator-curated `propose | apply`**. Retires the unbounded patching cycle by moving the "did this commit close this issue" judgment out of regex-and-config-knob territory and into per-candidate agent dispatches. Closes [#374](https://github.com/audiocontrol-org/deskwork/issues/374); supersedes [#366](https://github.com/audiocontrol-org/deskwork/issues/366)'s Medium fix proposal and finishes the architectural shift [#369](https://github.com/audiocontrol-org/deskwork/issues/369) started.
+
+**Reference artifacts (already on branch):**
+
+- Design spec: [`docs/superpowers/specs/2026-05-30-close-shipped-redesign.md`](../../../superpowers/specs/2026-05-30-close-shipped-redesign.md) (commit `52baa75`).
+- Implementation plan: [`docs/superpowers/plans/2026-05-30-close-shipped-redesign.md`](../../../superpowers/plans/2026-05-30-close-shipped-redesign.md) (commit `ad62b64`). 11 tasks, TDD throughout.
+
+### Task 1: Implement Phase 15 per the design spec + implementation plan
+
+Each step of the implementation plan ships its own commit (TDD red → green → commit per the writing-plans skill's discipline). The 11 tasks in the plan are:
+
+- [ ] Step 1: Add new types (`CandidateBundle`, `BundleSet`, `Verdict`, `VerdictSet`, `ProposalItem`, `Proposal`, `ProposalDecision`) to `close-shipped/types.ts`.
+- [ ] Step 2: `mention-scanner.ts` — pure regex extractor over arbitrary text; 9 vitest cases.
+- [ ] Step 3: `bundle.ts` — pure bundle assembler grouping mentions into per-candidate evidence; 6 vitest cases.
+- [ ] Step 4: `scan.ts` runtime — emits BundleSet with diff stats per commit; 3 vitest cases.
+- [ ] Step 5: `propose.ts` — composes Proposal JSON + markdown table; 6 vitest cases.
+- [ ] Step 6: `apply-v2.ts` — pre-validates Proposal + dispatches gh per accepted row; 5 vitest cases.
+- [ ] Step 7: CLI verb dispatch — `scan` / `propose` / `apply` keywords route to new code; bare invocation routes to existing legacy flow.
+- [ ] Step 8: Wire `scan` CLI to real walkers + git/gh; live-test against v0.26.5..v0.27.0.
+- [ ] Step 9: SKILL.md rewrite — Agent-tool dispatch orchestration (parallel single-message multi-tool-use; one-retry on JSON parse failure).
+- [ ] Step 10: Extend `scripts/smoke-hygiene.sh` with the scan → propose → apply round-trip using canned verdicts.
+- [ ] Step 11: Live verification against v0.27.0..v0.28.1 + AUDIT-20260530-02 entry + tick acceptance criteria.
+
+**Acceptance Criteria:**
+
+- [ ] `dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB>` walks all 4 sources permissively + emits the per-candidate bundle set as JSON.
+- [ ] `dw-lifecycle close-shipped propose --bundles <path> --verdicts <path>` writes a `proposals-<timestamp>.json` + prints a markdown summary table.
+- [ ] `dw-lifecycle close-shipped apply --proposal <path>` validates every item has a non-empty `decision`, dispatches `gh issue comment` + `--add-label pending-verification` per `accept-verdict`-shipped + `override-shipped` row, records per-item success/failure.
+- [ ] SKILL.md prose covers the `scan → Agent-tool parallel dispatch → propose → operator review → apply` orchestration end-to-end.
+- [ ] Live verification against v0.27.0..v0.28.1: agent correctly identifies #356, #361, #364, #366 as shipped (genuine fixes); correctly rejects #353, #355 (back-fill docs commits), #340/#347/etc. (already-closed / cross-reference), #365 (PR self-reference).
+- [ ] Candidate-count threshold (default 50) surfaces a confirmation prompt before the parallel Agent dispatch fires.
+- [ ] Vitest unit + integration tests for the mechanical paths; full plugin suite stays green.
+- [ ] Legacy bare-`close-shipped` invocation preserves the old single-command behavior for one release cycle.
+- [ ] SKILL.md prose names the new flow + the Agent-tool dispatch + the proposal/apply gate + the legacy-flag sunset.
+
+**Provenance (Phase 15):**
+
+- v0.28.1 install verification confirmed Phase 14's documented limitations would keep accruing (back-fill docs commits with end-of-subject parens still produce false-positives; prose-cited fixture text inside audit-log entries was leaking before the splitter heading-level fix). Operator pushback after the verification surfaced the structural concern: parsing prose to infer fix-ship semantics is an unbounded patching cycle.
+- Brainstormed via `superpowers:brainstorming` (2026-05-30 session). Initial draft proposed subprocess dispatch (audit-barrage pattern); operator pushback corrected to Agent-tool-from-skill-prose dispatch, matching the existing `/dw-lifecycle:review` and `/dw-lifecycle:implement` pattern.
+- Design spec + implementation plan on branch; Phase 15 promoted to [#374](https://github.com/audiocontrol-org/deskwork/issues/374) per the agent-discipline rule.
+- Supersedes [#366](https://github.com/audiocontrol-org/deskwork/issues/366) (Phase 13 Medium follow-up — operator-curation `propose | apply` split is now the v1 shape, not a follow-up) and [#369](https://github.com/audiocontrol-org/deskwork/issues/369) (Phase 14 prose-grammar follow-ups — retired in favor of mechanical narrowing + agent judgment).
