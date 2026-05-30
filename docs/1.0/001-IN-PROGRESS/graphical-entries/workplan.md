@@ -917,17 +917,17 @@ Closes AUDIT-20260530-22 (cross-model: AUDIT-BARRAGE-claude-01-P7small). Surface
 
 Closes AUDIT-20260530-23 (cross-model: AUDIT-BARRAGE-codex-01-P7small). Surface: `packages/core/src/entry/cancel.ts:209-279`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-23 (cross-model: AUDIT-BARRAGE-codex-01-P7small)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/core/test/entry/cancel-cascade.test.ts` `describe('cancelEntry — cascade catch narrowing (AUDIT-20260530-23)')` (3 propagation cases + 1 contract-preservation case).
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — verified via `git stash` of the cancel.ts change; the three propagation tests fail with `promise resolved instead of rejecting`; missing-member contract test still passes (broad catch covered that case too).
+- [x] Step 3: implement the fix — `existsSync(sidecarPath(projectRoot, memberUuid))` precondition replaces the broad try/catch.
+- [x] Step 4: confirm test passes — `npm --workspace @deskwork/core test -- --run test/entry/cancel-cascade.test.ts` 13/13 green; full @deskwork/core suite 823/823.
+- [x] Step 5: commit with `Closes AUDIT-20260530-23 (cross-model: AUDIT-BARRAGE-codex-01-P7small)` in subject — `5264770`.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/entry/cancel-cascade.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step — `fixed-5264770`.
 
 
 ### Task 7.39 (fix-finding-AUDIT-20260530-24 (cross-model: AUDIT-BARRAGE-claude-02-P7small)): AUDIT-20260530-24 — indentation regression on `CancelOptions.cascade` (3-space i…

@@ -3397,7 +3397,7 @@ Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (claude). 
 ### AUDIT-20260530-23 — cascade catch swallows write/journal failures as "skipped member" (can hide state corruption)
 
 Finding-ID: AUDIT-20260530-23 (cross-model: AUDIT-BARRAGE-codex-01-P7small)
-Status:     open
+Status:     fixed-5264770
 Severity:   medium
 Surface:    `packages/core/src/entry/cancel.ts:209-279`
 
