@@ -493,3 +493,57 @@ Operator decisions (locked in during definition):
 - Original tooling-feedback entry: `docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md` TF-003.
 - Promoted to [#366](https://github.com/audiocontrol-org/deskwork/issues/366) per the agent-discipline rule's "architectural / recurring-pattern → promote" trigger.
 - The Medium fix (operator-curation propose|apply split mirroring `triage-issues`) and the Heavy fix (per-source confidence scoring across all four evidence walkers) are scoped in the GH issue body for follow-up. This phase ships only the Light fix; Medium + Heavy are tracked as follow-ups under [#366](https://github.com/audiocontrol-org/deskwork/issues/366).
+
+## Phase 14: close-shipped walker accuracy follow-ups (Phase 13 dogfood)  ·  [#369](https://github.com/audiocontrol-org/deskwork/issues/369)
+
+**Deliverable:** Two follow-up fixes that the v0.28.1 install verification surfaced. Phase 13's strict narrowing is GitHub-grammar-correct, but the dogfood revealed (1) a convention mismatch with this project's commit-message practice and (2) a sibling false-positive shape in the audit-log walker. Closes [#369](https://github.com/audiocontrol-org/deskwork/issues/369).
+
+### Task 1: Configurable end-of-subject parens for the commit-log walker
+
+**Background:** Phase 13 dropped `parens` (end-of-subject `(#NNN)`) because the same shape appears in both genuine fix commits (`feat(scope): subject (#NNN)`) and back-fill / docs cite commits (`docs: back-fill (#NNN) link in workplan`). Distinguishing them mechanically isn't possible without more context. The v0.28.1 verification confirmed the cost: zero commit-log matches against the v0.26.5..v0.27.0 range even though `#356` / `#361` / `#364` all had explicit `(#NNN)` fix commits in that range. The deskwork project's commit-message convention uses end-of-subject parens; many adopters likely do too.
+
+Light fix: add a project-level config knob that opts adopters with this convention back into the parens shape, ONLY for end-of-subject matches (mid-subject and body parens stay dropped — those are usually cites, not fix-shipping signals).
+
+- [ ] Step 1: Add `.dw-lifecycle/close-shipped-config.yaml` schema + loader (`plugins/dw-lifecycle/src/close-shipped/config-loader.ts`). Single field: `treat_end_of_subject_parens_as_fix_marker: boolean` (default `false`). When the file is absent, defaults hold; when the file exists, the loader returns the parsed config. Resolves relative to the project root.
+- [ ] Step 2: Update `commit-scanner.ts` to take a `ScannerConfig` argument. When `treat_end_of_subject_parens_as_fix_marker` is `true`, add the parens pattern back to `PATTERNS` but ANCHOR it at end-of-subject only (`/\(#(\d+)\)\s*$/`). Body parens stay dropped regardless. Mid-subject parens (`subject (#42) trailing text`) stay dropped regardless. The new shape is end-of-subject-only.
+- [ ] Step 3: Thread the config through `scanCommits` / `scanAndGroup` / the subcommand orchestration. The CLI subcommand reads the config at startup; tests pass the config explicitly.
+- [ ] Step 4: Vitest coverage. New cases:
+  - (a) `feat: subject (#42)` with config knob `true` → surfaces #42 (verb `parens`).
+  - (b) Same input with config knob `false` (or no config file) → does NOT surface (Phase 13 strict behavior).
+  - (c) `feat: subject (#42) trailing text` (parens not at end) → does NOT surface regardless of knob.
+  - (d) `Closes #43` body with `feat: subject (#42)` subject and knob=true → both #42 and #43 surface (parens for subject, closes for body).
+- [ ] Step 5: SKILL.md update for `close-shipped` — document the new config file + knob + the trade-off (relaxes GitHub's strict grammar in exchange for project-convention support). Include an example `.dw-lifecycle/close-shipped-config.yaml` snippet for adopters whose convention matches.
+- [ ] Step 6: Ship the deskwork project's own `close-shipped-config.yaml` set to `true` — this project uses the convention.
+
+**Acceptance Criteria:**
+
+- [ ] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` from THIS project (with the new config file shipped) surfaces `#356`, `#361`, `#364` from the v0.27.0 dogfood range.
+- [ ] Still does NOT surface `#353`, `#355` (mid-subject parens in docs commits — drop-rule preserves them).
+- [ ] An adopter WITHOUT the config file (or with knob `false`) gets the Phase 13 strict behavior.
+- [ ] Vitest coverage for the 4 cases above passes; full plugin suite green.
+
+### Task 2: Audit-log walker entry-tracked vs prose-cited disambiguation
+
+**Background:** v0.28.1 dogfood also surfaced `#50` as a false-positive candidate via the audit-log walker. `AUDIT-20260529-09`'s entry body literally contains the test-fixture text `Bare \`#50\` in subject is dropped post-Phase-13; the \`Closes #50\` in the body is the only fix-shipping signal.` — describing a test case, not claiming to fix #50. The walker's body scrape matches the `Closes #50` substring and surfaces #50. Same false-positive shape Phase 13 fixed for the commit-log walker, but in the sibling walker.
+
+Light fix: add an optional per-entry field `tracks_issue: NNN`. The walker prefers this field; body scrape becomes a fallback only when the field is absent. Mirrors how the workplan-checkbox walker's `· [#NNN](url)` back-fill is the canonical signal.
+
+- [ ] Step 1: Update `audit-log-walker.ts` to parse an optional `tracks_issue: NNN` line from each AUDIT entry (sits alongside the existing `Status:` / `Severity:` / `Surface:` fields). The walker reads this field first; only when absent does it fall through to body fix-keyword scraping.
+- [ ] Step 2: Update existing AUDIT entries in `docs/1.0/001-IN-PROGRESS/hygiene/audit-log.md` to add the `Tracks-Issue:` field where appropriate. Entries that are pure review observations (no specific issue) leave the field absent.
+- [ ] Step 3: Vitest coverage. New cases:
+  - (a) Entry with `Tracks-Issue: 200` + body mentioning `Closes #100` → surfaces #200 only.
+  - (b) Entry without `Tracks-Issue` field + body `Closes #100` → surfaces #100 (back-compat).
+  - (c) Entry with prose-cited test fixture `Closes #50` and `Tracks-Issue: 200` → surfaces only #200, not #50.
+- [ ] Step 4: SKILL.md prose for `close-shipped` updated to describe the audit-log walker's new precedence (per-entry `Tracks-Issue` field > body scrape).
+
+**Acceptance Criteria:**
+
+- [ ] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` against an installed release-after-this-fix does NOT surface `#50` from the audit-log walker.
+- [ ] Existing AUDIT entries with explicit `Tracks-Issue:` fields are honored; entries without the field still use the body-scrape fallback (no breakage for adopters who haven't migrated).
+- [ ] Vitest coverage for the 3 cases above passes; full plugin suite green.
+
+**Provenance (Phase 14):**
+
+- Surfaced during the v0.28.1 install verification (2026-05-30) — Phase 13's strict semantic was correct under GitHub's grammar but the project's convention doesn't match, AND the audit-log walker had a sibling any-mention bug.
+- Promoted to [#369](https://github.com/audiocontrol-org/deskwork/issues/369) per the agent-discipline rule.
+- Sibling consideration: Phase 13's Medium fix (operator-curation `propose|apply` split) tracked under [#366](https://github.com/audiocontrol-org/deskwork/issues/366) is a strictly stronger response — if it ships, the configurable-parens approach here becomes one of several heuristics the operator can override at curation time. Phase 14's Light fix here is the immediate-value path; Phase 13's Medium remains the future architectural change.
