@@ -22,6 +22,41 @@ import { renderCalendar } from './render.ts';
  *   - every entry stage-transition helper (#148: keep calendar.md
  *     in sync after each approve/block/cancel/induct so adopters
  *     don't have to run `doctor --fix=all` to see their state).
+ *
+ * Error-tolerance contract (AUDIT-20260530-17):
+ *
+ *   Pre-fix, any throw from the underlying `renderCalendar` —
+ *   including throws from `loadLaneConfig` / `loadPipelineTemplate`
+ *   triggered by a single malformed `.deskwork/lanes/*.json` (or a
+ *   lane pointing at a missing/invalid pipeline template) — propagated
+ *   out of `regenerateCalendar` into every entry verb (approve / block
+ *   / cancel / induct / publish / iterate). Each verb invokes
+ *   `regenerateCalendar` as its FINAL step, AFTER the sidecar mutation
+ *   and journal-event append have already landed. A single malformed
+ *   lane file therefore broke EVERY stage transition for EVERY entry,
+ *   AND the caller saw a verb failure even though the on-disk state
+ *   had partially advanced (sidecar + journal landed, calendar did
+ *   not). Blast radius: "this entry" → "the whole project, on any
+ *   verb."
+ *
+ *   Post-fix, the `renderCalendar` + write pair is wrapped in a
+ *   try/catch. On throw, the error is logged via `console.warn` (the
+ *   project's standard non-fatal-warning channel; mirrors the
+ *   `content-tree.ts:158` default) AND the function returns without
+ *   writing `calendar.md`. The verb completes successfully; the
+ *   sidecar + journal are durable; the calendar file is stale by
+ *   exactly one transition. The operator runs `doctor --fix` to
+ *   reconcile (this is the documented recovery path for calendar
+ *   staleness, per the `#148` comment trail). The stderr warning
+ *   surfaces the failure operator-visibly during the verb run, so
+ *   the staleness is not silent.
+ *
+ *   The catch is intentionally broad (`unknown`) — every throw shape
+ *   from this code path indicates a calendar-generation failure that
+ *   should not block the underlying transition. Specific failure
+ *   classes (malformed lane JSON, missing pipeline template, write
+ *   failure on calendar.md) all share the same disposition: log,
+ *   skip the write, let the doctor reconcile.
  */
 export async function regenerateCalendar(projectRoot: string): Promise<void> {
   const dir = sidecarsDir(projectRoot);
@@ -52,8 +87,24 @@ export async function regenerateCalendar(projectRoot: string): Promise<void> {
   // lane-aware code path activates when `.deskwork/lanes/*.json` is
   // present. Single-lane projects fall back to the editorial shape
   // unchanged.
-  const md = renderCalendar(entries, projectRoot);
-  const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
-  await mkdir(dirname(calendarPath), { recursive: true });
-  await writeFile(calendarPath, md);
+  //
+  // AUDIT-20260530-17: render + write are wrapped in try/catch so a
+  // lane/template misconfiguration (or any other render-time failure)
+  // does NOT propagate into the caller. Verbs invoke us as their
+  // final step after sidecar + journal land; propagating from here
+  // would surface a verb failure to the caller while the on-disk
+  // transition had already partially landed. The doctor reconciles
+  // calendar.md from the sidecar SSOT — see docstring above.
+  try {
+    const md = renderCalendar(entries, projectRoot);
+    const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
+    await mkdir(dirname(calendarPath), { recursive: true });
+    await writeFile(calendarPath, md);
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `regenerateCalendar: skipping calendar.md write — render or write failed (${detail}). ` +
+        `On-disk sidecar state is unchanged; run \`doctor --fix\` to reconcile calendar.md.`,
+    );
+  }
 }
