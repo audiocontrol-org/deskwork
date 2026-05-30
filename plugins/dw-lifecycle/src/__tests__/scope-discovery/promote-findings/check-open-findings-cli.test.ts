@@ -167,7 +167,7 @@ describe('runCheckOpenFindings — exit codes + refusal messaging', () => {
     const msg = stderr.text();
     expect(msg).toContain('AUDIT-20260529-12');
     expect(msg).toMatch(/Cannot advance|refuse|block/i);
-    expect(msg).toContain('/dw-lifecycle:promote-findings');
+    expect(msg).toContain('promote-findings');
     expect(msg).toContain('--feature demo');
   });
 
@@ -214,7 +214,7 @@ describe('runCheckOpenFindings — exit codes + refusal messaging', () => {
     expect(msg).toContain('AUDIT-20260529-12');
     expect(msg).toContain('AUDIT-20260529-13');
     expect(msg).toContain('AUDIT-20260529-14');
-    expect(msg).toContain('/dw-lifecycle:promote-findings');
+    expect(msg).toContain('promote-findings');
     // Count line — must reflect actual count.
     expect(msg).toMatch(/3 open/);
   });
@@ -263,5 +263,131 @@ describe('runCheckOpenFindings — exit codes + refusal messaging', () => {
 
     expect(exit).toBe(1);
     expect(stderr.text()).toContain('AUDIT-20260529-22');
+  });
+});
+
+// Phase 15 Task 1 — CLI-level tests for the workplan-aware refusal modes
+// + the new allow-when-scoped-as-next mode. Workplan presence on disk
+// determines which mode the gate emits; these tests verify the CLI's
+// refusal-message rendering for each.
+
+describe('runCheckOpenFindings — Phase 15 workplan-aware refusal modes', () => {
+  function makeRepoWithWorkplan(
+    name: string,
+    auditLog: string,
+    workplan: string,
+  ): string {
+    const repoRoot = join(workDir, name);
+    const featureDir = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');
+    mkdirSync(featureDir, { recursive: true });
+    writeFileSync(join(featureDir, 'audit-log.md'), auditLog, 'utf8');
+    writeFileSync(join(featureDir, 'workplan.md'), workplan, 'utf8');
+    return repoRoot;
+  }
+
+  function openEntry(id: string): string {
+    return [
+      `### ${id} — finding`,
+      '',
+      `Finding-ID: ${id}`,
+      'Status: open',
+      'Severity: low',
+      `Surface: src/${id}.ts`,
+      '',
+      'Body.',
+      '',
+    ].join('\n');
+  }
+
+  it('allows (open-findings-scoped-as-next) when the next unchecked task is the fix', async () => {
+    const repoRoot = makeRepoWithWorkplan(
+      'p15-allowed',
+      '# Audit Log\n\n' + openEntry('AUDIT-20260530-01'),
+      '# Workplan\n\n## Phase 99\n\n### Task 99.1: Fix it (fix-finding-AUDIT-20260530-01)\n\n- [ ] Step 1: write failing test\n\n**Acceptance Criteria:**\n\n- [ ] Closes AUDIT-20260530-01\n',
+    );
+
+    const stdout = new CaptureStream();
+    const stderr = new CaptureStream();
+    const exit = await runCheckOpenFindings({
+      opts: { featureSlug: 'demo' },
+      projectRoot: repoRoot,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+    });
+
+    expect(exit).toBe(0);
+    expect(stderr.text()).toMatch(/scoped as the next workplan tasks|proceed/i);
+  });
+
+  it('refuses with non-fix-task-before-fix-tasks message when an unrelated task is first', async () => {
+    const repoRoot = makeRepoWithWorkplan(
+      'p15-nonfix',
+      '# Audit Log\n\n' + openEntry('AUDIT-20260530-01'),
+      '# Workplan\n\n## Phase 99\n\n### Task 99.1: Some other work\n\n- [ ] Step 1: do thing\n\n### Task 99.2: Fix it (fix-finding-AUDIT-20260530-01)\n\n- [ ] Step 1: write failing test\n',
+    );
+
+    const stdout = new CaptureStream();
+    const stderr = new CaptureStream();
+    const exit = await runCheckOpenFindings({
+      opts: { featureSlug: 'demo' },
+      projectRoot: repoRoot,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+    });
+
+    expect(exit).toBe(1);
+    const msg = stderr.text();
+    expect(msg).toMatch(/NOT a \(fix-finding/);
+    expect(msg).toMatch(/reorder the workplan/);
+    expect(msg).toContain('AUDIT-20260530-01');
+    expect(msg).toContain('Some other work');
+  });
+
+  it('refuses with coverage-mismatch (missing) when a finding has no scoped fix-task', async () => {
+    const repoRoot = makeRepoWithWorkplan(
+      'p15-missing',
+      '# Audit Log\n\n' + openEntry('AUDIT-20260530-01') + openEntry('AUDIT-20260530-02'),
+      '# Workplan\n\n## Phase 99\n\n### Task 99.1: Fix one (fix-finding-AUDIT-20260530-01)\n\n- [ ] Step 1\n',
+    );
+
+    const stdout = new CaptureStream();
+    const stderr = new CaptureStream();
+    const exit = await runCheckOpenFindings({
+      opts: { featureSlug: 'demo' },
+      projectRoot: repoRoot,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+    });
+
+    expect(exit).toBe(1);
+    const msg = stderr.text();
+    expect(msg).toContain('Missing:');
+    expect(msg).toContain('AUDIT-20260530-02');
+    expect(msg).toMatch(/promote-findings/);
+  });
+
+  it('refuses with coverage-mismatch (extra) when scoped fix-tasks reference unopen IDs', async () => {
+    const repoRoot = makeRepoWithWorkplan(
+      'p15-extra',
+      '# Audit Log\n\n' + openEntry('AUDIT-20260530-01'),
+      '# Workplan\n\n## Phase 99\n\n### Task 99.1: Fix wrong (fix-finding-AUDIT-20260530-99)\n\n- [ ] Step 1\n',
+    );
+
+    const stdout = new CaptureStream();
+    const stderr = new CaptureStream();
+    const exit = await runCheckOpenFindings({
+      opts: { featureSlug: 'demo' },
+      projectRoot: repoRoot,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+    });
+
+    expect(exit).toBe(1);
+    const msg = stderr.text();
+    expect(msg).toContain('Missing:');
+    expect(msg).toContain('AUDIT-20260530-01');
+    expect(msg).toContain('Extras:');
+    expect(msg).toContain('AUDIT-20260530-99');
+    expect(msg).toMatch(/flip those audit-log entries|remove the stale/);
   });
 });

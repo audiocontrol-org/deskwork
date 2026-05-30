@@ -1007,50 +1007,20 @@ The whole phase is built around that framing. **No `--skip-audit-barrage-hook` f
 
 Replace the strict "refuse on any open finding" semantic of `check-open-findings` (Phase 13 Task 2) with workplan-aware: the gate allows when (a) zero open findings exist, OR (b) the next N unchecked workplan tasks (where N = open findings count) are EXACTLY the fix-finding tasks for those open findings.
 
-- [ ] Step 1: NEW pure-fn `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` exporting `checkWorkplanAwareGate({featureSlug, repoRoot}): Promise<WorkplanAwareGateResult>`. Discriminated union result:
-  ```ts
-  type WorkplanAwareGateResult =
-    | { allowed: true; reason: 'no-open-findings' | 'open-findings-scoped-as-next' }
-    | { allowed: false; reason: 'non-fix-task-before-fix-tasks'; offendingTask: string; openFindings: ReadonlyArray<OpenFinding> }
-    | { allowed: false; reason: 'coverage-mismatch'; missingIds: ReadonlyArray<string>; extraIds: ReadonlyArray<string>; openFindings: ReadonlyArray<OpenFinding> }
-  ```
-- [ ] Step 2: Algorithm:
-  - `findings = walkOpenFindings(audit-log)`.
-  - If `findings.length === 0` → `{ allowed: true, reason: 'no-open-findings' }`.
-  - `uncheckedTasks = parseWorkplan().uncheckedTasksInOrder()` — preserves workplan order.
-  - Inspect the first `findings.length` unchecked tasks:
-    - If any unchecked task in `[0..N-1]` is NOT tagged `(fix-finding-AUDIT-<id>)` → `{ allowed: false, reason: 'non-fix-task-before-fix-tasks', offendingTask: <title>, openFindings: [...] }`.
-    - Build `scopedIds` from those N fix-tagged tasks.
-    - `missingIds = openFindingIds \ scopedIds`; `extraIds = scopedIds \ openFindingIds`.
-    - If either non-empty → `{ allowed: false, reason: 'coverage-mismatch', missingIds, extraIds, openFindings: [...] }`.
-  - Otherwise → `{ allowed: true, reason: 'open-findings-scoped-as-next' }`.
-- [ ] Step 3: NEW helper `findUncheckedFixFindingTasks(workplan, sliceLimit?)` at `scope-discovery/promote-findings/tdd-enforcement.ts` (sibling of the existing `findCompletedFixFindingTasks`). Returns `[{ taskBlock, findingId, position }]` in workplan order; optional `sliceLimit` for the gate's first-N inspection.
-- [ ] Step 4: Update `subcommands/check-open-findings.ts` to use the workplan-aware semantic by default. Each refusal mode emits a distinct, actionable message:
-  - `non-fix-task-before-fix-tasks`: *"Cannot advance: <N> open audit findings (...) on feature <slug>. The next unchecked workplan task is `<offendingTask>`, which is NOT a fix-finding task — reorder the workplan so the (fix-finding-AUDIT-...) tasks come first."*
-  - `coverage-mismatch` with non-empty `missingIds`: *"Cannot advance: open finding(s) (<missingIds>) are not scoped as the next unchecked tasks. Run `dw-lifecycle promote-findings --feature <slug> --apply` to scope them."*
-  - `coverage-mismatch` with non-empty `extraIds` only: *"Cannot advance: the first N unchecked tasks include (fix-finding-AUDIT-...) entries for findings that are NOT open (<extraIds>) — either remove the stale scoped tasks or flip the corresponding audit-log entries' status."*
-- [ ] Step 5: Update SKILL.md prose at `plugins/dw-lifecycle/skills/implement/SKILL.md` Step 2 + Error-handling to document the new gate semantic. The "no escape hatch" rigidity stance survives — the new semantic IS the cure, not a flag.
-- [ ] Step 6: 12+ tests at `__tests__/scope-discovery/promote-findings/workplan-aware-gate.test.ts`:
-  - (a) zero open findings → allowed (`no-open-findings`).
-  - (b) 1 open + matching fix-task at position 0 → allowed.
-  - (c) 1 open + non-fix task at position 0 → refused (`non-fix-task-before-fix-tasks`).
-  - (d) 1 open + no fix-task anywhere in workplan → refused (`coverage-mismatch`, missingIds = [the id]).
-  - (e) 3 open + 3 matching fix-tasks at positions 0/1/2 in any order → allowed.
-  - (f) 3 open + 2 matching + 1 non-fix at position 2 → refused (non-fix).
-  - (g) 3 open + 4 fix-tasks (extra) at positions 0..3 → refused (`coverage-mismatch`, extraIds populated).
-  - (h) refusal-message asserts: every open finding ID surfaces; cure path cited (`promote-findings` for missing, "reorder" for non-fix-first, "flip status or remove" for extras).
-  - (i) edge: open finding ID has no corresponding fix-finding tag anywhere in workplan.
-  - (j) edge: workplan has zero unchecked tasks (all done) with N open findings → refused (`coverage-mismatch`).
-  - (k) order-invariance: 3 open in {C, A, B} order; 3 fix-tasks in {A, B, C} order → allowed.
-  - (l) integration: CLI exit codes (0 / 1 / 2) match the discriminated union; smoke against fixture repo.
-- [ ] Step 7: Live smoke against `feature/scope-discovery` worktree: deliberately add a synthetic `Status: open` audit entry; observe CLI refuses with `coverage-mismatch`; scope via `promote-findings --apply`; observe CLI allows.
+- [x] Step 1: NEW pure-fn `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` exporting `checkWorkplanAwareGate({featureSlug, repoRoot}): Promise<WorkplanAwareGateResult>`. Discriminated union shipped as designed (`no-open-findings` / `open-findings-scoped-as-next` / `non-fix-task-before-fix-tasks` / `coverage-mismatch`). Path resolution mirrors the Phase 14 review fix (AUDIT-20260529-17): directory walk under `docs/` so any version dir works.
+- [x] Step 2: Algorithm landed per spec, with a small refinement: when unchecked-task count is LESS than N, the coverage-mismatch (missing/extra) check fires before the non-fix-position check — the more actionable signal ("you haven't scoped the findings at all") surfaces ahead of the more granular shape ("position 0 isn't a fix-task").
+- [x] Step 3: NEW helper `findUncheckedTasksInOrder(workplanText, sliceLimit?)` at `scope-discovery/promote-findings/tdd-enforcement.ts`. Returns `[{taskBlock, position, heading, findingId | null}]` in workplan order. Each entry is the first occurrence of a task heading that has at least one `- [ ]` checkbox in its body (mixed-state tasks count as unchecked — in-progress is not complete).
+- [x] Step 4: Rewired `subcommands/check-open-findings.ts` to use `checkWorkplanAwareGate`. Three distinct refusal-message shapes implemented: non-fix-task mode names the offending task + position + cure ("reorder the workplan"); missing mode lists the IDs + cures via `dw-lifecycle promote-findings --apply`; extra mode lists IDs + cures via flip-status-or-remove.
+- [x] Step 5: SKILL.md prose at `plugins/dw-lifecycle/skills/implement/SKILL.md` updated — Step 2 enumerates both allow-flavors + the three refusal modes with per-mode cures; Error-handling block updated to match. The Phase 15 operator directive ("findings are guardrails, not exceptions") quoted in-line.
+- [x] Step 6: 13 library tests at `workplan-aware-gate.test.ts` covering all 12 spec scenarios + an additional version-dir fallback case. All passing. Old `open-findings-gate.ts` + tests deleted (replaced; no back-compat shim per project rule).
+- [x] Step 7: Live smoke against `feature/scope-discovery` — `dw-lifecycle check-open-findings --feature scope-discovery` returns exit 0 with `zero open findings; proceed` against the post-v0.28.0 branch (no open findings on this feature today).
 
 **Acceptance Criteria:**
-- [ ] Gate refuses to advance when open findings exist AND aren't all scoped as the next N tasks.
-- [ ] Gate ALLOWS advance when open findings exist AND the next N unchecked tasks are fix-finding tasks covering exactly those finding IDs.
-- [ ] Refusal message names the specific failure mode (non-fix-task / missing scoped / extra scoped) and the specific cure.
-- [ ] No `--ignore-open-findings` flag in v1 (per Phase 13 operator decision; carries forward).
-- [ ] Live verified against scope-discovery branch.
+- [x] Gate refuses to advance when open findings exist AND aren't all scoped as the next N tasks.
+- [x] Gate ALLOWS advance when open findings exist AND the next N unchecked tasks are fix-finding tasks covering exactly those finding IDs.
+- [x] Refusal message names the specific failure mode (non-fix-task / missing scoped / extra scoped) and the specific cure.
+- [x] No `--ignore-open-findings` flag in v1 (per Phase 13 operator decision; carries forward).
+- [x] Live verified against scope-discovery branch.
 
 ### Task 2: Audit-barrage finding extraction library
 

@@ -10,15 +10,24 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
 ## Steps
 
 1. Confirm slug and target version.
-2. **Open-findings gate.** Before picking up the next task, run:
+2. **Workplan-aware open-findings gate.** Before picking up the next task, run:
 
    ```bash
    dw-lifecycle check-open-findings --feature <slug>
    ```
 
-   On `exit 0` (zero `Status: open` audit-log findings), proceed. On `exit 1` (one or more open findings), the verb emits a refusal message naming every open finding ID and pointing at `/dw-lifecycle:promote-findings` as the cure — STOP the skill and surface the refusal to the operator. On `exit 2` (feature root not found or argv error), surface the message and pause for operator action.
+   Exit 0 = proceed. Two flavors of exit 0:
+   - `no-open-findings` — the audit-log has zero `Status: open` entries.
+   - `open-findings-scoped-as-next` — open findings exist, AND the next N unchecked workplan tasks at positions `[0..N-1]` are the `(fix-finding-AUDIT-<id>)` tasks covering exactly those finding IDs. The loop is allowed because the open findings ARE the next work.
 
-   Per Phase 13's anti-deferral discipline, open findings block task pickup with no override flag in v1. The cure is to either run `/dw-lifecycle:promote-findings --feature <slug>` to scope each open finding into the workplan as a TDD-first fix task, OR (if the finding's fix has already landed) flip its audit-log status to `fixed-<sha>` and re-run the gate. Project rule cited verbatim: "broken implementation is not done — it's broken."
+   Exit 1 = refusal. Three modes, each with a specific cure rendered in the message:
+   - `non-fix-task-before-fix-tasks` — an unchecked task at a position before all open-finding fix-tasks is NOT tagged `(fix-finding-AUDIT-<id>)`. Cure: reorder the workplan so the fix-tasks come first.
+   - `coverage-mismatch (missing)` — one or more open findings have no scoped fix-task in positions `[0..N-1]`. Cure: run `dw-lifecycle promote-findings --feature <slug> --apply` to scope them.
+   - `coverage-mismatch (extra)` — scoped fix-tasks in positions `[0..N-1]` reference Finding-IDs that are not currently open. Cure: flip those audit-log entries to `fixed-<sha>`/`verified-<date>` OR remove the stale scoped tasks from the workplan.
+
+   Exit 2 = config error (feature root not found or argv error). Surface and pause.
+
+   Per Phase 13's anti-deferral discipline + the Phase 15 operator directive (*"audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path"*), open findings do NOT block task pickup when they're scoped as the next work; they DO block when they're unscoped or non-next. No `--ignore-open-findings` override flag — the workplan-aware semantic IS the cure, not an escape hatch.
 3. Invoke `superpowers:subagent-driven-development` as the orchestration discipline. The skill walks the workplan, dispatching per-task subagents with full task context.
 4. For features touching existing code, dispatch `code-explorer` (from `feature-dev`) once at start to orient the agent. Skip if feature-dev not installed.
 5. For each task in the workplan:
@@ -154,8 +163,8 @@ Defaults at `DEFAULT_LOOP_CONFIG` in `orchestrator-loop/loop-config.ts`. Operato
 
 ## Error handling
 
-- **Open-findings gate refuses (`dw-lifecycle check-open-findings` exit 1).** STOP the skill. Surface the refusal message verbatim. The cure is `/dw-lifecycle:promote-findings --feature <slug>` to scope each open finding into the workplan as a TDD-first fix task. Per Phase 13's anti-deferral discipline there is no `--ignore-open-findings` flag — the gate is intentionally strict. If a finding is already addressed but its audit-log Status still reads `open`, flip it to `fixed-<sha>` (or `acknowledged-<ref>` with a substantive reason that passes the validator) before re-running the gate.
-- **Open-findings gate config error (`dw-lifecycle check-open-findings` exit 2).** Feature root not found OR an argv error. Surface the message; pause for operator action. Common causes: invalid slug, missing `docs/<v>/001-IN-PROGRESS/<slug>/` layout, missing `--feature` argument.
+- **Workplan-aware gate refuses (`dw-lifecycle check-open-findings` exit 1).** STOP the skill. Surface the refusal message verbatim. The refusal mode determines the cure: `non-fix-task-before-fix-tasks` → reorder the workplan so fix-tasks occupy positions `[0..N-1]`; `coverage-mismatch (missing)` → run `dw-lifecycle promote-findings --feature <slug> --apply` to scope unscoped findings; `coverage-mismatch (extra)` → flip stale audit-log entries to `fixed-<sha>`/`verified-<date>` OR remove the stale scoped fix-tasks. The new semantic + the absence of an override flag (per Phase 13 rigidity stance + Phase 15 operator directive) are intentional: findings ARE the next work, not exceptions blocking it.
+- **Workplan-aware gate config error (`dw-lifecycle check-open-findings` exit 2).** Feature root not found OR an argv error. Surface the message; pause for operator action. Common causes: invalid slug, missing `docs/<v>/001-IN-PROGRESS/<slug>/` layout, missing `--feature` argument.
 - **feature-dev not installed.** Print one-line warning at start; agent dispatch steps that depend on it are skipped. Skill continues with single-agent fallback. Dispatch-wrapper engagement still applies to the remaining dispatches.
 - **Bug surfaces during a task.** Invoke `superpowers:systematic-debugging` before continuing the task. Don't push through with a known bug.
 - **Test failures during TDD.** Per the TDD discipline: failing test is expected before implementation. Failing tests AFTER implementation means the impl is wrong; iterate, don't bypass the test.
