@@ -19,6 +19,7 @@ export {
   showGroup,
   listGroups,
   addGroupMember,
+  OutOfRangePositionError,
   removeGroupMember,
   archiveGroup,
   restoreGroup,

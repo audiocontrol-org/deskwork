@@ -40,6 +40,7 @@ import {
   archiveGroup,
   createGroup,
   listGroups,
+  OutOfRangePositionError,
   removeGroupMember,
   restoreGroup,
   showGroup,
@@ -289,6 +290,12 @@ async function handleAddMember(
       members: result.members,
     });
   } catch (err) {
+    // OutOfRangePositionError maps to exit 2 (usage error) so that
+    // every bad `--at` value yields the same exit code as the
+    // CLI-layer numeric-parse failure above. Closes AUDIT-20260530-91.
+    if (err instanceof OutOfRangePositionError) {
+      fail(err.message, 2);
+    }
     fail(err instanceof Error ? err.message : String(err));
   }
 }

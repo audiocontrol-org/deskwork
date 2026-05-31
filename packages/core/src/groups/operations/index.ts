@@ -12,7 +12,7 @@ export { createGroup } from './create.ts';
 export { updateGroup } from './update.ts';
 export { showGroup } from './show.ts';
 export { listGroups } from './list.ts';
-export { addGroupMember } from './add-member.ts';
+export { addGroupMember, OutOfRangePositionError } from './add-member.ts';
 export { removeGroupMember } from './remove-member.ts';
 export { archiveGroup, restoreGroup } from './archive.ts';
 

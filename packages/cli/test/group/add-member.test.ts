@@ -118,15 +118,41 @@ describe('deskwork group add-member', () => {
     expect(details['index']).toBe(0);
   });
 
-  it('refuses --at <out-of-range>', () => {
+  // Closes AUDIT-20260530-91. Out-of-range `--at` must exit 2
+  // (usage error) — matching the CLI-layer rejection of `--at -1`
+  // and `--at 1.5` — so scripts branching on exit code don't have to
+  // distinguish "the operator supplied a bad --at value, but its
+  // badness was only discoverable after reading the group" from
+  // "the operator supplied a clearly-bad --at value at parse time."
+  it('refuses --at <out-of-range> with exit 2 (usage error)', () => {
     fixture();
     const res = group(
       project,
       'add-member', 'g', 'member-a',
       '--at', '5',
     );
-    expect(res.code).not.toBe(0);
+    expect(res.code).toBe(2);
     expect(res.stderr).toMatch(/--at 5 is out of range/);
+  });
+
+  // Closes AUDIT-20260530-91. `--at 0` on an empty group is the
+  // valid lower-bound insertion (equivalent to omitting `--at`). The
+  // happy-path assertion pins the contract: only out-of-range values
+  // exit 2; valid in-range values exit 0.
+  it('accepts --at 0 on an empty group (lower-bound valid)', () => {
+    const { memberA } = fixture();
+    const res = group(
+      project,
+      'add-member', 'g', 'member-a',
+      '--at', '0',
+    );
+    expect(res.code).toBe(0);
+    const parsed = JSON.parse(res.stdout) as {
+      index: number;
+      members: string[];
+    };
+    expect(parsed.index).toBe(0);
+    expect(parsed.members).toEqual([memberA]);
   });
 
   it('refuses --at <negative>', () => {

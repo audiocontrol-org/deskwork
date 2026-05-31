@@ -44,6 +44,28 @@ import { resolveEntryUuid } from '../../sidecar/lookup.ts';
 import { writeSidecar } from '../../sidecar/write.ts';
 import type { Entry } from '../../schema/entry.ts';
 
+/**
+ * Typed error thrown by `addGroupMember` when the `--at` insertion
+ * index is out of range (negative, non-integer, or greater than the
+ * group's current `members.length`).
+ *
+ * Surfaced as a discriminable type so the CLI layer (which has no
+ * line-of-sight to the resolved group's member count when parsing
+ * `--at`) can map this to a usage-error exit code (2) rather than the
+ * generic state-error exit code (1). Aligns the operator-perspective
+ * contract: `--at -1`, `--at 1.5`, and `--at 5` are all "the `--at`
+ * argument is bad" and all yield exit 2.
+ *
+ * Closes AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2).
+ */
+export class OutOfRangePositionError extends Error {
+  readonly name = 'OutOfRangePositionError';
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 export interface AddGroupMemberOptions {
   readonly groupSlugOrUuid: string;
   readonly memberSlugOrUuid: string;
@@ -111,7 +133,7 @@ export async function addGroupMember(
     || insertIndex < 0
     || insertIndex > currentMembers.length
   ) {
-    throw new Error(
+    throw new OutOfRangePositionError(
       `Cannot add member to "${opts.groupSlugOrUuid}": --at ${insertIndex} `
       + `is out of range. Valid range: 0..${currentMembers.length} (inclusive; `
       + `${currentMembers.length} is the append position).`,
