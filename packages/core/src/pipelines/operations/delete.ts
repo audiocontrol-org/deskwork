@@ -84,6 +84,23 @@ export async function deletePipeline(
   // same path-traversal exposure Task 6.1 closed for lanes.
   assertSafePipelineId(projectRoot, opts.id);
 
+  // AUDIT-20260530-55 (cross-model: AUDIT-BARRAGE-claude-P6-1):
+  // empty-string `reassignLanesTo` is semantically equivalent to "no
+  // reassign target" — collapse the value to either a non-empty
+  // string or `undefined` and use the normalized form everywhere the
+  // rest of the function previously checked `undefined`-vs-`length > 0`.
+  // Without this normalization, an empty value slipped past the
+  // dependent-lane refusal guard (`reassignLanesTo === undefined`)
+  // AND the validation/rebind block (`reassignLanesTo.length > 0`),
+  // causing the override to be unlinked while every dependent lane
+  // was left pointing at a now-missing template. The CLI boundary
+  // also normalizes empty-string to `undefined` (defense-in-depth —
+  // both layers reject the value).
+  const reassignTarget: string | undefined =
+    opts.reassignLanesTo !== undefined && opts.reassignLanesTo.length > 0
+      ? opts.reassignLanesTo
+      : undefined;
+
   // Reviewer-fix #2 (continued): also validate the replacement id so
   // a malicious `--reassign-lanes-to ../../etc/foo` can't slip
   // through the lane write path. The lanes module's
@@ -92,8 +109,8 @@ export async function deletePipeline(
   // field* is data, not a filename, so it never reaches a path-
   // validation site on its own. Enforce the charset here so the
   // value persisted into every dependent lane's JSON conforms.
-  if (opts.reassignLanesTo !== undefined && opts.reassignLanesTo.length > 0) {
-    assertSafePipelineId(projectRoot, opts.reassignLanesTo);
+  if (reassignTarget !== undefined) {
+    assertSafePipelineId(projectRoot, reassignTarget);
   }
 
   // Plugin-preset refusal fires before override-presence so the
@@ -138,7 +155,7 @@ export async function deletePipeline(
     }
   }
 
-  if (dependents.length > 0 && opts.reassignLanesTo === undefined) {
+  if (dependents.length > 0 && reassignTarget === undefined) {
     const sample = dependents.slice(0, 5).map((d) => d.id);
     const remainder = dependents.length - sample.length;
     const suffix = remainder > 0 ? `, +${remainder} more` : '';
@@ -155,42 +172,36 @@ export async function deletePipeline(
   // BEFORE we touch any lane on disk. The two-phase shape (verify, then
   // rewrite) makes a partial-failure mid-walk less likely; a tmp+rename
   // per lane keeps each individual write atomic.
-  if (
-    opts.reassignLanesTo !== undefined
-    && opts.reassignLanesTo.length > 0
-  ) {
-    if (opts.reassignLanesTo === opts.id) {
+  if (reassignTarget !== undefined) {
+    if (reassignTarget === opts.id) {
       throw new Error(
         `Cannot delete pipeline "${opts.id}": --reassign-lanes-to value `
         + `is the same id being deleted.`,
       );
     }
     try {
-      loadPipelineTemplate(opts.reassignLanesTo, projectRoot);
+      loadPipelineTemplate(reassignTarget, projectRoot);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       throw new Error(
         `Cannot delete pipeline "${opts.id}": replacement template `
-        + `"${opts.reassignLanesTo}" does not resolve:\n${detail}`,
+        + `"${reassignTarget}" does not resolve:\n${detail}`,
       );
     }
   }
 
   const reassigned: { laneId: string; from: string; to: string }[] = [];
-  if (
-    opts.reassignLanesTo !== undefined
-    && opts.reassignLanesTo.length > 0
-  ) {
+  if (reassignTarget !== undefined) {
     for (const { id: laneId, config } of dependents) {
       const updated: LaneConfig = {
         ...config,
-        pipelineTemplate: opts.reassignLanesTo,
+        pipelineTemplate: reassignTarget,
       };
       commitLaneConfig(projectRoot, laneId, updated, 'pipeline-delete reassign');
       reassigned.push({
         laneId,
         from: opts.id,
-        to: opts.reassignLanesTo,
+        to: reassignTarget,
       });
     }
   }

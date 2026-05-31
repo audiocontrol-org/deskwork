@@ -182,6 +182,55 @@ describe('deskwork pipeline delete', () => {
     expect(pipelineOverrideExists(project, 'my-blog')).toBe(true);
   });
 
+  // AUDIT-20260530-55 (cross-model: AUDIT-BARRAGE-claude-P6-1). An
+  // empty-string `--reassign-lanes-to` value (e.g. an unset shell
+  // variable expanded as `--reassign-lanes-to ""`) used to slip past
+  // both the dependent-lane refusal guard (`reassignLanesTo === undefined`)
+  // and the validation/rebind block (`reassignLanesTo.length > 0`),
+  // causing the override to be unlinked while every dependent lane
+  // was left pointing at a now-missing template. The fix normalizes
+  // empty-string to "no target" at the CLI boundary AND tightens the
+  // guards in `deletePipeline`. With a dependent lane present, the
+  // dependent-lane refusal must fire and the override must remain.
+  it('refuses --reassign-lanes-to "" (empty string) with dependent lanes', () => {
+    writeLaneJson(project, 'default', {
+      id: 'default',
+      name: 'Default',
+      pipelineTemplate: 'my-blog',
+      contentDir: 'docs',
+    });
+    const res = pipeline(
+      project, 'delete', 'my-blog',
+      '--reassign-lanes-to', '',
+    );
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/1 lane references it.*default/);
+    // The override file must survive — the refusal fired BEFORE unlink.
+    expect(pipelineOverrideExists(project, 'my-blog')).toBe(true);
+    // The dependent lane's pipelineTemplate must be unchanged.
+    expect(readLaneJson(project, 'default')['pipelineTemplate']).toBe('my-blog');
+  });
+
+  // Companion to AUDIT-20260530-55: when no lane depends on the
+  // template, `--reassign-lanes-to ""` is semantically equivalent to
+  // omitting the flag entirely — the override deletes cleanly with an
+  // empty `reassignedLanes` list. This guards against an over-eager
+  // fix that treats empty-string as a hard error even when no rebind
+  // would have been required.
+  it('treats --reassign-lanes-to "" as no-target when no lanes depend', () => {
+    const res = pipeline(
+      project, 'delete', 'my-blog',
+      '--reassign-lanes-to', '',
+    );
+    expect(res.stderr).toBe('');
+    expect(res.code).toBe(0);
+    expect(pipelineOverrideExists(project, 'my-blog')).toBe(false);
+    const parsed = JSON.parse(res.stdout) as {
+      reassignedLanes: unknown[];
+    };
+    expect(parsed.reassignedLanes).toEqual([]);
+  });
+
   // Reviewer-fix #3: deleting a pipeline must unlink any rename-
   // migration sidecar that exists, so a subsequent
   // `pipeline create <same-id>` does not inherit stale audit data.

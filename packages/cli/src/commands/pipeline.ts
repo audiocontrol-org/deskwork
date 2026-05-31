@@ -327,12 +327,21 @@ async function handleDelete(
 ): Promise<void> {
   if (rest.length < 1) verbUsage('delete');
   const [id] = rest;
+  // AUDIT-20260530-55 (cross-model: AUDIT-BARRAGE-claude-P6-1):
+  // normalize an empty `--reassign-lanes-to ""` (or an unset shell
+  // variable expanding to the empty string) to "flag not supplied" so
+  // the operation-side dependent-lane refusal fires instead of
+  // silently bypassing the refusal AND the rebind block. Defense-in-
+  // depth — `deletePipeline` independently rejects an empty value;
+  // the CLI normalization here ensures the operation also receives
+  // a clean `undefined`.
+  const reassignRaw = flags['reassign-lanes-to'];
+  const reassignLanesTo =
+    reassignRaw !== undefined && reassignRaw.length > 0 ? reassignRaw : undefined;
   try {
     const result = await deletePipeline(projectRoot, {
       id,
-      ...(flags['reassign-lanes-to'] !== undefined && {
-        reassignLanesTo: flags['reassign-lanes-to'],
-      }),
+      ...(reassignLanesTo !== undefined && { reassignLanesTo }),
     });
     emit({
       deleted: true,
