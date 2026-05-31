@@ -20,6 +20,10 @@
  *   - Clicking the `.r-eye-btn` inside the sheet does NOT close the
  *     sheet (the operator is still curating visibility from inside).
  *   - On close, focus returns to the trigger.
+ *   - Focus trap (AUDIT-20260530-38 / AUDIT-20260530-41): Tab from the
+ *     last focusable wraps to the first; Shift+Tab from the first
+ *     wraps to the last; Tab mid-list does not escape to document.body
+ *     or to the trigger behind the scrim.
  *
  * The shared `createSlideUpSheet` controller writes its own
  * `data-lane-sheet-open` attribute on `document.body`; assertions
@@ -249,6 +253,110 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
     );
     expect(document.activeElement).toBe(trigger);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Focus trap — AUDIT-20260530-38 / AUDIT-20260530-41 regression coverage.
+  //
+  // The audit scope explicitly names "mobile-sheet a11y (focus trap, scrim,
+  // dismiss)" and a scrim-backed bottom sheet over background content is the
+  // canonical case where Tab can silently walk focus out of the sheet into the
+  // page behind the scrim. These tests pin the contract that Tab from the last
+  // focusable wraps to the first sheet-internal focusable and that Shift+Tab
+  // from the first wraps to the last — proving focus does NOT escape to
+  // document.body or background controls while the sheet is open.
+  //
+  // Note: jsdom does not implement the browser's native Tab focus traversal;
+  // the focus-trap controller must explicitly call `.focus()` on the wrap
+  // target. These tests dispatch a Tab keydown from a focused source element
+  // and assert `document.activeElement` is the wrap target.
+  // ---------------------------------------------------------------------------
+
+  it('Tab from the last focusable inside the sheet wraps focus to the first focusable (no escape)', () => {
+    buildShellWithSheet(['default', 'mockups', 'qa']);
+    initSwimlaneMobileSheet();
+    const trigger = document.querySelector<HTMLButtonElement>(
+      '[data-lane-sheet-trigger]',
+    );
+    trigger?.click();
+    // Sheet is open; focus is on the first eye-button.
+    const sheet = document.querySelector<HTMLElement>('[data-lane-sheet]');
+    expect(sheet).not.toBeNull();
+    const focusables = sheet?.querySelectorAll<HTMLElement>(
+      'button, [tabindex="0"]',
+    );
+    expect(focusables).not.toBeUndefined();
+    const first = focusables?.[0];
+    const last = focusables?.[focusables.length - 1];
+    expect(first).not.toBeUndefined();
+    expect(last).not.toBeUndefined();
+    // Focus the last focusable and dispatch Tab — focus must wrap to first.
+    last?.focus();
+    expect(document.activeElement).toBe(last);
+    last?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }),
+    );
+    expect(document.activeElement).toBe(first);
+    // And focus has NOT escaped to the body or to the trigger.
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).not.toBe(trigger);
+  });
+
+  it('Shift+Tab from the first focusable inside the sheet wraps focus to the last focusable (no escape)', () => {
+    buildShellWithSheet(['default', 'mockups', 'qa']);
+    initSwimlaneMobileSheet();
+    const trigger = document.querySelector<HTMLButtonElement>(
+      '[data-lane-sheet-trigger]',
+    );
+    trigger?.click();
+    const sheet = document.querySelector<HTMLElement>('[data-lane-sheet]');
+    const focusables = sheet?.querySelectorAll<HTMLElement>(
+      'button, [tabindex="0"]',
+    );
+    const first = focusables?.[0];
+    const last = focusables?.[focusables.length - 1];
+    expect(first).not.toBeUndefined();
+    expect(last).not.toBeUndefined();
+    first?.focus();
+    expect(document.activeElement).toBe(first);
+    first?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }),
+    );
+    expect(document.activeElement).toBe(last);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).not.toBe(trigger);
+  });
+
+  it('Tab keydown inside the sheet does NOT escape to document.body when focus is mid-list', () => {
+    buildShellWithSheet(['default', 'mockups', 'qa']);
+    initSwimlaneMobileSheet();
+    const trigger = document.querySelector<HTMLButtonElement>(
+      '[data-lane-sheet-trigger]',
+    );
+    trigger?.click();
+    const sheet = document.querySelector<HTMLElement>('[data-lane-sheet]');
+    const focusables = sheet?.querySelectorAll<HTMLElement>(
+      'button, [tabindex="0"]',
+    );
+    // Focus a middle focusable (not the first or last). The trap permits the
+    // browser's natural traversal — we assert only that focus remains inside
+    // the sheet (i.e., the trap does not move focus, and the source element
+    // remains the activeElement because jsdom does not natively advance Tab
+    // focus). This pins that the trap does not over-fire on non-edge Tabs.
+    const middleIdx = Math.floor((focusables?.length ?? 0) / 2);
+    const middle = focusables?.[middleIdx];
+    expect(middle).not.toBeUndefined();
+    middle?.focus();
+    expect(document.activeElement).toBe(middle);
+    middle?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }),
+    );
+    // The trap should NOT have hijacked focus to first/last; jsdom's natural
+    // behavior (no advance) is preserved. The point is focus stays inside the
+    // sheet — not at document.body, not at the trigger.
+    expect(sheet?.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).not.toBe(trigger);
   });
 
   it('initSwimlaneMobileSheet is a no-op when the trigger is absent', () => {

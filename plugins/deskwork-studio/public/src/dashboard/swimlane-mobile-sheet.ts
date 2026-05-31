@@ -25,8 +25,12 @@
  * Mirrors the existing slide-up sheet patterns at
  * `entry-review/mobile-sheet-bar.ts` and `dashboard/compose-chip.ts`
  * via the shared `createSlideUpSheet` controller. New idioms are
- * limited to (a) the trigger's `aria-expanded` mirroring and (b) the
- * focus-return-to-trigger contract on close.
+ * limited to (a) the trigger's `aria-expanded` mirroring, (b) the
+ * focus-return-to-trigger contract on close, and (c) the opt-in
+ * `trapFocus: true` flag on the shared controller — the scrim-backed
+ * lane sheet is a modal-shaped surface, so Tab/Shift+Tab must contain
+ * focus within the sheet (WCAG 2.4.3 Focus Order). Audit-coverage:
+ * AUDIT-20260530-38 / AUDIT-20260530-41.
  */
 
 import { createSlideUpSheet } from '../mobile-shell/sheet-controller.ts';
@@ -55,6 +59,12 @@ export function initSwimlaneMobileSheet(): void {
     sheetEl: sheet,
     bodyOpenAttr: 'data-lane-sheet-open',
     scrimEl: backdrop ?? undefined,
+    // The scrim-backed lane sheet is a modal-shaped surface; Tab and
+    // Shift+Tab must wrap inside the sheet so keyboard focus doesn't
+    // walk into the page behind the scrim. AUDIT-20260530-38 /
+    // AUDIT-20260530-41 regression coverage in
+    // packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts.
+    trapFocus: true,
     onClose: () => {
       sheet.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');

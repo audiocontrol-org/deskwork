@@ -20,6 +20,35 @@
 /** Default drag-to-dismiss threshold in pixels (matches both consumers). */
 const DEFAULT_DRAG_DISMISS_PX = 80;
 
+/**
+ * Selector for keyboard-focusable elements inside a container. Used by
+ * the opt-in focus trap. Mirrors the canonical "focusable element"
+ * shortlist (links/buttons/inputs/tabindex>=0) and excludes elements
+ * explicitly removed from the tab order via `tabindex="-1"` or
+ * `disabled`. Not exhaustive (no contenteditable, no audio/video
+ * controls) — the lane-sheet and current sibling sheets render only
+ * buttons + role-button rows, so this matches the deployed surface
+ * without overreach.
+ */
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+/**
+ * Collect focusable elements inside `root` in DOM order, excluding any
+ * with explicit `tabindex="-1"` or `disabled`. Returns an empty array
+ * when nothing matches.
+ */
+function collectFocusables(root: HTMLElement): readonly HTMLElement[] {
+  const matches = root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+  return Array.from(matches);
+}
+
 export interface SlideUpSheetOptions {
   /**
    * The sheet host element. Container, not the inner panel.
@@ -72,6 +101,29 @@ export interface SlideUpSheetOptions {
    * NOT called when close() is called while already closed.
    */
   onClose?: () => void;
+  /**
+   * When `true`, install an opt-in focus trap that contains Tab /
+   * Shift+Tab traversal within `sheetEl` while the sheet is open.
+   *
+   * Contract:
+   *   - Tab from the LAST focusable inside `sheetEl` wraps focus to
+   *     the FIRST focusable inside `sheetEl` (preventDefault).
+   *   - Shift+Tab from the FIRST focusable wraps to the LAST
+   *     (preventDefault).
+   *   - Tab mid-list is not interfered with (browser's natural
+   *     traversal applies; the trap only fires at the edges).
+   *   - The trap is gated on `isOpen()` — does nothing while closed.
+   *
+   * Why opt-in: existing consumers (compose-chip,
+   * entry-review/mobile-sheet-bar) shipped without an explicit trap
+   * and have their own a11y contracts. Opting in keeps them
+   * back-compat while letting the lane-visibility sheet (and any
+   * future modal-shaped consumer) honor the WCAG 2.4.3 (Focus Order)
+   * expectation that a scrim-backed sheet contains keyboard focus.
+   *
+   * Default: `false`.
+   */
+  trapFocus?: boolean;
 }
 
 export interface SlideUpSheetController {
@@ -122,6 +174,37 @@ export function createSlideUpSheet(opts: SlideUpSheetOptions): SlideUpSheetContr
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Escape' && open) doClose();
   });
+
+  // ---- Focus trap (opt-in) -------------------------------------------------
+  //
+  // Tab / Shift+Tab containment for scrim-backed modal sheets. Wired on
+  // `sheetEl` (capture=false) so a consumer's own keydown handlers fire
+  // first; the trap's only job is the edge-wrap at first/last focusable.
+  // No-op when `opts.trapFocus` is false (default) or while closed.
+
+  if (opts.trapFocus === true) {
+    sheetEl.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (!open) return;
+      if (e.key !== 'Tab') return;
+      const focusables = collectFocusables(sheetEl);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (first === undefined || last === undefined) return;
+      const activeEl = document.activeElement;
+      const onFirst = activeEl === first;
+      const onLast = activeEl === last;
+      if (e.shiftKey && onFirst) {
+        e.preventDefault();
+        last.focus();
+        return;
+      }
+      if (!e.shiftKey && onLast) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+  }
 
   // ---- Drag-to-dismiss via the handle (touch + mouse) ---------------------
 
