@@ -3986,7 +3986,7 @@ Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). 
 ### AUDIT-20260530-67 — [P6-2 claude] Corrupt/unreadable lane JSON is silently dropped from `referencingLanes`, so the pipelines Delete gate can under-count dependents
 
 Finding-ID: AUDIT-20260530-67 (cross-model: AUDIT-BARRAGE-claude-P6-2)
-Status:     open
+Status:     fixed-b44f042
 Severity:   medium
 Surface:    `packages/studio/src/pages/pipelines/data.ts` — `readLanePipelineTemplate` (returns `null` on `readFile`/`JSON.parse` failure), `findReferencingLanes`, consumed by `renderDeleteButton` in `pipelines/table.ts`
 
