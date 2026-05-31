@@ -227,18 +227,40 @@ const rule: DoctorRule = {
       }
 
       const laneFilePath = laneConfigPath(ctx.projectRoot, laneId);
+      // AUDIT-20260530-80: distinguish archived from active lanes in the
+      // emitted severity. Archiving is the project's soft-delete path
+      // (`lane archive`) — deleting the custom pipeline an archived lane
+      // was bound to is a normal, intentional sequence per the project's
+      // "content-management databases preserve, they don't delete" rule.
+      // A dangling template reference on an ARCHIVED lane is a frozen
+      // historical record, not an active-pipeline defect; surfacing it
+      // at `error` conflates *"this active lane is broken"* with *"this
+      // retired lane references a since-removed template."* Both kinds
+      // of finding still emit (preserving the historical record so the
+      // operator can choose to clean up the orphan reference); only the
+      // severity differs. The `details.archived` flag lets downstream
+      // consumers (renderers, CLI summaries) distinguish without re-
+      // reading the lane JSON.
+      const archived =
+        typeof lane.archivedAt === 'string' && lane.archivedAt.length > 0;
+      const severity = archived ? 'info' : 'error';
+      const archivedSuffix = archived
+        ? ' [archived lane — historical record; repair only if you want the frozen record tidy]'
+        : '';
       findings.push({
         ruleId: RULE_ID,
         site: ctx.site,
-        severity: 'error',
+        severity,
         message:
           `Lane "${laneId}" references pipelineTemplate "${lane.pipelineTemplate}" ` +
-          `which does not resolve (file: ${relative(ctx.projectRoot, laneFilePath)})`,
+          `which does not resolve (file: ${relative(ctx.projectRoot, laneFilePath)})` +
+          archivedSuffix,
         details: {
           laneId,
           laneFilePath,
           unresolvedTemplateId: lane.pipelineTemplate,
           availableTemplates,
+          archived,
         },
       });
     }
