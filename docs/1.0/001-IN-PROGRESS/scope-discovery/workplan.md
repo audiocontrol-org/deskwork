@@ -582,7 +582,7 @@ Closes AUDIT-20260531-08. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 
 - [x] No forbidden-deferral phrase in `feature-root.test.ts`.
 - [x] AUDIT-10 regression guard (below) asserts the source file is clean too.
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.26 (fix-finding-AUDIT-20260531-09): AUDIT-20260531-09 — Doc-prose closure of Task 5.23 will trip the `fix-task-tdd-d…
@@ -598,7 +598,7 @@ Closes AUDIT-20260531-09. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 **Acceptance Criteria:**
 
 - [x] No bare `feature-root.test.ts` token in workplan task bodies (all references now use full paths).
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.27 (fix-finding-AUDIT-20260531-10): AUDIT-20260531-10 — AUDIT-06's fix has no automated regression guard — the cited…
@@ -615,7 +615,7 @@ Closes AUDIT-20260531-10. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 6 (follow-up): Primitive-extraction dispatch hygiene
 

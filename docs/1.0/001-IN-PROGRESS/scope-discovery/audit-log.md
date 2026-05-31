@@ -979,7 +979,7 @@ Instead, the test performs `writeFileSync(workplanPath, wpManual, ...)` to manua
 ### AUDIT-20260531-08 — The AUDIT-06 deferral-phrase purge is incomplete — the equivalent phrase survives in the companion test file the fix's own docblock cross-references
 
 Finding-ID: AUDIT-20260531-08
-Status:     open
+Status:     fixed-bb419606f90d1e481b074323328e8e90b63f217c
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:108-117` (untouched by the diff); cross-referenced from `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:25-27`
 
@@ -992,7 +992,7 @@ This is materially the same deferral shape AUDIT-06 named (references the same h
 ### AUDIT-20260531-09 — Doc-prose closure of Task 5.23 will trip the `fix-task-tdd-discipline` doctor rule — its bare `feature-root.test.ts` token resolves to a nonexistent repo-root file
 
 Finding-ID: AUDIT-20260531-09
-Status:     open
+Status:     fixed-bb419606f90d1e481b074323328e8e90b63f217c
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 block) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`
 
@@ -1011,7 +1011,7 @@ So `verifyFixTaskTDD` returns `missing-test-file`, and the `fix-task-tdd-discipl
 ### AUDIT-20260531-10 — AUDIT-06's fix has no automated regression guard — the cited "regression test" exercises sort behavior, not phrase presence
 
 Finding-ID: AUDIT-20260531-10
-Status:     open
+Status:     fixed-bb419606f90d1e481b074323328e8e90b63f217c
 Severity:   low
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 acceptance criteria) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:118-130`
 
