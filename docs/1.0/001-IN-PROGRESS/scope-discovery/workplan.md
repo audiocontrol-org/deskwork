@@ -452,7 +452,7 @@ Closes AUDIT-20260531-01. Surface: `plugins/dw-lifecycle/src/subcommands/apply-a
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.19 (fix-finding-AUDIT-20260531-02): AUDIT-20260531-02 — The new AUDIT-17 test asserts only the immediate error, not …
@@ -469,7 +469,7 @@ Closes AUDIT-20260531-02. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.20 (fix-finding-AUDIT-20260531-03): AUDIT-20260531-03 — AUDIT-16 marked `fixed` while the physical task order it nam…
@@ -486,7 +486,7 @@ Closes AUDIT-20260531-03 (claude-03 + codex-01 + codex-02; cross-model). Surface
 
 - [x] Workplan reads monotonically: Task 5.1 → 5.22, AUDIT-20260530-01 → AUDIT-20260531-05.
 - [x] Reorder script preserved at `scripts/reorder-fix-tasks.py` for re-runs.
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.21 (fix-finding-AUDIT-20260531-04): AUDIT-20260531-04 — The extracted feature-root helper still ships the documented…
@@ -503,7 +503,7 @@ Closes AUDIT-20260531-04. Surface: `plugins/dw-lifecycle/src/scope-discovery/uti
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.22 (fix-finding-AUDIT-20260531-05): AUDIT-20260531-05 — Feature-root extraction stops one level short of DRY — both …
@@ -520,7 +520,7 @@ Closes AUDIT-20260531-05. Surface: `plugins/dw-lifecycle/src/scope-discovery/uti
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 4: Skill-prose convention template
 

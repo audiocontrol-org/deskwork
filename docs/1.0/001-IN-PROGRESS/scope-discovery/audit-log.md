@@ -902,7 +902,7 @@ That is the exact stale-state shape AUDIT-20260530-14 was fixing: `findUnchecked
 ### AUDIT-20260531-01 — AUDIT-17 fix surfaces the split-state but its instructed recovery path is untested and may be unreachable
 
 Finding-ID: AUDIT-20260531-01
-Status:     open
+Status:     fixed-bf0a5de3e82a1d17d65797e22b1533497d6081e3
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:454-471`
 
@@ -913,7 +913,7 @@ The error message instructs the operator to "re-run apply-audit-flips to confirm
 ### AUDIT-20260531-02 — The new AUDIT-17 test asserts only the immediate error, not the split-state or the recovery contract it claims to handle
 
 Finding-ID: AUDIT-20260531-02
-Status:     open
+Status:     fixed-bf0a5de3e82a1d17d65797e22b1533497d6081e3
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:331-388`
 
@@ -924,7 +924,7 @@ This is the same shape as prior findings on this feature (AUDIT-09's vacuous det
 ### AUDIT-20260531-03 — AUDIT-16 marked `fixed` while the physical task order it named remains non-monotonic, and the residual is deferred with a "follow-up if needed" IOU
 
 Finding-ID: AUDIT-20260531-03 (claude-03 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-64d278abde25ed8a3d03e4ace4fa01113e1697dd
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.9 block, the renumbered `Task 5.11..5.17` headings, and the new "Out of scope (deferred)" line)
 
@@ -935,7 +935,7 @@ The Task 5.9 block self-documents this gap (`Step 4: physical reorder NOT done`)
 ### AUDIT-20260531-04 — The extracted feature-root helper still ships the documented semver-incorrect sort behind a deferral comment, and no test exercises a lex-vs-semver divergence
 
 Finding-ID: AUDIT-20260531-04
-Status:     open
+Status:     fixed-01a0a550246f3769ab782768bc9ce7aa1c025d5e
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:18-22` (docblock) and `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `'multi-version'` and `'determinism'` cases)
 
@@ -944,7 +944,7 @@ The consolidation is correct in shape, but it carries forward the lex-descending
 ### AUDIT-20260531-05 — Feature-root extraction stops one level short of DRY — both callers still independently construct `docsRoot = join(x, 'docs')`
 
 Finding-ID: AUDIT-20260531-05
-Status:     open
+Status:     fixed-01a0a550246f3769ab782768bc9ce7aa1c025d5e
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:53-55` (helper takes `docsRoot`), `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` (`const docsRoot = join(args.repoRoot, 'docs')`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:181-183` (`const docsRoot = join(rootDir, 'docs')`)
 
