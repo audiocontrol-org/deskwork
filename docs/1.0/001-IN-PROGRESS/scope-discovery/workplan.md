@@ -1734,3 +1734,148 @@ Recorded resolutions (no further operator iteration required; each is the seamle
 - `audit-barrage` skill + CLI verb (Phase 12) — Task 4 composes with the new `--output-run-dir` flag.
 - `promote-findings` library + CLI verb (Phase 13 Task 1) — Task 4 composes as the final step of the per-task hook.
 - `apply-audit-flips` (Phase 13 Task 4 Step 2) — unchanged; its `Closes AUDIT-<id> → fixed-<sha>` semantic remains the bridge between fix commits and audit-log status.
+
+## Phase 16: Audit-barrage gate refactor — always fire, dampener controls disposition (#383)
+
+**Motivating case** (graphical-entries Phase 0 burndown, 2026-05-31): Barrage 1 (post-Task 0.1) found 1 MED + 2 INFO; Barrage 2 (post-Tasks 0.71–0.73) found 1 LOW + 2 INFO — 0 HIGH+, 0 MEDIUM → dampener engaged (single-run rule). Tasks 0.3–0.70 (~70 more tasks) all ran with dampener engaged. Every iteration's Step 6 hit the skip branch. New work spanned schema additions, atomic-transaction patches, defense-in-depth catches, error refactoring, security-relevant fixes, doctor rules, CLI arity refusal, test infra — none of it audited beyond TDD + in-band self-audit. The dampener's *"the auditor has gone quiet on real bugs"* claim from Barrage 2 (covering ~80 lines of compact-strip hygiene) could not structurally speak to whether 70 commits later, touching unrelated subsystems, there was a new HIGH+.
+
+**Root cause:** SKILL.md Step 6's gate fuses two separate concerns — *"should new work be cross-model audited?"* (yes, always — that's the entire reason the third audit surface exists) and *"should nit-level findings be scoped as fix-tasks or slushed?"* (context-dependent — what the dampener was actually designed for). The current "dampener engaged → skip the whole hook" branch conflates them. As a side effect the dampener counter becomes structurally trapping: it resets only when a barrage surfaces a HIGH+, but no barrage ever fires once dampened.
+
+**Operator-decided semantic** (2026-05-31, the exact framing this phase implements verbatim):
+
+> *"Do work, audit barrage, if 0 HIGH and 0 MEDIUM findings on the NEW work, put new findings in slush. If there have been 2 consecutive audits on the new work with 0 HIGH findings on new work, then put new findings in slush."*
+
+Reframed as the new Step 6 contract:
+
+1. **Always fire the barrage when there is new diff since the last barrage's tip** (`git rev-list --count <last-barrage-tip>..HEAD > 0`). No skip on dampened.
+2. **Always lift the findings.** Audit-log entries land regardless of disposition.
+3. **Dampener controls disposition only.** Engaged (Rule A: 1 barrage with 0 HIGH + 0 MEDIUM OR Rule B: 2 consecutive 0-HIGH barrages) → `slush-remaining --apply` over the latest section. Not engaged → `promote-findings --auto` over the latest section.
+4. **Tip-tracking persistence.** Each `audit-barrage` run writes `<run-dir>/tip.sha` = `git rev-parse HEAD` at fire-time. The "since last barrage" check resolves to that file from the most-recent run-dir.
+
+**Operator-acknowledged trade-offs** (explicit choices, NOT holes):
+- Under Rule B regime, MEDIUMs in the current barrage get slushed when the past 2 barrages were quiet — same trade as the existing post-#380 severity filter (HIGHs only preserved); operator already accepts.
+- First-barrage slushing on a clean feature start (no history needed for Rule A) — consistent with operator's stated rule.
+- Per-iteration barrage cost when dampened shifts from zero to one barrage — cost is on subscription-auth CLIs (no per-call billing); autonomous-loop context means operator isn't waiting; cross-model coverage is the whole reason the third audit surface exists.
+
+**Loop-stop semantic is UNCHANGED.** The implement-loop has always stopped on workplan-exhaustion, not on dampener engagement. Pre-fix, dampener-engaged iterations skipped the barrage but the loop still ran until the workplan exhausted. Post-fix, dampener-engaged iterations slush the barrage's findings but the loop still runs until the workplan exhausts. The dampener never was a stop-the-loop mechanism; it just suppressed new-fix-task generation.
+
+### Task 1: TDD spec — failing test for new gate semantic
+
+Write the failing regression test FIRST per project TDD discipline. The test must red pre-fix and green post-fix; it pins the semantic so a future regression can't quietly revert.
+
+- [ ] Step 1: NEW test file `plugins/dw-lifecycle/src/__tests__/scope-discovery/implement-hook/gate-semantic.test.ts` (or extend an existing test surface — pick whichever module currently owns the Step 6 hook integration).
+- [ ] Step 2: Fixture scenario A — long-burndown re-fire. Audit-log has 2 barrage sections with 0 HIGH+ (dampener engaged). HEAD has 3 new commits since the most-recent barrage's `tip.sha`. Assert: the new-diff guard reports >0, the barrage fires, lift writes a new section, dampener engaged → slush is the chosen disposition.
+- [ ] Step 3: Fixture scenario B — undampened path. Audit-log has 1 barrage section with 1 HIGH (dampener NOT engaged). HEAD has 2 new commits. Assert: barrage fires, lift writes new section, dampener not engaged → promote-findings is the chosen disposition.
+- [ ] Step 4: Fixture scenario C — no-diff skip. Audit-log has a recent barrage section; HEAD is at that barrage's `tip.sha`. Assert: new-diff guard reports 0; barrage does NOT fire; no audit-log delta.
+- [ ] Step 5: Fixture scenario D — Rule B counter resets organically. Barrage 1 with 0 HIGH (counter=1) → engaged via Rule B? No (threshold=2). promote → loop runs. Barrage 2 lands with 1 HIGH (counter resets). Assert: counter is correctly read post-fix.
+- [ ] Step 6: Confirm all four scenarios are RED against the current code (skipping branch still present).
+
+**Acceptance Criteria:**
+- [ ] Test file exists; vitest reports the new tests as failing pre-fix.
+- [ ] Each scenario asserts exactly one observable outcome (fire/skip + disposition choice).
+
+### Task 2: `tip.sha` persistence on audit-barrage runs
+
+The new-diff guard needs a stable anchor for *"since last barrage."* The cleanest place is to write the current HEAD into each run-dir at fire-time. Downstream verbs (`check-barrage-tip`, the new Step 6 gate) read the most-recent run-dir's `tip.sha`.
+
+- [ ] Step 1: Modify `dw-lifecycle audit-barrage` to write `<run-dir>/tip.sha` containing `git rev-parse HEAD` at the moment the barrage is fired. Single line, newline-terminated, no other content.
+- [ ] Step 2: Add a test against the audit-barrage CLI verifying tip.sha lands in the run-dir with the expected shape.
+- [ ] Step 3: Backward-compat read: if a run-dir's `tip.sha` is missing (historical runs from before this Phase), the new-diff guard treats it as *"unknown tip"* → defaults to firing the barrage (fail-safe to AUDIT, not fail-safe to SKIP). Add a test for this path.
+
+**Acceptance Criteria:**
+- [ ] Every new audit-barrage run-dir contains `tip.sha`.
+- [ ] Missing-tip.sha fallback is fire (not skip).
+- [ ] Tests cover both shapes.
+
+### Task 3: `check-barrage-tip` CLI verb + library
+
+New verb that answers *"is there new diff since the last barrage?"* — the gate's diff-emptiness guard.
+
+- [ ] Step 1: NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-tip.ts` exporting `checkBarrageTip({featureSlug, repoRoot}): Promise<BarrageTipCheckResult>`. Result is `{ hasNewDiff: boolean, lastTipSha: string | null, newCommitCount: number, reason: string }`. Resolves the most-recent run-dir via `.dw-lifecycle/scope-discovery/audit-runs/`, reads `tip.sha`, runs `git rev-list --count <tip>..HEAD`.
+- [ ] Step 2: NEW CLI shim `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts`. Exit 0 = new diff exists; exit 1 = no new diff; exit 2 = config error. Stderr summary: *"new commits since last barrage (<tip-shortsha>): N"*.
+- [ ] Step 3: Wire the verb into `dw-lifecycle` main dispatcher.
+- [ ] Step 4: Library + CLI tests against fixture audit-runs trees + temp git repos.
+
+**Acceptance Criteria:**
+- [ ] Library returns correct hasNewDiff for: zero new commits / N new commits / no prior barrage (no run-dirs).
+- [ ] CLI exit codes match the contract.
+- [ ] Stderr summary names the tip + commit count.
+
+### Task 4: SKILL.md Step 6 refactor
+
+Replace the existing Step 6 gate (`if ! check-barrage-dampener; then slush; else fire+lift+promote`) with the new shape.
+
+- [ ] Step 1: Rewrite Step 6 bash composition in `plugins/dw-lifecycle/skills/implement/SKILL.md`:
+   ```bash
+   # 0. New-diff guard. Skip iff there's no new work since the last barrage.
+   if ! dw-lifecycle check-barrage-tip --feature <slug>; then
+     # No new diff since last barrage; nothing to audit. Skip the hook.
+     :
+   else
+     # 1. Render the prompt from the project's audit-barrage template.
+     # ... (steps 1, 2, 3 — render, fire, lift — unchanged from current)
+
+     # 2. Disposition gate. Dampener engaged → slush new findings.
+     #    Not engaged → promote new findings as fix-tasks.
+     if ! dw-lifecycle check-barrage-dampener --feature <slug>; then
+       dw-lifecycle slush-remaining --feature <slug> --apply
+     else
+       dw-lifecycle promote-findings --feature <slug> --auto
+     fi
+
+     # 3. Sanity-check the gate now allows pickup.
+     dw-lifecycle check-open-findings --feature <slug>
+   fi
+   ```
+- [ ] Step 2: Update Step 6's prose to document the new semantic. Quote the motivating case (graphical-entries burndown). Quote the operator's verbatim framing. Frame the dampener as *"controls disposition of new findings, not whether to audit."*
+- [ ] Step 3: Remove the *"the auditor has gone quiet on real bugs"* phrasing — it was the misleading framing that justified the skip branch. Replace with *"the dampener engages when recent runs were quiet; engaged-state means new findings (on this iteration's new diff) get slushed rather than promoted."*
+- [ ] Step 4: Update the failure-path documentation block — the new flow has the same failure paths (render-fail, lift-fail, promote-fail, gate-fail), plus one new one (tip-check-fail → degrade to fire-anyway, NOT skip).
+- [ ] Step 5: Document the trade-offs (MEDIUM-slushing under Rule B; first-barrage slushing on Rule A) inline in the disposition gate's prose, citing the operator's 2026-05-31 acknowledgment.
+
+**Acceptance Criteria:**
+- [ ] Step 6 prose no longer has the skip-on-dampened branch.
+- [ ] The new-diff guard is the ONLY skip condition.
+- [ ] Disposition gate documents both Rule A (0 HIGH + 0 MEDIUM, single-run) and Rule B (2 consecutive 0 HIGH).
+- [ ] Trade-offs are documented as operator-acknowledged choices.
+
+### Task 5: Live verification + dogfood
+
+Run the new semantic against this feature's own loop before shipping.
+
+- [ ] Step 1: Mutate `audit-runs/` locally to simulate a dampened state. Confirm that with the new Step 6, a new commit triggers a barrage (not a skip).
+- [ ] Step 2: Confirm that with no new diff, the new-diff guard skips the barrage (no useless re-firing on idle iterations).
+- [ ] Step 3: Confirm the dampener's slush-vs-promote disposition fires correctly for both states.
+- [ ] Step 4: File any tooling-feedback entries surfacing during the dogfood.
+
+**Acceptance Criteria:**
+- [ ] All four scenarios behave per spec on the live loop.
+- [ ] No regressions in `dw-lifecycle audit-barrage`'s existing CLI contract.
+
+### Task 6: Cross-references + docs
+
+- [ ] Step 1: Update `.claude/rules/agent-discipline.md` § "Audit-barrage: structured cross-model audit" — replace the *"the operator-decided cadence"* paragraph with the new semantic. Note that audit-barrage now fires on every iteration with new diff; dampener controls disposition only.
+- [ ] Step 2: Update `plugins/dw-lifecycle/skills/audit-barrage/SKILL.md` cross-reference to the implement-skill's new Step 6 shape (the audit-barrage skill itself is unchanged; only its caller's gate logic shifted).
+- [ ] Step 3: Update `ROADMAP.md` if it references the old skip-on-dampened semantic. (Audit the file; remove rot-prone references.)
+- [ ] Step 4: Document the motivating case in the Phase 16 commit message body (graphical-entries Phase 0 burndown, 70 unaudited tasks, link to #383).
+
+**Acceptance Criteria:**
+- [ ] Agent-discipline rule documents the new gate semantic.
+- [ ] audit-barrage SKILL.md cross-link is up-to-date.
+- [ ] ROADMAP free of references to the retired skip-on-dampened branch.
+- [ ] Phase 16 commit message names the dogfood motivating case.
+
+### Phase 16 — Out of Scope
+
+- **Changing the dampener engagement rules.** Rule A (single-run 0 HIGH + 0 MEDIUM) and Rule B (2 consecutive 0 HIGH) are unchanged. The dampener's library (`check-barrage-dampener.ts`) is unchanged. Only the SKILL.md gate that CALLS it shifts.
+- **Adding a `--rebarrage-after N` CLI flag.** Phase 16 ships the "always fire on new diff" semantic, full stop. A per-iteration counter knob was considered (Option C in #383) and rejected in favor of the always-fire shape.
+- **The slush-remaining or promote-findings library themselves.** Both verbs are reused as-is; Phase 16 only changes which one fires when.
+- **Re-auditing already-shipped historical work.** Phase 16's semantic applies forward only; historical sections in audit-log are not retroactively re-audited.
+- **Changing the audit-barrage prompt or model battery.** Unrelated; out of scope for this phase.
+
+### Phase 16 — Existing primitives this composes over
+
+- `check-barrage-dampener` (Phase 15) — unchanged; Phase 16 keeps its OR-of-two-rules semantic.
+- `slush-remaining` (Phase 15 Task 7 + #380 fix) — unchanged; called from the disposition gate.
+- `promote-findings --auto` (Phase 13 Task 1) — unchanged; called from the disposition gate.
+- `check-open-findings` (Phase 15 Task 1) — unchanged; called as the post-disposition sanity check.
+- `audit-barrage` CLI (Phase 12 + Phase 15 Task 4a `--output-run-dir`) — extended with `tip.sha` write in Task 2.
