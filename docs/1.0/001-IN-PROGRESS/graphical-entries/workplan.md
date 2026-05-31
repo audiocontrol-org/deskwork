@@ -1087,17 +1087,17 @@ Closes AUDIT-20260530-76 (cross-model: AUDIT-BARRAGE-codex-P6-2). Surface: `pack
 
 Closes AUDIT-20260530-77 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/core/src/doctor/rules/lane-config-missing-template.ts:290-309` (delete dependency check + refusal message).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-77 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-77 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/doctor/lane-config-missing-template.test.ts:273-388` (extended single-entry assertion at :310-322 + new two-entry case at :324-388)
+- [x] `npm --workspace @deskwork/core test -- --run test/doctor/lane-config-missing-template.test.ts` exits 0 (6/6 pass against the fix)
+- [x] Audit-log Status flipped to `fixed-041db67` via the close-shipped-audit-findings step
 
 
 

@@ -4122,7 +4122,7 @@ Resolution (Task 0.51 — commit 056528c): chose the "no-current key" variant of
 ### AUDIT-20260530-77 — [P6-3 claude] Delete-refusal message lists entry UUIDs but instructs a slug-based `lane move` command
 
 Finding-ID: AUDIT-20260530-77 (cross-model: AUDIT-BARRAGE-claude-P6-3)
-Status:     open
+Status:     fixed-041db67
 Severity:   medium
 Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:290-309` (delete dependency check + refusal message)
 
