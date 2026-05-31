@@ -4167,7 +4167,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). 
 ### AUDIT-20260530-80 — [P6-3 claude] Audit scans archived lanes at severity=error, producing persistent noise for intentionally-retired lanes
 
 Finding-ID: AUDIT-20260530-80 (cross-model: AUDIT-BARRAGE-claude-P6-3)
-Status:     open
+Status:     fixed-d2eede1
 Severity:   medium
 Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:165` (`listLaneConfigs(ctx.projectRoot, { includeArchived: true })`)
 
