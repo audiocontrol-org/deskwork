@@ -7,6 +7,7 @@
  *     --feature <slug>
  *     [--threshold <N>]      default: 2
  *     [--slush-date <YYYY-MM-DD>]  default: today UTC
+ *     [--scope latest|all]   default: latest (per Issue #380)
  *     [--repo-root <path>]
  *     [--apply]              default is dry-run
  *     [--help]
@@ -34,6 +35,7 @@ export interface SlushRemainingCliOptions {
   readonly featureSlug: string;
   readonly threshold: number;
   readonly slushDate?: string;
+  readonly scope: 'latest' | 'all';
   readonly repoRoot?: string;
   readonly apply: boolean;
   readonly help?: boolean;
@@ -48,6 +50,7 @@ const USAGE = [
   '    --feature <slug>',
   '    [--threshold <N>]',
   '    [--slush-date <YYYY-MM-DD>]',
+  '    [--scope latest|all]',
   '    [--repo-root <path>]',
   '    [--apply]',
   '    [--help]',
@@ -56,6 +59,8 @@ const USAGE = [
   '--threshold <N>           Dampener threshold (must match the gate). Default: 2.',
   '--slush-date <YYYY-MM-DD> Date stamp for the `acknowledged-slush-pile-<date>`',
   '                          status suffix. Default: today UTC.',
+  '--scope latest|all        Restrict slush to the most-recent barrage section',
+  '                          (default) or every barrage section. Per Issue #380.',
   '--repo-root <path>        Project root. Default: cwd.',
   '--apply                   Write the flips. Default is dry-run.',
   '',
@@ -76,6 +81,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
   let featureSlug: string | undefined;
   let threshold = 2;
   let slushDate: string | undefined;
+  let scope: 'latest' | 'all' = 'latest';
   let repoRootOverride: string | undefined;
   let apply = false;
   let help = false;
@@ -93,6 +99,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
       flag === '--feature' ||
       flag === '--threshold' ||
       flag === '--slush-date' ||
+      flag === '--scope' ||
       flag === '--repo-root'
     ) {
       const value = argv[i + 1];
@@ -108,13 +115,21 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
         }
         threshold = parsed;
       } else if (flag === '--slush-date') slushDate = value;
-      else if (flag === '--repo-root') repoRootOverride = value;
+      else if (flag === '--scope') {
+        if (value !== 'latest' && value !== 'all') {
+          return { ok: false, error: `--scope must be 'latest' or 'all' (got '${value}')` };
+        }
+        scope = value;
+      } else if (flag === '--repo-root') repoRootOverride = value;
       continue;
     }
     return { ok: false, error: `unknown flag: ${flag ?? '(undefined)'}` };
   }
   if (help) {
-    return { ok: true, opts: { featureSlug: featureSlug ?? '', threshold, apply, help: true } };
+    return {
+      ok: true,
+      opts: { featureSlug: featureSlug ?? '', threshold, scope, apply, help: true },
+    };
   }
   if (featureSlug === undefined) {
     return { ok: false, error: '--feature <slug> is required' };
@@ -122,6 +137,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
   const opts: SlushRemainingCliOptions = {
     featureSlug,
     threshold,
+    scope,
     apply,
     ...(slushDate !== undefined ? { slushDate } : {}),
     ...(repoRootOverride !== undefined ? { repoRoot: repoRootOverride } : {}),
@@ -170,6 +186,7 @@ export async function runSlushRemaining(args: RunArgs): Promise<number> {
     workplanText,
     slushDate,
     threshold: args.opts.threshold,
+    scope: args.opts.scope,
   });
   if (!result.dampenerEngaged) {
     args.stderr.write(
@@ -177,12 +194,22 @@ export async function runSlushRemaining(args: RunArgs): Promise<number> {
     );
     return 0;
   }
-  args.stderr.write(`slush-remaining: dampener engaged. ${result.flips.length} finding(s) to slush.\n`);
+  args.stderr.write(
+    `slush-remaining: dampener engaged. ` +
+      `flipped: ${result.flips.length}, ` +
+      `skipped: ${result.skippedHighs.length} HIGH${result.skippedHighs.length === 1 ? '' : 's'} ` +
+      `(left open as guardrails)\n`,
+  );
   for (const flip of result.flips) {
     args.stdout.write(
       `  ${flip.findingId} → acknowledged-slush-pile-${slushDate}` +
         (flip.workplanTaskFlipped ? ' (workplan task boxes flipped)' : ' (no workplan task found)') +
         '\n',
+    );
+  }
+  for (const skipped of result.skippedHighs) {
+    args.stdout.write(
+      `  ${skipped.findingId} (severity=${skipped.severity ?? 'unknown'}) — preserved as Status: open\n`,
     );
   }
   if (!args.opts.apply) {

@@ -48,15 +48,19 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    #    Threshold N is operator-tunable via --threshold N. Exit 1 = skip;
    #    exit 0 = fire.
    if ! dw-lifecycle check-barrage-dampener --feature <slug>; then
-     # Dampener engaged — auto-slush any remaining open MED/LOW findings
-     # (the operator's "address all findings, bin the smaller items into
-     # the slush pile" directive baked into /dwi). slush-remaining
-     # refuses unless the dampener says we're engaged (already true
-     # by definition here); flips each open finding's audit-log status
-     # to `acknowledged-slush-pile-<YYYY-MM-DD>` AND ticks all the
-     # `- [ ]` checkboxes in the matching workplan fix-task blocks.
-     # The audit-log entries stay as historical record per the
-     # preservation rule. After slushing, skip the hook.
+     # Dampener engaged — auto-slush remaining open MED/LOW findings
+     # in the MOST RECENT barrage's scope (per Issue #380). The
+     # operator's "address all findings, bin the smaller items into
+     # the slush pile" directive: slush only the items in scope of
+     # THIS barrage, not every prior barrage's findings. slush-remaining
+     # refuses unless the dampener says we're engaged (already true by
+     # definition here); flips each open MED/LOW/INFO finding's audit-
+     # log status to `acknowledged-slush-pile-<YYYY-MM-DD>` AND ticks
+     # all the `- [ ]` checkboxes in the matching workplan fix-task
+     # blocks. HIGHs are NEVER slushed — they survive the severity
+     # filter as defense-in-depth. The audit-log entries stay as
+     # historical record per the preservation rule. After slushing,
+     # skip the hook.
      dw-lifecycle slush-remaining --feature <slug> --apply
    else
      # 1. Render the prompt from the project's audit-barrage template (or override).
@@ -101,7 +105,7 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    fi
    ```
 
-   **Slush pile mechanic (operator directive, baked into /dwi):** *"We should address all of the auditors' findings, but when we've gone two consecutive audits with 0 high issues, we can bin the smaller items into the slush pile."* The Step 0 dampener gate above runs `slush-remaining --apply` automatically when the dampener engages. That flips every remaining `Status: open` finding (in audit-barrage lift sections) to `acknowledged-slush-pile-<YYYY-MM-DD>` AND ticks the matching workplan fix-task blocks' checkboxes — so the workplan-aware gate (Step 2) sees zero open findings and the implement-skill doesn't try to pick up the orphan fix-tasks. The audit-log entries stay as historical record per the preservation rule. **HIGHs are NEVER slushed**: any future barrage that surfaces a HIGH+ finding resets the dampener counter, and the next hook fire surfaces it as new next-work.
+   **Slush pile mechanic (operator directive, baked into /dwi):** *"We should address all of the auditors' findings, but when we've gone two consecutive audits with 0 high issues, we can bin the smaller items into the slush pile."* The Step 0 dampener gate above runs `slush-remaining --apply` automatically when the dampener engages. Per Issue #380, the slush is scoped to **the most recent barrage section only** — operator's intent is *"slush items in scope of THIS barrage so we can move on to the next tranche of work,"* NOT wiping every prior barrage's findings. That flips MED/LOW/INFO `Status: open` findings in the most-recent barrage section to `acknowledged-slush-pile-<YYYY-MM-DD>` AND ticks the matching workplan fix-task blocks' checkboxes — so the workplan-aware gate (Step 2) sees zero open findings and the implement-skill doesn't try to pick up the orphan fix-tasks. The audit-log entries stay as historical record per the preservation rule. **HIGHs are NEVER slushed**: the severity filter is defense-in-depth (the dampener's invariant already prevents HIGHs from being in the most-recent section when engaged, but the filter ensures `--scope all` and any future legacy paths still preserve them). Any future barrage that surfaces a HIGH+ finding resets the dampener counter, and the next hook fire surfaces it as new next-work.
 
    **Failure-path policy (fail loud; do not pause the loop on findings):**
 
