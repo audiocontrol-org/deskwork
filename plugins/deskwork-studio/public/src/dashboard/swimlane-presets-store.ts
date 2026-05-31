@@ -251,6 +251,39 @@ function collectAllLaneIds(): string[] {
   return out;
 }
 
+/**
+ * Filter a stored lane-id list against the live lane set, preserving
+ * the stored order. Mirrors the read-time-filter discipline of
+ * `reconcileOrder` in `swimlane-reorder.ts`: dead ids are dropped
+ * silently, no exception, no write-back to the source preset. The
+ * caller writes the filtered list to the live storage key while the
+ * saved preset on disk remains untouched.
+ *
+ * Per AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3):
+ * without this filter, `applyPreset` and `snapshotCurrentState`
+ * persisted lane ids for renamed / archived / purged lanes verbatim,
+ * accumulating dead references indefinitely. The drag-order
+ * controller's `reconcileOrder` already defends against the same
+ * failure mode; this helper closes the asymmetry in the preset path.
+ *
+ * Read-time-filter vs self-heal-write choice: this helper follows
+ * `reconcileOrder` exactly — no rewrite of the stored preset. A
+ * self-heal write-back would (a) double the failure surface (every
+ * apply could fail a localStorage quota check), (b) silently mutate
+ * presets across browsers when the same id minted independently
+ * (cross-machine deep-link presets exist but resolve to nothing per
+ * AUDIT-20260530-47), and (c) make the apply boundary non-idempotent.
+ * Leaving the saved preset untouched lets the operator inspect or
+ * re-save the preset under a new name if they want a "clean" copy.
+ */
+function reconcileLaneIds(
+  stored: readonly string[],
+  live: readonly string[],
+): string[] {
+  const liveSet = new Set(live);
+  return stored.filter((id) => liveSet.has(id));
+}
+
 function readJsonArrayOfStrings(key: string): string[] {
   const out: string[] = [];
   const raw = window.localStorage.getItem(key);
@@ -329,12 +362,24 @@ export function snapshotCurrentState(projectKey: string): {
 } {
   // visible-lanes is `all lanes − hidden set`. Reading allLanes from
   // the rail rows is the most-faithful source — the rail is the
-  // operator-perceivable inventory.
+  // operator-perceivable inventory. The filter `allLanes.filter(...)`
+  // already constrains the result to live ids, so no further
+  // reconciliation is needed for the visibility axis at snapshot time.
   const allLanes = collectAllLaneIds();
   const hidden = new Set(readJsonArrayOfStrings(visibilityKey(projectKey)));
   const visibleLanes = allLanes.filter((id) => !hidden.has(id));
 
-  const focusedLanes = readJsonArrayOfStrings(focusKey(projectKey));
+  // Per AUDIT-20260530-45 — reconcile :focus storage against the
+  // live lane set before capturing. Without this filter, a corrupted
+  // or stale :focus key (lane renamed/archived/purged after the focus
+  // chip was last clicked) would propagate dead ids into the
+  // newly-minted preset, where they would be unfixable except by
+  // operator inspection. Mirrors `reconcileOrder`'s read-time-filter
+  // discipline.
+  const focusedLanes = reconcileLaneIds(
+    readJsonArrayOfStrings(focusKey(projectKey)),
+    allLanes,
+  );
 
   // view-mode: read EFFECTIVE per-lane mode from the live DOM, not
   // from storage. See `readEffectiveViewModeFromDom` for the why.
@@ -392,11 +437,27 @@ function writeJsonOrIgnore(key: string, value: unknown): void {
  * writes would race the controllers against a partial state.
  */
 export function applyPreset(projectKey: string, preset: FocusPreset): void {
+  // Per AUDIT-20260530-45 — reconcile every lane-id-bearing axis
+  // against the live lane set BEFORE the storage writes. A preset
+  // captured when N lanes existed can be applied later when one or
+  // more of those lanes has been renamed/archived/purged. Mirrors
+  // `reconcileOrder`'s read-time-filter discipline (the saved preset
+  // on disk is left untouched; only the live storage writes reflect
+  // the intersection).
+  const allLanes = collectAllLaneIds();
+  const reconciledVisible = reconcileLaneIds(preset.visibleLanes, allLanes);
+  const reconciledFocused = reconcileLaneIds(preset.focusedLanes, allLanes);
+
   // 1. Visibility — visible-lanes is the inverse of the on-disk
   //    `hidden` set. Rebuild as "every lane known to the page that's
-  //    NOT in the preset's visibleLanes set."
-  const allLanes = collectAllLaneIds();
-  const visibleSet = new Set(preset.visibleLanes);
+  //    NOT in the reconciled visibleLanes set." Using the reconciled
+  //    set (rather than the verbatim preset set) keeps the hidden
+  //    write symmetric with the visible write — if the preset
+  //    contained a dead id, that id is dropped from both sides
+  //    rather than being silently dropped on the hidden side only
+  //    (the pre-fix `allLanes.filter` already filtered the hidden
+  //    side; this aligns the visible side).
+  const visibleSet = new Set(reconciledVisible);
   const hidden = allLanes.filter((id) => !visibleSet.has(id));
   writeJsonOrIgnore(visibilityKey(projectKey), hidden);
 
@@ -421,8 +482,10 @@ export function applyPreset(projectKey: string, preset: FocusPreset): void {
   }
   writeJsonOrIgnore(stageCollapseKey(projectKey), stageOut);
 
-  // 4. Focus — focused-lanes array.
-  writeJsonOrIgnore(focusKey(projectKey), preset.focusedLanes);
+  // 4. Focus — focused-lanes array. Per AUDIT-20260530-45 the write
+  //    uses the reconciled list (dead ids dropped) so the post-apply
+  //    :focus key never references a lane the live page doesn't have.
+  writeJsonOrIgnore(focusKey(projectKey), reconciledFocused);
 
   // Re-apply each constituent controller from storage. Order in the
   // visual / DOM apply matters less than the storage-write order
