@@ -25,10 +25,22 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initLanesPage } from '../../../../plugins/deskwork-studio/public/src/lanes/lanes-page';
 
+/**
+ * Build a synthetic lanes container that mirrors what the server
+ * renders. Per AUDIT-20260530-68 (fixed in Task 0.43): the server
+ * emits `data-project-key="<sha1-12 of projectRoot>"` on the lanes
+ * container so the client's `resolveProjectKey` returns a stable
+ * per-project namespace for localStorage. The fixture builder MUST
+ * include the attribute by default — earlier versions of these tests
+ * set `container.dataset.projectKey` by hand inside individual
+ * archived-section cases, which masked the missing-from-server bug
+ * the audit finding flagged (the TDD-blind-spot pattern).
+ */
 function buildContainer(): HTMLElement {
   document.body.innerHTML = '';
   const container = document.createElement('main');
   container.dataset.lanesContainer = '';
+  container.dataset.projectKey = 'test-proj';
   document.body.appendChild(container);
   return container;
 }
@@ -427,8 +439,10 @@ describe('lanes-page client controller', () => {
   });
 
   it('archived section: toggle event persists open state to localStorage (project-scoped)', () => {
+    // `buildContainer` already mirrors the server-emitted
+    // `data-project-key="test-proj"`. Per AUDIT-20260530-68 fix, the
+    // fixture matches the production markup — no per-test injection.
     const container = buildContainer();
-    container.dataset.projectKey = 'test-proj';
 
     // Build a <details> archived section
     const section = document.createElement('section');
@@ -455,8 +469,8 @@ describe('lanes-page client controller', () => {
   });
 
   it('archived section: stored open=true is restored on init', () => {
+    // Same: `buildContainer` carries the server-mirrored attribute.
     const container = buildContainer();
-    container.dataset.projectKey = 'test-proj';
 
     const section = document.createElement('section');
     const details = document.createElement('details');

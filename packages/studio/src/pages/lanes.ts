@@ -44,9 +44,21 @@ import { renderLaneTable } from './lanes/table.ts';
 import { renderNewLaneForm } from './lanes/new-form.ts';
 import { renderArchivedSection } from './lanes/archived-section.ts';
 import { renderLaneErrorBanner } from './lanes/error-banner.ts';
+import { projectKeyHash } from './dashboard/project-key.ts';
 
 export async function renderLanesPage(ctx: StudioContext): Promise<string> {
   const data = await loadLanesPageData(ctx.projectRoot);
+  // Per AUDIT-20260530-68 (cross-model: AUDIT-BARRAGE-claude-P6-2):
+  // the client controller's `initArchivedSection` reads
+  // `container.dataset.projectKey` via `resolveProjectKey` to
+  // namespace the archived-section open-state localStorage key.
+  // Without this attribute, `resolveProjectKey` silently falls back
+  // to `window.location.pathname` and every project on the machine
+  // shares one `archived-open` key. The dashboard's bay-shell emits
+  // the same `data-project-key` via the same hash helper — re-using
+  // the helper keeps the per-project localStorage namespace
+  // consistent across surfaces.
+  const projectKey = projectKeyHash(ctx.projectRoot);
 
   const masthead = renderMasthead({
     kicker: "The compositor's desk",
@@ -85,7 +97,7 @@ export async function renderLanesPage(ctx: StudioContext): Promise<string> {
     ${masthead}
     ${renderMastheadMenu()}
     ${renderEditorialFolio('dashboard', "the compositor's desk")}
-    <main class="er-container lanes-container" data-lanes-container>
+    <main class="er-container lanes-container" data-lanes-container data-project-key="${projectKey}">
       ${header}
       ${errorBanner}
       ${newForm}
