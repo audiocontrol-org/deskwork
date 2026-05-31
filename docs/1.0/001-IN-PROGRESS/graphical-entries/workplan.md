@@ -353,17 +353,17 @@ Closes AUDIT-20260530-36 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `pac
 
 Closes AUDIT-20260530-37 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `packages/studio/src/pages/dashboard/affordances.ts:99-107` (throw), `packages/studio/src/pages/dashboard/swimlane-card.ts:186-193` (`renderStageCol` body map).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-37 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-37 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-classify-throw-fallback.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 

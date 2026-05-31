@@ -3584,7 +3584,7 @@ Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). 
 ### AUDIT-20260530-37 — [P5-2 claude] `classifyStage` throw converts a single out-of-template entry into a whole-dashboard 500
 
 Finding-ID: AUDIT-20260530-37 (cross-model: AUDIT-BARRAGE-claude-P5-2)
-Status:     open
+Status:     fixed-07a3ccd
 Severity:   medium
 Surface:    `packages/studio/src/pages/dashboard/affordances.ts:99-107` (throw), `packages/studio/src/pages/dashboard/swimlane-card.ts:186-193` (`renderStageCol` body map)
 
