@@ -9,7 +9,13 @@
  * and the journal-event append.
  */
 
-export { listPipelines, type ListedPipeline, type PipelineSource } from './list.ts';
+export {
+  listPipelines,
+  type ListedPipeline,
+  type ListPipelinesResult,
+  type MalformedPipeline,
+  type PipelineSource,
+} from './list.ts';
 export { showPipeline, type ShowPipelineResult } from './show.ts';
 export {
   createPipeline,

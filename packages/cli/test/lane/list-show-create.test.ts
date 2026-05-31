@@ -8,6 +8,8 @@
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   assertDeskworkBinPresent,
   destroyProject,
@@ -98,6 +100,37 @@ describe('deskwork lane list', () => {
     };
     expect(parsed.lanes.map((l) => l.id)).toEqual(['default', 'stale']);
     expect(parsed.lanes[1].archived).toBe(true);
+  });
+
+  it('surfaces healthy lanes plus a malformed section when one config is corrupt (AUDIT-20260530-57)', () => {
+    writeLaneJson(project, 'default', {
+      id: 'default',
+      name: 'Default',
+      pipelineTemplate: 'editorial',
+      contentDir: 'docs',
+    });
+    writeLaneJson(project, 'mockups', {
+      id: 'mockups',
+      name: 'Mockups',
+      pipelineTemplate: 'editorial',
+      contentDir: 'src/mockups',
+    });
+    // Write a malformed lane JSON directly (bypassing writeLaneJson's
+    // JSON.stringify), so the enumeration includes it but loadLaneConfig
+    // would throw.
+    const lanesDir = join(project, '.deskwork', 'lanes');
+    mkdirSync(lanesDir, { recursive: true });
+    writeFileSync(join(lanesDir, 'broken.json'), '{ not json', 'utf-8');
+
+    const res = lane(project, 'list');
+    expect(res.code).toBe(0);
+    const parsed = JSON.parse(res.stdout) as {
+      lanes: Array<{ id: string }>;
+      malformed: Array<{ id: string; error: string }>;
+    };
+    expect(parsed.lanes.map((l) => l.id).sort()).toEqual(['default', 'mockups']);
+    expect(parsed.malformed).toHaveLength(1);
+    expect(parsed.malformed[0].id).toBe('broken');
   });
 });
 

@@ -133,13 +133,26 @@ export async function run(argv: string[]): Promise<void> {
 
 async function handleList(projectRoot: string, full: boolean): Promise<void> {
   try {
-    const pipelines = listPipelines(projectRoot);
+    // AUDIT-20260530-57 (Task 0.33): consume the operation's two-channel
+    // result (healthy `pipelines` + `malformed` entries) so a single
+    // corrupt project-override JSON cannot abort the whole enumeration.
+    // The CLI surfaces the malformed channel alongside the healthy list
+    // so the operator's picker still shows every built-in preset even
+    // when one of their overrides fails to parse.
+    const result = listPipelines(projectRoot);
+    const malformed = result.malformed.map((m) => ({
+      id: m.id,
+      error: m.error,
+    }));
     if (!full) {
-      emit({ pipelines: pipelines.map((p) => ({ id: p.id })) });
+      emit({
+        pipelines: result.pipelines.map((p) => ({ id: p.id })),
+        malformed,
+      });
       return;
     }
     emit({
-      pipelines: pipelines.map((p) => ({
+      pipelines: result.pipelines.map((p) => ({
         id: p.id,
         name: p.template.name,
         source: p.source,
@@ -147,6 +160,7 @@ async function handleList(projectRoot: string, full: boolean): Promise<void> {
         lockedStageCount: p.lockedStageCount,
         offPipelineStageCount: p.offPipelineStageCount,
       })),
+      malformed,
     });
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));

@@ -7,6 +7,8 @@
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   assertDeskworkBinPresent,
   destroyProject,
@@ -70,6 +72,28 @@ describe('deskwork pipeline list', () => {
     const editorial = parsed.pipelines.find((p) => p.id === 'editorial');
     expect(editorial?.source).toBe('project-override');
     expect(editorial?.linearStageCount).toBe(3);
+  });
+
+  it('surfaces healthy templates plus a malformed section when one override is corrupt (AUDIT-20260530-57)', () => {
+    // Write a malformed override JSON directly, bypassing
+    // writePipelineOverride's JSON.stringify, so enumeration includes
+    // the id but loadPipelineTemplate would throw.
+    const dir = join(project, '.deskwork', 'pipelines');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'broken-override.json'), '{ not json', 'utf-8');
+
+    const res = pipeline(project, 'list');
+    expect(res.code).toBe(0);
+    const parsed = JSON.parse(res.stdout) as {
+      pipelines: Array<{ id: string }>;
+      malformed: Array<{ id: string; error: string }>;
+    };
+    // Healthy built-in presets still emit.
+    const ids = parsed.pipelines.map((p) => p.id);
+    expect(ids).toContain('editorial');
+    expect(ids).toContain('blog-post');
+    // The corrupt override surfaces under malformed.
+    expect(parsed.malformed.map((m) => m.id)).toEqual(['broken-override']);
   });
 });
 

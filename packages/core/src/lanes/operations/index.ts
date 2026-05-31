@@ -18,7 +18,12 @@ export { purgeLane } from './purge.ts';
 export { moveEntryToLane } from './move.ts';
 
 export type { CreateLaneOptions, CreateLaneResult } from './create.ts';
-export type { ListLanesOptions, ListedLane } from './list.ts';
+export type {
+  ListLanesOptions,
+  ListLanesResult,
+  ListedLane,
+  MalformedLane,
+} from './list.ts';
 export type { UpdateLaneOptions, UpdateLaneResult } from './update.ts';
 export type { ArchiveLaneResult } from './archive.ts';
 export type { PurgeLaneResult } from './purge.ts';

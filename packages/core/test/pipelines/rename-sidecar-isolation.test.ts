@@ -123,14 +123,14 @@ describe('rename-migration sidecar isolation (AUDIT-20260530-54)', () => {
     expect(() => listPipelines(projectRoot)).not.toThrow();
 
     const listed = listPipelines(projectRoot);
-    const ids = listed.map((p) => p.id);
+    const ids = listed.pipelines.map((p) => p.id);
     expect(ids).toContain('my-blog');
     expect(ids.some((id) => id.includes('renames'))).toBe(false);
 
     // The rename actually landed: the override template now reports the
     // post-rename stage names. Confirms the rename succeeded AND the
     // list surface stayed healthy on the same disk state.
-    const myBlog = listed.find((p) => p.id === 'my-blog');
+    const myBlog = listed.pipelines.find((p) => p.id === 'my-blog');
     expect(myBlog).toBeDefined();
     expect(myBlog?.template.linearStages).toEqual(
       ['Idea', 'Writing', 'Review', 'Live'],
@@ -156,7 +156,7 @@ describe('rename-migration sidecar isolation (AUDIT-20260530-54)', () => {
     expect(readdirSync(migrationsRoot)).toEqual(['my-blog.json']);
 
     expect(() => listPipelines(projectRoot)).not.toThrow();
-    const ids = listPipelines(projectRoot).map((p) => p.id);
+    const ids = listPipelines(projectRoot).pipelines.map((p) => p.id);
     expect(ids).toContain('my-blog');
     expect(ids.some((id) => id.includes('renames'))).toBe(false);
   });

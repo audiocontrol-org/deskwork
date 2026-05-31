@@ -129,9 +129,15 @@ async function handleList(
   includeArchived: boolean,
 ): Promise<void> {
   try {
-    const lanes = listLanes(projectRoot, { includeArchived });
+    // AUDIT-20260530-57 (Task 0.33): consume the operation's two-channel
+    // result (healthy `lanes` + `malformed` entries) so a single corrupt
+    // lane JSON cannot abort the whole enumeration. The CLI surfaces the
+    // malformed channel alongside the healthy list so the operator can
+    // see both at once instead of losing the entire list to the first
+    // parse error.
+    const result = listLanes(projectRoot, { includeArchived });
     emit({
-      lanes: lanes.map((entry) => ({
+      lanes: result.lanes.map((entry) => ({
         id: entry.id,
         name: entry.config.name,
         pipelineTemplate: entry.config.pipelineTemplate,
@@ -140,6 +146,10 @@ async function handleList(
         ...(entry.config.archivedAt !== undefined && {
           archivedAt: entry.config.archivedAt,
         }),
+      })),
+      malformed: result.malformed.map((entry) => ({
+        id: entry.id,
+        error: entry.error,
       })),
     });
   } catch (err) {

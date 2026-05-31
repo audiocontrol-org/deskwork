@@ -1,4 +1,4 @@
-generated_at: 2026-05-31T11:08:08.885Z
+generated_at: 2026-05-31T11:20:06.703Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -113,18 +113,11 @@ clones:
       - packages/cli/src/commands/shortform-start.ts:81:97
     disposition: pending
     reason: null
-  - id: 3fd0df7350a4
-    lines: 12
-    members:
-      - packages/cli/src/commands/group.ts:151:162
-      - packages/cli/src/commands/lane.ts:141:150
-    disposition: keep-with-reason
-    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 043c7ab6b5e8
     lines: 14
     members:
       - packages/cli/src/commands/group.ts:221:234
-      - packages/cli/src/commands/lane.ts:215:228
+      - packages/cli/src/commands/lane.ts:225:238
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 303a01d3ddec
@@ -148,25 +141,25 @@ clones:
       - packages/cli/src/commands/publish.ts:53:65
     disposition: pending
     reason: null
-  - id: 1d7745b2f157
-    lines: 13
+  - id: 835569e8b606
+    lines: 12
     members:
-      - packages/cli/src/commands/lane.ts:142:154
-      - packages/cli/src/commands/pipeline.ts:148:160
+      - packages/cli/src/commands/lane.ts:153:164
+      - packages/cli/src/commands/pipeline.ts:163:174
     disposition: keep-with-reason
-    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
+    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline list handlers each emit a malformed channel with the same { id, error } projection shape — the projection is the verb-family contract, not a refactorable helper. Extracting would couple two unrelated CLI surfaces and obscure the AUDIT-20260530-57 fix. Mirrors prior dispositions on the lane/pipeline KNOWN_FLAGS/VERB_USAGE/genericUsage clones."
   - id: 35dd3acfbdb6
     lines: 11
     members:
-      - packages/cli/src/commands/lane.ts:185:195
-      - packages/cli/src/commands/pipeline.ts:186:196
+      - packages/cli/src/commands/lane.ts:195:205
+      - packages/cli/src/commands/pipeline.ts:200:210
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
   - id: 51bf553937e3
     lines: 11
     members:
-      - packages/cli/src/commands/lane.ts:220:230
-      - packages/cli/src/commands/pipeline.ts:296:305
+      - packages/cli/src/commands/lane.ts:230:240
+      - packages/cli/src/commands/pipeline.ts:310:319
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
   - id: 99d2afe73b96
@@ -179,8 +172,8 @@ clones:
   - id: f8fd4881f0dc
     lines: 12
     members:
-      - packages/cli/src/commands/pipeline.ts:213:228
-      - packages/cli/src/commands/pipeline.ts:312:323
+      - packages/cli/src/commands/pipeline.ts:227:242
+      - packages/cli/src/commands/pipeline.ts:326:337
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: in-file similarity between handleCreate (parse --shape, emit created result) and handleDelete (parse --reassign-lanes-to, emit deleted result). Both follow the verb-handler shape (parse → invoke core → emit) but operate on different argument structures and different result envelopes; collapsing into a generic verb handler would obscure per-verb argument validation."
   - id: e5936d3c2a28
