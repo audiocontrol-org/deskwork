@@ -555,17 +555,19 @@ Closes AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plu
 
 Closes AUDIT-20260530-48 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `packages/studio/src/pages/dashboard/swimlane-rail.ts:renderPresetSurface` docstring ("re-rendered identically by the client … no flash-of-empty-content") vs `plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:renderPresetList`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-48 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+Disposition: docstring-only fix. Rewrote the no-flash claim at `swimlane-rail.ts:131-132` to scope the guarantee to the empty case + explain the saved-presets flash as the cost of THESIS Consequence 2 (per-operator state stays per-operator; SSR has no per-browser localStorage access). No code/behaviour change.
+
+- [x] Step 1: docstring-only; no failing test required (no behaviour to assert)
+- [x] Step 2: N/A (docstring fix)
+- [x] Step 3: implemented in `4ca60b6`
+- [x] Step 4: full studio suite (1000 passed) confirms no regression from the docstring edit
+- [x] Step 5: closed via Task 0.24 docstring commit `4ca60b6`
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `(N/A — docstring fix, no behaviour test possible)`
+- [x] `npx vitest run` exits 0 — full suite 1000 passed
+- [x] Audit-log Status flipped to `fixed-4ca60b6`
 
 
 

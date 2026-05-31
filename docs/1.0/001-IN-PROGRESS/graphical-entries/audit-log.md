@@ -3727,7 +3727,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). 
 ### AUDIT-20260530-48 — [P5-3 claude] SSR "no flash-of-empty-content" claim is false for operators who have saved presets
 
 Finding-ID: AUDIT-20260530-48 (cross-model: AUDIT-BARRAGE-claude-P5-3)
-Status:     open
+Status:     fixed-4ca60b6
 Severity:   low
 Surface:    `packages/studio/src/pages/dashboard/swimlane-rail.ts:renderPresetSurface` docstring ("re-rendered identically by the client … no flash-of-empty-content") vs `plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:renderPresetList`
 
