@@ -134,7 +134,8 @@ export function renderUnbucketedCompactCell(
 
   return unsafe(html`
     <div class="sc-stage is-unbucketed" data-sc-stage="unbucketed">
-      <span class="sc-name">${UNBUCKETED_GLYPH} ${UNBUCKETED_STAGE_LABEL}</span>
+      <span class="sc-glyph" aria-hidden="true">${UNBUCKETED_GLYPH}</span>
+      <span class="sc-name">${UNBUCKETED_STAGE_LABEL}</span>
       <span class="sc-count">${unbucketed.length}</span>
     </div>`);
 }

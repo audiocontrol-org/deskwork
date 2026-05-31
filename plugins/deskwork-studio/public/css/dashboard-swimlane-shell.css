@@ -245,6 +245,24 @@
   color: var(--er-proof-blue);
 }
 
+/* AUDIT-20260531-06 — unbucketed (routing-drift) cell scoped styling.
+ * Mirrors the kanban (`.stage-col.is-unbucketed`) and list
+ * (`.lb-group.is-unbucketed`) precedents the renderer docstring claims
+ * to mirror. The `.sc-glyph` span carries the `⊘` mark with
+ * `aria-hidden="true"` so a screen reader voices only the label;
+ * the subtle muted-paper tint distinguishes the cell from the
+ * template-bucketed cells without introducing new tokens. */
+.swim-compact .sc-stage.is-unbucketed {
+  background: var(--er-paper-2);
+}
+
+.swim-compact .sc-stage.is-unbucketed .sc-glyph {
+  font-family: var(--er-font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  color: var(--er-faded);
+}
+
 /* ============================================================
  *  Stage grid — flex container so collapsed columns
  *  redistribute remaining space via `flex: 0 0 42px`.
