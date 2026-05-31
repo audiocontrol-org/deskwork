@@ -4197,7 +4197,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). 
 ### AUDIT-20260530-82 — [P6-3 claude] Integration test silently depends on a prebuilt `node_modules/.bin/deskwork` with no build step
 
 Finding-ID: AUDIT-20260530-82 (cross-model: AUDIT-BARRAGE-claude-P6-3)
-Status:     open
+Status:     fixed-8d51f00
 Severity:   low
 Surface:    `packages/cli/test/custom-pipeline-lane-integration.test.ts:46-47, 60-69`
 

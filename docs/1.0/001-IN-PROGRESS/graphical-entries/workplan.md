@@ -1177,17 +1177,27 @@ Closes AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `pac
 
 Closes AUDIT-20260530-82 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/cli/test/custom-pipeline-lane-integration.test.ts:46-47, 60-69`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-82 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-82 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject (8d51f00)
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing tests exist at `packages/cli/test/util/assert-deskwork-bin.test.ts:90-127` (missing-bin error message) and `:129-159` (stale-target error message); both assert the new error message contract that includes `npm --workspace @deskwork/cli run build`
+- [x] `npm --workspace @deskwork/cli test -- test/util/assert-deskwork-bin.test.ts` exits 0 (4/4 pass against the fix); full CLI suite remains green (414/414, 29 skipped)
+- [x] Audit-log Status flipped to `fixed-8d51f00`
+
+**Fix shape applied (per audit dispatch's option (1) + (2); option (3) intentionally skipped):**
+
+- New shared helper at `packages/cli/test/util/assert-deskwork-bin.ts` exporting `assertDeskworkBinPresent()` + `deskworkBin` constant.
+- The helper verifies (a) the bin file exists AND (b) its `realpath` resolves under the workspace's `packages/cli/dist/` directory (the workspace-symlinked freshly-built CLI, not a standalone npm-installed copy).
+- On any failure, the error message names BOTH `npm install` AND `npm --workspace @deskwork/cli run build`.
+- All three `helpers.ts` files (`test/lane/`, `test/pipeline/`, `test/group/`) and both inlined integration tests (`custom-pipeline-lane-integration.test.ts`, `add-lane-stage-integration.test.ts`) re-export from the new shared module — 5 near-identical copies collapsed to 1 implementation.
+- New unit-test file at `packages/cli/test/util/assert-deskwork-bin.test.ts` (4 tests: happy path, missing-bin error message, stale-target error message, dangling-symlink error message); all 4 pass.
+- mtime-based source-vs-dist comparison (option 3 from the audit dispatch) intentionally skipped — too noisy in practice (race-prone on parallel builds, as the audit dispatch itself flagged).
+- Clone-detector flagged the two helpers.ts files' top-of-file import boilerplate as new clone groups (8bd4f043d261 + 00a1ad8a5366); dispositioned as `ignore-with-justification` ("Standard TypeScript top-of-file import ceremony for test helper modules; not duplicated logic — extracting these import lines would obscure rather than clarify").
 
 
 
