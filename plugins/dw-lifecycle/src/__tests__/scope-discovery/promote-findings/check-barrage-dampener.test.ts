@@ -83,15 +83,17 @@ describe('checkBarrageDampener — Phase 15 Task 7', () => {
     expect(result.dampened).toBe(false);
   });
 
-  it('reports NOT dampened when an older run within the threshold window has HIGH findings', () => {
+  it('reports NOT dampened when an older run within the threshold window has HIGH findings (N-quiet rule isolated)', () => {
     const log = [
       '# Audit Log',
       '',
       barrageSection('2026-06-01', 'run-a', ['high', 'low']),
       '',
-      barrageSection('2026-06-02', 'run-b', ['low']),
+      barrageSection('2026-06-02', 'run-b', ['medium', 'low']),
     ].join('\n');
-    // Threshold=2: last 2 runs are run-a + run-b. run-a has HIGH.
+    // Threshold=2: last 2 runs are run-a + run-b. run-a has HIGH so
+    // N-quiet rule doesn't engage. run-b has MEDIUM so single-run
+    // rule doesn't engage either. Net: not dampened.
     const result = checkBarrageDampener({ auditLogText: log });
     expect(result.dampened).toBe(false);
   });
@@ -126,7 +128,7 @@ describe('checkBarrageDampener — Phase 15 Task 7', () => {
     expect(result.recentRunCounts).toHaveLength(2);
   });
 
-  it('threshold override (threshold=3 requires 3 consecutive quiet runs)', () => {
+  it('threshold override (threshold=3 requires 3 consecutive quiet runs) — N-quiet rule isolated', () => {
     const log = [
       '# Audit Log',
       '',
@@ -134,10 +136,12 @@ describe('checkBarrageDampener — Phase 15 Task 7', () => {
       '',
       barrageSection('2026-06-02', 'run-b', ['low']),
       '',
-      barrageSection('2026-06-03', 'run-c', ['low']),
+      barrageSection('2026-06-03', 'run-c', ['medium', 'low']),
     ].join('\n');
+    // Last 3 = run-a + run-b + run-c. run-a has HIGH → N-quiet
+    // (3 needed) doesn't engage. run-c has MEDIUM → single-run rule
+    // doesn't engage either. Net: not dampened.
     const result = checkBarrageDampener({ auditLogText: log, threshold: 3 });
-    // Last 3 = run-a + run-b + run-c. run-a has HIGH → not dampened.
     expect(result.dampened).toBe(false);
   });
 
@@ -212,8 +216,11 @@ describe('checkBarrageDampener — Phase 15 Task 7', () => {
       'Body.',
       '',
     ].join('\n');
-    const cleanBarrage = barrageSection('2026-06-02', 'clean-run', ['low']);
-    const log = ['# Audit Log', '', openHighBarrage, '', cleanBarrage].join('\n');
+    // Use a MEDIUM in the most-recent run so the single-run rule
+    // doesn't engage and we can isolate the N-quiet rule's
+    // open-HIGH-counts behavior.
+    const cleanWithMediumBarrage = barrageSection('2026-06-02', 'clean-run', ['medium']);
+    const log = ['# Audit Log', '', openHighBarrage, '', cleanWithMediumBarrage].join('\n');
     const result = checkBarrageDampener({ auditLogText: log });
     expect(result.dampened).toBe(false);
     expect(result.recentRunCounts.find((r) => r.runDirBasename === 'open-high-run')?.highPlusCount).toBe(1);
@@ -251,5 +258,89 @@ describe('checkBarrageDampener — Phase 15 Task 7', () => {
     expect(result.dampened).toBe(true);
     expect(result.reason).toMatch(/2/);
     expect(result.reason.toLowerCase()).toMatch(/quiet|consecutive|0 high/);
+  });
+
+  /**
+   * Operator directive 2026-05-31 (post v0.29.1):
+   *   "I'd like to try a policy where, if there are 0 HIGH and 0
+   *    MEDIUM issues on any audit barrage, we engage the dampener.
+   *    This is in addition to the two consecutive 0 HIGH barrage
+   *    runs."
+   *
+   * Second engagement rule: any single most-recent run with 0 HIGH+
+   * AND 0 MEDIUM open findings dampens. Stiffer than the N-quiet
+   * rule (catches "this run is essentially clean" rather than "the
+   * last N runs were quiet on HIGH+").
+   */
+  describe('single-run-no-medium-or-high rule (operator directive 2026-05-31)', () => {
+    it('engages on a single run with 0 HIGH+ AND 0 MEDIUM (LOW + informational only)', () => {
+      const log = ['# Audit Log', '', barrageSection('2026-06-01', 'run-a', ['low', 'informational'])].join('\n');
+      const result = checkBarrageDampener({ auditLogText: log });
+      expect(result.dampened).toBe(true);
+    });
+
+    it('does NOT engage on a single run with 0 HIGH+ but ≥1 MEDIUM', () => {
+      const log = ['# Audit Log', '', barrageSection('2026-06-01', 'run-a', ['medium', 'low'])].join('\n');
+      const result = checkBarrageDampener({ auditLogText: log });
+      // N-quiet rule: only 1 run, threshold=2 → not enough.
+      // Single-run rule: has a MEDIUM → doesn't qualify.
+      expect(result.dampened).toBe(false);
+    });
+
+    it('does NOT engage on a single run with HIGH+', () => {
+      const log = ['# Audit Log', '', barrageSection('2026-06-01', 'run-a', ['high'])].join('\n');
+      const result = checkBarrageDampener({ auditLogText: log });
+      expect(result.dampened).toBe(false);
+    });
+
+    it('engages on a run with 0 findings at all (vacuously clean)', () => {
+      const log = ['# Audit Log', '', barrageSection('2026-06-01', 'run-a', [])].join('\n');
+      const result = checkBarrageDampener({ auditLogText: log });
+      expect(result.dampened).toBe(true);
+    });
+
+    it('still engages via the N-quiet rule when the most recent run has MEDIUM but the consecutive-quiet streak holds', () => {
+      const log = [
+        '# Audit Log',
+        '',
+        barrageSection('2026-06-01', 'run-a', ['low']),
+        '',
+        barrageSection('2026-06-02', 'run-b', ['medium', 'low']),
+      ].join('\n');
+      // N-quiet rule: last 2 are run-a + run-b. Both have 0 HIGH+.
+      // Engages via N-quiet (the MEDIUM doesn't matter for that rule).
+      const result = checkBarrageDampener({ auditLogText: log });
+      expect(result.dampened).toBe(true);
+    });
+
+    it('MEDIUM findings whose Status is non-open do NOT count toward the single-run rule (slush-pile semantic)', () => {
+      const slushedMediumBarrage = [
+        '## 2026-06-01 — audit-barrage lift (slushed-medium-run)',
+        '',
+        '### AUDIT-20260601-01 — Slushed medium',
+        '',
+        'Finding-ID: AUDIT-20260601-01',
+        'Status:     acknowledged-slush-pile-2026-06-01',
+        'Severity:   medium',
+        '',
+        'Body.',
+        '',
+      ].join('\n');
+      const log = ['# Audit Log', '', slushedMediumBarrage].join('\n');
+      const result = checkBarrageDampener({ auditLogText: log });
+      // The medium is slushed → no open HIGH+ or MEDIUM → single-run
+      // rule engages.
+      expect(result.dampened).toBe(true);
+    });
+
+    it('reason string distinguishes which rule triggered the dampener', () => {
+      const log = ['# Audit Log', '', barrageSection('2026-06-01', 'run-a', ['low'])].join('\n');
+      const result = checkBarrageDampener({ auditLogText: log });
+      expect(result.dampened).toBe(true);
+      // Engaged via single-run rule (only 1 run, but it had 0
+      // HIGH+ AND 0 MEDIUM). Reason should distinguish from the
+      // N-consecutive case.
+      expect(result.reason.toLowerCase()).toMatch(/single|medium|stiffer|no high.+no medium|0 medium/);
+    });
   });
 });

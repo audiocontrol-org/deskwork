@@ -37,13 +37,16 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    - If a step is independent of others, consider `superpowers:dispatching-parallel-agents` to fan out.
    - Every sub-agent dispatched in this loop (implementer, reviewer, code-explorer, code-architect, etc.) MUST be routed through the dispatch wrapper — see "Dispatch-wrapper engagement" below.
    - When the task body is complete, mark its checkboxes and commit.
-6. **End-of-task audit-barrage hook (dampener-gated).** After the task-completion commit lands AND before any between-task work, run an audit-barrage pass against the task's diff, lift the surfaced findings into the audit-log, and auto-scope them at the head of the workplan so the workplan-aware gate (Step 2) sees them as the next work on next pickup. Per the Phase 15 operator directive (*"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do. Audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path"*), the hook is unconditional EXCEPT for the dampener gate — per the Phase 15 closeout decision (2026-05-31, after the 7-round dogfood demonstrated the convergence pattern), the dampener skips the hook when the last 2 consecutive barrages found zero HIGH+ open findings. Auditor agents always find SOMETHING; the dampener lets the loop self-stop on nit-level meta-critiques.
+6. **End-of-task audit-barrage hook (dampener-gated).** After the task-completion commit lands AND before any between-task work, run an audit-barrage pass against the task's diff, lift the surfaced findings into the audit-log, and auto-scope them at the head of the workplan so the workplan-aware gate (Step 2) sees them as the next work on next pickup. Per the Phase 15 operator directive (*"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do. Audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path"*), the hook is unconditional EXCEPT for the dampener gate. The dampener engages via **either** of two rules: **(1)** the last 2 consecutive barrages each surfaced 0 HIGH+ open findings (the N-quiet rule), OR **(2)** the most recent barrage surfaced 0 HIGH+ AND 0 MEDIUM open findings (the single-run rule added 2026-05-31 — when one barrage comes back essentially clean, that's signal enough). Auditor agents always find SOMETHING; the dampener lets the loop self-stop on nit-level meta-critiques.
 
    ```bash
-   # 0. Dampener gate. If the last 2 consecutive audit-barrage runs each
-   #    surfaced 0 HIGH+ findings (where HIGH+ = `high` or `blocking` AND
-   #    Status: open), skip the hook. Threshold is operator-tunable
-   #    via --threshold N (default 2). Exit 1 = skip; exit 0 = fire.
+   # 0. Dampener gate. Engages via EITHER:
+   #      (a) last N=2 consecutive barrages each surfaced 0 HIGH+ open
+   #          findings (HIGH+ = `high` or `blocking`); OR
+   #      (b) the most recent barrage surfaced 0 HIGH+ AND 0 MEDIUM open
+   #          findings (single-run rule, stiffer than (a)).
+   #    Threshold N is operator-tunable via --threshold N. Exit 1 = skip;
+   #    exit 0 = fire.
    if ! dw-lifecycle check-barrage-dampener --feature <slug>; then
      # Dampener engaged — auto-slush any remaining open MED/LOW findings
      # (the operator's "address all findings, bin the smaller items into
