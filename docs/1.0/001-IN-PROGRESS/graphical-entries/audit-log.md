@@ -3438,7 +3438,7 @@ Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (claude). 
 ### AUDIT-20260530-25 — [P5-1 claude] Lane-bucket `unbucketed` entries are silently dropped from the rendered dashboard while inflating every entry count
 
 Finding-ID: AUDIT-20260530-25 (cross-model: AUDIT-BARRAGE-claude-P5-1)
-Status:     open
+Status:     fixed-fc192e9
 Severity:   high
 Surface:    `packages/studio/src/pages/dashboard/swimlane-card.ts` (`renderSwimlane`, the stage-column assembly ~lines after "const stagesRaw"), `packages/studio/src/pages/dashboard/lane-data.ts` (`LaneBucket.unbucketed` + `loadLaneBuckets` entryCount math)
 
