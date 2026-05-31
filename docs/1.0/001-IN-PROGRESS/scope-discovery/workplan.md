@@ -147,7 +147,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 - [x] Marker detection via regex set; configurable per project — built-in defaults: `/refactor/i`, `/extract(?:ion|ing)?/i`, `/clones?\.yaml/i`, `/canonical_side/i`, `/tests_proof/i`; override at `.dw-lifecycle/scope-discovery/refactor-markers.yaml` (replaces built-in list); schema at `plugins/dw-lifecycle/src/scope-discovery/schema/refactor-markers.yaml.schema.json`.
 
 
-### Task 6 (fix-finding-AUDIT-20260530-08): AUDIT-20260530-08 — Lexicographic version-dir sort fixes split-brain but picks t…
+### Task 5.11 (fix-finding-AUDIT-20260530-08): AUDIT-20260530-08 — Lexicographic version-dir sort fixes split-brain but picks t…
 
 Closes AUDIT-20260530-08. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120`, `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180`.
 
@@ -164,7 +164,7 @@ Closes AUDIT-20260530-08. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
-### Task 7 (fix-finding-AUDIT-20260530-09): AUDIT-20260530-09 — `feature-root-determinism.test.ts` "resolve to the SAME vers…
+### Task 5.12 (fix-finding-AUDIT-20260530-09): AUDIT-20260530-09 — `feature-root-determinism.test.ts` "resolve to the SAME vers…
 
 Closes AUDIT-20260530-09. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` (the `'audit-barrage-lift + workplan-aware-gate resolve to the SAME version dir'` case).
 
@@ -181,7 +181,7 @@ Closes AUDIT-20260530-09. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
-### Task 8 (fix-finding-AUDIT-20260530-10): AUDIT-20260530-10 — `atomicWriteFile` wraps `writeFile` in a no-op try/catch and…
+### Task 5.13 (fix-finding-AUDIT-20260530-10): AUDIT-20260530-10 — `atomicWriteFile` wraps `writeFile` in a no-op try/catch and…
 
 Closes AUDIT-20260530-10. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/atomic-write-file.ts:36-41`, `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (the `'cleans up the temp file if the rename itself somehow fails'` case).
 
@@ -198,7 +198,7 @@ Closes AUDIT-20260530-10. Surface: `plugins/dw-lifecycle/src/scope-discovery/uti
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
-### Task 9 (fix-finding-AUDIT-20260530-11): AUDIT-20260530-11 — `normalizeSeverity('')` now maps empty/missing severity to `…
+### Task 5.14 (fix-finding-AUDIT-20260530-11): AUDIT-20260530-11 — `normalizeSeverity('')` now maps empty/missing severity to `…
 
 Closes AUDIT-20260530-11. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:90-101`.
 
@@ -215,7 +215,7 @@ Closes AUDIT-20260530-11. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
-### Task 10 (fix-finding-AUDIT-20260530-12): AUDIT-20260530-12 — Auto-position still cannot see renderer-shaped fix-task head…
+### Task 5.15 (fix-finding-AUDIT-20260530-12): AUDIT-20260530-12 — Auto-position still cannot see renderer-shaped fix-task head…
 
 Closes AUDIT-20260530-12. Surface: plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:44,170-216; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:60-61.
 
@@ -232,7 +232,7 @@ Closes AUDIT-20260530-12. Surface: plugins/dw-lifecycle/src/scope-discovery/prom
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
-### Task 11 (fix-finding-AUDIT-20260530-13): AUDIT-20260530-13 — Cross-model workplan idempotency canonicalizes only the exis…
+### Task 5.16 (fix-finding-AUDIT-20260530-13): AUDIT-20260530-13 — Cross-model workplan idempotency canonicalizes only the exis…
 
 Closes AUDIT-20260530-13. Surface: plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-editor.ts:120-149; plugins/dw-lifecycle/src/scope-discovery/promote-findings/apply.ts:150-155; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:57-63.
 
@@ -249,7 +249,7 @@ Closes AUDIT-20260530-13. Surface: plugins/dw-lifecycle/src/scope-discovery/prom
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
-### Task 12 (fix-finding-AUDIT-20260530-14): AUDIT-20260530-14 — Fixed audit tasks remain unchecked in the workplan
+### Task 5.17 (fix-finding-AUDIT-20260530-14): AUDIT-20260530-14 — Fixed audit tasks remain unchecked in the workplan
 
 Closes AUDIT-20260530-14. Surface: docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:167-271; docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:713-768.
 
@@ -415,17 +415,19 @@ Closes AUDIT-20260530-15 (claude-01 + claude-02 + codex-01 + codex-03; cross-mod
 
 Closes AUDIT-20260530-16. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:151-271`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-16` in subject
+- [x] Step 1: this is a doc-cleanup finding (no code change). No test gates the workplan's task-heading numbering.
+- [x] Step 2: confirmed the workplan had mixed flat (`Task 6..12`) + hierarchical (`Task 5.1..5.7`) fix-task numbering interleaved with pre-existing Phase 5 flat tasks (`Task 1..5`).
+- [x] Step 3: renumbered the round-2 fix-tasks `Task 6..12` → `Task 5.11..5.17`. All fix-task headings now use the hierarchical `5.X` convention monotonically.
+- [x] Step 4: physical reorder NOT done — leaving the insertion-chronological file order as historical dogfood evidence. The convention-mixing harm (operator legibility, broken "next N tasks" framing) is resolved by the renumbering alone; the gate keys on position-order so functional behavior was never affected.
+- [x] Step 5: commit with `Closes AUDIT-20260530-16` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Workplan now uses consistent `5.X` hierarchical numbering for all fix-tasks (no more `Task 6..12` flat shapes).
+- [x] No code-side test gates this; the cure is doc hygiene.
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+**Out of scope (deferred):** physical reordering of the task blocks (currently 5.11-5.17 appear before 5.1-5.7 in the file due to insertion chronology). Numbering is the primary legibility lever AUDIT-16 named; physical reorder is a follow-up if needed.
 
 
 ### Task 5.10 (fix-finding-AUDIT-20260530-17): AUDIT-20260530-17 — Workplan closure ticking is best-effort after the audit-log …
