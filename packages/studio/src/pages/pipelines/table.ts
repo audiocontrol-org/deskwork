@@ -108,9 +108,9 @@ function renderSourceBadge(source: PipelineRow['source']): RawHtml {
 }
 
 function renderDeleteButton(row: PipelineRow): RawHtml {
-  // Two gates surface as visibly-disabled chrome so the operator sees
-  // the obstruction before clicking. The CLI enforces the same gates;
-  // these are the visual mirrors.
+  // Three gates surface as visibly-disabled chrome so the operator
+  // sees the obstruction before clicking. The CLI enforces the same
+  // gates; these are the visual mirrors.
   if (row.source === 'plugin-preset') {
     return unsafe(html`
       <button
@@ -137,6 +137,28 @@ function renderDeleteButton(row: PipelineRow): RawHtml {
         <p class="pipelines-delete-deps" id="pipelines-delete-deps-${row.id}" data-pipelines-delete-deps>
           Used by <code>${list}</code>. Reassign via
           <code>/deskwork:pipeline delete ${row.id} --reassign-lanes-to &lt;other-id&gt;</code>.
+        </p>
+      </div>`);
+  }
+  if (row.unreadableLaneCount > 0) {
+    // Per AUDIT-20260530-67: an unreadable lane MIGHT reference this
+    // template — we cannot prove otherwise without reading its JSON.
+    // The safe posture is to disable Delete so the operator cannot
+    // delete a template whose dependents we cannot enumerate. The
+    // page-level banner names which lane files need fixing.
+    const noun = row.unreadableLaneCount === 1 ? 'lane is' : 'lanes are';
+    return unsafe(html`
+      <div class="pipelines-delete-blocked" data-pipelines-delete-blocked data-pipelines-delete-unreadable>
+        <button
+          class="pipelines-btn pipelines-btn--delete-disabled"
+          type="button"
+          disabled
+          aria-disabled="true"
+          aria-describedby="pipelines-delete-unreadable-${row.id}"
+          title="Cannot delete: ${row.unreadableLaneCount} ${noun} unreadable; cannot confirm whether they reference this pipeline. Fix the unreadable lane JSON first."
+        >${COPY_BTN_DELETE_LABEL} — ${row.unreadableLaneCount} unreadable</button>
+        <p class="pipelines-delete-deps" id="pipelines-delete-unreadable-${row.id}" data-pipelines-delete-unreadable-deps>
+          ${row.unreadableLaneCount} ${noun} unreadable; cannot confirm whether they reference this pipeline. Fix the unreadable lane JSON before deleting.
         </p>
       </div>`);
   }

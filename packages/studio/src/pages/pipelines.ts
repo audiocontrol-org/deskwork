@@ -50,6 +50,7 @@ import {
 import { renderPipelineTable } from './pipelines/table.ts';
 import { renderNewPipelineForm } from './pipelines/new-form.ts';
 import { renderErrorBanner } from './pipelines/error-banner.ts';
+import { renderUnreadableLanesBanner } from './pipelines/unreadable-lanes-banner.ts';
 
 export async function renderPipelinesPage(ctx: StudioContext): Promise<string> {
   const data = await loadPipelinesPageData(ctx.projectRoot);
@@ -64,6 +65,9 @@ export async function renderPipelinesPage(ctx: StudioContext): Promise<string> {
   const header = renderHeader(data);
   const newForm = renderNewPipelineForm();
   const errorBanner = renderErrorBanner(data.errors);
+  const unreadableLanesBanner = renderUnreadableLanesBanner(
+    data.unreadableLaneCount,
+  );
   const table = renderPipelineTable({
     rows: data.rows,
     errors: data.errors,
@@ -76,6 +80,7 @@ export async function renderPipelinesPage(ctx: StudioContext): Promise<string> {
     <main class="er-container pipelines-container" data-pipelines-container>
       ${header}
       ${errorBanner}
+      ${unreadableLanesBanner}
       ${newForm}
       <section class="pipelines-table-section" aria-labelledby="pipelines-table-heading">
         <h2 class="pipelines-section-heading" id="pipelines-table-heading">Templates</h2>
