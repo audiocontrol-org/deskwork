@@ -4385,7 +4385,7 @@ Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (codex). R
 ### AUDIT-20260531-01 — Collapsed compact strip (`renderSwimCompact`) still drops unbucketed entries — the same count-vs-visible defect AUDIT-25 set out to close, on a third surface the fix didn't touch
 
 Finding-ID: AUDIT-20260531-01 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-5cd5294
 Severity:   medium
 Surface:    `packages/studio/src/pages/dashboard/swimlane-card.ts:358-382` (`renderSwimCompact`), called unconditionally at `:476`
 
@@ -4398,7 +4398,7 @@ Consequence: for a lane with unbucketed entries in collapsed view, the swim-head
 ### AUDIT-20260531-02 — Count-consistency test asserts the count *text* and two slugs but never counts the rendered cards — it does not verify the reconciliation it claims
 
 Finding-ID: AUDIT-20260531-02
-Status:     open
+Status:     fixed-f9b5888
 Severity:   medium
 Surface:    `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:90-138` (the `count consistency` test)
 
@@ -4411,7 +4411,7 @@ Fix: assert the rendered card count directly — e.g. `(stageGrid.match(/data-ro
 ### AUDIT-20260531-03 — Checks that came back clean (recorded so the operator can see what was ruled out)
 
 Finding-ID: AUDIT-20260531-03
-Status:     open
+Status:     acknowledged-clean-check
 Severity:   informational
 Surface:    (escaping, grid layout, class reuse, overflow affordance)
 

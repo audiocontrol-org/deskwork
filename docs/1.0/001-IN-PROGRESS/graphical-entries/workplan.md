@@ -42,51 +42,51 @@ Closes AUDIT-20260530-25 (cross-model: AUDIT-BARRAGE-claude-P5-1). Surface: `pac
 
 Closes AUDIT-20260531-01 (claude-01 + claude-03 + codex-01 + codex-02; cross-model). Surface: `packages/studio/src/pages/dashboard/swimlane-card.ts:358-382` (`renderSwimCompact`), called unconditionally at `:476`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260531-01 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260531-01 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` — `renders unbucketed compact cell in swim compact strip when lane is collapsed (AUDIT-20260531-01)` (cited in Step 1)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-5cd5294` via the close-shipped-audit-findings step
 
 
 ### Task 0.72 (fix-finding-AUDIT-20260531-02): AUDIT-20260531-02 — Count-consistency test asserts the count *text* and two slug…
 
 Closes AUDIT-20260531-02. Surface: `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:90-138` (the `count consistency` test).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260531-02` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260531-02` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` — strengthened `count consistency: swim-head ${n} entries matches the visible cards once unbucketed renders` (cited in Step 1). Verified failure-on-regression by temporarily disabling `renderUnbucketedStageCol` (mutation reverted before commit; strengthened cardCount assertion failed with `expected 1 to be 3`).
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-f9b5888` via the close-shipped-audit-findings step
 
 
 ### Task 0.73 (fix-finding-AUDIT-20260531-03): AUDIT-20260531-03 — Checks that came back clean (recorded so the operator can se…
 
 Closes AUDIT-20260531-03. Surface: (escaping, grid layout, class reuse, overflow affordance).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260531-03` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — N/A (informational finding; no code change)
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — N/A (informational finding; no code change)
+- [x] Step 3: implement the fix — N/A (informational finding; no code change)
+- [x] Step 4: confirm test passes — N/A (informational finding; no code change)
+- [x] Step 5: commit with `Closes AUDIT-20260531-03` in subject — closure recorded in the AUDIT-20260531-01..03 docs commit; audit-log Status set to `acknowledged-clean-check` rather than `fixed-<sha>` because the four checks (escaping, grid layout, class reuse, overflow affordance) were confirmed clean by the auditor with no code change required.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `(N/A — informational finding; auditor confirmed escaping, grid layout, class reuse, overflow affordance all clean. No test required.)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix) — N/A (informational finding; no code change, no new test)
+- [x] Audit-log Status flipped to `acknowledged-clean-check` via the close-shipped-audit-findings step (informational findings disposition rather than `fixed-<sha>`)
 
 ### Task 0.2 (fix-finding-AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)): AUDIT-20260530-26 — [P5-1 claude] No clear-on-version-bump for swimlane localSto…
 
