@@ -1,4 +1,4 @@
-generated_at: 2026-05-30T09:37:21.136Z
+generated_at: 2026-05-31T11:08:08.885Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -294,6 +294,13 @@ clones:
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:96:111
     disposition: pending
     reason: null
+  - id: 8fd1c4d33bd7
+    lines: 10
+    members:
+      - packages/core/src/doctor/rules/lane-config-missing-template.ts:122:131
+      - packages/core/src/pipelines/operations/rename-migration.ts:166:175
+    disposition: keep-with-reason
+    reason: tmp+rename inlining is the documented project pattern for callers that do not need commitPipelineTemplate/commitLaneConfig's verb-and-validator wrapper; lane-config-missing-template.ts already inlines for the same reason
   - id: e1b16a900b51
     lines: 18
     members:
@@ -413,6 +420,13 @@ clones:
       - packages/core/src/pipelines/operations/commit.ts:45:59
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
+  - id: 68bfea210780
+    lines: 8
+    members:
+      - packages/core/src/pipelines/operations/rename-migration.ts:127:134
+      - plugins/dw-lifecycle/src/lifecycle-integration/parent-closure/apply.ts:165:172
+    disposition: keep-with-reason
+    reason: JSON-parse + rethrow-with-context is idiomatic try/catch; extracting a cross-package helper for 4-line shape would not reduce complexity; each caller throws a domain-specific error type
   - id: b1fd648407e9
     lines: 10
     members:

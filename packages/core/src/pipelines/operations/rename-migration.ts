@@ -26,14 +26,39 @@
  * without explicit operator approval. (Reviewer finding #5, decline-
  * with-reasoning.)
  *
- * Malformed-file handling (reviewer fix #4): when the existing file
- * fails JSON parse or schema validation, we MOVE it aside to
- * `<id>.malformed-<iso-timestamp>.json` before writing the new
- * payload. The operator can recover the prior audit trail from the
- * moved file; we emit a stderr warning identifying the path. The
- * original Phase 6 Task 6.2 shape silently reset to empty and
- * overwrote — losing the audit trail without any operator-visible
- * signal.
+ * Malformed-file handling (Task 0.32, closes AUDIT-20260530-56): when
+ * the existing file fails JSON parse or schema validation, the
+ * function THROWS — naming the path AND the underlying parse /
+ * validation message. The prior shape (Task 6.2 review fix #4) moved
+ * the file aside to `<id>.malformed-<iso>.json` and reset the audit
+ * trail to empty with only a stderr warning. That was still a silent
+ * fallback by the project's no-fallback rule: an operator who misses
+ * the warning line loses the audit trail the SKILL.md promises is
+ * append-only. Throwing is louder; the operator MUST acknowledge the
+ * corruption before any more renames can land. Recovery: inspect the
+ * file, repair or delete it, then retry the rename.
+ *
+ * Atomic write (Task 0.32, closes AUDIT-20260530-56): the sidecar is
+ * written via the tmp+rename pattern that
+ * `packages/core/src/pipelines/operations/commit.ts` and
+ * `packages/core/src/lanes/operations/commit.ts` already use — a
+ * crash mid-write leaves the prior sidecar intact (and possibly a
+ * `.tmp` file, which the next attempt cleans up on rename failure)
+ * rather than truncating the operator's audit trail.
+ *
+ * Ordering note (Task 0.32, closes AUDIT-20260530-56): the caller
+ * `pipelines/operations/update.ts:updatePipeline` runs
+ * `commitPipelineTemplate` FIRST, then this function. Rationale: an
+ * operator-visible rename on disk paired with a missing audit-trail
+ * entry is recoverable (re-run the rename — the actual stage names
+ * are already what the operator asked for; the second rename throws
+ * "from not found" which is the correct diagnostic, OR run doctor to
+ * regenerate the audit trail from journal events). The reverse order
+ * (migration record first, then commit) would record a rename that
+ * never happened — silent drift between the audit trail and the
+ * actual template state, which is unrecoverable without operator
+ * forensics. The current order is the safer of the two failure
+ * modes.
  */
 
 import {
@@ -41,6 +66,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { z } from 'zod';
@@ -70,6 +96,11 @@ export type RenameMigration = z.infer<typeof RenameMigrationSchema>;
  * Creates the file (and the `migrations/` directory) on the first
  * rename; appends to the existing `renames` array on subsequent
  * renames.
+ *
+ * Throws on JSON parse failure or schema validation failure of the
+ * existing sidecar — the operator must repair the file before more
+ * renames can be recorded. See module docblock for the no-fallback
+ * rationale.
  */
 export function appendRenameMigration(
   projectRoot: string,
@@ -79,46 +110,66 @@ export function appendRenameMigration(
 ): void {
   const path = pipelineMigrationPath(projectRoot, pipelineId);
   mkdirSync(pipelineMigrationsDir(projectRoot), { recursive: true });
-  let payload: RenameMigration;
-  if (existsSync(path)) {
-    const raw = readFileSync(path, 'utf8');
-    let parsed: unknown = null;
-    let parseFailed = false;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      parseFailed = true;
-    }
-    const validated = parseFailed
-      ? null
-      : RenameMigrationSchema.safeParse(parsed);
-    if (validated !== null && validated.success) {
-      payload = validated.data;
-    } else {
-      const movedTo = relocateMalformedMigration(path);
-      process.stderr.write(
-        `warn: rename-migration file at ${path} was malformed; `
-        + `moved aside to ${movedTo} before starting a fresh audit trail.\n`,
-      );
-      payload = { pipelineId, renames: [] };
-    }
-  } else {
-    payload = { pipelineId, renames: [] };
-  }
+  const payload: RenameMigration = existsSync(path)
+    ? readExistingMigration(path)
+    : { pipelineId, renames: [] };
   payload.renames.push({ from, to, at: new Date().toISOString() });
-  writeFileSync(path, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+  atomicWriteMigration(path, payload);
 }
 
 /**
- * Move a malformed rename-migration file out of the way so a fresh
- * audit trail can start without overwriting the operator's prior
- * data. Destination: same directory, name suffixed with
- * `.malformed-<iso-timestamp>.json`. ISO colons replaced with `-` so
- * the path is filesystem-friendly across platforms.
+ * Load an existing migration sidecar and validate it. Throws —
+ * naming the path AND the underlying parse / validation message — on
+ * either JSON parse failure or schema validation failure. The
+ * project's no-fallback rule means the operator sees the corruption
+ * loudly rather than losing the audit trail behind a stderr line.
  */
-function relocateMalformedMigration(originalPath: string): string {
-  const stamp = new Date().toISOString().replace(/[:]/g, '-');
-  const moved = `${originalPath.replace(/\.json$/, '')}.malformed-${stamp}.json`;
-  renameSync(originalPath, moved);
-  return moved;
+function readExistingMigration(path: string): RenameMigration {
+  const raw = readFileSync(path, 'utf8');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Cannot append to rename-migration sidecar at "${path}": JSON `
+      + `parse failed (${message}). The audit trail at this path is `
+      + `corrupt; inspect, repair, or delete the file before retrying `
+      + `the rename. The previous implementation silently moved the `
+      + `file aside and reset the audit trail — that behavior was `
+      + `removed in Task 0.32 (AUDIT-20260530-56).`,
+    );
+  }
+  const validated = RenameMigrationSchema.safeParse(parsed);
+  if (!validated.success) {
+    throw new Error(
+      `Cannot append to rename-migration sidecar at "${path}": schema `
+      + `validation failed:\n${validated.error.message}\nThe audit `
+      + `trail at this path is invalid; inspect, repair, or delete the `
+      + `file before retrying the rename.`,
+    );
+  }
+  return validated.data;
+}
+
+/**
+ * Write the migration payload to disk via tmp+rename, matching the
+ * precedent in `packages/core/src/pipelines/operations/commit.ts` and
+ * `packages/core/src/lanes/operations/commit.ts`. The tmp file is
+ * unlinked on rename failure so a doomed write doesn't leak a `.tmp`
+ * artifact next to the sidecar.
+ */
+function atomicWriteMigration(
+  path: string,
+  payload: RenameMigration,
+): void {
+  const tmpPath = `${path}.${process.pid}.tmp`;
+  const body = JSON.stringify(payload, null, 2) + '\n';
+  try {
+    writeFileSync(tmpPath, body, 'utf8');
+    renameSync(tmpPath, path);
+  } catch (err) {
+    try { unlinkSync(tmpPath); } catch { /* tmp absent — ignore */ }
+    throw err;
+  }
 }
