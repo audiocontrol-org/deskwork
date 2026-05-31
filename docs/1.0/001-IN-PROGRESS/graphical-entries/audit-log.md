@@ -3999,7 +3999,7 @@ Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). 
 ### AUDIT-20260530-68 — [P6-2 claude] Lanes page never emits `data-project-key`, so archived-section persistence is not project-scoped despite the docstring — and the test masks the gap
 
 Finding-ID: AUDIT-20260530-68 (cross-model: AUDIT-BARRAGE-claude-P6-2)
-Status:     open
+Status:     fixed-ba190d6
 Severity:   medium
 Surface:    `packages/studio/src/pages/lanes.ts` (`<main ... data-lanes-container>`); `plugins/deskwork-studio/public/src/lanes/lanes-page.ts` — `archivedOpenKey`/`initArchivedSection` via `resolveProjectKey(container)`; `packages/studio/test/lanes/lanes-page-client.test.ts` (`container.dataset.projectKey = 'test-proj'`)
 
