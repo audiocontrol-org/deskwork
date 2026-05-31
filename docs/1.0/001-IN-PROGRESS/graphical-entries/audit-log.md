@@ -3714,7 +3714,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). 
 ### AUDIT-20260530-47 — [P5-3 claude] Deep-link `?preset=<id>` only resolves in the originating browser — silent no-op everywhere else
 
 Finding-ID: AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3)
-Status:     open
+Status:     fixed-e0ff622
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:savePresetFromCurrent` (id minting: `const id = \`p${now.getTime().toString(36)}\``) + `swimlane-presets.ts:applyDeepLinkPreset`
 

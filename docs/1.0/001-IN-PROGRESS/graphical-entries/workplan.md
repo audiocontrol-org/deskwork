@@ -537,17 +537,17 @@ Closes AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plu
 
 Closes AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:savePresetFromCurrent` (id minting: `const id = \`p${now.getTime().toString(36)}\``) + `swimlane-presets.ts:applyDeepLinkPreset`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/studio/test/dashboard-swimlane-presets-client.test.ts` `it('deep-link with unknown preset id surfaces a visible notice and strips the param (AUDIT-20260530-47)')`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — `[data-preset-deep-link-notice]` query returns `null` before the fix (`expected null not to be null`)
+- [x] Step 3: implement the fix — `swimlane-presets.ts:applyDeepLinkPreset` branches on cache miss to mount a transient inline notice via `showDeepLinkMissNotice` + strip the `?preset=` param; CSS rules in `dashboard-swimlane-presets.css` paint the notice in the press-check palette
+- [x] Step 4: confirm test passes — full `dashboard-swimlane-presets-client.test.ts` 6/6 green; `npm --workspace @deskwork/studio test` 1000 passed (up from 999)
+- [x] Step 5: commit with `Closes AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject — `e0ff622`
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-presets-client.test.ts` (the new `AUDIT-20260530-47` case under `Task 5.5 — saveable focus presets UI affordances`)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-presets-client.test.ts` exits 0 (passes against the fix; full @deskwork/studio suite stays green at 1000 passed)
+- [x] Audit-log Status flipped to `fixed-e0ff622` via the close-shipped-audit-findings step
 
 
 
