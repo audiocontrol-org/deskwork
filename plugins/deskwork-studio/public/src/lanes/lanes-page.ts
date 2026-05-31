@@ -95,6 +95,25 @@ interface EditFormValues {
  */
 let openLaneId: string | null = null;
 
+/**
+ * DOM-attribute wired sentinel — guards `initLanesPage` against
+ * double-binding when invoked twice against the same container. The
+ * sentinel lives on the `[data-lanes-container]` element's dataset
+ * (`data-lanes-wired="true"`); a fresh container rebuilds without
+ * the attribute, so the next init wires normally. This shape
+ * mirrors the swimlane controllers' shell-attribute variant (Task
+ * 0.6, AUDIT-20260530-30) rather than the module-level boolean used
+ * by `initRowMemberTab` (`row-member-tab.ts:87`). The choice matters
+ * for test isolation: ~80 client-test invocations in this suite
+ * rebuild the container between `beforeEach` blocks and expect the
+ * next `initLanesPage()` to bind handlers on the fresh DOM. A
+ * module-level boolean would leave the guard latched-true between
+ * tests; the DOM-attribute sentinel resets naturally because the
+ * container is a new element. Closes AUDIT-20260530-75 (cross-
+ * model: AUDIT-BARRAGE-codex-P6-2).
+ */
+const LANES_WIRED_ATTR = 'lanesWired';
+
 function readFieldValue(form: HTMLElement, name: string): string {
   const el = form.querySelector<HTMLInputElement | HTMLSelectElement>(
     `[data-lanes-field="${name}"]`,
@@ -414,20 +433,32 @@ function initEmptyStateCta(container: HTMLElement): void {
 }
 
 /**
- * Wire every interactive control on the lanes page. Idempotent —
- * a missing `[data-lanes-container]` short-circuits, so importing
- * this from a shared bundle on other surfaces is harmless.
+ * Wire every interactive control on the lanes page. Idempotent — a
+ * second invocation against the same DOM is a no-op, guarded by the
+ * module-level `wiredLanes` sentinel (per AUDIT-20260530-75). A
+ * missing `[data-lanes-container]` short-circuits BEFORE the sentinel
+ * flips, so importing this from a shared bundle on other surfaces is
+ * harmless and a subsequent run on the actual lanes page still wires
+ * correctly.
  */
 export function initLanesPage(): void {
-  // Reset module-level state so repeat init calls (e.g. in tests)
-  // don't carry an open-row tracker across mounts.
+  // Reset module-level state so repeat init calls don't carry an
+  // open-row tracker across mounts.
   openLaneId = null;
   const container = document.querySelector<HTMLElement>('[data-lanes-container]');
   if (!container) return;
+  // Wired-once guard via container dataset. If the page was already
+  // wired (same container element), this is a no-op. A re-render that
+  // replaces the container resets the sentinel naturally.
+  if (container.dataset[LANES_WIRED_ATTR] === 'true') return;
   initNewForm(container);
   initEditForms(container);
   initEditToggles(container);
   initRowCopyButtons(container);
   initArchivedSection(container);
   initEmptyStateCta(container);
+  // Flip the sentinel only AFTER all wiring lands. An exception
+  // during wiring leaves the sentinel absent so the operator can
+  // retry; pre-flipping would strand the page half-wired.
+  container.dataset[LANES_WIRED_ATTR] = 'true';
 }

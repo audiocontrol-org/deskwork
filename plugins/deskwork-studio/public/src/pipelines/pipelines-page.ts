@@ -81,6 +81,19 @@ interface OpenPanelState {
 
 let openPanel: OpenPanelState | null = null;
 
+/**
+ * DOM-attribute wired sentinel — guards `initPipelinesPage` against
+ * double-binding when invoked twice against the same container. Same
+ * shape as `LANES_WIRED_ATTR` in `lanes-page.ts`; mirrors the
+ * swimlane controllers' shell-attribute variant (Task 0.6, AUDIT-
+ * 20260530-30). DOM-attribute over module-level boolean for the same
+ * test-isolation reason: client-test fixtures rebuild the container
+ * between cases, and a fresh container element naturally resets the
+ * sentinel. Closes AUDIT-20260530-75 (cross-model: AUDIT-BARRAGE-
+ * codex-P6-2).
+ */
+const PIPELINES_WIRED_ATTR = 'pipelinesWired';
+
 function rebuildNewPreview(form: HTMLElement): BuildResult {
   const result = buildCreateCommand(form);
   const preview = form.querySelector<HTMLElement>(
@@ -314,19 +327,30 @@ function initRowCopyButtons(container: HTMLElement): void {
 
 /**
  * Wire every interactive control on the pipelines page. Idempotent —
- * absent `[data-pipelines-container]` short-circuits, so importing
- * this from a shared bundle on other surfaces is harmless.
+ * a second invocation against the same DOM is a no-op, guarded by
+ * the module-level `wiredPipelines` sentinel (per AUDIT-20260530-75).
+ * Absent `[data-pipelines-container]` short-circuits BEFORE the
+ * sentinel flips, so importing this from a shared bundle on other
+ * surfaces is harmless and a subsequent run on the actual pipelines
+ * page still wires correctly.
  */
 export function initPipelinesPage(): void {
-  // Reset module-level state so repeat init calls (e.g. across tests)
-  // don't carry a stale open-panel tracker.
+  // Reset module-level state so repeat init calls don't carry a
+  // stale open-panel tracker.
   openPanel = null;
   const container = document.querySelector<HTMLElement>(
     '[data-pipelines-container]',
   );
   if (!container) return;
+  // Wired-once guard via container dataset. If the page was already
+  // wired (same container element), this is a no-op. A re-render that
+  // replaces the container resets the sentinel naturally.
+  if (container.dataset[PIPELINES_WIRED_ATTR] === 'true') return;
   initNewForm(container);
   initEditPanels(container);
   initRowToggles(container);
   initRowCopyButtons(container);
+  // Flip the sentinel only AFTER wiring lands. An exception during
+  // wiring leaves it absent so the operator can retry.
+  container.dataset[PIPELINES_WIRED_ATTR] = 'true';
 }
