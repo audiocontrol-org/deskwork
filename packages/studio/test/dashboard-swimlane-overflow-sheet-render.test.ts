@@ -104,12 +104,15 @@ describe('dashboard swimlane Task 5.3 — overflow + mobile lane-sheet (render +
     expect(css).toMatch(
       /\.lane-sheet-container\s+\.lane-rail\s*\{[\s\S]*?position:\s*fixed[\s\S]*?bottom:\s*0[\s\S]*?transform:\s*translateY\(100%\)/,
     );
-    // Open state translates to 0.
+    // Open state translates to 0. Per AUDIT-20260530-40, this rule
+    // keys off the SAME body attribute the backdrop CSS uses, so the
+    // two surfaces (rail + scrim) animate in lockstep without a
+    // hand-maintained `.is-open` class on the container.
     expect(css).toMatch(
-      /\.lane-sheet-container\.is-open\s+\.lane-rail\s*\{[\s\S]*?transform:\s*translateY\(0\)/,
+      /body\[data-lane-sheet-open\]\s+\.lane-sheet-container\s+\.lane-rail\s*\{[\s\S]*?transform:\s*translateY\(0\)/,
     );
     // Backdrop reveal via body[data-lane-sheet-open] (shared
-    // controller's attribute name).
+    // controller's attribute name) — same single signal as the rail.
     expect(css).toMatch(
       /body\[data-lane-sheet-open\]\s+\.lane-sheet-backdrop\s*\{[\s\S]*?background:\s*rgba\(/,
     );

@@ -224,10 +224,16 @@
     z-index: 1000;
   }
 
-  /* Open-state — slide the panel in. The `.is-open` class is added
-   * to the container by the client controller; the transition
-   * above animates both directions. */
-  .lane-sheet-container.is-open .lane-rail {
+  /* Open-state — slide the panel in. Both the rail's slide-up and
+   * the backdrop's reveal key off the same `body[data-lane-sheet-open]`
+   * attribute (owned by the shared `createSlideUpSheet` controller),
+   * so the two surfaces always animate in lockstep regardless of which
+   * close path fires (trigger toggle, backdrop tap, Escape, rail-row
+   * activation). Pre-AUDIT-20260530-40 this rule keyed off a separate
+   * `.lane-sheet-container.is-open` class maintained by the local
+   * controller; collapsing onto the body attribute eliminates the
+   * hand-sync requirement between the two flags. */
+  body[data-lane-sheet-open] .lane-sheet-container .lane-rail {
     transform: translateY(0);
   }
 }

@@ -31,6 +31,18 @@
  * lane sheet is a modal-shaped surface, so Tab/Shift+Tab must contain
  * focus within the sheet (WCAG 2.4.3 Focus Order). Audit-coverage:
  * AUDIT-20260530-38 / AUDIT-20260530-41.
+ *
+ * Presentation-state contract (AUDIT-20260530-40): the sheet's visual
+ * open/closed state is driven by a SINGLE signal —
+ * `body[data-lane-sheet-open]`, owned by the shared
+ * `createSlideUpSheet` controller. Both the rail's slide-up and the
+ * backdrop's scrim-reveal CSS key off that one attribute, so any close
+ * path (trigger toggle, backdrop tap, Escape, rail-row activation, or
+ * a future controller-internal auto-dismiss) closes the two surfaces
+ * in lockstep with no hand-sync code. The local controller deliberately
+ * does NOT maintain a parallel `.is-open` class on the container —
+ * a second flag would re-introduce the divergence seam the audit
+ * called out.
  */
 
 import { createSlideUpSheet } from '../mobile-shell/sheet-controller.ts';
@@ -53,8 +65,17 @@ export function initSwimlaneMobileSheet(): void {
 
   // The shared controller flips `data-lane-sheet-open` on document.
   // body; the CSS rules in dashboard-swimlane-mobile.css translate
-  // that into a slide-up reveal on the `[data-lane-sheet]` container.
-  // Local state mirrors `aria-expanded` on the trigger.
+  // that into a slide-up reveal on the `[data-lane-sheet]` container
+  // AND the backdrop's scrim. Both surfaces key off the same body
+  // attribute so they animate in lockstep regardless of which close
+  // path fires — there is no parallel `.is-open` class to keep in
+  // sync (AUDIT-20260530-40: a single source of truth eliminates the
+  // hand-sync seam that the pre-fix split between body attribute +
+  // local class introduced).
+  //
+  // The local `onClose` is responsible only for trigger-side state
+  // (aria-expanded mirror + focus return); the presentation state is
+  // wholly owned by the body attribute.
   const sheetController = createSlideUpSheet({
     sheetEl: sheet,
     bodyOpenAttr: 'data-lane-sheet-open',
@@ -66,7 +87,6 @@ export function initSwimlaneMobileSheet(): void {
     // packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts.
     trapFocus: true,
     onClose: () => {
-      sheet.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');
       // Return focus to the trigger so a sighted operator's pointer
       // and an AT user's reading focus both land on the affordance
@@ -77,7 +97,6 @@ export function initSwimlaneMobileSheet(): void {
   });
 
   function openSheet(): void {
-    sheet!.classList.add('is-open');
     trigger!.setAttribute('aria-expanded', 'true');
     sheetController.open();
     focusFirstSheetTarget();

@@ -198,8 +198,9 @@ export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
   // widths. The container also houses a backdrop sibling the client
   // controller binds for tap-to-dismiss. Desktop CSS leaves the rail
   // in its original left-column position; mobile CSS hides the rail
-  // until the `.lane-sheet-trigger` toggles `.is-open` on the
-  // container.
+  // until the `.lane-sheet-trigger` flips `body[data-lane-sheet-open]`
+  // (the single source of truth that drives both the rail's slide-up
+  // and the backdrop's reveal — AUDIT-20260530-40).
   const sheetContainerOpen
     = '<div class="lane-sheet-container" id="lane-sheet" data-lane-sheet>';
   const sheetBackdrop

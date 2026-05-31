@@ -10,8 +10,8 @@
  * `[data-lane-sheet-backdrop]` sibling).
  *
  * Coverage:
- *   - Click on `[data-lane-sheet-trigger]` toggles `.is-open` on the
- *     container and flips the trigger's aria-expanded.
+ *   - Click on `[data-lane-sheet-trigger]` flips
+ *     `body[data-lane-sheet-open]` and the trigger's aria-expanded.
  *   - Escape key closes the sheet.
  *   - Backdrop click closes the sheet.
  *   - Clicking a `[data-rail-lane]` row inside the sheet closes the
@@ -24,6 +24,11 @@
  *     last focusable wraps to the first; Shift+Tab from the first
  *     wraps to the last; Tab mid-list does not escape to document.body
  *     or to the trigger behind the scrim.
+ *   - Unified-state contract (AUDIT-20260530-40): the sheet's visual
+ *     state is driven by a SINGLE signal —
+ *     `body[data-lane-sheet-open]`. The local controller does not
+ *     maintain a parallel `.is-open` class on the container; both the
+ *     rail slide-up and the backdrop CSS key off the body attribute.
  *
  * The shared `createSlideUpSheet` controller writes its own
  * `data-lane-sheet-open` attribute on `document.body`; assertions
@@ -117,7 +122,7 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
     document.body.removeAttribute('data-lane-sheet-open');
   });
 
-  it('clicking the trigger opens the sheet (.is-open class + body attribute + aria-expanded mirrors)', () => {
+  it('clicking the trigger opens the sheet (body attribute + aria-expanded mirrors)', () => {
     buildShellWithSheet(['default', 'mockups', 'qa']);
     initSwimlaneMobileSheet();
     const trigger = document.querySelector<HTMLButtonElement>(
@@ -126,15 +131,16 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
     const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
     expect(trigger).not.toBeNull();
     expect(container).not.toBeNull();
-    expect(container?.classList.contains('is-open')).toBe(false);
     expect(trigger?.getAttribute('aria-expanded')).toBe('false');
     expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
 
     trigger?.click();
 
-    expect(container?.classList.contains('is-open')).toBe(true);
-    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    // The body attribute is the single source of truth for the sheet's
+    // visual state (AUDIT-20260530-40); the local controller does not
+    // maintain a parallel `.is-open` class on the container.
     expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('clicking the trigger again closes the sheet', () => {
@@ -143,13 +149,11 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
     const trigger = document.querySelector<HTMLButtonElement>(
       '[data-lane-sheet-trigger]',
     );
-    const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
     trigger?.click();
-    expect(container?.classList.contains('is-open')).toBe(true);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
     trigger?.click();
-    expect(container?.classList.contains('is-open')).toBe(false);
-    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
     expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('Escape key closes an open sheet', () => {
@@ -158,13 +162,12 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
     const trigger = document.querySelector<HTMLButtonElement>(
       '[data-lane-sheet-trigger]',
     );
-    const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
     trigger?.click();
-    expect(container?.classList.contains('is-open')).toBe(true);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
     document.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
     );
-    expect(container?.classList.contains('is-open')).toBe(false);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
     expect(trigger?.getAttribute('aria-expanded')).toBe('false');
   });
 
@@ -174,14 +177,13 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
     const trigger = document.querySelector<HTMLButtonElement>(
       '[data-lane-sheet-trigger]',
     );
-    const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
     const backdrop = document.querySelector<HTMLElement>(
       '[data-lane-sheet-backdrop]',
     );
     trigger?.click();
-    expect(container?.classList.contains('is-open')).toBe(true);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
     backdrop?.click();
-    expect(container?.classList.contains('is-open')).toBe(false);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
   });
 
   it('clicking a rail-lane row inside the open sheet closes the sheet', () => {
@@ -190,14 +192,13 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
     const trigger = document.querySelector<HTMLButtonElement>(
       '[data-lane-sheet-trigger]',
     );
-    const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
     const qaRow = document.querySelector<HTMLElement>(
       '[data-rail-lane="qa"]',
     );
     trigger?.click();
-    expect(container?.classList.contains('is-open')).toBe(true);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
     qaRow?.click();
-    expect(container?.classList.contains('is-open')).toBe(false);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
   });
 
   it('clicking the .r-eye-btn inside the open sheet does NOT close (operator is curating visibility)', () => {
@@ -206,16 +207,15 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
     const trigger = document.querySelector<HTMLButtonElement>(
       '[data-lane-sheet-trigger]',
     );
-    const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
     const eye = document.querySelector<HTMLElement>(
       '[data-rail-lane="qa"] .r-eye-btn',
     );
     trigger?.click();
-    expect(container?.classList.contains('is-open')).toBe(true);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
     eye?.click();
     // Sheet remains open — the eye-button is a hide/show gesture the
     // operator may want to repeat without dismissing.
-    expect(container?.classList.contains('is-open')).toBe(true);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
   });
 
   it('pressing Enter on a rail-lane row inside the sheet closes the sheet (mirrors click)', () => {
@@ -224,16 +224,15 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
     const trigger = document.querySelector<HTMLButtonElement>(
       '[data-lane-sheet-trigger]',
     );
-    const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
     const mockupsRow = document.querySelector<HTMLElement>(
       '[data-rail-lane="mockups"]',
     );
     trigger?.click();
-    expect(container?.classList.contains('is-open')).toBe(true);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
     mockupsRow?.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
     );
-    expect(container?.classList.contains('is-open')).toBe(false);
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
   });
 
   it('on close, focus returns to the trigger', () => {
@@ -365,5 +364,95 @@ describe('swimlane mobile sheet controller — Task 5.3.3', () => {
     // No throw, no body-attribute side-effect.
     expect(() => initSwimlaneMobileSheet()).not.toThrow();
     expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Unified state-source — AUDIT-20260530-40 regression coverage.
+  //
+  // Pre-fix, the sheet's visual state was split across two flags: the backdrop
+  // CSS keyed off `body[data-lane-sheet-open]` (set by the shared controller),
+  // while the rail's slide-up CSS keyed off `.lane-sheet-container.is-open`
+  // (set by the local controller's `openSheet`/`onClose`). The finding called
+  // out the fragility: if the shared controller ever closed via a path that
+  // didn't invoke the local `onClose` (auto-dismiss, resize handler, second
+  // close() early-return), the body attribute and the container class would
+  // diverge — backdrop fading while the panel stays slid-up, or vice-versa.
+  //
+  // The fix unifies on `body[data-lane-sheet-open]` as the single source of
+  // truth (CSS rewritten to key the rail slide-up off the body attribute; the
+  // `.is-open` class manipulation removed from `swimlane-mobile-sheet.ts`).
+  // These tests pin the unified-state contract: both the rail and backdrop's
+  // visible state derive from the same body attribute, and the local code no
+  // longer maintains a parallel class.
+  // ---------------------------------------------------------------------------
+
+  it('open and close paths drive a single body attribute — no parallel container class added', () => {
+    buildShellWithSheet(['default', 'mockups', 'qa']);
+    initSwimlaneMobileSheet();
+    const trigger = document.querySelector<HTMLButtonElement>(
+      '[data-lane-sheet-trigger]',
+    );
+    const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
+    expect(container?.classList.contains('is-open')).toBe(false);
+
+    trigger?.click();
+    // Open: body attribute flips, container does NOT acquire `.is-open`
+    // (the local code no longer maintains this redundant flag).
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
+    expect(container?.classList.contains('is-open')).toBe(false);
+
+    trigger?.click();
+    // Close: body attribute clears, container still does not carry `.is-open`.
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
+    expect(container?.classList.contains('is-open')).toBe(false);
+  });
+
+  it('Escape close clears the body attribute and aria-expanded together (no class divergence)', () => {
+    buildShellWithSheet(['default', 'mockups', 'qa']);
+    initSwimlaneMobileSheet();
+    const trigger = document.querySelector<HTMLButtonElement>(
+      '[data-lane-sheet-trigger]',
+    );
+    const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
+    trigger?.click();
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
+    // Pre-fix this asserted `.is-open` true after open; post-fix the class is
+    // never set. The body attribute is the sole presentation signal.
+    expect(container?.classList.contains('is-open')).toBe(false);
+
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+
+    // Escape closes via the shared controller's keydown handler (NOT via the
+    // trigger click path). The body attribute clears, aria-expanded mirrors,
+    // and no container class is left dangling.
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+    expect(container?.classList.contains('is-open')).toBe(false);
+  });
+
+  it('backdrop close drives the same single signal (body attribute) — no divergence', () => {
+    buildShellWithSheet(['default', 'mockups', 'qa']);
+    initSwimlaneMobileSheet();
+    const trigger = document.querySelector<HTMLButtonElement>(
+      '[data-lane-sheet-trigger]',
+    );
+    const container = document.querySelector<HTMLElement>('[data-lane-sheet]');
+    const backdrop = document.querySelector<HTMLElement>(
+      '[data-lane-sheet-backdrop]',
+    );
+    trigger?.click();
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(true);
+
+    backdrop?.click();
+
+    // The shared controller's scrim-click path closes the sheet by clearing
+    // the body attribute and firing onClose. Because the rail and backdrop
+    // CSS both key off `body[data-lane-sheet-open]`, both surfaces close in
+    // lockstep — there is no second flag to keep in sync.
+    expect(document.body.hasAttribute('data-lane-sheet-open')).toBe(false);
+    expect(container?.classList.contains('is-open')).toBe(false);
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
   });
 });
