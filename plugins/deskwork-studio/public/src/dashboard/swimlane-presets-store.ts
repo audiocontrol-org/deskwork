@@ -206,18 +206,39 @@ export function readPresets(projectKey: string): Map<string, FocusPreset> {
   }
 }
 
+/**
+ * Persist the presets store to localStorage. Returns true when the
+ * write landed; returns false when `localStorage.setItem` threw
+ * (QuotaExceededError, Safari private-mode SecurityError, the
+ * browser disabling persistent storage). Per AUDIT-20260530-44 the
+ * earlier signature swallowed the error and returned `void`, which
+ * let the caller paint a green success flash on a write that never
+ * landed. The boolean lets the caller branch on persistence
+ * truthfully.
+ *
+ * The thrown Error is surfaced via `console.warn` with the storage
+ * key so an operator opening devtools after a failed save sees which
+ * key failed and what the underlying browser error was — the silent
+ * swallow blocked that diagnostic path.
+ */
 function writePresets(
   projectKey: string,
   presets: ReadonlyMap<string, FocusPreset>,
-): void {
+): boolean {
   try {
     const obj: Record<string, FocusPreset> = {};
     for (const [id, preset] of presets) {
       obj[id] = preset;
     }
     window.localStorage.setItem(presetsKey(projectKey), JSON.stringify(obj));
-  } catch {
-    // localStorage unavailable — in-page state still works.
+    return true;
+  } catch (err) {
+    const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[deskwork] writePresets failed for key ${presetsKey(projectKey)}: ${reason}`,
+    );
+    return false;
   }
 }
 
@@ -414,15 +435,35 @@ export function applyPreset(projectKey: string, preset: FocusPreset): void {
 }
 
 /**
- * Save a snapshot of the current state under a new id + name.
- * Returns the saved preset. The id is a timestamp-derived token —
- * collision-resistant for human use without dragging in a UUID
- * library. The createdAt timestamp is the same instant, ISO-8601.
+ * Result of a `savePresetFromCurrent` call. The discriminated union
+ * forces the caller to branch on persistence success rather than
+ * trusting that the in-memory `FocusPreset` reached disk. Per
+ * AUDIT-20260530-44 the previous unconditional-`FocusPreset` return
+ * let the controller paint a green success flash on writes that
+ * silently failed (quota exceeded, Safari private mode); the
+ * controller now gates its success affordance on `ok === true`.
+ */
+export type SavePresetResult =
+  | { readonly ok: true; readonly preset: FocusPreset }
+  | { readonly ok: false };
+
+/**
+ * Save a snapshot of the current state under a new id + name. The
+ * id is a timestamp-derived token — collision-resistant for human
+ * use without dragging in a UUID library. The createdAt timestamp
+ * is the same instant, ISO-8601.
+ *
+ * Returns `{ ok: true, preset }` when the preset was minted AND the
+ * underlying `writePresets` call landed in localStorage. Returns
+ * `{ ok: false }` when `writePresets` returned false (quota
+ * exceeded, Safari private mode, persistent storage disabled). The
+ * caller MUST branch on `result.ok` before surfacing success
+ * affordances — see `handleSaveClick` in `swimlane-presets.ts`.
  */
 export function savePresetFromCurrent(
   projectKey: string,
   name: string,
-): FocusPreset {
+): SavePresetResult {
   const now = new Date();
   const presets = readPresets(projectKey);
   // Per AUDIT-20260528-34 — `p${Date.now().toString(36)}` is
@@ -454,8 +495,9 @@ export function savePresetFromCurrent(
     stageCollapseState: snapshot.stageCollapseState,
   };
   presets.set(id, preset);
-  writePresets(projectKey, presets);
-  return preset;
+  const persisted = writePresets(projectKey, presets);
+  if (!persisted) return { ok: false };
+  return { ok: true, preset };
 }
 
 /**

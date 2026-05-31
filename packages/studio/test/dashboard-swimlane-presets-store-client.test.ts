@@ -125,7 +125,13 @@ describe('Task 5.5 — saveable focus presets store + apply path', () => {
     // Save a preset. localStorage's `view-mode` key is empty (no
     // operator clicks); only the DOM carries the resolved mode.
     expect(window.localStorage.getItem(`${PREFIX}:view-mode`)).toBeNull();
-    const saved = savePresetFromCurrent(PROJECT_KEY, 'Mobile list view');
+    // Per AUDIT-20260530-44 — savePresetFromCurrent returns a
+    // discriminated union; the round-trip path asserts `ok` then
+    // reaches through `preset`.
+    const savedResult = savePresetFromCurrent(PROJECT_KEY, 'Mobile list view');
+    expect(savedResult.ok).toBe(true);
+    if (!savedResult.ok) return;
+    const saved = savedResult.preset;
     // The snapshot captured the DOM state, so all three lanes are
     // `list`. Without the AUDIT-38 fix this would be `{}` because
     // storage is empty.
@@ -171,7 +177,12 @@ describe('Task 5.5 — saveable focus presets store + apply path', () => {
       JSON.stringify(['default']),
     );
 
-    const saved = savePresetFromCurrent(PROJECT_KEY, 'Press Bay only');
+    // Per AUDIT-20260530-44 — discriminated union; assert ok then
+    // reach through preset.
+    const savedResult = savePresetFromCurrent(PROJECT_KEY, 'Press Bay only');
+    expect(savedResult.ok).toBe(true);
+    if (!savedResult.ok) return;
+    const saved = savedResult.preset;
     expect(saved.name).toBe('Press Bay only');
     expect(saved.focusedLanes).toEqual(['default']);
 

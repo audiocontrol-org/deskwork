@@ -160,6 +160,23 @@ function flashSaveConfirm(button: HTMLElement): void {
   }, 1400);
 }
 
+/**
+ * Flash the Save button in the failure-error state when persistence
+ * failed (quota exceeded, Safari private-mode, persistent storage
+ * disabled). Mirrors `flashSaveConfirm`'s structure — same revert
+ * timer, same affordance-feedback contract — but applies the
+ * `is-error` class so the styling layer can paint a distinct red
+ * background instead of the green-blue success swatch. Per
+ * AUDIT-20260530-44 this is the operator-visible signal the silent
+ * `catch` previously suppressed.
+ */
+function flashSaveError(button: HTMLElement): void {
+  button.classList.add('is-error');
+  window.setTimeout(() => {
+    button.classList.remove('is-error');
+  }, 1400);
+}
+
 export interface PresetControllerHooks {
   readonly promptForName: (defaultName: string, anchor: HTMLElement) => Promise<string | null>;
   readonly confirmDelete: (presetName: string, anchor: HTMLElement) => Promise<boolean>;
@@ -200,7 +217,19 @@ async function handleSaveClick(
   // contract.
   const trimmed = name.trim();
   if (trimmed.length === 0) return;
-  savePresetFromCurrent(projectKey, trimmed);
+  // Per AUDIT-20260530-44: branch on persistence success. The earlier
+  // unconditional flow painted the green success flash + re-rendered
+  // the list whether or not the write landed; under
+  // QuotaExceededError or Safari private-mode the operator saw a
+  // success signal AND an unchanged list. The discriminated result
+  // forces a true / false branch — success path renders + flashes
+  // green; failure path skips the render (storage holds the prior
+  // state) and flashes the error class instead.
+  const result = savePresetFromCurrent(projectKey, trimmed);
+  if (!result.ok) {
+    flashSaveError(saveBtn);
+    return;
+  }
   renderPresetList(listContainer, projectKey);
   flashSaveConfirm(saveBtn);
 }

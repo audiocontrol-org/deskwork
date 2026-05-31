@@ -408,7 +408,12 @@ describe('AUDIT-20260528-37 — preset polish followups', () => {
       // Now save + restore through the full preset path and verify
       // the DOM ends up in the same shape: Drafting collapsed,
       // Final not collapsed.
-      const saved = savePresetFromCurrent(PROJECT_KEY, 'F6 round-trip');
+      // Per AUDIT-20260530-44 — discriminated union; assert ok then
+      // reach through preset.
+      const savedResult = savePresetFromCurrent(PROJECT_KEY, 'F6 round-trip');
+      expect(savedResult.ok).toBe(true);
+      if (!savedResult.ok) return;
+      const saved = savedResult.preset;
       expect(saved.stageCollapseState).toEqual({ default: ['Drafting'] });
 
       // Wipe storage + DOM, rebuild, then apply.

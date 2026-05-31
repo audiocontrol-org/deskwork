@@ -48,6 +48,19 @@
   border-color: var(--er-proof-blue, #2563eb);
 }
 
+/*
+ * Failure-flash. Per AUDIT-20260530-44 — when `writePresets` returns
+ * false (quota exceeded, Safari private-mode SecurityError, persistent
+ * storage disabled) the Save button paints this state instead of the
+ * green-blue `.is-flashing` success swatch. The operator-visible red
+ * is the signal the silent swallow previously suppressed.
+ */
+.lane-rail .preset-save.is-error {
+  background: var(--er-correction-red, #b91c1c);
+  color: #fff;
+  border-color: var(--er-correction-red, #b91c1c);
+}
+
 .lane-rail .preset-list {
   display: flex;
   flex-direction: column;
