@@ -442,16 +442,16 @@ Closes AUDIT-20260530-17. Surface: plugins/dw-lifecycle/src/subcommands/apply-au
 
 Closes AUDIT-20260531-01. Surface: `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:454-471`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260531-01` in subject
+- [x] Step 1: NEW recovery-path test in `apply-audit-flips-cli.test.ts` exercises the operator's manual-recovery procedure end-to-end: failing-writer run → exit 1 → manual checkbox flip → working-writer re-run → exit 0 → workplan content unchanged + audit-log already-dispositioned.
+- [x] Step 2: confirmed the recovery path was untested pre-fix.
+- [x] Step 3: test passes against the existing code (idempotent catchup already works correctly); the missing coverage was the test itself.
+- [x] Step 4: tests pass; plugin suite green.
+- [x] Step 5: closed by `64d278a` (commit included both AUDIT-01 + AUDIT-02 test additions).
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -459,16 +459,16 @@ Closes AUDIT-20260531-01. Surface: `plugins/dw-lifecycle/src/subcommands/apply-a
 
 Closes AUDIT-20260531-02. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:331-388`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260531-02` in subject
+- [x] Step 1: extended the AUDIT-17 test with split-state assertions — verify audit-log shows `Status: fixed-closesha` AND workplan still has `- [ ] Audit-log Status flipped to` post-failure.
+- [x] Step 2: confirmed pre-fix the test asserted only exit code + stderr.
+- [x] Step 3: appended four lines of assertions verifying the split-state contract.
+- [x] Step 4: tests pass; plugin suite green.
+- [x] Step 5: closed by `64d278a` (same commit as AUDIT-01).
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -493,16 +493,16 @@ Closes AUDIT-20260531-03 (claude-03 + codex-01 + codex-02; cross-model). Surface
 
 Closes AUDIT-20260531-04. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:18-22` (docblock) and `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `'multi-version'` and `'determinism'` cases).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260531-04` in subject
+- [x] Step 1: new regression test pinning the lex-vs-semver divergence (`['0.9.0', '0.10.0']` → lex-greatest `0.9.0`, NOT semver-greatest `0.10.0`).
+- [x] Step 2: confirmed the deferral comment + missing test pre-fix.
+- [x] Step 3: replaced the "until semver-sort lands" deferral with a docblock that documents the lex-vs-semver behavior as intentional and cites the regression test that pins it.
+- [x] Step 4: tests pass; plugin suite 2435/2435.
+- [x] Step 5: commit with `Closes AUDIT-20260531-04` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -510,16 +510,16 @@ Closes AUDIT-20260531-04. Surface: `plugins/dw-lifecycle/src/scope-discovery/uti
 
 Closes AUDIT-20260531-05. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:53-55` (helper takes `docsRoot`), `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` (`const docsRoot = join(args.repoRoot, 'docs')`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:181-183` (`const docsRoot = join(rootDir, 'docs')`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260531-05` in subject
+- [x] Step 1: two new tests — `repoRoot` shape (helper joins `docs/` internally) + error when neither arg supplied.
+- [x] Step 2: confirmed pre-fix both callers constructed `join(repoRoot, 'docs')` independently.
+- [x] Step 3: `ResolveFeatureRootArgs` accepts `repoRoot` as an alternative to `docsRoot`; the helper joins `'docs'` internally. Both callers refactored to pass `repoRoot` directly.
+- [x] Step 4: tests pass; plugin suite 2435/2435.
+- [x] Step 5: commit with `Closes AUDIT-20260531-05` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 4: Skill-prose convention template

@@ -112,9 +112,8 @@ export class FeatureRootNotFoundError extends Error {
 export async function checkWorkplanAwareGate(
   args: CheckWorkplanAwareGateArgs,
 ): Promise<WorkplanAwareGateResult> {
-  const docsRoot = join(args.repoRoot, 'docs');
   const { root: featureRoot, versionsChecked } = await resolveFeatureRoot({
-    docsRoot,
+    repoRoot: args.repoRoot,
     slug: args.featureSlug,
   });
   if (featureRoot === undefined) {

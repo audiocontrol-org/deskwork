@@ -176,8 +176,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
 // workplan-aware-gate.ts now call the same function, so any future
 // change to the resolution logic lives in one place.
 async function resolveFeatureRoot(rootDir: string, slug: string): Promise<string | null> {
-  const docsRoot = join(rootDir, 'docs');
-  const { root } = await resolveFeatureRootShared({ docsRoot, slug });
+  const { root } = await resolveFeatureRootShared({ repoRoot: rootDir, slug });
   return root ?? null;
 }
 

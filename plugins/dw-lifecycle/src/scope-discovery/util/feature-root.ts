@@ -20,8 +20,14 @@
  * Lex-greatest sort (descending) is the AUDIT-06+AUDIT-08 contract:
  * with `docs/1.0/`, `docs/0.19.0/`, `docs/0.x/`, the walker picks
  * `1.0` — the active version, biasing AWAY from archived
- * directories. Not semver-correct (`0.10.0` < `0.9.0` in lex order),
- * but a workable default until semver-aware sort lands.
+ * directories. NOT semver-correct: `0.10.0` < `0.9.0` in lex order
+ * (lex compares strings character-by-character, `'1' < '9'`), so a
+ * project that ever ships a `0.10.0` alongside a `0.9.0` would
+ * resolve to `0.9.0`. This is documented intentional behavior until
+ * a semver-aware sort lands; the regression test
+ * `feature-root.test.ts > 'lex-vs-semver divergence is intentional'`
+ * pins the current contract so a future semver-aware change must
+ * update the test in lockstep.
  */
 
 import { existsSync } from 'node:fs';
@@ -29,8 +35,16 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export interface ResolveFeatureRootArgs {
-  /** The absolute path of the project's `docs/` directory. */
-  readonly docsRoot: string;
+  /**
+   * Either the absolute path of the project's `docs/` directory
+   * (`docsRoot`), OR the project's repo root (the helper joins
+   * `docs/` for you when `repoRoot` is supplied). Pass exactly one.
+   * Per AUDIT-20260531-05: pre-fix both callers independently
+   * constructed `join(repoRoot, 'docs')` — same DRY-extraction
+   * pattern AUDIT-20260530-15 closed for the walker logic itself.
+   */
+  readonly docsRoot?: string;
+  readonly repoRoot?: string;
   /** The feature slug (the leaf dir name under `001-IN-PROGRESS`). */
   readonly slug: string;
 }
@@ -54,18 +68,31 @@ export interface ResolveFeatureRootResult {
 export async function resolveFeatureRoot(
   args: ResolveFeatureRootArgs,
 ): Promise<ResolveFeatureRootResult> {
-  if (!existsSync(args.docsRoot)) {
+  // Per AUDIT-20260531-05: accept either `docsRoot` (the legacy
+  // shape, kept for the workplan-aware-gate's pre-extracted path)
+  // OR `repoRoot` (the helper does the `join(repoRoot, 'docs')`
+  // itself). Both call sites previously constructed the docs path
+  // independently — moving that one line into the helper means the
+  // resolution logic AND the path construction live in one place.
+  const docsRoot =
+    args.docsRoot ?? (args.repoRoot !== undefined ? join(args.repoRoot, 'docs') : undefined);
+  if (docsRoot === undefined) {
+    throw new Error(
+      'resolveFeatureRoot: one of `docsRoot` or `repoRoot` must be supplied.',
+    );
+  }
+  if (!existsSync(docsRoot)) {
     return { root: undefined, versionsChecked: [] };
   }
   let topEntries: ReadonlyArray<string>;
   try {
-    topEntries = [...(await readdir(args.docsRoot))].sort().reverse();
+    topEntries = [...(await readdir(docsRoot))].sort().reverse();
   } catch {
     return { root: undefined, versionsChecked: [] };
   }
   const versionsChecked: string[] = [];
   for (const version of topEntries) {
-    const inProgress = join(args.docsRoot, version, '001-IN-PROGRESS');
+    const inProgress = join(docsRoot, version, '001-IN-PROGRESS');
     if (!existsSync(inProgress)) continue;
     versionsChecked.push(version);
     const featureDir = join(inProgress, args.slug);

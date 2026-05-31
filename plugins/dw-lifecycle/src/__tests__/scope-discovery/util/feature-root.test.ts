@@ -104,4 +104,50 @@ describe('resolveFeatureRoot — shared helper (AUDIT-20260530-15)', () => {
     // Lex-greatest of ['0.5.0', '0.x', '1.0', '2.0'] sorted desc = '2.0'.
     expect(r1.root).toBe(join(repoRoot, 'docs', '2.0', '001-IN-PROGRESS', 'demo'));
   });
+
+  /**
+   * AUDIT-20260531-04 regression: the lex-vs-semver divergence is
+   * documented intentional behavior. With versions ['0.9.0', '0.10.0']
+   * the semver-greatest is `0.10.0` but the lex-greatest is `0.9.0`
+   * (because `'1' < '9'` character-wise). The helper picks lex-
+   * greatest, so this test pins `0.9.0` as the resolution. If a
+   * future semver-aware sort lands, this test must be updated in
+   * lockstep — the test's existence makes the divergence auditable
+   * rather than buried behind a deferral comment.
+   */
+  it('picks lex-greatest, NOT semver-greatest, when they diverge (AUDIT-20260531-04)', async () => {
+    const repoRoot = makeRepo('lex-vs-semver', ['0.9.0', '0.10.0'], 'demo');
+    const result = await resolveFeatureRoot({
+      docsRoot: join(repoRoot, 'docs'),
+      slug: 'demo',
+    });
+    // Lex compares char-by-char: '0' === '0', '.' === '.', '9' > '1'
+    // so '0.9.0' > '0.10.0' in lex order. The walker picks lex-
+    // greatest. Semver-greatest WOULD be `0.10.0`.
+    expect(result.root).toBe(
+      join(repoRoot, 'docs', '0.9.0', '001-IN-PROGRESS', 'demo'),
+    );
+  });
+
+  /**
+   * AUDIT-20260531-05 regression: the helper accepts `repoRoot` and
+   * constructs `docs/` internally, so callers don't have to mirror
+   * `join(repoRoot, 'docs')` independently.
+   */
+  it('accepts repoRoot and constructs the docs/ subpath internally (AUDIT-20260531-05)', async () => {
+    const repoRoot = makeRepo('repo-root-shape', ['1.0'], 'demo');
+    const result = await resolveFeatureRoot({
+      repoRoot,
+      slug: 'demo',
+    });
+    expect(result.root).toBe(
+      join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo'),
+    );
+  });
+
+  it('throws when neither docsRoot nor repoRoot is supplied', async () => {
+    await expect(
+      resolveFeatureRoot({ slug: 'demo' } as unknown as Parameters<typeof resolveFeatureRoot>[0]),
+    ).rejects.toThrow(/docsRoot.*repoRoot/);
+  });
 });
