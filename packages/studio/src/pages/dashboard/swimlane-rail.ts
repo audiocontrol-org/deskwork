@@ -123,13 +123,22 @@ function renderRailRow(
  * as a named preset; the per-row Load buttons re-apply a saved
  * preset; the per-row Delete buttons remove a preset.
  *
- * The list container is server-rendered empty + populated by the
- * client controller (`swimlane-presets.ts`) on init. The empty
- * state is `<span class="preset-empty">No saved presets</span>`,
- * matching what the client renders before any preset exists. This
- * means the SSR output is operator-perceivable on first paint
- * (before client JS runs) and re-rendered identically by the client
- * once it boots — no flash-of-empty-content.
+ * The list container is server-rendered with the empty-state
+ * placeholder (`<span class="preset-empty">No saved presets</span>`)
+ * and populated by the client controller (`swimlane-presets.ts`)
+ * on init from per-browser localStorage.
+ *
+ * Per AUDIT-20260530-48: the no-flash guarantee is *scoped to the
+ * empty case*. For an operator with zero presets, SSR's
+ * `No saved presets` matches the client's first render — no flash.
+ * For an operator who HAS saved presets, the SSR placeholder is
+ * replaced once `renderPresetList` runs (`container.textContent = ''`
+ * → real rows), producing an empty→populated flash on first paint.
+ * Eliminating the flash for the saved-presets case would require
+ * server-side knowledge of per-browser localStorage state, which
+ * is by design unavailable in the SSR pipeline (THESIS Consequence
+ * 2 — per-operator state stays per-operator). The flash is accepted
+ * as the cost of the per-browser-state design.
  */
 function renderPresetSurface(): RawHtml {
   return unsafe(html`
