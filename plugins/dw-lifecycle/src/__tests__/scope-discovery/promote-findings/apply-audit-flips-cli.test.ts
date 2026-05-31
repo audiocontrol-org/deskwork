@@ -328,6 +328,65 @@ describe('runApplyAuditFlips — dry-run + apply flows', () => {
    * apply-audit-flips ALSO ticks the closure-criterion checkbox in
    * the matching workplan task block.
    */
+  it('returns NON-ZERO exit when the workplan-side write fails (AUDIT-20260530-17)', async () => {
+    // Per AUDIT-20260530-17: workplan-tick was best-effort post-fix
+    // (audit-log written, workplan write fails, exit 0 with warning).
+    // That preserved the AUDIT-14 failure mode: audit-log says fixed,
+    // workplan checkbox still `- [ ]`. Hard-error on workplan write
+    // failure so the operator at least sees the split-state.
+    const repoRoot = makeRepo('hard-error', OPEN_TWO_ENTRIES);
+    const featureDir = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');
+    // Pre-existing workplan with a matching fix-task closure criterion.
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '',
+        '## Phase 13: x',
+        '',
+        '### Task 13.1 (fix-finding-AUDIT-20260529-12): first',
+        '',
+        '- [x] step',
+        '',
+        '**Acceptance Criteria:**',
+        '',
+        '- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    const walker: CommitWalker = () => [
+      { sha: 'closesha', message: 'fix: Closes AUDIT-20260529-12' },
+    ];
+    const stdout = new CaptureStream();
+    const stderr = new CaptureStream();
+    const workplanPath = join(featureDir, 'workplan.md');
+    // Inject a write seam that THROWS only for the workplan path.
+    // Audit-log write still goes through fs (default writer).
+    const writerWithWorkplanFailure = async (
+      path: string,
+      content: string,
+    ): Promise<void> => {
+      if (path === workplanPath) {
+        throw new Error('synthetic workplan write failure');
+      }
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(path, content, 'utf8');
+    };
+    const exit = await runApplyAuditFlips({
+      opts: { featureSlug: 'demo', apply: true },
+      projectRoot: repoRoot,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+      commitWalker: walker,
+      write: writerWithWorkplanFailure,
+    });
+    // Hard error per AUDIT-17.
+    expect(exit).not.toBe(0);
+    // Operator visibility: stderr names the failure.
+    expect(stderr.text()).toMatch(/workplan|synthetic/i);
+  });
+
   it('ticks the workplan closure-criterion checkbox for each flipped finding (AUDIT-20260530-14)', async () => {
     const repoRoot = makeRepo('tick-criterion', OPEN_TWO_ENTRIES);
     const featureDir = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');

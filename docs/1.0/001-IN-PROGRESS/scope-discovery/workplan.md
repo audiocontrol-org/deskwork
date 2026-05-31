@@ -434,16 +434,16 @@ Closes AUDIT-20260530-16. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 Closes AUDIT-20260530-17. Surface: plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:403-463.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-17` in subject
+- [x] Step 1: new test in `apply-audit-flips-cli.test.ts` injecting a failing writer for the workplan path; asserts non-zero exit + stderr names the failure.
+- [x] Step 2: confirmed test failed pre-fix (returned 0 with warning).
+- [x] Step 3: changed the catch block from "warn + continue" to "stderr + return 1"; the error message names the workplan path, the split-state, and the manual cure.
+- [x] Step 4: tests pass; plugin suite 2431/2431.
+- [x] Step 5: commit with `Closes AUDIT-20260530-17` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 6 (follow-up): Primitive-extraction dispatch hygiene

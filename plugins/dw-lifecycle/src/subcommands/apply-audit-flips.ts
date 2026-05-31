@@ -454,12 +454,21 @@ export async function runApplyAuditFlips(args: RunArgs): Promise<number> {
             );
           }
         } catch (wpErr) {
-          // Workplan-side flip is best-effort hygiene; an error here
-          // doesn't undo the audit-log write. Surface as a warning,
-          // not a failure.
+          // Per AUDIT-20260530-17: the workplan-side flip is now a
+          // HARD requirement on --apply. Pre-fix this was best-effort
+          // with a warning, which preserved the AUDIT-14 failure mode:
+          // audit-log says fixed, workplan checkbox stays `- [ ]`,
+          // gate keeps treating the task as unchecked. Hard-exit so
+          // the operator sees the split-state and can fix it.
           args.stderr.write(
-            `apply-audit-flips: workplan-side flip skipped: ${wpErr instanceof Error ? wpErr.message : String(wpErr)}\n`,
+            `apply-audit-flips: workplan-side write FAILED at ${workplanPath}: ` +
+              `${wpErr instanceof Error ? wpErr.message : String(wpErr)}.\n` +
+              `  The audit-log was already written; state is split ` +
+              `(audit-log shows fixed-<sha>; workplan checkbox still \`- [ ]\`). ` +
+              `Manually flip the workplan checkbox for each fixed finding, ` +
+              `then re-run apply-audit-flips to confirm the catchup is idempotent.\n`,
           );
+          return 1;
         }
       }
     }
