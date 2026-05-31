@@ -71,7 +71,10 @@ import { renderRow } from './section.ts';
 import { stageGlyph, GLYPH_OFF } from './swimlane-stage-glyph.ts';
 import { laneGlyph } from './lane-glyph.ts';
 import { renderListBody } from './swimlane-list-body.ts';
-import { renderUnbucketedStageCol } from './swimlane-unbucketed.ts';
+import {
+  renderUnbucketedStageCol,
+  renderUnbucketedCompactCell,
+} from './swimlane-unbucketed.ts';
 import type { LaneBucket } from './lane-data.ts';
 import type { LaneRailRow } from './swimlane-rail.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
@@ -377,8 +380,15 @@ function renderSwimCompact(bucket: LaneBucket): RawHtml {
         </div>`;
     })
     .join('');
+  // Per AUDIT-20260531-01 — trailing unbucketed cell so the per-cell
+  // counts in the collapsed compact strip reconcile with the swim-head
+  // `quick-meta` (`${bucket.entryCount} entries`, which already folds
+  // unbucketed in). Mirrors the kanban + list-body unbucketed-tail
+  // precedents the AUDIT-20260530-25 fix landed on the two other
+  // surfaces.
+  const unbucketedRaw = renderUnbucketedCompactCell(bucket.unbucketed).__raw;
   return unsafe(html`
-    <div class="swim-compact" data-swim-compact>${unsafe(cellsRaw)}</div>`);
+    <div class="swim-compact" data-swim-compact>${unsafe(cellsRaw)}${unsafe(unbucketedRaw)}</div>`);
 }
 
 export function renderSwimlane(

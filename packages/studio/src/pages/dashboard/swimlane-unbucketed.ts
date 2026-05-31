@@ -108,6 +108,38 @@ export function renderUnbucketedStageCol(
 }
 
 /**
+ * Compact-strip unbucketed cell (AUDIT-20260531-01). Renders a trailing
+ * `.sc-stage.is-unbucketed` cell appended to the per-swim
+ * `.swim-compact` strip (revealed by CSS when the lane is `.collapsed`).
+ * Mirrors the structure of the regular compact cells emitted by
+ * `renderSwimCompact` (`.sc-stage` > `.sc-name` + `.sc-count`) so the
+ * existing flex layout (`dashboard-swimlane-shell.css`) handles the
+ * trailing cell with no template changes.
+ *
+ * Mirrors the AUDIT-20260530-25 precedent on the two other dashboard
+ * surfaces — `renderUnbucketedStageCol` (kanban grid) and
+ * `renderUnbucketedListGroup` (list body) — which already reconcile
+ * `bucket.unbucketed` against the swim-head's `quick-meta` count.
+ * Pre-fix, the collapsed compact strip read `entryCount - unbucketed.length`
+ * while the swim-head's `${entryCount} entries` text included the
+ * unbucketed entries; this cell closes that reconciliation gap.
+ *
+ * Returns the empty string (as `RawHtml`) when there are no unbucketed
+ * entries, so callers can append unconditionally.
+ */
+export function renderUnbucketedCompactCell(
+  unbucketed: readonly Entry[],
+): RawHtml {
+  if (unbucketed.length === 0) return unsafe('');
+
+  return unsafe(html`
+    <div class="sc-stage is-unbucketed" data-sc-stage="unbucketed">
+      <span class="sc-name">${UNBUCKETED_GLYPH} ${UNBUCKETED_STAGE_LABEL}</span>
+      <span class="sc-count">${unbucketed.length}</span>
+    </div>`);
+}
+
+/**
  * List-surface unbucketed tail. Renders a trailing `.lb-group` group
  * carrying `.is-unbucketed`; each entry uses the same `.lb-row` chrome
  * the list view emits for template-bucketed entries, with the

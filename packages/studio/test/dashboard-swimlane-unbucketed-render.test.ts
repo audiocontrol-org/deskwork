@@ -151,6 +151,99 @@ describe('dashboard swimlane AUDIT-20260530-25 — unbucketed entries are render
     expect(r.html).not.toMatch(/class="lb-group[^"]*\bis-unbucketed\b/);
   });
 
+  it('renders unbucketed compact cell in swim compact strip when lane is collapsed (AUDIT-20260531-01)', async () => {
+    // AUDIT-20260531-01 — `renderSwimCompact` (per-stage compact strip
+    // emitted on every swim and revealed by CSS when the lane is
+    // `.collapsed`) iterates only `template.linearStages +
+    // template.offPipelineStages` and never reads `bucket.unbucketed`.
+    // Result: the sum of visible `.sc-count` values is
+    // `entryCount − unbucketed.length` while the swim-head `quick-meta`
+    // reads `${bucket.entryCount} entries` — count inflated, entries
+    // silently dropped from the compact strip.
+    //
+    // Fix mirrors the kanban + list-body precedents (AUDIT-20260530-25):
+    // append a trailing `.sc-stage.is-unbucketed` cell carrying the
+    // `⊘` glyph + `unbucketed.length` so the per-cell counts reconcile
+    // with the swim-head's `quick-meta`.
+    await writeSidecar(
+      root,
+      makeEntry({
+        uuid: UUID_EDITORIAL_UNRECOGNIZED,
+        slug: 'compact-mystery-one',
+        title: 'Compact Mystery One',
+        currentStage: 'NonExistentStage',
+        iterationByStage: { NonExistentStage: 0 },
+        lane: 'default',
+      }),
+    );
+    await writeSidecar(
+      root,
+      makeEntry({
+        uuid: UUID_VISUAL_UNRECOGNIZED,
+        slug: 'compact-mystery-two',
+        title: 'Compact Mystery Two',
+        currentStage: 'AnotherMissingStage',
+        iterationByStage: { AnotherMissingStage: 0 },
+        lane: 'default',
+      }),
+    );
+
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+
+    const editorialBlock = extractLaneSection(r.html, 'default');
+    expect(editorialBlock).not.toBe('');
+
+    // (a) Locate the `.swim-compact` substring (the per-stage
+    // compact strip revealed when the lane is `.collapsed`).
+    const swimCompactOpen = editorialBlock.indexOf('<div class="swim-compact"');
+    expect(swimCompactOpen).toBeGreaterThanOrEqual(0);
+    const swimCompactClose = editorialBlock.indexOf('</div>', swimCompactOpen);
+    // The compact strip contains nested `.sc-stage` divs; find the
+    // outer closing tag by scanning forward through matched opens.
+    let depth = 1;
+    let cursor = swimCompactOpen + '<div class="swim-compact"'.length;
+    while (depth > 0 && cursor < editorialBlock.length) {
+      const nextOpen = editorialBlock.indexOf('<div', cursor);
+      const nextClose = editorialBlock.indexOf('</div>', cursor);
+      if (nextClose === -1) break;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth += 1;
+        cursor = nextOpen + '<div'.length;
+      } else {
+        depth -= 1;
+        cursor = nextClose + '</div>'.length;
+      }
+    }
+    const swimCompact = editorialBlock.slice(swimCompactOpen, cursor);
+    expect(swimCompact).toContain('<div class="swim-compact"');
+    void swimCompactClose;
+
+    // (b) An unbucketed cell renders inside `.swim-compact` with
+    // `data-sc-stage="unbucketed"` and the `is-unbucketed` modifier.
+    expect(swimCompact).toMatch(/class="sc-stage[^"]*\bis-unbucketed\b/);
+    expect(swimCompact).toContain('data-sc-stage="unbucketed"');
+
+    // (c) The unbucketed cell's `.sc-count` is 2 (matches
+    // `bucket.unbucketed.length` for this fixture).
+    const unbucketedCellMatch = swimCompact.match(
+      /class="sc-stage[^"]*\bis-unbucketed\b[^"]*"[\s\S]*?<span class="sc-count">(\d+)<\/span>/,
+    );
+    expect(unbucketedCellMatch).not.toBeNull();
+    expect(unbucketedCellMatch?.[1]).toBe('2');
+
+    // (d) The sum of all `.sc-count` numeric values inside
+    // `.swim-compact` reconciles with `bucket.entryCount` (3).
+    const scCountMatches = swimCompact.match(
+      /<span class="sc-count">(\d+)<\/span>/g,
+    ) ?? [];
+    const compactSum = scCountMatches.reduce((acc, raw) => {
+      const m = raw.match(/(\d+)/);
+      return m === null ? acc : acc + Number.parseInt(m[1], 10);
+    }, 0);
+    expect(compactSum).toBe(3);
+  });
+
   it('unbucketed render is scoped per-swim: an unbucketed entry in editorial does NOT leak into the mockups swim', async () => {
     await writeSidecar(
       root,
