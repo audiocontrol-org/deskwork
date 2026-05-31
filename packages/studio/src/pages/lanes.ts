@@ -96,7 +96,7 @@ export async function renderLanesPage(ctx: StudioContext): Promise<string> {
   const body = html`
     ${masthead}
     ${renderMastheadMenu()}
-    ${renderEditorialFolio('dashboard', "the compositor's desk")}
+    ${renderEditorialFolio('lanes', "the compositor's desk")}
     <main class="er-container lanes-container" data-lanes-container data-project-key="${projectKey}">
       ${header}
       ${errorBanner}

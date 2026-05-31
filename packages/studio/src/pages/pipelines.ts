@@ -76,7 +76,7 @@ export async function renderPipelinesPage(ctx: StudioContext): Promise<string> {
   const body = html`
     ${masthead}
     ${renderMastheadMenu()}
-    ${renderEditorialFolio('dashboard', 'the pipeline registry')}
+    ${renderEditorialFolio('pipelines', 'the pipeline registry')}
     <main class="er-container pipelines-container" data-pipelines-container>
       ${header}
       ${errorBanner}
