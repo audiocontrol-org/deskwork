@@ -407,17 +407,17 @@ Closes AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `pac
 
 Closes AUDIT-20260530-40 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:62-86`, `plugins/deskwork-studio/public/css/dashboard-swimlane.css` (`body[data-lane-sheet-open] .lane-sheet-backdrop` vs `.lane-sheet-container.is-open .lane-rail`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-40 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — three unified-state contract tests added at `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:370-465` (open/close drives single body attribute; Escape close clears body attr + aria-expanded together; backdrop close uses same single signal)
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — 2 of 3 new tests failed against pre-fix code (the third — backdrop close — passed coincidentally because pre-fix `onClose` removed `.is-open` on the scrim path)
+- [x] Step 3: implement the fix — CSS rewritten to key the rail slide-up off `body[data-lane-sheet-open] .lane-sheet-container .lane-rail` (instead of `.lane-sheet-container.is-open .lane-rail`); removed `.is-open` class manipulation from `openSheet`/`onClose` in `swimlane-mobile-sheet.ts`; docblock updated to declare the unified-state contract; existing CSS-shape test updated to assert the new selector
+- [x] Step 4: confirm test passes — 15/15 mobile-sheet-client tests pass; 989/989 studio tests pass (1 prior failing CSS-shape test brought in line with the new selector)
+- [x] Step 5: commit with `Closes AUDIT-20260530-40 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject — commit 316c693
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:370-465` (cited in Step 1)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-316c693` via the close-shipped-audit-findings step
 
 
 

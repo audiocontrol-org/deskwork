@@ -3623,7 +3623,7 @@ Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). 
 ### AUDIT-20260530-40 — [P5-2 claude] Mobile sheet open/closed state is tracked redundantly across a body attribute and a container class that must be kept in sync by hand
 
 Finding-ID: AUDIT-20260530-40 (cross-model: AUDIT-BARRAGE-claude-P5-2)
-Status:     open
+Status:     fixed-316c693
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:62-86`, `plugins/deskwork-studio/public/css/dashboard-swimlane.css` (`body[data-lane-sheet-open] .lane-sheet-backdrop` vs `.lane-sheet-container.is-open .lane-rail`)
 
