@@ -52,6 +52,7 @@
 import { html, unsafe, type RawHtml } from '../html.ts';
 import { entryRowLinkMeta } from './entry-link-meta.ts';
 import { stageGlyph, GLYPH_OFF } from './swimlane-stage-glyph.ts';
+import { renderUnbucketedListGroup } from './swimlane-unbucketed.ts';
 import type { LaneBucket } from './lane-data.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
 
@@ -186,6 +187,12 @@ export function renderListBody(
         true,
       ).__raw,
     ),
+    // Per AUDIT-20260530-25: list-view analogue of the kanban
+    // unbucketed-tail column. Same data, same operator-diagnosable
+    // shape; CSS picks which surface paints via the `.swim.view-list`
+    // class. Without this group, switching to the list view re-creates
+    // the silent-drop the kanban fix closes.
+    renderUnbucketedListGroup(lane.id, bucket.unbucketed).__raw,
   ].join('');
 
   return unsafe(html`<div class="list-body" data-list-body>${unsafe(groupsRaw)}</div>`);

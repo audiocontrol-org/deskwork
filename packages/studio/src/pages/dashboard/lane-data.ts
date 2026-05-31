@@ -31,11 +31,17 @@
  *     issue surface.
  *
  *   - Entries whose `currentStage` isn't in the resolved template's
- *     stage list go into an "unbucketed" array on the lane bucket.
- *     This is a data-integrity bug upstream (the entry's stage was
- *     never validated against its lane's template), but the dashboard
- *     surfaces it instead of crashing — the operator sees the count
- *     and can run doctor.
+ *     stage list go into an "unbucketed" array on the lane bucket and
+ *     are folded into `entryCount`. This is a data-integrity bug
+ *     upstream (the entry's stage was never validated against its
+ *     lane's template). Per AUDIT-20260530-25, the dashboard
+ *     renderers (`swimlane-card.ts` + `swimlane-list-body.ts`) read
+ *     `bucket.unbucketed` and emit an explicit `(unrecognized stage)`
+ *     tail column / group per swim — mirroring the AUDIT-20260530-14
+ *     fix at the canonical calendar SSOT and the AUDIT-20260529-37
+ *     fix at the entry-review composed view — so the entries remain
+ *     visible inline with their offending `currentStage` value and
+ *     the swim-head count reconciles with the visible cards.
  */
 
 import {

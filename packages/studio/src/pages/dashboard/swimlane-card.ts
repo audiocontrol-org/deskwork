@@ -71,6 +71,7 @@ import { renderRow } from './section.ts';
 import { stageGlyph, GLYPH_OFF } from './swimlane-stage-glyph.ts';
 import { laneGlyph } from './lane-glyph.ts';
 import { renderListBody } from './swimlane-list-body.ts';
+import { renderUnbucketedStageCol } from './swimlane-unbucketed.ts';
 import type { LaneBucket } from './lane-data.ts';
 import type { LaneRailRow } from './swimlane-rail.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
@@ -419,6 +420,11 @@ export function renderSwimlane(
         parentsByMemberUuid,
       ).__raw,
     ),
+    // Per AUDIT-20260530-25 — unbucketed-tail column. See
+    // `swimlane-unbucketed.ts` for the rationale; this call reconciles
+    // the swim-head count (which already folds unbucketed entries into
+    // `entryCount`) with the visible cards.
+    renderUnbucketedStageCol(lane.id, bucket.unbucketed).__raw,
   ].join('');
 
   const stageCount = template.linearStages.length + template.offPipelineStages.length;
@@ -439,22 +445,15 @@ export function renderSwimlane(
     );
   }
 
-  // Per AUDIT-20260528-02: the swimlane is server-rendered alongside
-  // its stub for every visibility-on lane. CSS hides exactly one
-  // based on `.is-focus-hidden`. The class is applied at the server
-  // when the lane is not in the initial focus set, and the client
-  // controller mirrors the toggle on chip clicks (already wired in
-  // `swimlane.ts:153`).
+  // Per AUDIT-20260528-02: swimlane server-rendered alongside its
+  // stub for every visibility-on lane; CSS hides one or the other
+  // via `.is-focus-hidden`. Per Task 5.1B: the server-default
+  // view-mode class is `view-kanban`; the client controller
+  // post-DOMContentLoaded applies the per-lane localStorage override
+  // OR the viewport-aware default (mobile→list). Both bodies emit at
+  // server time so the controller flips one class instead of mutating
+  // DOM (mirrors the dual swim+stub pattern AUDIT-02 landed).
   const focusClass = focusHidden ? ' is-focus-hidden' : '';
-  // Per Task 5.1B: the server-default view-mode class is `view-
-  // kanban` — the client controller post-DOMContentLoaded mirrors
-  // the operator's per-lane localStorage override OR the viewport-
-  // aware default (mobile→list). CSS toggles which body renders
-  // via `.swim.view-kanban .list-body { display: none }` and
-  // `.swim.view-list .stage-grid { display: none }`. Both bodies
-  // are emitted at server time so the controller flips one class
-  // instead of mutating DOM (mirrors the dual swim+stub pattern
-  // AUDIT-02 landed for focus toggle).
   return unsafe(html`
     <article class="swim swim--${template.id} view-kanban${unsafe(focusClass)}"
       data-lane-id="${lane.id}"
