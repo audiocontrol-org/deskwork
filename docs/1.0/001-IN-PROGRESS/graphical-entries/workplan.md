@@ -975,17 +975,19 @@ This finding is a TEST COVERAGE gap, not a code bug. The `html.ts` tagged-templa
 
 Closes AUDIT-20260530-71 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/pipelines/table.ts` — `renderHealthyRow` (always emits `renderViewPanel(row)` + `renderEditForm(row, …)`); `edit-form.ts`, `view-panel.ts`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-71 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+Disposition: acknowledged-known-tradeoff. AUDIT-71 is a render-weight optimization concern, not a correctness bug — the audit itself frames lazy hydration as a "candidate" for "if/when this bites" (i.e. when measurable DOM weight regression appears at N≥20 templates). The current eager-render shape has the advantage of working without JS (panels degrade to plain `<details>` for crawlers/screen-readers). Implementing lazy hydration is a substantial change with regression risk; per the autonomous-burndown loop's bounded-fix discipline, deferring to a tracked follow-up is the right move when the operator can't weigh in on the tradeoff. **Flag: operator should file a follow-up GH issue when they review this disposition** — the GH-issue file at `/tmp/dw-issue-lazy-panel-hydration.md` (drafted but blocked by auto-mode classifier) captures the suggested fix shape + acceptance criteria + revisit conditions for that issue.
+
+- [x] Step 1: N/A (acknowledged-known-tradeoff; no test repros a "render too much" perf bug)
+- [x] Step 2: N/A
+- [x] Step 3: N/A (the render-weight is acknowledged; lazy hydration is the candidate fix shape, deferred per the audit's own framing)
+- [x] Step 4: N/A
+- [x] Step 5: closed via Task 0.46 docs commit
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `(N/A — perf/render-weight tradeoff; deferred)`
+- [x] `npx vitest run` exits 0 (no source change)
+- [x] Audit-log Status flipped to `acknowledged-known-tradeoff`
 
 
 
@@ -993,17 +995,19 @@ Closes AUDIT-20260530-71 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `pac
 
 Closes AUDIT-20260530-72 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/pipelines/data.ts` — `classifyLoadError`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-72 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+Disposition: acknowledged-known-tradeoff. AUDIT-72 is informational — `classifyLoadError`'s substring matching can produce a cosmetically-wrong `kind` label (e.g. "missing" instead of "zod"), but the verbatim error `message` is preserved and shown to the operator. The audit itself notes "the impact is a cosmetically-wrong category label." The fix the audit suggests (structured discriminant from the loader instead of English substring matching) is a substantial refactor across the loader + classifier + consumers. Per the autonomous-burndown discipline, deferring to a follow-up when an operator can name the structured-discriminant scheme is the right move. **If/when the `kind` label drives differential UI** (currently it's just a one-line hint alongside the verbatim message), this disposition needs revisiting.
+
+- [x] Step 1: N/A (informational; cosmetic label only)
+- [x] Step 2: N/A
+- [x] Step 3: N/A (acknowledged; structured-discriminant refactor deferred)
+- [x] Step 4: N/A
+- [x] Step 5: closed via Task 0.47 docs commit
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `(N/A — informational finding; cosmetic label)`
+- [x] `npx vitest run` exits 0 (no source change)
+- [x] Audit-log Status flipped to `acknowledged-known-tradeoff`
 
 
 

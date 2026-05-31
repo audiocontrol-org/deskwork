@@ -4038,7 +4038,7 @@ Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). 
 ### AUDIT-20260530-71 — [P6-2 claude] View and Edit panels are rendered in full (5 sub-forms + stage chips/checkboxes) for every pipeline row even though every panel ships hidden
 
 Finding-ID: AUDIT-20260530-71 (cross-model: AUDIT-BARRAGE-claude-P6-2)
-Status:     open
+Status:     acknowledged-known-tradeoff (render-weight; lazy hydration is a candidate when DOM weight measurably regresses — flag for operator to file follow-up issue)
 Severity:   low
 Surface:    `packages/studio/src/pages/pipelines/table.ts` — `renderHealthyRow` (always emits `renderViewPanel(row)` + `renderEditForm(row, …)`); `edit-form.ts`, `view-panel.ts`
 
@@ -4051,7 +4051,7 @@ Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). 
 ### AUDIT-20260530-72 — [P6-2 claude] `classifyLoadError` substring matching can misclassify a Zod message as `missing`
 
 Finding-ID: AUDIT-20260530-72 (cross-model: AUDIT-BARRAGE-claude-P6-2)
-Status:     open
+Status:     acknowledged-known-tradeoff (substring matching is fragile but verbatim message is shown; refactor to structured error codes if/when kind drives differential UI)
 Severity:   informational
 Surface:    `packages/studio/src/pages/pipelines/data.ts` — `classifyLoadError`
 
