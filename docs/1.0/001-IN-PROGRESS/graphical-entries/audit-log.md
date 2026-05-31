@@ -4152,7 +4152,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). 
 ### AUDIT-20260530-79 — [P6-3 claude] Lane mutation lands on disk before the journal append; an append failure leaves no audit record
 
 Finding-ID: AUDIT-20260530-79 (cross-model: AUDIT-BARRAGE-claude-P6-3)
-Status:     open
+Status:     fixed-7de9a07
 Severity:   medium
 Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:243-262` (set-template) and `:314-333` (delete)
 
