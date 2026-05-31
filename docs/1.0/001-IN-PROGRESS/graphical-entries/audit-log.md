@@ -3549,7 +3549,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). 
 ### AUDIT-20260530-34 — [P5-1 gemini] The mobile dashboard lane-stack/lane-head variant, specified in `docs/studio-design/ACCEPTED/2026-05-27-multi-lane-dashboard-d3-press-bay/brief.md:14` as a "vertical lane-stack of accordion sections on mobile," appears to be incompletely implemented. While `workplan.md` marks Step 5.1B.4 as completed and the CSS (`dashboard-swimlane.css`) includes media queries for mobile, the implementation primarily adapts the desktop swim markup using CSS (`flex-direction: column` for `.stage-grid`). The audit finding AUDIT-20260528-10 points out this discrepancy, stating "mobile gets desktop swim markup adapted by CSS while the 5.1B workplan text marks the lane-head mobile variant as shipped." The "accordion sections" and a distinct "lane-head" renderer path for mobile seem absent, suggesting a gap between the accepted design and the delivered implementation.
 
 Finding-ID: AUDIT-20260530-34 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
-Status:     open
+Status:     fixed-e228e26 (duplicate of AUDIT-20260528-10; closed by the same commit)
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:231` (and related mobile rendering)
 

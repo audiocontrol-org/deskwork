@@ -295,17 +295,19 @@ Disposition: duplicate of AUDIT-20260528-09 (the original surfacing of the "All 
 
 Closes AUDIT-20260530-34 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:231` (and related mobile rendering).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-34 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+Disposition: duplicate of AUDIT-20260528-10 (the original surfacing of "Task 5.1B mobile lane-stack / lane-head variant is not implemented or the workplan has over-claimed the mobile scope"). The gemini auditor's finding text explicitly cites AUDIT-20260528-10 in its narrative ("The audit finding AUDIT-20260528-10 points out this discrepancy...") but inspected only `dashboard-swimlane.css`'s media queries and missed the distinct mobile DOM tree that ships in commit `e228e26` on 2026-05-29. The "accordion sections" and "distinct lane-head renderer path for mobile" that the gemini auditor calls absent actually exist in tree: the server-rendered mobile renderer lives at `packages/studio/src/pages/dashboard/lane-stack-card.ts` (emitting `<section class="lane-stack"><article class="lane-section"><header class="lane-head">…</header><div class="lane-body">…</div></article></section>`), with companion CSS at `plugins/deskwork-studio/public/css/dashboard-lane-stack.css` and client controller at `plugins/deskwork-studio/public/src/dashboard/lane-stack.ts`. The desktop swim markup and the mobile lane-stack markup are both server-rendered as siblings; CSS gates which paints at any given viewport (`.lane-stack { display: none }` on desktop; `.swim-bay-body { display: none }` plus `.lane-stack { display: block }` at and below 720px). Dual-viewport verification at desktop (1920×1080) and phone (390×844) is documented in this audit-log at the "2026-05-29 audit: AUDIT-10 dual-viewport verification (post-`e228e26`)" entry (lines 2083–2118), confirming the brief-contracted DOM structure (`.lane-section > .lane-head + .lane-body`) and every brief affordance (chevron, glyph, name, count, compose chip, view-toggle) lands on the mobile lane-head. Regression coverage lives in `packages/studio/test/dashboard-lane-stack-render.test.ts` and `packages/studio/test/dashboard-lane-stack-client.test.ts`; both files pass against the current implementation (17/17 tests).
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — covered by `dashboard-lane-stack-render.test.ts` + `dashboard-lane-stack-client.test.ts`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — verified during AUDIT-20260528-10 cycle (commit `e228e26`)
+- [x] Step 3: implement the fix — `e228e26`
+- [x] Step 4: confirm test passes — `npx vitest run packages/studio/test/dashboard-lane-stack-render.test.ts packages/studio/test/dashboard-lane-stack-client.test.ts` → 17/17 pass
+- [x] Step 5: commit with `Closes AUDIT-20260530-34 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject — see disposition note; closed via duplicate-of-10 disposition rather than a fresh fix commit
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-lane-stack-render.test.ts` + `packages/studio/test/dashboard-lane-stack-client.test.ts` (AUDIT-10 regression — same brief-contracted mobile lane-stack DOM tree)
+- [x] `npx vitest run packages/studio/test/dashboard-lane-stack-render.test.ts packages/studio/test/dashboard-lane-stack-client.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-e228e26 (duplicate of AUDIT-20260528-10; closed by the same commit)` per duplicate disposition
 
 
 
