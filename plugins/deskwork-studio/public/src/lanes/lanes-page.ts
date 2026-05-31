@@ -50,10 +50,27 @@
  */
 
 import { copyAndFlash, quoteValue } from '../copy-builder.ts';
+import {
+  applyResultToCopy,
+  type CopyBuildResult,
+  type NoticeConfig,
+} from '../copy-validation.ts';
 import { resolveProjectKey } from '../dashboard/swimlane-storage.ts';
 
 const ARCHIVED_OPEN_STORAGE_PREFIX = 'deskwork:lanes:';
 const ARCHIVED_OPEN_STORAGE_SUFFIX = ':archived-open';
+
+/**
+ * Per-page notice element configuration for the lanes Copy buttons.
+ * Distinct from the pipelines page's `pipelines-copy-notice` so a
+ * single DOM containing both pages' fragments doesn't produce
+ * notice-element collisions.
+ */
+const LANES_NOTICE_CONFIG: NoticeConfig = {
+  datasetKey: 'lanesCopyNotice',
+  selector: '[data-lanes-copy-notice]',
+  className: 'lanes-copy-notice',
+};
 
 interface NewFormValues {
   readonly id: string;
@@ -99,7 +116,28 @@ function readFieldCurrent(form: HTMLElement, name: string): string {
   return el?.dataset.current?.trim() ?? '';
 }
 
-function buildCreateCommand(values: NewFormValues): string {
+/**
+ * Build the `/deskwork:lane create` command from new-form values.
+ *
+ * Preview-vs-validity split (per AUDIT-20260530-73, Task 0.48):
+ *
+ *   - `command` is ALWAYS populated, using placeholder angle-brackets
+ *     for empty required fields (`<id>`, `<template>`, `<path>`). The
+ *     placeholder shape is preview-only — it gives the operator
+ *     typing-feedback about the eventual command shape without
+ *     premature value-binding.
+ *   - `error` is non-null when one or more required fields (`id`,
+ *     `template`, `contentDir`) are empty. When set, the Copy button
+ *     is disabled and the inline notice surfaces the message. This
+ *     prevents the pre-fix bug where the Copy handler clipboarded
+ *     the placeholder-bearing preview verbatim — pasting `<id>` into
+ *     a shell is shell-injection-grade dangerous.
+ *
+ * The `name` field is intentionally optional (only emitted as
+ * `--name <value>` when filled); its absence does NOT mark the build
+ * invalid.
+ */
+function buildCreateCommand(values: NewFormValues): CopyBuildResult {
   const id = values.id.length > 0 ? quoteValue(values.id) : '<id>';
   const template =
     values.template.length > 0 ? quoteValue(values.template) : '<template>';
@@ -107,7 +145,24 @@ function buildCreateCommand(values: NewFormValues): string {
     values.contentDir.length > 0 ? quoteValue(values.contentDir) : '<path>';
   const nameFragment =
     values.name.length > 0 ? ` --name ${quoteValue(values.name)}` : '';
-  return `/deskwork:lane create ${id} --template ${template} --content-dir ${contentDir}${nameFragment}`;
+  const command = `/deskwork:lane create ${id} --template ${template} --content-dir ${contentDir}${nameFragment}`;
+
+  const missing: string[] = [];
+  if (values.id.length === 0) missing.push('id');
+  if (values.template.length === 0) missing.push('template');
+  if (values.contentDir.length === 0) missing.push('content-dir');
+
+  if (missing.length === 0) {
+    return { command, error: null };
+  }
+  // Name fields in the operator's vocabulary (e.g. `content-dir` for
+  // the `contentDir` JS field), so the notice text matches the
+  // `--content-dir` flag the operator sees in the preview.
+  const fieldsLabel = missing.length === 1 ? 'field' : 'fields';
+  return {
+    command,
+    error: `Fill required ${fieldsLabel}: ${missing.join(', ')}.`,
+  };
 }
 
 /**
@@ -143,17 +198,17 @@ function buildUpdateCommand(
   return `/deskwork:lane update ${quoteValue(laneId)}${flagFragment}`;
 }
 
-function rebuildNewFormPreview(form: HTMLElement): string {
+function rebuildNewFormPreview(form: HTMLElement): CopyBuildResult {
   const values: NewFormValues = {
     id: readFieldValue(form, 'id'),
     name: readFieldValue(form, 'name'),
     template: readFieldValue(form, 'template'),
     contentDir: readFieldValue(form, 'contentDir'),
   };
-  const command = buildCreateCommand(values);
+  const result = buildCreateCommand(values);
   const preview = form.querySelector<HTMLElement>('[data-lanes-preview]');
-  if (preview) preview.textContent = command;
-  return command;
+  if (preview) preview.textContent = result.command;
+  return result;
 }
 
 function rebuildEditFormPreview(form: HTMLElement, laneId: string): string {
@@ -177,8 +232,12 @@ function initNewForm(container: HTMLElement): void {
   const inputs = Array.from(
     form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-lanes-field]'),
   );
+  const copyButton = form.querySelector<HTMLButtonElement>(
+    '[data-lanes-copy-button="new"]',
+  );
   const rebuild = (): void => {
-    rebuildNewFormPreview(form);
+    const result = rebuildNewFormPreview(form);
+    if (copyButton) applyResultToCopy(copyButton, result, LANES_NOTICE_CONFIG);
   };
   for (const input of inputs) {
     input.addEventListener('input', rebuild);
@@ -186,13 +245,16 @@ function initNewForm(container: HTMLElement): void {
   }
   rebuild();
 
-  const copyButton = form.querySelector<HTMLButtonElement>(
-    '[data-lanes-copy-button="new"]',
-  );
   if (copyButton) {
     copyButton.addEventListener('click', async () => {
-      const command = rebuildNewFormPreview(form);
-      await copyAndFlash(command, copyButton, 'Copied create command');
+      const result = rebuildNewFormPreview(form);
+      applyResultToCopy(copyButton, result, LANES_NOTICE_CONFIG);
+      // Defense-in-depth (AUDIT-20260530-73, Task 0.48): refuse to
+      // clipboard a placeholder-bearing command even if a synthetic
+      // dispatch bypasses the `disabled` attribute. The visible gate
+      // is the disabled state; this re-check is the hard stop.
+      if (result.error !== null) return;
+      await copyAndFlash(result.command, copyButton, 'Copied create command');
     });
   }
 }

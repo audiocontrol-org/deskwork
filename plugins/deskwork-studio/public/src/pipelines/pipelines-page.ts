@@ -45,12 +45,28 @@
 
 import { copyAndFlash } from '../copy-builder.ts';
 import {
+  applyResultToCopy,
+  type NoticeConfig,
+} from '../copy-validation.ts';
+import {
   buildCreateCommand,
   buildEditCommand,
   UPDATE_OPS,
   type BuildResult,
   type UpdateOp,
 } from './pipelines-builders.ts';
+
+/**
+ * Per-page notice element configuration for the pipelines Copy
+ * buttons. Distinct dataset/selector/class from the lanes page so a
+ * single DOM containing both pages' fragments (in tests, e.g.)
+ * doesn't produce notice-element collisions.
+ */
+const PIPELINES_NOTICE_CONFIG: NoticeConfig = {
+  datasetKey: 'pipelinesCopyNotice',
+  selector: '[data-pipelines-copy-notice]',
+  className: 'pipelines-copy-notice',
+};
 
 /**
  * Module-level tracker for the currently-open per-row panel (View or
@@ -87,57 +103,6 @@ function rebuildEditPreview(
   return result;
 }
 
-/**
- * Resolve (or lazily create) the inline notice element adjacent to a
- * Copy button. The notice is a sibling `<p>` injected into the Copy
- * button's containing actions block; it shows the validity error when
- * the build result is invalid and is hidden otherwise. Keeping the
- * controller responsible for the notice element (rather than the
- * server-side renderer) means every Copy button — regardless of which
- * sub-form rendered it — gets the same affordance shape automatically.
- */
-function resolveNotice(button: HTMLButtonElement): HTMLElement {
-  const existing = button.parentElement?.querySelector<HTMLElement>(
-    '[data-pipelines-copy-notice]',
-  );
-  if (existing) return existing;
-  const notice = document.createElement('p');
-  notice.dataset.pipelinesCopyNotice = '';
-  notice.className = 'pipelines-copy-notice';
-  notice.hidden = true;
-  // Insert AFTER the button so screen-reader order matches visual order
-  // (operator focuses the button, hears "disabled", then reads the notice
-  // explaining why). When no parent exists (test fixtures may attach the
-  // button directly to a container), fall back to inserting nothing —
-  // the disabled state alone still prevents the broken paste.
-  button.parentElement?.insertBefore(notice, button.nextSibling);
-  return notice;
-}
-
-/**
- * Apply a build result to a Copy button + its adjacent inline notice.
- * Disables the button (with `disabled` AND `aria-disabled="true"`) when
- * the result carries a validity error; surfaces the error text in the
- * notice; otherwise enables the button and hides the notice.
- */
-function applyResultToCopy(
-  button: HTMLButtonElement,
-  result: BuildResult,
-): void {
-  const notice = resolveNotice(button);
-  if (result.error === null) {
-    button.disabled = false;
-    button.removeAttribute('aria-disabled');
-    notice.hidden = true;
-    notice.textContent = '';
-    return;
-  }
-  button.disabled = true;
-  button.setAttribute('aria-disabled', 'true');
-  notice.hidden = false;
-  notice.textContent = result.error;
-}
-
 function initNewForm(container: HTMLElement): void {
   const form = container.querySelector<HTMLElement>('[data-pipelines-new-form]');
   if (!form) return;
@@ -151,7 +116,7 @@ function initNewForm(container: HTMLElement): void {
   );
   const rebuild = (): void => {
     const result = rebuildNewPreview(form);
-    if (copy) applyResultToCopy(copy, result);
+    if (copy) applyResultToCopy(copy, result, PIPELINES_NOTICE_CONFIG);
   };
   for (const input of inputs) {
     input.addEventListener('input', rebuild);
@@ -162,7 +127,7 @@ function initNewForm(container: HTMLElement): void {
   if (copy) {
     copy.addEventListener('click', async () => {
       const result = rebuildNewPreview(form);
-      applyResultToCopy(copy, result);
+      applyResultToCopy(copy, result, PIPELINES_NOTICE_CONFIG);
       // Refuse to clipboard a command whose preview still carries the
       // `<id>` / `<stages>` angle-bracket markers. The disabled
       // attribute prevents native clicks, but defense-in-depth: if a
@@ -209,7 +174,7 @@ function initEditOpForm(
   };
   const rebuild = (): void => {
     const result = buildForCopy();
-    if (copy) applyResultToCopy(copy, result);
+    if (copy) applyResultToCopy(copy, result, PIPELINES_NOTICE_CONFIG);
   };
   for (const input of inputs) {
     input.addEventListener('input', rebuild);
@@ -220,7 +185,7 @@ function initEditOpForm(
   if (copy) {
     copy.addEventListener('click', async () => {
       const result = buildForCopy();
-      applyResultToCopy(copy, result);
+      applyResultToCopy(copy, result, PIPELINES_NOTICE_CONFIG);
       // Defense-in-depth: refuse to clipboard a command the build
       // reported as invalid (empty required field, empty stage list,
       // plugin-preset gate, etc.) even if the disabled attribute was

@@ -1,4 +1,4 @@
-generated_at: 2026-05-31T11:20:06.703Z
+generated_at: 2026-05-31T12:54:10.819Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -802,11 +802,11 @@ clones:
       - plugins/deskwork-studio/public/src/scrapbook-mutations.ts:130:136
     disposition: pending
     reason: null
-  - id: 7f05f288e9c0
+  - id: 2e09f35cb310
     lines: 12
     members:
-      - plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:153:164
-      - plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:211:222
+      - plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:118:129
+      - plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:176:187
     disposition: keep-with-reason
     reason: Symmetric init-listeners-then-wire-click-handler shape between initNewForm and initEditOpForm; both bind input/change listeners that rebuild + apply result and a click handler that defense-in-depth re-checks error before dispatching clipboard write. Collapsing would require a generic init helper that obscures per-form contract.
   - id: 2b94a9cef4a7

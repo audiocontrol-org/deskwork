@@ -261,11 +261,24 @@ describe('lanes-page client controller', () => {
     const { calls } = installClipboardStub();
     initLanesPage();
 
-    (container.querySelector<HTMLInputElement>('[data-lanes-field="id"]')!).value = 'mockups';
-    (container.querySelector<HTMLSelectElement>('[data-lanes-field="template"]')!).value = 'visual';
-    (container.querySelector<HTMLInputElement>('[data-lanes-field="contentDir"]')!).value = 'mockups';
+    // Per AUDIT-20260530-73 (Task 0.48): each required-field set MUST
+    // dispatch an `input` (or `change` for <select>) event so the
+    // controller's rebuild fires and the Copy button transitions from
+    // disabled (initial state with empty required fields) to enabled.
+    // Pre-fix, the Copy button was always enabled regardless of
+    // validity — that was the bug.
+    const idInput = container.querySelector<HTMLInputElement>('[data-lanes-field="id"]')!;
+    idInput.value = 'mockups';
+    idInput.dispatchEvent(inputEvent());
+    const select = container.querySelector<HTMLSelectElement>('[data-lanes-field="template"]')!;
+    select.value = 'visual';
+    select.dispatchEvent(changeEvent());
+    const contentDir = container.querySelector<HTMLInputElement>('[data-lanes-field="contentDir"]')!;
+    contentDir.value = 'mockups';
+    contentDir.dispatchEvent(inputEvent());
 
     const copy = form.querySelector<HTMLButtonElement>('[data-lanes-copy-button="new"]')!;
+    expect(copy.disabled).toBe(false);
     copy.click();
     // Allow the async copyAndFlash to flush.
     await Promise.resolve();
