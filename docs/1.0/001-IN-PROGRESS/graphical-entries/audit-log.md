@@ -4350,7 +4350,7 @@ Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (codex). R
 ### AUDIT-20260530-93 — [P7T7.2 codex] Group mutators can commit sidecar changes without the required group journal event
 
 Finding-ID: AUDIT-20260530-93 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)
-Status:     open
+Status:     fixed-567b047
 Severity:   medium
 Surface:    `packages/core/src/groups/operations/create.ts:106-121`, `packages/core/src/groups/operations/update.ts:84-94`, `packages/core/src/groups/operations/add-member.ts:126-145`, `packages/core/src/groups/operations/remove-member.ts:72-89`, `packages/core/src/groups/operations/archive.ts:68-77`, `packages/core/src/groups/operations/archive.ts:104-109`
 
