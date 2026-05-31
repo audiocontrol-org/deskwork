@@ -613,17 +613,19 @@ AUDIT-20260530-44 (Task 0.20) already added `dashboard-swimlane-presets-save-fai
 
 Closes AUDIT-20260530-51 (cross-model: AUDIT-BARRAGE-codex-P5-3). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:209-221,349-414; plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:188-205.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-51 (cross-model: AUDIT-BARRAGE-codex-P5-3)` in subject
+Disposition: duplicate of AUDIT-20260530-44 (claude). Both findings describe the same silent-success-on-write-failure bug in `writePresets` / `writeJsonOrIgnore`. Closed by Task 0.20 commit `3e9d77b` which gave write helpers a boolean success contract and made `handleSaveClick` gate the flash on the return.
+
+- [x] Step 1: covered by AUDIT-44 test (`dashboard-swimlane-presets-save-failure.test.ts`)
+- [x] Step 2: verified during AUDIT-44 cycle
+- [x] Step 3: implemented in `3e9d77b`
+- [x] Step 4: verified
+- [x] Step 5: closed via duplicate-of-44 disposition (Task 0.27 docs commit)
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-presets-save-failure.test.ts` (AUDIT-44 regression — same surface)
+- [x] `npx vitest run` exits 0
+- [x] Audit-log Status flipped to `fixed-3e9d77b (duplicate of AUDIT-20260530-44; closed by the same Task 0.20 commit)`
 
 
 

@@ -3766,7 +3766,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). 
 ### AUDIT-20260530-51 — [P5-3 codex] Preset storage write failures are reported as successful saves/applies
 
 Finding-ID: AUDIT-20260530-51 (cross-model: AUDIT-BARRAGE-codex-P5-3)
-Status:     open
+Status:     fixed-3e9d77b (duplicate of AUDIT-20260530-44; closed by the same Task 0.20 commit)
 Severity:   medium
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:209-221,349-414; plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:188-205
 
