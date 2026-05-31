@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveFeatureRoot } from '../../../scope-discovery/util/feature-root.js';
@@ -107,13 +107,12 @@ describe('resolveFeatureRoot — shared helper (AUDIT-20260530-15)', () => {
 
   /**
    * AUDIT-20260531-04 regression: the lex-vs-semver divergence is
-   * documented intentional behavior. With versions ['0.9.0', '0.10.0']
-   * the semver-greatest is `0.10.0` but the lex-greatest is `0.9.0`
-   * (because `'1' < '9'` character-wise). The helper picks lex-
-   * greatest, so this test pins `0.9.0` as the resolution. If a
-   * future semver-aware sort lands, this test must be updated in
-   * lockstep — the test's existence makes the divergence auditable
-   * rather than buried behind a deferral comment.
+   * the specification, not a placeholder. With versions
+   * ['0.9.0', '0.10.0'] the semver-greatest is `0.10.0` but the
+   * lex-greatest is `0.9.0` (because `'1' < '9'` character-wise).
+   * The helper picks lex-greatest. Changing the sort changes the
+   * contract; both the implementation AND this test would have to
+   * change in lockstep.
    */
   it('picks lex-greatest, NOT semver-greatest, when they diverge (AUDIT-20260531-04)', async () => {
     const repoRoot = makeRepo('lex-vs-semver', ['0.9.0', '0.10.0'], 'demo');
@@ -149,5 +148,52 @@ describe('resolveFeatureRoot — shared helper (AUDIT-20260530-15)', () => {
     await expect(
       resolveFeatureRoot({ slug: 'demo' } as unknown as Parameters<typeof resolveFeatureRoot>[0]),
     ).rejects.toThrow(/docsRoot.*repoRoot/);
+  });
+
+  /**
+   * AUDIT-20260531-10 regression: AUDIT-06 was a doc-prose fix
+   * (remove forbidden-deferral phrases from the helper's docblock)
+   * with no automated guard against the phrases creeping back. This
+   * test reads the SOURCE file verbatim and asserts none of the
+   * project's canonical forbidden-deferral phrases appear. Scope is
+   * intentionally limited to the source — the test file itself
+   * stores the phrase list as DATA (this `forbiddenPhrases` array
+   * below), which would self-trigger if scanned.
+   *
+   * The phrase list is a subset of FORBIDDEN_DEFERRAL_PHRASES
+   * (defined in dispatch-wrapper). Stored here as data to keep this
+   * test self-contained; if the canonical list grows, this test can
+   * be migrated to import it directly.
+   */
+  it('feature-root source file contains NO forbidden-deferral phrases (AUDIT-20260531-10)', () => {
+    const sourcePath = join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'scope-discovery',
+      'util',
+      'feature-root.ts',
+    );
+    const sourceText = readFileSync(sourcePath, 'utf8');
+    // Phrases assembled via concat so the test file's data array
+    // doesn't trigger an accidental self-scan if a future change
+    // widens the scope to include test files.
+    const forbiddenPhrases = [
+      'for ' + 'now',
+      'will fix ' + 'later',
+      'until.*lands',
+      'until.*ships',
+      'deferred to v',
+      'follow-up if ' + 'needed',
+      'follow-up ' + 'later',
+      'come back ' + 'to',
+      'address in a ' + 'follow-up',
+      'TO' + 'DO',
+    ];
+    for (const phrase of forbiddenPhrases) {
+      const re = new RegExp(phrase, 'i');
+      expect(sourceText, `forbidden phrase "${phrase}" in feature-root.ts`).not.toMatch(re);
+    }
   });
 });

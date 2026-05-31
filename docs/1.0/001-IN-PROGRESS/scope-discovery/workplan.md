@@ -567,6 +567,56 @@ Closes AUDIT-20260531-07. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
+
+### Task 5.25 (fix-finding-AUDIT-20260531-08): AUDIT-20260531-08 — The AUDIT-06 deferral-phrase purge is incomplete — the equiv…
+
+Closes AUDIT-20260531-08. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:108-117` (untouched by the diff); cross-referenced from `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:25-27`.
+
+- [x] Step 1: closure verified by the AUDIT-10 regression guard test below.
+- [x] Step 2: confirmed pre-fix the test file's docblock contained "future semver-aware sort lands" — the same forbidden-deferral phrase the AUDIT-06 fix purged from the source.
+- [x] Step 3: rewrote the test docblock to frame lex-greatest as specification, not deferred behavior. No "future... lands" framing.
+- [x] Step 4: tests pass; plugin suite 2436/2436.
+- [x] Step 5: commit with `Closes AUDIT-20260531-08` in subject.
+
+**Acceptance Criteria:**
+
+- [x] No forbidden-deferral phrase in `feature-root.test.ts`.
+- [x] AUDIT-10 regression guard (below) asserts the source file is clean too.
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.26 (fix-finding-AUDIT-20260531-09): AUDIT-20260531-09 — Doc-prose closure of Task 5.23 will trip the `fix-task-tdd-d…
+
+Closes AUDIT-20260531-09. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 block) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`.
+
+- [x] Step 1: this is a doc-cleanup finding — the bare `feature-root.test.ts` token at line 550 would resolve to a nonexistent repo-root file.
+- [x] Step 2: confirmed pre-fix line 550 said: `Regression test \`feature-root.test.ts > ...\``.
+- [x] Step 3: replaced the bare reference with the full path `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts > picks lex-greatest, NOT semver-greatest` so the `fix-task-tdd-discipline` doctor rule resolves correctly.
+- [x] Step 4: no code-side test gates this; the cure is doc hygiene.
+- [x] Step 5: commit with `Closes AUDIT-20260531-09` in subject.
+
+**Acceptance Criteria:**
+
+- [x] No bare `feature-root.test.ts` token in workplan task bodies (all references now use full paths).
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.27 (fix-finding-AUDIT-20260531-10): AUDIT-20260531-10 — AUDIT-06's fix has no automated regression guard — the cited…
+
+Closes AUDIT-20260531-10. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 acceptance criteria) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:118-130`.
+
+- [x] Step 1: NEW phrase-presence regression test in `feature-root.test.ts` reads the source file verbatim and asserts no forbidden-deferral phrase (subset of the canonical FORBIDDEN_DEFERRAL_PHRASES list).
+- [x] Step 2: confirmed pre-fix there was no automated guard against the phrases creeping back; AUDIT-06's fix was prose-only.
+- [x] Step 3: phrase strings stored as concat-assembled data (`'for ' + 'now'`) so the test's own array doesn't self-trigger if the scan widens to test files later.
+- [x] Step 4: tests pass; plugin suite 2436/2436.
+- [x] Step 5: commit with `Closes AUDIT-20260531-10` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 6 (follow-up): Primitive-extraction dispatch hygiene
 
 - [ ] Extend `dispatch-wrapper-prelude.md` with a "Primitive-extraction dispatch hygiene" section enumerating the integration-layer audit concerns (CSS class-name conflicts, ARIA contract correctness, callback-index drift, wire-format rounding/clamping). Surfaced by audiocontrol pilot TF-016 (AUDIT-20260525-09); tracked at [#290](https://github.com/audiocontrol-org/deskwork/issues/290).

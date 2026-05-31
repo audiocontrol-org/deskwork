@@ -973,3 +973,48 @@ Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings
 AUDIT-01 asked for a test that "drives failure → re-run → **confirms the workplan tick lands on the second pass**." The AUDIT-14 fix established that `tickClosureCriteria` "runs unconditionally on every --apply (including for already-dispositioned entries) so prior runs' missed flips catch up." That means a plain re-run with a working writer — *without any manual intervention* — should itself flip the missed `- [ ]` to `- [x]`. That is the load-bearing recovery contract and the most valuable thing to verify.
 
 Instead, the test performs `writeFileSync(workplanPath, wpManual, ...)` to manually flip the checkbox *before* the second run, then asserts the second run is a no-op (`toContain('- [x] Audit-log Status flipped to')`). Because the checkbox is already `[x]` when the tool re-runs, the test cannot distinguish "the tool recovered the tick" from "the operator recovered the tick and the tool did nothing." The one branch AUDIT-01 flagged as possibly unreachable (does the tool re-process an already-`fixed-<sha>` entry and flip the box?) is exactly the branch the manual pre-flip hides. This is the same vacuous-assertion shape as AUDIT-09's determinism test and AUDIT-02's own complaint. Fix: in the second run, do NOT pre-flip; assert the tool flips the still-`[ ]` checkbox to `[x]` on plain re-run.
+
+## 2026-05-31 — audit-barrage lift (20260531T042521095Z-scope-discovery)
+
+### AUDIT-20260531-08 — The AUDIT-06 deferral-phrase purge is incomplete — the equivalent phrase survives in the companion test file the fix's own docblock cross-references
+
+Finding-ID: AUDIT-20260531-08
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:108-117` (untouched by the diff); cross-referenced from `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:25-27`
+
+AUDIT-06 was flipped to `fixed-6763491` for removing "until a semver-aware sort lands" from `feature-root.ts`. The commit message records the strictest cross-model agreement on this feature (claude×5 + codex×3) flagging that *rewording* a deferral phrase isn't a fix. The diff's new docblock (`feature-root.ts:23-30`) is clean — and it explicitly points the reader at the regression test `feature-root.test.ts > 'picks lex-greatest…'`. But that very test file, at lines 113-116, still reads: *"If a **future semver-aware sort lands**, this test must be updated in lockstep — the test's existence makes the divergence auditable rather than buried behind a deferral comment."*
+
+This is materially the same deferral shape AUDIT-06 named (references the same hypothetical future semver-aware sort, with no tracking issue), one file over, in the artifact the fix cross-references. The purge was scoped to the `.ts` file and left its twin in the `.test.ts` file — the exact "patched one copy, left the other" pattern AUDIT-15 named for this feature. Under the strict canon the 8-voice round closed AUDIT-06 by, the finding is marked fixed while an equivalent phrase ships. Fix: either drop the "if a future semver-aware sort lands" clause from the test docblock (state the lex-greatest contract flatly), or, if the deferral is legitimate, file a GitHub issue for semver-aware sorting and cite its number in both docblocks.
+
+---
+
+### AUDIT-20260531-09 — Doc-prose closure of Task 5.23 will trip the `fix-task-tdd-discipline` doctor rule — its bare `feature-root.test.ts` token resolves to a nonexistent repo-root file
+
+Finding-ID: AUDIT-20260531-09
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 block) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`
+
+Task 5.23 is marked `[x]` with Step 1 = *"this is a doc-prose finding (no code-side test)."* But its acceptance-criteria line embeds a bare token: *"Regression test `feature-root.test.ts > picks lex-greatest…`"*. `findCompletedFixFindingTasks` matches this task (its heading carries `fix-finding-AUDIT-20260531-06`), and `extractTestFilePath` scans the whole block. I ran the actual extraction against the live workplan:
+
+```
+backtick match: null   (the backticked group ends with " > picks…", not at the .test.ts boundary)
+plain match:    feature-root.test.ts
+resolve@repoRoot exists? false -> <repoRoot>/feature-root.test.ts
+```
+
+So `verifyFixTaskTDD` returns `missing-test-file`, and the `fix-task-tdd-discipline` doctor rule (which "walks every `[x]`-checked fix-finding task and flags violations") will report this completed task as a violation. Worse: if the `check-fix-task-tdd` commit-msg gate were enforced on this branch, the `Closes AUDIT-20260531-06` commit could not have landed (same `missing-test-file` extraction) — so either the gate was bypassed/unwired, or it's silently inconsistent with the doctor rule. The root cause is a design gap: the TDD-enforcement grammar has no sentinel for a *legitimately testless* doc-prose finding. Contrast Task 5.24, which cites a full resolvable path (`plugins/…/apply-audit-flips-cli.test.ts`) and passes. Fix: give doc-prose findings a recognized "no-code-test" shape the enforcement primitive treats as valid, OR avoid embedding any bare `*.test.ts` token in a testless task's body (the doctor rule will keep latching onto it).
+
+---
+
+### AUDIT-20260531-10 — AUDIT-06's fix has no automated regression guard — the cited "regression test" exercises sort behavior, not phrase presence
+
+Finding-ID: AUDIT-20260531-10
+Status:     open
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 acceptance criteria) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:118-130`
+
+Task 5.23's acceptance criterion claims the contract is pinned by *"Regression test `feature-root.test.ts > picks lex-greatest, NOT semver-greatest` still pins the contract."* But that test asserts only the *sort outcome* (`['0.9.0','0.10.0'] → 0.9.0`) — which the AUDIT-06 fix did not touch. Nothing in the suite asserts the *absence of a forbidden deferral phrase* in the docblock. If someone re-adds "until X lands" / "for now" to `feature-root.ts`, no test fails; the sort test stays green. The acceptance criterion "No forbidden-deferral phrase in `feature-root.ts`" is a manual claim, not a check.
+
+This is the same vacuous-coverage shape prior rounds named (AUDIT-09's vacuous determinism test, AUDIT-02's surface-symptom-only assertion) and is the structural reason the twin phrase in claude-01 went unnoticed: there is no scanner over committed source for the project's forbidden-deferral canon (the dispatch-wrapper only screens live *agent output*, not files on disk). A reasonable fix is a small doctor rule / unit test that greps the scope-discovery source tree for the banned-phrase canon and fails on a hit — which would close claude-01 and claude-03 together and make "No forbidden-deferral phrase" falsifiable rather than asserted.
