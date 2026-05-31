@@ -1406,17 +1406,17 @@ Closes AUDIT-20260530-93 (cross-model: AUDIT-BARRAGE-codex-P7T7.2). Surface: `pa
 
 Closes AUDIT-20260530-94 (cross-model: AUDIT-BARRAGE-codex-P7T7.2). Surface: `packages/cli/src/commands/group.ts:151-163`, `packages/cli/src/commands/group.ts:182-213`, `packages/cli/src/commands/group.ts:221-248`, `packages/cli/src/commands/group.ts:274-296`, `packages/cli/src/commands/group.ts:302-318`, `packages/cli/src/commands/group.ts:324-340`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-94 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/cli/test/group/extra-positional-refused.test.ts`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — 7 of 8 cases failed pre-fix
+- [x] Step 3: implement the fix — `assertExactPositional` helper in `packages/cli/src/commands/group.ts` invoked from all 7 verb handlers
+- [x] Step 4: confirm test passes — 8/8 in new file; 77/77 in `test/group/`; 423/423 in full `@deskwork/cli` suite
+- [x] Step 5: commit with `Closes AUDIT-20260530-94 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)` in subject — sha eec6aec
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/cli/test/group/extra-positional-refused.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-eec6aec` via the close-shipped-audit-findings step
 
 
 
