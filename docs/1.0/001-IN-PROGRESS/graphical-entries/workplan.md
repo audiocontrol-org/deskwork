@@ -1159,17 +1159,17 @@ Closes AUDIT-20260530-80 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `pac
 
 Closes AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `packages/core/src/doctor/rules/lane-config-missing-template.ts:200-210` (finding.details), `:324-329` (journal event); `packages/core/src/schema/journal-events.ts:228` (`laneFilePath: z.string().min(1)`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
+- [x] Step 1: update existing assertions at `packages/core/test/doctor/lane-config-missing-template.test.ts:141-145` and `:240` to expect relative form (TDD-style failure first)
+- [x] Step 2: confirmed the pre-fix assertions failed (the rule emitted absolute paths)
+- [x] Step 3: persisted `relative(ctx.projectRoot, laneFilePath)` in both `finding.details.laneFilePath` and the `lane-config-repair` journal event's `details.laneFilePath`; updated schema docstring at `packages/core/src/schema/journal-events.ts` to document the relative-path convention
+- [x] Step 4: `npm --workspace @deskwork/core test` — 879/879 pass
+- [x] Step 5: committed as `b9784cc` with `Closes AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Updated assertions live at `packages/core/test/doctor/lane-config-missing-template.test.ts:141-150` and `:248-254` (one absolute-form assertion replaced + an explicit `startsWith('/')` guard added in each scenario)
+- [x] `npm --workspace @deskwork/core test -- test/doctor/lane-config-missing-template.test.ts` exits 0 (6/6 pass against the fix)
+- [x] Audit-log Status flipped to `fixed-b9784cc`
 
 
 

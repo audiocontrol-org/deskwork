@@ -4182,7 +4182,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). 
 ### AUDIT-20260530-81 — [P6-3 claude] `laneFilePath` is persisted as an absolute path in the journal event and finding details
 
 Finding-ID: AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3)
-Status:     open
+Status:     fixed-b9784cc
 Severity:   low
 Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:200-210` (finding.details), `:324-329` (journal event); `packages/core/src/schema/journal-events.ts:228` (`laneFilePath: z.string().min(1)`)
 
