@@ -385,6 +385,112 @@ describe('runApplyAuditFlips — dry-run + apply flows', () => {
     expect(exit).not.toBe(0);
     // Operator visibility: stderr names the failure.
     expect(stderr.text()).toMatch(/workplan|synthetic/i);
+
+    // AUDIT-20260531-02 regression: the split-state is verifiable —
+    // audit-log was written (status fixed-closesha) but workplan
+    // checkbox stayed `- [ ]` because the write threw.
+    const auditLogAfterFail = readFileSync(
+      join(featureDir, 'audit-log.md'),
+      'utf8',
+    );
+    expect(auditLogAfterFail).toContain('Status: fixed-closesha');
+    const workplanAfterFail = readFileSync(workplanPath, 'utf8');
+    expect(workplanAfterFail).toContain('- [ ] Audit-log Status flipped to');
+  });
+
+  it('recovers from a workplan write failure on re-run (AUDIT-20260531-01 — manual catchup is idempotent)', async () => {
+    // Per AUDIT-20260531-01: the AUDIT-17 error message instructs
+    // the operator to "manually flip the workplan checkbox for each
+    // fixed finding, then re-run apply-audit-flips to confirm the
+    // catchup is idempotent." That recovery path was never tested.
+    // This test exercises it end-to-end:
+    //   1. First run: failing workplan-writer → exit 1, audit-log
+    //      written, workplan checkbox stays `[ ]`.
+    //   2. Operator manually flips the workplan checkbox.
+    //   3. Second run: working writer; apply-audit-flips re-runs
+    //      cleanly (catchup is a no-op on the already-flipped box).
+    const repoRoot = makeRepo('recovery', OPEN_TWO_ENTRIES);
+    const featureDir = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');
+    const workplanPath = join(featureDir, 'workplan.md');
+    writeFileSync(
+      workplanPath,
+      [
+        '# Workplan',
+        '',
+        '## Phase 13: x',
+        '',
+        '### Task 13.1 (fix-finding-AUDIT-20260529-12): first',
+        '',
+        '- [x] step',
+        '',
+        '**Acceptance Criteria:**',
+        '',
+        '- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    const walker: CommitWalker = () => [
+      { sha: 'recsha', message: 'fix: Closes AUDIT-20260529-12' },
+    ];
+
+    // First run — failing writer for the workplan.
+    const failingWriter = async (
+      path: string,
+      content: string,
+    ): Promise<void> => {
+      if (path === workplanPath) {
+        throw new Error('synthetic write failure');
+      }
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(path, content, 'utf8');
+    };
+    const stdout1 = new CaptureStream();
+    const stderr1 = new CaptureStream();
+    const exit1 = await runApplyAuditFlips({
+      opts: { featureSlug: 'demo', apply: true },
+      projectRoot: repoRoot,
+      stdout: stdout1 as unknown as NodeJS.WriteStream,
+      stderr: stderr1 as unknown as NodeJS.WriteStream,
+      commitWalker: walker,
+      write: failingWriter,
+    });
+    expect(exit1).not.toBe(0);
+    // Audit-log fixed but workplan unchecked.
+    expect(readFileSync(join(featureDir, 'audit-log.md'), 'utf8')).toContain(
+      'Status: fixed-recsha',
+    );
+    expect(readFileSync(workplanPath, 'utf8')).toContain(
+      '- [ ] Audit-log Status flipped to',
+    );
+
+    // Operator simulates the manual recovery: flip the checkbox.
+    const wpManual = readFileSync(workplanPath, 'utf8').replace(
+      '- [ ] Audit-log Status flipped to',
+      '- [x] Audit-log Status flipped to',
+    );
+    writeFileSync(workplanPath, wpManual, 'utf8');
+
+    // Second run — working writer. apply-audit-flips re-runs;
+    // audit-log status is already `fixed-recsha` so the finding
+    // is `already-dispositioned`; the workplan catchup is a no-op
+    // (checkbox already `[x]`); exit 0.
+    const stdout2 = new CaptureStream();
+    const stderr2 = new CaptureStream();
+    const exit2 = await runApplyAuditFlips({
+      opts: { featureSlug: 'demo', apply: true },
+      projectRoot: repoRoot,
+      stdout: stdout2 as unknown as NodeJS.WriteStream,
+      stderr: stderr2 as unknown as NodeJS.WriteStream,
+      commitWalker: walker,
+    });
+    expect(exit2).toBe(0);
+    // Workplan content unchanged (the manual flip stuck).
+    expect(readFileSync(workplanPath, 'utf8')).toContain(
+      '- [x] Audit-log Status flipped to',
+    );
+    // The re-run reported the finding as already-dispositioned.
+    expect(stdout2.text() + stderr2.text()).toMatch(/already.*fixed/i);
   });
 
   it('ticks the workplan closure-criterion checkbox for each flipped finding (AUDIT-20260530-14)', async () => {
