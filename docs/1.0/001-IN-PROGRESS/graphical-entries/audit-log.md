@@ -3649,7 +3649,7 @@ Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (codex). R
 ### AUDIT-20260530-42 — [P5-2 codex] Unbucketed template-stage entries are counted but never rendered
 
 Finding-ID: AUDIT-20260530-42 (cross-model: AUDIT-BARRAGE-codex-P5-2)
-Status:     open
+Status:     fixed-fc192e9 (duplicate of AUDIT-20260530-25; closed by the same Task 0.1 commit)
 Severity:   high
 Surface:    packages/studio/src/pages/dashboard/lane-data.ts:266-273; packages/studio/src/pages/dashboard/swimlane-card.ts:391-422
 

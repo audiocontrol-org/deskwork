@@ -445,17 +445,19 @@ Disposition: duplicate of AUDIT-20260530-38 (claude). Both findings describe the
 
 Closes AUDIT-20260530-42 (cross-model: AUDIT-BARRAGE-codex-P5-2). Surface: packages/studio/src/pages/dashboard/lane-data.ts:266-273; packages/studio/src/pages/dashboard/swimlane-card.ts:391-422.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-42 (cross-model: AUDIT-BARRAGE-codex-P5-2)` in subject
+Disposition: duplicate of AUDIT-20260530-25 (claude). Both describe `bucket.unbucketed` entries being counted but never rendered. Closed by Task 0.1 commit `fc192e9` which added per-swim unbucketed-tail rendering (`renderUnbucketedStageCol` + `renderUnbucketedListGroup` in `swimlane-unbucketed.ts`). Regression coverage at `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` covers the same surface.
+
+- [x] Step 1: covered by AUDIT-25 test
+- [x] Step 2: verified during AUDIT-25 cycle
+- [x] Step 3: implemented in `fc192e9`
+- [x] Step 4: verified
+- [x] Step 5: closed via duplicate-of-25 disposition (see Task 0.18 docs commit)
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` (AUDIT-25 regression — same surface)
+- [x] `npx vitest run` exits 0
+- [x] Audit-log Status flipped to `fixed-fc192e9 (duplicate of AUDIT-20260530-25; closed by the same Task 0.1 commit)`
 
 
 
