@@ -342,9 +342,15 @@ const rule: DoctorRule = {
           skipReason: 'apply-failed',
         };
       }
+      // AUDIT-20260530-77 — list dependent **slugs**, not UUIDs.
+      // The refusal message instructs the operator to run
+      // `deskwork lane move <slug> --to <other>`; UUIDs cannot be
+      // pasted into that command. The sibling `lane purge` refusal
+      // (lanes/operations/purge.ts) also maps to `entry.slug`; this
+      // surface must speak the same vocabulary.
       const dependents = sidecars
         .filter((entry) => entry.lane === laneId)
-        .map((entry) => entry.uuid);
+        .map((entry) => entry.slug);
       if (dependents.length > 0) {
         const sample = dependents.slice(0, DELETE_DEPENDENTS_SAMPLE_LIMIT);
         const remainder = dependents.length - sample.length;

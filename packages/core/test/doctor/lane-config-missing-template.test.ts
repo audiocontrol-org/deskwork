@@ -10,7 +10,12 @@
  *   3. Repair via `delete-lane` (no entries bound): the lane file is
  *      removed and a journal event is emitted.
  *   4. Repair via `delete-lane` when entries are bound: the apply
- *      refuses with `success: false` and names the bound entry's UUID.
+ *      refuses with `success: false` and names the bound entry's
+ *      **slug** (per AUDIT-20260530-77 — the refusal message must use
+ *      slugs to match the `lane move <slug>` instruction it gives and
+ *      to match the sibling `lane purge` refusal surface).
+ *   5. Repair via `delete-lane` with multiple bound entries: refusal
+ *      lists every bound slug, never UUIDs.
  *
  * Fixtures live on disk under tmp directories — no filesystem mocking,
  * per the project's testing rules.
@@ -308,7 +313,79 @@ describe('doctor: lane-config-missing-template', () => {
       payload: choice.payload,
     });
     expect(result.applied).toBe(false);
-    expect(result.message).toContain(boundUuid);
+    // Per AUDIT-20260530-77 — the refusal message must list the slug
+    // (the identifier the operator can paste into the suggested
+    // `lane move <slug>` command), not the UUID. The sibling
+    // `lane purge` surface (purge.ts) already uses slugs; this surface
+    // must match.
+    expect(result.message).toContain('bound-entry');
+    expect(result.message).not.toContain(boundUuid);
+    expect(result.message).toMatch(/Cannot delete lane/);
+
+    // Lane file still on disk — refusal was effective.
+    expect(
+      existsSync(join(fixture.root, '.deskwork', 'lanes', 'dangling.json')),
+    ).toBe(true);
+  });
+
+  it('refuses delete-lane and lists slugs (never UUIDs) for multiple bound entries', async () => {
+    // AUDIT-20260530-77 — extended scenario per Task 0.52 brief: two
+    // bound entries with operator-recognizable slugs. The refusal
+    // message must name each slug; no UUID may leak through.
+    writeLaneJson(fixture.root, 'dangling', {
+      id: 'dangling',
+      name: 'Dangling Lane',
+      pipelineTemplate: 'nonsense',
+      contentDir: 'docs',
+    });
+    const firstUuid = '22222222-2222-4222-8222-222222222222';
+    const secondUuid = '33333333-3333-4333-8333-333333333333';
+    const nowIso = new Date().toISOString();
+    writeSidecarJson(fixture.root, {
+      uuid: firstUuid,
+      slug: 'first-post',
+      title: 'First Post',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      lane: 'dangling',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
+    writeSidecarJson(fixture.root, {
+      uuid: secondUuid,
+      slug: 'second-post',
+      title: 'Second Post',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      lane: 'dangling',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
+
+    const ctx = buildCtx(fixture);
+    const findings = await laneConfigMissingTemplate.audit(ctx);
+    expect(findings).toHaveLength(1);
+
+    const plan = await laneConfigMissingTemplate.plan(ctx, findings[0]);
+    if (plan.kind !== 'prompt') throw new Error('plan must be prompt');
+    const choice = plan.choices.find((c) => c.id === 'delete-lane');
+    if (!choice) throw new Error('delete-lane choice missing');
+
+    const result = await laneConfigMissingTemplate.apply(ctx, {
+      kind: 'apply',
+      finding: findings[0],
+      summary: choice.label,
+      payload: choice.payload,
+    });
+    expect(result.applied).toBe(false);
+    expect(result.message).toContain('first-post');
+    expect(result.message).toContain('second-post');
+    expect(result.message).not.toContain(firstUuid);
+    expect(result.message).not.toContain(secondUuid);
     expect(result.message).toMatch(/Cannot delete lane/);
 
     // Lane file still on disk — refusal was effective.
