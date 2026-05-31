@@ -357,7 +357,6 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
       );
       return 0;
     }
-    const cappedFindings: readonly OpenFinding[] = findings.slice(0, opts.limit);
     let workplanText: string;
     try {
       workplanText = await args.read.workplan(workplanPath);
@@ -367,6 +366,32 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
       );
       return 2;
     }
+    // Per Issue #377: filter out findings already scoped in the
+    // workplan BEFORE applying the slice cap. Pre-fix `slice(0, limit)`
+    // ran on the full set in audit-log file order (oldest-first);
+    // newly-lifted findings at the audit-log tail got dropped past the
+    // cap while already-scoped findings filled the limit + got
+    // de-duped by workplan-editor's `findingsAlreadyInserted`. The
+    // /dwi audit-barrage hook's auto-promote step then silently
+    // no-op'd the scoping of NEW findings.
+    const FIX_FINDING_MARKER_RE = /\bfix-finding-(AUDIT-\d{8}-\d+)/g;
+    const alreadyScoped = new Set<string>();
+    for (const m of workplanText.matchAll(FIX_FINDING_MARKER_RE)) {
+      if (m[1] !== undefined) alreadyScoped.add(m[1]);
+    }
+    const CANONICAL_AUDIT_ID_RE = /\bAUDIT-\d{8}-\d+/;
+    const canonicalOf = (id: string): string =>
+      CANONICAL_AUDIT_ID_RE.exec(id)?.[0] ?? id;
+    const newFindings = findings.filter(
+      (f) => !alreadyScoped.has(canonicalOf(f.findingId)),
+    );
+    if (newFindings.length === 0) {
+      stdout.write(
+        `promote-findings --auto: no new findings to scope on feature ${opts.featureSlug} (${findings.length} open finding(s) already scoped in workplan).\n`,
+      );
+      return 0;
+    }
+    const cappedFindings: readonly OpenFinding[] = newFindings.slice(0, opts.limit);
     let position;
     try {
       position = computeAutoPosition(workplanText);

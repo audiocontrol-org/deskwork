@@ -951,3 +951,197 @@ describe('runPromoteFindings — auto-apply MULTI-finding path (AUDIT-20260530-0
     }
   });
 });
+
+/**
+ * Issue #377 regression: `--auto` walked open findings in audit-log
+ * file order (oldest first) and applied `slice(0, limit)` BEFORE
+ * checking which ones were already scoped in the workplan. Result:
+ * newly-lifted findings at the audit-log tail were dropped past the
+ * limit cap, while already-scoped findings filled the limit and got
+ * de-duped by workplan-editor's `findingsAlreadyInserted`. The
+ * `/dwi` end-of-task hook chain ran end-to-end successfully but
+ * silently no-op'd the scoping of NEW findings, leaving the gate
+ * stuck.
+ *
+ * Fix: filter out already-scoped findings BEFORE the slice cap.
+ * Test fixture: workplan already has Task 0.1 scoping AUDIT-OLD-1
+ * (which is still `Status: open` because not yet fixed); audit-log
+ * has AUDIT-OLD-1 (open) + AUDIT-NEW-1 (open, newly lifted, appears
+ * AFTER OLD-1 in file order). Run `--auto` with `limit: 1`.
+ *
+ * Pre-fix: slice(0, 1) → [OLD-1]; OLD-1 deduped by workplan; net
+ * insertion: 0; NEW-1 never scoped.
+ *
+ * Post-fix: filter scoped → delta = [NEW-1]; slice(0, 1) → [NEW-1];
+ * NEW-1 inserted.
+ */
+describe('runPromoteFindings — auto-apply DELTA filtering (Issue #377)', () => {
+  function makeDeltaFixture(): {
+    root: string;
+    featureSlug: string;
+    cleanup: () => void;
+  } {
+    const root = mkdtempSync(join(tmpdir(), 'pf-delta-'));
+    const featureSlug = 'demo-feature';
+    const featureDir = join(root, 'docs', '1.0', '001-IN-PROGRESS', featureSlug);
+    mkdirSync(featureDir, { recursive: true });
+    // Workplan: Phase 0 + Task 0.1 already scoping AUDIT-OLD-1.
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '',
+        '## Phase 0: audit cleanup',
+        '',
+        '### Task 0.1 (fix-finding-AUDIT-20260530-OLD-1): pre-existing fix-task',
+        '',
+        '- [ ] Step 1: write failing test',
+        '- [ ] Step 2: confirm fails',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    // Audit-log: OLD-1 is in file order BEFORE NEW-1, both `Status: open`.
+    // Note: AUDIT-NN format requires 8-digit date + integer NN. Using
+    // synthetic-but-canonical-shape IDs for the test.
+    writeFileSync(
+      join(featureDir, 'audit-log.md'),
+      [
+        '# Audit Log',
+        '',
+        '### Pre-existing finding (already scoped in workplan)',
+        '',
+        'Finding-ID: AUDIT-20260530-01',
+        'Status: open',
+        'Severity: medium',
+        'Surface: src/a.ts:10',
+        '',
+        'Body.',
+        '',
+        '### Newly-lifted finding',
+        '',
+        'Finding-ID: AUDIT-20260601-01',
+        'Status: open',
+        'Severity: high',
+        'Surface: src/b.ts:20',
+        '',
+        'Body.',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    // The workplan has a fix-task tagged with `AUDIT-20260530-OLD-1`
+    // which doesn't actually match the audit-log entry above. Fix by
+    // re-writing the workplan to use the actual ID.
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '',
+        '## Phase 0: audit cleanup',
+        '',
+        '### Task 0.1 (fix-finding-AUDIT-20260530-01): pre-existing fix-task',
+        '',
+        '- [ ] Step 1: write failing test',
+        '- [ ] Step 2: confirm fails',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    return {
+      root,
+      featureSlug,
+      cleanup: () => rmSync(root, { recursive: true, force: true }),
+    };
+  }
+
+  it('drops the new finding pre-fix because slice(limit=1) takes the already-scoped OLD first', async () => {
+    // This test pins the EXPECTED post-fix behavior: with limit=1,
+    // the new finding (NEW-1) gets scoped while the old finding
+    // (OLD-1, already scoped) is filtered out before the slice.
+    const fix = makeDeltaFixture();
+    try {
+      const proposalFs = new Map<string, string>();
+      const { args, diskWrites, stdout } = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: fix.featureSlug,
+          bucket: 'open',
+          limit: 1,
+        },
+        fix,
+        proposalFs,
+      );
+      const exit = await runPromoteFindings(args);
+      expect(exit).toBe(0);
+      const workplanPath = join(
+        fix.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        fix.featureSlug,
+        'workplan.md',
+      );
+      const written = diskWrites.get(workplanPath) ?? '';
+      // The new finding (NEW-1) must be scoped.
+      expect(written).toMatch(/AUDIT-20260601-01/);
+      // The old finding's task must NOT be duplicated (it was already
+      // scoped; the dedupe + delta filter prevent re-insertion).
+      const oldOccurrences = (written.match(/fix-finding-AUDIT-20260530-01/g) ?? []).length;
+      expect(oldOccurrences).toBe(1);
+      // Auto-applied count should report 1 (the new finding).
+      expect(stdout.text()).toMatch(/Auto-applied: 1/);
+    } finally {
+      fix.cleanup();
+    }
+  });
+
+  it('reports `no new findings to scope` when every open finding is already scoped', async () => {
+    const fix = makeDeltaFixture();
+    try {
+      // Remove the audit-log's NEW-1 entry so only the already-scoped
+      // OLD-1 remains.
+      const featureDir = join(
+        fix.root,
+        'docs',
+        '1.0',
+        '001-IN-PROGRESS',
+        fix.featureSlug,
+      );
+      writeFileSync(
+        join(featureDir, 'audit-log.md'),
+        [
+          '# Audit Log',
+          '',
+          '### Pre-existing finding (already scoped in workplan)',
+          '',
+          'Finding-ID: AUDIT-20260530-01',
+          'Status: open',
+          'Severity: medium',
+          '',
+          'Body.',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      const proposalFs = new Map<string, string>();
+      const { args, stdout } = makeRunArgs(
+        {
+          verb: 'auto-apply',
+          featureSlug: fix.featureSlug,
+          bucket: 'open',
+          limit: 10,
+        },
+        fix,
+        proposalFs,
+      );
+      const exit = await runPromoteFindings(args);
+      expect(exit).toBe(0);
+      // The verb should report "no NEW findings to scope" (all open
+      // findings are already in the workplan).
+      expect(stdout.text().toLowerCase()).toMatch(/no new|already scoped/);
+    } finally {
+      fix.cleanup();
+    }
+  });
+});
