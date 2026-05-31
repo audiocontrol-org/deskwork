@@ -3835,7 +3835,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). 
 ### AUDIT-20260530-56 — [P6-1 claude] `appendRenameMigration` is non-atomic and silently discards a corrupt renames file, contradicting the append-only audit-trail promise
 
 Finding-ID: AUDIT-20260530-56 (cross-model: AUDIT-BARRAGE-claude-P6-1)
-Status:     open
+Status:     fixed-cb78c6b
 Severity:   medium
 Surface:    `packages/core/src/pipelines/operations/update.ts:appendRenameMigration` (read + `writeFileSync` direct), and `plugins/deskwork/skills/pipeline/SKILL.md` Safety-rules ("migration sidecar is append-only … deleting it loses the audit trail")
 
