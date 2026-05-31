@@ -57,7 +57,7 @@ import {
   rmSync,
   unlinkSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { appendJournalEvent } from '../../journal/append.ts';
 import { writeSidecar } from '../../sidecar/write.ts';
 import { readSidecar } from '../../sidecar/read.ts';
@@ -95,6 +95,43 @@ export interface MoveEntryResult {
  */
 function resolveContentDirAbs(projectRoot: string, contentDir: string): string {
   return isAbsolute(contentDir) ? contentDir : resolve(projectRoot, contentDir);
+}
+
+/**
+ * AUDIT-20260530-64 boundary check. Refuses any resolved filesystem
+ * path that escapes its containing lane contentDir. Used at four
+ * sites in `moveEntryToLane`: source artifact, target artifact,
+ * source scrapbook, target scrapbook. Each site joins a contentDir
+ * with an entry-controlled relative segment (`sidecar.artifactPath`
+ * or `sidecar.slug`) — without this check, a malformed sidecar with
+ * `artifactPath: "../outside.md"` or `slug: "../escape"` makes the
+ * move read + write files outside the lane content tree.
+ *
+ * The check uses `path.relative(contentDir, resolvedPath)` and
+ * refuses any relative path that starts with `..` (or is itself
+ * `..`) or is absolute. This is the canonical Node pattern for
+ * "is X inside Y" — works on both POSIX and Windows because the
+ * underlying `path.resolve` and `path.relative` are platform-aware.
+ */
+function assertPathInsideContentDir(args: {
+  resolvedPath: string;
+  contentDirAbs: string;
+  entrySlug: string;
+  boundary: 'artifactPath' | 'slug-derived scrapbook';
+  side: 'source' | 'target';
+}): void {
+  const { resolvedPath, contentDirAbs, entrySlug, boundary, side } = args;
+  const rel = relative(contentDirAbs, resolvedPath);
+  const escapes = rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel);
+  if (escapes) {
+    throw new Error(
+      `cannot move entry '${entrySlug}': ${side} ${boundary} resolves to `
+      + `'${resolvedPath}', which escapes the ${side} lane contentDir `
+      + `'${contentDirAbs}'. Refusing the move — repair the sidecar `
+      + `(remove '..' segments / absolute paths from the offending field) `
+      + `before retrying.`,
+    );
+  }
 }
 
 /**
@@ -249,11 +286,35 @@ export async function moveEntryToLane(
   // sidecar, the source file is at `<sourceContentDir>/<artifactPath>`;
   // we move it to `<targetContentDir>/<artifactPath>` (same relative
   // shape under the new contentDir).
+  //
+  // Per AUDIT-20260530-64, BOTH the source and the target resolved
+  // paths are checked against their respective contentDirs before any
+  // filesystem operation runs. The schema-level refinement on
+  // `artifactPath` blocks the canonical attack shapes upstream, but
+  // the boundary check stays as defense-in-depth — the field could be
+  // populated by a non-deskwork process, or a future code path could
+  // bypass the schema. The check uses `path.resolve` (via
+  // `assertPathInsideContentDir`) so even a normalised-looking
+  // relative path that traverses out is caught.
   let fromArtifactAbs: string | undefined;
   let toArtifactAbs: string | undefined;
   if (sidecar.artifactPath !== undefined) {
-    fromArtifactAbs = join(sourceContentDir, sidecar.artifactPath);
-    toArtifactAbs = join(targetContentDir, sidecar.artifactPath);
+    fromArtifactAbs = resolve(sourceContentDir, sidecar.artifactPath);
+    toArtifactAbs = resolve(targetContentDir, sidecar.artifactPath);
+    assertPathInsideContentDir({
+      resolvedPath: fromArtifactAbs,
+      contentDirAbs: sourceContentDir,
+      entrySlug: sidecar.slug,
+      boundary: 'artifactPath',
+      side: 'source',
+    });
+    assertPathInsideContentDir({
+      resolvedPath: toArtifactAbs,
+      contentDirAbs: targetContentDir,
+      entrySlug: sidecar.slug,
+      boundary: 'artifactPath',
+      side: 'target',
+    });
     if (!existsSync(fromArtifactAbs)) {
       throw new Error(
         `Cannot move entry ${sidecar.slug}: source artifact does not exist at `
@@ -271,8 +332,27 @@ export async function moveEntryToLane(
     }
   }
 
-  const sourceScrapbookDir = join(sourceContentDir, sidecar.slug, 'scrapbook');
-  const targetScrapbookDir = join(targetContentDir, sidecar.slug, 'scrapbook');
+  const sourceScrapbookDir = resolve(sourceContentDir, sidecar.slug, 'scrapbook');
+  const targetScrapbookDir = resolve(targetContentDir, sidecar.slug, 'scrapbook');
+  // Per AUDIT-20260530-64, the per-entry scrapbook path is built from
+  // `sidecar.slug` — also entry-controlled. EntrySchema's `slug` is
+  // an unconstrained `z.string().min(1)` for back-compat, so a slug
+  // like `../escape` parses cleanly. Refuse here for the same reason
+  // as the artifact branch above; check both sides.
+  assertPathInsideContentDir({
+    resolvedPath: sourceScrapbookDir,
+    contentDirAbs: sourceContentDir,
+    entrySlug: sidecar.slug,
+    boundary: 'slug-derived scrapbook',
+    side: 'source',
+  });
+  assertPathInsideContentDir({
+    resolvedPath: targetScrapbookDir,
+    contentDirAbs: targetContentDir,
+    entrySlug: sidecar.slug,
+    boundary: 'slug-derived scrapbook',
+    side: 'target',
+  });
 
   // Track which filesystem operations succeeded so the catch below
   // can reverse them on a later failure (e.g. writeSidecar throwing

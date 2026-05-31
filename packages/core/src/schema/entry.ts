@@ -117,7 +117,31 @@ export function nextStage(s: string): Stage | null {
 }
 
 import { z } from 'zod';
+import { isAbsolute as nodeIsAbsolute } from 'node:path';
 import { LANE_ID_REGEX } from '../lanes/types.ts';
+
+/**
+ * Absolute-path detection that covers both POSIX (`/etc/passwd`) and
+ * Windows (`C:\Users\…`, `\\share\…`) shapes regardless of which OS
+ * the schema runs on. Node's `path.isAbsolute` is platform-aware —
+ * on POSIX it does NOT classify `C:\Foo` as absolute, and on Windows
+ * it does NOT classify `/etc/passwd` as absolute. The schema's
+ * AUDIT-20260530-64 boundary check needs to refuse BOTH shapes
+ * regardless of the runtime platform, so we OR both checks together.
+ */
+function isAbsoluteAnyPlatform(value: string): boolean {
+  if (nodeIsAbsolute(value)) return true;
+  // POSIX-style leading slash check (in case the runtime is Windows
+  // and Node's posix-blind isAbsolute would return false).
+  if (value.startsWith('/')) return true;
+  // Windows drive-letter form (`C:\` / `C:/`) — the leading `\\?\`
+  // and UNC `\\server\share` shapes both start with `\`, caught by
+  // the next check.
+  if (/^[a-zA-Z]:[\\/]/.test(value)) return true;
+  // Windows UNC / extended-length / device shapes.
+  if (value.startsWith('\\')) return true;
+  return false;
+}
 
 /**
  * Editorial-pipeline stage enum — kept as a back-compat export. New
@@ -215,7 +239,41 @@ export const EntrySchema = z.object({
   // `/deskwork:iterate` verb operates on that file. When absent, the
   // group is metadata-only and `iterate` refuses with a
   // "metadata-only" message per Task 7.7.2.
-  artifactPath: z.string().optional(),
+  //
+  // Per AUDIT-20260530-64: defense-in-depth at the schema boundary.
+  // A malformed sidecar with `artifactPath: "../outside.md"` used to
+  // parse cleanly and flow straight into `join(contentDir,
+  // artifactPath)` at the move/render boundary, escaping the lane
+  // content tree. The refinement below rejects:
+  //   - absolute paths (begin with `/` on POSIX or a drive letter on
+  //     Windows — caught by Node's `path.isAbsolute`),
+  //   - any path containing a `..` segment (parent-directory
+  //     traversal — covers leading, mid-path, and trailing forms),
+  //   - empty strings (the field is optional; an explicit empty
+  //     string is meaningless).
+  // The move-layer boundary check stays — defense in depth: a
+  // path that passes the schema can still escape if the sidecar's
+  // `slug` carries `..` (slug is unconstrained for back-compat),
+  // and an absolute artifactPath written by a non-deskwork process
+  // could still slip past if the schema is bypassed.
+  artifactPath: z
+    .string()
+    .min(1, 'artifactPath must be a non-empty string when present')
+    .refine(
+      (value) => !value.split(/[\\/]/).includes('..'),
+      {
+        message:
+          'artifactPath must not contain `..` segments (path-traversal blocked)',
+      },
+    )
+    .refine(
+      (value) => !isAbsoluteAnyPlatform(value),
+      {
+        message:
+          'artifactPath must be relative to the lane contentDir, not absolute',
+      },
+    )
+    .optional(),
 
   // Group membership (Phase 7 Task 7.1.1). Optional array of member
   // entry UUIDs. The schema's invariant per Task 7.1.2: entries with
