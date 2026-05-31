@@ -255,17 +255,19 @@ Closes AUDIT-20260530-31 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `pac
 
 Closes AUDIT-20260530-32 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `packages/studio/src/pages/dashboard/swimlane-list-body.ts:109`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-32 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+Disposition: duplicate of AUDIT-20260528-08 (the original inert-button-trap surfacing on the same `.lb-overflow` site). The gemini auditor's finding text explicitly cites AUDIT-20260528-08 in its narrative ("This issue is explicitly flagged as AUDIT-20260528-08 in `audit-log.md`...") but read pre-fix source — the actual `swimlane-list-body.ts` already renders `.lb-overflow` as a plain decorative `<span aria-hidden="true" data-lb-overflow="...">` with NO `role="button"`, NO `tabindex`, NO `aria-label`, per the fix landed in commit `e309f00`. Regression coverage lives in `packages/studio/test/dashboard-swimlane-list-render.test.ts` — the `AUDIT-08: lb-overflow span is NOT in the keyboard tab order (no role, no tabindex, no aria-label)` test asserts every attribute AUDIT-32 names (no `role=`, no `tabindex=`, no `aria-label=`, `aria-hidden="true"` present), and the row-shape test pins the `data-lb-overflow="${uuid}"` retention so future Task 5.1C/5.2 wiring can find the elements. Both tests pass; the fix is already in tree.
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — covered by AUDIT-08 test in `dashboard-swimlane-list-render.test.ts`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — verified during AUDIT-20260528-08 cycle (commit `e309f00`)
+- [x] Step 3: implement the fix — `e309f00`
+- [x] Step 4: confirm test passes — `npx vitest run packages/studio/test/dashboard-swimlane-list-render.test.ts` → 12/12 pass
+- [x] Step 5: commit with `Closes AUDIT-20260530-32 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject — see disposition note; closed via duplicate-of-08 disposition rather than a fresh fix commit
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-list-render.test.ts` (AUDIT-08 regression — same `.lb-overflow` site, same focusability vectors)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-list-render.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-e309f00 (duplicate of AUDIT-20260528-08; closed by the same commit)` per duplicate disposition
 
 
 

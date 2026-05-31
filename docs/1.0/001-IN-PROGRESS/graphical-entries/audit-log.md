@@ -3527,7 +3527,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). 
 ### AUDIT-20260530-32 — [P5-1 gemini] The list-view overflow affordance (`.lb-overflow`) is rendered as a `<span>` with `role="button"` and `tabindex="0"` inside an `<a>` element (`.lb-row`). This makes it a focusable and semantically interactive control. However, the accompanying comment explicitly states, "Task 5.1C / 5.2 wires a click handler to the affordance; the markup ships with `role="button"` + `tabindex="0"` + `aria-label` so the semantics are correct at the affordance level even when no handler is bound." This creates an operator-discipline trap (per the prompt's definition): a user can focus and attempt to activate this "button," but it will be inert until a future task implements its behavior. Interactive elements should not be focusable if they perform no action, as this leads to a confusing and frustrating user experience. This issue is explicitly flagged as AUDIT-20260528-08 in `audit-log.md` and remains unfixed.
 
 Finding-ID: AUDIT-20260530-32 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
-Status:     open
+Status:     fixed-e309f00 (duplicate of AUDIT-20260528-08; closed by the same commit)
 Severity:   medium
 Surface:    `packages/studio/src/pages/dashboard/swimlane-list-body.ts:109`
 
