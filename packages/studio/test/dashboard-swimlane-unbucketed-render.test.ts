@@ -129,14 +129,46 @@ describe('dashboard swimlane AUDIT-20260530-25 — unbucketed entries are render
     // entryCount already folds them in).
     expect(editorialBlock).toMatch(/<span class="quick-meta">3 entries<\/span>/);
 
+    // AUDIT-20260531-02 — count the actual rendered cards directly so
+    // the test fails if a regression makes the visible-card count
+    // diverge from the displayed entry count. Pre-strengthening the
+    // assertions only checked the text "3 entries" + slug substrings,
+    // never the rendered card count, so a regression where a
+    // template-bucketed card vanished (count text still "3", only 2
+    // cards visible) would have passed green. The bucket.entryCount
+    // for this fixture is 3 (1 template-bucketed `a-draft` + 2
+    // unbucketed). The kanban surface emits one `data-row-shell` per
+    // entry; the list surface emits one `lb-row` per entry — both
+    // counts must reconcile with bucket.entryCount.
+    const expectedEntryCount = 3;
+    const stageGridHtml = extractStageGridSection(editorialBlock);
+    const cardCount = (stageGridHtml.match(/data-row-shell/g) ?? []).length;
+    expect(cardCount).toBe(expectedEntryCount);
+
+    const listBodyHtml = extractListBodySection(editorialBlock);
+    // Per the AUDIT-20260531-02 finding's regex-tuning note: count
+    // `data-row-shell` attribute occurrences inside the list body
+    // rather than `\blb-row\b`. The list body emits THREE different
+    // `lb-row`-class shapes — real entry rows (`class="lb-row"`),
+    // empty-state placeholders (`class="lb-row empty-state"`, one per
+    // empty template stage), and unbucketed rows (`class="lb-row
+    // lb-row--unbucketed"`). Only the first and third represent
+    // visible entries; `renderEmptyListRow` deliberately omits
+    // `data-row-shell` so the attribute count tracks real cards.
+    // This makes the assertion symmetric with the kanban surface's
+    // `data-row-shell` count above.
+    const lbRowCount = (listBodyHtml.match(/data-row-shell/g) ?? []).length;
+    expect(lbRowCount).toBe(expectedEntryCount);
+
     // Both unbucketed entries are visible in the rendered output
-    // (operator-perceivable — they did not vanish).
+    // (operator-perceivable — they did not vanish). Kept as auxiliary
+    // assertions; the load-bearing reconciliation claim is the
+    // cardCount + lbRowCount comparisons above.
     expect(editorialBlock).toContain('data-slug="mystery-one"');
     expect(editorialBlock).toContain('data-slug="mystery-two"');
     // The raw offending stage values are surfaced for operator diagnosis.
-    const stageGrid = extractStageGridSection(editorialBlock);
-    expect(stageGrid).toContain('NonExistentStage');
-    expect(stageGrid).toContain('AnotherMissingStage');
+    expect(stageGridHtml).toContain('NonExistentStage');
+    expect(stageGridHtml).toContain('AnotherMissingStage');
   });
 
   it('happy-path regression: a swim with every entry at template-known stages emits NO unbucketed column or group', async () => {
