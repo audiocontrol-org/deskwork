@@ -55,7 +55,7 @@ The `group` verb is a CRUD family for the group-specific lifecycle (creation, me
 
 - `group list` excludes archived groups by default. Pass `--include-archived` for the full set.
 - `group create --title <text>` defaults to the slug when omitted.
-- `group create` initializes `members: []` (NOT `members: undefined`) — the empty array carries the operator-intent signal that distinguishes "intentionally a group, awaiting members" from "regular entry that happens to have no members." Doctor's `group-empty-members-array` informational rule (Task 7.5.5) surfaces this dual representation for operators who want to normalize.
+- `group create` initializes `members: []` (NOT `members: undefined`) — the empty array carries the operator-intent signal that distinguishes "intentionally a group, awaiting members" from "regular entry that happens to have no members." Doctor's `group-stale-empty-members` informational rule (Task 7.5.5) surfaces declared-empty groups that have been empty for longer than a configurable threshold AND have no `group-add-member` journal events (groups created in error or abandoned mid-setup) — operator decides whether to cancel, archive, or populate them. `members: []` is the canonical declared-empty state, not a normalization target.
 - `group add-member` appends to `members[]` when `--at` is omitted (insertion at `members.length`).
 - `group cancel` uses the universal `/deskwork:cancel` verb. Pass `--cascade` to propagate the cancellation to every member; default behaviour cancels only the group.
 
