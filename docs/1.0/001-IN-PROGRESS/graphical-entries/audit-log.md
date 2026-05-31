@@ -3503,7 +3503,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (codex). R
 ### AUDIT-20260530-30 — [P5-1 codex] Re-running swimlane initializers stacks duplicate event listeners with stale state closures
 
 Finding-ID: AUDIT-20260530-30 (cross-model: AUDIT-BARRAGE-codex-P5-1)
-Status:     open
+Status:     fixed-7b6543e
 Severity:   low
 Surface:    plugins/deskwork-studio/public/src/editorial-studio-client.ts:527-530; plugins/deskwork-studio/public/src/dashboard/swimlane.ts:469-490; plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:464-477; plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:292-312; plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:270-282
 
