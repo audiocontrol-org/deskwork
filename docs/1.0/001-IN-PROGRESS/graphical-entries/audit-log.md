@@ -3464,7 +3464,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (claude). 
 ### AUDIT-20260530-27 — [P5-1 claude] Rail eye-toggle `.r-eye-btn` is a 14px-wide interactive target with no min-height — below WCAG 2.5.8 while every sibling affordance was sized to 24×24
 
 Finding-ID: AUDIT-20260530-27 (cross-model: AUDIT-BARRAGE-claude-P5-1)
-Status:     open
+Status:     fixed-94d7213
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/css/dashboard-swimlane.css` (`.rail-lane .r-eye-btn` rule: `width: 14px; ... padding: 0;`)
 
