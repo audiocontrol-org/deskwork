@@ -425,17 +425,19 @@ Closes AUDIT-20260530-40 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `plu
 
 Closes AUDIT-20260530-41 (cross-model: AUDIT-BARRAGE-codex-P5-2). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:54-131; plugins/deskwork-studio/public/src/mobile-shell/sheet-controller.ts:96-123.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-41 (cross-model: AUDIT-BARRAGE-codex-P5-2)` in subject
+Disposition: duplicate of AUDIT-20260530-38 (claude). Both findings describe the same missing-focus-trap on the mobile lane sheet. Closed by Task 0.14 commit `1a25b84` which added the opt-in `trapFocus?: boolean` flag to `createSlideUpSheet` and enabled it on the lane sheet. Regression coverage at `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:253-340` (the AUDIT-38 focus-trap tests) covers the AUDIT-41 surface verbatim — same controller, same lane sheet, same Tab/Shift+Tab edge-wrap contract.
+
+- [x] Step 1: write failing test exercising the bug — covered by AUDIT-38 test
+- [x] Step 2: confirm test fails against current code — verified during AUDIT-38 cycle
+- [x] Step 3: implement the fix — `1a25b84`
+- [x] Step 4: confirm test passes — verified during AUDIT-38 cycle
+- [x] Step 5: commit with `Closes AUDIT-20260530-41 (cross-model: AUDIT-BARRAGE-codex-P5-2)` in subject — closed via duplicate-of-38 disposition (see Task 0.17 docs commit)
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts` (AUDIT-38 focus-trap regression — same surface)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-1a25b84 (duplicate of AUDIT-20260530-38; closed by the same Task 0.14 commit)` per duplicate disposition
 
 
 

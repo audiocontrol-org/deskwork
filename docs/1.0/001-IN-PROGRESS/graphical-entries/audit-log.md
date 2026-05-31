@@ -3636,7 +3636,7 @@ Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). 
 ### AUDIT-20260530-41 — [P5-2 codex] Mobile lane sheet opens like a modal but does not trap focus
 
 Finding-ID: AUDIT-20260530-41 (cross-model: AUDIT-BARRAGE-codex-P5-2)
-Status:     open
+Status:     fixed-1a25b84 (duplicate of AUDIT-20260530-38; closed by the same Task 0.14 commit)
 Severity:   high
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:54-131; plugins/deskwork-studio/public/src/mobile-shell/sheet-controller.ts:96-123
 
