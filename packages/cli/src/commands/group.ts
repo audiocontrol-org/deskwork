@@ -84,6 +84,31 @@ function verbUsage(verb: string): never {
   fail(`Usage: ${u}`, 2);
 }
 
+/**
+ * Refuse extra positional arguments on a `group` verb. Closes
+ * AUDIT-20260530-94 — the handlers previously checked only minimum
+ * arity and silently discarded extras (e.g. `group archive a b`
+ * archived only `a`). For state-mutating verbs the project
+ * convention is to refuse loudly so operator typos surface as
+ * usage errors (exit 2), not as a quiet partial-effect.
+ */
+function assertExactPositional(
+  rest: readonly string[],
+  expected: number,
+  verb: string,
+): void {
+  if (rest.length > expected) {
+    const extras = rest.slice(expected);
+    fail(
+      `deskwork group ${verb}: takes exactly ${expected} positional `
+        + `argument${expected === 1 ? '' : 's'}; got ${rest.length}, `
+        + `extras: ${extras.map((e) => JSON.stringify(e)).join(', ')}\n`
+        + `  Usage: ${VERB_USAGE[verb]}`,
+      2,
+    );
+  }
+}
+
 export async function run(argv: string[]): Promise<void> {
   let parsed: ParsedArgs;
   try {
@@ -163,6 +188,7 @@ async function handleShow(
   rest: string[],
 ): Promise<void> {
   if (rest.length < 1) verbUsage('show');
+  assertExactPositional(rest, 1, 'show');
   const [slug] = rest;
   try {
     const result = await showGroup(projectRoot, slug);
@@ -193,6 +219,7 @@ async function handleCreate(
   flags: Record<string, string>,
 ): Promise<void> {
   if (rest.length < 1) verbUsage('create');
+  assertExactPositional(rest, 1, 'create');
   const [slug] = rest;
   if (flags['lane'] === undefined) {
     fail('Missing required flag --lane <lane-id>', 2);
@@ -232,6 +259,7 @@ async function handleUpdate(
   flags: Record<string, string>,
 ): Promise<void> {
   if (rest.length < 1) verbUsage('update');
+  assertExactPositional(rest, 1, 'update');
   const [slug] = rest;
 
   try {
@@ -257,6 +285,7 @@ async function handleAddMember(
   flags: Record<string, string>,
 ): Promise<void> {
   if (rest.length < 2) verbUsage('add-member');
+  assertExactPositional(rest, 2, 'add-member');
   const [groupSlug, memberSlug] = rest;
 
   // Parse --at into a number with a clear error message on invalid
@@ -305,6 +334,7 @@ async function handleRemoveMember(
   rest: string[],
 ): Promise<void> {
   if (rest.length < 2) verbUsage('remove-member');
+  assertExactPositional(rest, 2, 'remove-member');
   const [groupSlug, memberSlug] = rest;
 
   try {
@@ -330,6 +360,7 @@ async function handleArchive(
   rest: string[],
 ): Promise<void> {
   if (rest.length < 1) verbUsage('archive');
+  assertExactPositional(rest, 1, 'archive');
   const [slug] = rest;
   try {
     const result = await archiveGroup(projectRoot, slug);
@@ -349,6 +380,7 @@ async function handleRestore(
   rest: string[],
 ): Promise<void> {
   if (rest.length < 1) verbUsage('restore');
+  assertExactPositional(rest, 1, 'restore');
   const [slug] = rest;
   try {
     const result = await restoreGroup(projectRoot, slug);

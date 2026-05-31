@@ -1,4 +1,4 @@
-generated_at: 2026-05-31T14:41:02.188Z
+generated_at: 2026-05-31T14:47:09.057Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -113,20 +113,20 @@ clones:
       - packages/cli/src/commands/shortform-start.ts:81:97
     disposition: pending
     reason: null
-  - id: 043c7ab6b5e8
+  - id: 7fd4d02355a8
+    lines: 30
+    members:
+      - packages/cli/src/commands/group.ts:110:139
+      - packages/cli/src/commands/pipeline.ts:93:106
+    disposition: keep-with-reason
+    reason: Sibling verb-dispatch convention across group/lane/pipeline CRUD modules; shared shape is deliberate, not duplication.
+  - id: 40b2115a7171
     lines: 14
     members:
-      - packages/cli/src/commands/group.ts:222:235
+      - packages/cli/src/commands/group.ts:249:262
       - packages/cli/src/commands/lane.ts:225:238
     disposition: keep-with-reason
-    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
-  - id: 303a01d3ddec
-    lines: 39
-    members:
-      - packages/cli/src/commands/group.ts:76:114
-      - packages/cli/src/commands/pipeline.ts:84:106
-    disposition: keep-with-reason
-    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+    reason: Sibling per-verb update-handler shape across group/lane CRUD modules; parallel emit/fail handling is deliberate, not duplication.
   - id: 89f8a99f8ce2
     lines: 13
     members:
