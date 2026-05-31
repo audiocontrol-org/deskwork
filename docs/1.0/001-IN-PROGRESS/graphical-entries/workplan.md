@@ -371,17 +371,17 @@ Closes AUDIT-20260530-37 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `pac
 
 Closes AUDIT-20260530-38 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:60-90`, `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:1-30` (coverage docblock).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-38 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — three Tab/Shift+Tab wrap tests added at `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:253-340`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — 2 of 3 new tests failed against pre-fix code (Tab/Shift+Tab edge-wrap); mid-list passed because the controller did nothing
+- [x] Step 3: implement the fix — added opt-in `trapFocus?: boolean` to `createSlideUpSheet` with edge-wrap Tab/Shift+Tab handler; enabled in `swimlane-mobile-sheet.ts`
+- [x] Step 4: confirm test passes — 12/12 mobile-sheet-client tests pass; 19/19 shared sheet-controller tests pass; 983/983 studio tests pass
+- [x] Step 5: commit with `Closes AUDIT-20260530-38 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject — commit 1a25b84
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:253-340` (cited in Step 1)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-1a25b84` via the close-shipped-audit-findings step
 
 
 

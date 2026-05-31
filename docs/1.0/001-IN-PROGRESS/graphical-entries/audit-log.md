@@ -3597,7 +3597,7 @@ Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). 
 ### AUDIT-20260530-38 — [P5-2 claude] Mobile lane-sheet focus-trap contract is unverified — no test asserts Tab is contained
 
 Finding-ID: AUDIT-20260530-38 (cross-model: AUDIT-BARRAGE-claude-P5-2)
-Status:     open
+Status:     fixed-1a25b84
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts:60-90`, `packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:1-30` (coverage docblock)
 
