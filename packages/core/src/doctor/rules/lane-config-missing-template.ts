@@ -43,7 +43,7 @@ import {
   loadPipelineTemplate,
 } from '../../pipelines/loader.ts';
 import { LaneConfigSchema, type LaneConfig } from '../../lanes/types.ts';
-import { readAllSidecars } from '../../sidecar/read-all.ts';
+import { readAllSidecarsPartitioned } from '../../sidecar/read-all.ts';
 import type {
   DoctorContext,
   DoctorRule,
@@ -330,9 +330,23 @@ const rule: DoctorRule = {
       // Refuse if any entry references this lane — mirror the guard
       // in `lanes/operations/purge.ts`. The operator must `lane move`
       // every dependent first.
-      let sidecars;
+      //
+      // AUDIT-20260530-78 — use the partitioned reader so unparseable
+      // sidecars surface on a sibling channel rather than throwing.
+      // A throwing reader collapses to "couldn't read, refuse with a
+      // generic error"; the partitioned reader lets us refuse with a
+      // SPECIFIC message — *"N sidecars are unparseable, repair them
+      // and retry"* — that tells the operator the corrective action.
+      // The orphan failure mode the cited finding flags (corrupt
+      // sidecar references the doomed lane → not in `dependents` →
+      // guard sees zero → unlink proceeds) is closed by refusing
+      // whenever `malformed.length > 0`: we cannot prove the
+      // unreadable sidecars don't reference the lane, so the gate
+      // fails closed. Per the project rule "Never implement fallbacks"
+      // — refusal is the correct disposition.
+      let partition;
       try {
-        sidecars = await readAllSidecars(ctx.projectRoot);
+        partition = await readAllSidecarsPartitioned(ctx.projectRoot);
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
         return {
@@ -342,13 +356,25 @@ const rule: DoctorRule = {
           skipReason: 'apply-failed',
         };
       }
+      if (partition.malformed.length > 0) {
+        const count = partition.malformed.length;
+        return {
+          finding: plan.finding,
+          applied: false,
+          message:
+            `Cannot delete lane "${laneId}": ${count} ${count === 1 ? 'sidecar is' : 'sidecars are'} ` +
+            `unparseable; cannot confirm they don't reference this lane. ` +
+            `Repair the sidecars (run /deskwork:doctor) and retry.`,
+          skipReason: 'editorial-decision',
+        };
+      }
       // AUDIT-20260530-77 — list dependent **slugs**, not UUIDs.
       // The refusal message instructs the operator to run
       // `deskwork lane move <slug> --to <other>`; UUIDs cannot be
       // pasted into that command. The sibling `lane purge` refusal
       // (lanes/operations/purge.ts) also maps to `entry.slug`; this
       // surface must speak the same vocabulary.
-      const dependents = sidecars
+      const dependents = partition.entries
         .filter((entry) => entry.lane === laneId)
         .map((entry) => entry.slug);
       if (dependents.length > 0) {
