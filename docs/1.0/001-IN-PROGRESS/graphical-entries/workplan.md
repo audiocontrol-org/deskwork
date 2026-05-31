@@ -501,17 +501,17 @@ Closes AUDIT-20260530-44 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plu
 
 Closes AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:applyPreset` + `snapshotCurrentState`; contrast `swimlane-drag.ts:reconcileOrder`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/studio/test/dashboard-swimlane-presets-reconcile.test.ts`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — pre-fix failed on case (1) `applyPreset drops dead lane ids from focusedLanes` AND case (3) `savePresetFromCurrent drops dead lane ids from the captured focus set`
+- [x] Step 3: implement the fix — added `reconcileLaneIds` helper mirroring `reconcileOrder`'s read-time-filter discipline; threaded through `applyPreset` (both visible + focused axes) and `snapshotCurrentState` (focused axis)
+- [x] Step 4: confirm test passes — 4/4 cases pass; full @deskwork/studio suite 997 passed (was 993; +4 from new test file), 0 regressions
+- [x] Step 5: commit with `Closes AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject — commit `81fb028`
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-presets-reconcile.test.ts` (the new `AUDIT-20260530-45 — preset lane-id reconciliation` describe block; 4/4 cases pass)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-presets-reconcile.test.ts` exits 0 (passes against the fix; full @deskwork/studio suite stays green at 997 passed)
+- [x] Audit-log Status flipped to `fixed-81fb028` via the close-shipped-audit-findings step
 
 
 

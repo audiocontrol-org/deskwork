@@ -3688,7 +3688,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). 
 ### AUDIT-20260530-45 — [P5-3 claude] Presets are never reconciled when a lane is renamed/archived/purged — asymmetry with the drag-order path
 
 Finding-ID: AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3)
-Status:     open
+Status:     fixed-81fb028
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:applyPreset` + `snapshotCurrentState`; contrast `swimlane-drag.ts:reconcileOrder`
 
