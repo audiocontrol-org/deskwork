@@ -226,7 +226,16 @@ const rule: DoctorRule = {
         continue;
       }
 
-      const laneFilePath = laneConfigPath(ctx.projectRoot, laneId);
+      const laneFilePathAbsolute = laneConfigPath(ctx.projectRoot, laneId);
+      // AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3) —
+      // persist the lane file location as a PROJECT-RELATIVE path in
+      // both `finding.details` and (downstream) the journal event.
+      // Absolute paths embed the host's filesystem layout; if the
+      // project is moved or cloned to a different absolute root, the
+      // persisted absolute path points at a location that no longer
+      // exists. The user-facing message already uses the relative form;
+      // the structured / persisted values now match.
+      const laneFilePathRelative = relative(ctx.projectRoot, laneFilePathAbsolute);
       // AUDIT-20260530-80: distinguish archived from active lanes in the
       // emitted severity. Archiving is the project's soft-delete path
       // (`lane archive`) — deleting the custom pipeline an archived lane
@@ -253,11 +262,11 @@ const rule: DoctorRule = {
         severity,
         message:
           `Lane "${laneId}" references pipelineTemplate "${lane.pipelineTemplate}" ` +
-          `which does not resolve (file: ${relative(ctx.projectRoot, laneFilePath)})` +
+          `which does not resolve (file: ${laneFilePathRelative})` +
           archivedSuffix,
         details: {
           laneId,
-          laneFilePath,
+          laneFilePath: laneFilePathRelative,
           unresolvedTemplateId: lane.pipelineTemplate,
           availableTemplates,
           archived,
@@ -520,13 +529,23 @@ const rule: DoctorRule = {
           skipReason: 'apply-failed',
         };
       }
+      // AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3) —
+      // emit the journal event's `laneFilePath` as a project-relative
+      // path so the audit record survives project relocation / cloning.
+      // The disk operations above operate on the absolute path; only
+      // the persisted / structured surface is converted.
+      const laneFilePathRelative = relative(ctx.projectRoot, laneFilePath);
       try {
         await appendJournalEvent(ctx.projectRoot, {
           kind: 'lane-config-repair',
           at: new Date().toISOString(),
           laneId,
           ruleId: RULE_ID,
-          details: { action: 'delete', deleted: true, laneFilePath },
+          details: {
+            action: 'delete',
+            deleted: true,
+            laneFilePath: laneFilePathRelative,
+          },
         });
       } catch (err) {
         // Compensating write: re-create the lane file from the
@@ -545,8 +564,8 @@ const rule: DoctorRule = {
       return {
         finding: plan.finding,
         applied: true,
-        message: `deleted lane file ${relative(ctx.projectRoot, laneFilePath)}`,
-        details: { laneId, laneFilePath },
+        message: `deleted lane file ${laneFilePathRelative}`,
+        details: { laneId, laneFilePath: laneFilePathRelative },
       };
     }
 

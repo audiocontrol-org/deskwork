@@ -138,9 +138,16 @@ describe('doctor: lane-config-missing-template', () => {
     expect(f.severity).toBe('error');
     expect(f.details.laneId).toBe('dangling');
     expect(f.details.unresolvedTemplateId).toBe('nonsense');
+    // AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3) — the
+    // persisted `laneFilePath` must be project-relative (`.deskwork/...`),
+    // not absolute. Absolute paths embed the authoring host's filesystem
+    // layout and break when the project is moved or cloned.
     expect(f.details.laneFilePath).toBe(
-      join(fixture.root, '.deskwork', 'lanes', 'dangling.json'),
+      join('.deskwork', 'lanes', 'dangling.json'),
     );
+    // Sanity guard: must not start with a path separator (i.e. NOT
+    // absolute) regardless of which OS produced the value.
+    expect(String(f.details.laneFilePath).startsWith('/')).toBe(false);
     expect(f.details.availableTemplates).toEqual(EXPECTED_PRESET_TEMPLATES);
   });
 
@@ -237,7 +244,14 @@ describe('doctor: lane-config-missing-template', () => {
     expect(repairEvents).toHaveLength(1);
     expect(repairEvents[0].details.action).toBe('delete');
     expect(repairEvents[0].details.deleted).toBe(true);
-    expect(repairEvents[0].details.laneFilePath).toBe(laneFile);
+    // AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3) — the
+    // persisted `laneFilePath` in the journal event must be project-
+    // relative so the historical record survives project relocation /
+    // cloning. The actual on-disk file at `laneFile` is unaffected.
+    expect(repairEvents[0].details.laneFilePath).toBe(
+      join('.deskwork', 'lanes', 'dangling.json'),
+    );
+    expect(repairEvents[0].details.laneFilePath.startsWith('/')).toBe(false);
   });
 
   it('plan: filters malformed override ids out of set-template choices (AUDIT-20260529-08)', async () => {

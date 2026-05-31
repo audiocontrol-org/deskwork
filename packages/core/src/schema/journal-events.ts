@@ -239,6 +239,15 @@ const LaneMoveEvent = z.object({
  * The event is project-scoped (no `entryId`); `laneId` identifies the
  * lane the repair acted on. `ruleId` records the originating doctor
  * rule so an audit trail can be filtered by which rule wrote the entry.
+ *
+ * AUDIT-20260530-81 (cross-model: AUDIT-BARRAGE-claude-P6-3): the
+ * `delete` variant's `laneFilePath` is recorded as a PROJECT-RELATIVE
+ * path (e.g. `.deskwork/lanes/<id>.json`), NOT an absolute path. The
+ * journal is the project's portable historical record — embedding the
+ * authoring host's absolute filesystem layout would break the record
+ * the first time the project is moved, cloned, or rebuilt under a
+ * different root. The rule converts the on-disk absolute path via
+ * `relative(projectRoot, ...)` before emitting this event.
  */
 const LaneConfigRepairEvent = z.object({
   kind: z.literal('lane-config-repair'),
@@ -254,6 +263,7 @@ const LaneConfigRepairEvent = z.object({
     z.object({
       action: z.literal('delete'),
       deleted: z.literal(true),
+      // AUDIT-20260530-81: project-relative path (see header docblock).
       laneFilePath: z.string().min(1),
     }),
   ]),
