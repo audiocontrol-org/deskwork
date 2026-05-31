@@ -3973,7 +3973,7 @@ Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). 
 ### AUDIT-20260530-66 — [P6-2 claude] `/dev/lanes` hard-fails the entire page on one malformed lane config, where `/dev/pipelines` degrades gracefully
 
 Finding-ID: AUDIT-20260530-66 (cross-model: AUDIT-BARRAGE-claude-P6-2)
-Status:     open
+Status:     fixed-039e734
 Severity:   medium
 Surface:    `packages/studio/src/pages/lanes/data.ts` — `loadLanesPageData` loop (`loadLaneConfig(id, projectRoot)` with no try/catch); `packages/studio/src/server.ts:/dev/lanes` route
 
