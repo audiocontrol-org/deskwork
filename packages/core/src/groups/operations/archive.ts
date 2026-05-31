@@ -38,6 +38,7 @@ import { appendJournalEvent } from '../../journal/append.ts';
 import { readSidecar } from '../../sidecar/read.ts';
 import { resolveEntryUuid } from '../../sidecar/lookup.ts';
 import { writeSidecar } from '../../sidecar/write.ts';
+import { withJournalRollback } from '../../sidecar/with-journal-rollback.ts';
 import type { Entry } from '../../schema/entry.ts';
 import { isArchivedEntry } from '../types.ts';
 
@@ -71,12 +72,16 @@ export async function archiveGroup(
     archivedAt: at,
     updatedAt: at,
   };
-  await writeSidecar(projectRoot, updated);
-  await appendJournalEvent(projectRoot, {
-    kind: 'group-archive',
-    at,
-    entryId: uuid,
-    details: { archivedAt: at },
+  // AUDIT-20260530-93: compensating-write protection. See
+  // create.ts for the pattern rationale.
+  await withJournalRollback(projectRoot, uuid, async () => {
+    await writeSidecar(projectRoot, updated);
+    await appendJournalEvent(projectRoot, {
+      kind: 'group-archive',
+      at,
+      entryId: uuid,
+      details: { archivedAt: at },
+    });
   });
   return { entry: updated };
 }
@@ -110,11 +115,15 @@ export async function restoreGroup(
     ...rest,
     updatedAt: at,
   };
-  await writeSidecar(projectRoot, updated);
-  await appendJournalEvent(projectRoot, {
-    kind: 'group-restore',
-    at,
-    entryId: uuid,
+  // AUDIT-20260530-93: compensating-write protection. See
+  // create.ts for the pattern rationale.
+  await withJournalRollback(projectRoot, uuid, async () => {
+    await writeSidecar(projectRoot, updated);
+    await appendJournalEvent(projectRoot, {
+      kind: 'group-restore',
+      at,
+      entryId: uuid,
+    });
   });
   return { entry: updated };
 }

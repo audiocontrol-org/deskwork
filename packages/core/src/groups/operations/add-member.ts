@@ -42,6 +42,7 @@ import { appendJournalEvent } from '../../journal/append.ts';
 import { readSidecar } from '../../sidecar/read.ts';
 import { resolveEntryUuid } from '../../sidecar/lookup.ts';
 import { writeSidecar } from '../../sidecar/write.ts';
+import { withJournalRollback } from '../../sidecar/with-journal-rollback.ts';
 import type { Entry } from '../../schema/entry.ts';
 
 /**
@@ -152,18 +153,21 @@ export async function addGroupMember(
     members: nextMembers,
     updatedAt: at,
   };
-  await writeSidecar(projectRoot, updated);
-
-  await appendJournalEvent(projectRoot, {
-    kind: 'group-add-member',
-    at,
-    entryId: groupUuid,
-    details: {
-      memberId: memberUuid,
-      memberSlug: member.slug,
-      index: insertIndex,
-      membersAfter: nextMembers,
-    },
+  // AUDIT-20260530-93: compensating-write protection. See
+  // create.ts for the pattern rationale.
+  await withJournalRollback(projectRoot, groupUuid, async () => {
+    await writeSidecar(projectRoot, updated);
+    await appendJournalEvent(projectRoot, {
+      kind: 'group-add-member',
+      at,
+      entryId: groupUuid,
+      details: {
+        memberId: memberUuid,
+        memberSlug: member.slug,
+        index: insertIndex,
+        membersAfter: nextMembers,
+      },
+    });
   });
 
   return {

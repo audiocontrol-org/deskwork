@@ -1,4 +1,4 @@
-generated_at: 2026-05-31T13:54:50.807Z
+generated_at: 2026-05-31T14:41:02.188Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -116,14 +116,14 @@ clones:
   - id: 043c7ab6b5e8
     lines: 14
     members:
-      - packages/cli/src/commands/group.ts:221:234
+      - packages/cli/src/commands/group.ts:222:235
       - packages/cli/src/commands/lane.ts:225:238
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 303a01d3ddec
     lines: 39
     members:
-      - packages/cli/src/commands/group.ts:75:113
+      - packages/cli/src/commands/group.ts:76:114
       - packages/cli/src/commands/pipeline.ts:84:106
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
@@ -378,18 +378,18 @@ clones:
       - packages/core/src/entry/publish.ts:2:12
     disposition: ignore-with-justification
     reason: verb-module import header symmetry; cancel/block/publish share readSidecar+writeSidecar+journal+calendar+schema+lane-resolve+pipeline-helpers imports as architectural symmetry across the verb family — extraction would harm clarity
-  - id: e56c638702cc
-    lines: 13
+  - id: 3ea7a5311a8d
+    lines: 15
     members:
-      - packages/core/src/groups/operations/add-member.ts:124:136
-      - packages/core/src/groups/operations/remove-member.ts:68:80
+      - packages/core/src/groups/operations/add-member.ts:147:161
+      - packages/core/src/groups/operations/remove-member.ts:69:83
     disposition: keep-with-reason
-    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+    reason: "Structurally-parallel siblings: add-member and remove-member intentionally mirror each other (entry-build + withJournalRollback wrap), differing only by event kind and details shape; the shared protection logic was already extracted to packages/core/src/sidecar/with-journal-rollback.ts per AUDIT-20260530-93."
   - id: d31f449b3e8c
     lines: 9
     members:
-      - packages/core/src/groups/operations/archive.ts:48:56
-      - packages/core/src/groups/operations/archive.ts:84:92
+      - packages/core/src/groups/operations/archive.ts:49:57
+      - packages/core/src/groups/operations/archive.ts:89:97
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: c8e1466c8f39

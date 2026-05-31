@@ -24,6 +24,7 @@ import { loadLaneConfig } from '../../lanes/loader.ts';
 import { loadPipelineTemplate } from '../../pipelines/loader.ts';
 import { readAllSidecars } from '../../sidecar/read-all.ts';
 import { writeSidecar } from '../../sidecar/write.ts';
+import { withJournalRollback } from '../../sidecar/with-journal-rollback.ts';
 import type { Entry } from '../../schema/entry.ts';
 
 export interface CreateGroupOptions {
@@ -109,16 +110,27 @@ export async function createGroup(
     updatedAt: at,
   };
 
-  await writeSidecar(projectRoot, entry);
-  await appendJournalEvent(projectRoot, {
-    kind: 'group-create',
-    at,
-    entryId: uuid,
-    details: {
-      slug: opts.slug,
-      lane: opts.lane,
-      ...(opts.artifactPath !== undefined && { artifactPath: opts.artifactPath }),
-    },
+  // AUDIT-20260530-93 (cross-model: AUDIT-BARRAGE-codex-P7T7.2):
+  // wrap sidecar-write + journal-append in `withJournalRollback` so a
+  // journal-append failure rolls back the sidecar to its pre-mutation
+  // state. For `create` specifically, the snapshot records that the
+  // sidecar was ABSENT before the call, so a failed create deletes
+  // the just-created file rather than leaving an entry on disk with
+  // no `group-create` audit event. Mirrors the compensating-write
+  // pattern in `lane-config-missing-template` (AUDIT-20260530-79)
+  // and `bootstrapDefaultLaneIfMissing` (AUDIT-20260530-13).
+  await withJournalRollback(projectRoot, uuid, async () => {
+    await writeSidecar(projectRoot, entry);
+    await appendJournalEvent(projectRoot, {
+      kind: 'group-create',
+      at,
+      entryId: uuid,
+      details: {
+        slug: opts.slug,
+        lane: opts.lane,
+        ...(opts.artifactPath !== undefined && { artifactPath: opts.artifactPath }),
+      },
+    });
   });
 
   return { entry };
