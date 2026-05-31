@@ -43,6 +43,7 @@ import { loadLanesPageData, type LanesPageData } from './lanes/data.ts';
 import { renderLaneTable } from './lanes/table.ts';
 import { renderNewLaneForm } from './lanes/new-form.ts';
 import { renderArchivedSection } from './lanes/archived-section.ts';
+import { renderLaneErrorBanner } from './lanes/error-banner.ts';
 
 export async function renderLanesPage(ctx: StudioContext): Promise<string> {
   const data = await loadLanesPageData(ctx.projectRoot);
@@ -58,8 +59,14 @@ export async function renderLanesPage(ctx: StudioContext): Promise<string> {
   const newForm = renderNewLaneForm({
     availableTemplates: data.availableTemplates,
   });
+  const errorBanner = renderLaneErrorBanner(data.malformed);
+  // Per Task 0.41 (closes AUDIT-20260530-66): malformed lanes are
+  // surfaced as inline error rows inside the active-lanes table (the
+  // operator sees them next to the healthy lanes). The empty-state
+  // CTA only fires when BOTH active rows AND malformed rows are
+  // empty — otherwise the table itself renders with its error rows.
   const activeTable =
-    data.active.length === 0
+    data.active.length === 0 && data.malformed.length === 0
       ? renderEmptyActiveState()
       : renderLaneTable({
           rows: data.active,
@@ -67,6 +74,7 @@ export async function renderLanesPage(ctx: StudioContext): Promise<string> {
           emptyMessage: 'No active lanes.',
           tableLabel: 'Active lanes',
           archivedTable: false,
+          errors: data.malformed,
         });
   const archivedSection = renderArchivedSection({
     rows: data.archived,
@@ -79,6 +87,7 @@ export async function renderLanesPage(ctx: StudioContext): Promise<string> {
     ${renderEditorialFolio('dashboard', "the compositor's desk")}
     <main class="er-container lanes-container" data-lanes-container>
       ${header}
+      ${errorBanner}
       ${newForm}
       <section class="lanes-active" data-lanes-active aria-labelledby="lanes-active-heading">
         <h2 class="lanes-active-heading" id="lanes-active-heading">Active lanes</h2>

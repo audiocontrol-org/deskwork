@@ -46,6 +46,65 @@
   border-radius: 2px;
 }
 
+/* ---- Top-of-page errors banner + inline error rows (AUDIT-20260530-66) ---- */
+
+.lanes-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-ink, #1A1614);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+}
+
+.lanes-banner code {
+  background: var(--er-paper-3, #DFD7BF);
+  padding: 0 0.3rem;
+  border-radius: 2px;
+}
+
+.lanes-row--error {
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.lanes-error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--er-ink, #1A1614);
+}
+
+.lanes-error-kind {
+  font-weight: 600;
+  margin: 0;
+}
+
+.lanes-error-path {
+  margin: 0;
+  color: var(--er-ink-soft, #3A332E);
+}
+
+.lanes-error-message {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--er-paper, #F5F1E8);
+  padding: 0.4rem 0.6rem;
+  border-radius: 2px;
+}
+
+.lanes-error-icon {
+  color: var(--er-red-pencil, #B8362A);
+  font-weight: 700;
+}
+
 /* ---- Active / archived section heads ---- */
 
 .lanes-active-heading,

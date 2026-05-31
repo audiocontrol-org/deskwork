@@ -24,7 +24,7 @@
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
-import type { LaneRow } from './data.ts';
+import type { LaneRow, LaneErrorRow, LaneLoadErrorKind } from './data.ts';
 import { renderEditForm } from './edit-form.ts';
 
 const COPY_BTN_ARCHIVE_LABEL = 'Archive';
@@ -39,6 +39,15 @@ interface RenderLaneTableInput {
   readonly tableLabel: string;
   /** When true, each row is rendered with a `data-archived` flag. */
   readonly archivedTable: boolean;
+  /**
+   * Per Task 0.41 (closes AUDIT-20260530-66): malformed lane configs
+   * render as inline error rows so one corrupt JSON does not blind
+   * the operator to the healthy lanes. Mirrors the pipelines page's
+   * `PipelineErrorRow` channel. Only the active-table render passes
+   * this; archived-table renders are healthy-only because the
+   * archived/active routing already failed at load time.
+   */
+  readonly errors?: readonly LaneErrorRow[];
 }
 
 function renderTableRow(
@@ -155,15 +164,65 @@ function renderDisabledPurgeButton(entryCount: number): RawHtml {
     >${COPY_BTN_PURGE_LABEL} — ${entryCount} ${noun}</button>`);
 }
 
+function describeLaneErrorKind(kind: LaneLoadErrorKind): string {
+  switch (kind) {
+    case 'parse':
+      return 'JSON parse error';
+    case 'zod':
+      return 'Schema validation failed';
+    case 'id-mismatch':
+      return 'id field disagrees with filename basename';
+    case 'pipeline-resolve':
+      return 'Referenced pipeline template failed to resolve';
+    case 'missing':
+      return 'File not found';
+    case 'unknown':
+      return 'Load error';
+  }
+}
+
+/**
+ * Render an inline error row for a malformed lane config. Mirrors
+ * `renderErrorRow` in `pages/pipelines/table.ts`. The row spans the
+ * action columns (it has no per-row affordances — there's nothing to
+ * Edit / Archive / Restore / Purge on a lane that won't load) and
+ * surfaces the loader's diagnostic + the offending path so the
+ * operator can fix the JSON.
+ */
+function renderLaneErrorRow(row: LaneErrorRow): RawHtml {
+  return unsafe(html`
+    <tr class="lanes-row lanes-row--error" data-lane-row data-lane-id="${row.id}" data-lane-error>
+      <td class="lanes-cell lanes-cell--handle">
+        <span class="lanes-error-icon" aria-hidden="true" title="Lane failed to load">!</span>
+      </td>
+      <td class="lanes-cell lanes-cell--id"><code>${row.id}</code></td>
+      <td class="lanes-cell" colspan="6">
+        <div class="lanes-error" data-lane-error-detail>
+          <p class="lanes-error-kind">${describeLaneErrorKind(row.error.kind)}</p>
+          <p class="lanes-error-path">at <code>${row.error.path}</code></p>
+          <pre class="lanes-error-message">${row.error.message}</pre>
+        </div>
+      </td>
+    </tr>`);
+}
+
 /**
  * Render a lane table with caption + thead + tbody. Empty rows fall
  * back to the supplied empty-message inside a single colspan cell so
  * the table chrome is still visible (per DESIGN-STANDARDS structure-
  * over-scrolling — even an empty hierarchy node communicates the
  * shape of the page).
+ *
+ * Per Task 0.41 (closes AUDIT-20260530-66): when `input.errors` is
+ * non-empty, error rows render alongside healthy rows so the
+ * operator can see exactly which lane id failed and the loader's
+ * diagnostic. The table is still rendered even when EVERY enumerated
+ * lane is malformed (rows empty + errors non-empty); the empty
+ * message renders only when both rows AND errors are empty.
  */
 export function renderLaneTable(input: RenderLaneTableInput): RawHtml {
-  if (input.rows.length === 0) {
+  const errors = input.errors ?? [];
+  if (input.rows.length === 0 && errors.length === 0) {
     return unsafe(html`
       <table
         class="lanes-table${unsafe(input.archivedTable ? ' lanes-table--archived' : '')}"
@@ -187,6 +246,7 @@ export function renderLaneTable(input: RenderLaneTableInput): RawHtml {
       <thead>${renderHeadRow()}</thead>
       <tbody>
         ${input.rows.map((row) => renderTableRow(row, input.availableTemplates))}
+        ${errors.map((row) => renderLaneErrorRow(row))}
       </tbody>
     </table>`);
 }
