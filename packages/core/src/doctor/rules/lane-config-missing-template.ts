@@ -13,6 +13,13 @@
  * any entry whose sidecar references the lane id blocks the delete
  * until the operator moves it elsewhere via `deskwork lane move`.
  *
+ * Both repair branches snapshot the lane JSON BEFORE mutating disk so
+ * a journal-append failure rolls back to the pre-repair state. Mirrors
+ * the compensating-write pattern in `bootstrapDefaultLaneIfMissing`
+ * (AUDIT-20260530-13). See AUDIT-20260530-79 for the failure mode this
+ * guards against (set-template / delete landing without an audit
+ * record when the journal write fails after the disk mutation).
+ *
  * Audit / multi-site semantics:
  *
  *   The runner invokes `audit()` once per configured site. Lane configs
@@ -129,6 +136,42 @@ function atomicWriteLaneJson(
     throw err;
   }
   return path;
+}
+
+/**
+ * AUDIT-20260530-79 helper: snapshot the lane JSON at `laneFilePath`
+ * for compensating-write rollback. Returns the file body on success;
+ * returns a `{ error }` envelope on failure so the caller can surface
+ * a `RepairResult` (rather than throwing through the apply boundary).
+ */
+function snapshotLaneFile(
+  laneFilePath: string,
+): { ok: true; body: string } | { ok: false; error: string } {
+  try {
+    return { ok: true, body: readFileSync(laneFilePath, 'utf8') };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
+ * AUDIT-20260530-79 helper: best-effort restore from a prior
+ * `snapshotLaneFile` result. Used by the compensating-write branches
+ * to roll the lane file back to its pre-repair state when journal
+ * append fails. Swallows any restore-side error so the caller can
+ * surface the original journal-append error as the actionable root
+ * cause; the next doctor run will re-detect any residual broken state
+ * regardless.
+ */
+function restoreLaneFile(laneFilePath: string, snapshot: string): void {
+  try {
+    writeFileSync(laneFilePath, snapshot, 'utf8');
+  } catch {
+    // intentional swallow — see docblock
+  }
 }
 
 /**
@@ -300,6 +343,24 @@ const rule: DoctorRule = {
       }
       const before = lane.pipelineTemplate;
       const updated: LaneConfig = { ...lane, pipelineTemplate: templateId };
+      // AUDIT-20260530-79: snapshot the on-disk lane JSON BEFORE
+      // mutating so we can roll back if the subsequent journal append
+      // fails. Mirrors the compensating-write pattern in
+      // `bootstrapDefaultLaneIfMissing` (AUDIT-20260530-13) — without
+      // rollback, an atomicWrite that lands followed by a journal
+      // failure leaves the rebind in place with no audit record, and
+      // the next audit run sees a clean lane it has no journal-event
+      // evidence of having repaired.
+      const laneFilePath = laneConfigPath(ctx.projectRoot, laneId);
+      const snap = snapshotLaneFile(laneFilePath);
+      if (!snap.ok) {
+        return {
+          finding: plan.finding,
+          applied: false,
+          message: `failed to snapshot lane JSON for rollback: ${snap.error}`,
+          skipReason: 'apply-failed',
+        };
+      }
       try {
         atomicWriteLaneJson(ctx.projectRoot, laneId, updated);
       } catch (err) {
@@ -311,13 +372,28 @@ const rule: DoctorRule = {
           skipReason: 'apply-failed',
         };
       }
-      await appendJournalEvent(ctx.projectRoot, {
-        kind: 'lane-config-repair',
-        at: new Date().toISOString(),
-        laneId,
-        ruleId: RULE_ID,
-        details: { action: 'set-template', before, after: templateId },
-      });
+      try {
+        await appendJournalEvent(ctx.projectRoot, {
+          kind: 'lane-config-repair',
+          at: new Date().toISOString(),
+          laneId,
+          ruleId: RULE_ID,
+          details: { action: 'set-template', before, after: templateId },
+        });
+      } catch (err) {
+        // Compensating write: restore the snapshot so the lane returns
+        // to its pre-repair state. See `restoreLaneFile` docblock for
+        // the best-effort semantics.
+        restoreLaneFile(laneFilePath, snap.body);
+        const detail = err instanceof Error ? err.message : String(err);
+        return {
+          finding: plan.finding,
+          applied: false,
+          message:
+            `failed to append journal event for set-template repair (lane rolled back): ${detail}`,
+          skipReason: 'apply-failed',
+        };
+      }
       return {
         finding: plan.finding,
         applied: true,
@@ -394,6 +470,23 @@ const rule: DoctorRule = {
       }
 
       const laneFilePath = laneConfigPath(ctx.projectRoot, laneId);
+      // AUDIT-20260530-79: snapshot the lane JSON BEFORE the unlink so
+      // we can re-create the file if the subsequent journal append
+      // fails. Pre-fix the unlink landed first; a journal failure left
+      // the lane file gone with no audit record of who removed it —
+      // strictly worse than the set-template case because the operator
+      // had no surviving evidence of the deletion. Same compensating-
+      // write pattern as the set-template branch above and as
+      // `bootstrapDefaultLaneIfMissing` (AUDIT-20260530-13).
+      const snap = snapshotLaneFile(laneFilePath);
+      if (!snap.ok) {
+        return {
+          finding: plan.finding,
+          applied: false,
+          message: `failed to snapshot lane JSON for rollback: ${snap.error}`,
+          skipReason: 'apply-failed',
+        };
+      }
       try {
         unlinkSync(laneFilePath);
       } catch (err) {
@@ -405,13 +498,28 @@ const rule: DoctorRule = {
           skipReason: 'apply-failed',
         };
       }
-      await appendJournalEvent(ctx.projectRoot, {
-        kind: 'lane-config-repair',
-        at: new Date().toISOString(),
-        laneId,
-        ruleId: RULE_ID,
-        details: { action: 'delete', deleted: true, laneFilePath },
-      });
+      try {
+        await appendJournalEvent(ctx.projectRoot, {
+          kind: 'lane-config-repair',
+          at: new Date().toISOString(),
+          laneId,
+          ruleId: RULE_ID,
+          details: { action: 'delete', deleted: true, laneFilePath },
+        });
+      } catch (err) {
+        // Compensating write: re-create the lane file from the
+        // snapshot so the project returns to its pre-repair state. See
+        // `restoreLaneFile` docblock for the best-effort semantics.
+        restoreLaneFile(laneFilePath, snap.body);
+        const detail = err instanceof Error ? err.message : String(err);
+        return {
+          finding: plan.finding,
+          applied: false,
+          message:
+            `failed to append journal event for delete repair (lane file restored): ${detail}`,
+          skipReason: 'apply-failed',
+        };
+      }
       return {
         finding: plan.finding,
         applied: true,
