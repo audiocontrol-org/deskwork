@@ -45,10 +45,16 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    #    Status: open), skip the hook. Threshold is operator-tunable
    #    via --threshold N (default 2). Exit 1 = skip; exit 0 = fire.
    if ! dw-lifecycle check-barrage-dampener --feature <slug>; then
-     # Dampener engaged — skip the hook this turn. The audit will
-     # re-engage automatically once a future task introduces a HIGH+
-     # finding (any future barrage finding 1+ HIGH+ resets the counter).
-     :
+     # Dampener engaged — auto-slush any remaining open MED/LOW findings
+     # (the operator's "address all findings, bin the smaller items into
+     # the slush pile" directive baked into /dwi). slush-remaining
+     # refuses unless the dampener says we're engaged (already true
+     # by definition here); flips each open finding's audit-log status
+     # to `acknowledged-slush-pile-<YYYY-MM-DD>` AND ticks all the
+     # `- [ ]` checkboxes in the matching workplan fix-task blocks.
+     # The audit-log entries stay as historical record per the
+     # preservation rule. After slushing, skip the hook.
+     dw-lifecycle slush-remaining --feature <slug> --apply
    else
      # 1. Render the prompt from the project's audit-barrage template (or override).
      #    The vars JSON carries feature_slug, workplan_summary, diff,
@@ -92,7 +98,7 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    fi
    ```
 
-   **Slush pile mechanic:** when the operator decides a HIGH+ finding is a nit and shouldn't be worked, flip its audit-log status to `acknowledged-slush-pile` (or any `acknowledged-*` / `fixed-*` / `verified-*` / `withdrawn-*`). The dampener counts only HIGH+ findings whose status is `open`, so slushed findings don't keep the dampener disengaged. The audit-log entry stays as historical record per the preservation rule.
+   **Slush pile mechanic (operator directive, baked into /dwi):** *"We should address all of the auditors' findings, but when we've gone two consecutive audits with 0 high issues, we can bin the smaller items into the slush pile."* The Step 0 dampener gate above runs `slush-remaining --apply` automatically when the dampener engages. That flips every remaining `Status: open` finding (in audit-barrage lift sections) to `acknowledged-slush-pile-<YYYY-MM-DD>` AND ticks the matching workplan fix-task blocks' checkboxes — so the workplan-aware gate (Step 2) sees zero open findings and the implement-skill doesn't try to pick up the orphan fix-tasks. The audit-log entries stay as historical record per the preservation rule. **HIGHs are NEVER slushed**: any future barrage that surfaces a HIGH+ finding resets the dampener counter, and the next hook fire surfaces it as new next-work.
 
    **Failure-path policy (fail loud; do not pause the loop on findings):**
 

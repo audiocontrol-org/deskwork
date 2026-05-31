@@ -1024,7 +1024,7 @@ This is the same vacuous-coverage shape prior rounds named (AUDIT-09's vacuous d
 ### AUDIT-20260531-11 — Fix-tasks 5.25 and 5.26 reintroduce the exact bare-`*.test.ts` token that AUDIT-09 was closing — they will re-trip the `fix-task-tdd-discipline` doctor rule
 
 Finding-ID: AUDIT-20260531-11
-Status:     open
+Status:     fixed-9e50b27c00c949dcd14fbb660ad7f87679017b18
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.25 acceptance criteria + Task 5.26 acceptance criteria, added in this diff) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`
 
@@ -1038,7 +1038,7 @@ Both tasks are `[x]`-checked, so `findCompletedFixFindingTasks` matches them and
 ### AUDIT-20260531-12 — The AUDIT-10 regression guard scans a single file, not the source tree — it does not close the class of bug it was built for
 
 Finding-ID: AUDIT-20260531-12
-Status:     open
+Status:     acknowledged-slush-pile-2026-05-31
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:159-199` (the new `feature-root source file contains NO forbidden-deferral phrases` test)
 
@@ -1052,7 +1052,7 @@ A fix that matched AUDIT-10's framing would walk the `scope-discovery/` tree (ex
 ### AUDIT-20260531-13 — `until.*lands` / `until.*ships` regexes have a multi-line blind spot — a line-wrapped deferral phrase (the exact form AUDIT-08 cited) evades the guard
 
 Finding-ID: AUDIT-20260531-13
-Status:     open
+Status:     acknowledged-slush-pile-2026-05-31
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `forbiddenPhrases` array — `'until.*lands'`, `'until.*ships'`)
 
@@ -1061,7 +1061,7 @@ The phrases are compiled with `new RegExp(phrase, 'i')` — case-insensitive onl
 ### AUDIT-20260531-14 — The guard test's own comment is a deferral/IOU shape — "this test can be migrated to import it directly" — inside the enforcer
 
 Finding-ID: AUDIT-20260531-14
-Status:     open
+Status:     acknowledged-slush-pile-2026-05-31
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the docblock above the new test: "if the canonical list grows, this test **can be migrated to import it directly**")
 
@@ -1070,7 +1070,7 @@ The project's "Just for now is bullshit" rule forbids IOU comments that promise 
 ### AUDIT-20260531-15 — Inconsistent concat-splitting leaves literal forbidden-phrase fragments in the test file, undermining the comment's stated self-trigger defense
 
 Finding-ID: AUDIT-20260531-15
-Status:     open
+Status:     acknowledged-slush-pile-2026-05-31
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `forbiddenPhrases` array)
 
