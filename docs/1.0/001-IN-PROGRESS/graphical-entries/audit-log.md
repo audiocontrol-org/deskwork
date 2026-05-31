@@ -3779,7 +3779,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (codex). R
 ### AUDIT-20260530-52 — [P5-3 codex] Workplan marks a scoped server-side preset path as postponed
 
 Finding-ID: AUDIT-20260530-52 (cross-model: AUDIT-BARRAGE-codex-P5-3)
-Status:     open
+Status:     tracked-issue-382 (server-side preset path tracked at #382; workplan line tightened to reference issue)
 Severity:   low
 Surface:    docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:267-271
 

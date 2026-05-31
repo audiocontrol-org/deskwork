@@ -631,19 +631,21 @@ Disposition: duplicate of AUDIT-20260530-44 (claude). Both findings describe the
 
 ### Task 0.28 (fix-finding-AUDIT-20260530-52 (cross-model: AUDIT-BARRAGE-codex-P5-3)): AUDIT-20260530-52 — [P5-3 codex] Workplan marks a scoped server-side preset path…
 
-Closes AUDIT-20260530-52 (cross-model: AUDIT-BARRAGE-codex-P5-3). Surface: docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:267-271.
+Closes AUDIT-20260530-52 (cross-model: AUDIT-BARRAGE-codex-P5-3). Surface: `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md` Step 5.5.2 line — the "deferred to Phase 6 enhancements" language for the `.deskwork/personal/<operator-id>/focus-presets.json` server-side preset path.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-52 (cross-model: AUDIT-BARRAGE-codex-P5-3)` in subject
+Disposition: tracked via issue [#382](https://github.com/audiocontrol-org/deskwork/issues/382) per project rule "Just for now is bullshit." The workplan Step 5.5.2 line has been tightened to reference #382 (the issue body captures the originally-specified shape, five operator-decision open questions, and the acceptance criteria for the eventual Phase 6 implementation). The deferral language is no longer untracked — anyone reading the workplan can follow the link to the open issue.
+
+- [x] Step 1: N/A (docs-discipline finding, no test possible)
+- [x] Step 2: N/A
+- [x] Step 3: implemented in this commit (workplan line edit + Status flip)
+- [x] Step 4: N/A
+- [x] Step 5: closed via Task 0.28 docs commit
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `(N/A — docs-discipline finding)`
+- [x] `npx vitest run` exits 0 (no source change)
+- [x] Audit-log Status flipped to `tracked-issue-382`
 
 
 
@@ -1658,7 +1660,7 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 ### Task 5.5: Saveable focus presets + deep-link URL pattern
 
 - [x] Step 5.5.1: The dashboard's base view is already multi-lane (D3 Press Bay) — every focused lane renders simultaneously. The "composed view" concept becomes a **saved focus preset**: a named subset of `{ visible-lanes, focused-lanes, per-lane-view-mode, per-lane-collapse-state }` that the operator can re-open later.
-- [x] Step 5.5.2: Saved presets stored at `${STORAGE_KEY_PREFIX}${projectKey}:focus-presets` localStorage (per-operator). `.deskwork/personal/<operator-id>/focus-presets.json` server-side path deferred to Phase 6 enhancements per dispatch scope.
+- [x] Step 5.5.2: Saved presets stored at `${STORAGE_KEY_PREFIX}${projectKey}:focus-presets` localStorage (per-operator). `.deskwork/personal/<operator-id>/focus-presets.json` server-side path tracked at [#382](https://github.com/audiocontrol-org/deskwork/issues/382) (Phase 6 enhancement — operator-decision-blocking open questions on storage location, operator-id source, conflict resolution, deep-link semantics, migration).
 - [x] Step 5.5.3: Deep-link URL pattern: `/dev/editorial-studio?preset=<preset-id>` opens the saved preset. The rail head surfaces "Save current as preset…" + a per-row "Load <name>" affordance + "Delete" sibling. Per `.claude/rules/affordance-placement.md`, affordances live on the rail head (component-attached), not in a separate page-level toolbar.
 
 ### Task 5.6: Integration test against multi-lane fixture
