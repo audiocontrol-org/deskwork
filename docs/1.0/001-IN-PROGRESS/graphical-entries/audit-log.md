@@ -4025,7 +4025,7 @@ Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). 
 ### AUDIT-20260530-70 — [P6-2 claude] No XSS regression test feeds an operator-controlled name/contentDir through the server render — the stated audit focus is entirely uncovered
 
 Finding-ID: AUDIT-20260530-70 (cross-model: AUDIT-BARRAGE-claude-P6-2)
-Status:     open
+Status:     fixed-3cbe4c7
 Severity:   low
 Surface:    `packages/studio/src/pages/lanes/edit-form.ts` (`value="${row.name}"`, `data-current="${row.name}"`, `data-current="${row.contentDir}"`); `packages/studio/src/pages/pipelines/view-panel.ts`/`table.ts`; `packages/studio/test/lanes/*` + `test/pipelines/*`
 
