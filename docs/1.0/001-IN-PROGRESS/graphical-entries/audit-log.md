@@ -3805,7 +3805,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (codex). R
 ### AUDIT-20260530-54 — [P6-1 claude] `pipeline update --rename-stage` writes `<id>-renames.json` into the override dir, which the loader enumerates as a phantom template — breaks `pipeline list` after any rename
 
 Finding-ID: AUDIT-20260530-54 (cross-model: AUDIT-BARRAGE-claude-P6-1)
-Status:     open
+Status:     fixed-ec38100
 Severity:   high
 Surface:    `packages/core/src/pipelines/operations/update.ts:appendRenameMigration` (writes `${pipelineId}-renames.json` into `pipelineOverridesDir`) vs `packages/core/src/pipelines/loader.ts:listAvailablePipelineTemplates` (`:251`) + `packages/core/src/pipelines/operations/list.ts:listPipelines`
 

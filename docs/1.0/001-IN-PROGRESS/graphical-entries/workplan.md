@@ -671,17 +671,17 @@ Closes AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3). Surface: plugi
 
 Closes AUDIT-20260530-54 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `packages/core/src/pipelines/operations/update.ts:appendRenameMigration` (writes `${pipelineId}-renames.json` into `pipelineOverridesDir`) vs `packages/core/src/pipelines/loader.ts:listAvailablePipelineTemplates` (`:251`) + `packages/core/src/pipelines/operations/list.ts:listPipelines`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-54 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/core/test/pipelines/rename-sidecar-isolation.test.ts`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — bug already fixed in commit f247311 (Phase 6 Task 6.2 review fix #1) BEFORE this task ran. The test pins the loader-level isolation contract so a future regression that moves the sidecar back into `pipelineOverridesDir` (the pre-fix shape) will fail at the core boundary. The bug-repro check was performed at audit-finding time on the pre-f247311 tree, not re-replayed here; the trace evidence in AUDIT-20260530-54's `Surface:` paragraph plus the existing CLI-level regression at `packages/cli/test/pipeline/update.test.ts:213` (which would also have caught it pre-fix) is the closure narrative.
+- [x] Step 3: implement the fix — already in place at `packages/core/src/pipelines/operations/rename-migration.ts` (migrations live under `<projectRoot>/.deskwork/pipelines/migrations/<id>.json`; the loader's `listJsonBasenames` does not recurse, so the sibling subdir is invisible to enumeration)
+- [x] Step 4: confirm test passes — `npx vitest run packages/core/test/pipelines/rename-sidecar-isolation.test.ts` → 4/4 pass; `npm --workspace @deskwork/core test` → 836/836 pass; `npx vitest run packages/cli/test/pipeline/update.test.ts` → 27/27 pass
+- [x] Step 5: commit with `Closes AUDIT-20260530-54 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject — commit `ec38100`
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/pipelines/rename-sidecar-isolation.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-ec38100` via the close-shipped-audit-findings step
 
 
 
