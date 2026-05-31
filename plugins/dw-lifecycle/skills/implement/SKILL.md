@@ -37,49 +37,62 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    - If a step is independent of others, consider `superpowers:dispatching-parallel-agents` to fan out.
    - Every sub-agent dispatched in this loop (implementer, reviewer, code-explorer, code-architect, etc.) MUST be routed through the dispatch wrapper — see "Dispatch-wrapper engagement" below.
    - When the task body is complete, mark its checkboxes and commit.
-6. **End-of-task audit-barrage hook (always fires).** After the task-completion commit lands AND before any between-task work, run an audit-barrage pass against the task's diff, lift the surfaced findings into the audit-log, and auto-scope them at the head of the workplan so the workplan-aware gate (Step 2) sees them as the next work on next pickup. Per the Phase 15 operator directive (*"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do. Audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path"*), the hook is unconditional — there is NO `--skip-audit-barrage-hook` flag. The hook composes five CLI invocations:
+6. **End-of-task audit-barrage hook (dampener-gated).** After the task-completion commit lands AND before any between-task work, run an audit-barrage pass against the task's diff, lift the surfaced findings into the audit-log, and auto-scope them at the head of the workplan so the workplan-aware gate (Step 2) sees them as the next work on next pickup. Per the Phase 15 operator directive (*"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do. Audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path"*), the hook is unconditional EXCEPT for the dampener gate — per the Phase 15 closeout decision (2026-05-31, after the 7-round dogfood demonstrated the convergence pattern), the dampener skips the hook when the last 2 consecutive barrages found zero HIGH+ open findings. Auditor agents always find SOMETHING; the dampener lets the loop self-stop on nit-level meta-critiques.
 
    ```bash
-   # 1. Render the prompt from the project's audit-barrage template (or override).
-   #    The vars JSON carries feature_slug, workplan_summary, diff,
-   #    audit_log_excerpt, commit_subjects. The agent builds it from session
-   #    context: slug from --feature; workplan_summary from workplan.md tail;
-   #    diff from `git diff <task-start-sha>..HEAD`; audit_log_excerpt from
-   #    audit-log.md tail; commit_subjects from `git log --format=%s
-   #    <task-start-sha>..HEAD`. No operator prompts on the happy path.
-   VARS=$(mktemp).json
-   # ...write vars JSON to "$VARS"...
-   PROMPT=$(mktemp).md
-   dw-lifecycle audit-barrage-render \
-     --feature <slug> \
-     --vars-file "$VARS" \
-     --output "$PROMPT"
+   # 0. Dampener gate. If the last 2 consecutive audit-barrage runs each
+   #    surfaced 0 HIGH+ findings (where HIGH+ = `high` or `blocking` AND
+   #    Status: open), skip the hook. Threshold is operator-tunable
+   #    via --threshold N (default 2). Exit 1 = skip; exit 0 = fire.
+   if ! dw-lifecycle check-barrage-dampener --feature <slug>; then
+     # Dampener engaged — skip the hook this turn. The audit will
+     # re-engage automatically once a future task introduces a HIGH+
+     # finding (any future barrage finding 1+ HIGH+ resets the counter).
+     :
+   else
+     # 1. Render the prompt from the project's audit-barrage template (or override).
+     #    The vars JSON carries feature_slug, workplan_summary, diff,
+     #    audit_log_excerpt, commit_subjects. The agent builds it from session
+     #    context: slug from --feature; workplan_summary from workplan.md tail;
+     #    diff from `git diff <task-start-sha>..HEAD`; audit_log_excerpt from
+     #    audit-log.md tail; commit_subjects from `git log --format=%s
+     #    <task-start-sha>..HEAD`. No operator prompts on the happy path.
+     VARS=$(mktemp).json
+     # ...write vars JSON to "$VARS"...
+     PROMPT=$(mktemp).md
+     dw-lifecycle audit-barrage-render \
+       --feature <slug> \
+       --vars-file "$VARS" \
+       --output "$PROMPT"
 
-   # 2. Fire the barrage. --output-run-dir prints JUST the run-dir path on
-   #    stdout (suppressing the JSON) so bash captures it cleanly.
-   RUN_DIR=$(dw-lifecycle audit-barrage \
-     --feature <slug> \
-     --prompt-file "$PROMPT" \
-     --output-run-dir)
+     # 2. Fire the barrage. --output-run-dir prints JUST the run-dir path on
+     #    stdout (suppressing the JSON) so bash captures it cleanly.
+     RUN_DIR=$(dw-lifecycle audit-barrage \
+       --feature <slug> \
+       --prompt-file "$PROMPT" \
+       --output-run-dir)
 
-   # 3. Lift findings into audit-log.md. Sequential AUDIT-<date>-<NN> IDs
-   #    continue from the highest existing for today.
-   dw-lifecycle audit-barrage-lift \
-     --feature <slug> \
-     --run-dir "$RUN_DIR" \
-     --apply
+     # 3. Lift findings into audit-log.md. Sequential AUDIT-<date>-<NN> IDs
+     #    continue from the highest existing for today.
+     dw-lifecycle audit-barrage-lift \
+       --feature <slug> \
+       --run-dir "$RUN_DIR" \
+       --apply
 
-   # 4. Auto-scope findings at the workplan's next-unchecked position. Each
-   #    new fix-finding task lands BEFORE the first existing unchecked task,
-   #    so the workplan-aware gate's positions [0..N-1] are exactly the
-   #    fix-tasks for the open finding IDs. No operator dispositions needed.
-   dw-lifecycle promote-findings --feature <slug> --auto
+     # 4. Auto-scope findings at the workplan's next-unchecked position. Each
+     #    new fix-finding task lands BEFORE the first existing unchecked task,
+     #    so the workplan-aware gate's positions [0..N-1] are exactly the
+     #    fix-tasks for the open finding IDs. No operator dispositions needed.
+     dw-lifecycle promote-findings --feature <slug> --auto
 
-   # 5. Sanity-check the gate now allows pickup (it will: findings are
-   #    scoped as the next N tasks). Loop re-runs the gate at next pickup
-   #    in Step 2, this is a smoke for the hook itself.
-   dw-lifecycle check-open-findings --feature <slug>
+     # 5. Sanity-check the gate now allows pickup (it will: findings are
+     #    scoped as the next N tasks). Loop re-runs the gate at next pickup
+     #    in Step 2, this is a smoke for the hook itself.
+     dw-lifecycle check-open-findings --feature <slug>
+   fi
    ```
+
+   **Slush pile mechanic:** when the operator decides a HIGH+ finding is a nit and shouldn't be worked, flip its audit-log status to `acknowledged-slush-pile` (or any `acknowledged-*` / `fixed-*` / `verified-*` / `withdrawn-*`). The dampener counts only HIGH+ findings whose status is `open`, so slushed findings don't keep the dampener disengaged. The audit-log entry stays as historical record per the preservation rule.
 
    **Failure-path policy (fail loud; do not pause the loop on findings):**
 

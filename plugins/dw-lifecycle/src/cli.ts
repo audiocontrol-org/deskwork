@@ -38,6 +38,7 @@ import { triageIssues } from './subcommands/triage-issues.js';
 import { promoteDeferrals } from './subcommands/promote-deferrals.js';
 import { promoteFindings } from './subcommands/promote-findings.js';
 import { checkOpenFindingsCli } from './subcommands/check-open-findings.js';
+import { checkBarrageDampenerCli } from './subcommands/check-barrage-dampener.js';
 import { applyAuditFlipsCli } from './subcommands/apply-audit-flips.js';
 import { closeShippedAuditFindingsCli } from './subcommands/close-shipped-audit-findings.js';
 import { reAuditFixedFindingsCli } from './subcommands/re-audit-fixed-findings.js';
@@ -102,6 +103,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'promote-deferrals': promoteDeferrals,
   'promote-findings': promoteFindings,
   'check-open-findings': checkOpenFindingsCli,
+  'check-barrage-dampener': checkBarrageDampenerCli,
   'apply-audit-flips': applyAuditFlipsCli,
   'close-shipped-audit-findings': closeShippedAuditFindingsCli,
   're-audit-fixed-findings': reAuditFixedFindingsCli,
