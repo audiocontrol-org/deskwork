@@ -465,17 +465,17 @@ Disposition: duplicate of AUDIT-20260530-25 (claude). Both describe `bucket.unbu
 
 Closes AUDIT-20260530-43 (cross-model: AUDIT-BARRAGE-codex-P5-2). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:250-262.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-43 (cross-model: AUDIT-BARRAGE-codex-P5-2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-43 (cross-model: AUDIT-BARRAGE-codex-P5-2)` in subject — commit a37a05f
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-compose-client.test.ts` (the new `held Space (repeat=true) preventDefaults page scroll but does NOT activate clipboard write` case appended at the end of the file)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-compose-client.test.ts` exits 0 (passes against the fix; 11/11 cases pass)
+- [x] Audit-log Status flipped to `fixed-a37a05f` via the close-shipped-audit-findings step
 
 
 

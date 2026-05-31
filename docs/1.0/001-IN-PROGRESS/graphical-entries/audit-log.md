@@ -3662,7 +3662,7 @@ Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (codex). R
 ### AUDIT-20260530-43 — [P5-2 codex] Held Space repeat on compose/empty CTA still allows page scroll
 
 Finding-ID: AUDIT-20260530-43 (cross-model: AUDIT-BARRAGE-codex-P5-2)
-Status:     open
+Status:     fixed-a37a05f
 Severity:   low
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:250-262
 
