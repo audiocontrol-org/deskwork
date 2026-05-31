@@ -593,17 +593,19 @@ Closes AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plu
 
 Closes AUDIT-20260530-50 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `packages/studio/test/dashboard-swimlane-presets-client.test.ts` + `packages/studio/test/dashboard-swimlane-drag-client.test.ts`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-50 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+AUDIT-20260530-44 (Task 0.20) already added `dashboard-swimlane-presets-save-failure.test.ts` covering `writePresets` failure via prototype-level `Storage.prototype.setItem` spy. The remaining gap — `writeStoredOrder` (drag/reorder) and `writeStoredSet` (visibility/focus state on swimlane.ts) — is closed by new `packages/studio/test/dashboard-swimlane-write-failure.test.ts` (commit `9ab86b1`). The new file mirrors the AUDIT-44 prototype-spy pattern with a targeted-matcher per test so only the key under test fails. Three tests: drag drop with failing lane-order key + eye-toggle click with failing visibility/focus keys + focus-chip click with failing focus/visibility keys. Each asserts (a) no exception propagates out of the handler and (b) the in-DOM state still applied.
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/studio/test/dashboard-swimlane-write-failure.test.ts`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — initial run produced 2/3 failures (storage-state sanity assertions needed adjustment for `initSwimlane` pre-writing initial state); contract assertions held throughout
+- [x] Step 3: implement the fix — coverage-only finding; production swallow already correct per AUDIT-49 refactor (commit `9ab86b1`)
+- [x] Step 4: confirm test passes — `npx vitest run packages/studio/test/dashboard-swimlane-write-failure.test.ts` exits 0 (3/3 passed); `npm --workspace @deskwork/studio test` exits 0 (1012/1012 passed, no regression)
+- [x] Step 5: commit with `Closes AUDIT-20260530-50 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject — commit `9ab86b1`
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-write-failure.test.ts` (cited in Step 1)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-write-failure.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-9ab86b1` via the close-shipped-audit-findings step
 
 
 

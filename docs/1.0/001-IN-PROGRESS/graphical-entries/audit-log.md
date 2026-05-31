@@ -3753,7 +3753,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). 
 ### AUDIT-20260530-50 — [P5-3 claude] Test suite never exercises localStorage write-failure / quota for either feature
 
 Finding-ID: AUDIT-20260530-50 (cross-model: AUDIT-BARRAGE-claude-P5-3)
-Status:     open
+Status:     fixed-9ab86b1
 Severity:   low
 Surface:    `packages/studio/test/dashboard-swimlane-presets-client.test.ts` + `packages/studio/test/dashboard-swimlane-drag-client.test.ts`
 
