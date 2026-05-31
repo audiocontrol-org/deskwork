@@ -1334,19 +1334,18 @@ Closes AUDIT-20260530-89 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `p
 
 ### Task 0.65 (fix-finding-AUDIT-20260530-90 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)): AUDIT-20260530-90 — [P7T7.2 claude] `isPopulatedGroupEntry` is defined and docum…
 
-Closes AUDIT-20260530-90 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `packages/core/src/groups/types.ts:46-49` (definition + doc) vs `packages/core/src/groups/index.ts:11` (`export { isArchivedEntry, isGroupEntry } from './types.ts';`).
+Closes AUDIT-20260530-90 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `packages/core/src/groups/types.ts:46-49` (definition + doc) vs `packages/core/src/groups/index.ts:11`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-90 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in subject
+Disposition: already fixed by commit `b642cd6` (Task 7.3/7.4 implementation). The audit cited the pre-Task-7.3 barrel — the current `packages/core/src/groups/index.ts:12` exports `isPopulatedGroupEntry` alongside `isArchivedEntry` and `isGroupEntry`. The Task 7.3 + 7.4 work landed the first consumers (multi-lane composed view) and the export was added at the same time.
+
+- [x] Step 1-5: covered by `b642cd6` (Task 7.3/7.4 implementation)
+- [x] Audit-log Status flipped to `fixed-b642cd6 (already addressed at Task 7.3/7.4 implementation time — barrel export added with the first consumer)`
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/groups/` (existing predicate tests pin `isPopulatedGroupEntry` via the barrel)
+- [x] `npx vitest run` exits 0
+- [x] Status flipped
 
 
 

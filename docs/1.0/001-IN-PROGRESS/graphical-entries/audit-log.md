@@ -4305,7 +4305,7 @@ Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (claude). 
 ### AUDIT-20260530-90 — [P7T7.2 claude] `isPopulatedGroupEntry` is defined and documented as downstream public API but not barrel-exported — unreachable via `@deskwork/core/groups`
 
 Finding-ID: AUDIT-20260530-90 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)
-Status:     open
+Status:     fixed-b642cd6 (already addressed at Task 7.3/7.4 implementation time — barrel export added with the first consumer)
 Severity:   low
 Surface:    `packages/core/src/groups/types.ts:46-49` (definition + doc) vs `packages/core/src/groups/index.ts:11` (`export { isArchivedEntry, isGroupEntry } from './types.ts';`)
 
