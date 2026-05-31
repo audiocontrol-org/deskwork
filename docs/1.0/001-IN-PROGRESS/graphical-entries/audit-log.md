@@ -4422,7 +4422,7 @@ I checked four things that looked suspect from the diff and confirmed each is fi
 ### AUDIT-20260531-04 — Dead variable `swimCompactClose` in the new compact-strip test — computed then explicitly discarded
 
 Finding-ID: AUDIT-20260531-04
-Status:     open
+Status:     fixed-fa2014f
 Severity:   low
 Surface:    `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` (the AUDIT-20260531-01 test, the `swimCompactClose` line + its `void swimCompactClose;`)
 
@@ -4435,7 +4435,7 @@ The new test computes `const swimCompactClose = editorialBlock.indexOf('</div>',
 ### AUDIT-20260531-05 — Compact-strip test asserts DOM presence but never exercises the collapsed state its name claims — CSS reveal path is unverified
 
 Finding-ID: AUDIT-20260531-05
-Status:     open
+Status:     fixed-168af95
 Severity:   informational
 Surface:    `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` (`renders unbucketed compact cell in swim compact strip when lane is collapsed (AUDIT-20260531-01)`); CSS at `plugins/deskwork-studio/public/css/dashboard-swimlane-shell.css:197-206`
 
@@ -4448,7 +4448,7 @@ This is acceptable for an HTML-presence test, but per `.claude/rules/ui-verifica
 ### AUDIT-20260531-06 — New `.sc-stage.is-unbucketed` compact cell has no dedicated CSS and a label far longer than real stage names — only the inline glyph distinguishes it
 
 Finding-ID: AUDIT-20260531-06
-Status:     open
+Status:     fixed-b0da816
 Severity:   informational
 Surface:    `packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:135-139` (`renderUnbucketedCompactCell`); CSS at `dashboard-swimlane-shell.css:208-246`
 
