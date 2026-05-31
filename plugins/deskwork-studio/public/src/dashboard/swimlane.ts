@@ -465,10 +465,35 @@ export function reapplyFromStorage(): void {
  * Entry point — wire the swimlane shell to localStorage + click
  * handlers. No-op when the bay shell is absent (e.g. on a project
  * without lanes, or a page that doesn't render the dashboard).
+ *
+ * Idempotent per AUDIT-20260530-30 (cross-model:
+ * AUDIT-BARRAGE-codex-P5-1): re-invocation against the SAME bay-shell
+ * element short-circuits via a DOM sentinel (`data-swimlane-wired`).
+ * Pre-fix, calling `initSwimlane()` twice on the same DOM would (a)
+ * bind every focus-chip + rail-eye + swim-stub click handler twice and
+ * (b) reassign the module-level `activeState` singleton at lines
+ * 480-481 while previously-bound handlers retained closure references
+ * to the prior `state` object — splitting state mutations across two
+ * objects, so the second invocation's bindings would mutate the new
+ * object while the first invocation's bindings (still attached) would
+ * mutate the orphan. Both concerns collapse to a single fix: bind the
+ * shell exactly once.
+ *
+ * The sibling `initRowMemberTab` / `initGroupMembersSection` precedent
+ * uses a module-level `let wired = false` guard (commit 90be5c3,
+ * AUDIT-20260529-42). We use a DOM-attached sentinel here instead
+ * because the four swimlane controllers have ~80 existing
+ * `init*()` test invocations across nine test files that rebuild the
+ * shell in `beforeEach` and expect re-init against the fresh DOM to
+ * re-bind handlers. A DOM sentinel pins to the shell — fresh shell
+ * (new test) means absent sentinel means init proceeds; same shell
+ * (re-init path) means sentinel present means no-op. The wired-once
+ * contract is preserved; only the storage location differs.
  */
 export function initSwimlane(): void {
   const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
   if (shell === null) return;
+  if (shell.dataset.swimlaneWired === 'true') return;
 
   const allLanes = collectAllLanes();
   if (allLanes.length === 0) return;
@@ -488,4 +513,11 @@ export function initSwimlane(): void {
   bindFocusChips(state, projectKey);
   bindRailEyeToggles(state, projectKey);
   bindSwimStubs(state, projectKey);
+  // Flip the sentinel ONLY after every binder has attached its
+  // listeners — early-flipping risks leaving the shell half-wired if
+  // a binder throws. The current binders don't throw, but the
+  // post-flip ordering keeps the guard robust to future changes
+  // (matches the precedent's post-flip ordering in
+  // group-members-section.ts).
+  shell.dataset.swimlaneWired = 'true';
 }

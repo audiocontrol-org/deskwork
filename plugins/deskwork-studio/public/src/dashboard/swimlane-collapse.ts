@@ -460,10 +460,17 @@ export function reapplyCollapseFromStorage(): void {
 /**
  * Entry point — wire collapse-chev handlers + restore persisted
  * state. No-op when there's no bay-shell on the page.
+ *
+ * Idempotent per AUDIT-20260530-30 — DOM-sentinel guard pinned to the
+ * bay-shell. See `initSwimlane` (swimlane.ts) for the full sentinel-
+ * vs-module-level-`wired` rationale; the same trade applies here
+ * (existing test-suite re-init expectations rule out module-level
+ * storage; the DOM sentinel resets naturally on shell rebuild).
  */
 export function initSwimlaneCollapse(): void {
   const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
   if (shell === null) return;
+  if (shell.dataset.swimlaneCollapseWired === 'true') return;
 
   const projectKey = resolveProjectKey(shell);
   const state: CollapseState = {
@@ -474,4 +481,7 @@ export function initSwimlaneCollapse(): void {
 
   applyCollapseState(state);
   bindHandlers(state, projectKey);
+  // Post-flip ordering — sentinel flips only after every binder has
+  // attached so a thrown binder leaves the shell re-init-able.
+  shell.dataset.swimlaneCollapseWired = 'true';
 }

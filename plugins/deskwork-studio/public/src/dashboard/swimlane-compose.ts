@@ -324,10 +324,19 @@ function bindAffordance(button: HTMLButtonElement, spec: AffordanceSpec): void {
 /**
  * Entry point — wire compose-chip + empty-lane CTA handlers for
  * every swim on the page. No-op when the bay-shell is absent.
+ *
+ * Idempotent per AUDIT-20260530-30 — DOM-sentinel guard pinned to the
+ * bay-shell. See `initSwimlane` (swimlane.ts) for the full sentinel-
+ * vs-module-level-`wired` rationale. Pre-fix, re-invocation would
+ * bind a second click + keydown handler on every compose chip + empty-
+ * lane CTA, so a single operator click would `await navigator.
+ * clipboard.writeText(text)` twice and run the flash-revert dance
+ * twice — visible as a "stuttering" copied-flash state.
  */
 export function initSwimlaneCompose(): void {
   const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
   if (shell === null) return;
+  if (shell.dataset.swimlaneComposeWired === 'true') return;
   for (const button of document.querySelectorAll<HTMLButtonElement>(
     COMPOSE_CHIP_SPEC.selector,
   )) {
@@ -338,4 +347,7 @@ export function initSwimlaneCompose(): void {
   )) {
     bindAffordance(button, EMPTY_CTA_SPEC);
   }
+  // Post-flip ordering — sentinel flips only after every binder has
+  // attached so a thrown binder leaves the shell re-init-able.
+  shell.dataset.swimlaneComposeWired = 'true';
 }

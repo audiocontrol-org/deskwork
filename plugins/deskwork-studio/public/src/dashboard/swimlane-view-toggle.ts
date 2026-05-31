@@ -288,10 +288,19 @@ export function reapplyViewToggleFromStorage(): void {
  * Entry point — wire view-toggle handlers + restore the operator's
  * resolved view-mode for every swim on the page. No-op when the
  * bay-shell is absent.
+ *
+ * Idempotent per AUDIT-20260530-30 — DOM-sentinel guard pinned to the
+ * bay-shell. See `initSwimlane` (swimlane.ts) for the full sentinel-
+ * vs-module-level-`wired` rationale. This controller is particularly
+ * sensitive because pre-fix re-invocation would also stack a second
+ * `observeCollapseClassChanges()` MutationObserver and a second
+ * `watchViewport` resize listener — both compounding the binding-
+ * stacking concern with extra observer churn.
  */
 export function initSwimlaneViewToggle(): void {
   const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
   if (shell === null) return;
+  if (shell.dataset.swimlaneViewToggleWired === 'true') return;
 
   const projectKey = resolveProjectKey(shell);
   const overrides = readStoredOverrides(viewModeKey(projectKey));
@@ -309,4 +318,8 @@ export function initSwimlaneViewToggle(): void {
   bindCellClicks(state, projectKey);
   observeCollapseClassChanges();
   watchViewport(state);
+  // Post-flip ordering — sentinel flips only after every binder +
+  // observer has attached so a thrown binder leaves the shell
+  // re-init-able.
+  shell.dataset.swimlaneViewToggleWired = 'true';
 }
