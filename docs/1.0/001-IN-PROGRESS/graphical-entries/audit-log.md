@@ -3451,7 +3451,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (claude). 
 ### AUDIT-20260530-26 — [P5-1 claude] No clear-on-version-bump for swimlane localStorage state — schema drift silently persists stale per-operator state
 
 Finding-ID: AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)
-Status:     open
+Status:     fixed-ec51035
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts` (`STORAGE_KEY_PREFIX`, `resolveProjectKey`, `readStoredObjectMap`) and the four key suffixes in `swimlane.ts` / `swimlane-collapse.ts` / `swimlane-view-toggle.ts`
 

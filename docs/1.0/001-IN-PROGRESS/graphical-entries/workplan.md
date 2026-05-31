@@ -143,17 +143,17 @@ Closes AUDIT-20260531-06. Surface: `packages/studio/src/pages/dashboard/swimlane
 
 Closes AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts` (`STORAGE_KEY_PREFIX`, `resolveProjectKey`, `readStoredObjectMap`) and the four key suffixes in `swimlane.ts` / `swimlane-collapse.ts` / `swimlane-view-toggle.ts`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-client.test.ts` — `AUDIT-20260530-26: ignores stale unversioned dashboard visibility state` (cited in Step 1)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-client.test.ts packages/studio/test/dashboard-swimlane-collapse-client.test.ts packages/studio/test/dashboard-swimlane-collapse-list-client.test.ts packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts packages/studio/test/dashboard-swimlane-presets-store-client.test.ts packages/studio/test/dashboard-swimlane-presets-client.test.ts packages/studio/test/dashboard-swimlane-presets-polish-client.test.ts packages/studio/test/dashboard-swimlane-integration-client.test.ts packages/studio/test/dashboard-lane-stack-client.test.ts packages/studio/test/dashboard-swimlane-drag-client.test.ts packages/studio/test/dashboard-swimlane-drag-client-pure.test.ts packages/studio/test/dashboard-swimlane-drag-client-reorder-buttons.test.ts` exits 0 (96 tests pass)
+- [x] Audit-log Status flipped to `fixed-ec51035` via the close-shipped-audit-findings step
 
 
 
