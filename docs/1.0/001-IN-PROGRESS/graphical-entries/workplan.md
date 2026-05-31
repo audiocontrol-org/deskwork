@@ -315,17 +315,19 @@ Disposition: duplicate of AUDIT-20260528-10 (the original surfacing of "Task 5.1
 
 Closes AUDIT-20260530-35 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `docs/1.0/001-IN-PROGRESS/graphical-entries/tooling-feedback.md`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-35 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+Disposition: acknowledged-informational. AUDIT-35 surfaces that TF-008/TF-009/TF-010 are still listed as `Open` in `tooling-feedback.md`. The gemini auditor itself notes *"these are not directly bugs in the feature under audit, they represent acknowledged friction points with the development tooling"* — i.e. this is a status notice, not a feature defect. TF entries are tracked separately through the tooling-feedback workflow (see `.claude/rules/agent-discipline.md` § scope-discovery v1 — dogfood feedback via tooling-feedback.md): each TF entry is closed via its own lifecycle, not via the feature's audit-barrage cleanup queue. No feature-side fix possible; no test possible.
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — inapplicable (informational finding; no testable feature bug)
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — inapplicable
+- [x] Step 3: implement the fix — inapplicable (no feature-side fix possible)
+- [x] Step 4: confirm test passes — inapplicable
+- [x] Step 5: commit with `Closes AUDIT-20260530-35 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject — informational disposition (acknowledged-informational-tooling-status); see Task 0.11 docs commit
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `(inapplicable — informational finding)` — no test possible
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix) — inapplicable
+- [x] Audit-log Status flipped to `acknowledged-informational-tooling-status` per disposition
 
 
 

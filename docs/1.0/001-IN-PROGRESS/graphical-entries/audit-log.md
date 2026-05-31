@@ -3560,7 +3560,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). 
 ### AUDIT-20260530-35 — [P5-1 gemini] The `tooling-feedback.md` explicitly lists TF-008, TF-009, and TF-010 as `Open` issues related to the scope-discovery tooling. While these are not directly bugs in the feature under audit, they represent acknowledged friction points with the development tooling. The resolution paths for TF-008 and TF-009 are documented as updates to `GRAMMAR_INSTRUCTION` (documentation-only fixes), and TF-010 is an upstream stub (#318). It's important for the operator to note that these tooling-related issues persist and might affect agent performance or developer experience, even if they don't block the feature's functional correctness.
 
 Finding-ID: AUDIT-20260530-35 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
-Status:     open
+Status:     acknowledged-informational-tooling-status (TF entries tracked separately in tooling-feedback.md; not a feature bug)
 Severity:   low
 Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/tooling-feedback.md`
 
