@@ -3538,7 +3538,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). 
 ### AUDIT-20260530-33 — [P5-1 gemini] The logic for the "All" focus chip in `bindFocusChips` contains an unconditional `state.focused.clear()` before conditionally re-populating `state.focused`. This means that if all visible lanes are already focused (`isAlreadyAll` is true), clicking the "All" chip will still clear the `state.focused` set and leave no lanes focused. This directly contradicts the expected behavior in AUDIT-20260528-09, which states, "Expected: clicking `All` restores or keeps every visibility-on lane focused. Actual: when every visible lane is already focused, clicking `All` leaves the focus set empty." The suggested fix was to make "All" idempotently select all visible lanes, which the current implementation does not achieve.
 
 Finding-ID: AUDIT-20260530-33 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
-Status:     open
+Status:     fixed-9eff7af (duplicate of AUDIT-20260528-09; closed by the same commit)
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane.ts:251-254`
 

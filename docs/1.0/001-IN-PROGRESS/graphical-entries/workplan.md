@@ -275,17 +275,19 @@ Disposition: duplicate of AUDIT-20260528-08 (the original inert-button-trap surf
 
 Closes AUDIT-20260530-33 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane.ts:251-254`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-33 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+Disposition: duplicate of AUDIT-20260528-09 (the original surfacing of the "All chip silently empties focus when every visible lane is already focused" bug on the same `bindFocusChips` handler in `plugins/deskwork-studio/public/src/dashboard/swimlane.ts`). The gemini auditor's finding text explicitly cites AUDIT-20260528-09 in its narrative ("This directly contradicts the expected behavior in AUDIT-20260528-09, which states...") but quoted stale line numbers (`:251-254`) and misread the current implementation — the actual `bindFocusChips` handler at lines 282-293 unconditionally clears `state.focused` and then unconditionally re-populates it with every visible lane (`state.focused.clear(); for (const id of allVisible) state.focused.add(id);`), per the fix landed in commit `9eff7af` on 2026-05-28. There is no conditional `!isAlreadyAll` branch gating the re-population; the gemini auditor's "if isAlreadyAll is true, clearing leaves it empty" claim describes the pre-fix shape, not the current code. Regression coverage lives in `packages/studio/test/dashboard-swimlane-client-keys.test.ts` — the `AUDIT-09: clicking the All chip is idempotent — all-already-focused stays all-focused (does NOT empty the set)` test asserts the all-already-focused → still-all-focused idempotency contract, and the paired `AUDIT-09: clicking the All chip from a partial-focus state restores every visible lane` test pins the partial-focus → all-focused contract. Both tests pass against the current handler; the fix is already in tree.
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — covered by AUDIT-09 tests in `dashboard-swimlane-client-keys.test.ts:254` and `:290`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — verified during AUDIT-20260528-09 cycle (commit `9eff7af`)
+- [x] Step 3: implement the fix — `9eff7af`
+- [x] Step 4: confirm test passes — `npx vitest run packages/studio/test/dashboard-swimlane-client-keys.test.ts -t "AUDIT-09"` → 2/2 pass
+- [x] Step 5: commit with `Closes AUDIT-20260530-33 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject — see disposition note; closed via duplicate-of-09 disposition rather than a fresh fix commit
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-client-keys.test.ts` (AUDIT-09 regression — same `bindFocusChips` handler, same idempotency contract)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-client-keys.test.ts -t "AUDIT-09"` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-9eff7af (duplicate of AUDIT-20260528-09; closed by the same commit)` per duplicate disposition
 
 
 
