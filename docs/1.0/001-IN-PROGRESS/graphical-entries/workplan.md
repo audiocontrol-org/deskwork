@@ -1424,17 +1424,18 @@ Closes AUDIT-20260530-94 (cross-model: AUDIT-BARRAGE-codex-P7T7.2). Surface: `pa
 
 Closes AUDIT-20260530-95 (cross-model: AUDIT-BARRAGE-codex-P7T7.2). Surface: `plugins/deskwork/skills/group/SKILL.md:53`, `plugins/deskwork/skills/group/SKILL.md:58-66`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-95 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)` in subject
+Disposition: split fix:
+1. **Error-catalog half** (lines 58-66 — the show/update refusal-message drift) — already addressed by Task 0.63 commit `a11aa60` (closed AUDIT-20260530-88, same drift surface).
+2. **Defaults-section half** (line 58 — superseded `group-empty-members-array` rule name + retired "dual representation for normalization" framing) — fixed in this task at commit `e9cdd6e`. Updated to reference current `group-stale-empty-members` rule per Task 7.5.5 + correct semantic per AUDIT-15/16.
+
+- [x] Step 1-5: split fix; covered by `a11aa60` (Task 0.63) + `e9cdd6e` (this task)
+- [x] Status flipped to `fixed-e9cdd6e (Defaults section); error-catalog half covered by Task 0.63 commit a11aa60`
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/groups/skill-md-error-strings.test.ts` (Task 0.63 doc-conformance regression — still passes 16/16 post-Defaults fix)
+- [x] `npx vitest run` exits 0
+- [x] Status flipped
 
 ## Phase 1: Prior-art research + build-vs-reuse decision  ·  [#302](https://github.com/audiocontrol-org/deskwork/issues/302)
 
