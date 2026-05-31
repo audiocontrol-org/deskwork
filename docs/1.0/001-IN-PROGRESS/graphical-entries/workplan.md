@@ -335,17 +335,17 @@ Disposition: acknowledged-informational. AUDIT-35 surfaces that TF-008/TF-009/TF
 
 Closes AUDIT-20260530-36 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `packages/studio/src/pages/dashboard/affordances.ts:178` (`verbsForStage`), `:370` (`renderMenu`), `:419-475` (`renderRowActions` / `renderRowDrawer` / `renderRowMenu`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-36 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/studio/test/dashboard-affordances-hoisted-classify.test.ts` (4 assertions: counter on `classifyStage` calls through `renderRow` + 3 sentinel assertions proving the threaded `verbs`/`category` are consumed)
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — all 4 tests failed pre-fix (counter=0 because pre-fix call was buried in `verbsForStage`'s closure; sentinel tests failed with TypeError because the renderers were trying to call `verbsForStage` themselves)
+- [x] Step 3: implement the fix — hoisted `classifyStage` + `verbsForStage` to `renderRow` (`section.ts`); narrowed sub-renderer signatures to `renderRowActions(verbs)`, `renderRowDrawer(verbs)`, `renderRowMenu(verbs, category)`; `renderMenu` now accepts the precomputed `category`. Exported `StageCategory` + `VerbSet` types.
+- [x] Step 4: confirm test passes — 4 new tests pass + full studio suite (977 passed, 11 skipped) + workspace build clean
+- [x] Step 5: commit with `Closes AUDIT-20260530-36 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject — commit 9f17e72
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-affordances-hoisted-classify.test.ts` (cited in Step 1)
+- [x] `npx vitest run packages/studio/test/dashboard-affordances-hoisted-classify.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-9f17e72` via the close-shipped-audit-findings step
 
 
 

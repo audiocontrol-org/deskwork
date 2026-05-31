@@ -3571,7 +3571,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (gemini). 
 ### AUDIT-20260530-36 — [P5-2 claude] Template-aware verb dispatch recomputes `classifyStage` + rebuilds the full verb set 4× per row
 
 Finding-ID: AUDIT-20260530-36 (cross-model: AUDIT-BARRAGE-claude-P5-2)
-Status:     open
+Status:     fixed-9f17e72
 Severity:   low
 Surface:    `packages/studio/src/pages/dashboard/affordances.ts:178` (`verbsForStage`), `:370` (`renderMenu`), `:419-475` (`renderRowActions` / `renderRowDrawer` / `renderRowMenu`)
 
