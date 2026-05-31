@@ -358,11 +358,29 @@ function collectKnownStages(template: PipelineTemplate): Set<string> {
 }
 
 /**
+ * Migration-window convention: a sidecar lacking a `lane` field is
+ * treated as belonging to the implicit `default` lane. Mirrors the
+ * constant `lane move` uses (see `lanes/operations/move.ts`). Naming
+ * the constant in one place per module keeps the two surfaces in
+ * lock-step — if the convention changes, both move.
+ */
+const DEFAULT_LANE_ID = 'default';
+
+/**
  * Refuse `remove-stage` when any entry's `currentStage` still
  * references the doomed stage AND that entry is bound to a lane whose
  * pipelineTemplate is the one being mutated. Walking only the
  * matching-template entries keeps the error message focused — entries
  * in other lanes are unaffected by the mutation.
+ *
+ * Per AUDIT-20260530-62 (cross-model: AUDIT-BARRAGE-codex-P6-1): when
+ * an entry's sidecar lacks a `lane` field (a legacy migration-window
+ * state), resolve through the implicit `default` lane the same way
+ * `lane move` does — otherwise legacy entries silently pass the
+ * refusal check even when they still occupy the doomed stage. Only
+ * skip when the entry genuinely cannot be associated with the mutated
+ * template: no `default` lane on disk, OR the resolved lane binds to
+ * a different pipeline.
  */
 async function refuseRemoveStageWhenReferenced(
   projectRoot: string,
@@ -380,14 +398,19 @@ async function refuseRemoveStageWhenReferenced(
 
   const offenders: string[] = [];
   for (const entry of sidecars) {
-    if (entry.lane === undefined) continue;
+    // Resolve the effective lane id: explicit `entry.lane` wins;
+    // missing `entry.lane` falls back to the migration-window
+    // `default` lane (AUDIT-20260530-62). If the resolved lane
+    // config doesn't load (missing for legacy entries with no
+    // default lane on disk, malformed for either path), skip the
+    // entry — doctor surfaces the underlying config issue
+    // separately, and refusing to skip would mask the remove-stage
+    // diagnostic behind an unrelated lane-config error.
+    const effectiveLaneId = entry.lane ?? DEFAULT_LANE_ID;
     let laneConfig;
     try {
-      laneConfig = loadLaneConfig(entry.lane, projectRoot);
+      laneConfig = loadLaneConfig(effectiveLaneId, projectRoot);
     } catch {
-      // Malformed / missing lane config: skip — doctor surfaces that
-      // separately. We don't want to mask the remove-stage diagnostic
-      // behind an unrelated lane-config error.
       continue;
     }
     if (laneConfig.pipelineTemplate !== pipelineId) continue;
