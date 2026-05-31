@@ -230,7 +230,6 @@ describe('dashboard swimlane AUDIT-20260530-25 — unbucketed entries are render
     // compact strip revealed when the lane is `.collapsed`).
     const swimCompactOpen = editorialBlock.indexOf('<div class="swim-compact"');
     expect(swimCompactOpen).toBeGreaterThanOrEqual(0);
-    const swimCompactClose = editorialBlock.indexOf('</div>', swimCompactOpen);
     // The compact strip contains nested `.sc-stage` divs; find the
     // outer closing tag by scanning forward through matched opens.
     let depth = 1;
@@ -249,7 +248,6 @@ describe('dashboard swimlane AUDIT-20260530-25 — unbucketed entries are render
     }
     const swimCompact = editorialBlock.slice(swimCompactOpen, cursor);
     expect(swimCompact).toContain('<div class="swim-compact"');
-    void swimCompactClose;
 
     // (b) An unbucketed cell renders inside `.swim-compact` with
     // `data-sc-stage="unbucketed"` and the `is-unbucketed` modifier.
