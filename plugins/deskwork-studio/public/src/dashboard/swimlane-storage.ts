@@ -48,7 +48,8 @@ export function resolveProjectKey(shell: HTMLElement): string {
 /**
  * Read a JSON array of strings from localStorage. Returns null on
  * any read failure (missing entry, parse error, wrong root shape).
- * Non-string array elements are dropped. Callers pick their own
+ * Non-string array elements are dropped. Duplicate strings are
+ * deduped preserving first-occurrence order. Callers pick their own
  * container type — `swimlane.ts:readStoredSet` projects into a
  * `Set<string>`; `swimlane-drag.ts:readStoredOrder` keeps the
  * positional array (lane order is positional, not set-like).
@@ -56,6 +57,22 @@ export function resolveProjectKey(shell: HTMLElement): string {
  * Centralising the read+parse boilerplate avoids drift between the
  * two surfaces while letting each caller pick the in-memory shape
  * that matches its access pattern.
+ *
+ * Per AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3) the
+ * helper enforces an array-of-unique-strings invariant. The reorder
+ * controller's order model is a one-to-one permutation of the live
+ * lane set; pre-fix, a corrupted or hand-edited value like
+ * `["qa","qa","default"]` passed validation, became `state.order`,
+ * and was written back after the next real reorder. The dedup
+ * happens at the read boundary so every caller — positional
+ * (`readStoredOrder`), set-projected (`readStoredSet`,
+ * `new Set(readStoredStringArray(...) ?? [])`), and record-keyed
+ * (the `laneCollapseState` build in `swimlane-presets-store.ts`) —
+ * receives a clean array regardless of on-disk corruption.
+ *
+ * First-occurrence order is preserved so the positional surface
+ * keeps the operator's intended order; later duplicates of an
+ * already-seen id are discarded.
  */
 export function readStoredStringArray(key: string): readonly string[] | null {
   try {
@@ -63,9 +80,13 @@ export function readStoredStringArray(key: string): readonly string[] | null {
     if (raw === null) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
+    const seen = new Set<string>();
     const out: string[] = [];
     for (const item of parsed) {
-      if (typeof item === 'string') out.push(item);
+      if (typeof item !== 'string') continue;
+      if (seen.has(item)) continue;
+      seen.add(item);
+      out.push(item);
     }
     return out;
   } catch {
