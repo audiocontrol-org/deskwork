@@ -547,7 +547,7 @@ Closes AUDIT-20260531-06 (claude-01 + claude-02 + claude-04 + claude-05 + claude
 **Acceptance Criteria:**
 
 - [x] No forbidden-deferral phrase in `feature-root.ts`.
-- [x] Regression test `feature-root.test.ts > picks lex-greatest, NOT semver-greatest` still pins the contract.
+- [x] Regression test `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts > picks lex-greatest, NOT semver-greatest` still pins the contract.
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -580,7 +580,7 @@ Closes AUDIT-20260531-08. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 
 **Acceptance Criteria:**
 
-- [x] No forbidden-deferral phrase in `feature-root.test.ts`.
+- [x] No forbidden-deferral phrase in `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`.
 - [x] AUDIT-10 regression guard (below) asserts the source file is clean too.
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
@@ -589,15 +589,15 @@ Closes AUDIT-20260531-08. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 
 Closes AUDIT-20260531-09. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 block) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`.
 
-- [x] Step 1: this is a doc-cleanup finding — the bare `feature-root.test.ts` token at line 550 would resolve to a nonexistent repo-root file.
-- [x] Step 2: confirmed pre-fix line 550 said: `Regression test \`feature-root.test.ts > ...\``.
+- [x] Step 1: this is a doc-cleanup finding — the bare `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` token at line 550 would resolve to a nonexistent repo-root file.
+- [x] Step 2: confirmed pre-fix line 550 said: `Regression test \`plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts > ...\``.
 - [x] Step 3: replaced the bare reference with the full path `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts > picks lex-greatest, NOT semver-greatest` so the `fix-task-tdd-discipline` doctor rule resolves correctly.
 - [x] Step 4: no code-side test gates this; the cure is doc hygiene.
 - [x] Step 5: commit with `Closes AUDIT-20260531-09` in subject.
 
 **Acceptance Criteria:**
 
-- [x] No bare `feature-root.test.ts` token in workplan task bodies (all references now use full paths).
+- [x] No bare `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` token in workplan task bodies (all references now use full paths).
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -605,7 +605,7 @@ Closes AUDIT-20260531-09. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 Closes AUDIT-20260531-10. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 acceptance criteria) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:118-130`.
 
-- [x] Step 1: NEW phrase-presence regression test in `feature-root.test.ts` reads the source file verbatim and asserts no forbidden-deferral phrase (subset of the canonical FORBIDDEN_DEFERRAL_PHRASES list).
+- [x] Step 1: NEW phrase-presence regression test in `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` reads the source file verbatim and asserts no forbidden-deferral phrase (subset of the canonical FORBIDDEN_DEFERRAL_PHRASES list).
 - [x] Step 2: confirmed pre-fix there was no automated guard against the phrases creeping back; AUDIT-06's fix was prose-only.
 - [x] Step 3: phrase strings stored as concat-assembled data (`'for ' + 'now'`) so the test's own array doesn't self-trigger if the scan widens to test files later.
 - [x] Step 4: tests pass; plugin suite 2436/2436.
