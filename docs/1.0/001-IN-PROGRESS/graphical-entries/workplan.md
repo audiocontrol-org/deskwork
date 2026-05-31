@@ -853,17 +853,29 @@ Closes AUDIT-20260530-64 (cross-model: AUDIT-BARRAGE-codex-P6-1). Surface: `pack
 
 Closes AUDIT-20260530-65 (cross-model: AUDIT-BARRAGE-claude-P6-2). Surface: `packages/studio/src/pages/pipelines/data.ts` — `loadPipelinesPageData` (loop), `findReferencingLanes`, `readLanePipelineTemplate`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-65 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-65 (cross-model: AUDIT-BARRAGE-claude-P6-2)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/pipelines-data-perf.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+**Implementation note:** the O(N×M) → O(M) fix itself already landed in
+commit b068da6 (Phase 6 Task 6.4 review followups — Fix 3, 2026-05-28),
+which replaced `findReferencingLanes` with `buildLaneRefIndex` (a
+single-pass inverse `Map<templateId, laneId[]>`). AUDIT-20260530-65 was
+filed against the fixed source tree without a regression guard. This
+task adds the missing perf-regression guard: a vitest test that wraps
+`node:fs.readFileSync` via `vi.mock` and asserts strict equality on the
+lane-directory read count (M=5 for the N=3, M=5 fixture, not N*M=15).
+Negative-verification was performed by temporarily reinlining the
+pre-fix per-template walk — the test failed with the expected 45-vs-5
+mismatch — and then reverting.
 
 
 

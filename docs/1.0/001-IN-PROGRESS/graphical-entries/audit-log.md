@@ -3960,7 +3960,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). R
 ### AUDIT-20260530-65 — [P6-2 claude] Pipelines data layer re-reads + re-parses every lane file once per template (O(templates × lanes) redundant IO)
 
 Finding-ID: AUDIT-20260530-65 (cross-model: AUDIT-BARRAGE-claude-P6-2)
-Status:     open
+Status:     fixed-43bd0ee
 Severity:   high
 Surface:    `packages/studio/src/pages/pipelines/data.ts` — `loadPipelinesPageData` (loop), `findReferencingLanes`, `readLanePipelineTemplate`
 
