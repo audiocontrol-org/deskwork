@@ -4223,7 +4223,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). 
 ### AUDIT-20260530-84 — [P6-3 claude] `spawnSync` calls have no timeout; a hung CLI stalls the suite until vitest's global timeout
 
 Finding-ID: AUDIT-20260530-84 (cross-model: AUDIT-BARRAGE-claude-P6-3)
-Status:     open
+Status:     fixed-dd7de48
 Severity:   low
 Surface:    `packages/cli/test/custom-pipeline-lane-integration.test.ts:99-108` (`pipeline`), `:111-120` (`lane`)
 
