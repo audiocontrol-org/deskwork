@@ -761,17 +761,17 @@ Closes AUDIT-20260530-58 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `pac
 
 Closes AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `packages/cli/test/lane/move.test.ts:264-280` ("rolls back artifact + scrapbook when writeSidecar fails").
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/cli/test/lane/move.test.ts` (in-process rollback test under the `deskwork lane move — sidecar-write failure rollback` describe; falsified by commenting out the rollback `moveDir`/`moveFile` calls in `packages/core/src/lanes/operations/move.ts`)
+- [x] `npm --workspace @deskwork/cli test -- --run test/lane/move.test.ts` exits 0 (11/11 passes against the fix)
+- [x] Audit-log Status flipped to `fixed-c4f0f5c` via the close-shipped-audit-findings step
 
 
 

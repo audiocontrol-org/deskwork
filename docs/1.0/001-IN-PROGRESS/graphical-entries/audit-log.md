@@ -3880,7 +3880,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). 
 ### AUDIT-20260530-59 — [P6-1 claude] Rollback-test silently no-ops (returns "pass") when it cannot simulate the write failure — the contract goes unverified on root/CI sandboxes
 
 Finding-ID: AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1)
-Status:     open
+Status:     fixed-c4f0f5c
 Severity:   low
 Surface:    `packages/cli/test/lane/move.test.ts:264-280` ("rolls back artifact + scrapbook when writeSidecar fails")
 
