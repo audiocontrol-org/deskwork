@@ -389,17 +389,17 @@ Closes AUDIT-20260530-38 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `plu
 
 Closes AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2). Surface: `packages/studio/src/pages/dashboard/swimlane-card.ts:84-115` (`EDITORIAL_STAGE_EMPTY_HINTS` + `stageEmptyHint`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/studio/test/dashboard-stage-empty-hint.test.ts` (3 tests: editorial-preset round-trip + no-hints fallback + partial-hints per-stage lookup).
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — 2 of 3 failed before the fix (editorial-preset `stageEmptyHints` undefined; partial-hints custom template fell back to generic for the named stage).
+- [x] Step 3: implement the fix — added optional `stageEmptyHints` to `PipelineTemplateSchema` (`packages/core/src/pipelines/types.ts`); populated `packages/core/src/pipelines/editorial.json` with the eight hints; rewrote `stageEmptyHint` in `packages/studio/src/pages/dashboard/swimlane-card.ts` to read from `template.stageEmptyHints?.[stage]` with generic fallback; deleted `EDITORIAL_STAGE_EMPTY_HINTS` map + `templateId === 'editorial'` special case.
+- [x] Step 4: confirm test passes — 3/3 in the new suite; 986/986 in the full studio suite; 832/832 in the full core suite; the pre-existing editorial-empty-hint end-to-end assertions in `dashboard.test.ts` + `dashboard-swimlane-cta-render.test.ts` continue to pass (same verbatim strings, now sourced from JSON).
+- [x] Step 5: commit with `Closes AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2)` in subject — `c6810a0`.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-stage-empty-hint.test.ts` (cited in Step 1)
+- [x] `npx vitest run packages/studio/test/dashboard-stage-empty-hint.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-c6810a0` via the close-shipped-audit-findings step
 
 
 

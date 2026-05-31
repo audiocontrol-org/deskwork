@@ -3610,7 +3610,7 @@ Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (claude). 
 ### AUDIT-20260530-39 — [P5-2 claude] `EDITORIAL_STAGE_EMPTY_HINTS` hardcodes editorial pipeline knowledge in the studio — sibling of AUDIT-20260530-19
 
 Finding-ID: AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2)
-Status:     open
+Status:     fixed-c6810a0
 Severity:   low
 Surface:    `packages/studio/src/pages/dashboard/swimlane-card.ts:84-115` (`EDITORIAL_STAGE_EMPTY_HINTS` + `stageEmptyHint`)
 
