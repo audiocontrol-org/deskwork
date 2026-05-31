@@ -377,4 +377,36 @@ describe('swimlane compose-chip client — Task 5.1C', () => {
     // a11y test above asserts the original label restoration after revert).
     expect(chip?.getAttribute('aria-label')).toBe('Copied — paste in chat');
   });
+
+  // AUDIT-20260530-43 — held-Space auto-repeat must still suppress the
+  // browser's default page-scroll behaviour. The pre-fix code returned on
+  // `ev.repeat` BEFORE calling `preventDefault`, so a long Space-press
+  // scrolled the page even though no clipboard write fired. The fix
+  // reorders the handler so `preventDefault` runs unconditionally for
+  // every Space keydown, then the repeat guard short-circuits activation.
+  it('held Space (repeat=true) preventDefaults page scroll but does NOT activate clipboard write', async () => {
+    const { calls } = installClipboard(() => Promise.resolve());
+    buildShell([
+      { laneId: 'default', laneName: 'Editorial', firstStage: 'Ideas' },
+    ]);
+    initSwimlaneCompose();
+    const chip = document.querySelector<HTMLButtonElement>('.swim-compose');
+    expect(chip).not.toBeNull();
+    const ev = new KeyboardEvent('keydown', {
+      key: ' ',
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    chip?.dispatchEvent(ev);
+    // Page-scroll suppression contract: preventDefault must fire for every
+    // Space keydown — including auto-repeats from a held key.
+    expect(ev.defaultPrevented).toBe(true);
+    // Single-activation contract: the repeat guard still short-circuits
+    // the clipboard write so a held Space doesn't fire N copies.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toEqual([]);
+    // Chip stays out of the .copied flash state — no activation occurred.
+    expect(chip?.classList.contains('copied')).toBe(false);
+  });
 });

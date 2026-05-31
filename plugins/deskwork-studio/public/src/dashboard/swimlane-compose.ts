@@ -307,16 +307,23 @@ function bindAffordance(button: HTMLButtonElement, spec: AffordanceSpec): void {
   });
   button.addEventListener('keydown', (ev) => {
     if (ev.key !== ' ') return;
+    // Space activates the affordance. Per WCAG 2.1 SC 2.1.1,
+    // preventDefault to suppress page scroll. Enter is free with
+    // the native `<button>` keyboard contract — no extra handler
+    // needed.
+    //
+    // AUDIT-20260530-43: preventDefault MUST run unconditionally for
+    // every Space keydown — including auto-repeats — so a held key
+    // doesn't trigger the browser's default scroll while focus is on
+    // the button. The pre-fix order returned on `ev.repeat` before
+    // calling preventDefault, which stopped repeated clipboard writes
+    // but left the page-scroll path live for held-Space.
+    ev.preventDefault();
     // Suppress held-Space auto-repeat so a long press doesn't fire N
     // clipboard writes (each keydown auto-repeat would otherwise re-
     // invoke `activateAffordance`). The single-activation contract
     // matches the click handler's one-shot semantics.
     if (ev.repeat) return;
-    // Space activates the affordance. Per WCAG 2.1 SC 2.1.1,
-    // preventDefault to suppress page scroll. Enter is free with
-    // the native `<button>` keyboard contract — no extra handler
-    // needed.
-    ev.preventDefault();
     activateAffordance(button, spec).catch(surfaceActivationError);
   });
 }
