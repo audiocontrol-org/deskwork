@@ -4092,7 +4092,7 @@ Resolution (Task 0.49 — commit 5ceee19): adopted option (2). The Copy gate alr
 ### AUDIT-20260530-75 — [P6-2 codex] Page init is not actually idempotent
 
 Finding-ID: AUDIT-20260530-75 (cross-model: AUDIT-BARRAGE-codex-P6-2)
-Status:     open
+Status:     fixed-6d8a400
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:167-189,193-221,240-289,322-344,347-364`; `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:141-174,177-231,240-267,294-347,350-367`
 
@@ -4101,6 +4101,8 @@ Both controllers describe init as idempotent, but every init path calls `addEven
 Reasonable fix: add a module-level or container-level wired guard, or mark each wired element with a dataset sentinel before attaching listeners.
 
 Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/codex.md`.
+
+Resolution (Task 0.50 — commit 6d8a400): adopted the container-dataset variant of the wired guard, mirroring the swimlane shell-attribute pattern from Task 0.6 (AUDIT-20260530-30). `data-lanes-wired="true"` flips on the lanes container; `data-pipelines-wired="true"` flips on the pipelines container. Container-dataset over module-level boolean was required for test isolation: the existing client-test suite rebuilds the container in `beforeEach`, and a fresh container element naturally resets the sentinel — a module-level boolean would latch true after the first test and silently no-op every subsequent one. TDD regression at `packages/studio/test/lanes/lanes-page-idempotent.test.ts` + `packages/studio/test/pipelines/pipelines-page-idempotent.test.ts` (3 cases each) asserts the observable signal: one click => one clipboard write, one input event => one preview rebuild, one toggle click => one open transition. Full studio suite (1059 tests) stays green.
 
 ### AUDIT-20260530-76 — [P6-2 codex] Lanes and pipelines pages mark Dashboard as the current page
 
