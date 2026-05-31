@@ -155,6 +155,73 @@ Most ambitious. Highest cost (continuous-audit run-rate). Highest decoupling (au
 
 Design C is exploratory. The roadmap acknowledges it as the eventual end-state; commits to it only after Design A + B prove the model-diversity payoff justifies the always-on cost.
 
+## Autonomous implementation loop — long-term arc
+
+The deskwork lifecycle skills (`/dw-lifecycle:implement`, `/dw-lifecycle:review`, `/dw-lifecycle:ship`, hygiene family, audit-barrage triad) are converging toward a single end-state vision the operator has named explicitly:
+
+> *"A fully autonomous implementation loop that is self-regulating and self-correcting. Ultimately, I want to be able to point an orchestrator agent at a workplan, fire off `/dwi`, then come back when the entire workplan is fully implemented, fully tested, and fully audited — unless there are ambiguities in the spec uncovered during execution that can only be resolved by asking the operator to provide direction."*
+
+Every recent Phase has been a piece of this. The pieces aren't a feature backlog in their own right — they're the mechanization of *"the operator's toolkit evolves under your direction"* extended to multi-task autonomous operation.
+
+### What's in place
+
+| Phase / mechanism | Role in the autonomous loop |
+|---|---|
+| Workplan-aware gate (Phase 15 T1) | Refuses pickup when open findings aren't the next N tasks → loop can't drift |
+| End-of-task audit-barrage hook (Phase 15 T4) | Auto-fires after every commit; no operator prompts at run-time |
+| `promote-findings --auto` (Phase 13 T1) | Default-scopes findings without dispositioning prompts |
+| `slush-remaining` + dampener (Phase 15 T7) | Breaks nit-loops automatically |
+| TDD commit-msg gate (Phase 13 T3) | Refuses fix-task commits without a failing test first |
+| `apply-audit-flips` + `close-shipped-audit-findings` (Phase 13 T4) | Closure mechanization — commits flip statuses; releases propose verification |
+| `slush-remaining` HIGH-filter + latest-scope (#380, v0.29.3) | Severity filter is defense-in-depth; latest-scope matches operator's "this barrage's findings" intent |
+| Phase 16 (#383, in flight) | Audit-barrage always fires on new diff; dampener controls disposition, not gating. Closes the audit-coverage hole revealed by the graphical-entries 70-task burndown. |
+
+The mechanical pieces — implement, audit, scope-findings, slush-nits, close-shipped — are largely complete. The loop is structurally self-correcting today: every commit gets cross-model audited (post-Phase-16); every finding gets scoped or slushed; every fix is TDD-gated; every release is verification-tracked.
+
+### What isn't yet built
+
+What's missing is the **operator-interaction surface for genuine spec ambiguity**. Rough order of how blocking each gap is for the full vision:
+
+1. **Spec-ambiguity surface.** Today the agent's default is *"make the reasonable call; operator redirects if wrong."* That's correct for interactive sessions but fails for overnight autonomous loops — a bad call early on propagates 30 tasks deep before anyone sees it. There's no structural way to halt with *"this task has a genuine ambiguity; here's the question; here's the options; awaiting direction."* Three flavors of ambiguity matter:
+   - **Local** — sub-decision in execution (lib choice, naming). Skip-and-proceed is safe.
+   - **Spec-fork** — design has a real choice (option A or B). Affects only THIS task's implementation. Skip safe iff downstream tasks don't touch the disputed surface.
+   - **Cross-cutting** — answer changes a shared contract / pattern. Skip is UNSAFE; downstream tasks WILL touch the same surface.
+   
+   The agent has to honestly classify which flavor before deciding whether to skip. *"Vibes call"* — but it's a judgment the agent has visibility for (it can grep downstream usage).
+
+2. **Skip-around-blocked-tasks subtlety.** Halt-and-wait is the strict-serial case; *"skip this one and keep going on what's independent"* is what makes the autonomous loop actually amortize the operator's offline time. Tensions:
+   - Dependency inference is ambiguous (workplan has implicit *"earlier first"* but no declared dep graph). Forging ahead on task M when M depends on the resolution of blocked task N risks **lock-in** — the operator's eventual answer to N may require ripping out M's work.
+   - Workplan-aware gate interaction: a blocked task needs a third state — neither `- [ ]` (loop can pick up) nor `- [x]` (done) — so the gate walks past it. `- [?]` or `(blocked-awaiting-AUDIT-<id>)` is a candidate shape.
+   - Cascading blocks: agent skips N → hits another ambiguity at N+1 → skips → etc. Need a cap (e.g. *"3 outstanding blocks, halt entirely"*) so the operator doesn't return to a tangled mess.
+
+3. **Halt-and-resume primitive.** Even after (1) lands, the loop needs a clean *"paused, awaiting operator on Q"* state + a resume verb. Today a paused loop is an idle Claude Code session — no structural state, no way for next-session restart to know where it left off mid-task. Candidate shape: `awaiting-operator/<task-id>.md` files (question + recommendation + impact classification + rollback cost estimate), operator answers async via a CLI verb or studio surface, audit-log records every block + every resume.
+
+4. **Final-verification gate.** Workplan-exhaustion stops the loop, but *"workplan exhausted"* ≠ *"feature shippable."* A `/dw-lifecycle:complete`-style aggregate gate: all tests green, tsc clean, no open findings, audit-log clean, smoke green. Today these are spread across separate verbs; an aggregate would be the *"yes, the burndown actually finished"* signal.
+
+5. **Re-entry idempotence.** If the loop's session dies mid-task (context exhaustion, network, restart), `/dwi` against the same workplan should pick up cleanly. The workplan-aware gate already handles most of this, but the in-flight barrage hook + auto-flips have failure modes that could leave the state inconsistent. Worth a discipline pass when it surfaces.
+
+6. **Resource-budget self-stop.** *"Run until done"* needs a budget. Wall-clock cap? Task count cap? *"This loop has been going for 4 hours, halt and report what's left"* so the operator isn't surprised by a 24h runaway.
+
+### Design framing for the spec-ambiguity surface (when work begins)
+
+The framing the operator anchored on, captured here so future sessions don't re-derive it:
+
+> *"This isn't 'the agent decides everything autonomously.' It's 'the agent decides cheaply, halts loudly, and packages every halt with enough context that an operator can answer in 30 seconds without re-deriving the situation.'"*
+
+The blocking primitive is as much about **legibility** (what is being asked, what is the consequence, what is the rollback cost) as about the halt itself. The agent's job at block-time is to produce a structured prompt the operator can answer in 30 seconds; the operator's job is to answer; the resume mechanism handles re-integration.
+
+Failure modes to design against:
+
+- **Optimistic local classification.** The agent claims local impact, skips, and the answer turns out to be cross-cutting → rework. Mitigation: every skip-decision logs the agent's grep evidence; track skipped-then-required-revert events as a feedback signal for tightening the heuristic.
+- **Cascading blocks.** Cap on outstanding blocks → halt entirely.
+- **Re-entry order.** When the operator unblocks N after the agent shipped M..M+2, the resumed work on N has to integrate cleanly with the diff that landed in M..M+2. Rebasing logic, branch state, audit-log re-runs — all need a story.
+
+(1) is hardest because the *"is this a genuine ambiguity or am I just being lazy?"* judgment is exactly the kind of call the agent has a mixed track record on. (4) is easiest — composition of existing verbs. (2), (3), (5), (6) are middle-difficulty plumbing.
+
+### Status
+
+This section is **the long-term arc**, not committed work. Phase 16 (audit-coverage hole) is the audit-half of *"fully audited"*; that lands first. The autonomous-but-self-interruptible-on-real-ambiguity half is the next frontier, likely a Phase 17/18 after we have feedback from running the autonomous loop end-to-end on a real burndown.
+
 ## Cross-cutting principles
 
 These shape every roadmap item:

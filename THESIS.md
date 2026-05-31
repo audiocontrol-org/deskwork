@@ -45,7 +45,7 @@ agent-readable. A precompiled binary with no source equivalent, or a
 server endpoint that runs a multi-step state machine on a button click, is
 a static tool.
 
-## Three architectural consequences
+## Four architectural consequences
 
 ### Consequence 1: distribution must keep the source agent-reachable
 
@@ -207,6 +207,34 @@ modifying an existing one, ask:
 The current state of this consequence is the project's largest debt
 against the thesis. It's not a feature backlog — it's a build
 commitment that the project hasn't honored yet.
+
+### Consequence 4: the implementation loop must be autonomously self-regulating
+
+The thesis says the agent is the primary tool. The natural extension is that the agent can execute multi-task workplans without the operator having to babysit each iteration. The end-state vision the project is converging toward:
+
+> Point an orchestrator agent at a workplan, fire off `/dwi`, come back when the entire workplan is fully implemented, fully tested, and fully audited — unless there are ambiguities in the spec uncovered during execution that can only be resolved by asking the operator to provide direction.
+
+The operator's attention is the binding resource. Every mechanical step — pick up the next task, run the audit, scope the findings, slush the nits, gate the commits, ship the release — should happen without the operator in the loop. The operator's attention should be reserved for what only they can do: resolve genuine spec ambiguities that surface during execution.
+
+This is a build commitment, not a slogan. It shapes design choices:
+
+- **Mechanical pickiness is the agent's job, not the operator's.** Status flips, audit lifts, finding-scoping, slush-disposition — none of these require operator input on the happy path. When they do require operator input, that's a bug to fix structurally, not a prompt to surface.
+- **Cross-model audit coverage is non-negotiable on new work.** The autonomous loop's self-correction relies on the third audit surface (the audit-barrage) running on every new commit. Skipping audits to save compute is the failure mode that lets bad work accumulate undetected through a 70-task burndown.
+- **Findings get scoped, not deferred.** A finding the loop doesn't immediately address must be either (a) scoped into the workplan as a fix-task with TDD discipline, or (b) explicitly slushed when the dampener engages. *"Code comment + future-dispatch promise"* is not a disposition (see the existing *"Just for now is bullshit"* discipline).
+- **Spec ambiguity is the ONLY legitimate halt.** When the loop genuinely cannot proceed without operator direction, it halts loudly with a structured question the operator can answer in 30 seconds. Halts on other failure modes (test red, lint fail, tsc error, finding scoped) are bugs in the loop's mechanization, not reasons to interrupt the operator.
+- **Skip-around-blocked-tasks is a design surface, not an afterthought.** A halted task shouldn't strand independent downstream work. Identifying which downstream work is genuinely independent (vs. constrained by the blocked answer) is part of what the loop has to do well to amortize the operator's offline time.
+
+**What's actually built today:** the mechanical half is largely in place. The workplan-aware gate, the audit-barrage hook, the auto-promote/auto-slush triad, the TDD commit gate, the closure mechanization (`apply-audit-flips`, `close-shipped`) all serve this consequence. The autonomous loop runs end-to-end for the mechanical pieces today.
+
+**What's not built yet:** the **operator-interaction surface for genuine spec ambiguity**. There's no structural way for the loop to halt with *"this task has a genuine ambiguity; here are the options; awaiting direction"* and then resume cleanly when the operator answers — let alone the skip-around-blocked-tasks subtlety. Today the agent's default is *"make the reasonable call; operator redirects if wrong,"* which is fine for interactive sessions but breaks for overnight autonomous loops.
+
+The detailed design space for this is captured in `ROADMAP.md` § *"Autonomous implementation loop — long-term arc."* The thesis-level commitment is: **the loop is the agent's job; the operator's attention is for ambiguity.**
+
+**Implication for design and review:** when adding to the lifecycle skills, ask:
+
+- *Does this require operator input on the happy path?* If yes, why? Can the mechanical question be answered by the agent from spec / repo state / audit-log? If a prompt is structurally needed, can it be deferred to a halt-with-question that the operator answers async rather than blocking the loop?
+- *Does this add a new halt condition?* If yes, is the halt classifiable as "genuine spec ambiguity" vs. "loop failed mechanically"? Only the first is acceptable as a halt; the second is a bug.
+- *Does this preserve forward progress when the agent CAN proceed?* Skip-around-blocked-tasks is a goal; design new mechanisms with skip-friendliness in mind.
 
 ### Pattern: adjacent assets belong in the entry's scrapbook (concrete example)
 
