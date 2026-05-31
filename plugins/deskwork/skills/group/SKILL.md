@@ -61,22 +61,31 @@ The `group` verb is a CRUD family for the group-specific lifecycle (creation, me
 
 ### Error handling
 
+Two refusal-message families fire when a group-only verb is invoked against a non-group entry (one without a `members` field on the sidecar). The two families are distinct on purpose — the catalog below preserves each verb's literal text so an adopter grepping the message finds the right code path:
+
+- **`show` / `update`** emit `entry is not a group (no \`members\` field on the sidecar)...` — these are the read / metadata-mutation verbs.
+- **`add-member` / `remove-member` / `archive` / `restore`** emit `entry has no \`members\` field...` — these are the member-mutation and listing-affordance verbs.
+
+A `members: []` entry IS a group (the declared-empty marker per Task 7.5.5) and passes the non-group check for every verb above; only entries without the `members` field at all are refused.
+
 - **`list` / `show` on a project with no sidecars.** `list` emits `{ groups: [] }`; `show <slug>` refuses with the slug-not-found error from `resolveEntryUuid`.
-- **`show <slug>` against a non-group entry.** Refused with `Cannot show group "<slug>": entry has no members. Per the Task 7.1.2 invariant, only entries with a non-empty members[] are groups.` Pointer: use the universal entry read paths for non-group entries.
+- **`show <slug>` against a non-group entry.** Refused with `Cannot show group "<slug>": entry is not a group (no \`members\` field on the sidecar). Group-only verbs require the \`members\` field to be present; regular entries should be read via the universal entry paths.` Pointer: use the universal entry read paths for non-group entries.
 - **`create <slug>` with an unknown lane.** Refused with the loader's underlying `Lane config "<id>" not found at <path>` error. Pointer: list existing lanes with `deskwork lane list`.
 - **`create <slug>` into an archived lane.** Refused with `Cannot create group "<slug>" in archived lane "<id>". Restore the lane first via "deskwork lane restore <id>".`
 - **`create <slug>` with a colliding slug.** Refused with `Cannot create group "<slug>": slug collision with entry <uuid> (currentStage="..."). Pick a different slug.`
 - **`create <slug>` against a template with no linearStages.** Refused with the configuration-error message naming the template id; repair the template before creating a group.
 - **`update <slug>` with no patch flags.** Refused with `Cannot update group "<slug>": no patch fields supplied. Pass --title <text>.`
-- **`update <slug>` against a non-group entry.** Refused with the same "entry has no members" shape as `show` — the verb is group-specific.
+- **`update <slug>` against a non-group entry.** Refused with `Cannot update group "<slug>": entry is not a group (no \`members\` field on the sidecar). Group-only verbs require the \`members\` field to be present; regular entries should be mutated via the universal entry verbs.` Same `entry is not a group` family as `show` (see family note above).
 - **`add-member <group> <member>` with the member already in the group.** Refused with `member "<slug>" (UUID <uuid>) is already in this group. Duplicates within a single group are refused; the same entry CAN be a member of multiple groups simultaneously (Step 7.2.4).`
 - **`add-member <group> <group>` (self-membership).** Refused with `refused self-membership. A group cannot contain itself as a member (1-element cycle).`
 - **`add-member <group> <member> --at <i>` with `i` out of range.** Refused with `--at <i> is out of range. Valid range: 0..<members.length> (inclusive; <members.length> is the append position).`
 - **`add-member <group> <member> --at <not-an-integer>`.** Refused with `Invalid --at value "<value>": must be a non-negative integer (0-based insertion index).`
-- **`add-member` against a non-group entry.** Refused with `Cannot add member to "<slug>": entry has no \`members\` field.` Pointer: `deskwork group create <slug> --lane <lane>` first.
-- **`remove-member <group> <member>` with the member not present.** Refused with `member "<slug>" (UUID <uuid>) is not in this group's members[]. Current members: <list>.`
-- **`archive <slug>` against a non-group entry.** Refused with the "entry has no members" shape.
+- **`add-member` against a non-group entry.** Refused with `Cannot add member to "<slug>": entry has no \`members\` field.` Pointer: `deskwork group create <slug> --lane <lane>` first. (`entry has no \`members\` field` family — see family note above.)
+- **`remove-member <group> <member>` with the member not present.** Refused with `member "<slug>" (UUID <uuid>) is not in this group's \`members[]\`. Current members: <list>.`
+- **`remove-member` against a non-group entry.** Refused with `Cannot remove member from "<slug>": entry has no \`members\` field.` (`entry has no \`members\` field` family.)
+- **`archive <slug>` against a non-group entry.** Refused with `Cannot archive group "<slug>": entry has no \`members\` field.` (`entry has no \`members\` field` family.)
 - **`archive <slug>` against a group already archived.** Refused with `already archived (archivedAt=<timestamp>).`
+- **`restore <slug>` against a non-group entry.** Refused with `Cannot restore group "<slug>": entry has no \`members\` field.` (`entry has no \`members\` field` family.)
 - **`restore <slug>` against a group not archived.** Refused with `not archived (no archivedAt field).`
 
 ### Safety rules
