@@ -7,7 +7,13 @@
  *      field. Migration-window default: an entry without a `lane`
  *      field is treated as belonging to the `default` lane (matches
  *      the doctor's lane-back-fill default). The move is refused
- *      when the source lane and target lane are the same.
+ *      when the source lane and target lane are the same. Per
+ *      AUDIT-20260530-58, when the resolved source lane config does
+ *      NOT exist on disk the function refuses with an
+ *      entry-named error (no `lane` field → instruct operator to
+ *      run `/deskwork:doctor`; explicit `lane` field → name the
+ *      missing lane id). No silent fallback to the project's
+ *      contentDir — the migration gap is surfaced.
  *
  *   2. Resolves the target lane's pipeline template. The target
  *      stage MUST be in the union of `linearStages ∪
@@ -145,6 +151,7 @@ export async function moveEntryToLane(
 ): Promise<MoveEntryResult> {
   const sidecar = await readSidecar(projectRoot, opts.uuid);
 
+  const sidecarHadLane = sidecar.lane !== undefined;
   const sourceLaneId = sidecar.lane ?? DEFAULT_LANE_ID;
   if (sourceLaneId === opts.toLane) {
     throw new Error(
@@ -152,7 +159,44 @@ export async function moveEntryToLane(
     );
   }
 
-  const sourceLane = loadLaneConfig(sourceLaneId, projectRoot);
+  // Resolve the source lane explicitly per AUDIT-20260530-58. The
+  // raw `loadLaneConfig` error names the missing lane config file,
+  // which is the wrong object to surface to the operator — they
+  // asked to move a specific entry. Re-throw with a message that
+  // names the entry (and tells the operator how to recover):
+  //
+  //   - sidecar HAD an explicit `lane` field → the named lane is
+  //     genuinely missing on disk; the error reports the lane id.
+  //   - sidecar had NO `lane` field → the move fell back to the
+  //     implicit `default` lane, which also does not exist (real
+  //     migration-window state); the error names the entry slug
+  //     and directs the operator to `/deskwork:doctor` to back-fill
+  //     lane assignments before retrying the move.
+  //
+  // Per the project no-fallback rule, the function does NOT silently
+  // substitute the project's contentDir for the missing lane — that
+  // would hide the migration gap and produce wrong-place file moves.
+  let sourceLane;
+  try {
+    sourceLane = loadLaneConfig(sourceLaneId, projectRoot);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    if (sidecarHadLane) {
+      throw new Error(
+        `cannot move entry '${sidecar.slug}': declared source lane `
+        + `'${sourceLaneId}' is not a known lane. Re-bind the entry to an `
+        + `existing lane (or restore the lane config under `
+        + `.deskwork/lanes/${sourceLaneId}.json) before retrying. `
+        + `Underlying error: ${detail}`,
+      );
+    }
+    throw new Error(
+      `cannot determine source lane for entry '${sidecar.slug}' — sidecar `
+      + `has no 'lane' field AND no '${DEFAULT_LANE_ID}' lane config exists. `
+      + `Run /deskwork:doctor to back-fill lane assignments before moving the `
+      + `entry. Underlying error: ${detail}`,
+    );
+  }
   const targetLane = loadLaneConfig(opts.toLane, projectRoot);
   if (
     typeof targetLane.archivedAt === 'string'
