@@ -90,6 +90,42 @@ describe('Task 5.5 — saveable focus presets UI affordances', () => {
     expect(after).toBe(before);
   });
 
+  // Per AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3):
+  // when `?preset=<id>` resolves to nothing in the local browser the
+  // controller MUST surface a visible "preset not found" affordance
+  // instead of returning silently. Architectural per-browser-id scope
+  // is left for a separate operator decision; this test fixes the UX
+  // half of the finding: cache miss => visible notice (DOM-mounted,
+  // text contains the missing id), and the `?preset=` param is
+  // stripped from the URL so a refresh doesn't re-trigger the notice.
+  it('deep-link with unknown preset id surfaces a visible notice and strips the param (AUDIT-20260530-47)', () => {
+    buildShell(['default', 'mockups', 'qa']);
+    bootControllers();
+    window.history.replaceState(
+      {},
+      '',
+      '/dev/editorial-studio?preset=p-missing-xyz',
+    );
+    initSwimlanePresets(makeHooks(''));
+
+    // The notice element is mounted inside the bay shell and carries
+    // the operator-readable message. Both the class hook and the
+    // dataset attribute are part of the contract so styling +
+    // behavior tests can both query for it.
+    const notice = document.querySelector<HTMLElement>(
+      '[data-preset-deep-link-notice]',
+    );
+    expect(notice).not.toBeNull();
+    expect(notice?.textContent ?? '').toContain('p-missing-xyz');
+    expect(notice?.textContent ?? '').toContain('not found in this browser');
+    expect(notice?.classList.contains('preset-deep-link-notice')).toBe(true);
+    expect(notice?.getAttribute('role')).toBe('status');
+
+    // The `?preset=` param is stripped on miss too — a refresh
+    // shouldn't re-trigger the notice for a stale URL.
+    expect(window.location.search).not.toContain('preset=');
+  });
+
   it('Save button + name prompt + Load + Delete affordances are bound', async () => {
     buildShell(['default', 'mockups', 'qa']);
     bootControllers();

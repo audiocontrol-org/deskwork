@@ -329,13 +329,33 @@ function bindHandlers(
  * stripped from the URL post-apply (see `stripPresetFromUrl`); the
  * `?focus=` param is left intact for back-link symmetry but no
  * longer reflects live state.
+ *
+ * Per AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3): on
+ * a cache miss the prior implementation silently returned, leaving
+ * the operator with no signal that the URL did anything. Preset ids
+ * are minted from a per-browser local timestamp (`p<getTime base36>`)
+ * — a URL copied to a different browser, incognito window, or
+ * collaborator will not resolve. The architectural shareability
+ * question (content-hash ids, server-stored shares) is left for an
+ * explicit operator decision; this code surfaces the UX half: cache
+ * miss => mount a transient "preset not found in this browser"
+ * notice + strip the param so a refresh doesn't re-trigger the
+ * notice for the stale URL.
  */
 function applyDeepLinkPreset(projectKey: string): void {
   const id = parsePresetIdFromUrl();
   if (id === null) return;
   const presets = readPresets(projectKey);
   const preset = presets.get(id);
-  if (preset === undefined) return;
+  if (preset === undefined) {
+    showDeepLinkMissNotice(id);
+    // Strip the `?preset=` param on miss too — same reasoning as the
+    // post-apply strip below: the URL bar should not advertise state
+    // the page didn't actually enter, and a refresh should not
+    // re-trigger the notice for a stale URL.
+    stripPresetFromUrl();
+    return;
+  }
   applyPreset(projectKey, preset);
   // Per AUDIT-20260528-33 — strip `?preset=<id>` from the URL after
   // applying the preset. Once applied the preset's contribution to
@@ -344,6 +364,45 @@ function applyDeepLinkPreset(projectKey: string): void {
   // drift the live state away from what the URL bar advertises. A
   // shareable deep-link should always be honest about what it opens.
   stripPresetFromUrl();
+}
+
+/** Duration the cache-miss notice stays mounted (ms). */
+const DEEP_LINK_NOTICE_FADE_MS = 5000;
+
+/**
+ * Inline-mount a transient notice on the bay shell when a deep-link
+ * preset id misses cache. Mirrors the short-lived feedback pattern
+ * used by `flashSaveConfirm` / `flashLinkCopied` — DOM element with
+ * a class hook + auto-removal via `setTimeout`. The notice is
+ * `role="status"` so assistive tech announces it; the visible text
+ * names the missing id so the operator can correlate to the URL bar.
+ *
+ * Per `.claude/rules/affordance-placement.md`: this notice is
+ * component-attached to the bay shell (the surface that owns preset
+ * state) rather than mounted in a page-level toolbar — the message
+ * is about a preset-state event, not an app-level event.
+ */
+function showDeepLinkMissNotice(presetId: string): void {
+  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
+  if (shell === null) return;
+  // If a prior notice is still mounted (operator visited two stale
+  // URLs in quick succession), replace it in place so the timer
+  // resets and the new id is shown instead of stacking two notices.
+  const existing = shell.querySelector<HTMLElement>(
+    '[data-preset-deep-link-notice]',
+  );
+  if (existing !== null) existing.remove();
+  const notice = document.createElement('div');
+  notice.classList.add('preset-deep-link-notice');
+  notice.dataset.presetDeepLinkNotice = '';
+  notice.setAttribute('role', 'status');
+  notice.textContent =
+    `preset "${presetId}" not found in this browser — ` +
+    'preset URLs are per-browser by design.';
+  shell.appendChild(notice);
+  window.setTimeout(() => {
+    notice.remove();
+  }, DEEP_LINK_NOTICE_FADE_MS);
 }
 
 /**

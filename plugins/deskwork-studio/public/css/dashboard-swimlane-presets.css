@@ -159,3 +159,31 @@
   background: var(--er-stamp-green, #1e8449);
   color: #fff;
 }
+
+/*
+ * Per AUDIT-20260530-47 (cross-model: AUDIT-BARRAGE-claude-P5-3):
+ * transient notice mounted on the bay shell when a deep-link
+ * `?preset=<id>` URL misses cache. The notice auto-removes after
+ * ~5s (see swimlane-presets.ts:DEEP_LINK_NOTICE_FADE_MS). Pinned to
+ * the top-right of the bay shell so it sits above the swim columns
+ * but doesn't fight the rail head's preset surface for attention.
+ * Styled in the same press-check palette as the rail head's preset
+ * affordances so it reads as preset-state, not page-state.
+ */
+.bay-shell .preset-deep-link-notice {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 50;
+  max-width: 22rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--er-paper-2, #f5efe3);
+  border: 1px solid var(--er-red-pencil, #b14848);
+  color: var(--er-ink, #2a1f1a);
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  border-radius: 2px;
+  box-shadow: 0 6px 14px -8px rgba(26, 22, 20, 0.4);
+}
