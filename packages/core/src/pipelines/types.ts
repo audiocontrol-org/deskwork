@@ -124,6 +124,32 @@ export const PipelineTemplateSchema = z.object({
   linearStages: uniqueStringArray('linearStages', 1),
   lockedStages: uniqueStringArray('lockedStages', 0).optional(),
   offPipelineStages: uniqueStringArray('offPipelineStages', 0),
+  // Optional per-stage empty-state copy for renderers (the studio
+  // dashboard's swimlane stage columns, the list-body groups, any
+  // other surface that shows an "empty stage" placeholder). Each
+  // key is a stage name (linear OR off-pipeline) and the value is
+  // the human-readable hint string the renderer surfaces when the
+  // stage carries no entries.
+  //
+  // Per AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2):
+  // the editorial pipeline's bespoke empty-state copy used to live
+  // hardcoded inside `packages/studio/src/pages/dashboard/swimlane-
+  // card.ts` (`EDITORIAL_STAGE_EMPTY_HINTS`), gated on `templateId
+  // === 'editorial'`. That duplicated the editorial pipeline's
+  // stage vocabulary inside the renderer — the same drift hazard
+  // AUDIT-20260530-19 named for `EDITORIAL_FALLBACK` vs
+  // `editorial.json`. Moving the copy onto the template itself
+  // means each pipeline's empty-state vocabulary travels with the
+  // pipeline definition (renderer-independent per the "collection
+  // model is renderer-independent" principle) and a stage rename
+  // in the JSON propagates to the studio automatically.
+  //
+  // The field is optional and partial: a template may omit it
+  // entirely (every empty column gets the renderer's generic
+  // fallback `Nothing in <stage>.`) OR provide hints for a subset
+  // of stages (named stages use the template-provided copy;
+  // un-named stages take the generic fallback per-stage).
+  stageEmptyHints: z.record(z.string(), z.string()).optional(),
   // Sole explicitly-declared "extra" key — the comments-in-JSON
   // workaround the presets use. Declared so `.strict()` admits it.
   // Anything else at the top level is rejected (AUDIT-20260530-02).
@@ -206,8 +232,9 @@ function uniqueTokens(stages: readonly string[]): boolean {
  *
  * The schema is `.strict()`, so the inferred type lists exactly the
  * declared keys: `id`, `name`, `description`, `linearStages`,
- * `lockedStages` (optional), `offPipelineStages`, `$rationale`
- * (optional). Unknown top-level keys fail parse at the schema layer.
+ * `lockedStages` (optional), `offPipelineStages`, `stageEmptyHints`
+ * (optional), `$rationale` (optional). Unknown top-level keys fail
+ * parse at the schema layer.
  */
 export type PipelineTemplate = z.infer<typeof PipelineTemplateSchema>;
 

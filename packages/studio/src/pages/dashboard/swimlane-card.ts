@@ -85,38 +85,31 @@ import {
 } from '@deskwork/core/pipelines';
 
 /**
- * Editorial-template empty-state strings. The pre-Task-5.1 dashboard
- * tests pin these verbatim phrasings ("Run /deskwork:add to capture
- * one.", "/deskwork:approve <slug> to graduate an idea.", etc.) and
- * the strings name the editorial verb vocabulary explicitly.
+ * Per-stage empty-state hint. Sourced from the template's optional
+ * `stageEmptyHints` map (a pipeline-level field carrying per-stage
+ * copy that the renderer surfaces when a stage has no entries). The
+ * editorial preset populates the map with the eight verbatim hints
+ * the pre-Task-5.1 dashboard tests pin (`No open ideas. Run
+ * /deskwork:add to capture one.`, `Nothing planned. /deskwork:approve
+ * <slug> to graduate an idea.`, etc.). Templates that omit the field
+ * — or that omit a specific stage from the field — fall back to the
+ * neutral `Nothing in ${stage.toLowerCase()}.` shape.
  *
- * Per Task 5.2: this map is scoped to the editorial template only.
- * Non-editorial lanes fall through to the neutral `Nothing in
- * ${stage.toLowerCase()}.` so the editorial verb vocabulary does
- * not leak into other templates' empty-state copy.
+ * Per AUDIT-20260530-39 (cross-model: AUDIT-BARRAGE-claude-P5-2):
+ * the prior shape hardcoded the editorial pipeline's eight stage
+ * names + bespoke hints inside this module under
+ * `EDITORIAL_STAGE_EMPTY_HINTS`, gated on `templateId === 'editorial'`.
+ * That duplicated `editorial.json`'s stage vocabulary inside the
+ * studio renderer — the same drift hazard AUDIT-20260530-19 named for
+ * `EDITORIAL_FALLBACK`. The fix moves the copy onto the template
+ * definition itself (via the schema's optional `stageEmptyHints`
+ * field) so the per-pipeline vocabulary travels with the pipeline,
+ * and a future stage rename in editorial.json propagates here without
+ * a studio-side patch.
  */
-const EDITORIAL_STAGE_EMPTY_HINTS: Record<string, string> = {
-  Ideas: 'No open ideas. Run /deskwork:add to capture one.',
-  Planned: 'Nothing planned. /deskwork:approve <slug> to graduate an idea.',
-  Outlining: 'Nothing in outlining.',
-  Drafting: 'No posts in drafting.',
-  Final: 'Nothing in final review.',
-  Published: 'No published posts yet.',
-  Blocked: 'Nothing blocked.',
-  Cancelled: 'No cancelled entries.',
-};
-
-/**
- * Editorial-specific copy for the editorial template; generic
- * "Nothing in ${stage}." for any other template. The dispatch is
- * template-id-gated so each pipeline's empty-state vocabulary
- * tracks its own pipeline copy.
- */
-function stageEmptyHint(stage: string, templateId: string): string {
-  if (templateId === 'editorial') {
-    const editorial = EDITORIAL_STAGE_EMPTY_HINTS[stage];
-    if (editorial !== undefined) return editorial;
-  }
+function stageEmptyHint(stage: string, template: PipelineTemplate): string {
+  const fromTemplate = template.stageEmptyHints?.[stage];
+  if (fromTemplate !== undefined) return fromTemplate;
   return `Nothing in ${stage.toLowerCase()}.`;
 }
 
@@ -192,7 +185,7 @@ function renderStageCol(
   const legacyAnchor = laneId === 'default'
     ? unsafe(`<span id="stage-${stageIdSlug}" aria-hidden="true"></span>`)
     : '';
-  const emptyHint = stageEmptyHint(stage, template.id);
+  const emptyHint = stageEmptyHint(stage, template);
   const emptyAttrs = entries.length === 0
     ? unsafe(html` data-empty-stage="${stage}"`)
     : '';
