@@ -183,7 +183,8 @@ describe('dashboard swimlane AUDIT-20260530-25 — unbucketed entries are render
     expect(r.html).not.toMatch(/class="lb-group[^"]*\bis-unbucketed\b/);
   });
 
-  it('renders unbucketed compact cell in swim compact strip when lane is collapsed (AUDIT-20260531-01)', async () => {
+  // Server-render coverage only — the .swim.collapsed CSS-reveal path (display:none → display:flex) is not exercised by this string-match test.
+  it('emits unbucketed cell into swim compact strip (AUDIT-20260531-01)', async () => {
     // AUDIT-20260531-01 — `renderSwimCompact` (per-stage compact strip
     // emitted on every swim and revealed by CSS when the lane is
     // `.collapsed`) iterates only `template.linearStages +
@@ -226,8 +227,8 @@ describe('dashboard swimlane AUDIT-20260530-25 — unbucketed entries are render
     const editorialBlock = extractLaneSection(r.html, 'default');
     expect(editorialBlock).not.toBe('');
 
-    // (a) Locate the `.swim-compact` substring (the per-stage
-    // compact strip revealed when the lane is `.collapsed`).
+    // (a) Locate the `.swim-compact` substring in the server-rendered
+    // HTML (the per-stage compact strip emitted on every swim).
     const swimCompactOpen = editorialBlock.indexOf('<div class="swim-compact"');
     expect(swimCompactOpen).toBeGreaterThanOrEqual(0);
     // The compact strip contains nested `.sc-stage` divs; find the
