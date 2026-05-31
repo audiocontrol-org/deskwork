@@ -38,6 +38,7 @@
 import {
   readStoredStringArray,
   STORAGE_KEY_PREFIX,
+  writeJsonOrIgnore,
 } from './swimlane-storage.ts';
 
 const ORDER_KEY_SUFFIX = ':lane-order';
@@ -51,13 +52,16 @@ export function orderKey(projectKey: string): string {
 // the focus / hidden surface in swimlane.ts projects into a Set.
 export const readStoredOrder = readStoredStringArray;
 
+// Per AUDIT-20260530-49 — `writeStoredOrder` was a near-identical copy
+// of the `writePresets` + `writeJsonOrIgnore` try/catch shape. It now
+// delegates to the shared `writeJsonOrIgnore` in `swimlane-storage.ts`
+// so all four write call sites in the dashboard share one
+// implementation. The reorder controllers don't branch on persistence
+// success (the in-DOM reorder runs unconditionally and the operator
+// only loses persistence across reloads on a swallowed failure), so the
+// boolean return is dropped here.
 export function writeStoredOrder(key: string, value: readonly string[]): void {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // localStorage unavailable — the reorder still applies in-page;
-    // the operator just loses persistence across reloads.
-  }
+  writeJsonOrIgnore(key, value);
 }
 
 /**

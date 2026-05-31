@@ -74,6 +74,40 @@ export function readStoredStringArray(key: string): readonly string[] | null {
 }
 
 /**
+ * Write a JSON-serialised value to localStorage with a swallowed
+ * catch. Returns `true` when `setItem` landed; returns `false` when
+ * the call threw (QuotaExceededError under quota pressure, Safari
+ * private-mode SecurityError, the browser disabling persistent
+ * storage). The boolean lets the caller branch on persistence
+ * truthfully — per AUDIT-20260530-44 the prior void-returning
+ * helpers let a silent swallow paint a green success affordance on
+ * a write that never landed.
+ *
+ * Per AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3) this
+ * helper consolidates the three near-identical `try { setItem(JSON.
+ * stringify) } catch {}` shapes that previously lived in
+ * `writePresets` + `writeJsonOrIgnore` (presets-store) +
+ * `writeStoredOrder` (drag/reorder). The next bug fix to the write
+ * path lands in one place instead of three.
+ *
+ * The thrown error (when one occurs) is intentionally swallowed
+ * rather than re-thrown — every caller is in the "best-effort
+ * persistence; in-page state still works without it" mode the
+ * dashboard controllers depend on. Callers that want a richer
+ * diagnostic (e.g. `writePresets`'s `console.warn` with the key
+ * name) wrap their call site to add the warning before returning
+ * the boolean.
+ */
+export function writeJsonOrIgnore(key: string, value: unknown): boolean {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Read a JSON object from localStorage and project it into a
  * `Map<string, T>` via a per-value type guard. Returns an empty
  * Map on every read failure (missing entry, parse error, wrong

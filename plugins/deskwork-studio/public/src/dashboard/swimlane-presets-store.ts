@@ -17,7 +17,9 @@
 
 import {
   readStoredObjectMap,
+  readStoredStringArray,
   STORAGE_KEY_PREFIX,
+  writeJsonOrIgnore as writeJsonOrIgnoreShared,
 } from './swimlane-storage.ts';
 import { reapplyFromStorage as reapplySwimlaneFromStorage } from './swimlane.ts';
 import { reapplyCollapseFromStorage } from './swimlane-collapse.ts';
@@ -216,30 +218,31 @@ export function readPresets(projectKey: string): Map<string, FocusPreset> {
  * landed. The boolean lets the caller branch on persistence
  * truthfully.
  *
- * The thrown Error is surfaced via `console.warn` with the storage
- * key so an operator opening devtools after a failed save sees which
- * key failed and what the underlying browser error was — the silent
- * swallow blocked that diagnostic path.
+ * On the failure branch, a `console.warn` surfaces the storage key so
+ * an operator opening devtools after a failed save sees which key
+ * failed — the silent swallow blocked that diagnostic path. The
+ * underlying `try/catch + setItem(JSON.stringify)` shape is provided
+ * by `writeJsonOrIgnore` in `swimlane-storage.ts` per
+ * AUDIT-20260530-49 (the dashboard previously held three near-
+ * identical copies of this shape across two files).
  */
 function writePresets(
   projectKey: string,
   presets: ReadonlyMap<string, FocusPreset>,
 ): boolean {
-  try {
-    const obj: Record<string, FocusPreset> = {};
-    for (const [id, preset] of presets) {
-      obj[id] = preset;
-    }
-    window.localStorage.setItem(presetsKey(projectKey), JSON.stringify(obj));
-    return true;
-  } catch (err) {
-    const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+  const obj: Record<string, FocusPreset> = {};
+  for (const [id, preset] of presets) {
+    obj[id] = preset;
+  }
+  const key = presetsKey(projectKey);
+  const ok = writeJsonOrIgnoreShared(key, obj);
+  if (!ok) {
     // eslint-disable-next-line no-console
     console.warn(
-      `[deskwork] writePresets failed for key ${presetsKey(projectKey)}: ${reason}`,
+      `[deskwork] writePresets failed for key ${key} (localStorage.setItem threw)`,
     );
-    return false;
   }
+  return ok;
 }
 
 function collectAllLaneIds(): string[] {
@@ -314,21 +317,6 @@ function enforceHiddenNotFocused(
   return focused.filter((id) => visibleSet.has(id));
 }
 
-function readJsonArrayOfStrings(key: string): string[] {
-  const out: string[] = [];
-  const raw = window.localStorage.getItem(key);
-  if (raw === null) return out;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      for (const v of parsed) if (typeof v === 'string') out.push(v);
-    }
-  } catch {
-    // Read collapsed to empty.
-  }
-  return out;
-}
-
 /**
  * Read the EFFECTIVE per-lane view-mode from the live DOM.
  *
@@ -396,7 +384,10 @@ export function snapshotCurrentState(projectKey: string): {
   // already constrains the result to live ids, so no further
   // reconciliation is needed for the visibility axis at snapshot time.
   const allLanes = collectAllLaneIds();
-  const hidden = new Set(readJsonArrayOfStrings(visibilityKey(projectKey)));
+  // Per AUDIT-20260530-49 — read via the shared `readStoredStringArray`
+  // (coerce `null → []` to preserve the "missing key = empty list"
+  // semantics the constructor depends on).
+  const hidden = new Set(readStoredStringArray(visibilityKey(projectKey)) ?? []);
   const visibleLanes = allLanes.filter((id) => !hidden.has(id));
 
   // Per AUDIT-20260530-45 — reconcile :focus storage against the
@@ -407,7 +398,7 @@ export function snapshotCurrentState(projectKey: string): {
   // operator inspection. Mirrors `reconcileOrder`'s read-time-filter
   // discipline.
   const focusedLanes = reconcileLaneIds(
-    readJsonArrayOfStrings(focusKey(projectKey)),
+    readStoredStringArray(focusKey(projectKey)) ?? [],
     allLanes,
   );
 
@@ -416,7 +407,7 @@ export function snapshotCurrentState(projectKey: string): {
   const viewModePerLane = readEffectiveViewModeFromDom();
 
   const laneCollapseState: Record<string, boolean> = {};
-  for (const laneId of readJsonArrayOfStrings(laneCollapseKey(projectKey))) {
+  for (const laneId of readStoredStringArray(laneCollapseKey(projectKey)) ?? []) {
     laneCollapseState[laneId] = true;
   }
 
@@ -442,12 +433,16 @@ export function snapshotCurrentState(projectKey: string): {
   };
 }
 
+// Per AUDIT-20260530-49 — the apply-side write helper was a near-
+// identical copy of `writePresets`'s try/catch shape. It now delegates
+// to the shared `writeJsonOrIgnore` in `swimlane-storage.ts` so all
+// four write call sites in the dashboard (presets, apply-axes, lane-
+// order) share one implementation. The applyPreset flow doesn't branch
+// on persistence success (the DOM reapply runs unconditionally), so the
+// boolean return is ignored here — `writePresets` is the call site that
+// surfaces the boolean to the operator via the save flash.
 function writeJsonOrIgnore(key: string, value: unknown): void {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // localStorage unavailable — DOM apply still happens.
-  }
+  writeJsonOrIgnoreShared(key, value);
 }
 
 /**
