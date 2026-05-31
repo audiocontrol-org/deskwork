@@ -85,6 +85,49 @@ describe('pipelines-page client controller — Copy-button validation', () => {
     expect(notice!.hidden).toBe(true);
   });
 
+  // AUDIT-20260530-74 — even when the Copy gate disables paste-out, the
+  // live preview for an empty checkbox selection MUST NOT advertise the
+  // CLI-refused literal `--set-locked ""` shape (which reads as "this
+  // would clear all locks" — exactly the operator misread the audit
+  // names). The preview surfaces a `<stages>` placeholder instead,
+  // mirroring the New form's `<id>` / `<stages>` placeholder convention
+  // for unfilled required fields.
+  it('Set-locked sub-form: preview shows <stages> placeholder for empty selection, never --set-locked ""', () => {
+    const container = buildContainer();
+    const { panel } = buildEditPanel(container, 'editorial', {
+      linearStages: ['Ideas', 'Drafting', 'Final'],
+      lockedStages: ['Final'],
+      offPipelineStages: [],
+    });
+    initPipelinesPage();
+
+    const previewEl = panel.querySelector<HTMLElement>(
+      '[data-pipelines-preview="set-locked"]',
+    )!;
+
+    // Uncheck the only ticked box → empty selection.
+    const finalCb = panel.querySelector<HTMLInputElement>(
+      '[data-pipelines-op-form="set-locked"] input[value="Final"]',
+    )!;
+    finalCb.checked = false;
+    finalCb.dispatchEvent(changeEvent());
+
+    // Preview MUST NOT carry the CLI-refused empty-quoted literal.
+    expect(previewEl.textContent).not.toContain('--set-locked ""');
+    // Preview MUST carry the `<stages>` placeholder so the operator
+    // reads "fill this in" rather than "this looks valid".
+    expect(previewEl.textContent).toBe(
+      '/deskwork:pipeline update "editorial" --set-locked <stages>',
+    );
+
+    // Re-tick a box → preview snaps to the real assembled value.
+    finalCb.checked = true;
+    finalCb.dispatchEvent(changeEvent());
+    expect(previewEl.textContent).toBe(
+      '/deskwork:pipeline update "editorial" --set-locked "Final"',
+    );
+  });
+
   it('Set-off-pipeline sub-form: Copy disables + inline notice surfaces the CLI gate when the field is empty', () => {
     const container = buildContainer();
     const { panel } = buildEditPanel(container, 'editorial', {

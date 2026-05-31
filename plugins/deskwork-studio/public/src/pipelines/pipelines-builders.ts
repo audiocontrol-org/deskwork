@@ -212,8 +212,16 @@ export function buildSetLockedCommand(
 ): BuildResult {
   const checked = readCheckedValues(form, 'set-locked');
   const idArg = quoteValue(pipelineId);
-  const csv = checked.join(',');
-  const command = `/deskwork:pipeline update ${idArg} --set-locked ${quoteValue(csv)}`;
+  // AUDIT-20260530-74: when the operator unchecks every box, do NOT
+  // advertise the literal `--set-locked ""` in the preview — that shape
+  // reads as "this would clear all locks" but the CLI's `splitStageList`
+  // refuses an empty comma-separated list (exit 2). Surface a `<stages>`
+  // placeholder instead, mirroring the New form's `<id>` / `<stages>`
+  // unfilled-required-field convention. The Copy gate (error below)
+  // still disables paste-out; the placeholder removes the misleading
+  // empty-literal from what the operator reads in the preview.
+  const stagesArg = checked.length === 0 ? '<stages>' : quoteValue(checked.join(','));
+  const command = `/deskwork:pipeline update ${idArg} --set-locked ${stagesArg}`;
   // The CLI's `splitStageList` rejects an empty comma-separated list
   // (exit 2). Surface the gate here so the operator who unchecks every
   // box doesn't stumble into a broken paste. The lock set lives on the
