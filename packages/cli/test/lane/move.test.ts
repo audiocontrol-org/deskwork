@@ -8,7 +8,7 @@
  * rule, and the refusal shapes.
  */
 
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
@@ -243,14 +243,45 @@ describe('deskwork lane move', () => {
   });
 });
 
+/**
+ * Sidecar-write failure rollback (AUDIT-20260530-59).
+ *
+ * Drives `moveEntryToLane` in-process and uses `vi.mock` to make
+ * `writeSidecar` throw on the rollback path. This is deterministic
+ * regardless of the test runner's uid (root or unprivileged), unlike
+ * the prior chmod-based pattern that pre-flighted a write and silently
+ * bailed via `return` when the lock didn't take effect — vitest then
+ * recorded a green PASS for an unverified contract.
+ *
+ * The mock targets the same source file that move.ts imports
+ * (`packages/core/src/sidecar/write.ts`) so vitest's module-graph dedup
+ * routes both consumers (the test and the move impl) through the
+ * mocked module. We import `moveEntryToLane` from source for the same
+ * reason: a dist-build import would resolve `writeSidecar` from the
+ * compiled `dist/sidecar/write.js`, a different module from the
+ * mocked source path.
+ */
+vi.mock('../../../core/src/sidecar/write.ts', async () => {
+  const actual = await vi.importActual<
+    typeof import('../../../core/src/sidecar/write.ts')
+  >('../../../core/src/sidecar/write.ts');
+  return {
+    ...actual,
+    writeSidecar: vi.fn(),
+  };
+});
+
 describe('deskwork lane move — sidecar-write failure rollback', () => {
   it('rolls back artifact + scrapbook when writeSidecar fails', async () => {
-    // Skip on platforms / users where chmod 0o555 doesn't prevent
-    // writes (e.g. running as root — happens in some CI sandboxes).
-    // The test pre-flights a write into the read-only dir before
-    // asserting; if the pre-flight succeeds, the test framework
-    // can't simulate the failure mode and skips.
-    const { chmodSync } = await import('node:fs');
+    const { writeSidecar: mockedWriteSidecar } = await import(
+      '../../../core/src/sidecar/write.ts'
+    );
+    const { moveEntryToLane } = await import(
+      '../../../core/src/lanes/operations/move.ts'
+    );
+
+    const writeMock = vi.mocked(mockedWriteSidecar);
+    writeMock.mockRejectedValueOnce(new Error('mocked sidecar write failure'));
 
     const uuid = '550e8400-e29b-41d4-a716-446655440100';
     seedEntryWithArtifact({
@@ -261,36 +292,42 @@ describe('deskwork lane move — sidecar-write failure rollback', () => {
       scrapbookContents: { 'note.md': 'pre-move scrapbook\n' },
     });
 
-    const entriesDir = join(project, '.deskwork', 'entries');
-    chmodSync(entriesDir, 0o555);
-    try {
-      // Pre-flight: try writing into the locked dir. If it succeeds,
-      // we can't simulate the failure (running as root); bail.
-      try {
-        writeFileSync(join(entriesDir, '.preflight'), 'x', 'utf-8');
-        chmodSync(entriesDir, 0o755);
-        return; // skip
-      } catch { /* good — writes are blocked */ }
+    const sidecarPathAbs = join(
+      project,
+      '.deskwork',
+      'entries',
+      `${uuid}.json`,
+    );
+    const sidecarBefore = readFileSync(sidecarPathAbs, 'utf-8');
 
-      const res = lane(project, 'move', 'rollback-me', '--to', 'mockups');
-      expect(res.code).not.toBe(0);
-      expect(res.stderr).toMatch(/sidecar write failed/);
+    await expect(
+      moveEntryToLane(project, { uuid, toLane: 'mockups' }),
+    ).rejects.toThrow(/sidecar write failed/);
 
-      // Artifact restored at source path; target empty.
-      expect(existsSync(join(project, 'docs', 'rollback-me.md'))).toBe(true);
-      expect(existsSync(join(project, 'src', 'mockups', 'rollback-me.md'))).toBe(false);
+    expect(writeMock).toHaveBeenCalledTimes(1);
 
-      // Scrapbook restored at source path; target empty.
-      expect(
-        existsSync(join(project, 'docs', 'rollback-me', 'scrapbook', 'note.md')),
-      ).toBe(true);
-      expect(
-        existsSync(
-          join(project, 'src', 'mockups', 'rollback-me', 'scrapbook', 'note.md'),
-        ),
-      ).toBe(false);
-    } finally {
-      chmodSync(entriesDir, 0o755);
-    }
+    // Artifact restored at source path; target empty.
+    expect(
+      readFileSync(join(project, 'docs', 'rollback-me.md'), 'utf-8'),
+    ).toBe('# pre-move\n');
+    expect(existsSync(join(project, 'src', 'mockups', 'rollback-me.md'))).toBe(
+      false,
+    );
+
+    // Scrapbook restored at source path; target empty.
+    expect(
+      readFileSync(
+        join(project, 'docs', 'rollback-me', 'scrapbook', 'note.md'),
+        'utf-8',
+      ),
+    ).toBe('pre-move scrapbook\n');
+    expect(
+      existsSync(
+        join(project, 'src', 'mockups', 'rollback-me', 'scrapbook', 'note.md'),
+      ),
+    ).toBe(false);
+
+    // Sidecar untouched: write was mocked to throw before disk contact.
+    expect(readFileSync(sidecarPathAbs, 'utf-8')).toBe(sidecarBefore);
   });
 });
