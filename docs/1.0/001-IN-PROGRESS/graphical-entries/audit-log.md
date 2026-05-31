@@ -4249,7 +4249,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (codex). R
 ### AUDIT-20260530-86 — [P6-3 codex] Rebind prompt can offer templates that cannot actually be selected
 
 Finding-ID: AUDIT-20260530-86 (cross-model: AUDIT-BARRAGE-codex-P6-3)
-Status:     open
+Status:     fixed-a031183e (duplicate of AUDIT-20260529-08; closed by commit a031183e on 2026-05-28, prior to this audit run)
 Severity:   medium
 Surface:    packages/core/src/doctor/rules/lane-config-missing-template.ts:214-229 and packages/core/src/doctor/rules/lane-config-missing-template.ts:287-299
 

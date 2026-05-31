@@ -1263,17 +1263,19 @@ Disposition: duplicate of AUDIT-20260530-79 (claude). Both describe the same mut
 
 Closes AUDIT-20260530-86 (cross-model: AUDIT-BARRAGE-codex-P6-3). Surface: packages/core/src/doctor/rules/lane-config-missing-template.ts:214-229 and packages/core/src/doctor/rules/lane-config-missing-template.ts:287-299.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-86 (cross-model: AUDIT-BARRAGE-codex-P6-3)` in subject
+**Disposition: duplicate of AUDIT-20260529-08.** The fix codex requested (filter `listAvailablePipelineTemplates` through `loadPipelineTemplate` before constructing rebind choices) was already implemented in commit `a031183e` (Task 0.49 closing AUDIT-20260529-08) on 2026-05-28, prior to the 2026-05-30 audit-barrage run that surfaced AUDIT-86. See lane-config-missing-template.ts:298-299 for the live `.filter((templateId) => templateResolves(...))` call, and test/doctor/lane-config-missing-template.test.ts:257 for the regression test (`plan: filters malformed override ids out of set-template choices`). The codex barrage reviewed the pre-AUDIT-29-08 code shape or missed the extant fix.
+
+- [x] Step 1: write failing test exercising the bug — n/a, regression test already exists from AUDIT-29-08 closure
+- [x] Step 2: confirm test fails against current code — n/a, fix predates this audit; current test passes
+- [x] Step 3: implement the fix — already implemented in commit a031183e (2026-05-28)
+- [x] Step 4: confirm test passes — `npm --workspace @deskwork/core test` 879/879 pass
+- [x] Step 5: commit with `Closes AUDIT-20260530-86 (cross-model: AUDIT-BARRAGE-codex-P6-3)` in subject — docs-only commit (duplicate disposition)
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/doctor/lane-config-missing-template.test.ts:257` (`plan: filters malformed override ids out of set-template choices`)
+- [x] `npm --workspace @deskwork/core test` exits 0 (879/879 pass)
+- [x] Audit-log Status flipped to `fixed-a031183e (duplicate of AUDIT-20260529-08; closed by commit a031183e on 2026-05-28, prior to this audit run)`
 
 
 
