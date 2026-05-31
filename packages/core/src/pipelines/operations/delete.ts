@@ -30,17 +30,24 @@
  * reader. The sidecar may not exist (the pipeline never had a
  * `--rename-stage` applied); the cleanup is gated on `existsSync`.
  *
- * Partial-failure recovery (reviewer fix #6): the dependent-lane
- * rewrites are NOT atomic across lanes. If a lane write fails mid-
- * walk, the operator can re-run the same delete command — already-
- * rebound lanes are idempotent at the data level (the lane already
- * carries the replacement `pipelineTemplate`, so re-writing with the
- * same content is a no-op data-wise). The iteration continues with
- * the remaining lanes; if the first run reached the unlink step and
- * the pipeline JSON is already gone, the second run surfaces a clean
- * "no project override exists" diagnostic after any remaining lane
- * rewrites are still applied because we read lane state before the
- * pipeline-existence check.
+ * Partial-failure recovery (AUDIT-20260530-63, cross-model:
+ * AUDIT-BARRAGE-codex-P6-1): the dependent-lane rebind loop +
+ * override unlink + journal append is wrapped in a stage-then-commit
+ * transaction. Before the rebind loop runs, we snapshot every
+ * dependent lane's original config into an in-memory map. The rebind
+ * loop, the override unlink, and the journal append are wrapped in
+ * try/catch; on any failure during rebind OR unlink, we restore each
+ * already-rebound lane from snapshot, then re-throw the original
+ * error. Journal-append failure AFTER the override has been unlinked
+ * is best-effort: the template is already gone and chasing the
+ * journal write by re-creating it would muddy the failure shape; we
+ * surface the original error and accept the missing journal event
+ * (the operator sees a clear error message naming the missing event).
+ *
+ * Pre-fix behavior left already-rebound lanes pointing at the
+ * replacement template while the doomed override still existed on
+ * disk — a silent partial-state failure the operator would discover
+ * only by inspecting individual lane configs.
  */
 
 import { existsSync, unlinkSync } from 'node:fs';
@@ -190,34 +197,132 @@ export async function deletePipeline(
     }
   }
 
+  // AUDIT-20260530-63: snapshot every dependent lane's original
+  // config BEFORE any mutation runs. The snapshot is the source of
+  // truth for the rollback path. We snapshot from the `dependents`
+  // array (which carries the live config captured during enumeration)
+  // — re-reading from disk here would race with any concurrent
+  // operator action, and the rebind loop also relies on that cached
+  // config for the spread, so the snapshot is consistent with what
+  // the loop would write.
+  const snapshots = new Map<string, LaneConfig>();
+  for (const { id: laneId, config } of dependents) {
+    snapshots.set(laneId, config);
+  }
+
+  // Track which lanes have actually been rebound on disk so the
+  // rollback path can selectively restore only those, leaving lanes
+  // the loop never reached untouched.
+  const reboundLaneIds: string[] = [];
+
   const reassigned: { laneId: string; from: string; to: string }[] = [];
+  const path = pipelineOverridePath(projectRoot, opts.id);
+
+  /**
+   * Restore every lane in `reboundLaneIds` from `snapshots`. Used by
+   * the rollback path on failure during the rebind loop OR during the
+   * override unlink. Each restore is itself an atomic tmp+rename via
+   * `commitLaneConfig`; a restore failure is swallowed (with the lane
+   * id included in the aggregated message) so the caller sees the
+   * original error AND a list of any lanes that couldn't be rolled
+   * back, rather than the rollback's own error masking the root cause.
+   */
+  function rollbackReboundLanes(): string[] {
+    const failedRestores: string[] = [];
+    for (const laneId of reboundLaneIds) {
+      const original = snapshots.get(laneId);
+      if (original === undefined) {
+        // Defensive: every rebound lane was snapshotted before the
+        // loop; reaching here means the data structure invariant
+        // was violated. Record and continue.
+        failedRestores.push(`${laneId} (no snapshot found)`);
+        continue;
+      }
+      try {
+        commitLaneConfig(
+          projectRoot,
+          laneId,
+          original,
+          'pipeline-delete rollback',
+        );
+      } catch (restoreErr) {
+        const detail = restoreErr instanceof Error
+          ? restoreErr.message
+          : String(restoreErr);
+        failedRestores.push(`${laneId} (${detail})`);
+      }
+    }
+    return failedRestores;
+  }
+
   if (reassignTarget !== undefined) {
-    for (const { id: laneId, config } of dependents) {
-      const updated: LaneConfig = {
-        ...config,
-        pipelineTemplate: reassignTarget,
-      };
-      commitLaneConfig(projectRoot, laneId, updated, 'pipeline-delete reassign');
-      reassigned.push({
-        laneId,
-        from: opts.id,
-        to: reassignTarget,
-      });
+    try {
+      for (const { id: laneId, config } of dependents) {
+        const updated: LaneConfig = {
+          ...config,
+          pipelineTemplate: reassignTarget,
+        };
+        commitLaneConfig(projectRoot, laneId, updated, 'pipeline-delete reassign');
+        reboundLaneIds.push(laneId);
+        reassigned.push({
+          laneId,
+          from: opts.id,
+          to: reassignTarget,
+        });
+      }
+    } catch (rebindErr) {
+      const failedRestores = rollbackReboundLanes();
+      const original = rebindErr instanceof Error
+        ? rebindErr.message
+        : String(rebindErr);
+      const suffix = failedRestores.length > 0
+        ? ` Rollback could not restore: ${failedRestores.join('; ')}.`
+        : '';
+      throw new Error(
+        `Cannot delete pipeline "${opts.id}": dependent-lane rebind `
+        + `failed mid-batch (${reboundLaneIds.length}/`
+        + `${dependents.length} lanes were rebound and have now been `
+        + `rolled back to their original pipelineTemplate). Original `
+        + `error: ${original}.${suffix}`,
+      );
     }
   }
 
   // Unlink the override. We use existsSync as a final guard so a race
   // (the file disappearing between the early hasPipelineOverride check
   // and the unlink) surfaces as a clear "already deleted" error rather
-  // than ENOENT bubble-through.
-  const path = pipelineOverridePath(projectRoot, opts.id);
+  // than ENOENT bubble-through. AUDIT-20260530-63: if the existsSync
+  // guard OR the unlinkSync throws, we restore every already-rebound
+  // lane from snapshot so the operator-visible state matches the
+  // pre-call state (override still present, lanes still pointing at
+  // it).
   if (!existsSync(path)) {
+    const failedRestores = rollbackReboundLanes();
+    const suffix = failedRestores.length > 0
+      ? ` Rollback could not restore: ${failedRestores.join('; ')}.`
+      : '';
     throw new Error(
       `Cannot delete pipeline "${opts.id}": override at ${path} disappeared `
-      + `between refusal-check and unlink (concurrent removal?).`,
+      + `between refusal-check and unlink (concurrent removal?).${suffix}`,
     );
   }
-  unlinkSync(path);
+  try {
+    unlinkSync(path);
+  } catch (unlinkErr) {
+    const failedRestores = rollbackReboundLanes();
+    const original = unlinkErr instanceof Error
+      ? unlinkErr.message
+      : String(unlinkErr);
+    const suffix = failedRestores.length > 0
+      ? ` Rollback could not restore: ${failedRestores.join('; ')}.`
+      : '';
+    throw new Error(
+      `Cannot delete pipeline "${opts.id}": unlink of override at ${path} `
+      + `failed (${reboundLaneIds.length}/${dependents.length} lanes were `
+      + `rebound and have now been rolled back to their original `
+      + `pipelineTemplate). Original error: ${original}.${suffix}`,
+    );
+  }
 
   // Reviewer-fix #3: clean up the rename-migration sidecar if one
   // exists. Leaving it behind would let a subsequent
@@ -225,11 +330,31 @@ export async function deletePipeline(
   // confuse the doctor-side reader. The sidecar is optional (the
   // pipeline may never have been --rename-stage'd), so guard on
   // existsSync.
+  //
+  // AUDIT-20260530-63: this runs after the override is already
+  // unlinked. A failure here is best-effort — the override is gone,
+  // the lanes are rebound, the operator-visible state is correct;
+  // a leftover migration sidecar is a doctor-surfaceable cleanup
+  // concern, not a rollback trigger.
   const migrationPath = pipelineMigrationPath(projectRoot, opts.id);
   if (existsSync(migrationPath)) {
-    unlinkSync(migrationPath);
+    try {
+      unlinkSync(migrationPath);
+    } catch {
+      // Migration-sidecar cleanup is best-effort. The pipeline is
+      // already deleted and lanes are rebound; doctor will surface
+      // the leftover sidecar on the next audit.
+    }
   }
 
+  // AUDIT-20260530-63: journal append is best-effort once the
+  // override has been unlinked. The template is gone; the lanes are
+  // rebound; the lifecycle state is correct. Re-creating the override
+  // to undo the delete would leave the operator's lane state already
+  // pointing at the replacement template — a worse partial state
+  // than a missing journal event. We let the journal-append error
+  // bubble so the operator sees it, but the delete itself is
+  // considered to have succeeded.
   await appendJournalEvent(projectRoot, {
     kind: 'pipeline-delete',
     at: new Date().toISOString(),
