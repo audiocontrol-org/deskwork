@@ -17,9 +17,9 @@
  *
  * State is stored per-operator-per-project in localStorage:
  *
- *   - `deskwork:dashboard:<projectKey>:lane-collapse`
+ *   - `deskwork:dashboard:v2:<projectKey>:lane-collapse`
  *     JSON array of lane ids the operator has collapsed.
- *   - `deskwork:dashboard:<projectKey>:stage-collapse`
+ *   - `deskwork:dashboard:v2:<projectKey>:stage-collapse`
  *     JSON object mapping lane id → array of collapsed stage names.
  *     Per-stage collapse state is SHARED across kanban + list-body
  *     — a stage collapsed in kanban shows collapsed in list-body

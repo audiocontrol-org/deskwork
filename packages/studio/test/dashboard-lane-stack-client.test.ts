@@ -248,7 +248,7 @@ describe('lane-stack accordion client — AUDIT-20260528-10', () => {
     defaultChev?.click();
     // Persisted to localStorage under the expected key.
     const stored = window.localStorage.getItem(
-      'deskwork:dashboard:lane-stack-test-key:lane-stack-collapse',
+      'deskwork:dashboard:v2:lane-stack-test-key:lane-stack-collapse',
     );
     expect(stored).not.toBeNull();
     if (stored === null) throw new Error('stored value missing');

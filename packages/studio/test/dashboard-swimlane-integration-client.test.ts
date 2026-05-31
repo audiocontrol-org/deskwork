@@ -189,7 +189,7 @@ describe('Phase 5 Task 5.6 — multi-lane integration (client)', () => {
 
   it('Step 5.6.2: pre-seed visibility-hidden state, mount controllers, chip + swim + rail row all carry the hidden signals', () => {
     // Pre-seed BEFORE building the shell (controllers read storage on init).
-    const visibilityKey = `deskwork:dashboard:${PROJECT_KEY}:visibility`;
+    const visibilityKey = `deskwork:dashboard:v2:${PROJECT_KEY}:visibility`;
     window.localStorage.setItem(visibilityKey, JSON.stringify(['qa']));
     buildShell();
     mountAllControllers();

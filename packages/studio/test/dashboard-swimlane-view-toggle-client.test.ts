@@ -226,7 +226,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
 
     // localStorage persists.
     const storedRaw = window.localStorage.getItem(
-      'deskwork:dashboard:task-5-1b-test-key:view-mode',
+      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
     );
     expect(storedRaw).not.toBeNull();
     if (storedRaw === null) return;
@@ -239,7 +239,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
     // `view-list` (otherwise the desktop default would resolve the
     // swim back to kanban regardless of the server-rendered class).
     window.localStorage.setItem(
-      'deskwork:dashboard:task-5-1b-test-key:view-mode',
+      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
       JSON.stringify({ default: 'list' }),
     );
     buildShell([
@@ -274,7 +274,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
     // localStorage only carries the default lane's override.
     const stored: unknown = JSON.parse(
       window.localStorage.getItem(
-        'deskwork:dashboard:task-5-1b-test-key:view-mode',
+        'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
       ) ?? '{}',
     );
     expect(stored).toEqual({ default: 'list' });
@@ -309,7 +309,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
 
   it('per-lane override beats viewport default — mobile with stored kanban shows kanban', () => {
     window.localStorage.setItem(
-      'deskwork:dashboard:task-5-1b-test-key:view-mode',
+      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
       JSON.stringify({ default: 'kanban' }),
     );
     setMatchMediaMatches(true); // mobile
@@ -399,7 +399,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
     expect(swim?.classList.contains('view-list')).toBe(false);
     // No localStorage write either.
     const storedRaw = window.localStorage.getItem(
-      'deskwork:dashboard:task-5-1b-test-key:view-mode',
+      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
     );
     expect(storedRaw).toBeNull();
   });

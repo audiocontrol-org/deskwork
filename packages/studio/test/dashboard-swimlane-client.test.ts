@@ -95,6 +95,23 @@ describe('swimlane client controller — AUDIT-02 / AUDIT-04 acceptance', () => 
     expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(false);
   });
 
+  it('AUDIT-20260530-26: ignores stale unversioned dashboard visibility state', () => {
+    window.localStorage.setItem(
+      'deskwork:dashboard:test-project-key:visibility',
+      JSON.stringify(['qa']),
+    );
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    const qaRow = document.querySelector<HTMLElement>(
+      '[data-rail-lane="qa"]',
+    );
+    const qaChip = document.querySelector<HTMLButtonElement>(
+      '[data-focus-chip="qa"]',
+    );
+    expect(qaRow?.dataset.laneVisible).toBe('true');
+    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(false);
+  });
+
   it('F5: pressing Enter on a rail row toggles focus (mirrors the click handler)', () => {
     buildShell(['default', 'mockups', 'qa']);
     initSwimlane();

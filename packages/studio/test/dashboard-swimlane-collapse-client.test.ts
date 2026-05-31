@@ -253,7 +253,7 @@ describe('swimlane collapse client — Task 5.1A', () => {
   });
 
   it('lane-collapse persists in localStorage across a simulated reload', () => {
-    const storageKey = 'deskwork:dashboard:task-5-1a-test-key:lane-collapse';
+    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:lane-collapse';
     buildShell([
       { laneId: 'default', laneName: 'Editorial', stages: ['Drafting'] },
       { laneId: 'mockups', laneName: 'Mockups', stages: ['Sketched'] },
@@ -295,7 +295,7 @@ describe('swimlane collapse client — Task 5.1A', () => {
   });
 
   it('stage-collapse persists in localStorage (per-lane scoped) across a simulated reload', () => {
-    const storageKey = 'deskwork:dashboard:task-5-1a-test-key:stage-collapse';
+    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:stage-collapse';
     buildShell([
       { laneId: 'default', laneName: 'Editorial', stages: ['Drafting', 'Final'] },
       { laneId: 'mockups', laneName: 'Mockups', stages: ['Sketched', 'Approved'] },

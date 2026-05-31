@@ -40,7 +40,7 @@ import {
 } from '../../../plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store';
 
 const PROJECT_KEY = 'test-project-key';
-const PREFIX = `deskwork:dashboard:${PROJECT_KEY}`;
+const PREFIX = `deskwork:dashboard:v2:${PROJECT_KEY}`;
 
 interface CSSShim {
   escape: (id: string) => string;

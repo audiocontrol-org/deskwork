@@ -18,7 +18,7 @@ import { initSwimlaneViewToggle } from '../../../../plugins/deskwork-studio/publ
 import type { PresetControllerHooks } from '../../../../plugins/deskwork-studio/public/src/dashboard/swimlane-presets';
 
 export const PROJECT_KEY = 'test-project-key';
-export const PREFIX = `deskwork:dashboard:${PROJECT_KEY}`;
+export const PREFIX = `deskwork:dashboard:v2:${PROJECT_KEY}`;
 
 interface CSSShim {
   escape: (id: string) => string;

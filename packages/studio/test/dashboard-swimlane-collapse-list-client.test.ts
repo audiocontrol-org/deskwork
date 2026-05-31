@@ -33,7 +33,7 @@ describe('swimlane collapse client — Task 5.1B list-body extension', () => {
     // Mirror of the per-stage kanban test, scoped to the list-body
     // shape. Task 5.1B extended `swimlane-collapse.ts` to handle
     // both `.stage-col` AND `.lb-group` as the toggle parent.
-    const storageKey = 'deskwork:dashboard:task-5-1a-test-key:stage-collapse';
+    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:stage-collapse';
     document.body.innerHTML = '';
     window.localStorage.clear();
     const shell = document.createElement('section');
@@ -102,7 +102,7 @@ describe('swimlane collapse client — Task 5.1B list-body extension', () => {
     // Build a swim that carries BOTH a kanban `.stage-col` AND a
     // list-body `.lb-group` for the same stage. Persisting one
     // collapses the other on reload — shared state per lane:stage.
-    const storageKey = 'deskwork:dashboard:task-5-1a-test-key:stage-collapse';
+    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:stage-collapse';
     window.localStorage.setItem(storageKey, JSON.stringify({ default: ['Drafting'] }));
     document.body.innerHTML = '';
     const shell = document.createElement('section');

@@ -12,7 +12,7 @@
  *   - reorders the per-lane swim + stub pairs inside the bay so the
  *     bay column matches the new rail order,
  *   - persists to localStorage as `string[]` of lane ids under
- *     `deskwork:dashboard:<projectKey>:lane-order` — per-operator,
+ *     `deskwork:dashboard:v2:<projectKey>:lane-order` — per-operator,
  *     per-project (matches the other 5.x state idioms — visibility,
  *     focus, view-mode, collapse, compose). PRD `Two split state
  *     axes for lanes` leaves `.deskwork/lane-order.json` (project-

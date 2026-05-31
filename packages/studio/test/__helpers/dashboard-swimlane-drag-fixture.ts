@@ -30,7 +30,7 @@ if (typeof (globalThis as { CSS?: unknown }).CSS === 'undefined') {
 }
 
 export const PROJECT_KEY = 'task-5-4-drag-test-key';
-export const ORDER_STORAGE_KEY = `deskwork:dashboard:${PROJECT_KEY}:lane-order`;
+export const ORDER_STORAGE_KEY = `deskwork:dashboard:v2:${PROJECT_KEY}:lane-order`;
 
 export interface FakeDataTransfer {
   effectAllowed: string;

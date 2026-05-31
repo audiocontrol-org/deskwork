@@ -11,7 +11,7 @@
  *     reusing it here keeps the view-default switch aligned with the
  *     layout switch the operator already perceives.
  *   - Reads any per-lane operator overrides from localStorage at
- *     `deskwork:dashboard:<projectKey>:view-mode` (a `Record<laneId,
+ *     `deskwork:dashboard:v2:<projectKey>:view-mode` (a `Record<laneId,
  *     'kanban' | 'list'>` map).
  *   - Applies the resolved mode to each swim by swapping `.view-
  *     kanban` and `.view-list` classes; mirrors `aria-checked` on

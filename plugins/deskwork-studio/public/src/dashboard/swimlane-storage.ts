@@ -3,14 +3,14 @@
  *
  * The `swimlane.ts`, `swimlane-collapse.ts`, and `swimlane-view-
  * toggle.ts` controllers all namespace localStorage entries under
- * `deskwork:dashboard:<projectKey>:<suffix>` and all resolve the
- * `<projectKey>` from the bay-shell's `data-project-key` attribute
- * (falling back to the page pathname when the shell lacks one). The
- * map-shaped controllers (collapse + view-toggle) additionally read
- * a `Map<laneId, T>` whose on-disk shape is a JSON object. This
- * module centralises all three pieces — the key prefix, the project-
- * key resolver, and the read+parse boilerplate — so the controllers
- * import a single contract instead of redeclaring it.
+ * `deskwork:dashboard:v<schema>:<projectKey>:<suffix>` and all
+ * resolve the `<projectKey>` from the bay-shell's `data-project-key`
+ * attribute (falling back to the page pathname when the shell lacks
+ * one). The map-shaped controllers (collapse + view-toggle)
+ * additionally read a `Map<laneId, T>` whose on-disk shape is a JSON
+ * object. This module centralises all three pieces — the key prefix,
+ * the project-key resolver, and the read+parse boilerplate — so the
+ * controllers import a single contract instead of redeclaring it.
  *
  * Failures (no entry / malformed JSON / wrong root type / unknown
  * value shape) all collapse to "empty map" — the controllers treat
@@ -19,12 +19,19 @@
  */
 
 /**
+ * Schema version for dashboard localStorage keys. Bump this when the
+ * persisted shapes or restore semantics change so stale per-operator
+ * state is ignored instead of silently replayed into the new UI.
+ */
+export const STORAGE_SCHEMA_VERSION = 2;
+
+/**
  * Common prefix for every dashboard localStorage key. Controllers
- * append `:<projectKey>:<suffix>` to namespace per-operator state
+ * append `<projectKey>:<suffix>` to namespace per-operator state
  * per-project (so two operators sharing a machine but working on
  * different projects don't see each other's lane state).
  */
-export const STORAGE_KEY_PREFIX = 'deskwork:dashboard:';
+export const STORAGE_KEY_PREFIX = `deskwork:dashboard:v${STORAGE_SCHEMA_VERSION}:`;
 
 /**
  * Resolve the project key the swimlane controllers use to namespace
