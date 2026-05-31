@@ -26,6 +26,7 @@ import { checkBarrageDampener } from './check-barrage-dampener.js';
 
 const BARRAGE_HEADER_RE = /^##\s+\d{4}-\d{2}-\d{2}\s+—\s+audit-barrage\s+lift\s+\(([^)]+)\)/i;
 const FINDING_ID_RE = /^Finding-ID:\s*(.+?)\s*$/i;
+const SEVERITY_RE = /^Severity:\s*(\S+)/i;
 const STATUS_OPEN_RE = /^Status:\s*open\b/i;
 const TOP_HEADER_RE = /^##\s+/;
 const ENTRY_HEADER_RE = /^###\s+/;
@@ -36,6 +37,13 @@ export interface SlushFlip {
   readonly findingId: string;
   /** Full Finding-ID line value (may carry cross-model annotation). */
   readonly fullFindingId: string;
+  /**
+   * Severity as parsed from the audit-log entry (lowercased). May be
+   * undefined when the entry's `Severity:` line couldn't be parsed.
+   * For skipped HIGHs (this is `high` or `blocking`) the entry was
+   * NOT modified.
+   */
+  readonly severity?: string;
   /** Whether the matching workplan task was found + flipped. */
   readonly workplanTaskFlipped: boolean;
 }
@@ -47,12 +55,30 @@ export interface SlushRemainingArgs {
   readonly slushDate: string;
   /** Dampener threshold override; default 2 (matches the gate). */
   readonly threshold?: number;
+  /**
+   * Per Issue #380: scope the slush to the most-recent barrage section
+   * (default) or every barrage section in the audit-log. Operator-
+   * intent is "slush items in scope of THIS barrage," so the default
+   * is `'latest'`. `'all'` is the legacy pre-#380 behavior, retained
+   * for explicit override and as a guardrail-test surface for the
+   * severity filter.
+   */
+  readonly scope?: 'latest' | 'all';
 }
 
 export interface SlushRemainingResult {
   readonly dampenerEngaged: boolean;
   readonly dampenerReason: string;
+  /** Findings whose Status was flipped (MEDIUM/LOW/informational). */
   readonly flips: readonly SlushFlip[];
+  /**
+   * Findings whose Severity is `high` or `blocking` — NEVER slushed
+   * per the SKILL.md invariant ("HIGHs are NEVER slushed"). The
+   * audit-log entries for these stay `Status: open`; the CLI shim
+   * surfaces them in the per-run summary so the operator sees that
+   * a real-bug guardrail was preserved.
+   */
+  readonly skippedHighs: readonly SlushFlip[];
   readonly newAuditLogText: string;
   readonly newWorkplanText: string;
 }
@@ -67,6 +93,14 @@ interface RawSection {
   readonly endIndex: number;
 }
 
+/**
+ * Locate audit-barrage lift sections in the audit-log. The
+ * audit-log is append-only with newest sections at the bottom, so
+ * the last entry returned is the most-recent barrage. Per Issue
+ * #380, the slush is scoped to ONLY the most-recent section by
+ * default — operator-intent is "slush items in scope of THIS
+ * barrage," not "wipe every prior barrage's findings."
+ */
 function findBarrageSections(lines: ReadonlyArray<string>): RawSection[] {
   const headerIndices: number[] = [];
   for (let i = 0; i < lines.length; i += 1) {
@@ -92,6 +126,8 @@ interface OpenFindingRef {
   readonly statusLineIndex: number;
   readonly findingId: string; // canonical
   readonly fullFindingId: string;
+  /** Lowercased Severity value; undefined if the entry has no parseable Severity line. */
+  readonly severity: string | undefined;
 }
 
 function findOpenFindingsInSections(
@@ -107,9 +143,12 @@ function findOpenFindingsInSections(
         i += 1;
         continue;
       }
-      // Walk this entry's field block.
+      // Walk this entry's field block, capturing severity in
+      // addition to status + finding-id (per Issue #380 — HIGHs
+      // are never slushed).
       let statusLineIndex = -1;
       let fullFindingId: string | undefined;
+      let severity: string | undefined;
       let j = i + 1;
       while (j < section.endIndex) {
         const inner = lines[j] ?? '';
@@ -117,6 +156,10 @@ function findOpenFindingsInSections(
         const fid = FINDING_ID_RE.exec(inner);
         if (fid !== null && fullFindingId === undefined) {
           fullFindingId = fid[1]!;
+        }
+        const sev = SEVERITY_RE.exec(inner);
+        if (sev !== null && severity === undefined) {
+          severity = sev[1]!.toLowerCase();
         }
         if (STATUS_OPEN_RE.test(inner) && statusLineIndex === -1) {
           statusLineIndex = j;
@@ -129,6 +172,7 @@ function findOpenFindingsInSections(
           statusLineIndex,
           findingId: canonicalAuditId(fullFindingId),
           fullFindingId,
+          severity,
         });
       }
       i = j;
@@ -184,17 +228,47 @@ export function slushRemaining(args: SlushRemainingArgs): SlushRemainingResult {
       dampenerEngaged: false,
       dampenerReason: dampener.reason,
       flips: [],
+      skippedHighs: [],
       newAuditLogText: args.auditLogText,
       newWorkplanText: args.workplanText,
     };
   }
   const auditLines = args.auditLogText.split(/\r?\n/);
   const workplanLines = args.workplanText.split(/\r?\n/);
-  const sections = findBarrageSections(auditLines);
-  const openFindings = findOpenFindingsInSections(auditLines, sections);
+  const allSections = findBarrageSections(auditLines);
+  // Per Issue #380: scope to ONLY the most-recent barrage lift
+  // section (default) — operator-intent is "slush items in scope of
+  // THIS barrage." Older sections' findings are out-of-scope for
+  // this dampener engagement; if they need slushing they'll re-
+  // surface in a future barrage. Caller can opt into legacy
+  // all-section walking via `scope: 'all'`.
+  const scope: 'latest' | 'all' = args.scope ?? 'latest';
+  const scopedSections =
+    scope === 'all'
+      ? allSections
+      : allSections.length > 0
+        ? [allSections[allSections.length - 1]!]
+        : [];
+  const openFindings = findOpenFindingsInSections(auditLines, scopedSections);
   const flips: SlushFlip[] = [];
+  const skippedHighs: SlushFlip[] = [];
   const newStatus = `acknowledged-slush-pile-${args.slushDate}`;
   for (const ref of openFindings) {
+    // Per Issue #380: HIGHs (high + blocking) are NEVER slushed.
+    // Per SKILL.md: "any future barrage that surfaces a HIGH+
+    // finding resets the dampener counter, and the next hook fire
+    // surfaces it as new next-work." Leave the audit-log entry
+    // untouched; report it in skippedHighs.
+    const isHighPlus = ref.severity === 'high' || ref.severity === 'blocking';
+    if (isHighPlus) {
+      skippedHighs.push({
+        findingId: ref.findingId,
+        fullFindingId: ref.fullFindingId,
+        severity: ref.severity,
+        workplanTaskFlipped: false,
+      });
+      continue;
+    }
     // Flip the audit-log Status line.
     auditLines[ref.statusLineIndex] = (auditLines[ref.statusLineIndex] ?? '').replace(
       STATUS_OPEN_RE,
@@ -205,6 +279,7 @@ export function slushRemaining(args: SlushRemainingArgs): SlushRemainingResult {
     flips.push({
       findingId: ref.findingId,
       fullFindingId: ref.fullFindingId,
+      severity: ref.severity,
       workplanTaskFlipped: wpFlipped,
     });
   }
@@ -212,6 +287,7 @@ export function slushRemaining(args: SlushRemainingArgs): SlushRemainingResult {
     dampenerEngaged: true,
     dampenerReason: dampener.reason,
     flips,
+    skippedHighs,
     newAuditLogText: auditLines.join('\n'),
     newWorkplanText: workplanLines.join('\n'),
   };
