@@ -186,6 +186,63 @@ function defaultCommitWalker(args: {
   return parseCommitsFromGitLog(raw);
 }
 
+/**
+ * Per AUDIT-20260530-14: for each `open → fixed-<sha>` flip, locate
+ * the matching workplan fix-finding task (heading carries
+ * `(fix-finding-<canonical-id>)`) and flip the closure-criterion
+ * checkbox `- [ ] Audit-log Status flipped to \`fixed-` → `- [x]`.
+ *
+ * Best-effort: the regex anchors on the canonical AUDIT-id, so both
+ * the renderer-shape clean marker and the cross-model nested-paren
+ * variant match. Tasks not found in the workplan (e.g. the operator
+ * deleted the task block, or the finding was closed without ever
+ * being scoped) are silently skipped.
+ */
+function tickClosureCriteria(
+  workplanText: string,
+  flips: readonly StatusFlip[],
+): string {
+  const canonicalAuditId = (id: string): string =>
+    /\bAUDIT-\d{8}-\d+/.exec(id)?.[0] ?? id;
+  let updated = workplanText;
+  for (const flip of flips) {
+    const canonical = canonicalAuditId(flip.findingId);
+    // Find the task heading line containing the canonical marker.
+    const headingRe = new RegExp(
+      `^(###\\s+Task\\s+[^\\n]*?fix-finding-${escapeRegExp(canonical)}\\b[^\\n]*:.*)$`,
+      'mi',
+    );
+    const headingMatch = headingRe.exec(updated);
+    if (headingMatch === null || headingMatch.index === undefined) continue;
+    const taskBlockStart = headingMatch.index + headingMatch[0].length;
+    // Find the end of this task block (next `### ` or `## ` heading,
+    // or EOF).
+    const tail = updated.slice(taskBlockStart);
+    const nextHeadingRe = /\n(###\s|##\s)/m;
+    const nextHeadingMatch = nextHeadingRe.exec(tail);
+    const blockEnd =
+      nextHeadingMatch !== null && nextHeadingMatch.index !== undefined
+        ? taskBlockStart + nextHeadingMatch.index
+        : updated.length;
+    const block = updated.slice(taskBlockStart, blockEnd);
+    // Replace `- [ ] Audit-log Status flipped to \`fixed-` (with any
+    // trailing prose) → `- [x] ...`. Match only the FIRST occurrence
+    // inside the block.
+    const newBlock = block.replace(
+      /- \[ \](\s+Audit-log Status flipped to `fixed-)/,
+      '- [x]$1',
+    );
+    if (newBlock !== block) {
+      updated = updated.slice(0, taskBlockStart) + newBlock + updated.slice(blockEnd);
+    }
+  }
+  return updated;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function parseCommitsFromGitLog(raw: string): ReadonlyArray<CommitInput> {
   const chunks = raw.split('\0');
   const out: CommitInput[] = [];
@@ -293,7 +350,15 @@ export async function runApplyAuditFlips(args: RunArgs): Promise<number> {
   const auditLog = await parseAuditLogFile(auditLogPath);
   const currentStatusById = new Map<string, string>();
   for (const entry of auditLog.entries) {
-    currentStatusById.set(entry.findingId, entry.status);
+    // Per AUDIT-20260530-07 / -08-equivalent: cross-model audit-log
+    // entries carry their Finding-ID with a trailing `(claude-X +
+    // codex-Y; cross-model)` annotation. The auto-flip proposal's
+    // findingId (parsed from `Closes AUDIT-NNNNNNNN-NN` in the
+    // commit subject) is canonical. Index the map by the canonical
+    // form on both sides so the lookup succeeds for cross-model
+    // findings too.
+    const canonical = /AUDIT-\d{8}-\d+/.exec(entry.findingId)?.[0] ?? entry.findingId;
+    currentStatusById.set(canonical, entry.status);
   }
 
   const actionable: StatusFlip[] = [];
@@ -359,6 +424,54 @@ export async function runApplyAuditFlips(args: RunArgs): Promise<number> {
     args.stderr.write(
       `apply-audit-flips: dry-run (re-run with --apply to write).\n`,
     );
+  }
+
+  // Per AUDIT-20260530-14: ALSO tick the workplan closure-criterion
+  // checkbox for every finding the audit-log shows as fixed-<sha>
+  // — both newly-actionable flips (this run) AND already-dispositioned
+  // entries (prior runs). The gate's findUncheckedTasksInOrder treats
+  // any task with a `- [ ]` checkbox as unchecked, so a previously-
+  // flipped audit-log entry whose workplan checkbox stayed `- [ ]`
+  // keeps the task looking unfinished forever. Catch up on every
+  // --apply run.
+  if (args.opts.apply === true) {
+    const allFixed: readonly StatusFlip[] = [
+      ...actionable,
+      ...alreadyDispositioned
+        .filter((e) => e.currentStatus.startsWith('fixed-'))
+        .map((e) => ({ findingId: e.findingId, newStatus: e.currentStatus })),
+    ];
+    if (allFixed.length > 0) {
+      const workplanPath = join(featureRoot, 'workplan.md');
+      if (existsSync(workplanPath)) {
+        try {
+          const wpBefore = await reader(workplanPath);
+          const wpAfter = tickClosureCriteria(wpBefore, allFixed);
+          if (wpAfter !== wpBefore) {
+            await writer(workplanPath, wpAfter);
+            args.stderr.write(
+              `apply-audit-flips: closure-criterion checkbox(es) flipped in ${workplanPath}.\n`,
+            );
+          }
+        } catch (wpErr) {
+          // Per AUDIT-20260530-17: the workplan-side flip is now a
+          // HARD requirement on --apply. Pre-fix this was best-effort
+          // with a warning, which preserved the AUDIT-14 failure mode:
+          // audit-log says fixed, workplan checkbox stays `- [ ]`,
+          // gate keeps treating the task as unchecked. Hard-exit so
+          // the operator sees the split-state and can fix it.
+          args.stderr.write(
+            `apply-audit-flips: workplan-side write FAILED at ${workplanPath}: ` +
+              `${wpErr instanceof Error ? wpErr.message : String(wpErr)}.\n` +
+              `  The audit-log was already written; state is split ` +
+              `(audit-log shows fixed-<sha>; workplan checkbox still \`- [ ]\`). ` +
+              `Manually flip the workplan checkbox for each fixed finding, ` +
+              `then re-run apply-audit-flips to confirm the catchup is idempotent.\n`,
+          );
+          return 1;
+        }
+      }
+    }
   }
 
   const report: ApplyAuditFlipsReport = {

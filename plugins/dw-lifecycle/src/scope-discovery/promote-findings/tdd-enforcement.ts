@@ -138,7 +138,12 @@ export function findCompletedFixFindingTasks(
       i++;
       continue;
     }
-    const headingMatch = /^###\s+Task\s+[\d.]+:.*?\(fix-finding-(AUDIT-\d{8}-\d+)\)/i.exec(line);
+    // Permissive heading-match per AUDIT-20260530-07: accept the
+    // renderer-output shape `### Task N.M (fix-finding-AUDIT-...): title`
+    // AND the legacy synthetic-fixture shape `### Task N.M: Fix ...
+    // (fix-finding-AUDIT-...)`. The `.*?fix-finding-(AUDIT-\d{8}-\d+)`
+    // captures the canonical AUDIT-ID anywhere in the heading line.
+    const headingMatch = /^###\s+Task\s+[\d.]+.*?fix-finding-(AUDIT-\d{8}-\d+)/i.exec(line);
     if (headingMatch === null) {
       i++;
       continue;
@@ -163,6 +168,92 @@ export function findCompletedFixFindingTasks(
     // for the fix-finding task is checked, treat the task as completed.
     if (/^\s*-\s+\[x\]/m.test(taskBlock)) {
       out.push({ taskBlock, findingId });
+    }
+    i = j;
+  }
+  return out;
+}
+
+/**
+ * Walk a workplan markdown for unchecked tasks (any `### Task ...`
+ * heading whose body contains at least one `- [ ]` checkbox) in
+ * workplan order. Returns each task's block + position (0-indexed),
+ * plus the AUDIT-id when the task is tagged `(fix-finding-AUDIT-<id>)`.
+ *
+ * Phase 15 Task 1 — `findUncheckedTasksInOrder` is the workplan-aware
+ * gate's queue inspector. The gate checks the first N entries (where
+ * N = open-findings count) to decide whether the open findings are
+ * scoped as the next N tasks.
+ *
+ * `sliceLimit` (optional) caps how many unchecked tasks the helper
+ * returns. The gate passes `N` (open-findings count) so the walker
+ * stops scanning once enough context is collected.
+ *
+ * Task-block boundary semantics mirror `findCompletedFixFindingTasks`
+ * — heading line through the line BEFORE the next `### ` / `## `
+ * heading. "Unchecked" = the block contains at least one `- [ ]` line.
+ * A task with mixed state (some `[x]` + some `[ ]`) counts as unchecked
+ * (in-progress is not complete).
+ */
+export interface UncheckedTask {
+  /** Full markdown block including the heading line. */
+  readonly taskBlock: string;
+  /** 0-indexed position in workplan order among ALL unchecked tasks. */
+  readonly position: number;
+  /** Heading text without the `### ` prefix. */
+  readonly heading: string;
+  /** AUDIT-id when the task is tagged `(fix-finding-AUDIT-<id>)`; null otherwise. */
+  readonly findingId: string | null;
+}
+
+// Permissive matchers that accept the canonical renderer-output shape
+// (per AUDIT-20260530-07): `### Task N.M (fix-finding-AUDIT-...): title`
+// where the parenthetical sits BETWEEN the task number and the colon.
+// The inner content may contain nested parens for cross-model findings
+// like `(fix-finding-AUDIT-20260530-01 (claude-01 + codex-03; cross-model))`.
+// `\bfix-finding-(AUDIT-\d{8}-\d+)` skips paren-balancing entirely by
+// anchoring on the canonical-ID prefix; the closing paren of the marker
+// doesn't have to follow immediately.
+const FIX_FINDING_TAG_RE = /\bfix-finding-(AUDIT-\d{8}-\d+)/i;
+// `.*?:` lazily walks any characters between the task number and the
+// FIRST `:` on the line — so the optional parenthetical is absorbed
+// without paren-balancing.
+const TASK_HEADING_RE = /^###\s+Task\s+[\d.]+.*?:/i;
+
+export function findUncheckedTasksInOrder(
+  workplanText: string,
+  sliceLimit?: number,
+): ReadonlyArray<UncheckedTask> {
+  const lines = workplanText.split('\n');
+  const out: UncheckedTask[] = [];
+  let position = 0;
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line === undefined) {
+      i++;
+      continue;
+    }
+    if (!TASK_HEADING_RE.test(line)) {
+      i++;
+      continue;
+    }
+    // Collect the task body.
+    const start = i;
+    let j = i + 1;
+    while (j < lines.length) {
+      const next = lines[j];
+      if (next !== undefined && (next.startsWith('### ') || next.startsWith('## '))) break;
+      j++;
+    }
+    const taskBlock = lines.slice(start, j).join('\n');
+    if (/^\s*-\s+\[ \]/m.test(taskBlock)) {
+      const fixMatch = FIX_FINDING_TAG_RE.exec(line);
+      const findingId = fixMatch !== null && fixMatch[1] !== undefined ? fixMatch[1] : null;
+      const heading = line.replace(/^###\s+/, '');
+      out.push({ taskBlock, position, heading, findingId });
+      position++;
+      if (sliceLimit !== undefined && out.length >= sliceLimit) break;
     }
     i = j;
   }

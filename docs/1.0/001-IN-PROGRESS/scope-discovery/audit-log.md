@@ -707,3 +707,375 @@ All 4 actionable findings (AUDIT-20260529-16/17/18/19/20) land in the same revie
 - `dw-lifecycle check-open-findings --feature open-issue-tranche-cleanup` → exit 0 (NEW)
 
 Awaiting `verified-<date>` on each of -16 through -20 after the next batch of dispatch-wrapper-using or gate-using work confirms no regression.
+
+## 2026-05-30 — audit-barrage lift (20260530T071155888Z-scope-discovery)
+
+### AUDIT-20260530-01 — Audit-barrage finding extraction silently downgrades unrecognized severities to `informational` (the LOWEST rank)
+
+Finding-ID: AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model)
+Status:     fixed-2af92b7ee1cdb32df61584a7a2d80c00412fec34
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:130-136`
+
+`normalizeSeverity` maps any value outside `{blocking, high, medium, low, informational}` to `'informational'` — the lowest rank in `SEVERITY_RANK` (0). The test suite even pins this: `expect(normalizeSeverity('critical')).toBe('informational')` (extract-barrage-findings.test.ts). The single most likely model deviation from the canonical set is `critical` (every model uses it), and the chosen fallback buries it at the bottom of the triage queue. For merged clusters this is doubly harmful: `mergeCluster` picks `max-of-cluster` rank (lines 254-258), so a cluster where one model says `blocking` and another says `critical` collapses the `critical` voice to rank 0, and if BOTH models say `critical`, the merged finding is `informational` — i.e. a cross-model HIGH-confidence agreement on a critical bug surfaces to the operator as `informational`. The whole feature exists to prioritize findings into the work queue; an unknown-severity fallback to the lowest rank actively defeats that. A safer fallback is `high` (fail toward attention, not away from it) or preserving the raw string as a flagged "non-canonical severity" so the operator sees it. The lift verb (audit-barrage-lift.ts:`renderEntry`) writes this normalized value straight into the audit-log `Severity:` line, so the downgrade is persisted.
+
+### AUDIT-20260530-02 — `computeAutoPosition` hard-codes `## Phase` headings; non-Phase workplans throw and HALT the unconditional implement-loop hook
+
+Finding-ID: AUDIT-20260530-02
+Status:     fixed-16be1bbec4cc0fe8dd52b914d328c871f0be4951
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:96,97,166-170`
+
+`PHASE_HEADING_RE = /^##\s+Phase\b/i` and `PHASE_NUMBER_RE = /^##\s+Phase\s+(\d+)/i` only match headings literally beginning with "Phase". When no such heading exists, `computeAutoPosition` throws `AutoPositionError` (lines 166-170), which `promote-findings --auto` maps to exit 2 (promote-findings.ts:`runPromoteFindings` auto-apply branch). Per the SKILL.md Step 6 failure policy, `promote-findings --auto` non-zero is a **STOP-the-loop event** — and the hook is **unconditional** (no `--skip-audit-barrage-hook` flag). The project's own PM standard (work-level CLAUDE.md / PROJECT-MANAGEMENT.md) explicitly sanctions non-temporal terms "milestone, sprint, **phase**". An adopter whose workplan uses `## Milestone 3` or `## Sprint 2` will therefore: complete a task, fire the barrage, surface ≥1 finding, and then hit a hard loop-stop at the first auto-promote — at every task boundary, forever, with an error that points at the wrong cause ("no parseable Phase headings"). Because the failure only manifests once the barrage surfaces a finding, it won't show up in a clean dogfood and will ambush a real adopter mid-loop. The regex should accept the sanctioned heading vocabulary (Phase/Milestone/Sprint) or the AutoPositionError path should degrade (skip auto-scope, surface a warning) rather than stop the loop, given the hook's unconditional contract.
+
+### AUDIT-20260530-03 — Auto-position task numbering assumes hierarchical `Task <phase>.<minor>` but the scope-discovery workplan itself uses flat `Task N:`
+
+Finding-ID: AUDIT-20260530-03
+Status:     fixed-1645d43021ccc45190f7d339e43c80f5dd67e176
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:182-191` (`nextTaskNumberFactory`), `auto-position.ts:153-157` (`currentMaxMinorInPhase`)
+
+`nextTaskNumberFactory` emits `${phaseNumber}.${currentMaxMinorInPhase + 1 + idx}`, deriving the major segment from the `## Phase N` heading and the minor from existing `Task N.M` headings *whose major equals the phase number*. The auto-position tests validate this against fixtures using hierarchical numbering (`### Task 14.1`, `### Task 15.1`, `### Task 15.2`). But the actual scope-discovery workplan under audit uses **flat** numbering: `### Task 1:` … `### Task 6:` under `## Phase 15` (see the workplan.md hunks — every task heading is `### Task <single-int>:`). On that workplan: `collectTaskHeadings` parses `### Task 5:` as major=5/minor=0; the phase is 15; no task has major===15, so `currentMaxMinorInPhase = 0`; new fix-tasks are numbered `Task 15.1`, `Task 15.2`. The result is `### Task 15.1:` interleaved among `Task 1..6` — visually broken, non-monotonic numbering, and inconsistent with the file's own convention. The gate keys on the `(fix-finding-AUDIT-...)` tag rather than the number so it still opens, but the workplan the operator reads is now incoherent. The library's numbering scheme and its test fixtures encode an assumption the project's own workplans violate; the helper should detect the workplan's prevailing task-numbering convention (flat vs hierarchical) instead of assuming `<phase>.<minor>`.
+
+### AUDIT-20260530-04 — `audit-barrage-lift` writes the canonical audit-log non-atomically, risking loss of all preserved history on crash
+
+Finding-ID: AUDIT-20260530-04
+Status:     fixed-4335b64a8a4a0fd11d420dfde5fa93cdd0682697
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:333-340`
+
+The apply path reads the full audit-log, concatenates the new section, and writes the whole file back with a single `writeFile(auditLogPath, ...)` (default writer at line 312; the `--apply` branch at 333-340). `writeFile` truncates-then-writes — it is not atomic. If the process is interrupted between truncate and full write (signal, disk-full, operator Ctrl-C mid-hook), the canonical `audit-log.md` is left truncated or empty. This file is precious historical record under the project's own rule ("Content-management databases preserve, they don't delete… deleting from a database wipes them from history"), and the lift's entire contract (Step 5: "preserve all pre-existing entries verbatim") depends on the write succeeding atomically. The fix is the standard write-temp-then-`rename` pattern (rename is atomic on POSIX), so a crash leaves either the old file or the new file, never a truncated one. The same concern applies to `promote-findings --auto`'s workplan write, but the audit-log is the higher-stakes append-only ledger.
+
+### AUDIT-20260530-05 — The `--auto` multi-finding insertion path (the feature's primary case) is untested; all `--auto` tests use a single finding
+
+Finding-ID: AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model)
+Status:     fixed-3ba712dea1a110718764eb3c4597dc3b47945419
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/promote-findings.ts` (auto-apply branch, items mapped with shared `insertAfterLine`), `__tests__/.../subcommand.test.ts:551-771`
+
+In the auto-apply branch every proposal item is given the **same** `fields.insertAfterLine = position.insertAfterLine` (all findings anchor to one line); ordering and task-number coherence then depend entirely on how `applyProposal` sequences multiple inserts at an identical anchor — code not shown in this diff and therefore unverified. The barrage's whole reason to exist is surfacing **multiple** findings per run (Phase 12 cited "4 cross-model HIGH + 7 single-model"), so multi-finding auto-scope is the primary path. Yet every `--auto` test in subcommand.test.ts exercises exactly one open finding (`AUDIT-20260529-77`): the "writes a workplan insert" test asserts a single `Task 15.2`, and the idempotency test re-runs with one finding. There is no test that two findings at the same anchor produce two correctly-ordered, non-colliding task blocks whose physical order matches their `15.1 / 15.2` numbering, nor that the workplan-aware gate then sees both at positions [0..1]. Per the project's TDD discipline and the audit-log's own "passing the spec test suite ≠ correct implementation" lesson, the load-bearing path needs a ≥2-finding fixture before this is callable from an unconditional loop hook.
+
+### AUDIT-20260530-06 — Feature-root resolution is non-deterministic when a slug exists under multiple version dirs
+
+Finding-ID: AUDIT-20260530-06
+Status:     fixed-b67627bef41c1004d92af60c8abe8c81d8d22905
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:120-141` (`findFeatureRoot`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:289-305` (`resolveFeatureRoot`)
+
+Both walkers iterate `await readdir(docsRoot)` and return the **first** `docs/<version>/001-IN-PROGRESS/<slug>` match. `readdir` returns entries in arbitrary (filesystem) order, not sorted. If the same slug exists under two version directories (e.g. a feature carried across `docs/1.0/` and `docs/0.19.0/`, which AUDIT-20260529-17 shows is a real layout in this repo), the gate and the lift can each pick a *different* directory, and either can change which one it picks between runs. The gate would then read one feature's audit-log while the lift writes the other's — a split-brain that silently corrupts the closure loop. The walk should sort `topEntries` deterministically (and ideally error if a slug is ambiguous across versions) rather than depend on readdir order. Low because the multi-version-same-slug case is uncommon, but the failure is silent and cross-verb when it happens.
+
+### AUDIT-20260530-07 — Auto-promoted fix tasks are invisible to the new gate
+
+Finding-ID: AUDIT-20260530-07
+Status:     fixed-e0b20c1267029aad2654b20e2b650b12cf1d1e5c
+Severity:   blocking
+Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:204-222, plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:41-46
+
+`findUncheckedTasksInOrder` only recognizes task headings shaped like `### Task 15.2:` because `TASK_HEADING_RE` requires the colon immediately after the numeric task id. The canonical renderer used by `promote-findings --auto` emits `### Task 15.2 (fix-finding-AUDIT-...): ...`, with the fix marker before the colon. That means the hook can insert fix tasks successfully, but `check-open-findings` will not see those tasks as unchecked workplan tasks, so the sanity gate in the hook still refuses.
+
+The tests miss this because their fixtures use `### Task 99.1: Fix ... (fix-finding-...)`, not the renderer’s real heading shape. Update the task-heading parser to accept the canonical rendered heading, and add an integration test that runs `promote-findings --auto` then `check-open-findings` against the resulting workplan.
+
+## 2026-05-30 — audit-barrage lift (20260530T180223318Z-scope-discovery)
+
+### AUDIT-20260530-08 — Lexicographic version-dir sort fixes split-brain but picks the semantically-wrong (older) version and still never errors on ambiguity
+
+Finding-ID: AUDIT-20260530-08
+Status:     fixed-6bc39e57574baca67d517b967e4dc45e6c2e33d1
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120`, `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180`
+
+The AUDIT-20260530-06 fix replaces `await readdir(docsRoot)` with `[...(await readdir(docsRoot))].sort()` in both walkers and picks the first match. This *does* eliminate the cross-verb split-brain (gate and lift now agree, since both apply identical default lexicographic sort), so that half of the finding is genuinely closed. But two problems remain unaddressed by this fix:
+
+1. **The pick is semantically arbitrary and usually wrong.** Default `.sort()` is lexicographic, not semver. With the repo's own real layout (`docs/1.0/`, `docs/0.19.0/`, `docs/0.16.0/` — all cited verbatim in AUDIT-20260529-17), a slug present under both `1.0` and `0.19.0` resolves to `0.19.0` because `'0' < '1'` — i.e. the walker deterministically prefers the *older/archived* version over the active one. Worse, lexicographic ordering breaks within a major: `'0.10.0' < '0.9.0'` (since `'1' < '9'`), so the chosen dir doesn't even track string-version intuition. The closure loop would then read/write the wrong feature's audit-log + workplan — silently.
+
+2. **The original finding explicitly recommended erroring on ambiguity** ("ideally error if a slug is ambiguous across versions"); the fix chose silent-deterministic-pick instead. Determinism without a loud signal means a genuinely-ambiguous slug is resolved by an arbitrary rule the operator never sees. A reasonable fix: when `readdir` yields ≥2 version dirs containing the same slug, throw (or warn loudly and prefer the lexicographically-*greatest* `001-IN-PROGRESS` match, which at least biases toward `1.0` over `0.x`). The frequency is low (multi-version same-slug is uncommon), but the failure is silent and cross-verb when it lands — exactly the shape the finding named.
+
+### AUDIT-20260530-09 — `feature-root-determinism.test.ts` "resolve to the SAME version dir" test asserts nothing meaningful — it does not test the split-brain it's named for
+
+Finding-ID: AUDIT-20260530-09
+Status:     fixed-6bc39e57574baca67d517b967e4dc45e6c2e33d1
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` (the `'audit-barrage-lift + workplan-aware-gate resolve to the SAME version dir'` case)
+
+This test claims to verify the AUDIT-06 split-brain contract (lift and gate pick the same dir), but its own inline comments concede it can't: *"If the gate picked a DIFFERENT version than the lift, we wouldn't have a way to detect that here — so let me just assert determinism (both calls return the same gate result)."* The actual assertions are `expect(liftExit).toBe(0)`, `expect(gateResult.allowed).toBe(true)` (both versions' audit-logs are empty, so this is trivially true regardless of which dir either verb chose), and `expect(liftStderr).toBeDefined()` — which is a tautology, since a captured-string accumulator is always defined. None of these would fail if the lift wrote `0.x` while the gate read `1.0`. Per the project's own testing rule ("tests that don't test the contract they claim to test"), this is a misleading test: its name and docblock assert split-brain coverage that the body does not provide.
+
+The split-brain contract IS partially covered by the third test (lex-first pick → `0.x`'s open finding makes the gate refuse), so the regression isn't entirely untested — but this middle test should either be made to actually compare the two verbs' chosen paths (e.g. have the lift `--apply` write a distinguishable marker into whichever audit-log it picked, then assert the gate reads that same marker) or be deleted, because as written it provides false confidence.
+
+### AUDIT-20260530-10 — `atomicWriteFile` wraps `writeFile` in a no-op try/catch and its "rename fails" test actually exercises the write-fail path
+
+Finding-ID: AUDIT-20260530-10
+Status:     fixed-c6b74da704604a268038b261a1bdd3abb5e04c29
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/atomic-write-file.ts:36-41`, `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (the `'cleans up the temp file if the rename itself somehow fails'` case)
+
+Two hygiene issues in the otherwise-correct AUDIT-04 atomic-write helper:
+
+1. The `try { await writeFile(tmpPath, content, 'utf8'); } catch (writeErr) { throw writeErr; }` block catches and immediately re-throws with no added behavior — it's a no-op try/catch that obscures the real control flow (the meaningful cleanup is only in the *rename* catch). Drop the write-side try/catch; let the write error propagate directly. The comment above it is the only thing the block contributes, and a comment doesn't need a try/catch to exist.
+
+2. The test named `'cleans up the temp file if the rename itself somehow fails'` does not test a rename failure at all — it targets `does-not-exist/subdir/file.md`, so the *write* throws before any rename is attempted (the test's own comment admits this: "the temp file write throws BEFORE the rename"). The rename-failure cleanup path (`unlink(tmpPath).catch(...)` at lines 47-50) is therefore never exercised by any test, despite being the one branch where the cleanup logic actually matters. The named contract — temp-file cleanup after a *rename* failure — is unverified. Either rename the test to match what it checks, or inject a failing `rename` seam to cover the real branch.
+
+### AUDIT-20260530-11 — `normalizeSeverity('')` now maps empty/missing severity to `high`, conflating a parse artifact with an unknown-but-real severity
+
+Finding-ID: AUDIT-20260530-11
+Status:     fixed-13b87d9c12c9660ba87dc847aeae849046667f5d
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:90-101`
+
+The AUDIT-01 fix correctly raises the unknown-severity fallback from `informational` to `high` ("fail toward attention"), which is the right call for a real-but-non-canonical token like `critical`. But the same fallback — and the new test pinning it (`expect(normalizeSeverity('')).toBe('high')`) — also routes an **empty** severity to `high`. An empty severity field is qualitatively different from `critical`: it's most often a *parse artifact* (the model emitted a malformed finding where the `Severity:` line was absent or unparseable), not a model judgment of high impact. Because merged clusters take max-of-cluster rank, a single malformed empty-severity finding can now inflate an entire cross-model cluster to `high` and jump the triage queue ahead of findings the models actually rated. 
+
+This is defensible as the operator-chosen "fail toward attention" stance, so it's informational-bordering-low rather than a bug — but worth surfacing: consider distinguishing "non-canonical token" (→ `high`, the AUDIT-01 case) from "absent/empty severity" (→ a flagged `needs-severity` marker, or `medium`) so a parser miss doesn't masquerade as a model-asserted high. The graceful-skip path (Task 2 Step 4) already exists for fully-malformed `<model>.md` files; an empty severity inside an otherwise-parseable finding falls through that net and lands at `high` instead.
+
+---
+
+I walked the seven fix commits (severity fallback, Phase/Milestone/Sprint heading vocabulary, flat-vs-hierarchical numbering, atomic write, lex-sort determinism, canonical-ID matching across the gate/renderer/editor/apply-flips quartet, and the permissive task-heading regexes). The canonical-ID matching changes (workplan-aware-gate.ts, workplan-task-renderer.ts, workplan-editor.ts, apply-audit-flips.ts, audit-log-editor.ts) are internally consistent — all five sites now key on `\bAUDIT-\d{8}-\d+`, and the renderer strips the cross-model annotation from the marker while preserving it in the `Closes` line and the audit-log Finding-ID, so the round-trip holds. The auto-position convention detection is correct for the clean flat and hierarchical cases. My four findings are: the lex-sort version pick is deterministic-but-semantically-wrong and still silent on ambiguity (medium), one determinism test is vacuous (medium), and two hygiene issues in the atomic-write helper + an empty-severity conflation (low). No `blocking` findings — the canonical-ID unification genuinely closes the AUDIT-07 gate-blindness regression.
+
+### AUDIT-20260530-12 — Auto-position still cannot see renderer-shaped fix-task headings
+
+Finding-ID: AUDIT-20260530-12
+Status:     fixed-1f6612a2579795b84021d450dbf4ee00e7a12bbb
+Severity:   high
+Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:44,170-216; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:60-61
+
+`workplan-task-renderer` now emits fix tasks as `### Task N.M (fix-finding-AUDIT-...): title`, but `auto-position.ts` still uses `TASK_HEADING_RE = /^###\s+Task\s+(\d+)(?:\.(\d+))?\s*:/i`, which only matches when the colon comes immediately after the task number. The same parser feeds both first-unchecked detection and current task-number calculation at lines 170-216, so already auto-promoted fix tasks disappear from `computeAutoPosition`.
+
+This is the same shape that was fixed for the gate in `tdd-enforcement.ts`, but the auto-position copy was left behind. On a repeated `promote-findings --auto` run, or any run against a workplan that already contains renderer-shaped fix tasks, the helper can insert at the wrong anchor and reuse stale task numbers because it ignores those existing tasks. The fix is to align `auto-position.ts` task-heading parsing with the renderer-output shape and add a regression where `computeAutoPosition` runs after a rendered fix task already exists.
+
+### AUDIT-20260530-13 — Cross-model workplan idempotency canonicalizes only the existing marker side
+
+Finding-ID: AUDIT-20260530-13
+Status:     fixed-42e93f47fd2335a00f0bc47d6d32cb50d9517e35
+Severity:   high
+Surface:    plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-editor.ts:120-149; plugins/dw-lifecycle/src/scope-discovery/promote-findings/apply.ts:150-155; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:57-63
+
+`findingsAlreadyInserted` now stores canonical marker IDs like `AUDIT-20260530-01`, but the idempotency filter compares those values directly against `ins.findingId` at line 148. `apply.ts` passes `item.finding.findingId` into the insertion unchanged, and cross-model findings carry the full annotated value, e.g. `AUDIT-20260530-01 (claude-01 + codex-03; cross-model)`. Meanwhile, the renderer deliberately writes only the canonical marker in the heading.
+
+That means the recovery path for a cross-model partial apply is still not idempotent: the workplan may already contain `(fix-finding-AUDIT-20260530-01)`, but a re-run with insertion ID `AUDIT-20260530-01 (claude-...; cross-model)` does not match the set and inserts a duplicate task. Canonicalize `ins.findingId` before the `alreadyInserted.has(...)` check and in the tie-breaker map key.
+
+### AUDIT-20260530-14 — Fixed audit tasks remain unchecked in the workplan
+
+Finding-ID: AUDIT-20260530-14
+Status:     fixed-49808af899510688b6485077ba9319eed61b9876
+Severity:   medium
+Surface:    docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:167-271; docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:713-768
+
+The diff flips AUDIT-20260530-01 through AUDIT-20260530-07 to `fixed-<sha>` in the audit log, but every corresponding workplan task still has an unchecked acceptance criterion saying the audit-log status must be flipped. Examples are lines 167-169, 184-186, 201-203, and the same pattern continues through line 271.
+
+Because `findUncheckedTasksInOrder` treats any task block with a `- [ ]` checkbox as unchecked, these completed fix tasks still look unfinished to workplan consumers even though the audit log says they are fixed. That can make next-task pickup or live verification operate on stale fix tasks before the real remaining work. Mark those acceptance criteria checked wherever the audit-log status was flipped, or keep the audit-log status open until the workplan task is actually complete.
+
+## 2026-05-30 — audit-barrage lift (20260530T183745619Z-scope-discovery)
+
+### AUDIT-20260530-15 — Duplicated feature-root resolution across gate and lift is the structural root of the split-brain class — the diff patches both copies in lockstep instead of extracting one
+
+Finding-ID: AUDIT-20260530-15 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)
+Status:     fixed-e27370c03edc8c0dc4d26b6234fff553953449cf
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120` (`findFeatureRoot`) and `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180` (`resolveFeatureRoot`)
+
+The version-dir resolution logic exists as **two independent copies**. This diff changes both from `[...(await readdir(docsRoot))].sort()` to `[...(await readdir(docsRoot))].sort().reverse()` — byte-for-byte identical edits in two files, with identical comments. That is precisely the failure shape AUDIT-06 (split-brain) and AUDIT-08 (wrong-version pick) keep re-surfacing: the gate and the lift must agree on which `docs/<version>/.../<slug>` they resolve, and the only thing keeping them in agreement is a developer remembering to mirror every change across both functions.
+
+The split-brain *class* of bug isn't closed by making the two copies currently identical — it's closed by making them the same function. The next maintainer who improves one walker (e.g. lands the semver-aware sort the comment promises) and forgets the other re-introduces exactly the cross-verb divergence AUDIT-06 named. The fix is to extract a single `resolveFeatureRoot(docsRoot, slug)` helper (returning the chosen dir + the list of candidate versions for the ambiguity check) and have both the gate and the lift call it. As long as the logic is duplicated, every future audit of this surface has to re-verify that both copies are in sync — a recurring tax the abstraction would eliminate.
+
+### AUDIT-20260530-16 — Phase 15 workplan now mixes flat (`Task 6-12`) and hierarchical (`Task 5.2-5.7`) fix-task numbering, with the flat fix-tasks ordered physically before `Task 4` — the AUDIT-03 incoherence persists in shipped docs
+
+Finding-ID: AUDIT-20260530-16
+Status:     fixed-a4aa5db3491e41700b6117c7584c743ac0375709
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:151-271`
+
+In the workplan hunk, the round-2 fix-tasks for AUDIT-08…14 are numbered **flat** (`### Task 6` … `### Task 12`) and appear *physically above* `### Task 4: Skill-prose convention template` and the round-1 fix-tasks, which use **hierarchical** numbering (`### Task 5.2` … `### Task 5.7`). The resulting file order is `Task 6,7,8,9,10,11,12, 4, 5.2,5.3,5.4,5.5,5.6,5.7, 5` — non-monotonic and using two numbering conventions in the same `## Phase 15`. This is the exact symptom AUDIT-03 ("flat vs hierarchical numbering incoherence") named, and AUDIT-12 explicitly traced it to "round-2's auto-promote landing at the same Phase 5 anchor as round 1."
+
+This diff only flips the checkboxes inside those task blocks (`[ ]→[x]`); it leaves the incoherent ordering and the mixed-convention numbering in place, so the broken workplan ships. The workplan-aware gate keys on *position order* rather than the printed numbers, so the gate itself still functions — the harm is operator legibility and the credibility of the "next N tasks" framing the whole phase rests on (a human reading `Task 12` before `Task 4` cannot trust the numbering to reflect work order). The convention-detection fix (AUDIT-03/AUDIT-12) evidently does not repair a workplan that *already* contains a mixed-convention region; either the existing fix-tasks should be renumbered into one monotonic scheme, or the auto-positioner should refuse to interleave a second numbering convention into a phase that already established one.
+
+### AUDIT-20260530-17 — Workplan closure ticking is best-effort after the audit-log write, so AUDIT-14 can recur on any workplan write failure
+
+Finding-ID: AUDIT-20260530-17
+Status:     fixed-7f6b08496130d30dbec29ff9419afb078f88fbc2
+Severity:   medium
+Surface:    plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:403-463
+
+`runApplyAuditFlips` writes the audit-log status first, then separately tries to tick the matching workplan checkbox. If the workplan read/write fails, lines 456-463 only emit a warning and still return success, leaving the audit-log at `fixed-<sha>` while the workplan task remains unchecked.
+
+That is the exact stale-state shape AUDIT-20260530-14 was fixing: `findUncheckedTasksInOrder` will continue to treat the completed fix task as unfinished. Since this command now owns both sides of the state transition, the workplan-side update should either be part of the required apply operation with a non-zero exit on failure, or the command should avoid flipping the audit-log when it cannot also update the corresponding workplan closure criterion.
+
+## 2026-05-31 — audit-barrage lift (20260531T040245407Z-scope-discovery)
+
+### AUDIT-20260531-01 — AUDIT-17 fix surfaces the split-state but its instructed recovery path is untested and may be unreachable
+
+Finding-ID: AUDIT-20260531-01
+Status:     fixed-bf0a5de3e82a1d17d65797e22b1533497d6081e3
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:454-471`
+
+The fix changes the workplan-write catch from "warn + continue" to "stderr + `return 1`", but it does **not** change the write ordering: the audit-log is still written *before* the workplan tick is attempted (the new error text concedes this — "The audit-log was already written; state is split"). So on a workplan-write failure the on-disk inconsistency AUDIT-14/AUDIT-17 named still physically exists; only the exit code changed. Worse, because this happens inside the per-finding loop, an early failure aborts the loop with *some* findings' audit-log entries flipped to `fixed-<sha>` and their workplan ticks never applied, and there is no rollback of the already-written audit-log.
+
+The error message instructs the operator to "re-run apply-audit-flips to confirm the catchup is idempotent" — but whether a re-run actually re-applies the missing workplan ticks depends on unshown logic: does the command re-process an entry whose audit-log status is *already* `fixed-<sha>`, or does it skip it? If already-fixed entries are short-circuited (a common idempotency shape), the workplan checkbox is lost permanently and exit-1 just becomes a recurring failure with no path to green. AUDIT-17 explicitly offered two cures — hard-fail *or* "avoid flipping the audit-log when it cannot also update the workplan." The implementation took the first half (hard-fail) without the transactional ordering that would make the recovery deterministic. A fix should either write the workplan first (so an audit-log flip never lands without its tick) or add a test that drives failure → re-run → confirms the workplan tick lands on the second pass.
+
+### AUDIT-20260531-02 — The new AUDIT-17 test asserts only the immediate error, not the split-state or the recovery contract it claims to handle
+
+Finding-ID: AUDIT-20260531-02
+Status:     fixed-bf0a5de3e82a1d17d65797e22b1533497d6081e3
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:331-388`
+
+The test named `'returns NON-ZERO exit when the workplan-side write fails (AUDIT-20260530-17)'` asserts exactly two things: `expect(exit).not.toBe(0)` and `expect(stderr.text()).toMatch(/workplan|synthetic/i)`. It never asserts the contract the fix's own error message promises. Specifically it does not verify (a) that the audit-log *was* in fact written before the failure (the "split state" the message tells the operator about — if it wasn't written, the message is misleading), nor (b) that a subsequent re-run actually completes the workplan tick (the recovery the message instructs). Per the project's testing rule — "tests that don't test the contract they claim to test" — this test pins the surface symptom (exit code) while leaving the load-bearing behavior (split-state + idempotent catchup) unverified.
+
+This is the same shape as prior findings on this feature (AUDIT-09's vacuous determinism test, AUDIT-05's single-finding-only coverage): the test exercises the easy assertion and skips the one that would catch a real regression. A failure-then-re-run integration test against the resulting workplan would close both this gap and the recovery-path uncertainty in claude-01.
+
+### AUDIT-20260531-03 — AUDIT-16 marked `fixed` while the physical task order it named remains non-monotonic, and the residual is deferred with a "follow-up if needed" IOU
+
+Finding-ID: AUDIT-20260531-03 (claude-03 + codex-01 + codex-02; cross-model)
+Status:     fixed-64d278abde25ed8a3d03e4ace4fa01113e1697dd
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.9 block, the renumbered `Task 5.11..5.17` headings, and the new "Out of scope (deferred)" line)
+
+AUDIT-16 gave two acceptable cures: renumber the fix-tasks into "one monotonic scheme," **or** make the auto-positioner refuse to interleave conventions. The diff did the renumber (`Task 6..12` → `Task 5.11..5.17`) so the numbering is now uniformly hierarchical — but the *file order* it produced is `5.11, 5.12, … 5.17, 4, 5.2, … 5.7, 5`, which is numerically jumbled: `5.11` now physically precedes `5.2`. That is not "monotonic"; arguably it reads worse than the pre-fix `Task 6` (at least `6 > 5` was locally increasing). AUDIT-16's core complaint — "a human reading `Task 12` before `Task 4` cannot trust the numbering to reflect work order" — is only half-resolved: a human now reads `5.11` before `5.2`.
+
+The Task 5.9 block self-documents this gap (`Step 4: physical reorder NOT done`) and closes it with **"physical reorder is a follow-up if needed"** — a deferral phrase the project's "Just for now is bullshit" rule forbids unless paired with a GitHub issue, which isn't present. So AUDIT-16 is flipped to `fixed-a4aa5db` in the audit-log while the workplan simultaneously admits the named defect persists and is deferred without a tracking issue. Either complete the monotonic reorder, or file the follow-up as a GH issue and back-link it (per the rule), rather than leaving the deferral in the workplan prose with the audit-log claiming closure.
+
+### AUDIT-20260531-04 — The extracted feature-root helper still ships the documented semver-incorrect sort behind a deferral comment, and no test exercises a lex-vs-semver divergence
+
+Finding-ID: AUDIT-20260531-04
+Status:     fixed-01a0a550246f3769ab782768bc9ce7aa1c025d5e
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:18-22` (docblock) and `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `'multi-version'` and `'determinism'` cases)
+
+The consolidation is correct in shape, but it carries forward the lex-descending sort with the comment "Not semver-correct (`0.10.0` < `0.9.0` in lex order), but a workable default until semver-aware sort lands." `until … lands` is a deferral phrase with no tracking issue. More concretely, the two version-selection tests only pin cases where lexicographic order and semver order *agree*: `['0.x','1.0','0.19.0'] → 1.0` and `['0.x','1.0','2.0','0.5.0'] → 2.0`. Neither test constructs the divergence case the docblock itself names — e.g. `['0.9.0','0.10.0']`, where lex-descending picks `0.9.0` and semver wants `0.10.0`. So the one piece of behavior the helper documents as *wrong* is the one piece no test exercises; a future "semver-aware sort" change would flip that selection with zero test coverage telling anyone the behavior changed (or pinning the current wrong-but-deterministic result). Add a divergence-case test that pins today's behavior explicitly, so the documented incorrectness is at least falsifiable.
+
+### AUDIT-20260531-05 — Feature-root extraction stops one level short of DRY — both callers still independently construct `docsRoot = join(x, 'docs')`
+
+Finding-ID: AUDIT-20260531-05
+Status:     fixed-01a0a550246f3769ab782768bc9ce7aa1c025d5e
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:53-55` (helper takes `docsRoot`), `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` (`const docsRoot = join(args.repoRoot, 'docs')`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:181-183` (`const docsRoot = join(rootDir, 'docs')`)
+
+AUDIT-15's framing was "close the *class* of bug, not the instance — divergence is impossible if the logic only lives in one place." The shared helper accepts `docsRoot` rather than `repoRoot`, which means each of the two callers still independently appends the literal `'docs'` path segment. That is a small residual of the exact split-brain shape the extraction set out to eliminate: if the docs-directory location ever becomes configurable (or the segment is renamed), both call sites must change in lockstep again — the same lockstep-edit tax AUDIT-06/08/12/15 kept paying. Having the helper take `repoRoot` (or a `{repoRoot}` arg) and own the `join(repoRoot, 'docs')` itself would put the *entire* resolution path — including the docs segment — in one place. Low severity because the segment is currently a stable literal, but it's worth noting that the consolidation centralized the walk while leaving its root-construction duplicated.
+
+## 2026-05-31 — audit-barrage lift (20260531T041440932Z-scope-discovery)
+
+### AUDIT-20260531-06 — AUDIT-BARRAGE-claude-01 — The AUDIT-04 "fix" reworded but KEPT the forbidden deferral phrase "until a semver-aware sort lands" with no tracking issue
+
+Finding-ID: AUDIT-20260531-06 (claude-01 + claude-02 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-6763491c4452b94802b9244dc30d9849624e126c
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:23-30` (the rewritten docblock)
+
+AUDIT-20260531-04's literal complaint was: *"it carries forward the lex-descending sort with the comment 'a workable default **until semver-aware sort lands**' — `until … lands` is a deferral phrase with no tracking issue."* The fix (commit `01a0a55`, now marked `fixed-01a0a55`) rewrote the docblock but the replacement text reads: *"This is documented intentional behavior **until a semver-aware sort lands**; the regression test … pins the current contract."* The exact deferral phrase AUDIT-04 named survives the fix verbatim, and there is still no GitHub issue referenced for the deferred semver-aware sort.
+
+Per this audit's own hard constraint ("If you spot a deferral phrase IN the diff, surface it as a finding") and the project's "Just for now is bullshit" rule (a deferral phrase is only permitted when paired with a tracking issue number it *references*), this docblock is non-compliant. The finding was flipped to `fixed-<sha>` while the precise defect it named still ships. The correct fix is either (a) drop "until a semver-aware sort lands" and state the lex-sort as a flat permanent decision, or (b) file a GitHub issue for semver-aware sorting and cite its number in the docblock.
+
+### AUDIT-20260531-07 — AUDIT-BARRAGE-claude-03 — The AUDIT-01 "recovery" test pre-flips the workplan checkbox manually, masking whether the tool itself auto-recovers the missed tick — it asserts idempotency, not recovery
+
+Finding-ID: AUDIT-20260531-07
+Status:     fixed-6763491c4452b94802b9244dc30d9849624e126c
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:397-490` (the `'recovers from a workplan write failure on re-run'` case)
+
+AUDIT-01 asked for a test that "drives failure → re-run → **confirms the workplan tick lands on the second pass**." The AUDIT-14 fix established that `tickClosureCriteria` "runs unconditionally on every --apply (including for already-dispositioned entries) so prior runs' missed flips catch up." That means a plain re-run with a working writer — *without any manual intervention* — should itself flip the missed `- [ ]` to `- [x]`. That is the load-bearing recovery contract and the most valuable thing to verify.
+
+Instead, the test performs `writeFileSync(workplanPath, wpManual, ...)` to manually flip the checkbox *before* the second run, then asserts the second run is a no-op (`toContain('- [x] Audit-log Status flipped to')`). Because the checkbox is already `[x]` when the tool re-runs, the test cannot distinguish "the tool recovered the tick" from "the operator recovered the tick and the tool did nothing." The one branch AUDIT-01 flagged as possibly unreachable (does the tool re-process an already-`fixed-<sha>` entry and flip the box?) is exactly the branch the manual pre-flip hides. This is the same vacuous-assertion shape as AUDIT-09's determinism test and AUDIT-02's own complaint. Fix: in the second run, do NOT pre-flip; assert the tool flips the still-`[ ]` checkbox to `[x]` on plain re-run.
+
+## 2026-05-31 — audit-barrage lift (20260531T042521095Z-scope-discovery)
+
+### AUDIT-20260531-08 — The AUDIT-06 deferral-phrase purge is incomplete — the equivalent phrase survives in the companion test file the fix's own docblock cross-references
+
+Finding-ID: AUDIT-20260531-08
+Status:     fixed-bb419606f90d1e481b074323328e8e90b63f217c
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:108-117` (untouched by the diff); cross-referenced from `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:25-27`
+
+AUDIT-06 was flipped to `fixed-6763491` for removing "until a semver-aware sort lands" from `feature-root.ts`. The commit message records the strictest cross-model agreement on this feature (claude×5 + codex×3) flagging that *rewording* a deferral phrase isn't a fix. The diff's new docblock (`feature-root.ts:23-30`) is clean — and it explicitly points the reader at the regression test `feature-root.test.ts > 'picks lex-greatest…'`. But that very test file, at lines 113-116, still reads: *"If a **future semver-aware sort lands**, this test must be updated in lockstep — the test's existence makes the divergence auditable rather than buried behind a deferral comment."*
+
+This is materially the same deferral shape AUDIT-06 named (references the same hypothetical future semver-aware sort, with no tracking issue), one file over, in the artifact the fix cross-references. The purge was scoped to the `.ts` file and left its twin in the `.test.ts` file — the exact "patched one copy, left the other" pattern AUDIT-15 named for this feature. Under the strict canon the 8-voice round closed AUDIT-06 by, the finding is marked fixed while an equivalent phrase ships. Fix: either drop the "if a future semver-aware sort lands" clause from the test docblock (state the lex-greatest contract flatly), or, if the deferral is legitimate, file a GitHub issue for semver-aware sorting and cite its number in both docblocks.
+
+---
+
+### AUDIT-20260531-09 — Doc-prose closure of Task 5.23 will trip the `fix-task-tdd-discipline` doctor rule — its bare `feature-root.test.ts` token resolves to a nonexistent repo-root file
+
+Finding-ID: AUDIT-20260531-09
+Status:     fixed-bb419606f90d1e481b074323328e8e90b63f217c
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 block) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`
+
+Task 5.23 is marked `[x]` with Step 1 = *"this is a doc-prose finding (no code-side test)."* But its acceptance-criteria line embeds a bare token: *"Regression test `feature-root.test.ts > picks lex-greatest…`"*. `findCompletedFixFindingTasks` matches this task (its heading carries `fix-finding-AUDIT-20260531-06`), and `extractTestFilePath` scans the whole block. I ran the actual extraction against the live workplan:
+
+```
+backtick match: null   (the backticked group ends with " > picks…", not at the .test.ts boundary)
+plain match:    feature-root.test.ts
+resolve@repoRoot exists? false -> <repoRoot>/feature-root.test.ts
+```
+
+So `verifyFixTaskTDD` returns `missing-test-file`, and the `fix-task-tdd-discipline` doctor rule (which "walks every `[x]`-checked fix-finding task and flags violations") will report this completed task as a violation. Worse: if the `check-fix-task-tdd` commit-msg gate were enforced on this branch, the `Closes AUDIT-20260531-06` commit could not have landed (same `missing-test-file` extraction) — so either the gate was bypassed/unwired, or it's silently inconsistent with the doctor rule. The root cause is a design gap: the TDD-enforcement grammar has no sentinel for a *legitimately testless* doc-prose finding. Contrast Task 5.24, which cites a full resolvable path (`plugins/…/apply-audit-flips-cli.test.ts`) and passes. Fix: give doc-prose findings a recognized "no-code-test" shape the enforcement primitive treats as valid, OR avoid embedding any bare `*.test.ts` token in a testless task's body (the doctor rule will keep latching onto it).
+
+---
+
+### AUDIT-20260531-10 — AUDIT-06's fix has no automated regression guard — the cited "regression test" exercises sort behavior, not phrase presence
+
+Finding-ID: AUDIT-20260531-10
+Status:     fixed-bb419606f90d1e481b074323328e8e90b63f217c
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 acceptance criteria) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:118-130`
+
+Task 5.23's acceptance criterion claims the contract is pinned by *"Regression test `feature-root.test.ts > picks lex-greatest, NOT semver-greatest` still pins the contract."* But that test asserts only the *sort outcome* (`['0.9.0','0.10.0'] → 0.9.0`) — which the AUDIT-06 fix did not touch. Nothing in the suite asserts the *absence of a forbidden deferral phrase* in the docblock. If someone re-adds "until X lands" / "for now" to `feature-root.ts`, no test fails; the sort test stays green. The acceptance criterion "No forbidden-deferral phrase in `feature-root.ts`" is a manual claim, not a check.
+
+This is the same vacuous-coverage shape prior rounds named (AUDIT-09's vacuous determinism test, AUDIT-02's surface-symptom-only assertion) and is the structural reason the twin phrase in claude-01 went unnoticed: there is no scanner over committed source for the project's forbidden-deferral canon (the dispatch-wrapper only screens live *agent output*, not files on disk). A reasonable fix is a small doctor rule / unit test that greps the scope-discovery source tree for the banned-phrase canon and fails on a hit — which would close claude-01 and claude-03 together and make "No forbidden-deferral phrase" falsifiable rather than asserted.
+
+## 2026-05-31 — audit-barrage lift (20260531T043555454Z-scope-discovery)
+
+### AUDIT-20260531-11 — Fix-tasks 5.25 and 5.26 reintroduce the exact bare-`*.test.ts` token that AUDIT-09 was closing — they will re-trip the `fix-task-tdd-discipline` doctor rule
+
+Finding-ID: AUDIT-20260531-11
+Status:     fixed-9e50b27c00c949dcd14fbb660ad7f87679017b18
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.25 acceptance criteria + Task 5.26 acceptance criteria, added in this diff) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`
+
+This diff closes AUDIT-20260531-09 (bare `feature-root.test.ts` tokens trip the doctor rule because they resolve to a nonexistent repo-root file) — yet the *sibling tasks added in the same hunk* re-introduce the defect:
+
+- Task 5.25 (heading `fix-finding-AUDIT-20260531-08`, all `[x]`) carries the acceptance line: ``- [x] No forbidden-deferral phrase in `feature-root.test.ts`.`` The backtick group ends cleanly at `.test.ts`, so per AUDIT-09's own documented extraction behavior the backtick matcher captures the bare basename. Its Surface line's full path is disqualified by the `:108-117` suffix (exactly the null-backtick case AUDIT-09 proved), so the bare token wins → `missing-test-file`.
+- Task 5.26 (heading `fix-finding-AUDIT-20260531-09`, all `[x]`) is self-contradicting: its acceptance criterion ``- [x] No bare `feature-root.test.ts` token in workplan task bodies (all references now use full paths).`` *is itself a bare `feature-root.test.ts` token*. Its only other `.test.ts` reference (Step 3) ends with ` > picks lex-greatest…`, the same boundary-failure shape AUDIT-09 cited for Task 5.23 — so no clean full-path competitor exists, and the bare token in the acceptance line is captured.
+
+Both tasks are `[x]`-checked, so `findCompletedFixFindingTasks` matches them and `extractTestFilePath` scans their blocks. The result is the same `missing-test-file` the doctor rule flags. Contrast Task 5.27, which cites the full resolvable path with no line-suffix and passes. The fix for AUDIT-09 ("use full paths") was applied to Task 5.23 but not propagated to the new tasks created alongside it. Cure: rewrite every `.test.ts` reference in 5.25/5.26 task bodies as a full repo-relative path with no `:line` suffix and no trailing ` > …`, OR give doc-prose/testless findings a recognized sentinel the enforcement primitive treats as valid (the design gap AUDIT-09 already named).
+
+### AUDIT-20260531-12 — The AUDIT-10 regression guard scans a single file, not the source tree — it does not close the class of bug it was built for
+
+Finding-ID: AUDIT-20260531-12
+Status:     acknowledged-slush-pile-2026-05-31
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:159-199` (the new `feature-root source file contains NO forbidden-deferral phrases` test)
+
+AUDIT-10's recommended cure was "a small doctor rule / unit test that greps the scope-discovery **source tree** … which would close claude-01 and claude-03 together." The implemented guard reads exactly one file (`scope-discovery/util/feature-root.ts`) and a hardcoded *subset* of `FORBIDDEN_DEFERRAL_PHRASES`. Two consequences:
+
+1. **It cannot catch the AUDIT-08 twin-file shape.** AUDIT-08's whole point was that the phrase survived in `feature-root.test.ts` (a sibling file). The new guard explicitly excludes test files (and any file other than `feature-root.ts`), so a forbidden phrase creeping back into the test docblock — the precise regression AUDIT-08 documented — remains unguarded. The "patched one copy, left the other" pattern (AUDIT-15) is structurally preserved, not closed.
+2. **The subset drifts from canonical.** The comment concedes it's "a subset of FORBIDDEN_DEFERRAL_PHRASES … if the canonical list grows, this test can be migrated to import it directly." Any phrase in the canonical list but absent from this local copy is silently unguarded, and the two will drift the moment the canonical list changes.
+
+A fix that matched AUDIT-10's framing would walk the `scope-discovery/` tree (excluding the test file holding the data array) and import the canonical phrase set rather than copying a subset.
+
+### AUDIT-20260531-13 — `until.*lands` / `until.*ships` regexes have a multi-line blind spot — a line-wrapped deferral phrase (the exact form AUDIT-08 cited) evades the guard
+
+Finding-ID: AUDIT-20260531-13
+Status:     acknowledged-slush-pile-2026-05-31
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `forbiddenPhrases` array — `'until.*lands'`, `'until.*ships'`)
+
+The phrases are compiled with `new RegExp(phrase, 'i')` — case-insensitive only, no dotall/`s` flag. In a regex, `.` does not match newlines, so `until.*lands` only matches when "until" and "lands" land on the *same physical line*. But the deferral phrase AUDIT-08 named was wrapped across docblock lines (`* future\n * semver-aware sort lands`), and docblock comments line-wrap routinely. So the guard fails exactly where the original regression occurred: a phrase split across two `*`-prefixed comment lines passes the check silently. This is a false-negative blind spot in the very guard meant to make the contract falsifiable. Cure: normalize comment whitespace (strip `*`-prefixes and collapse newlines to spaces) before matching, or use `[\s\S]*?` with bounded distance instead of `.*`, and add the `s` flag.
+
+### AUDIT-20260531-14 — The guard test's own comment is a deferral/IOU shape — "this test can be migrated to import it directly" — inside the enforcer
+
+Finding-ID: AUDIT-20260531-14
+Status:     acknowledged-slush-pile-2026-05-31
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the docblock above the new test: "if the canonical list grows, this test **can be migrated to import it directly**")
+
+The project's "Just for now is bullshit" rule forbids IOU comments that promise future work without a tracking issue. The new test's docblock contains exactly that shape: it documents that the phrase list is a copied subset and that it *can be migrated* to import the canonical list later — with no GitHub issue referenced. It is the same deferral pattern the test enforces against, embedded in the enforcer. Worth noting that the new single-file guard would never catch this (it scans only `feature-root.ts`), so this IOU ships unguarded. Cure: either import the canonical list now, or file an issue and cite its number in the comment.
+
+### AUDIT-20260531-15 — Inconsistent concat-splitting leaves literal forbidden-phrase fragments in the test file, undermining the comment's stated self-trigger defense
+
+Finding-ID: AUDIT-20260531-15
+Status:     acknowledged-slush-pile-2026-05-31
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `forbiddenPhrases` array)
+
+The comment states the phrases are "assembled via concat so the test file's data array doesn't trigger an accidental self-scan if a future change widens the scope to include test files." But the splitting is applied inconsistently: `'for ' + 'now'`, `'will fix ' + 'later'`, `'follow-up if ' + 'needed'`, etc. are split, while `'until.*lands'`, `'until.*ships'`, and `'deferred to v'` are stored as plain literals. So the file now contains the literal fragment `deferred to v` (and the `until…lands/ships` regex literals) verbatim. If the scan is ever widened to test files as the comment anticipates, this file self-trips on the un-split entries — defeating the exact defense the comment claims. The defensive measure should be applied uniformly to every entry, or dropped in favor of importing the canonical list (which would localize the literals to one canonical source). Low severity because nothing scans this file today, but it's a claim that doesn't match the implementation.
+
+---
+
+Summary: the new regression guard is a step in the right direction but is scoped too narrowly to close the class AUDIT-08/09/10 named (claude-02, claude-03), and — most importantly — the diff's own new fix-tasks 5.25/5.26 re-introduce the bare-`*.test.ts` token that re-trips the doctor rule AUDIT-09 was fixing (claude-01, high). I'd treat claude-01 as the blocking-adjacent item: it means the `fixed-<sha>` flips on AUDIT-08/09 ship alongside workplan tasks the project's own doctor rule will flag as violations.

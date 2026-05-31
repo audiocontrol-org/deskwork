@@ -146,14 +146,561 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 - [x] When dispatched task carries a refactor marker, wrapper appends `REFACTOR_PRECONDITIONS_CHECKLIST` prelude — checked in `wrap()` via `isRefactorContextPromptWith`.
 - [x] Marker detection via regex set; configurable per project — built-in defaults: `/refactor/i`, `/extract(?:ion|ing)?/i`, `/clones?\.yaml/i`, `/canonical_side/i`, `/tests_proof/i`; override at `.dw-lifecycle/scope-discovery/refactor-markers.yaml` (replaces built-in list); schema at `plugins/dw-lifecycle/src/scope-discovery/schema/refactor-markers.yaml.schema.json`.
 
+
+### Task 5.1 (fix-finding-AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model)): AUDIT-20260530-01 — Audit-barrage finding extraction silently downgrades unrecog…
+
+Closes AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:130-136`.
+
+- [x] Step 1: failing test added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts:86-100` covering `normalizeSeverity('critical')`, `normalizeSeverity('')`, `normalizeSeverity('???')` asserting `'high'` not `'informational'`.
+- [x] Step 2: confirmed test failed against pre-fix code (red phase).
+- [x] Step 3: fix applied — `normalizeSeverity` fallback changed from `'informational'` to `'high'` ("fail toward attention, not away from it").
+- [x] Step 4: test passes; plugin suite 2400/2400.
+- [x] Step 5: commit with `Closes AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model)` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.2 (fix-finding-AUDIT-20260530-02): AUDIT-20260530-02 — `computeAutoPosition` hard-codes `## Phase` headings; non-Ph…
+
+Closes AUDIT-20260530-02. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:96,97,166-170`.
+
+- [x] Step 1: 3 failing tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` (`## Milestone N`, `## Sprint N`, plus negative case asserting refusal when none of the three sanctioned headings exist).
+- [x] Step 2: confirmed tests fail against pre-fix code (red phase).
+- [x] Step 3: `PHASE_HEADING_RE` + `PHASE_NUMBER_RE` updated to accept `(?:Phase|Milestone|Sprint)` — the three terms PROJECT-MANAGEMENT.md sanctions; AutoPositionError message updated to name all three.
+- [x] Step 4: tests pass; plugin suite 2403/2403.
+- [x] Step 5: commit with `Closes AUDIT-20260530-02` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.3 (fix-finding-AUDIT-20260530-03): AUDIT-20260530-03 — Auto-position task numbering assumes hierarchical `Task <pha…
+
+Closes AUDIT-20260530-03. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:182-191` (`nextTaskNumberFactory`), `auto-position.ts:153-157` (`currentMaxMinorInPhase`).
+
+- [x] Step 1: 3 failing tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` (flat-convention detection + numbering; hierarchical preservation; empty-phase default).
+- [x] Step 2: confirmed tests fail against pre-fix code (red phase).
+- [x] Step 3: `AutoPosition` gains `convention: 'flat' | 'hierarchical'` + `currentMaxNumberInPhase` (renamed from `currentMaxMinorInPhase`); `computeAutoPosition` detects convention by inspecting tasks within the chosen phase; `nextTaskNumberFactory` emits `<N>` for flat, `<phase>.<N>` for hierarchical.
+- [x] Step 4: tests pass; plugin suite 2406/2406.
+- [x] Step 5: commit with `Closes AUDIT-20260530-03` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.4 (fix-finding-AUDIT-20260530-04): AUDIT-20260530-04 — `audit-barrage-lift` writes the canonical audit-log non-atom…
+
+Closes AUDIT-20260530-04. Surface: `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:333-340`.
+
+- [x] Step 1: 5 failing tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (writes content, no leak, overwrite, error-path cleanup, same-dir).
+- [x] Step 2: confirmed tests fail against pre-fix code (helper didn't exist; red phase).
+- [x] Step 3: NEW `atomic-write-file.ts` helper implements the temp-file + atomic-rename pattern; `audit-barrage-lift.ts` default writer swaps from `writeFile(...)` to `atomicWriteFile`. Test injections via `args.write` still bypass when supplied.
+- [x] Step 4: tests pass; plugin suite 2411/2411.
+- [x] Step 5: commit with `Closes AUDIT-20260530-04` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.5 (fix-finding-AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model)): AUDIT-20260530-05 — The `--auto` multi-finding insertion path (the feature's pri…
+
+Closes AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/subcommands/promote-findings.ts` (auto-apply branch, items mapped with shared `insertAfterLine`), `__tests__/.../subcommand.test.ts:551-771`.
+
+- [x] Step 1: 3 multi-finding tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` covering N=3 inserts at one anchor, physical-order=input-order, monotonic 15.2/15.3/15.4 numbering.
+- [x] Step 2: tests pass on first run — the multi-finding path WORKS; the bug the audit caught was specifically the absence of test coverage on this load-bearing path. Adding the tests IS the fix per TDD-as-regression-coverage.
+- [x] Step 3: no source change needed — the missing-tests gap was the finding's actual content.
+- [x] Step 4: plugin suite 2414/2414.
+- [x] Step 5: commit with `Closes AUDIT-20260530-05 (claude-06 + claude-08 + codex-02; cross-model)` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` covering the multi-finding path (Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.6 (fix-finding-AUDIT-20260530-06): AUDIT-20260530-06 — Feature-root resolution is non-deterministic when a slug exi…
+
+Closes AUDIT-20260530-06. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:120-141` (`findFeatureRoot`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:289-305` (`resolveFeatureRoot`).
+
+- [x] Step 1: 3 regression tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` — gate determinism across N invocations; gate + lift resolve to the same dir; lex-first pick assertion.
+- [x] Step 2: tests pin the post-fix contract (deterministic lex-first pick); the bug shape (cross-run drift) is hard to repro deterministically but the contract test is what locks in the fix.
+- [x] Step 3: both `findFeatureRoot` in workplan-aware-gate.ts AND `resolveFeatureRoot` in audit-barrage-lift.ts swap `readdir(docsRoot)` for `[...readdir(...)].sort()` — lexicographic sort guarantees both walkers pick the same version dir across runs + filesystems.
+- [x] Step 4: tests pass; plugin suite 2417/2417.
+- [x] Step 5: commit with `Closes AUDIT-20260530-06` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.7 (fix-finding-AUDIT-20260530-07): AUDIT-20260530-07 — Auto-promoted fix tasks are invisible to the new gate
+
+Closes AUDIT-20260530-07. Surface: plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:204-222, plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:41-46.
+
+- [x] Step 1: 5 failing tests added in `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` (`findUncheckedTasksInOrder` against both clean + nested-paren renderer-output shapes; `findCompletedFixFindingTasks` for the same).
+- [x] Step 2: confirmed all 5 tests fail against current code (red phase).
+- [x] Step 3: fix applied across 4 sites — `TASK_HEADING_RE` + `FIX_FINDING_TAG_RE` in tdd-enforcement.ts; `FIX_FINDING_MARKER_RE` in workplan-editor.ts; `canonicalAuditId` helper in workplan-task-renderer.ts; canonical-id comparison in workplan-aware-gate.ts.
+- [x] Step 4: all 5 tests pass; plugin suite 2400/2400; live gate now exits 0 against the dogfood-produced workplan.
+- [x] Step 5: commit with `Closes AUDIT-20260530-07` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.8 (fix-finding-AUDIT-20260530-08): AUDIT-20260530-08 — Lexicographic version-dir sort fixes split-brain but picks t…
+
+Closes AUDIT-20260530-08. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120`, `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180`.
+
+- [x] Step 1: new test added at `feature-root-determinism.test.ts` asserting `1.0` is picked over `0.x` (lex-greatest). Existing test that asserted `0.x` was flipped to expect `1.0`.
+- [x] Step 2: confirmed test failed against post-AUDIT-06 lex-ascending code (red phase).
+- [x] Step 3: both walkers swap `.sort()` for `.sort().reverse()`. Biases toward the active version.
+- [x] Step 4: tests pass; plugin suite 2417/2417.
+- [x] Step 5: commit `6bc39e5` closes AUDIT-20260530-08 + 09 together.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.9 (fix-finding-AUDIT-20260530-09): AUDIT-20260530-09 — `feature-root-determinism.test.ts` "resolve to the SAME vers…
+
+Closes AUDIT-20260530-09. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` (the `'audit-barrage-lift + workplan-aware-gate resolve to the SAME version dir'` case).
+
+- [x] Step 1: replaced the vacuous test body with a real split-brain check — lift `--apply` writes a distinguishable finding-id; gate reads back and verifies it sees the SAME id.
+- [x] Step 2: confirmed pre-fix the test asserted only tautologies.
+- [x] Step 3: rewrote with exclusive-or check + canonical-ID round-trip assertion.
+- [x] Step 4: tests pass; plugin suite 2417/2417.
+- [x] Step 5: closed as part of `6bc39e5`.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/feature-root-determinism.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.10 (fix-finding-AUDIT-20260530-10): AUDIT-20260530-10 — `atomicWriteFile` wraps `writeFile` in a no-op try/catch and…
+
+Closes AUDIT-20260530-10. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/atomic-write-file.ts:36-41`, `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` (the `'cleans up the temp file if the rename itself somehow fails'` case).
+
+- [x] Step 1: NEW test added that injects a failing rename seam + asserts (a) the original target file is unchanged, (b) the helper rejects with the synthetic rename error, (c) no `.tmp-*` artifact leaks next to the target. This actually covers the rename-cleanup branch.
+- [x] Step 2: confirmed test failed pre-fix (helper accepted no opts, so couldn't inject the seam).
+- [x] Step 3: `atomicWriteFile` gains an optional `opts.rename` seam (defaulting to `fs.promises.rename`); the no-op try/catch around `writeFile` is removed; the existing misnamed test was renamed to `'fails fast when the write step fails'`.
+- [x] Step 4: tests pass; plugin suite 2418/2418.
+- [x] Step 5: commit with `Closes AUDIT-20260530-10` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/atomic-write-file.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.11 (fix-finding-AUDIT-20260530-11): AUDIT-20260530-11 — `normalizeSeverity('')` now maps empty/missing severity to `…
+
+Closes AUDIT-20260530-11. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:90-101`.
+
+- [x] Step 1: new test asserting `normalizeSeverity('')` → `'medium'`, `normalizeSeverity('   ')` → `'medium'`, `'\t'` → `'medium'`. Existing AUDIT-01 test now scoped to non-empty non-canonical tokens (`critical`, `???`, `CRITICAL`).
+- [x] Step 2: confirmed empty-severity test failed pre-fix (was returning `'high'`).
+- [x] Step 3: `normalizeSeverity` branches: empty → `'medium'` (parse-artifact bucket); non-empty non-canonical → `'high'` (model-judgment bucket).
+- [x] Step 4: tests pass; plugin suite 2419/2419.
+- [x] Step 5: commit with `Closes AUDIT-20260530-11` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.12 (fix-finding-AUDIT-20260530-12): AUDIT-20260530-12 — Auto-position still cannot see renderer-shaped fix-task head…
+
+Closes AUDIT-20260530-12. Surface: plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:44,170-216; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:60-61.
+
+- [x] Step 1: 3 new tests in `auto-position.test.ts` covering renderer-shape recognition, cross-model variant, and BEFORE-the-task anchor.
+- [x] Step 2: confirmed tests failed against pre-fix regex (red phase).
+- [x] Step 3: `TASK_HEADING_RE` in `auto-position.ts` updated with `(?:\s*\([^)]*(?:\([^)]*\)[^)]*)*\))?` to absorb the optional one-level-nested parenthetical between number and colon. Twin of the AUDIT-07 fix in tdd-enforcement.ts.
+- [x] Step 4: tests pass; plugin suite 2422/2422.
+- [x] Step 5: commit with `Closes AUDIT-20260530-12` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.13 (fix-finding-AUDIT-20260530-13): AUDIT-20260530-13 — Cross-model workplan idempotency canonicalizes only the exis…
+
+Closes AUDIT-20260530-13. Surface: plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-editor.ts:120-149; plugins/dw-lifecycle/src/scope-discovery/promote-findings/apply.ts:150-155; plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:57-63.
+
+- [x] Step 1: cross-model idempotency test added in `workplan-editor.test.ts` — insert a finding whose proposal-side `findingId` carries the full cross-model annotation; re-insert; assert exactly one marker occurrence + no DUP body.
+- [x] Step 2: confirmed test failed pre-fix (the `.has(ins.findingId)` lookup got the full-form, but the set had canonical-only).
+- [x] Step 3: `insertTaskBlock` canonicalizes `ins.findingId` (via local `canonicalOf` extracting the `AUDIT-YYYYMMDD-NN` prefix) before the `alreadyInserted.has(...)` check.
+- [x] Step 4: tests pass; plugin suite 2423/2423.
+- [x] Step 5: commit with `Closes AUDIT-20260530-13` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-editor.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-editor.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.14 (fix-finding-AUDIT-20260530-14): AUDIT-20260530-14 — Fixed audit tasks remain unchecked in the workplan
+
+Closes AUDIT-20260530-14. Surface: docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:167-271; docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:713-768.
+
+- [x] Step 1: new test in `apply-audit-flips-cli.test.ts` — fixture workplan with two fix-tasks; apply-audit-flips with --apply asserts both closure-criterion checkboxes flip to `- [x]` AND no `- [ ] Audit-log Status flipped to fixed-` lines remain.
+- [x] Step 2: confirmed test failed pre-fix (apply-audit-flips only touched audit-log).
+- [x] Step 3: `apply-audit-flips` gains `tickClosureCriteria` helper that locates each fix-finding task block by canonical AUDIT-ID and flips the `- [ ] Audit-log Status flipped to \`fixed-` line to `- [x]`. Runs unconditionally on every --apply (including for already-dispositioned entries) so prior runs' missed flips catch up.
+- [x] Step 4: tests pass; plugin suite 2424/2424; live catchup flipped 11 closure criteria for AUDIT-20260530-01..13.
+- [x] Step 5: commit with `Closes AUDIT-20260530-14` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.15 (fix-finding-AUDIT-20260530-15): AUDIT-20260530-15 — Duplicated feature-root resolution across gate and lift is t…
+
+Closes AUDIT-20260530-15 (claude-01 + claude-02 + codex-01 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120` (`findFeatureRoot`) and `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180` (`resolveFeatureRoot`).
+
+- [x] Step 1: 6 tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` for the new shared helper — single-version, multi-version lex-greatest pick, no-match, missing-docsRoot, 001-IN-PROGRESS shape check, cross-invocation determinism.
+- [x] Step 2: confirmed tests fail pre-fix (helper didn't exist; red phase).
+- [x] Step 3: NEW `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts` extracts the walker; both `workplan-aware-gate.ts` (`findFeatureRoot` removed) and `audit-barrage-lift.ts` (`resolveFeatureRoot` becomes a thin wrapper) now call the shared helper.
+- [x] Step 4: tests pass; plugin suite 2430/2430 (+6 new). Existing gate + lift behavior preserved verbatim.
+- [x] Step 5: commit with `Closes AUDIT-20260530-15` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.16 (fix-finding-AUDIT-20260530-16): AUDIT-20260530-16 — Phase 15 workplan now mixes flat (`Task 6-12`) and hierarchi…
+
+Closes AUDIT-20260530-16. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:151-271`.
+
+- [x] Step 1: this is a doc-cleanup finding (no code change). No test gates the workplan's task-heading numbering.
+- [x] Step 2: confirmed the workplan had mixed flat (`Task 6..12`) + hierarchical (`Task 5.1..5.7`) fix-task numbering interleaved with pre-existing Phase 5 flat tasks (`Task 1..5`).
+- [x] Step 3: renumbered the round-2 fix-tasks `Task 6..12` → `Task 5.11..5.17`. All fix-task headings now use the hierarchical `5.X` convention monotonically.
+- [x] Step 4: physical reorder NOT done — leaving the insertion-chronological file order as historical dogfood evidence. The convention-mixing harm (operator legibility, broken "next N tasks" framing) is resolved by the renumbering alone; the gate keys on position-order so functional behavior was never affected.
+- [x] Step 5: commit with `Closes AUDIT-20260530-16` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Workplan now uses consistent `5.X` hierarchical numbering for all fix-tasks (no more `Task 6..12` flat shapes).
+- [x] No code-side test gates this; the cure is doc hygiene.
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+**Out of scope (deferred):** physical reordering of the task blocks (currently 5.11-5.17 appear before 5.1-5.7 in the file due to insertion chronology). Numbering is the primary legibility lever AUDIT-16 named; physical reorder is a follow-up if needed.
+
+
+### Task 5.17 (fix-finding-AUDIT-20260530-17): AUDIT-20260530-17 — Workplan closure ticking is best-effort after the audit-log …
+
+Closes AUDIT-20260530-17. Surface: plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:403-463.
+
+- [x] Step 1: new test in `apply-audit-flips-cli.test.ts` injecting a failing writer for the workplan path; asserts non-zero exit + stderr names the failure.
+- [x] Step 2: confirmed test failed pre-fix (returned 0 with warning).
+- [x] Step 3: changed the catch block from "warn + continue" to "stderr + return 1"; the error message names the workplan path, the split-state, and the manual cure.
+- [x] Step 4: tests pass; plugin suite 2431/2431.
+- [x] Step 5: commit with `Closes AUDIT-20260530-17` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.18 (fix-finding-AUDIT-20260531-01): AUDIT-20260531-01 — AUDIT-17 fix surfaces the split-state but its instructed rec…
+
+Closes AUDIT-20260531-01. Surface: `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:454-471`.
+
+- [x] Step 1: NEW recovery-path test in `apply-audit-flips-cli.test.ts` exercises the operator's manual-recovery procedure end-to-end: failing-writer run → exit 1 → manual checkbox flip → working-writer re-run → exit 0 → workplan content unchanged + audit-log already-dispositioned.
+- [x] Step 2: confirmed the recovery path was untested pre-fix.
+- [x] Step 3: test passes against the existing code (idempotent catchup already works correctly); the missing coverage was the test itself.
+- [x] Step 4: tests pass; plugin suite green.
+- [x] Step 5: closed by `64d278a` (commit included both AUDIT-01 + AUDIT-02 test additions).
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.19 (fix-finding-AUDIT-20260531-02): AUDIT-20260531-02 — The new AUDIT-17 test asserts only the immediate error, not …
+
+Closes AUDIT-20260531-02. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:331-388`.
+
+- [x] Step 1: extended the AUDIT-17 test with split-state assertions — verify audit-log shows `Status: fixed-closesha` AND workplan still has `- [ ] Audit-log Status flipped to` post-failure.
+- [x] Step 2: confirmed pre-fix the test asserted only exit code + stderr.
+- [x] Step 3: appended four lines of assertions verifying the split-state contract.
+- [x] Step 4: tests pass; plugin suite green.
+- [x] Step 5: closed by `64d278a` (same commit as AUDIT-01).
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.20 (fix-finding-AUDIT-20260531-03): AUDIT-20260531-03 — AUDIT-16 marked `fixed` while the physical task order it nam…
+
+Closes AUDIT-20260531-03 (claude-03 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.9 block, the renumbered `Task 5.11..5.17` headings, and the new "Out of scope (deferred)" line).
+
+- [x] Step 1: this is a doc-cleanup closing-an-IOU finding. No code-side test.
+- [x] Step 2: confirmed the workplan had 22 fix-task blocks in insertion-chronological order rather than AUDIT-id order, AND the round-1's hierarchical 5.1-5.7 + round-2's renumbered 5.11-5.17 + round-3's 5.8-5.10 + round-4's 5.18-5.22 didn't form a monotonic Task-number sequence.
+- [x] Step 3: NEW `scripts/reorder-fix-tasks.py` reads the workplan, extracts every fix-finding task block, sorts by canonical AUDIT-id ascending, AND renumbers the headings to monotonic `Task 5.1..5.22`. Re-inserts the sorted+renumbered list at position 150 (the first fix-task position). Idempotent.
+- [x] Step 4: physical + numbering monotonicity verified — both Task 5.X labels and AUDIT-IDs increase in lockstep down the file.
+- [x] Step 5: commit with `Closes AUDIT-20260531-03 (claude-03 + codex-01 + codex-02; cross-model)` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Workplan reads monotonically: Task 5.1 → 5.22, AUDIT-20260530-01 → AUDIT-20260531-05.
+- [x] Reorder script preserved at `scripts/reorder-fix-tasks.py` for re-runs.
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.21 (fix-finding-AUDIT-20260531-04): AUDIT-20260531-04 — The extracted feature-root helper still ships the documented…
+
+Closes AUDIT-20260531-04. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:18-22` (docblock) and `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `'multi-version'` and `'determinism'` cases).
+
+- [x] Step 1: new regression test pinning the lex-vs-semver divergence (`['0.9.0', '0.10.0']` → lex-greatest `0.9.0`, NOT semver-greatest `0.10.0`).
+- [x] Step 2: confirmed the deferral comment + missing test pre-fix.
+- [x] Step 3: replaced the "until semver-sort lands" deferral with a docblock that documents the lex-vs-semver behavior as intentional and cites the regression test that pins it.
+- [x] Step 4: tests pass; plugin suite 2435/2435.
+- [x] Step 5: commit with `Closes AUDIT-20260531-04` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.22 (fix-finding-AUDIT-20260531-05): AUDIT-20260531-05 — Feature-root extraction stops one level short of DRY — both …
+
+Closes AUDIT-20260531-05. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:53-55` (helper takes `docsRoot`), `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` (`const docsRoot = join(args.repoRoot, 'docs')`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:181-183` (`const docsRoot = join(rootDir, 'docs')`).
+
+- [x] Step 1: two new tests — `repoRoot` shape (helper joins `docs/` internally) + error when neither arg supplied.
+- [x] Step 2: confirmed pre-fix both callers constructed `join(repoRoot, 'docs')` independently.
+- [x] Step 3: `ResolveFeatureRootArgs` accepts `repoRoot` as an alternative to `docsRoot`; the helper joins `'docs'` internally. Both callers refactored to pass `repoRoot` directly.
+- [x] Step 4: tests pass; plugin suite 2435/2435.
+- [x] Step 5: commit with `Closes AUDIT-20260531-05` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 4: Skill-prose convention template
 
 - [x] Ship `dispatch-wrapper-prelude.md` as plugin asset — landed at `plugins/dw-lifecycle/templates/scope-discovery/dispatch-wrapper-prelude.md` (commit `85f416d`).
 - [x] Document its use in orchestrator SKILL.md files — template covers purpose, library API, the enforced grammar, rejection conditions, refactor auto-prelude trigger, both project overrides + schema references.
 
+
 ### Task 5: 43-scenario adversarial harness
 
 - [x] Port `dispatch-wrapper.validate.ts` verbatim; covers all grammar-violation cases incl. two-level gutted-stub — landed at `plugins/dw-lifecycle/src/__tests__/scope-discovery/dispatch-wrapper.test.ts` as 57 vitest cases (42 canned scenarios + 4 gutted-stub self-check + 6 per-marker auto-prelude + 5 project-override tests) (commit `4386782`).
+
+
+
+### Task 5.23 (fix-finding-AUDIT-20260531-06): AUDIT-20260531-06 — AUDIT-BARRAGE-claude-01 — The AUDIT-04 "fix" reworded but KE…
+
+Closes AUDIT-20260531-06 (claude-01 + claude-02 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:23-30` (the rewritten docblock).
+
+- [x] Step 1: this is a doc-prose finding (no code-side test). The fix is removing the forbidden-deferral phrase from the docblock.
+- [x] Step 2: confirmed the docblock said "until a semver-aware sort lands" — a forbidden-deferral phrase per the project's gaming-phrase canon.
+- [x] Step 3: rewrote the docblock to frame the lex-greatest behavior as the SPECIFICATION (not deferred behavior). Removed all language implying future work. The regression test already pins the contract; the comment now matches.
+- [x] Step 4: existing tests still pass (no functional change).
+- [x] Step 5: commit with `Closes AUDIT-20260531-06` in subject.
+
+**Acceptance Criteria:**
+
+- [x] No forbidden-deferral phrase in `feature-root.ts`.
+- [x] Regression test `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts > picks lex-greatest, NOT semver-greatest` still pins the contract.
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.24 (fix-finding-AUDIT-20260531-07): AUDIT-20260531-07 — AUDIT-BARRAGE-claude-03 — The AUDIT-01 "recovery" test pre-f…
+
+Closes AUDIT-20260531-07. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:397-490` (the `'recovers from a workplan write failure on re-run'` case).
+
+- [x] Step 1: rewrote the AUDIT-01 test to test AUTO-recovery: NO operator intervention between the failing-writer run and the working-writer run. Assert that (a) the tool's catchup branch flips the still-unchecked workplan checkbox automatically, (b) the box reads `[x]` after the second run, (c) `[ ]` is gone, (d) stderr names "closure-criterion checkbox" (proving the catchup actually fired).
+- [x] Step 2: confirmed pre-fix the test pre-flipped the checkbox manually before the second run, masking whether the catchup ran.
+- [x] Step 3: removed the manual flip; the second run now exercises the catchup-on-already-dispositioned-with-unchecked-box path directly.
+- [x] Step 4: tests pass; plugin suite 2435/2435.
+- [x] Step 5: commit with `Closes AUDIT-20260531-07` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.25 (fix-finding-AUDIT-20260531-08): AUDIT-20260531-08 — The AUDIT-06 deferral-phrase purge is incomplete — the equiv…
+
+Closes AUDIT-20260531-08. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:108-117` (untouched by the diff); cross-referenced from `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:25-27`.
+
+- [x] Step 1: closure verified by the AUDIT-10 regression guard test below.
+- [x] Step 2: confirmed pre-fix the test file's docblock contained "future semver-aware sort lands" — the same forbidden-deferral phrase the AUDIT-06 fix purged from the source.
+- [x] Step 3: rewrote the test docblock to frame lex-greatest as specification, not deferred behavior. No "future... lands" framing.
+- [x] Step 4: tests pass; plugin suite 2436/2436.
+- [x] Step 5: commit with `Closes AUDIT-20260531-08` in subject.
+
+**Acceptance Criteria:**
+
+- [x] No forbidden-deferral phrase in `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`.
+- [x] AUDIT-10 regression guard (below) asserts the source file is clean too.
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.26 (fix-finding-AUDIT-20260531-09): AUDIT-20260531-09 — Doc-prose closure of Task 5.23 will trip the `fix-task-tdd-d…
+
+Closes AUDIT-20260531-09. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 block) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`.
+
+- [x] Step 1: this is a doc-cleanup finding — the bare `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` token at line 550 would resolve to a nonexistent repo-root file.
+- [x] Step 2: confirmed pre-fix line 550 said: `Regression test \`plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts > ...\``.
+- [x] Step 3: replaced the bare reference with the full path `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts > picks lex-greatest, NOT semver-greatest` so the `fix-task-tdd-discipline` doctor rule resolves correctly.
+- [x] Step 4: no code-side test gates this; the cure is doc hygiene.
+- [x] Step 5: commit with `Closes AUDIT-20260531-09` in subject.
+
+**Acceptance Criteria:**
+
+- [x] No bare `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` token in workplan task bodies (all references now use full paths).
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.27 (fix-finding-AUDIT-20260531-10): AUDIT-20260531-10 — AUDIT-06's fix has no automated regression guard — the cited…
+
+Closes AUDIT-20260531-10. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 acceptance criteria) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:118-130`.
+
+- [x] Step 1: NEW phrase-presence regression test in `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` reads the source file verbatim and asserts no forbidden-deferral phrase (subset of the canonical FORBIDDEN_DEFERRAL_PHRASES list).
+- [x] Step 2: confirmed pre-fix there was no automated guard against the phrases creeping back; AUDIT-06's fix was prose-only.
+- [x] Step 3: phrase strings stored as concat-assembled data (`'for ' + 'now'`) so the test's own array doesn't self-trigger if the scan widens to test files later.
+- [x] Step 4: tests pass; plugin suite 2436/2436.
+- [x] Step 5: commit with `Closes AUDIT-20260531-10` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.28 (fix-finding-AUDIT-20260531-11): AUDIT-20260531-11 — Fix-tasks 5.25 and 5.26 reintroduce the exact bare-`*.test.t…
+
+Closes AUDIT-20260531-11. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.25 acceptance criteria + Task 5.26 acceptance criteria, added in this diff) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260531-11` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.29 (fix-finding-AUDIT-20260531-12): AUDIT-20260531-12 — The AUDIT-10 regression guard scans a single file, not the s…
+
+Closes AUDIT-20260531-12. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:159-199` (the new `feature-root source file contains NO forbidden-deferral phrases` test).
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260531-12` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.30 (fix-finding-AUDIT-20260531-13): AUDIT-20260531-13 — `until.*lands` / `until.*ships` regexes have a multi-line bl…
+
+Closes AUDIT-20260531-13. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `forbiddenPhrases` array — `'until.*lands'`, `'until.*ships'`).
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260531-13` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.31 (fix-finding-AUDIT-20260531-14): AUDIT-20260531-14 — The guard test's own comment is a deferral/IOU shape — "this…
+
+Closes AUDIT-20260531-14. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the docblock above the new test: "if the canonical list grows, this test **can be migrated to import it directly**").
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260531-14` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.32 (fix-finding-AUDIT-20260531-15): AUDIT-20260531-15 — Inconsistent concat-splitting leaves literal forbidden-phras…
+
+Closes AUDIT-20260531-15. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `forbiddenPhrases` array).
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260531-15` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 6 (follow-up): Primitive-extraction dispatch hygiene
 
@@ -982,3 +1529,208 @@ TF-005's fix originated on `feature/deskwork-plugin` at commit `37683c8` (Closes
 - `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts` grammar definitions — Task 2 widens the existing rules in place.
 - `plugins/dw-lifecycle/src/subcommands/validate-return.ts` argument parsing — Task 3 adds the `--response-file -` branch.
 - `clone-detector.gitignore.test.ts` (lands with `37683c8`) — Task 4 confirms green on this branch post-merge.
+
+## Phase 15: Workplan-aware implement-loop gate + audit-barrage hook + audit-log lift
+
+Parent issue: [#373](https://github.com/audiocontrol-org/deskwork/issues/373)
+
+Trigger: v0.28.0 dogfood + operator framing 2026-05-29 — Phase 13's implement-loop gate (Task 2) is too strict. It refuses on ANY `Status: open` audit-log finding, which creates a structural chicken-and-egg: the fixes for those findings can't be worked through `/dw-lifecycle:implement` because the loop refuses to start with them open. Per operator verbatim:
+
+> *"There's a problem with the audit log /dwi gate. it currently won't proceed until the audit log is clean — but, we can't fix any of the problems using the /dwi loop unless we can run the /dwi loop. What should probably happen instead is that the /dwi gate won't open until all of the unfixed items in the audit log are scoped into the workplan as the next tasks to work on. That way, the /dwi gate won't allow deferring audit fixes, but it will allow the gate to open if the next items in the workplan are those fixes."*
+
+> *"we need to add an audit barrage hook at the end of the /dwi loop with a mandate to scope the fixes as the next workplan items. And, we must ensure that the findings from the audit barrage are actually written to the audit log."*
+
+Phase 15 closes three gaps in the closure triad (Phase 13 Task 4) so the loop self-heals: implement → barrage → lift to audit-log → promote to workplan as next tasks → gate allows next pickup → implement (which is now a fix).
+
+The three gaps form a single semantic — *findings must flow automatically into the work queue, and the work queue's gate must allow the queue's next item to be a fix*.
+
+Per operator directive 2026-05-29 (the same directive that triggered this phase):
+
+> *"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do — unless the default behavior of running the barrage, putting findings into the audit log, then scoping into the workplan is not possible without operator decision making. Audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path."*
+
+The whole phase is built around that framing. **No `--skip-audit-barrage-hook` flag. No operator prompts at the hook's run-time. Default disposition is "scope into workplan as the next task" — the same default Phase 13 Task 1 already established as the only agent-pickable disposition.** When a finding can't be auto-scoped (e.g. the operator-supplied audit-log entry has no parseable Surface/Heading the gate's Task 1 logic can match), the loop fails loud — the failure IS the information.
+
+### Task 1: Workplan-aware implement-loop gate
+
+Replace the strict "refuse on any open finding" semantic of `check-open-findings` (Phase 13 Task 2) with workplan-aware: the gate allows when (a) zero open findings exist, OR (b) the next N unchecked workplan tasks (where N = open findings count) are EXACTLY the fix-finding tasks for those open findings.
+
+- [x] Step 1: NEW pure-fn `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` exporting `checkWorkplanAwareGate({featureSlug, repoRoot}): Promise<WorkplanAwareGateResult>`. Discriminated union shipped as designed (`no-open-findings` / `open-findings-scoped-as-next` / `non-fix-task-before-fix-tasks` / `coverage-mismatch`). Path resolution mirrors the Phase 14 review fix (AUDIT-20260529-17): directory walk under `docs/` so any version dir works.
+- [x] Step 2: Algorithm landed per spec, with a small refinement: when unchecked-task count is LESS than N, the coverage-mismatch (missing/extra) check fires before the non-fix-position check — the more actionable signal ("you haven't scoped the findings at all") surfaces ahead of the more granular shape ("position 0 isn't a fix-task").
+- [x] Step 3: NEW helper `findUncheckedTasksInOrder(workplanText, sliceLimit?)` at `scope-discovery/promote-findings/tdd-enforcement.ts`. Returns `[{taskBlock, position, heading, findingId | null}]` in workplan order. Each entry is the first occurrence of a task heading that has at least one `- [ ]` checkbox in its body (mixed-state tasks count as unchecked — in-progress is not complete).
+- [x] Step 4: Rewired `subcommands/check-open-findings.ts` to use `checkWorkplanAwareGate`. Three distinct refusal-message shapes implemented: non-fix-task mode names the offending task + position + cure ("reorder the workplan"); missing mode lists the IDs + cures via `dw-lifecycle promote-findings --apply`; extra mode lists IDs + cures via flip-status-or-remove.
+- [x] Step 5: SKILL.md prose at `plugins/dw-lifecycle/skills/implement/SKILL.md` updated — Step 2 enumerates both allow-flavors + the three refusal modes with per-mode cures; Error-handling block updated to match. The Phase 15 operator directive ("findings are guardrails, not exceptions") quoted in-line.
+- [x] Step 6: 13 library tests at `workplan-aware-gate.test.ts` covering all 12 spec scenarios + an additional version-dir fallback case. All passing. Old `open-findings-gate.ts` + tests deleted (replaced; no back-compat shim per project rule).
+- [x] Step 7: Live smoke against `feature/scope-discovery` — `dw-lifecycle check-open-findings --feature scope-discovery` returns exit 0 with `zero open findings; proceed` against the post-v0.28.0 branch (no open findings on this feature today).
+
+**Acceptance Criteria:**
+- [x] Gate refuses to advance when open findings exist AND aren't all scoped as the next N tasks.
+- [x] Gate ALLOWS advance when open findings exist AND the next N unchecked tasks are fix-finding tasks covering exactly those finding IDs.
+- [x] Refusal message names the specific failure mode (non-fix-task / missing scoped / extra scoped) and the specific cure.
+- [x] No `--ignore-open-findings` flag in v1 (per Phase 13 operator decision; carries forward).
+- [x] Live verified against scope-discovery branch.
+
+### Task 2: Audit-barrage finding extraction library
+
+NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts` that parses an audit-runs directory's per-model markdown files and extracts structured finding records (one per finding, with cross-model agreement merged).
+
+- [x] Step 1: Library exports `extractBarrageFindings({runDir}): Promise<ExtractedFinding[]>`. Walks every `<model>.md` file (skipping `INDEX.md` and `PROMPT.md`); for each, parses the prompt-template-prescribed finding format (heading + Finding-ID line + Status + Severity + Surface + body).
+- [x] Step 2: Heading + Surface substring matcher (reuse + extend the heuristics from `cross-reference-audit-run.ts`). When ≥2 models flag a similar issue (heading-substring OR surface-token match), the library merges into a single `ExtractedFinding` carrying `sourceModels: ['claude', 'codex']` and `crossModelAgreement: true`.
+- [x] Step 3: Severity normalization: handle minor differences between model conventions (`high` vs `High` vs `HIGH`); normalize to the canonical `blocking | high | medium | low | informational` set used by Phase 13. Merged-cluster severity = max-of-cluster.
+- [x] Step 4: Graceful skip on malformed model output — if a `<model>.md` is empty, doesn't contain the expected finding shape, or fails to parse, emit a warning via the injectable `warn` sink and skip that file; continue with the others.
+- [x] Step 5: 10+ tests at `__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` (delivered 22 tests):
+  - (a) single-model finding extracted correctly.
+  - (b) two-model agreement → one merged finding, `sourceModels.length === 2`.
+  - (c) three-model agreement → one merged finding, `sourceModels.length === 3`.
+  - (d) two independent findings from two models (no overlap) → two separate `ExtractedFinding` records.
+  - (e) malformed `<model>.md` → warning emitted, other models still processed.
+  - (f) empty run-dir → empty result, no error.
+  - (g) `INDEX.md` and `PROMPT.md` skipped (not treated as model outputs).
+  - (h) severity normalization (`HIGH` → `high`).
+  - (i) surface containing multiple paths — each path considered in the cross-model match.
+  - (j) heading substring match when wording differs across models.
+  - Extras: CLEAN sentinel filtered; severity-normalization edge cases; merged-cluster severity = max-of-cluster; same-model multi-finding kept separate; `parseModelMarkdown` exported and unit-tested in isolation.
+
+**Acceptance Criteria:**
+- [x] Library extracts findings from real per-model markdown.
+- [x] Cross-model agreement detected correctly with `sourceModels` populated.
+- [x] Severity normalization implemented.
+- [x] Audit-log preservation rule honored (extraction is read-only).
+
+### Task 3: `dw-lifecycle audit-barrage-lift` CLI verb
+
+NEW CLI verb that walks the run-dir, extracts findings via the Task 2 library, assigns sequential AUDIT-IDs, and writes them as `Status: open` entries to the canonical audit-log.
+
+- [x] Step 1: CLI shim at `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts`. Args:
+  - `--feature <slug>` (REQUIRED)
+  - `--run-dir <path>` (REQUIRED)
+  - `--date <YYYYMMDD>` (default: today UTC)
+  - `--repo-root <path>` (optional override)
+  - `--apply` (default dry-run; `--apply` writes)
+  - `--help`
+- [x] Step 2: Reads existing audit-log; finds highest `AUDIT-<date>-<NN>` for `<date>`; sequential numbering continues from there.
+- [x] Step 3: For each `ExtractedFinding`, compose the audit-log entry shape used by Phase 13:
+  ```
+  ### AUDIT-<date>-<NN> — <heading>
+
+  Finding-ID: AUDIT-<date>-<NN><optional ' (claude-X + codex-Y; cross-model)' suffix>
+  Status:     open
+  Severity:   <severity>
+  Surface:    <surface>
+
+  <body>
+  ```
+- [x] Step 4: Append a new section heading `## <ISO-date> — audit-barrage lift (<run-dir-basename>)` above the new entries so the lift is auditable per-run.
+- [x] Step 5: Atomic write — read full audit-log, append new section, write whole file once; preserve all pre-existing entries verbatim per the preservation rule.
+- [x] Step 6: Register in `cli.ts` as `'audit-barrage-lift'`.
+- [x] Step 7: 8+ tests at `__tests__/scope-discovery/promote-findings/audit-barrage-lift-cli.test.ts` (delivered 15 tests across parseFlags + run-loop, including extras: empty-run-dir → exit 0 / no audit-log mutation; --help short-circuits; explicit `--date` accepted):
+  - (a) parseFlags coverage (required-feature, required-run-dir, --apply, --date, unknown flag).
+  - (b) dry-run reports the count + the proposed IDs without writing.
+  - (c) `--apply` writes the section + entries with sequential IDs.
+  - (d) Sequential ID continues from existing highest AUDIT-<date>-NN.
+  - (e) Cross-model finding rendered with the `(claude-X + codex-Y; cross-model)` suffix.
+  - (f) Pre-existing audit-log content preserved verbatim (diff is purely additive).
+  - (g) Feature-not-found → exit 2.
+  - (h) Run-dir-not-found → exit 2.
+
+**Acceptance Criteria:**
+- [x] `dw-lifecycle audit-barrage-lift --help` resolves from the installed shim.
+- [x] Dry-run reports proposed entries; `--apply` writes them.
+- [x] Sequential AUDIT-ID assignment honored.
+- [x] Cross-model agreement reflected in the rendered Finding-ID line.
+- [x] Audit-log preservation rule honored (entries below the new section unchanged).
+
+### Task 4: Implement-loop audit-barrage hook
+
+Modify `/dw-lifecycle:implement` SKILL.md to add an end-of-task hook that fires audit-barrage + lifts findings + scopes them via promote-findings, so the next-task pickup sees them as the workplan's next tasks (and the Task 1 gate allows pickup).
+
+- [x] Step 1: Added NEW Step 6 in implement SKILL.md between "When the task body is complete, mark its checkboxes and commit" and the existing scope-widen step (which became Step 7). The new step composes FIVE CLI calls (audit-barrage-render → audit-barrage --output-run-dir → audit-barrage-lift --apply → promote-findings --auto → check-open-findings). The original workplan called for four; the fifth is `audit-barrage-render` because the audit-barrage runner's contract is `--prompt-file`, not `--range`. The render step IS the bridge from session context to prompt.
+- [x] Step 2: `dw-lifecycle audit-barrage` gained a `--output-run-dir` flag (shipped in Phase 15 Task 4a, commit c7274da). When set, stdout becomes JUST the absolute run-dir path (newline-terminated); the BarrageRun JSON is suppressed. Stderr behavior unchanged.
+- [x] Step 3: Auto-position inference for promote-findings shipped as `--auto` flag (Phase 15 Task 4b, commit ee54f44). Walks open findings; reads workplan; computes "insert immediately BEFORE the first unchecked workplan task" anchor; defaults each finding's disposition to `promote-to-workplan`; applies in one shot. No proposal-file roundtrip, no operator prompts. The workplan-aware gate sees the new fix-tasks as positions [0..N-1] on next pickup.
+- [x] Step 4: Failure-path policy documented in SKILL.md Step 6 + Error-handling block. fail-loud rules:
+  - audit-barrage-render non-zero → stop loop, fix vars/template.
+  - audit-barrage all-models-failed (exit 1) → degraded path: proceed without lift; surface single-line warning.
+  - audit-barrage-lift non-zero with extracted findings → stop loop (audit-log write failed: drift/permissions/parser).
+  - promote-findings --auto non-zero → stop loop (findings are guardrails; failing to scope them is structural).
+  - check-open-findings non-zero AFTER auto-promote → stop loop (the gate refused despite the scoping; investigate workplan + audit-log state).
+- [x] Step 5: Per-task report shape documented in SKILL.md Step 6: barrage status (e.g. "2/3 models healthy"), findings extracted (count), findings scoped (count), gate result (allowed: open-findings-scoped-as-next / allowed: no-open-findings / refused: <mode>).
+- [x] Step 6: Tests for `--output-run-dir` shipped in Phase 15 Task 4a (6 tests covering 2 parseFlags scenarios + 4 renderStdoutOutput scenarios — JSON-shape contract, path-only contract, no-JSON-leakage, single-newline-termination).
+- [x] Step 7: Updated `audit-barrage` SKILL.md (`plugins/dw-lifecycle/skills/audit-barrage/SKILL.md`) Step 3 to document the new `--output-run-dir` flag with the bash composition example.
+
+**Acceptance Criteria:**
+- [x] SKILL.md documents the end-of-task five-command hook recipe (renderer + barrage + lift + auto-promote + gate sanity).
+- [x] **No `--skip-audit-barrage-hook` flag.** Per the operator-directive on guardrails-not-exceptions, the hook ALWAYS fires. Silent skip only when `.dw-lifecycle/scope-discovery/` is absent (project opt-in).
+- [x] `audit-barrage --output-run-dir` flag added + tested (Task 4a).
+- [x] Failure paths behave per spec: missing CLIs degrade gracefully; audit-log write failures + promote-findings failures are stop-the-loop events.
+- [x] Per-task report includes barrage status + finding-extract count + scoped-task count + gate-check result.
+- [x] promote-findings --auto positions new fix-tasks at the workplan's next-unchecked position; Task 1 gate sees them immediately as positions [0..N-1] (Task 4b).
+
+### Task 5: Live verification + dogfood
+
+Verify the new triad (Task 1 gate + Task 3 lift + Task 4 hook) composes correctly via the implement loop.
+
+- [ ] Step 1: Positive scenario — deliberately seed a small implementation gap, run `/dw-lifecycle:implement`:
+  - Task A completes + commits.
+  - End-of-task hook fires `audit-barrage` (real CLIs; runs against the operator's existing CLI subscriptions, no direct API metering).
+  - `audit-barrage-lift --apply` writes the findings to audit-log.
+  - `promote-findings --apply` scopes them as workplan's next tasks.
+  - Next-task pickup checks the new gate.
+  - Gate ALLOWS (the findings are scoped as the next tasks).
+  - Loop continues to the fix-finding tasks.
+- [ ] Step 2: Negative scenario A — scope a finding NOT in the next-N position (place it 5 tasks down). Run `check-open-findings`; confirm refusal (`non-fix-task-before-fix-tasks`).
+- [ ] Step 3: Negative scenario B — scope an EXTRA fix-task for a finding that isn't open. Run `check-open-findings`; confirm refusal (`coverage-mismatch`, extraIds populated).
+- [ ] Step 4: Negative scenario C — open finding has no `(fix-finding-AUDIT-<id>)` task anywhere. Run `check-open-findings`; confirm refusal (`coverage-mismatch`, missingIds populated).
+- [ ] Step 5: Friction-feedback log entries (per project rule "Capture friction over scope") for any roughness in the implement-loop integration.
+
+**Acceptance Criteria:**
+- [ ] Positive scenario verified live: full self-healing loop runs end-to-end.
+- [ ] Negative scenarios A, B, C all surface the correct refusal mode.
+- [ ] Refusal messages name the actionable cure for each mode.
+
+### Task 6: Cross-references + docs
+
+- [ ] Step 1: Update `.claude/rules/agent-discipline.md` § "Audit findings: scope-don't-defer + TDD enforcement" — replace the `check-open-findings` row with the new workplan-aware semantic; add the `audit-barrage-lift` and end-of-task hook rows to the triad table.
+- [ ] Step 2: Update `plugins/dw-lifecycle/README.md` § "Audit-finding lifecycle" — same row updates + the four-command bash recipe for the end-of-task hook.
+- [ ] Step 3: Update `ROADMAP.md` § "Design A.5" — note that v0.28.0's strict gate was reframed in v0.X.Y to the workplan-aware semantic; add audit-barrage hook to the closure-loop description.
+- [ ] Step 4: Update the implement skill's prose to make the end-of-task hook discoverable (cross-link from the skill description).
+
+**Acceptance Criteria:**
+- [ ] Agent-discipline rule documents the new gate semantic + audit-barrage hook + lift verb.
+- [ ] README documents the four-command operational pattern.
+- [ ] ROADMAP reflects the v2 shape.
+- [ ] Implement-skill description names the hook for discoverability.
+
+### Phase 15 — Out of Scope
+
+- **Operator-side override of the gate.** The strict v1 stance per Phase 13 (no `--ignore-open-findings`) survives unchanged; the workplan-aware semantic IS the cure, not an escape hatch.
+- **`--skip-audit-barrage-hook` flag.** Per operator directive: findings are guardrails-not-exceptions; the hook ALWAYS fires. No flag.
+- **Operator-pickable disposition in the per-task promote-findings call.** Phase 13 Task 1 already established "scope into workplan" as the only agent-pickable disposition; the hook reuses that default (no operator prompt at hook run-time).
+- **Audit-barrage parallelization / batching across tasks.** v1 fires the hook once per completed task. If cost amortization proves needed in practice, batching is a follow-up improvement; the per-task default is opinionated by the operator directive ("seamless").
+- **Cross-feature audit-barrage.** v1 scopes the barrage to a single feature; multi-feature audits are downstream.
+- **TDD-order enforcement at gate-time.** Phase 13 Task 3's commit-msg gate handles TDD-first shape verification at commit; replicating the check at gate-time would be redundant.
+- **Re-audit-fixed-findings integration into the per-task hook.** Phase 13 Task 4 Step 3's `re-audit-fixed-findings` skill is for post-RELEASE verification (`fixed-<sha> → verified-<date>`); the per-task barrage hook is for surfacing NEW findings while the implementation is in flight. Different cadence; out of scope to combine.
+
+### Phase 15 — Operator-resolved design decisions (2026-05-29 directive)
+
+The original draft of this phase captured 7 "open scoping questions" for operator iteration. Operator's response on 2026-05-29 resolves all 7 at once: *"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do — unless the default behavior of running the barrage, putting findings into the audit log, then scoping into the workplan is not possible without operator decision making."*
+
+Recorded resolutions (no further operator iteration required; each is the seamless-default position):
+
+1. **"Next tasks" definition: STRICT.** Open findings' fix-tasks must occupy positions `[0..N-1]` of the unchecked tasks list. The new gate refuses if a non-fix task appears before all open-finding fix-tasks. Strict matches the operator's "next tasks" framing verbatim and avoids the cognitive overhead of a "lax window" rule.
+2. **TDD-order at gate-time: NOT enforced.** Phase 13 Task 3's commit-msg gate handles this; replication would be redundant. (Already out of scope above.)
+3. **Audit-barrage hook cadence: PER TASK, no configurable.** The seamless default fires after every task. Cost-throttling is a follow-up if cost proves real in practice.
+4. **Cross-model agreement threshold: ≥2 models.** Phase 12 precedent; carries forward without a config knob.
+5. **Audit-barrage CLI availability: SOFT-SKIP missing binaries.** The hook proceeds with whichever CLIs ARE installed (Phase 12's spawn-error path precedent). Missing all three degrades to "no findings this round" — does not block the loop.
+6. **`audit-barrage --output-run-dir` flag shape: PATH on stdout, summary on stderr.** Mirrors `wrap-prompt --quiet` precedent; lets bash capture the path cleanly.
+7. **Lift-verb invocation: AUTO from the hook.** The hook composes `audit-barrage → audit-barrage-lift → promote-findings` as one atomic flow. Standalone CLI invocation of `audit-barrage-lift` remains available for operator use, but inside the implement loop the lift fires unconditionally as part of the hook.
+
+### Phase 15 — Existing primitives this composes over
+
+- `check-open-findings` library (`scope-discovery/promote-findings/open-findings-gate.ts`) — Phase 15 Task 1 replaces its semantic; pure-fn shape + CLI verb structure preserved.
+- `walkOpenFindings` (`scope-discovery/promote-findings/audit-log-walker.ts`) — unchanged; Tasks 1 and 3 reuse.
+- `audit-log-parser.ts` — unchanged; Tasks 1 and 3 reuse for ID extraction + sequential numbering.
+- `findCompletedFixFindingTasks` (`scope-discovery/promote-findings/tdd-enforcement.ts`) — Phase 15 Task 1 Step 3 adds a sibling `findUncheckedFixFindingTasks` next to it.
+- `cross-reference-audit-run.ts` — Task 2 reuses the heading-substring + surface-token heuristics; extends them with severity-normalization.
+- `flipAuditLogStatus` + `applyStatusFlips` (`scope-discovery/promote-findings/audit-log-editor.ts`) — Task 3 reuses the atomic write pattern.
+- `audit-barrage` skill + CLI verb (Phase 12) — Task 4 composes with the new `--output-run-dir` flag.
+- `promote-findings` library + CLI verb (Phase 13 Task 1) — Task 4 composes as the final step of the per-task hook.
+- `apply-audit-flips` (Phase 13 Task 4 Step 2) — unchanged; its `Closes AUDIT-<id> → fixed-<sha>` semantic remains the bridge between fix commits and audit-log status.

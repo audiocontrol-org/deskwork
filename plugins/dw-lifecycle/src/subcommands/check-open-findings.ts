@@ -2,7 +2,7 @@
  * plugins/dw-lifecycle/src/subcommands/check-open-findings.ts
  *
  * CLI verb the `/dw-lifecycle:implement` skill invokes at task-pickup
- * time. Wraps the pure `checkOpenFindings` library in argv parsing and
+ * time. Wraps the pure `checkWorkplanAwareGate` library in argv parsing and
  * exit-code semantics:
  *
  *   exit 0 — zero open findings on the feature; proceed.
@@ -20,10 +20,10 @@
 import { isAbsolute, resolve } from 'node:path';
 import { repoRoot } from '../repo.js';
 import {
-  checkOpenFindings,
+  checkWorkplanAwareGate,
   FeatureRootNotFoundError,
-  type OpenFindingsGateResult,
-} from '../scope-discovery/promote-findings/open-findings-gate.js';
+  type WorkplanAwareGateResult,
+} from '../scope-discovery/promote-findings/workplan-aware-gate.js';
 
 export interface CheckOpenFindingsCliOptions {
   readonly featureSlug: string;
@@ -102,23 +102,51 @@ export interface RunArgs {
 
 function renderRefusal(
   featureSlug: string,
-  openFindings: OpenFindingsGateResult & { allowed: false },
+  result: WorkplanAwareGateResult & { allowed: false },
 ): string {
-  const ids = openFindings.openFindings.map((f) => f.findingId).join(', ');
-  const n = openFindings.openFindings.length;
-  return [
-    `Cannot advance: feature ${featureSlug} has ${n} open audit finding${n === 1 ? '' : 's'} (${ids}).`,
-    `Open findings block task pickup per project rule "broken implementation is not done."`,
-    `Run \`/dw-lifecycle:promote-findings --feature ${featureSlug}\` to scope into workplan before continuing.`,
-    '',
-  ].join('\n');
+  const ids = result.openFindings.map((f) => f.findingId).join(', ');
+  const n = result.openFindings.length;
+  const header = `Cannot advance: feature ${featureSlug} has ${n} open audit finding${n === 1 ? '' : 's'} (${ids}).`;
+  const rule = `Open findings must be scoped as the next N workplan tasks per project rule "audit findings are guardrails, not exceptions."`;
+  if (result.reason === 'non-fix-task-before-fix-tasks') {
+    return [
+      header,
+      rule,
+      `The next unchecked task (position ${result.offendingPosition}) is "${result.offendingTask}" — NOT a (fix-finding-AUDIT-...) task.`,
+      `Cure: reorder the workplan so the ${n} fix-finding task${n === 1 ? '' : 's'} for the open finding${n === 1 ? '' : 's'} come${n === 1 ? 's' : ''} first.`,
+      '',
+    ].join('\n');
+  }
+  if (result.reason === 'coverage-mismatch') {
+    const lines = [header, rule];
+    if (result.missingIds.length > 0) {
+      lines.push(
+        `Missing: ${result.missingIds.length} open finding(s) are not scoped in the first ${n} unchecked task${n === 1 ? '' : 's'}: ${result.missingIds.join(', ')}.`,
+      );
+      lines.push(
+        `Cure: run \`dw-lifecycle promote-findings --feature ${featureSlug} --apply\` to scope them.`,
+      );
+    }
+    if (result.extraIds.length > 0) {
+      lines.push(
+        `Extras: ${result.extraIds.length} scoped fix-finding task${result.extraIds.length === 1 ? '' : 's'} reference Finding-ID(s) that are not currently open: ${result.extraIds.join(', ')}.`,
+      );
+      lines.push(
+        `Cure: either flip those audit-log entries' Status to fixed-<sha>/verified-<date>, or remove the stale scoped tasks.`,
+      );
+    }
+    lines.push('');
+    return lines.join('\n');
+  }
+  // Exhaustive over the discriminated union; unreachable.
+  return [header, rule, ''].join('\n');
 }
 
 export async function runCheckOpenFindings(args: RunArgs): Promise<number> {
   const repoRootResolved = args.opts.repoRoot ?? args.projectRoot;
-  let result: OpenFindingsGateResult;
+  let result: WorkplanAwareGateResult;
   try {
-    result = await checkOpenFindings({
+    result = await checkWorkplanAwareGate({
       featureSlug: args.opts.featureSlug,
       repoRoot: repoRootResolved,
     });
@@ -132,9 +160,15 @@ export async function runCheckOpenFindings(args: RunArgs): Promise<number> {
     throw err;
   }
   if (result.allowed) {
-    args.stderr.write(
-      `check-open-findings: feature '${args.opts.featureSlug}' has zero open findings; proceed.\n`,
-    );
+    if (result.reason === 'no-open-findings') {
+      args.stderr.write(
+        `check-open-findings: feature '${args.opts.featureSlug}' has zero open findings; proceed.\n`,
+      );
+    } else {
+      args.stderr.write(
+        `check-open-findings: feature '${args.opts.featureSlug}' has open findings scoped as the next workplan tasks; proceed.\n`,
+      );
+    }
     return 0;
   }
   args.stderr.write(renderRefusal(args.opts.featureSlug, result));

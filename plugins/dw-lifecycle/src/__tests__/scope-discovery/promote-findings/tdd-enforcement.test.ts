@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import {
   extractTestFilePath,
   findCompletedFixFindingTasks,
+  findUncheckedTasksInOrder,
   verifyFixTaskTDD,
   type VitestRunner,
 } from '../../../scope-discovery/promote-findings/tdd-enforcement.js';
@@ -192,5 +193,118 @@ describe('findCompletedFixFindingTasks — workplan walker', () => {
       'AUDIT-20260529-12',
       'AUDIT-20260529-13',
     ]);
+  });
+});
+
+/**
+ * Regression coverage for AUDIT-20260530-07: the gate's task-heading
+ * regex must match the actual shape `workplan-task-renderer` emits
+ * (`### Task N.M (fix-finding-AUDIT-NNNNNNNN-NN): ...`), not the
+ * synthetic shape the existing fixtures use (`### Task 99.1: Fix ...
+ * (fix-finding-...)`). Discovered live during the Phase 15 hook
+ * dogfood — `check-open-findings` refused despite `promote-findings
+ * --auto` successfully inserting fix-tasks, because the gate's parser
+ * skipped past them.
+ */
+describe('findUncheckedTasksInOrder — renderer-output shape (AUDIT-20260530-07)', () => {
+  it('recognizes the clean renderer-output shape: `### Task N.M (fix-finding-AUDIT-...): title`', () => {
+    const workplan = [
+      '## Phase 15: current',
+      '',
+      '### Task 15.1 (fix-finding-AUDIT-20260530-01): Title text',
+      '',
+      '- [ ] Step 1: write failing test',
+      '- [ ] Step 2: implement fix',
+      '',
+    ].join('\n');
+    const tasks = findUncheckedTasksInOrder(workplan);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.findingId).toBe('AUDIT-20260530-01');
+  });
+
+  it('recognizes the renderer-output shape with cross-model nested parens in the marker', () => {
+    const workplan = [
+      '## Phase 15: current',
+      '',
+      '### Task 15.1 (fix-finding-AUDIT-20260530-01 (claude-01 + claude-04 + codex-03; cross-model)): Title text',
+      '',
+      '- [ ] Step 1: write failing test',
+      '',
+    ].join('\n');
+    const tasks = findUncheckedTasksInOrder(workplan);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.findingId).toBe('AUDIT-20260530-01');
+  });
+
+  it('walks N renderer-shaped fix-tasks in order, populating findingId for each', () => {
+    const workplan = [
+      '## Phase 15: current',
+      '',
+      '### Task 15.1 (fix-finding-AUDIT-20260530-01): First',
+      '',
+      '- [ ] Step 1',
+      '',
+      '### Task 15.2 (fix-finding-AUDIT-20260530-02): Second',
+      '',
+      '- [ ] Step 1',
+      '',
+      '### Task 15.3 (fix-finding-AUDIT-20260530-07): Third',
+      '',
+      '- [ ] Step 1',
+      '',
+    ].join('\n');
+    const tasks = findUncheckedTasksInOrder(workplan);
+    expect(tasks).toHaveLength(3);
+    expect(tasks.map((t) => t.findingId)).toEqual([
+      'AUDIT-20260530-01',
+      'AUDIT-20260530-02',
+      'AUDIT-20260530-07',
+    ]);
+  });
+
+  it('still recognizes the legacy clean heading without parenthetical marker', () => {
+    const workplan = [
+      '## Phase 15',
+      '',
+      '### Task 15.4: Plain task title',
+      '',
+      '- [ ] Step 1',
+      '',
+    ].join('\n');
+    const tasks = findUncheckedTasksInOrder(workplan);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.findingId).toBeNull();
+  });
+});
+
+/**
+ * Same regression for `findCompletedFixFindingTasks` — the closed-task
+ * walker's regex sits next to `findUncheckedTasksInOrder`'s and has
+ * the identical shape assumption. The TDD-discipline doctor rule + the
+ * commit-msg gate both rely on it.
+ */
+describe('findCompletedFixFindingTasks — renderer-output shape (AUDIT-20260530-07)', () => {
+  it('detects a checked fix-task in clean renderer shape', () => {
+    const workplan = [
+      '### Task 15.1 (fix-finding-AUDIT-20260530-01): Title',
+      '',
+      '- [x] Step 1: `plugins/x/foo.test.ts`',
+      '',
+    ].join('\n');
+    const tasks = findCompletedFixFindingTasks(workplan);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.findingId).toBe('AUDIT-20260530-01');
+  });
+
+  it('detects a checked fix-task with nested cross-model parens in the marker', () => {
+    const workplan = [
+      '### Task 15.1 (fix-finding-AUDIT-20260530-01 (claude-01 + codex-03; cross-model)): Title',
+      '',
+      '- [x] Step 1: `plugins/x/foo.test.ts`',
+      '',
+    ].join('\n');
+    const tasks = findCompletedFixFindingTasks(workplan);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.findingId).toBe('AUDIT-20260530-01');
   });
 });
