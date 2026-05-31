@@ -3820,7 +3820,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). 
 ### AUDIT-20260530-55 — [P6-1 claude] `pipeline delete --reassign-lanes-to ""` (empty string) bypasses the dependent-lane refusal and orphans every dependent lane
 
 Finding-ID: AUDIT-20260530-55 (cross-model: AUDIT-BARRAGE-claude-P6-1)
-Status:     open
+Status:     fixed-b034cb9
 Severity:   high
 Surface:    `packages/core/src/pipelines/operations/delete.ts:deletePipeline` (refusal guard, validation guard, rebind loop)
 
