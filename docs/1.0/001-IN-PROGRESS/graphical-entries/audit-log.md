@@ -3865,7 +3865,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). 
 ### AUDIT-20260530-58 — [P6-1 claude] `lane move` of a pre-migration entry (no `lane` field) fails confusingly when no `default` lane config exists
 
 Finding-ID: AUDIT-20260530-58 (cross-model: AUDIT-BARRAGE-claude-P6-1)
-Status:     open
+Status:     fixed-138164f
 Severity:   low
 Surface:    `packages/core/src/lanes/operations/move.ts:moveEntryToLane` (`sourceLaneId = sidecar.lane ?? DEFAULT_LANE_ID`, then `loadLaneConfig(sourceLaneId, projectRoot)`)
 
