@@ -3490,7 +3490,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (codex). R
 ### AUDIT-20260530-29 — [P5-1 codex] Dashboard localStorage has no schema/version segment despite version-bump reset being in scope
 
 Finding-ID: AUDIT-20260530-29 (cross-model: AUDIT-BARRAGE-codex-P5-1)
-Status:     open
+Status:     fixed-ec51035 (duplicate of AUDIT-20260530-26; closed by the same commit)
 Severity:   medium
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:21-27; plugins/deskwork-studio/public/src/dashboard/swimlane.ts:64-69; plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:60-65; plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:68-70
 

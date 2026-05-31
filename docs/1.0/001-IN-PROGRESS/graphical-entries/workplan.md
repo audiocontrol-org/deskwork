@@ -197,17 +197,19 @@ Closes AUDIT-20260530-28 (cross-model: AUDIT-BARRAGE-codex-P5-1). Surface: plugi
 
 Closes AUDIT-20260530-29 (cross-model: AUDIT-BARRAGE-codex-P5-1). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:21-27; plugins/deskwork-studio/public/src/dashboard/swimlane.ts:64-69; plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:60-65; plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:68-70.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-29 (cross-model: AUDIT-BARRAGE-codex-P5-1)` in subject
+Disposition: duplicate of AUDIT-20260530-26 (claude); both findings describe the same missing-schema-version bug. Closed by `ec51035` (the AUDIT-26 fix), which added `STORAGE_SCHEMA_VERSION = 2` to `STORAGE_KEY_PREFIX` so stale unversioned keys are ignored. The regression test for AUDIT-26 at `packages/studio/test/dashboard-swimlane-client.test.ts` (the `ignores stale unversioned dashboard visibility state` case) covers the AUDIT-29 surface too — both findings cite the same prefix declaration site (`swimlane-storage.ts:21-27` = `swimlane-storage.ts` `STORAGE_KEY_PREFIX`).
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — covered by AUDIT-26 test
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — verified during AUDIT-26 cycle
+- [x] Step 3: implement the fix — `ec51035`
+- [x] Step 4: confirm test passes — verified during AUDIT-26 cycle
+- [x] Step 5: commit with `Closes AUDIT-20260530-29 (cross-model: AUDIT-BARRAGE-codex-P5-1)` in subject — see disposition note above; closed via duplicate-of-26 disposition rather than a fresh commit
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-client.test.ts` (AUDIT-20260530-26 regression — same prefix declaration site)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-ec51035 (duplicate of AUDIT-20260530-26; closed by the same commit)` per duplicate disposition
 
 
 
