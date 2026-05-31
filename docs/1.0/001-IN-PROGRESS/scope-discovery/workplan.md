@@ -408,7 +408,7 @@ Closes AUDIT-20260530-15 (claude-01 + claude-02 + codex-01 + codex-03; cross-mod
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.9 (fix-finding-AUDIT-20260530-16): AUDIT-20260530-16 — Phase 15 workplan now mixes flat (`Task 6-12`) and hierarchi…
@@ -425,7 +425,7 @@ Closes AUDIT-20260530-16. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 - [x] Workplan now uses consistent `5.X` hierarchical numbering for all fix-tasks (no more `Task 6..12` flat shapes).
 - [x] No code-side test gates this; the cure is doc hygiene.
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 **Out of scope (deferred):** physical reordering of the task blocks (currently 5.11-5.17 appear before 5.1-5.7 in the file due to insertion chronology). Numbering is the primary legibility lever AUDIT-16 named; physical reorder is a follow-up if needed.
 
@@ -444,7 +444,7 @@ Closes AUDIT-20260530-17. Surface: plugins/dw-lifecycle/src/subcommands/apply-au
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 6 (follow-up): Primitive-extraction dispatch hygiene
 

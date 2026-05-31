@@ -867,7 +867,7 @@ Because `findUncheckedTasksInOrder` treats any task block with a `- [ ]` checkbo
 ### AUDIT-20260530-15 — Duplicated feature-root resolution across gate and lift is the structural root of the split-brain class — the diff patches both copies in lockstep instead of extracting one
 
 Finding-ID: AUDIT-20260530-15 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)
-Status:     open
+Status:     fixed-e27370c03edc8c0dc4d26b6234fff553953449cf
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120` (`findFeatureRoot`) and `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180` (`resolveFeatureRoot`)
 
@@ -878,7 +878,7 @@ The split-brain *class* of bug isn't closed by making the two copies currently i
 ### AUDIT-20260530-16 — Phase 15 workplan now mixes flat (`Task 6-12`) and hierarchical (`Task 5.2-5.7`) fix-task numbering, with the flat fix-tasks ordered physically before `Task 4` — the AUDIT-03 incoherence persists in shipped docs
 
 Finding-ID: AUDIT-20260530-16
-Status:     open
+Status:     fixed-a4aa5db3491e41700b6117c7584c743ac0375709
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:151-271`
 
@@ -889,7 +889,7 @@ This diff only flips the checkboxes inside those task blocks (`[ ]→[x]`); it l
 ### AUDIT-20260530-17 — Workplan closure ticking is best-effort after the audit-log write, so AUDIT-14 can recur on any workplan write failure
 
 Finding-ID: AUDIT-20260530-17
-Status:     open
+Status:     fixed-7f6b08496130d30dbec29ff9419afb078f88fbc2
 Severity:   medium
 Surface:    plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:403-463
 
