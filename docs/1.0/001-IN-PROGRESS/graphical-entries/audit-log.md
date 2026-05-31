@@ -3934,7 +3934,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). R
 ### AUDIT-20260530-63 — [P6-1 codex] `delete --reassign-lanes-to` can leave a partial rebind
 
 Finding-ID: AUDIT-20260530-63 (cross-model: AUDIT-BARRAGE-codex-P6-1)
-Status:     open
+Status:     fixed-2c928d3
 Severity:   medium
 Surface:    `packages/core/src/pipelines/operations/delete.ts:179-222`
 
