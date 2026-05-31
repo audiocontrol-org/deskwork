@@ -1018,3 +1018,64 @@ Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.23 ac
 Task 5.23's acceptance criterion claims the contract is pinned by *"Regression test `feature-root.test.ts > picks lex-greatest, NOT semver-greatest` still pins the contract."* But that test asserts only the *sort outcome* (`['0.9.0','0.10.0'] → 0.9.0`) — which the AUDIT-06 fix did not touch. Nothing in the suite asserts the *absence of a forbidden deferral phrase* in the docblock. If someone re-adds "until X lands" / "for now" to `feature-root.ts`, no test fails; the sort test stays green. The acceptance criterion "No forbidden-deferral phrase in `feature-root.ts`" is a manual claim, not a check.
 
 This is the same vacuous-coverage shape prior rounds named (AUDIT-09's vacuous determinism test, AUDIT-02's surface-symptom-only assertion) and is the structural reason the twin phrase in claude-01 went unnoticed: there is no scanner over committed source for the project's forbidden-deferral canon (the dispatch-wrapper only screens live *agent output*, not files on disk). A reasonable fix is a small doctor rule / unit test that greps the scope-discovery source tree for the banned-phrase canon and fails on a hit — which would close claude-01 and claude-03 together and make "No forbidden-deferral phrase" falsifiable rather than asserted.
+
+## 2026-05-31 — audit-barrage lift (20260531T043555454Z-scope-discovery)
+
+### AUDIT-20260531-11 — Fix-tasks 5.25 and 5.26 reintroduce the exact bare-`*.test.ts` token that AUDIT-09 was closing — they will re-trip the `fix-task-tdd-discipline` doctor rule
+
+Finding-ID: AUDIT-20260531-11
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.25 acceptance criteria + Task 5.26 acceptance criteria, added in this diff) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`
+
+This diff closes AUDIT-20260531-09 (bare `feature-root.test.ts` tokens trip the doctor rule because they resolve to a nonexistent repo-root file) — yet the *sibling tasks added in the same hunk* re-introduce the defect:
+
+- Task 5.25 (heading `fix-finding-AUDIT-20260531-08`, all `[x]`) carries the acceptance line: ``- [x] No forbidden-deferral phrase in `feature-root.test.ts`.`` The backtick group ends cleanly at `.test.ts`, so per AUDIT-09's own documented extraction behavior the backtick matcher captures the bare basename. Its Surface line's full path is disqualified by the `:108-117` suffix (exactly the null-backtick case AUDIT-09 proved), so the bare token wins → `missing-test-file`.
+- Task 5.26 (heading `fix-finding-AUDIT-20260531-09`, all `[x]`) is self-contradicting: its acceptance criterion ``- [x] No bare `feature-root.test.ts` token in workplan task bodies (all references now use full paths).`` *is itself a bare `feature-root.test.ts` token*. Its only other `.test.ts` reference (Step 3) ends with ` > picks lex-greatest…`, the same boundary-failure shape AUDIT-09 cited for Task 5.23 — so no clean full-path competitor exists, and the bare token in the acceptance line is captured.
+
+Both tasks are `[x]`-checked, so `findCompletedFixFindingTasks` matches them and `extractTestFilePath` scans their blocks. The result is the same `missing-test-file` the doctor rule flags. Contrast Task 5.27, which cites the full resolvable path with no line-suffix and passes. The fix for AUDIT-09 ("use full paths") was applied to Task 5.23 but not propagated to the new tasks created alongside it. Cure: rewrite every `.test.ts` reference in 5.25/5.26 task bodies as a full repo-relative path with no `:line` suffix and no trailing ` > …`, OR give doc-prose/testless findings a recognized sentinel the enforcement primitive treats as valid (the design gap AUDIT-09 already named).
+
+### AUDIT-20260531-12 — The AUDIT-10 regression guard scans a single file, not the source tree — it does not close the class of bug it was built for
+
+Finding-ID: AUDIT-20260531-12
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts:159-199` (the new `feature-root source file contains NO forbidden-deferral phrases` test)
+
+AUDIT-10's recommended cure was "a small doctor rule / unit test that greps the scope-discovery **source tree** … which would close claude-01 and claude-03 together." The implemented guard reads exactly one file (`scope-discovery/util/feature-root.ts`) and a hardcoded *subset* of `FORBIDDEN_DEFERRAL_PHRASES`. Two consequences:
+
+1. **It cannot catch the AUDIT-08 twin-file shape.** AUDIT-08's whole point was that the phrase survived in `feature-root.test.ts` (a sibling file). The new guard explicitly excludes test files (and any file other than `feature-root.ts`), so a forbidden phrase creeping back into the test docblock — the precise regression AUDIT-08 documented — remains unguarded. The "patched one copy, left the other" pattern (AUDIT-15) is structurally preserved, not closed.
+2. **The subset drifts from canonical.** The comment concedes it's "a subset of FORBIDDEN_DEFERRAL_PHRASES … if the canonical list grows, this test can be migrated to import it directly." Any phrase in the canonical list but absent from this local copy is silently unguarded, and the two will drift the moment the canonical list changes.
+
+A fix that matched AUDIT-10's framing would walk the `scope-discovery/` tree (excluding the test file holding the data array) and import the canonical phrase set rather than copying a subset.
+
+### AUDIT-20260531-13 — `until.*lands` / `until.*ships` regexes have a multi-line blind spot — a line-wrapped deferral phrase (the exact form AUDIT-08 cited) evades the guard
+
+Finding-ID: AUDIT-20260531-13
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `forbiddenPhrases` array — `'until.*lands'`, `'until.*ships'`)
+
+The phrases are compiled with `new RegExp(phrase, 'i')` — case-insensitive only, no dotall/`s` flag. In a regex, `.` does not match newlines, so `until.*lands` only matches when "until" and "lands" land on the *same physical line*. But the deferral phrase AUDIT-08 named was wrapped across docblock lines (`* future\n * semver-aware sort lands`), and docblock comments line-wrap routinely. So the guard fails exactly where the original regression occurred: a phrase split across two `*`-prefixed comment lines passes the check silently. This is a false-negative blind spot in the very guard meant to make the contract falsifiable. Cure: normalize comment whitespace (strip `*`-prefixes and collapse newlines to spaces) before matching, or use `[\s\S]*?` with bounded distance instead of `.*`, and add the `s` flag.
+
+### AUDIT-20260531-14 — The guard test's own comment is a deferral/IOU shape — "this test can be migrated to import it directly" — inside the enforcer
+
+Finding-ID: AUDIT-20260531-14
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the docblock above the new test: "if the canonical list grows, this test **can be migrated to import it directly**")
+
+The project's "Just for now is bullshit" rule forbids IOU comments that promise future work without a tracking issue. The new test's docblock contains exactly that shape: it documents that the phrase list is a copied subset and that it *can be migrated* to import the canonical list later — with no GitHub issue referenced. It is the same deferral pattern the test enforces against, embedded in the enforcer. Worth noting that the new single-file guard would never catch this (it scans only `feature-root.ts`), so this IOU ships unguarded. Cure: either import the canonical list now, or file an issue and cite its number in the comment.
+
+### AUDIT-20260531-15 — Inconsistent concat-splitting leaves literal forbidden-phrase fragments in the test file, undermining the comment's stated self-trigger defense
+
+Finding-ID: AUDIT-20260531-15
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `forbiddenPhrases` array)
+
+The comment states the phrases are "assembled via concat so the test file's data array doesn't trigger an accidental self-scan if a future change widens the scope to include test files." But the splitting is applied inconsistently: `'for ' + 'now'`, `'will fix ' + 'later'`, `'follow-up if ' + 'needed'`, etc. are split, while `'until.*lands'`, `'until.*ships'`, and `'deferred to v'` are stored as plain literals. So the file now contains the literal fragment `deferred to v` (and the `until…lands/ships` regex literals) verbatim. If the scan is ever widened to test files as the comment anticipates, this file self-trips on the un-split entries — defeating the exact defense the comment claims. The defensive measure should be applied uniformly to every entry, or dropped in favor of importing the canonical list (which would localize the literals to one canonical source). Low severity because nothing scans this file today, but it's a claim that doesn't match the implementation.
+
+---
+
+Summary: the new regression guard is a step in the right direction but is scoped too narrowly to close the class AUDIT-08/09/10 named (claude-02, claude-03), and — most importantly — the diff's own new fix-tasks 5.25/5.26 re-introduce the bare-`*.test.ts` token that re-trips the doctor rule AUDIT-09 was fixing (claude-01, high). I'd treat claude-01 as the blocking-adjacent item: it means the `fixed-<sha>` flips on AUDIT-08/09 ship alongside workplan tasks the project's own doctor rule will flag as violations.
