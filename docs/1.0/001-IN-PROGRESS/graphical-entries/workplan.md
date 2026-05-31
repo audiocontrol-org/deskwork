@@ -1033,17 +1033,17 @@ Closes AUDIT-20260530-73 (cross-model: AUDIT-BARRAGE-codex-P6-2). Surface: `plug
 
 Closes AUDIT-20260530-74 (cross-model: AUDIT-BARRAGE-codex-P6-2). Surface: `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:157-163`; `packages/studio/test/pipelines/pipelines-page-client.test.ts:214-238`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-74 (cross-model: AUDIT-BARRAGE-codex-P6-2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-74 (cross-model: AUDIT-BARRAGE-codex-P6-2)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/pipelines/pipelines-page-client-validation.test.ts` (Set-locked sub-form preview placeholder case)
+- [x] `npm --workspace @deskwork/studio test -- --run pipelines/pipelines-page-client-validation` exits 0 (12/12 passing post-fix)
+- [x] Audit-log Status flipped to `fixed-5ceee19` via the close-shipped-audit-findings step
 
 
 

@@ -4077,7 +4077,7 @@ Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (codex). R
 ### AUDIT-20260530-74 — [P6-2 codex] Set-locked builder advertises a CLI-refused empty lock command
 
 Finding-ID: AUDIT-20260530-74 (cross-model: AUDIT-BARRAGE-codex-P6-2)
-Status:     open
+Status:     fixed-5ceee19
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:157-163`; `packages/studio/test/pipelines/pipelines-page-client.test.ts:214-238`
 
@@ -4086,6 +4086,8 @@ Surface:    `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:157-
 Reasonable fix: either add a supported CLI clear-locks behavior, or make the UI refuse empty selection with an inline message instead of copying a doomed command.
 
 Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/codex.md`.
+
+Resolution (Task 0.49 — commit 5ceee19): adopted option (2). The Copy gate already disabled paste-out via the inline notice; the remaining bug was that the live preview still advertised the literal `--set-locked ""` shape. Fixed `buildSetLockedCommand` to emit a `<stages>` placeholder in the preview for empty selection (mirrors the New form's `<id>` / `<stages>` unfilled-required-field convention). TDD regression in `packages/studio/test/pipelines/pipelines-page-client-validation.test.ts` asserts the preview text does NOT contain `--set-locked ""` and DOES match `... --set-locked <stages>` for zero-checked state; re-ticking a box snaps to the assembled `... --set-locked "Final"` value. Option (1) — adding a CLI `--clear-locks` verb — is a separate scope; out of Task 0.49 per the task brief.
 
 ### AUDIT-20260530-75 — [P6-2 codex] Page init is not actually idempotent
 
