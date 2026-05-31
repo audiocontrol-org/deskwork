@@ -83,7 +83,11 @@ describe('slushRemaining — Phase 15 Task 7', () => {
       '',
       barrageSection('2026-06-01', 'a', [{ id: 'AUDIT-1', severity: 'high', status: 'open' }]),
       '',
-      barrageSection('2026-06-02', 'b', [{ id: 'AUDIT-2', severity: 'low', status: 'open' }]),
+      // Use MEDIUM in the most-recent run so the single-run dampener
+      // rule (operator directive 2026-05-31: 0 HIGH AND 0 MEDIUM
+      // engages) doesn't fire — we want to test the "refuses when
+      // dampener not engaged" path here.
+      barrageSection('2026-06-02', 'b', [{ id: 'AUDIT-2', severity: 'medium', status: 'open' }]),
     ].join('\n');
     const workplan = workplanWithFixTasks(['AUDIT-1', 'AUDIT-2']);
     const result = slushRemaining({

@@ -24,7 +24,10 @@ const ENTRY_HEADER_RE = /^###\s+/;
 
 export interface BarrageSectionCount {
   readonly runDirBasename: string;
+  /** Open findings with severity ∈ {high, blocking}. */
   readonly highPlusCount: number;
+  /** Open findings with severity === medium. */
+  readonly mediumCount: number;
   readonly totalFindings: number;
 }
 
@@ -87,16 +90,14 @@ function countHighPlusInSection(
   lines: ReadonlyArray<string>,
   section: RawSection,
 ): BarrageSectionCount {
-  // Walk entry-by-entry. Each entry starts with `### ` and contains
-  // ONE `Severity:` and ONE `Status:` line. Count an entry as
-  // "HIGH+" only when severity ∈ {high, blocking} AND status is
-  // `open` — i.e., still unaddressed. A high-severity finding the
-  // operator has already dispositioned (fixed-*, acknowledged-*,
-  // verified-*, informational, withdrawn-*) doesn't count as
-  // unaddressed. This is what makes the slush-pile mechanic work:
-  // operator acknowledges a nit-level HIGH; the dampener stops
-  // counting it; future barrages can skip.
+  // Walk entry-by-entry. Each entry has ONE `Severity:` + ONE
+  // `Status:` line. An entry counts only when its status is `open`
+  // (slush-pile semantic: dispositioned findings don't count).
+  // HIGH+ = high/blocking; MEDIUM tracked separately for the
+  // stiffer single-run engagement rule (operator directive
+  // 2026-05-31).
   let highPlusOpen = 0;
+  let mediumOpen = 0;
   let total = 0;
   let i = section.headerIndex + 1;
   while (i < section.endIndex) {
@@ -105,8 +106,6 @@ function countHighPlusInSection(
       i += 1;
       continue;
     }
-    // We're at an entry header. Walk forward until the next entry
-    // header or section boundary, collecting severity + status.
     let severity: string | undefined;
     let status: string | undefined;
     let j = i + 1;
@@ -121,15 +120,18 @@ function countHighPlusInSection(
     }
     if (severity !== undefined) {
       total += 1;
-      const isHighPlus = severity === 'high' || severity === 'blocking';
       const isOpen = status === 'open' || status === undefined;
-      if (isHighPlus && isOpen) highPlusOpen += 1;
+      if (isOpen) {
+        if (severity === 'high' || severity === 'blocking') highPlusOpen += 1;
+        else if (severity === 'medium') mediumOpen += 1;
+      }
     }
     i = j;
   }
   return {
     runDirBasename: section.runDirBasename,
     highPlusCount: highPlusOpen,
+    mediumCount: mediumOpen,
     totalFindings: total,
   };
 }
@@ -147,17 +149,43 @@ export function checkBarrageDampener(
   const recentRunCounts = orderedRecent
     .slice(0, threshold)
     .map((s) => countHighPlusInSection(lines, s));
-  const dampened =
+
+  // Rule 1 — N-consecutive-quiet (original): last `threshold` runs
+  // all have 0 HIGH+ open. Looser threshold; engages after a streak.
+  const consecutiveQuietEngages =
     recentRunCounts.length >= threshold &&
     recentRunCounts.every((r) => r.highPlusCount === 0);
+
+  // Rule 2 — single-run-no-medium-or-high (operator directive
+  // 2026-05-31): the MOST RECENT run has 0 HIGH+ AND 0 MEDIUM open
+  // findings. Stiffer — a single clean run engages without waiting
+  // for the N-streak.
+  const mostRecent = recentRunCounts[0];
+  const singleRunCleanEngages =
+    mostRecent !== undefined &&
+    mostRecent.highPlusCount === 0 &&
+    mostRecent.mediumCount === 0;
+
+  const dampened = consecutiveQuietEngages || singleRunCleanEngages;
+
   const reason = (() => {
     if (sections.length === 0) {
       return 'No audit-barrage lift sections found in audit-log; the dampener has no signal yet.';
     }
     if (dampened) {
+      const parts: string[] = [];
+      if (consecutiveQuietEngages) {
+        parts.push(
+          `the last ${threshold} consecutive audit-barrage runs each surfaced 0 HIGH+ findings`,
+        );
+      }
+      if (singleRunCleanEngages) {
+        parts.push(
+          `the most recent run (${mostRecent!.runDirBasename}) surfaced 0 HIGH+ AND 0 MEDIUM findings (single-run rule)`,
+        );
+      }
       return (
-        `Dampened: the last ${threshold} consecutive audit-barrage ` +
-        `runs each surfaced 0 HIGH+ findings. The /dwi end-of-task ` +
+        `Dampened: ${parts.join(' AND ')}. The /dwi end-of-task ` +
         `hook should skip — the auditor has gone quiet on real bugs.`
       );
     }
@@ -169,9 +197,16 @@ export function checkBarrageDampener(
         `${notQuiet[0]!.runDirBasename} → ${notQuiet[0]!.highPlusCount} HIGH+).`
       );
     }
+    if (mostRecent !== undefined && mostRecent.mediumCount > 0) {
+      return (
+        `Not dampened: most recent run (${mostRecent.runDirBasename}) has ` +
+        `0 HIGH+ but ${mostRecent.mediumCount} MEDIUM findings — single-run ` +
+        `rule needs 0 MEDIUM too. N-quiet rule needs ${threshold} consecutive 0-HIGH+ runs.`
+      );
+    }
     return (
       `Not dampened yet: only ${recentRunCounts.length} consecutive ` +
-      `quiet runs (threshold = ${threshold}).`
+      `quiet runs (threshold = ${threshold}) and no single-run-clean trigger.`
     );
   })();
   return { dampened, threshold, recentRunCounts, reason };
