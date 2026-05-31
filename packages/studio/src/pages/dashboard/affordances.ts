@@ -85,12 +85,31 @@ interface Verb {
  * — read-only artifact). `locked` covers any lockedStages member
  * (review-frozen, awaiting the next approve). `activeLinear` is the
  * default linear-pipeline stage (iterate + approve both available).
+ *
+ * Exported per Task 0.12 (AUDIT-20260530-36) so callers — chiefly
+ * `renderRow` in `section.ts` — can hoist the `classifyStage` call
+ * to once-per-row and thread the result into the sub-renderers
+ * rather than each sub-renderer re-deriving it.
  */
-type StageCategory =
+export type StageCategory =
   | { readonly kind: 'offPipeline' }
   | { readonly kind: 'terminal' }
   | { readonly kind: 'locked'; readonly nextLinearStage: string }
   | { readonly kind: 'activeLinear' };
+
+/**
+ * Three views of the verb vocabulary for a single row: the inline-chip
+ * set (desktop high-frequency verbs), the drawer set (mobile swipe
+ * top-N), and the menu set (full stage-aware vocabulary). Returned by
+ * `verbsForStage`. Exported per Task 0.12 (AUDIT-20260530-36) so
+ * callers can hoist the construction to once-per-row and pass the
+ * computed value into the three sub-renderers.
+ */
+export interface VerbSet {
+  readonly inline: readonly Verb[];
+  readonly drawer: readonly Verb[];
+  readonly menu: readonly Verb[];
+}
 
 /**
  * Classify a stage against the template's linear + off-pipeline +
@@ -163,11 +182,7 @@ function verbsForStage(
   template: PipelineTemplate,
   entry: Entry,
   defaultSite: string,
-): {
-  readonly inline: readonly Verb[];
-  readonly drawer: readonly Verb[];
-  readonly menu: readonly Verb[];
-} {
+): VerbSet {
   const slug = entry.slug;
   const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
   // Scrapbook URL uses the project's defaultSite (#157, #205). Slug already
@@ -366,13 +381,17 @@ function renderMenuItem(verb: Verb): string {
  *
  * Short menus (off-pipeline OR terminal-frozen) skip dividers — the menu
  * holds at most two items there.
+ *
+ * Per Task 0.12 (AUDIT-20260530-36): `renderMenu` accepts the
+ * already-computed `category` rather than re-deriving it via a second
+ * `classifyStage(stage, template)` call. The category is computed once
+ * by the caller (`renderRow` → `renderRowMenu` → `renderMenu`) and
+ * threaded through; the duplicate-source-of-truth shape is gone.
  */
 function renderMenu(
-  stage: string,
-  template: PipelineTemplate,
+  category: StageCategory,
   menu: readonly Verb[],
 ): string {
-  const category = classifyStage(stage, template);
   const isShort = category.kind === 'offPipeline' || category.kind === 'terminal';
   if (isShort) {
     return menu.map(renderMenuItem).join('');
@@ -415,18 +434,20 @@ function renderMenu(
  * `renderRowMenu` (also exported) so section.ts can place them in the
  * correct outer layout (drawer is sibling of `.er-row-fg`; menu is sibling
  * of `.er-row-fg`).
+ *
+ * Per Task 0.12 (AUDIT-20260530-36): the caller (`renderRow` in
+ * `section.ts`) computes the verb set ONCE via `verbsForStage` and
+ * threads it into this renderer + `renderRowDrawer` + `renderRowMenu`.
+ * Pre-fix each sub-renderer re-derived its own set (4× `classifyStage`
+ * + 3× full verb-object construction per row); post-fix the
+ * computation happens exactly once per row.
  */
-export function renderRowActions(
-  entry: Entry,
-  template: PipelineTemplate,
-  defaultSite: string,
-): RawHtml {
+export function renderRowActions(verbs: VerbSet): RawHtml {
   // Per Phase 5 Task 5.2: the template-aware verb dispatch covers
   // every pipeline template's stage vocabulary. Every entry's row
   // now receives the verb-chip chrome — Commandment II ensures verbs
   // are universal across templates, gated only on stage position.
-  const { inline } = verbsForStage(entry.currentStage, template, entry, defaultSite);
-  const chips = inline.map(renderInlineChip).join('');
+  const chips = verbs.inline.map(renderInlineChip).join('');
   const overflow = html`<button type="button"
     class="er-row-overflow"
     data-row-overflow
@@ -446,27 +467,25 @@ export function renderRowActions(
  * Drawer rendered as a sibling of `.er-row-fg`. Absolute-positioned at the
  * row's trailing edge; hidden behind the foreground at-rest. Revealed by
  * the foreground translating left on swipe.
+ *
+ * Per Task 0.12 (AUDIT-20260530-36): consumes the already-computed
+ * `verbs` rather than re-deriving via `verbsForStage`.
  */
-export function renderRowDrawer(
-  entry: Entry,
-  template: PipelineTemplate,
-  defaultSite: string,
-): RawHtml {
-  const { drawer } = verbsForStage(entry.currentStage, template, entry, defaultSite);
-  return unsafe(html`<div class="er-row-drawer" aria-hidden="true">${unsafe(drawer.map(renderDrawerChip).join(''))}</div>`);
+export function renderRowDrawer(verbs: VerbSet): RawHtml {
+  return unsafe(html`<div class="er-row-drawer" aria-hidden="true">${unsafe(verbs.drawer.map(renderDrawerChip).join(''))}</div>`);
 }
 
 /**
  * Menu popover rendered as a sibling of `.er-row-fg`. Hidden by default
  * (the controller flips `hidden` + `aria-expanded` on the overflow button).
+ *
+ * Per Task 0.12 (AUDIT-20260530-36): consumes the already-computed
+ * `verbs` and `category` rather than re-deriving both via
+ * `verbsForStage` + `classifyStage`. The category drives `renderMenu`'s
+ * short-menu-vs-grouped-menu branch.
  */
-export function renderRowMenu(
-  entry: Entry,
-  template: PipelineTemplate,
-  defaultSite: string,
-): RawHtml {
-  const { menu } = verbsForStage(entry.currentStage, template, entry, defaultSite);
-  return unsafe(html`<div class="er-row-menu" role="menu" hidden>${unsafe(renderMenu(entry.currentStage, template, menu))}</div>`);
+export function renderRowMenu(verbs: VerbSet, category: StageCategory): RawHtml {
+  return unsafe(html`<div class="er-row-menu" role="menu" hidden>${unsafe(renderMenu(category, verbs.menu))}</div>`);
 }
 
 // Exported for tests + downstream renderers that need to compose verb

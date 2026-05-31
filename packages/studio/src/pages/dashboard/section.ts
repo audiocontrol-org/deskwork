@@ -9,7 +9,13 @@
 import { html, unsafe, type RawHtml } from '../html.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
 import type { PipelineTemplate } from '@deskwork/core/pipelines';
-import { renderRowActions, renderRowDrawer, renderRowMenu } from './affordances.ts';
+import {
+  classifyStage,
+  renderRowActions,
+  renderRowDrawer,
+  renderRowMenu,
+  verbsForStage,
+} from './affordances.ts';
 
 /**
  * Render the "Member of: N groups" pull-tab on the row's LEFT edge
@@ -121,12 +127,22 @@ export function renderRow(
   // when the row carries `.is-member-expanded`.
   const parents = parentsByMemberUuid.get(entry.uuid) ?? [];
   const memberClass = parents.length > 0 ? ' has-member-tab' : '';
+  // Per Task 0.12 (AUDIT-20260530-36): hoist the per-row stage
+  // classification + verb-set construction to ONCE per row. Pre-fix
+  // shape called `classifyStage` ~4× and `verbsForStage` 3× per row
+  // (each sub-renderer re-derived its own set; `renderMenu` then
+  // classified a SECOND time on the same stage+template). The
+  // computed `category` + `verbs` are now threaded into the three
+  // sub-renderers, eliminating both the wasted allocation AND the
+  // duplicate-source-of-truth shape.
+  const category = classifyStage(entry.currentStage, template);
+  const verbs = verbsForStage(entry.currentStage, template, entry, defaultSite);
   return unsafe(html`
     <div class="er-row-shell${unsafe(memberClass)}" data-row-shell data-search="${search}"${depthAttrs}
       data-stage="${entry.currentStage}"
       data-uuid="${entry.uuid}" data-slug="${entry.slug}">
       ${renderMemberTab(parents)}
-      ${renderRowDrawer(entry, template, defaultSite)}
+      ${renderRowDrawer(verbs)}
       <div class="er-row-fg er-calendar-row">
         <span class="er-row-num">№ ${String(index + 1).padStart(2, '0')}</span>
         <div class="er-calendar-body">
@@ -137,9 +153,9 @@ export function renderRow(
             datetime="${entry.updatedAt}" title="${entry.updatedAt}">${formatDate(entry.updatedAt)}</time>
         </div>
         <span class="er-calendar-status" aria-hidden="true"></span>
-        ${renderRowActions(entry, template, defaultSite)}
+        ${renderRowActions(verbs)}
       </div>
-      ${renderRowMenu(entry, template, defaultSite)}
+      ${renderRowMenu(verbs, category)}
       ${renderMemberPopover(parents)}
     </div>`);
 }

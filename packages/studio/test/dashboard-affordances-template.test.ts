@@ -363,37 +363,37 @@ describe('Commandment III — no review-state labels in template-aware row chrom
     }
   }
 
+  // Per Task 0.12 (AUDIT-20260530-36): the renderers now consume
+  // pre-computed `verbs` + `category` rather than re-deriving via
+  // `verbsForStage` / `classifyStage`. The helper below hoists those
+  // calls per test case so the assertions stay readable.
+  function rowChrome(
+    template: PipelineTemplate,
+    stage: string,
+  ): { actions: string; drawer: string; menu: string } {
+    const e = makeEntry(stage);
+    const verbs = verbsForStage(stage, template, e, DEFAULT_SITE);
+    const category = classifyStage(stage, template);
+    return {
+      actions: renderRowActions(verbs).__raw,
+      drawer: renderRowDrawer(verbs).__raw,
+      menu: renderRowMenu(verbs, category).__raw,
+    };
+  }
+
   it('editorial active-linear row chrome carries no review-state tokens', () => {
-    const e = makeEntry('Drafting');
-    assertNoReviewState(
-      renderRowActions(e, editorial, DEFAULT_SITE).__raw,
-      'editorial Drafting actions',
-    );
-    assertNoReviewState(
-      renderRowDrawer(e, editorial, DEFAULT_SITE).__raw,
-      'editorial Drafting drawer',
-    );
-    assertNoReviewState(
-      renderRowMenu(e, editorial, DEFAULT_SITE).__raw,
-      'editorial Drafting menu',
-    );
+    const chrome = rowChrome(editorial, 'Drafting');
+    assertNoReviewState(chrome.actions, 'editorial Drafting actions');
+    assertNoReviewState(chrome.drawer, 'editorial Drafting drawer');
+    assertNoReviewState(chrome.menu, 'editorial Drafting menu');
   });
 
   it('editorial locked + terminal row chrome carries no review-state tokens', () => {
     for (const stage of ['Final', 'Published']) {
-      const e = makeEntry(stage);
-      assertNoReviewState(
-        renderRowActions(e, editorial, DEFAULT_SITE).__raw,
-        `editorial ${stage} actions`,
-      );
-      assertNoReviewState(
-        renderRowDrawer(e, editorial, DEFAULT_SITE).__raw,
-        `editorial ${stage} drawer`,
-      );
-      assertNoReviewState(
-        renderRowMenu(e, editorial, DEFAULT_SITE).__raw,
-        `editorial ${stage} menu`,
-      );
+      const chrome = rowChrome(editorial, stage);
+      assertNoReviewState(chrome.actions, `editorial ${stage} actions`);
+      assertNoReviewState(chrome.drawer, `editorial ${stage} drawer`);
+      assertNoReviewState(chrome.menu, `editorial ${stage} menu`);
     }
   });
 
@@ -411,19 +411,10 @@ describe('Commandment III — no review-state labels in template-aware row chrom
       [blogPost, 'Published'],
     ];
     for (const [template, stage] of cases) {
-      const e = makeEntry(stage);
-      assertNoReviewState(
-        renderRowActions(e, template, DEFAULT_SITE).__raw,
-        `${template.id} ${stage} actions`,
-      );
-      assertNoReviewState(
-        renderRowDrawer(e, template, DEFAULT_SITE).__raw,
-        `${template.id} ${stage} drawer`,
-      );
-      assertNoReviewState(
-        renderRowMenu(e, template, DEFAULT_SITE).__raw,
-        `${template.id} ${stage} menu`,
-      );
+      const chrome = rowChrome(template, stage);
+      assertNoReviewState(chrome.actions, `${template.id} ${stage} actions`);
+      assertNoReviewState(chrome.drawer, `${template.id} ${stage} drawer`);
+      assertNoReviewState(chrome.menu, `${template.id} ${stage} menu`);
     }
   });
 });
