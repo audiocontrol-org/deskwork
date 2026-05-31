@@ -3477,7 +3477,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (claude). 
 ### AUDIT-20260530-28 — [P5-1 codex] Compose chip copies an invalid command for stage names with spaces
 
 Finding-ID: AUDIT-20260530-28 (cross-model: AUDIT-BARRAGE-codex-P5-1)
-Status:     open
+Status:     fixed-19cf21d
 Severity:   medium
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:90-98; packages/studio/src/pages/dashboard/swimlane-card.ts:297-307
 
