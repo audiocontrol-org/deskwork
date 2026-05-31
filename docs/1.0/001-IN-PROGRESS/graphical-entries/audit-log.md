@@ -3947,7 +3947,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). R
 ### AUDIT-20260530-64 — [P6-1 codex] `lane move` trusts sidecar paths when moving files
 
 Finding-ID: AUDIT-20260530-64 (cross-model: AUDIT-BARRAGE-codex-P6-1)
-Status:     open
+Status:     fixed-e4a3dcb71a60944b24750a3d10812968f451eac1
 Severity:   high
 Surface:    `packages/core/src/lanes/operations/move.ts:210-231`, `packages/core/src/schema/entry.ts:213-218`
 
