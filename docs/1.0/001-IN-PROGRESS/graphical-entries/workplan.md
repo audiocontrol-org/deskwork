@@ -1243,17 +1243,19 @@ Closes AUDIT-20260530-84 (cross-model: AUDIT-BARRAGE-claude-P6-3). Surface: `pac
 
 Closes AUDIT-20260530-85 (cross-model: AUDIT-BARRAGE-codex-P6-3). Surface: packages/core/src/doctor/rules/lane-config-missing-template.ts:303-320 and packages/core/src/doctor/rules/lane-config-missing-template.ts:364-381.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-85 (cross-model: AUDIT-BARRAGE-codex-P6-3)` in subject
+Disposition: duplicate of AUDIT-20260530-79 (claude). Both describe the same mutate-before-journal hazard in the doctor lane-repair branches. Closed by Task 0.54 commit `7de9a07` which added compensating-write rollback via `snapshotLaneFile`/`restoreLaneFile` helpers in both branches.
+
+- [x] Step 1: covered by AUDIT-79 test (`lane-repair-rollback-on-journal-fail.test.ts`)
+- [x] Step 2: verified
+- [x] Step 3: implemented in `7de9a07`
+- [x] Step 4: verified
+- [x] Step 5: closed via duplicate disposition
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/doctor/lane-repair-rollback-on-journal-fail.test.ts` (AUDIT-79 regression — same surface)
+- [x] `npx vitest run` exits 0
+- [x] Audit-log Status flipped to `fixed-7de9a07 (duplicate of AUDIT-20260530-79; closed by the same Task 0.54 commit)`
 
 
 

@@ -4236,7 +4236,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). 
 ### AUDIT-20260530-85 — [P6-3 codex] Repair can mutate lane state without recording the repair event
 
 Finding-ID: AUDIT-20260530-85 (cross-model: AUDIT-BARRAGE-codex-P6-3)
-Status:     open
+Status:     fixed-7de9a07 (duplicate of AUDIT-20260530-79; closed by the same Task 0.54 commit)
 Severity:   medium
 Surface:    packages/core/src/doctor/rules/lane-config-missing-template.ts:303-320 and packages/core/src/doctor/rules/lane-config-missing-template.ts:364-381
 
