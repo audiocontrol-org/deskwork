@@ -8,23 +8,35 @@
  *   2. Mark "Reviewed" locked + "Blocked,Cancelled" off-pipeline via
  *      mutually-exclusive `pipeline update` invocations.
  *   3. Create a lane (`blog-lane`) bound to that pipeline.
- *   4. Write two entry sidecars bound to the lane.
+ *   4. Create two entries via `deskwork add --lane <id> --stage <s>` so
+ *      the entry-creation path (calendar mutation + sidecar minting via
+ *      `createFreshEntrySidecar`) is genuinely exercised — not a
+ *      hand-rolled sidecar shape.
  *   5. Archive the lane — sidecars persist untouched.
  *   6. Restore the lane — sidecars persist untouched.
  *   7. Hard-delete (`lane purge`) is refused while entries reference the
  *      lane.
  *   8. State-intact: post-cycle sidecar JSON is byte-equivalent to the
- *      pre-cycle written bytes.
+ *      bytes captured immediately after `deskwork add`.
  *
  * No mocking — every CLI invocation is a real subprocess. The test
  * exercises the full surface implicated by Phase 6 Task 6.6's acceptance
  * criteria (CRUD CLI works end-to-end, soft-archive default, hard-delete
- * refusal when referenced).
+ * refusal when referenced) including the real entry-creation path.
+ *
+ * AUDIT-20260530-83 (cross-model: AUDIT-BARRAGE-claude-P6-3): prior to
+ * Task 0.58, step 4 hand-wrote sidecar JSON via a local helper, which
+ * made the byte-equivalence assertion in step 8 close to tautological —
+ * lane operations never touch sidecars, so "bytes unchanged" would
+ * hold even if entry binding were completely broken. Driving entry
+ * creation through `deskwork add` closes that gap: the sidecar shape
+ * comes from the real production path, and the byte-equivalence claim
+ * has teeth because it asserts the lane-lifecycle ops don't perturb
+ * sidecars produced by the canonical creation flow.
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -98,6 +110,19 @@ function lane(project: string, ...args: string[]): RunResult {
   };
 }
 
+function addEntry(project: string, ...args: string[]): RunResult {
+  const r = spawnSync(
+    deskworkBin,
+    ['add', project, ...args],
+    { encoding: 'utf-8' },
+  );
+  return {
+    code: r.status ?? -1,
+    stdout: r.stdout ?? '',
+    stderr: r.stderr ?? '',
+  };
+}
+
 function pipelinePath(project: string, id: string): string {
   return join(project, '.deskwork', 'pipelines', `${id}.json`);
 }
@@ -110,32 +135,32 @@ function sidecarPath(project: string, uuid: string): string {
   return join(project, '.deskwork', 'entries', `${uuid}.json`);
 }
 
-interface SidecarSeed {
-  readonly uuid: string;
-  readonly slug: string;
-  readonly currentStage: string;
-  readonly lane: string;
+/**
+ * Extract the UUID assigned to a slug by `deskwork add`. The add command
+ * emits `{ slug, ... }` on stdout but does NOT echo the entry UUID
+ * (calendar.md is the authoritative join from slug → UUID). We parse
+ * calendar.md's table row for the slug and pull the UUID column out —
+ * same shape as `add-lane-stage-integration.test.ts`'s helper.
+ */
+function uuidForSlug(project: string, slug: string): string {
+  const calendarRaw = readFileSync(
+    join(project, '.deskwork', 'calendar.md'),
+    'utf-8',
+  );
+  const m = calendarRaw.match(
+    new RegExp(`\\| ([0-9a-f-]{36}) \\| ${slug.replace(/[\/.]/g, '\\$&')} \\|`),
+  );
+  if (m === null) {
+    throw new Error(
+      `could not find UUID for slug "${slug}" in calendar.md`,
+    );
+  }
+  return m[1];
 }
 
-function writeSidecarFile(project: string, seed: SidecarSeed): string {
-  const path = sidecarPath(project, seed.uuid);
-  const now = new Date().toISOString();
-  const payload = {
-    uuid: seed.uuid,
-    slug: seed.slug,
-    title: seed.slug,
-    keywords: [],
-    source: 'manual',
-    currentStage: seed.currentStage,
-    iterationByStage: {},
-    lane: seed.lane,
-    createdAt: now,
-    updatedAt: now,
-  };
-  // JSON.stringify with no indentation; the file's exact byte content is
-  // what we round-trip-compare across the archive/restore cycle.
-  writeFileSync(path, JSON.stringify(payload), 'utf-8');
-  return path;
+interface AddedEntry {
+  readonly slug: string;
+  readonly uuid: string;
 }
 
 beforeAll(() => { assertDeskworkBinPresent(); });
@@ -238,27 +263,44 @@ describe('custom-pipeline + lane integration (Phase 6 Task 6.6)', () => {
     expect(laneOnDisk['pipelineTemplate']).toBe('custom-blog');
     expect(laneOnDisk['contentDir']).toBe('content/blog');
 
-    // 4. Write two entry sidecars bound to the lane at a non-locked,
-    //    non-terminal stage of the custom pipeline.
-    const seeds: SidecarSeed[] = [
-      {
-        uuid: randomUUID(),
-        slug: 'first-post',
-        currentStage: 'Drafting',
-        lane: 'blog-lane',
-      },
-      {
-        uuid: randomUUID(),
-        slug: 'second-post',
-        currentStage: 'Drafting',
-        lane: 'blog-lane',
-      },
-    ];
+    // 4. Create two entries via `deskwork add` bound to the lane at a
+    //    non-locked, non-terminal stage of the custom pipeline. Driving
+    //    `add` (rather than hand-writing a sidecar) exercises the real
+    //    creation path — calendar mutation + sidecar minting via
+    //    `createFreshEntrySidecar` — so the byte-equivalence assertion
+    //    in step 8 has teeth (the sidecar shape is the production
+    //    shape, not a test-author-invented shape that would pass even
+    //    if entry binding were broken).
+    const slugs = ['first-post', 'second-post'] as const;
+    const entries: AddedEntry[] = [];
     const sidecarPreBytes = new Map<string, string>();
-    for (const seed of seeds) {
-      const path = writeSidecarFile(project, seed);
+    for (const slug of slugs) {
+      const added = addEntry(
+        project,
+        '--lane', 'blog-lane',
+        '--stage', 'Drafting',
+        '--slug', slug,
+        slug,
+      );
+      expect(added.stderr).toBe('');
+      expect(added.code).toBe(0);
+      const uuid = uuidForSlug(project, slug);
+      const path = sidecarPath(project, uuid);
       expect(existsSync(path)).toBe(true);
-      sidecarPreBytes.set(seed.uuid, readFileSync(path, 'utf-8'));
+      sidecarPreBytes.set(uuid, readFileSync(path, 'utf-8'));
+      entries.push({ slug, uuid });
+
+      // Sanity-check the sidecar shape produced by the real add path so
+      // step 8's byte-equivalence claim is anchored to a known-good
+      // baseline (lane bound, stage bound, source manual).
+      const sidecar = JSON.parse(
+        readFileSync(path, 'utf-8'),
+      ) as Record<string, unknown>;
+      expect(sidecar['uuid']).toBe(uuid);
+      expect(sidecar['slug']).toBe(slug);
+      expect(sidecar['lane']).toBe('blog-lane');
+      expect(sidecar['currentStage']).toBe('Drafting');
+      expect(sidecar['source']).toBe('manual');
     }
 
     // 5. Archive the lane. Soft-archive: archivedAt populated; the lane
@@ -273,10 +315,10 @@ describe('custom-pipeline + lane integration (Phase 6 Task 6.6)', () => {
     expect(typeof laneAfterArchive['archivedAt']).toBe('string');
     expect(String(laneAfterArchive['archivedAt'])).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
-    for (const seed of seeds) {
-      expect(existsSync(sidecarPath(project, seed.uuid))).toBe(true);
-      const post = readFileSync(sidecarPath(project, seed.uuid), 'utf-8');
-      expect(post).toBe(sidecarPreBytes.get(seed.uuid));
+    for (const entry of entries) {
+      expect(existsSync(sidecarPath(project, entry.uuid))).toBe(true);
+      const post = readFileSync(sidecarPath(project, entry.uuid), 'utf-8');
+      expect(post).toBe(sidecarPreBytes.get(entry.uuid));
     }
 
     // 6. Restore the lane. archivedAt cleared; sidecars STILL intact.
@@ -291,8 +333,8 @@ describe('custom-pipeline + lane integration (Phase 6 Task 6.6)', () => {
     expect(laneAfterRestore['id']).toBe('blog-lane');
     expect(laneAfterRestore['pipelineTemplate']).toBe('custom-blog');
 
-    for (const seed of seeds) {
-      expect(existsSync(sidecarPath(project, seed.uuid))).toBe(true);
+    for (const entry of entries) {
+      expect(existsSync(sidecarPath(project, entry.uuid))).toBe(true);
     }
 
     // 7. Hard-delete (`lane purge`) is refused while entries reference the
@@ -309,14 +351,18 @@ describe('custom-pipeline + lane integration (Phase 6 Task 6.6)', () => {
     expect(existsSync(lanePath(project, 'blog-lane'))).toBe(true);
 
     // 8. State-intact verification: every sidecar's bytes are unchanged
-    //    by the full archive → restore → refused-purge cycle.
-    for (const seed of seeds) {
-      const finalBytes = readFileSync(sidecarPath(project, seed.uuid), 'utf-8');
-      expect(finalBytes).toBe(sidecarPreBytes.get(seed.uuid));
+    //    by the full archive → restore → refused-purge cycle. The
+    //    pre-cycle bytes were captured immediately after `deskwork add`
+    //    in step 4, so the claim is "lane-lifecycle ops do not perturb
+    //    sidecars produced by the canonical creation path" — not the
+    //    weaker tautology that held when sidecars were hand-rolled.
+    for (const entry of entries) {
+      const finalBytes = readFileSync(sidecarPath(project, entry.uuid), 'utf-8');
+      expect(finalBytes).toBe(sidecarPreBytes.get(entry.uuid));
 
       const finalParsed = JSON.parse(finalBytes) as Record<string, unknown>;
-      expect(finalParsed['uuid']).toBe(seed.uuid);
-      expect(finalParsed['slug']).toBe(seed.slug);
+      expect(finalParsed['uuid']).toBe(entry.uuid);
+      expect(finalParsed['slug']).toBe(entry.slug);
       expect(finalParsed['currentStage']).toBe('Drafting');
       expect(finalParsed['lane']).toBe('blog-lane');
     }
