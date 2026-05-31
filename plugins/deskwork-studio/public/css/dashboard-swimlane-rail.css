@@ -95,7 +95,6 @@
 
 .rail-lane .r-eye-btn {
   font-family: var(--er-font-mono);
-  width: 14px;
   text-align: center;
   color: var(--er-ink-soft);
   font-size: 0.85rem;
@@ -107,7 +106,21 @@
   padding: 0;
   margin: 0;
   cursor: pointer;
-  line-height: inherit;
+  line-height: 1;
+  /* AUDIT-20260530-27 — WCAG 2.2 SC 2.5.8 (AA) hit-target floor.
+   * The glyph itself stays small (font-size: 0.85rem) — the hit area
+   * expands via min-width / min-height + flex centering so the visual
+   * chrome doesn't bloat. Mirrors the `.r-move-up-btn` /
+   * `.r-move-down-btn` and `.collapse-chev` patterns in the same
+   * file. The button is independently focusable (own click handler
+   * in `swimlane.ts:bindRailEyeToggles` with `stopPropagation`), so
+   * it is subject to the target-size rule on its own — not covered
+   * by the row's larger hit area. */
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .rail-lane[data-lane-visible="false"] .r-eye-btn {
