@@ -3921,7 +3921,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). R
 ### AUDIT-20260530-62 — [P6-1 codex] `remove-stage` misses legacy default-lane entries
 
 Finding-ID: AUDIT-20260530-62 (cross-model: AUDIT-BARRAGE-codex-P6-1)
-Status:     open
+Status:     fixed-0d76ec5
 Severity:   medium
 Surface:    `packages/core/src/pipelines/operations/update.ts:367-395`
 

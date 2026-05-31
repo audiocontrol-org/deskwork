@@ -799,17 +799,17 @@ Disposition: duplicate of AUDIT-20260530-54 (claude). Both describe the same pha
 
 Closes AUDIT-20260530-62 (cross-model: AUDIT-BARRAGE-codex-P6-1). Surface: `packages/core/src/pipelines/operations/update.ts:367-395`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-62 (cross-model: AUDIT-BARRAGE-codex-P6-1)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-62 (cross-model: AUDIT-BARRAGE-codex-P6-1)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/pipelines/remove-stage-legacy-entry.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-0d76ec5` via the close-shipped-audit-findings step
 
 
 
