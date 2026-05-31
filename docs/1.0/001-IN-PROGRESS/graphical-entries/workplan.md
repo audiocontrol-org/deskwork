@@ -653,17 +653,17 @@ Disposition: tracked via issue [#382](https://github.com/audiocontrol-org/deskwo
 
 Closes AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3). Surface: plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:53-63; plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts:72-89,371-392.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-storage-dedup.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-57bd93d` via the close-shipped-audit-findings step
 
 
 

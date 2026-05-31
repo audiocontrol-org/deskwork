@@ -3792,7 +3792,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (codex). R
 ### AUDIT-20260530-53 — [P5-3 codex] Stored lane order accepts duplicate IDs and can poison reorder state
 
 Finding-ID: AUDIT-20260530-53 (cross-model: AUDIT-BARRAGE-codex-P5-3)
-Status:     open
+Status:     fixed-57bd93d
 Severity:   low
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:53-63; plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts:72-89,371-392
 
