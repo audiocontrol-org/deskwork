@@ -3516,7 +3516,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (codex). R
 ### AUDIT-20260530-31 — [P5-1 gemini] The stage ID slugification logic in `renderStageCol` (and implicitly in `renderListGroup` through shared stage name derivation) still uses `stage.toLowerCase().replace(/[^a-z0-9-]+/g, '-')`. This can lead to DOM ID collisions when a single lane has distinct stage names that slugify to the same value (e.g., `QA Review` and `QA_Review` both become `qa-review`). This issue is explicitly flagged as AUDIT-20260528-07 in the provided `audit-log.md` and remains unfixed in this diff. The proposed fix in AUDIT-20260528-07 is to use `stageNameToFilesystemToken(stage)` or a dedicated DOM-token helper, neither of which is implemented or used in `swimlane-card.ts`.
 
 Finding-ID: AUDIT-20260530-31 (cross-model: AUDIT-BARRAGE-gemini-P5-1)
-Status:     open
+Status:     fixed-fdf9621
 Severity:   medium
 Surface:    `packages/studio/src/pages/dashboard/swimlane-card.ts:127`
 

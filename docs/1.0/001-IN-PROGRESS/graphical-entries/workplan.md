@@ -235,17 +235,19 @@ Closes AUDIT-20260530-30 (cross-model: AUDIT-BARRAGE-codex-P5-1). Surface: plugi
 
 Closes AUDIT-20260530-31 (cross-model: AUDIT-BARRAGE-gemini-P5-1). Surface: `packages/studio/src/pages/dashboard/swimlane-card.ts:127`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-31 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-31 (cross-model: AUDIT-BARRAGE-gemini-P5-1)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-card-unit.test.ts` (3 tests — kanban-stage uniqueness from the existing AUDIT-20260528-07 regression + two new list-body regressions covering `data-lb-group` uniqueness AND no-duplicate-id contract on the list-body surface; sanity-checked the new tests catch a regression by injecting the pre-fix slugifier into `renderListGroup`'s `data-lb-group` and confirming the assertion failed with `['qa-review', 'qa-review']`, then reverted)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-fdf9621` via the close-shipped-audit-findings step
+
+**Disposition note:** the gemini finding cited stale source code (line 127 of `swimlane-card.ts`, which referenced the pre-`a281ea7` shape). The actual stage-DOM-id derivation in `renderStageCol` already routes through `stageNameToFilesystemToken` (swimlane-card.ts:183), so the kanban surface was already collision-safe per AUDIT-20260528-07's `fixed-a281ea7`. AUDIT-20260528-07 stays at `fixed-a281ea7` — its surface and the swimlane-card portion of AUDIT-20260530-31 are the same. The work that DID need to land was on the sibling `renderListGroup` site the gemini finding named "implicit through shared stage name derivation"; the verbatim-stage `data-lb-group` contract is now pinned by regression tests.
 
 
 
