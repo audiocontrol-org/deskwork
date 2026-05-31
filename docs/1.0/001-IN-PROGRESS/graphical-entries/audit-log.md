@@ -4137,7 +4137,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). 
 ### AUDIT-20260530-78 — [P6-3 claude] Entry-binding guard can false-negative on corrupt sidecars, orphaning entries on delete
 
 Finding-ID: AUDIT-20260530-78 (cross-model: AUDIT-BARRAGE-claude-P6-3)
-Status:     open
+Status:     fixed-d39551c
 Severity:   medium
 Surface:    `packages/core/src/doctor/rules/lane-config-missing-template.ts:280-300` (`readAllSidecars` dependency check)
 
