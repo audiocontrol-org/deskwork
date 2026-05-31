@@ -3908,7 +3908,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (codex). R
 ### AUDIT-20260530-61 — [P6-1 codex] Stage-rename sidecar is enumerated as a fake pipeline template
 
 Finding-ID: AUDIT-20260530-61 (cross-model: AUDIT-BARRAGE-codex-P6-1)
-Status:     open
+Status:     fixed-ec38100 (duplicate of AUDIT-20260530-54; closed by the same Task 0.30 commit)
 Severity:   high
 Surface:    `packages/core/src/pipelines/operations/update.ts:410-459`, `packages/core/src/pipelines/loader.ts:251-260`, `packages/core/src/pipelines/operations/list.ts:38-40`
 

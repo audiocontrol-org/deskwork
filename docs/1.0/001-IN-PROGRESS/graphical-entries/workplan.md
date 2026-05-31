@@ -779,17 +779,19 @@ Closes AUDIT-20260530-59 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `pac
 
 Closes AUDIT-20260530-61 (cross-model: AUDIT-BARRAGE-codex-P6-1). Surface: `packages/core/src/pipelines/operations/update.ts:410-459`, `packages/core/src/pipelines/loader.ts:251-260`, `packages/core/src/pipelines/operations/list.ts:38-40`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-61 (cross-model: AUDIT-BARRAGE-codex-P6-1)` in subject
+Disposition: duplicate of AUDIT-20260530-54 (claude). Both describe the same phantom-template bug (rename sidecar enumerated as a pipeline). Closed by Task 0.30 commit `ec38100` which moved migrations to `.deskwork/pipelines/migrations/<id>.json` subdir (loader does not recurse).
+
+- [x] Step 1: covered by AUDIT-54 test (`rename-sidecar-isolation.test.ts`)
+- [x] Step 2: verified
+- [x] Step 3: implemented in `ec38100`
+- [x] Step 4: verified
+- [x] Step 5: closed via duplicate disposition
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/pipelines/rename-sidecar-isolation.test.ts` (AUDIT-54 regression — same surface)
+- [x] `npx vitest run` exits 0
+- [x] Audit-log Status flipped to `fixed-ec38100 (duplicate of AUDIT-20260530-54; closed by the same Task 0.30 commit)`
 
 
 
