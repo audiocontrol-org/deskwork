@@ -4107,7 +4107,7 @@ Resolution (Task 0.50 — commit 6d8a400): adopted the container-dataset variant
 ### AUDIT-20260530-76 — [P6-2 codex] Lanes and pipelines pages mark Dashboard as the current page
 
 Finding-ID: AUDIT-20260530-76 (cross-model: AUDIT-BARRAGE-codex-P6-2)
-Status:     open
+Status:     fixed-056528c
 Severity:   low
 Surface:    `packages/studio/src/pages/lanes.ts:76-80`; `packages/studio/src/pages/pipelines.ts:72-75`; `packages/studio/src/pages/chrome.ts:63-67`
 
@@ -4116,6 +4116,8 @@ Both new pages call `renderEditorialFolio('dashboard', ...)`, and `renderEditori
 Reasonable fix: extend the folio active key set for `lanes` and `pipelines`, or pass a no-current key for these pages until they have explicit nav entries.
 
 Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T120247811Z-graphical-entries/codex.md`.
+
+Resolution (Task 0.51 — commit 056528c): chose the "no-current key" variant of the fix, mirroring the existing `'longform'` precedent in `chrome.ts`. Extended `ChromeActiveLink` with `'lanes'` and `'pipelines'` keys and the `FolioLink.key` Exclude list — both new keys are deliberately omitted from `NAV_LINKS`, so `renderEditorialFolio` finds no match and stamps neither `class="active"` nor `aria-current="page"` on any anchor. Lanes + pipelines surfaces now render the full 5-item folio without any link claiming to be the current page. Picked "no-current" over "add new nav-items" because the existing 5-item nav surface design is settled (per `folio-cross-page.test.ts` cross-page contract) and Lanes is reachable from the Dashboard masthead's back-link pattern. TDD regression at `packages/studio/test/chrome/folio-aria-current.test.ts` (12 cases) asserts: (a) Dashboard anchor does NOT carry `aria-current="page"` on `/dev/lanes` or `/dev/pipelines`, (b) zero `aria-current="page"` inside the folio nav block, (c) zero `class="active"` inside the folio nav block, (d) all 5 folio nav links remain present at their canonical routes. Full studio suite stays green (1071 passing, +12 from the new test file).
 
 ### AUDIT-20260530-77 — [P6-3 claude] Delete-refusal message lists entry UUIDs but instructs a slug-based `lane move` command
 
