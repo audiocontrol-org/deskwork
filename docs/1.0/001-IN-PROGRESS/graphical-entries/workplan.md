@@ -1283,17 +1283,16 @@ Closes AUDIT-20260530-86 (cross-model: AUDIT-BARRAGE-codex-P6-3). Surface: packa
 
 Closes AUDIT-20260530-87 (cross-model: AUDIT-BARRAGE-codex-P6-3). Surface: packages/cli/test/custom-pipeline-lane-integration.test.ts:86-104.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-87 (cross-model: AUDIT-BARRAGE-codex-P6-3)` in subject
+Disposition: duplicate of AUDIT-20260530-84 (claude). Both describe the same `spawnSync` no-timeout hang vector in the integration test helpers. Closed by Task 0.59 commit `dd7de48` which extracted `runDeskworkSubcommand` with `timeout: 30_000` + SIGTERM check.
+
+- [x] Step 1-5: covered by AUDIT-84 / Task 0.59
+- [x] Audit-log Status flipped to `fixed-dd7de48 (duplicate of AUDIT-20260530-84; closed by the same Task 0.59 commit)`
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/cli/test/custom-pipeline-lane-integration.test.ts` (AUDIT-84 fix — same surface)
+- [x] `npx vitest run` exits 0
+- [x] Status flipped
 
 
 

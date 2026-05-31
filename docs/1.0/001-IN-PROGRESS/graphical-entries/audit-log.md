@@ -4262,7 +4262,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (codex). R
 ### AUDIT-20260530-87 — [P6-3 codex] CLI subprocess integration test can hang indefinitely
 
 Finding-ID: AUDIT-20260530-87 (cross-model: AUDIT-BARRAGE-codex-P6-3)
-Status:     open
+Status:     fixed-dd7de48 (duplicate of AUDIT-20260530-84; closed by the same Task 0.59 commit)
 Severity:   medium
 Surface:    packages/cli/test/custom-pipeline-lane-integration.test.ts:86-104
 
