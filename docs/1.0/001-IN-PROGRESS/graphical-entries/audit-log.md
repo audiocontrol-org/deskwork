@@ -4012,7 +4012,7 @@ Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). 
 ### AUDIT-20260530-69 — [P6-2 claude] Edit-form diff-emit trims the live value but not `data-current`, producing a spurious `--flag` when the stored value has surrounding whitespace
 
 Finding-ID: AUDIT-20260530-69 (cross-model: AUDIT-BARRAGE-claude-P6-2)
-Status:     open
+Status:     fixed-2712118
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/src/lanes/lanes-page.ts` — `readFieldValue` (`el?.value.trim()`), `readFieldCurrent` (`el?.dataset.current` — untrimmed), `buildUpdateCommand`
 
