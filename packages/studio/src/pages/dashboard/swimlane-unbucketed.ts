@@ -1,5 +1,6 @@
 /**
- * Per-swim unbucketed-tail renderers (AUDIT-20260530-25).
+ * Per-swim unbucketed-tail renderers (AUDIT-20260530-25) +
+ * per-row classify-throw fallback (AUDIT-20260530-37).
  *
  * Mirrors the AUDIT-20260530-14 fix at the canonical calendar SSOT
  * (`packages/core/src/calendar/render.ts`) and the AUDIT-20260529-37
@@ -24,6 +25,28 @@
  * group. Both surfaces show each entry's raw `currentStage` value
  * inline so the operator can diagnose the routing drift without
  * leaving the dashboard.
+ *
+ * Per AUDIT-20260530-37 — `renderClassifyFallbackRow` is the
+ * defense-in-depth analogue used by `renderStageCol`'s
+ * `entries.map(renderRow)` try/catch boundary. The two paths surface
+ * DIFFERENT drift modes through related-but-distinct chrome:
+ *
+ *   - `.er-row-shell--unbucketed` (AUDIT-25): the data layer
+ *     (`bucketIntoLanes`) already routed the entry away from
+ *     `byStage` into `bucket.unbucketed`; the entry lands here via
+ *     the tail-column renderer.
+ *   - `.er-row-shell--classify-fallback` (AUDIT-37): the data layer
+ *     routed the entry into `byStage` (its `currentStage` matched
+ *     the bucket key), but the deeper `classifyStage` call inside
+ *     `renderRow` still threw — drift between the two
+ *     classifications (or a malformed template reaching the
+ *     renderer). The entry lands here via the try/catch in
+ *     `renderStageCol`'s map, keeping the rest of the column
+ *     intact.
+ *
+ * Both shapes keep the operator's identifying metadata + a link to
+ * the review surface and surface the offending `currentStage` value
+ * inline so the operator can diagnose without leaving the page.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
@@ -184,5 +207,43 @@ export function renderUnbucketedListGroup(
         <span class="lb-count">${unbucketed.length}</span>
       </div>
       ${unsafe(rowsRaw)}
+    </div>`);
+}
+
+/**
+ * Per-row fallback for the AUDIT-20260530-37 defense-in-depth catch
+ * in `renderStageCol`. When `renderRow` throws — most commonly via
+ * `classifyStage` rejecting an `entry.currentStage` value not in the
+ * resolved template's `linearStages` + `offPipelineStages` (drift
+ * between `bucketIntoLanes`'s `byStage.get(stage)` lookup shape and
+ * `classifyStage`'s indexOf-based lookup, or a malformed template
+ * reaching the renderer) — this helper emits a self-contained row
+ * that mirrors `renderUnbucketedKanbanRow`'s shape but carries a
+ * distinct `.er-row-shell--classify-fallback` marker class + a
+ * `data-classify-fallback-stage` carrier. The marker class lets the
+ * operator distinguish "stage drift caught at bucketize" (.er-row-
+ * shell--unbucketed via the tail column) from "verb-dispatch threw
+ * mid-render" (this fallback inline in the bucket column).
+ *
+ * Like `renderUnbucketedKanbanRow`, this skips `renderRowActions` /
+ * `renderRowDrawer` / `renderRowMenu` entirely — those dispatch
+ * through `verbsForStage` which is the source of the throw being
+ * caught, so re-entering them would re-trigger the bug.
+ */
+export function renderClassifyFallbackRow(entry: Entry, index: number): RawHtml {
+  const { reviewLink, search } = entryRowLinkMeta(entry);
+  return unsafe(html`<div class="er-row-shell er-row-shell--classify-fallback" data-row-shell data-search="${search}"
+      data-stage="${entry.currentStage}"
+      data-classify-fallback-stage="${entry.currentStage}"
+      data-uuid="${entry.uuid}" data-slug="${entry.slug}">
+      <div class="er-row-fg er-calendar-row">
+        <span class="er-row-num">№ ${String(index + 1).padStart(2, '0')}</span>
+        <div class="er-calendar-body">
+          <span class="er-row-slug"><a href="${reviewLink}"
+            title="open the review surface (entry's currentStage threw on classifyStage)">${entry.slug}</a></span>
+          <span class="er-calendar-title">${entry.title}</span>
+          <span class="er-row-unbucketed-stage">stage: ${entry.currentStage} (unrecognized — verb-dispatch failed)</span>
+        </div>
+      </div>
     </div>`);
 }

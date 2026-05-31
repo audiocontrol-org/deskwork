@@ -74,6 +74,7 @@ import { renderListBody } from './swimlane-list-body.ts';
 import {
   renderUnbucketedStageCol,
   renderUnbucketedCompactCell,
+  renderClassifyFallbackRow,
 } from './swimlane-unbucketed.ts';
 import type { LaneBucket } from './lane-data.ts';
 import type { LaneRailRow } from './swimlane-rail.ts';
@@ -203,11 +204,40 @@ function renderStageCol(
   // uniformly — Commandment II's "verbs are universal" contract.
   // Every entry now gets the verb-chip row regardless of its lane's
   // template.
+  //
+  // Per AUDIT-20260530-37: wrap each `renderRow` call in a try/catch
+  // so a single entry whose `currentStage` fails `classifyStage`
+  // (drift between `bucketIntoLanes`'s `byStage.get(stage)` lookup
+  // and `classifyStage`'s indexOf-based lookup, OR a malformed
+  // template reaching the renderer, OR a locked-stage with no
+  // linear-successor) does NOT take down the whole dashboard with a
+  // 500. The fallback row emitted via `renderClassifyFallbackRow`
+  // surfaces the offending stage inline so the operator can diagnose
+  // without leaving the page, and a `console.warn` names the entry +
+  // stage + template id in the server log. Defense-in-depth pairs
+  // with AUDIT-20260530-25's `bucket.unbucketed` tail (which already
+  // covers the same drift class when the data layer catches it
+  // first); this catch covers the case where the two
+  // classifications drift.
   const body = entries.length === 0
     ? unsafe(html`<div class="empty-state" data-empty-stage-msg>${emptyHint}</div>`)
     : unsafe(
       entries
-        .map((e, i) => renderRow(e, i, template, defaultSite, parentsByMemberUuid).__raw)
+        .map((e, i) => {
+          try {
+            return renderRow(e, i, template, defaultSite, parentsByMemberUuid).__raw;
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err);
+            // eslint-disable-next-line no-console
+            console.warn(
+              `dashboard: renderRow threw for entry "${e.slug}" `
+                + `(uuid=${e.uuid}, currentStage="${e.currentStage}", `
+                + `template="${template.id}"): ${reason}. `
+                + 'Emitting classify-fallback row; see AUDIT-20260530-37.',
+            );
+            return renderClassifyFallbackRow(e, i).__raw;
+          }
+        })
         .join(''),
     );
 
