@@ -3675,7 +3675,7 @@ Surfaced by audit-barrage run `20260530T115127432Z-graphical-entries` (codex). R
 ### AUDIT-20260530-44 — [P5-3 claude] Save button flashes success even when preset persistence silently fails
 
 Finding-ID: AUDIT-20260530-44 (cross-model: AUDIT-BARRAGE-claude-P5-3)
-Status:     open
+Status:     fixed-3e9d77b
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts:handleSaveClick` (the `savePresetFromCurrent → renderPresetList → flashSaveConfirm` sequence) + `swimlane-presets-store.ts:writePresets` (the swallowed `try/catch`)
 
