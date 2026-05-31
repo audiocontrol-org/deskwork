@@ -3740,7 +3740,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). 
 ### AUDIT-20260530-49 — [P5-3 claude] DRY regression: `readJsonArrayOfStrings` re-implements the very reader this diff extracted to dedupe
 
 Finding-ID: AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3)
-Status:     open
+Status:     fixed-043b775
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:readJsonArrayOfStrings` (and the trio `writePresets`/`writeJsonOrIgnore`/`writeStoredOrder` across the three files)
 

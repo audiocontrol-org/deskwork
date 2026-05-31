@@ -575,17 +575,17 @@ Disposition: docstring-only fix. Rewrote the no-flash claim at `swimlane-rail.ts
 
 Closes AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:readJsonArrayOfStrings` (and the trio `writePresets`/`writeJsonOrIgnore`/`writeStoredOrder` across the three files).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+- [x] Step 1: failing test written at `packages/studio/test/dashboard-swimlane-storage-dry.test.ts` (9 cases: 5 `readStoredStringArray` parity + 4 `writeJsonOrIgnore` contract)
+- [x] Step 2: pre-fix run failed 4/9 (`writeJsonOrIgnore` not exported from `swimlane-storage`)
+- [x] Step 3: implemented in `043b775` — added shared `writeJsonOrIgnore` to `swimlane-storage.ts`; removed `readJsonArrayOfStrings` from presets-store; routed `writePresets` + apply-side `writeJsonOrIgnore` + `writeStoredOrder` through the shared helper
+- [x] Step 4: full studio suite 1009 passed (was 1000; +9 new test); all 53 related preset+drag tests pass; AUDIT-44 boolean contract preserved
+- [x] Step 5: committed in `043b775` with `Closes AUDIT-20260530-49 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-storage-dry.test.ts` (cited in Step 1)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-storage-dry.test.ts` exits 0 (9/9 pass against the fix)
+- [x] Audit-log Status flipped to `fixed-043b775` via the close-shipped-audit-findings step
 
 
 
