@@ -46,6 +46,58 @@ const COPIED_FLASH_MS = 2000;
 /** Literal slug placeholder — operator replaces it in the chat editor. */
 const SLUG_PLACEHOLDER = '<SLUG>';
 
+/**
+ * Characters in a stage name that force argument quoting in the
+ * clipboard-copied slash command. Whitespace would otherwise split
+ * the stage value across argv tokens (the bug AUDIT-20260530-28
+ * names: `--stage QA Review` reads as stage `QA` plus a stray
+ * `Review`). A double-quote or backslash would terminate / escape
+ * a bare value inside any shell or slash-command parser.
+ *
+ * The pipeline-template schema constrains `linearStages` only to
+ * non-empty strings (`uniqueStringArray('linearStages', 1)` at
+ * `packages/core/src/pipelines/types.ts:108-115`), so operator-
+ * authored templates may legally name stages like `QA Review`,
+ * `Path\\Stage`, or `Joe "the" Stage`. The compose chip serialises
+ * those values directly from `data-first-stage`; the regex below
+ * gates which values get the `quoteValue` treatment.
+ *
+ * Lane id is NOT in this set: `LANE_ID_REGEX` at
+ * `packages/core/src/lanes/types.ts:72` constrains it to
+ * `[a-z0-9-]` — no whitespace, no quotes, no backslash.
+ */
+const STAGE_QUOTE_REQUIRED_REGEX = /[\s"\\]/;
+
+/**
+ * Quote an operator-authored stage value for inclusion in the
+ * clipboard slash command.
+ *
+ * Conditional quoting: bare values (`Ideas`, `Sketched`, `Drafted`,
+ * `Final`, etc.) pass through unchanged, preserving the back-compat
+ * contract pinned by the pre-existing compose-client tests at
+ * `dashboard-swimlane-compose-client.test.ts:152, 264, 323` and by
+ * the existing studio-design ACCEPTED entries for the chip's
+ * clipboard shape. Values containing whitespace, a double-quote,
+ * or a backslash are wrapped via `JSON.stringify` — the same helper
+ * the lanes / pipelines copy-builders use at
+ * `plugins/deskwork-studio/public/src/copy-builder.ts:42-44`. This
+ * produces double-quoted shell-style escapes, which is the convention
+ * the `/deskwork:add` SKILL.md documents at
+ * `plugins/deskwork/skills/add/SKILL.md:25, 33-35`:
+ * `--stage "QA Review"`, `--stage "Drafting"`, `--stage "Iterating"`.
+ *
+ * Why a local helper instead of importing `quoteValue` directly:
+ * `quoteValue` is unconditional, and applying it unconditionally
+ * would change the bare-value shape of every existing compose-chip
+ * emission. Conditional quoting keeps the diff scoped to the bug
+ * (operator-authored whitespace-bearing stage names) without
+ * regressing the 100+ implicit fixtures that rely on the bare shape.
+ */
+function quoteStageIfNeeded(stage: string): string {
+  if (!STAGE_QUOTE_REQUIRED_REGEX.test(stage)) return stage;
+  return JSON.stringify(stage);
+}
+
 /** Accessible name for an affordance during the `.copied` flash. */
 const COPIED_ARIA_LABEL = 'Copied — paste in chat';
 
@@ -94,7 +146,13 @@ function composeChipSlash(dataset: DOMStringMap): string {
       '.swim-compose chip missing data-lane-id or data-first-stage',
     );
   }
-  return `/deskwork:add ${SLUG_PLACEHOLDER} --lane ${laneId} --stage ${firstStage}`;
+  // Per AUDIT-20260530-28: pipeline templates allow arbitrary non-
+  // empty stage strings (`QA Review`, `Joe "the" Stage`, `Path\Stage`).
+  // Quote `--stage` conditionally so operator-authored whitespace
+  // bearing stage names parse as a single argv token in Claude Code's
+  // slash parser. Lane id is regex-constrained to `[a-z0-9-]`, no
+  // quoting needed.
+  return `/deskwork:add ${SLUG_PLACEHOLDER} --lane ${laneId} --stage ${quoteStageIfNeeded(firstStage)}`;
 }
 
 function composeEmptyCtaSlash(dataset: DOMStringMap): string {
