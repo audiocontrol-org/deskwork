@@ -538,16 +538,16 @@ Closes AUDIT-20260531-05. Surface: `plugins/dw-lifecycle/src/scope-discovery/uti
 
 Closes AUDIT-20260531-06 (claude-01 + claude-02 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:23-30` (the rewritten docblock).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260531-06 (claude-01 + claude-02 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model)` in subject
+- [x] Step 1: this is a doc-prose finding (no code-side test). The fix is removing the forbidden-deferral phrase from the docblock.
+- [x] Step 2: confirmed the docblock said "until a semver-aware sort lands" — a forbidden-deferral phrase per the project's gaming-phrase canon.
+- [x] Step 3: rewrote the docblock to frame the lex-greatest behavior as the SPECIFICATION (not deferred behavior). Removed all language implying future work. The regression test already pins the contract; the comment now matches.
+- [x] Step 4: existing tests still pass (no functional change).
+- [x] Step 5: commit with `Closes AUDIT-20260531-06` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] No forbidden-deferral phrase in `feature-root.ts`.
+- [x] Regression test `feature-root.test.ts > picks lex-greatest, NOT semver-greatest` still pins the contract.
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -555,16 +555,16 @@ Closes AUDIT-20260531-06 (claude-01 + claude-02 + claude-04 + claude-05 + claude
 
 Closes AUDIT-20260531-07. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:397-490` (the `'recovers from a workplan write failure on re-run'` case).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260531-07` in subject
+- [x] Step 1: rewrote the AUDIT-01 test to test AUTO-recovery: NO operator intervention between the failing-writer run and the working-writer run. Assert that (a) the tool's catchup branch flips the still-unchecked workplan checkbox automatically, (b) the box reads `[x]` after the second run, (c) `[ ]` is gone, (d) stderr names "closure-criterion checkbox" (proving the catchup actually fired).
+- [x] Step 2: confirmed pre-fix the test pre-flipped the checkbox manually before the second run, masking whether the catchup ran.
+- [x] Step 3: removed the manual flip; the second run now exercises the catchup-on-already-dispositioned-with-unchecked-box path directly.
+- [x] Step 4: tests pass; plugin suite 2435/2435.
+- [x] Step 5: commit with `Closes AUDIT-20260531-07` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 6 (follow-up): Primitive-extraction dispatch hygiene

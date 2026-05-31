@@ -20,14 +20,14 @@
  * Lex-greatest sort (descending) is the AUDIT-06+AUDIT-08 contract:
  * with `docs/1.0/`, `docs/0.19.0/`, `docs/0.x/`, the walker picks
  * `1.0` — the active version, biasing AWAY from archived
- * directories. NOT semver-correct: `0.10.0` < `0.9.0` in lex order
- * (lex compares strings character-by-character, `'1' < '9'`), so a
- * project that ever ships a `0.10.0` alongside a `0.9.0` would
- * resolve to `0.9.0`. This is documented intentional behavior until
- * a semver-aware sort lands; the regression test
- * `feature-root.test.ts > 'lex-vs-semver divergence is intentional'`
- * pins the current contract so a future semver-aware change must
- * update the test in lockstep.
+ * directories. Lex compares strings character-by-character, so
+ * `0.10.0` < `0.9.0` because `'1' < '9'`: a project that ships a
+ * `0.10.0` alongside a `0.9.0` resolves to `0.9.0`. The regression
+ * test `feature-root.test.ts > 'picks lex-greatest, NOT semver-
+ * greatest, when they diverge'` pins this contract: lex is the
+ * specification, not a placeholder. Changing the sort changes the
+ * contract; both the implementation AND the regression test must
+ * change in lockstep.
  */
 
 import { existsSync } from 'node:fs';

@@ -398,18 +398,18 @@ describe('runApplyAuditFlips — dry-run + apply flows', () => {
     expect(workplanAfterFail).toContain('- [ ] Audit-log Status flipped to');
   });
 
-  it('recovers from a workplan write failure on re-run (AUDIT-20260531-01 — manual catchup is idempotent)', async () => {
-    // Per AUDIT-20260531-01: the AUDIT-17 error message instructs
-    // the operator to "manually flip the workplan checkbox for each
-    // fixed finding, then re-run apply-audit-flips to confirm the
-    // catchup is idempotent." That recovery path was never tested.
-    // This test exercises it end-to-end:
-    //   1. First run: failing workplan-writer → exit 1, audit-log
-    //      written, workplan checkbox stays `[ ]`.
-    //   2. Operator manually flips the workplan checkbox.
-    //   3. Second run: working writer; apply-audit-flips re-runs
-    //      cleanly (catchup is a no-op on the already-flipped box).
-    const repoRoot = makeRepo('recovery', OPEN_TWO_ENTRIES);
+  it('AUTO-recovers from a workplan write failure on re-run — tool catchup, not manual (AUDIT-20260531-07)', async () => {
+    // Per AUDIT-20260531-07: the previous version of this test
+    // pre-flipped the workplan checkbox manually before the
+    // second run, so it asserted idempotency (no-op on already-
+    // flipped box) rather than the tool's catchup-on-still-
+    // unchecked-box. The AUDIT-17 fix's catchup branch is supposed
+    // to re-process already-dispositioned entries and flip any
+    // workplan checkbox still `- [ ]`. This test exercises THAT
+    // contract: between the failing-writer first run and the
+    // working-writer second run, the operator does NOTHING; the
+    // tool's catchup is what flips the box.
+    const repoRoot = makeRepo('auto-recovery', OPEN_TWO_ENTRIES);
     const featureDir = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');
     const workplanPath = join(featureDir, 'workplan.md');
     writeFileSync(
@@ -460,21 +460,19 @@ describe('runApplyAuditFlips — dry-run + apply flows', () => {
     expect(readFileSync(join(featureDir, 'audit-log.md'), 'utf8')).toContain(
       'Status: fixed-recsha',
     );
-    expect(readFileSync(workplanPath, 'utf8')).toContain(
-      '- [ ] Audit-log Status flipped to',
-    );
+    const wpAfterFirstRun = readFileSync(workplanPath, 'utf8');
+    expect(wpAfterFirstRun).toContain('- [ ] Audit-log Status flipped to');
+    expect(wpAfterFirstRun).not.toContain('- [x] Audit-log Status flipped to');
 
-    // Operator simulates the manual recovery: flip the checkbox.
-    const wpManual = readFileSync(workplanPath, 'utf8').replace(
-      '- [ ] Audit-log Status flipped to',
-      '- [x] Audit-log Status flipped to',
-    );
-    writeFileSync(workplanPath, wpManual, 'utf8');
+    // NO operator intervention between runs — the workplan checkbox
+    // stays `- [ ]` going into the second run. The tool's catchup
+    // branch is what we're testing.
 
     // Second run — working writer. apply-audit-flips re-runs;
     // audit-log status is already `fixed-recsha` so the finding
-    // is `already-dispositioned`; the workplan catchup is a no-op
-    // (checkbox already `[x]`); exit 0.
+    // is `already-dispositioned`; the catchup branch processes
+    // already-dispositioned entries; finds the unchecked workplan
+    // checkbox; FLIPS IT (the auto-recovery).
     const stdout2 = new CaptureStream();
     const stderr2 = new CaptureStream();
     const exit2 = await runApplyAuditFlips({
@@ -485,12 +483,14 @@ describe('runApplyAuditFlips — dry-run + apply flows', () => {
       commitWalker: walker,
     });
     expect(exit2).toBe(0);
-    // Workplan content unchanged (the manual flip stuck).
-    expect(readFileSync(workplanPath, 'utf8')).toContain(
-      '- [x] Audit-log Status flipped to',
-    );
-    // The re-run reported the finding as already-dispositioned.
+    // Auto-recovery: tool flipped the box on its own.
+    const wpAfterSecondRun = readFileSync(workplanPath, 'utf8');
+    expect(wpAfterSecondRun).toContain('- [x] Audit-log Status flipped to');
+    expect(wpAfterSecondRun).not.toContain('- [ ] Audit-log Status flipped to');
+    // The re-run reported the finding as already-dispositioned (on
+    // the audit-log side) AND flipped the workplan checkbox.
     expect(stdout2.text() + stderr2.text()).toMatch(/already.*fixed/i);
+    expect(stderr2.text()).toMatch(/closure-criterion checkbox/);
   });
 
   it('ticks the workplan closure-criterion checkbox for each flipped finding (AUDIT-20260530-14)', async () => {
