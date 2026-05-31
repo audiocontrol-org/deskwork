@@ -446,6 +446,91 @@ Closes AUDIT-20260530-17. Surface: plugins/dw-lifecycle/src/subcommands/apply-au
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
+
+### Task 5.18 (fix-finding-AUDIT-20260531-01): AUDIT-20260531-01 — AUDIT-17 fix surfaces the split-state but its instructed rec…
+
+Closes AUDIT-20260531-01. Surface: `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:454-471`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260531-01` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.19 (fix-finding-AUDIT-20260531-02): AUDIT-20260531-02 — The new AUDIT-17 test asserts only the immediate error, not …
+
+Closes AUDIT-20260531-02. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:331-388`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260531-02` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.20 (fix-finding-AUDIT-20260531-03): AUDIT-20260531-03 — AUDIT-16 marked `fixed` while the physical task order it nam…
+
+Closes AUDIT-20260531-03 (claude-03 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.9 block, the renumbered `Task 5.11..5.17` headings, and the new "Out of scope (deferred)" line).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260531-03 (claude-03 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.21 (fix-finding-AUDIT-20260531-04): AUDIT-20260531-04 — The extracted feature-root helper still ships the documented…
+
+Closes AUDIT-20260531-04. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:18-22` (docblock) and `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `'multi-version'` and `'determinism'` cases).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260531-04` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.22 (fix-finding-AUDIT-20260531-05): AUDIT-20260531-05 — Feature-root extraction stops one level short of DRY — both …
+
+Closes AUDIT-20260531-05. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:53-55` (helper takes `docsRoot`), `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` (`const docsRoot = join(args.repoRoot, 'docs')`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:181-183` (`const docsRoot = join(rootDir, 'docs')`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260531-05` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 6 (follow-up): Primitive-extraction dispatch hygiene
 
 - [ ] Extend `dispatch-wrapper-prelude.md` with a "Primitive-extraction dispatch hygiene" section enumerating the integration-layer audit concerns (CSS class-name conflicts, ARIA contract correctness, callback-index drift, wire-format rounding/clamping). Surfaced by audiocontrol pilot TF-016 (AUDIT-20260525-09); tracked at [#290](https://github.com/audiocontrol-org/deskwork/issues/290).

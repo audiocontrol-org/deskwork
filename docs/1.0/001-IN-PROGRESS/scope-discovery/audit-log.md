@@ -896,3 +896,56 @@ Surface:    plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:403-463
 `runApplyAuditFlips` writes the audit-log status first, then separately tries to tick the matching workplan checkbox. If the workplan read/write fails, lines 456-463 only emit a warning and still return success, leaving the audit-log at `fixed-<sha>` while the workplan task remains unchecked.
 
 That is the exact stale-state shape AUDIT-20260530-14 was fixing: `findUncheckedTasksInOrder` will continue to treat the completed fix task as unfinished. Since this command now owns both sides of the state transition, the workplan-side update should either be part of the required apply operation with a non-zero exit on failure, or the command should avoid flipping the audit-log when it cannot also update the corresponding workplan closure criterion.
+
+## 2026-05-31 — audit-barrage lift (20260531T040245407Z-scope-discovery)
+
+### AUDIT-20260531-01 — AUDIT-17 fix surfaces the split-state but its instructed recovery path is untested and may be unreachable
+
+Finding-ID: AUDIT-20260531-01
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:454-471`
+
+The fix changes the workplan-write catch from "warn + continue" to "stderr + `return 1`", but it does **not** change the write ordering: the audit-log is still written *before* the workplan tick is attempted (the new error text concedes this — "The audit-log was already written; state is split"). So on a workplan-write failure the on-disk inconsistency AUDIT-14/AUDIT-17 named still physically exists; only the exit code changed. Worse, because this happens inside the per-finding loop, an early failure aborts the loop with *some* findings' audit-log entries flipped to `fixed-<sha>` and their workplan ticks never applied, and there is no rollback of the already-written audit-log.
+
+The error message instructs the operator to "re-run apply-audit-flips to confirm the catchup is idempotent" — but whether a re-run actually re-applies the missing workplan ticks depends on unshown logic: does the command re-process an entry whose audit-log status is *already* `fixed-<sha>`, or does it skip it? If already-fixed entries are short-circuited (a common idempotency shape), the workplan checkbox is lost permanently and exit-1 just becomes a recurring failure with no path to green. AUDIT-17 explicitly offered two cures — hard-fail *or* "avoid flipping the audit-log when it cannot also update the workplan." The implementation took the first half (hard-fail) without the transactional ordering that would make the recovery deterministic. A fix should either write the workplan first (so an audit-log flip never lands without its tick) or add a test that drives failure → re-run → confirms the workplan tick lands on the second pass.
+
+### AUDIT-20260531-02 — The new AUDIT-17 test asserts only the immediate error, not the split-state or the recovery contract it claims to handle
+
+Finding-ID: AUDIT-20260531-02
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:331-388`
+
+The test named `'returns NON-ZERO exit when the workplan-side write fails (AUDIT-20260530-17)'` asserts exactly two things: `expect(exit).not.toBe(0)` and `expect(stderr.text()).toMatch(/workplan|synthetic/i)`. It never asserts the contract the fix's own error message promises. Specifically it does not verify (a) that the audit-log *was* in fact written before the failure (the "split state" the message tells the operator about — if it wasn't written, the message is misleading), nor (b) that a subsequent re-run actually completes the workplan tick (the recovery the message instructs). Per the project's testing rule — "tests that don't test the contract they claim to test" — this test pins the surface symptom (exit code) while leaving the load-bearing behavior (split-state + idempotent catchup) unverified.
+
+This is the same shape as prior findings on this feature (AUDIT-09's vacuous determinism test, AUDIT-05's single-finding-only coverage): the test exercises the easy assertion and skips the one that would catch a real regression. A failure-then-re-run integration test against the resulting workplan would close both this gap and the recovery-path uncertainty in claude-01.
+
+### AUDIT-20260531-03 — AUDIT-16 marked `fixed` while the physical task order it named remains non-monotonic, and the residual is deferred with a "follow-up if needed" IOU
+
+Finding-ID: AUDIT-20260531-03 (claude-03 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.9 block, the renumbered `Task 5.11..5.17` headings, and the new "Out of scope (deferred)" line)
+
+AUDIT-16 gave two acceptable cures: renumber the fix-tasks into "one monotonic scheme," **or** make the auto-positioner refuse to interleave conventions. The diff did the renumber (`Task 6..12` → `Task 5.11..5.17`) so the numbering is now uniformly hierarchical — but the *file order* it produced is `5.11, 5.12, … 5.17, 4, 5.2, … 5.7, 5`, which is numerically jumbled: `5.11` now physically precedes `5.2`. That is not "monotonic"; arguably it reads worse than the pre-fix `Task 6` (at least `6 > 5` was locally increasing). AUDIT-16's core complaint — "a human reading `Task 12` before `Task 4` cannot trust the numbering to reflect work order" — is only half-resolved: a human now reads `5.11` before `5.2`.
+
+The Task 5.9 block self-documents this gap (`Step 4: physical reorder NOT done`) and closes it with **"physical reorder is a follow-up if needed"** — a deferral phrase the project's "Just for now is bullshit" rule forbids unless paired with a GitHub issue, which isn't present. So AUDIT-16 is flipped to `fixed-a4aa5db` in the audit-log while the workplan simultaneously admits the named defect persists and is deferred without a tracking issue. Either complete the monotonic reorder, or file the follow-up as a GH issue and back-link it (per the rule), rather than leaving the deferral in the workplan prose with the audit-log claiming closure.
+
+### AUDIT-20260531-04 — The extracted feature-root helper still ships the documented semver-incorrect sort behind a deferral comment, and no test exercises a lex-vs-semver divergence
+
+Finding-ID: AUDIT-20260531-04
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:18-22` (docblock) and `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` (the `'multi-version'` and `'determinism'` cases)
+
+The consolidation is correct in shape, but it carries forward the lex-descending sort with the comment "Not semver-correct (`0.10.0` < `0.9.0` in lex order), but a workable default until semver-aware sort lands." `until … lands` is a deferral phrase with no tracking issue. More concretely, the two version-selection tests only pin cases where lexicographic order and semver order *agree*: `['0.x','1.0','0.19.0'] → 1.0` and `['0.x','1.0','2.0','0.5.0'] → 2.0`. Neither test constructs the divergence case the docblock itself names — e.g. `['0.9.0','0.10.0']`, where lex-descending picks `0.9.0` and semver wants `0.10.0`. So the one piece of behavior the helper documents as *wrong* is the one piece no test exercises; a future "semver-aware sort" change would flip that selection with zero test coverage telling anyone the behavior changed (or pinning the current wrong-but-deterministic result). Add a divergence-case test that pins today's behavior explicitly, so the documented incorrectness is at least falsifiable.
+
+### AUDIT-20260531-05 — Feature-root extraction stops one level short of DRY — both callers still independently construct `docsRoot = join(x, 'docs')`
+
+Finding-ID: AUDIT-20260531-05
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:53-55` (helper takes `docsRoot`), `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` (`const docsRoot = join(args.repoRoot, 'docs')`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:181-183` (`const docsRoot = join(rootDir, 'docs')`)
+
+AUDIT-15's framing was "close the *class* of bug, not the instance — divergence is impossible if the logic only lives in one place." The shared helper accepts `docsRoot` rather than `repoRoot`, which means each of the two callers still independently appends the literal `'docs'` path segment. That is a small residual of the exact split-brain shape the extraction set out to eliminate: if the docs-directory location ever becomes configurable (or the segment is renamed), both call sites must change in lockstep again — the same lockstep-edit tax AUDIT-06/08/12/15 kept paying. Having the helper take `repoRoot` (or a `{repoRoot}` arg) and own the `join(repoRoot, 'docs')` itself would put the *entire* resolution path — including the docs segment — in one place. Low severity because the segment is currently a stable literal, but it's worth noting that the consolidation centralized the walk while leaving its root-construction duplicated.
