@@ -519,17 +519,17 @@ Closes AUDIT-20260530-45 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plu
 
 Closes AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:applyPreset` (visibility write at the `writeJsonOrIgnore(visibilityKey...)` step + focus write at `writeJsonOrIgnore(focusKey..., preset.focusedLanes)`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — extended `packages/studio/test/dashboard-swimlane-presets-reconcile.test.ts` with new `AUDIT-20260530-46 — applyPreset enforces hidden⇒not-focused invariant` describe block (2 cases: positive strip + negative no-op)
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — pre-fix failed on the positive case `strips focused lanes that are NOT in the visible set before writing :focus` (`:focus` storage contained `['default', 'qa']` even though `qa` was in the hidden set)
+- [x] Step 3: implement the fix — added `enforceHiddenNotFocused(focused, visible)` helper mirroring `reconcileLaneIds`'s read-time-filter discipline; threaded through `applyPreset` at the focus-write call site (composes with the `reconcileLaneIds` filter so both apply-boundary invariants land together); `applyPreset` docstring updated to enumerate both invariants
+- [x] Step 4: confirm test passes — 2/2 new cases pass; full @deskwork/studio suite 999 passed (was 997; +2 from new cases), 0 regressions
+- [x] Step 5: commit with `Closes AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3)` in subject — commit `378fb46`
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-presets-reconcile.test.ts` (the new `AUDIT-20260530-46 — applyPreset enforces hidden⇒not-focused invariant` describe block; 2/2 cases pass)
+- [x] `npx vitest run packages/studio/test/dashboard-swimlane-presets-reconcile.test.ts` exits 0 (passes against the fix; full @deskwork/studio suite stays green at 999 passed)
+- [x] Audit-log Status flipped to `fixed-378fb46` via the close-shipped-audit-findings step
 
 
 

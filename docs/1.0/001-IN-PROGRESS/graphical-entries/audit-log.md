@@ -3701,7 +3701,7 @@ Surfaced by audit-barrage run `20260530T115517132Z-graphical-entries` (claude). 
 ### AUDIT-20260530-46 — [P5-3 claude] `applyPreset` does not enforce the hidden⇒not-focused invariant the live controllers maintain
 
 Finding-ID: AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3)
-Status:     open
+Status:     fixed-378fb46
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:applyPreset` (visibility write at the `writeJsonOrIgnore(visibilityKey...)` step + focus write at `writeJsonOrIgnore(focusKey..., preset.focusedLanes)`)
 
