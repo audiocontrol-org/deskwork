@@ -1353,17 +1353,17 @@ Disposition: already fixed by commit `b642cd6` (Task 7.3/7.4 implementation). Th
 
 Closes AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `packages/cli/src/commands/group.ts:233-245` (handleAddMember `--at` parse) and `packages/core/src/groups/operations/add-member.ts:124-135` (out-of-range throw).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in subject
+- [x] Step 1: write failing test exercising the bug (`packages/cli/test/group/add-member.test.ts` — tightened existing `refuses --at <out-of-range>` from `not.toBe(0)` to `toBe(2)`)
+- [x] Step 2: confirm test fails against current code (verified: pre-fix run reported `expected 1 to be 2`)
+- [x] Step 3: implement the fix (typed `OutOfRangePositionError` in `packages/core/src/groups/operations/add-member.ts`; CLI `handleAddMember` maps it to `fail(..., 2)`)
+- [x] Step 4: confirm test passes (`npm --workspace @deskwork/cli test` → 415 passed; `npm --workspace @deskwork/core test` → 897 passed)
+- [x] Step 5: commit with `Closes AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in subject (570e257)
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/cli/test/group/add-member.test.ts` (`refuses --at <out-of-range> with exit 2 (usage error)` + `accepts --at 0 on an empty group (lower-bound valid)`)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-570e257` via the close-shipped-audit-findings step
 
 
 

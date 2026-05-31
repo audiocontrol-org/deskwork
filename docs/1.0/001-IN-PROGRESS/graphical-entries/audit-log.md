@@ -4320,7 +4320,7 @@ Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (claude). 
 ### AUDIT-20260530-91 — [P7T7.2 claude] Inconsistent exit codes for a bad `--at` argument: out-of-range exits 1, malformed exits 2
 
 Finding-ID: AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)
-Status:     open
+Status:     fixed-570e257
 Severity:   low
 Surface:    `packages/cli/src/commands/group.ts:233-245` (handleAddMember `--at` parse) and `packages/core/src/groups/operations/add-member.ts:124-135` (out-of-range throw)
 
