@@ -725,17 +725,17 @@ Closes AUDIT-20260530-56 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `pac
 
 Closes AUDIT-20260530-57 (cross-model: AUDIT-BARRAGE-claude-P6-1). Surface: `packages/core/src/lanes/operations/list.ts:listLanes` (N+1 `loadLaneConfig`), `packages/core/src/pipelines/operations/list.ts:listPipelines` (N+1 `loadPipelineTemplate`), vs `packages/core/src/lanes/loader.ts:listLaneConfigs` + `isArchivedOnDisk`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-57 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260530-57 (cross-model: AUDIT-BARRAGE-claude-P6-1)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/lanes/list-graceful-degradation.test.ts` and `packages/core/test/pipelines/list-graceful-degradation.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-5c8ec5c` via the close-shipped-audit-findings step
 
 
 

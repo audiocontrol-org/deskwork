@@ -3850,7 +3850,7 @@ Surfaced by audit-barrage run `20260530T115914439Z-graphical-entries` (claude). 
 ### AUDIT-20260530-57 — [P6-1 claude] `listLanes` / `listPipelines` throw on a single malformed config, breaking the entire list command — undermining the loader's deliberate graceful-degradation contract
 
 Finding-ID: AUDIT-20260530-57 (cross-model: AUDIT-BARRAGE-claude-P6-1)
-Status:     open
+Status:     fixed-5c8ec5c
 Severity:   medium
 Surface:    `packages/core/src/lanes/operations/list.ts:listLanes` (N+1 `loadLaneConfig`), `packages/core/src/pipelines/operations/list.ts:listPipelines` (N+1 `loadPipelineTemplate`), vs `packages/core/src/lanes/loader.ts:listLaneConfigs` + `isArchivedOnDisk`
 
