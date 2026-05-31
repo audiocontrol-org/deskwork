@@ -18,27 +18,13 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import {
+  assertDeskworkBinPresent,
+  deskworkBin,
+} from '../util/assert-deskwork-bin.ts';
 
-const testDir = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(testDir, '../../../..');
-export const deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork');
-
-/**
- * Defensive precondition for the pipeline test suite: surface a clear
- * "run npm install" error rather than the confusing `code: -1` empty
- * stdout/stderr `spawnSync` returns when invoking a non-existent
- * binary. Mirrors `assertDeskworkBinPresent` in the lane suite.
- */
-export function assertDeskworkBinPresent(): void {
-  if (!existsSync(deskworkBin)) {
-    throw new Error(
-      `deskwork binary not found at ${deskworkBin} — run npm install at the `
-      + `workspace root before running pipeline tests.`,
-    );
-  }
-}
+export { assertDeskworkBinPresent, deskworkBin };
 
 export interface RunResult {
   readonly code: number;

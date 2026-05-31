@@ -1,4 +1,4 @@
-generated_at: 2026-05-31T13:29:56.351Z
+generated_at: 2026-05-31T13:54:50.807Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -179,52 +179,52 @@ clones:
   - id: e5936d3c2a28
     lines: 11
     members:
-      - packages/cli/test/group/helpers.ts:123:133
-      - packages/cli/test/lane/helpers.ts:84:94
-      - packages/cli/test/pipeline/helpers.ts:78:88
-      - packages/cli/test/pipeline/helpers.ts:91:101
+      - packages/cli/test/group/helpers.ts:115:125
+      - packages/cli/test/lane/helpers.ts:63:73
+      - packages/cli/test/pipeline/helpers.ts:64:74
+      - packages/cli/test/pipeline/helpers.ts:77:87
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
-  - id: 145311a2b165
-    lines: 13
+  - id: 00a1ad8a5366
+    lines: 24
     members:
-      - packages/cli/test/group/helpers.ts:21:33
-      - packages/cli/test/pipeline/helpers.ts:16:33
-    disposition: keep-with-reason
-    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+      - packages/cli/test/group/helpers.ts:21:44
+      - packages/cli/test/pipeline/helpers.ts:16:35
+    disposition: ignore-with-justification
+    reason: Standard TypeScript top-of-file import ceremony for test helper modules (node:fs / node:os / node:path / shared util re-export); not duplicated logic — extracting these import lines would obscure rather than clarify
   - id: dec3f51b1463
     lines: 18
     members:
-      - packages/cli/test/group/helpers.ts:56:73
-      - packages/cli/test/pipeline/helpers.ts:51:68
+      - packages/cli/test/group/helpers.ts:48:65
+      - packages/cli/test/pipeline/helpers.ts:37:54
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
-  - id: d93c17540f3a
-    lines: 29
-    members:
-      - packages/cli/test/lane/helpers.ts:11:39
-      - packages/cli/test/pipeline/helpers.ts:11:33
-    disposition: keep-with-reason
-    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
   - id: 2e09e327a82a
     lines: 19
     members:
-      - packages/cli/test/lane/helpers.ts:141:159
-      - packages/cli/test/pipeline/helpers.ts:178:196
+      - packages/cli/test/lane/helpers.ts:120:138
+      - packages/cli/test/pipeline/helpers.ts:164:182
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
+  - id: 8bd4f043d261
+    lines: 23
+    members:
+      - packages/cli/test/lane/helpers.ts:13:35
+      - packages/cli/test/pipeline/helpers.ts:14:36
+    disposition: ignore-with-justification
+    reason: Standard TypeScript top-of-file import ceremony for test helper modules (node:fs / node:os / node:path / shared util re-export); not duplicated logic — extracting these import lines would obscure rather than clarify
   - id: 6f13bea8f16e
     lines: 26
     members:
-      - packages/cli/test/lane/helpers.ts:56:81
-      - packages/cli/test/pipeline/helpers.ts:50:75
+      - packages/cli/test/lane/helpers.ts:35:60
+      - packages/cli/test/pipeline/helpers.ts:36:61
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
   - id: b182ab3fd6d1
     lines: 27
     members:
-      - packages/cli/test/lane/helpers.ts:91:117
-      - packages/cli/test/pipeline/helpers.ts:150:176
+      - packages/cli/test/lane/helpers.ts:70:96
+      - packages/cli/test/pipeline/helpers.ts:136:162
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
   - id: 44c103564dce
@@ -290,14 +290,14 @@ clones:
   - id: 8fd1c4d33bd7
     lines: 10
     members:
-      - packages/core/src/doctor/rules/lane-config-missing-template.ts:122:131
+      - packages/core/src/doctor/rules/lane-config-missing-template.ts:129:138
       - packages/core/src/pipelines/operations/rename-migration.ts:166:175
     disposition: keep-with-reason
     reason: tmp+rename inlining is the documented project pattern for callers that do not need commitPipelineTemplate/commitLaneConfig's verb-and-validator wrapper; lane-config-missing-template.ts already inlines for the same reason
   - id: e1b16a900b51
     lines: 18
     members:
-      - packages/core/src/doctor/rules/lane-config-missing-template.ts:241:258
+      - packages/core/src/doctor/rules/lane-config-missing-template.ts:315:332
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:158:174
     disposition: keep-with-reason
     reason: Doctor rule contract boilerplate (end of plan choices array + apply()'s plan.kind guard + payload coercion); each rule independently implements the DoctorRule interface against the same contract, so shape similarity is interface-driven not duplication; extracting a base class would violate composition-over-inheritance
@@ -466,14 +466,14 @@ clones:
     lines: 9
     members:
       - packages/core/src/schema/journal-events.ts:189:197
-      - packages/core/src/schema/journal-events.ts:401:409
+      - packages/core/src/schema/journal-events.ts:411:419
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: d93b64cd1eae
     lines: 7
     members:
-      - packages/core/src/schema/journal-events.ts:410:416
-      - packages/core/src/schema/journal-events.ts:422:428
+      - packages/core/src/schema/journal-events.ts:420:426
+      - packages/core/src/schema/journal-events.ts:432:438
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 13e80bf116fb

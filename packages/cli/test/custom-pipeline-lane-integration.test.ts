@@ -34,27 +34,16 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const testDir = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(testDir, '../../..');
-const deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork');
+import { join } from 'node:path';
+import {
+  assertDeskworkBinPresent,
+  deskworkBin,
+} from './util/assert-deskwork-bin.ts';
 
 interface RunResult {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
-}
-
-function assertDeskworkBinPresent(): void {
-  if (!existsSync(deskworkBin)) {
-    throw new Error(
-      `deskwork binary not found at ${deskworkBin} — run npm install at the `
-      + `workspace root before running the custom-pipeline-lane integration `
-      + `test.`,
-    );
-  }
 }
 
 function makeProject(): string {
