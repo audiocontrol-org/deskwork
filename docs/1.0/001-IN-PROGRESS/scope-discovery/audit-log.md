@@ -949,3 +949,27 @@ Severity:   low
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:53-55` (helper takes `docsRoot`), `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` (`const docsRoot = join(args.repoRoot, 'docs')`), `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:181-183` (`const docsRoot = join(rootDir, 'docs')`)
 
 AUDIT-15's framing was "close the *class* of bug, not the instance — divergence is impossible if the logic only lives in one place." The shared helper accepts `docsRoot` rather than `repoRoot`, which means each of the two callers still independently appends the literal `'docs'` path segment. That is a small residual of the exact split-brain shape the extraction set out to eliminate: if the docs-directory location ever becomes configurable (or the segment is renamed), both call sites must change in lockstep again — the same lockstep-edit tax AUDIT-06/08/12/15 kept paying. Having the helper take `repoRoot` (or a `{repoRoot}` arg) and own the `join(repoRoot, 'docs')` itself would put the *entire* resolution path — including the docs segment — in one place. Low severity because the segment is currently a stable literal, but it's worth noting that the consolidation centralized the walk while leaving its root-construction duplicated.
+
+## 2026-05-31 — audit-barrage lift (20260531T041440932Z-scope-discovery)
+
+### AUDIT-20260531-06 — AUDIT-BARRAGE-claude-01 — The AUDIT-04 "fix" reworded but KEPT the forbidden deferral phrase "until a semver-aware sort lands" with no tracking issue
+
+Finding-ID: AUDIT-20260531-06 (claude-01 + claude-02 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:23-30` (the rewritten docblock)
+
+AUDIT-20260531-04's literal complaint was: *"it carries forward the lex-descending sort with the comment 'a workable default **until semver-aware sort lands**' — `until … lands` is a deferral phrase with no tracking issue."* The fix (commit `01a0a55`, now marked `fixed-01a0a55`) rewrote the docblock but the replacement text reads: *"This is documented intentional behavior **until a semver-aware sort lands**; the regression test … pins the current contract."* The exact deferral phrase AUDIT-04 named survives the fix verbatim, and there is still no GitHub issue referenced for the deferred semver-aware sort.
+
+Per this audit's own hard constraint ("If you spot a deferral phrase IN the diff, surface it as a finding") and the project's "Just for now is bullshit" rule (a deferral phrase is only permitted when paired with a tracking issue number it *references*), this docblock is non-compliant. The finding was flipped to `fixed-<sha>` while the precise defect it named still ships. The correct fix is either (a) drop "until a semver-aware sort lands" and state the lex-sort as a flat permanent decision, or (b) file a GitHub issue for semver-aware sorting and cite its number in the docblock.
+
+### AUDIT-20260531-07 — AUDIT-BARRAGE-claude-03 — The AUDIT-01 "recovery" test pre-flips the workplan checkbox manually, masking whether the tool itself auto-recovers the missed tick — it asserts idempotency, not recovery
+
+Finding-ID: AUDIT-20260531-07
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:397-490` (the `'recovers from a workplan write failure on re-run'` case)
+
+AUDIT-01 asked for a test that "drives failure → re-run → **confirms the workplan tick lands on the second pass**." The AUDIT-14 fix established that `tickClosureCriteria` "runs unconditionally on every --apply (including for already-dispositioned entries) so prior runs' missed flips catch up." That means a plain re-run with a working writer — *without any manual intervention* — should itself flip the missed `- [ ]` to `- [x]`. That is the load-bearing recovery contract and the most valuable thing to verify.
+
+Instead, the test performs `writeFileSync(workplanPath, wpManual, ...)` to manually flip the checkbox *before* the second run, then asserts the second run is a no-op (`toContain('- [x] Audit-log Status flipped to')`). Because the checkbox is already `[x]` when the tool re-runs, the test cannot distinguish "the tool recovered the tick" from "the operator recovered the tick and the tool did nothing." The one branch AUDIT-01 flagged as possibly unreachable (does the tool re-process an already-`fixed-<sha>` entry and flip the box?) is exactly the branch the manual pre-flip hides. This is the same vacuous-assertion shape as AUDIT-09's determinism test and AUDIT-02's own complaint. Fix: in the second run, do NOT pre-flip; assert the tool flips the still-`[ ]` checkbox to `[x]` on plain re-run.
