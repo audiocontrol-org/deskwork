@@ -84,43 +84,58 @@ function destroyProject(project: string): void {
   rmSync(project, { recursive: true, force: true });
 }
 
-function pipeline(project: string, ...args: string[]): RunResult {
+/**
+ * Per-invocation timeout for every CLI subprocess in this file.
+ *
+ * AUDIT-20260530-84 (cross-model: AUDIT-BARRAGE-claude-P6-3): without an
+ * explicit `timeout` on `spawnSync`, a hung CLI invocation blocks the
+ * test until vitest's global timeout fires — which produces a useless
+ * "test timed out" diagnostic with no indication of which subprocess
+ * hung. Capping each subprocess at 30s gives the test a chance to fail
+ * with a verb-named error message naming the offending args.
+ */
+const SUBPROCESS_TIMEOUT_MS = 30_000;
+
+/**
+ * Wrap `spawnSync` with a timeout + SIGTERM check. When `timeout`
+ * elapses, Node sends SIGTERM and surfaces `r.signal === 'SIGTERM'`;
+ * `r.status` is `null` in that case. Without this check the caller
+ * would see `code: -1` (from `r.status ?? -1`) with no indication that
+ * the cause was a timeout vs. a normal non-zero exit.
+ */
+function runDeskworkSubcommand(
+  verb: string,
+  argsAfterProject: readonly string[],
+  project: string,
+): RunResult {
+  const fullArgs = [verb, project, ...argsAfterProject];
   const r = spawnSync(
     deskworkBin,
-    ['pipeline', project, ...args],
-    { encoding: 'utf-8' },
+    fullArgs,
+    { encoding: 'utf-8', timeout: SUBPROCESS_TIMEOUT_MS },
   );
+  if (r.signal === 'SIGTERM') {
+    throw new Error(
+      `deskwork ${verb} subprocess timed out after ${SUBPROCESS_TIMEOUT_MS}ms (args: ${JSON.stringify(fullArgs)})`,
+    );
+  }
   return {
     code: r.status ?? -1,
     stdout: r.stdout ?? '',
     stderr: r.stderr ?? '',
   };
+}
+
+function pipeline(project: string, ...args: string[]): RunResult {
+  return runDeskworkSubcommand('pipeline', args, project);
 }
 
 function lane(project: string, ...args: string[]): RunResult {
-  const r = spawnSync(
-    deskworkBin,
-    ['lane', project, ...args],
-    { encoding: 'utf-8' },
-  );
-  return {
-    code: r.status ?? -1,
-    stdout: r.stdout ?? '',
-    stderr: r.stderr ?? '',
-  };
+  return runDeskworkSubcommand('lane', args, project);
 }
 
 function addEntry(project: string, ...args: string[]): RunResult {
-  const r = spawnSync(
-    deskworkBin,
-    ['add', project, ...args],
-    { encoding: 'utf-8' },
-  );
-  return {
-    code: r.status ?? -1,
-    stdout: r.stdout ?? '',
-    stderr: r.stderr ?? '',
-  };
+  return runDeskworkSubcommand('add', args, project);
 }
 
 function pipelinePath(project: string, id: string): string {
