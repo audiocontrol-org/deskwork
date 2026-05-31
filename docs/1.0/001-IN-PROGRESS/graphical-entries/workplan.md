@@ -1300,17 +1300,17 @@ Disposition: duplicate of AUDIT-20260530-84 (claude). Both describe the same `sp
 
 Closes AUDIT-20260530-88 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `plugins/deskwork/skills/group/SKILL.md` (Error handling section, `show`/`update` bullets) vs `packages/core/src/groups/operations/show.ts:54-60` and `packages/core/src/groups/operations/update.ts:48-54`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-88 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in subject
+- [x] Step 1: regression test landed at `packages/core/test/groups/skill-md-error-strings.test.ts` (doc-conformance pinning)
+- [x] Step 2: agent verified docstring strings absent from code pre-fix (drift confirmed)
+- [x] Step 3: SKILL.md error catalog rewritten + 2-family overview note added (commit `a11aa60`)
+- [x] Step 4: 895 core tests pass post-fix (+16 from new regression suite)
+- [x] Step 5: committed as `a11aa60` with `Closes AUDIT-20260530-88 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in body
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/groups/skill-md-error-strings.test.ts` (doc-conformance regression)
+- [x] `npx vitest run packages/core/test/groups/skill-md-error-strings.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-a11aa60`
 
 
 

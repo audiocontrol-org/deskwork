@@ -4275,7 +4275,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (codex). R
 ### AUDIT-20260530-88 — [P7T7.2 claude] SKILL.md error-handling catalog contradicts the shipped refusal messages AND re-asserts the pre-AUDIT-15 "non-empty members = group" semantic
 
 Finding-ID: AUDIT-20260530-88 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)
-Status:     open
+Status:     fixed-a11aa60
 Severity:   medium
 Surface:    `plugins/deskwork/skills/group/SKILL.md` (Error handling section, `show`/`update` bullets) vs `packages/core/src/groups/operations/show.ts:54-60` and `packages/core/src/groups/operations/update.ts:48-54`
 
