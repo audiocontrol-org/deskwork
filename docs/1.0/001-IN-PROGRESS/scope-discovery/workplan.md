@@ -548,7 +548,7 @@ Closes AUDIT-20260531-06 (claude-01 + claude-02 + claude-04 + claude-05 + claude
 
 - [x] No forbidden-deferral phrase in `feature-root.ts`.
 - [x] Regression test `feature-root.test.ts > picks lex-greatest, NOT semver-greatest` still pins the contract.
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.24 (fix-finding-AUDIT-20260531-07): AUDIT-20260531-07 — AUDIT-BARRAGE-claude-03 — The AUDIT-01 "recovery" test pre-f…
@@ -565,7 +565,7 @@ Closes AUDIT-20260531-07. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts`
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 6 (follow-up): Primitive-extraction dispatch hygiene
 

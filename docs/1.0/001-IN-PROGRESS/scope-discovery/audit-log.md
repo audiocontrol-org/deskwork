@@ -955,7 +955,7 @@ AUDIT-15's framing was "close the *class* of bug, not the instance — divergenc
 ### AUDIT-20260531-06 — AUDIT-BARRAGE-claude-01 — The AUDIT-04 "fix" reworded but KEPT the forbidden deferral phrase "until a semver-aware sort lands" with no tracking issue
 
 Finding-ID: AUDIT-20260531-06 (claude-01 + claude-02 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model)
-Status:     open
+Status:     fixed-6763491c4452b94802b9244dc30d9849624e126c
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts:23-30` (the rewritten docblock)
 
@@ -966,7 +966,7 @@ Per this audit's own hard constraint ("If you spot a deferral phrase IN the diff
 ### AUDIT-20260531-07 — AUDIT-BARRAGE-claude-03 — The AUDIT-01 "recovery" test pre-flips the workplan checkbox manually, masking whether the tool itself auto-recovers the missed tick — it asserts idempotency, not recovery
 
 Finding-ID: AUDIT-20260531-07
-Status:     open
+Status:     fixed-6763491c4452b94802b9244dc30d9849624e126c
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/apply-audit-flips-cli.test.ts:397-490` (the `'recovers from a workplan write failure on re-run'` case)
 
