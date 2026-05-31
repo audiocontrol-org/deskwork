@@ -4290,7 +4290,7 @@ Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (claude). 
 ### AUDIT-20260530-89 — [P7T7.2 claude] `showGroup` member-enrichment swallows corrupt-sidecar parse/config errors as `missing: true` (same class as AUDIT-23, new surface)
 
 Finding-ID: AUDIT-20260530-89 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)
-Status:     open
+Status:     fixed-6f16c45
 Severity:   medium
 Surface:    `packages/core/src/groups/operations/show.ts:66-78` (the per-member `try { readSidecar } catch { ...missing: true }` loop)
 

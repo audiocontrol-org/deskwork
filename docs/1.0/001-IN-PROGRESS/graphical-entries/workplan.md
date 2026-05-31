@@ -1318,17 +1318,17 @@ Closes AUDIT-20260530-88 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `p
 
 Closes AUDIT-20260530-89 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `packages/core/src/groups/operations/show.ts:66-78` (the per-member `try { readSidecar } catch { ...missing: true }` loop).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-89 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — `packages/core/test/groups/show-corrupt-member-sidecar.test.ts`
+- [x] Step 2: confirm test fails against current code (verify the bug repros) — corrupt-member case mislabeled as `missing: true`, expected throw never fired
+- [x] Step 3: implement the fix — probe `existsSync(sidecarPath(...))` first; parse/schema/IO errors propagate (mirrors AUDIT-20260530-23 in cancel.ts)
+- [x] Step 4: confirm test passes — full `@deskwork/core` suite 897/897 green
+- [x] Step 5: committed as `6f16c45` with `Closes AUDIT-20260530-89 (cross-model: AUDIT-BARRAGE-claude-P7T7.2)` in body
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/groups/show-corrupt-member-sidecar.test.ts` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-6f16c45` via the close-shipped-audit-findings step
 
 
 
