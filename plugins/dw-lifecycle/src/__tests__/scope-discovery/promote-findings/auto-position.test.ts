@@ -275,6 +275,25 @@ describe('computeAutoPosition + nextTaskNumberFactory — convention detection (
     expect(factory({}, 1)).toBe('15.4');
   });
 
+  it('accepts `## Phase 0:` (audit-cleanup convention — operator preferred shape)', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Phase 0: audit cleanup',
+      '',
+      '### Task 0.1: pre-existing fix-task',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.phaseNumber).toBe(0);
+    expect(pos.phaseHeading).toBe('## Phase 0: audit cleanup');
+    const factory = nextTaskNumberFactory(pos);
+    // Phase 0 with hierarchical convention (Task 0.1 exists) → next is 0.2.
+    expect(factory({}, 0)).toBe('0.2');
+  });
+
   it('falls back to hierarchical when the phase has no existing tasks', () => {
     const wp = [
       '# Workplan',

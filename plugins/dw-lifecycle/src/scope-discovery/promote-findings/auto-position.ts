@@ -108,7 +108,10 @@ function collectPhases(lines: ReadonlyArray<string>): PhaseSpan[] {
     const m = PHASE_NUMBER_RE.exec(line);
     if (m === null) continue;
     const phaseNumber = Number.parseInt(m[1] ?? '0', 10);
-    if (!Number.isFinite(phaseNumber) || phaseNumber <= 0) continue;
+    // Phase 0 is valid (operator's preferred convention for the
+    // audit-cleanup phase). Only NaN / negative phase numbers are
+    // rejected.
+    if (!Number.isFinite(phaseNumber) || phaseNumber < 0) continue;
     phases.push({
       heading: line.trim(),
       phaseNumber,
@@ -143,7 +146,9 @@ function collectTaskHeadings(lines: ReadonlyArray<string>): TaskHeadingRef[] {
     if (m === null) continue;
     const major = Number.parseInt(m[1] ?? '0', 10);
     const minor = Number.parseInt(m[2] ?? '0', 10);
-    if (!Number.isFinite(major) || major <= 0) continue;
+    // Phase 0 valid → Task 0.X major valid. Reject only NaN /
+    // negative.
+    if (!Number.isFinite(major) || major < 0) continue;
     refs.push({ line: i + 1, major, minor });
   }
   return refs;
