@@ -284,6 +284,36 @@ function reconcileLaneIds(
   return stored.filter((id) => liveSet.has(id));
 }
 
+/**
+ * Enforce the cross-axis invariant `hidden ⇒ not focused` by filtering
+ * `focused` to the intersection with the resolved `visible` set.
+ * Mirrors the discipline of `reconcileLaneIds` (read-time filter, no
+ * write-back to the saved preset) but operates on a per-apply
+ * relationship between two preset axes rather than the per-axis
+ * relationship between stored ids and live ids.
+ *
+ * Per AUDIT-20260530-46 (cross-model: AUDIT-BARRAGE-claude-P5-3): the
+ * live swimlane controller upholds this invariant interactively
+ * (hiding a lane drops it from focus), but a hand-edited / migrated /
+ * imported preset can carry inconsistent axes. `applyPreset` is the
+ * import seam where the invariant has to be re-asserted; without this
+ * filter the focus write would land ids that the visibility write
+ * just marked hidden, producing a stored state where a lane is both
+ * stub-hidden and focus-styled.
+ *
+ * The reconciliation order is `visible first, then focused intersected
+ * against visible` — visible is the gating axis (hidden lanes can't be
+ * focused), and the function preserves the input order of `focused`
+ * for parity with the existing `reconcileLaneIds` contract.
+ */
+function enforceHiddenNotFocused(
+  focused: readonly string[],
+  visible: readonly string[],
+): string[] {
+  const visibleSet = new Set(visible);
+  return focused.filter((id) => visibleSet.has(id));
+}
+
 function readJsonArrayOfStrings(key: string): string[] {
   const out: string[] = [];
   const raw = window.localStorage.getItem(key);
@@ -429,12 +459,25 @@ function writeJsonOrIgnore(key: string, value: unknown): void {
  *   2. view-mode — independent axis; reapply doesn't depend on focus.
  *   3. collapse — independent axis; lane + stage scope.
  *   4. focus — last, because the visibility pass establishes the
- *      universe of focusable lanes and may force-hide a lane that
- *      the preset's `focusedLanes` then re-includes.
+ *      universe of focusable lanes and the focus write is filtered
+ *      via `enforceHiddenNotFocused` so a preset with `focusedLanes`
+ *      that names a hidden lane never produces a hidden-AND-focused
+ *      stored state.
  *
  * Storage writes happen FIRST (all four axes) so each `reapply*`
  * call reads a consistent post-preset world. Calling reapply between
  * writes would race the controllers against a partial state.
+ *
+ * Invariants re-asserted at the apply boundary:
+ *
+ *   - Per AUDIT-20260530-45 — lane ids are reconciled against the
+ *     live lane set (`reconcileLaneIds`), so dead ids in a stale
+ *     preset never reach storage.
+ *   - Per AUDIT-20260530-46 — the focus axis is intersected with
+ *     the resolved visible axis (`enforceHiddenNotFocused`), so the
+ *     hidden⇒not-focused invariant the live controllers uphold
+ *     interactively is also enforced when a preset is imported /
+ *     hand-edited / migrated through this apply seam.
  */
 export function applyPreset(projectKey: string, preset: FocusPreset): void {
   // Per AUDIT-20260530-45 — reconcile every lane-id-bearing axis
@@ -483,9 +526,19 @@ export function applyPreset(projectKey: string, preset: FocusPreset): void {
   writeJsonOrIgnore(stageCollapseKey(projectKey), stageOut);
 
   // 4. Focus — focused-lanes array. Per AUDIT-20260530-45 the write
-  //    uses the reconciled list (dead ids dropped) so the post-apply
-  //    :focus key never references a lane the live page doesn't have.
-  writeJsonOrIgnore(focusKey(projectKey), reconciledFocused);
+  //    starts from the reconciled list (dead ids dropped) so the
+  //    post-apply :focus key never references a lane the live page
+  //    doesn't have. Per AUDIT-20260530-46 the list is then
+  //    intersected against the resolved visible set so a preset
+  //    whose focusedLanes names a hidden lane never produces a
+  //    hidden-AND-focused stored state. Both filters operate at the
+  //    apply boundary (the import seam) without rewriting the saved
+  //    preset.
+  const focusedFiltered = enforceHiddenNotFocused(
+    reconciledFocused,
+    reconciledVisible,
+  );
+  writeJsonOrIgnore(focusKey(projectKey), focusedFiltered);
 
   // Re-apply each constituent controller from storage. Order in the
   // visual / DOM apply matters less than the storage-write order

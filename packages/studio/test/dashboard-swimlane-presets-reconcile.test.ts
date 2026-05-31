@@ -169,3 +169,84 @@ describe('AUDIT-20260530-45 — preset lane-id reconciliation', () => {
     expect(focusParsed).toEqual(['default', 'qa']);
   });
 });
+
+describe('AUDIT-20260530-46 — applyPreset enforces hidden⇒not-focused invariant', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    window.localStorage.clear();
+    window.history.replaceState({}, '', '/dev/editorial-studio');
+    setMatchMediaMatches(false);
+  });
+
+  it('strips focused lanes that are NOT in the visible set before writing :focus', () => {
+    // The hidden⇒not-focused invariant is upheld live by the swimlane
+    // controller (hiding a lane drops it from focus), but a hand-edited
+    // / migrated / imported preset can carry inconsistent axes. Apply
+    // boundary is the import seam where the invariant has to be
+    // re-asserted — without the fix, `:focus` storage post-apply
+    // contains `qa`, but the visibility write puts `qa` in the hidden
+    // set, leaving the page in a state where a hidden lane is also
+    // focused. Post-fix, focused is filtered against the resolved
+    // visible set so the storage write is internally consistent.
+    const preset: FocusPreset = {
+      id: 'p-test-invariant',
+      name: 'qa hidden but focused',
+      createdAt: '2026-05-30T10:00:00.000Z',
+      // qa is NOT in visibleLanes => qa is hidden after apply.
+      visibleLanes: ['default'],
+      // qa IS in focusedLanes => without the fix, :focus carries qa
+      // even though qa is hidden.
+      focusedLanes: ['default', 'qa'],
+      viewModePerLane: { default: 'kanban', qa: 'kanban' },
+      laneCollapseState: {},
+      stageCollapseState: {},
+    };
+
+    // Both lanes are live; the preset's inconsistency is the issue,
+    // not lane-id staleness (which Task 0.21 / AUDIT-45 covered).
+    buildShell(['default', 'qa']);
+    bootControllers();
+
+    applyPreset(PROJECT_KEY, preset);
+
+    // :visibility holds the hidden set (inverse of visibleLanes).
+    const visRaw = window.localStorage.getItem(`${PREFIX}:visibility`);
+    expect(visRaw).not.toBeNull();
+    const visParsed: unknown = JSON.parse(visRaw ?? '[]');
+    expect(visParsed).toEqual(['qa']);
+
+    // Bug reproduction (pre-fix): :focus = ['default', 'qa']; qa is
+    // both hidden AND focused.
+    // Post-fix: :focus is filtered to the intersection with the
+    // resolved visible set, so only `default` survives.
+    const focusRaw = window.localStorage.getItem(`${PREFIX}:focus`);
+    expect(focusRaw).not.toBeNull();
+    const focusParsed: unknown = JSON.parse(focusRaw ?? '[]');
+    expect(focusParsed).toEqual(['default']);
+  });
+
+  it('preserves focused lanes that are in the visible set (no false-positive strip)', () => {
+    // Negative test: when every focused id is also visible, the
+    // invariant filter is a no-op and the focus write matches the
+    // preset verbatim.
+    const preset: FocusPreset = {
+      id: 'p-test-invariant-noop',
+      name: 'consistent preset',
+      createdAt: '2026-05-30T10:00:00.000Z',
+      visibleLanes: ['default', 'qa'],
+      focusedLanes: ['default', 'qa'],
+      viewModePerLane: { default: 'kanban', qa: 'kanban' },
+      laneCollapseState: {},
+      stageCollapseState: {},
+    };
+
+    buildShell(['default', 'qa']);
+    bootControllers();
+
+    applyPreset(PROJECT_KEY, preset);
+
+    const focusRaw = window.localStorage.getItem(`${PREFIX}:focus`);
+    const focusParsed: unknown = JSON.parse(focusRaw ?? '[]');
+    expect(focusParsed).toEqual(['default', 'qa']);
+  });
+});
