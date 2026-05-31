@@ -20,8 +20,10 @@
  * empty member list.
  */
 
+import { existsSync } from 'node:fs';
 import { readSidecar } from '../../sidecar/read.ts';
 import { resolveEntryUuid } from '../../sidecar/lookup.ts';
+import { sidecarPath } from '../../sidecar/paths.ts';
 import type { Entry } from '../../schema/entry.ts';
 import { isArchivedEntry, isGroupEntry } from '../types.ts';
 
@@ -59,20 +61,32 @@ export async function showGroup(
   const memberUuids = entry.members ?? [];
   const members: MemberSummary[] = [];
   for (const memberUuid of memberUuids) {
-    try {
-      const member = await readSidecar(projectRoot, memberUuid);
-      members.push({
-        uuid: memberUuid,
-        missing: false,
-        slug: member.slug,
-        title: member.title,
-        ...(member.lane !== undefined && { lane: member.lane }),
-        currentStage: member.currentStage,
-        archived: isArchivedEntry(member),
-      });
-    } catch {
+    // Per AUDIT-20260530-89 (mirrors AUDIT-20260530-23 in cancel.ts):
+    // narrow the recoverable `missing: true` case to the genuinely-
+    // absent sidecar via an `existsSync` probe. The pre-fix code
+    // wrapped `readSidecar` in a bare `catch {}` that pushed
+    // `missing: true` for ANY thrown error, mislabeling corrupt-but-
+    // on-disk sidecars as dangling references. Doctor's
+    // `group-member-missing` rule then prompts the operator to delete
+    // the reference, compounding the data loss. With the probe in
+    // place, parse-failure / schema-failure / IO errors propagate so
+    // real corruption surfaces loudly rather than masquerading as a
+    // dangling UUID; only the genuine `file does not exist` case
+    // yields `missing: true`.
+    if (!existsSync(sidecarPath(projectRoot, memberUuid))) {
       members.push({ uuid: memberUuid, missing: true });
+      continue;
     }
+    const member = await readSidecar(projectRoot, memberUuid);
+    members.push({
+      uuid: memberUuid,
+      missing: false,
+      slug: member.slug,
+      title: member.title,
+      ...(member.lane !== undefined && { lane: member.lane }),
+      currentStage: member.currentStage,
+      archived: isArchivedEntry(member),
+    });
   }
 
   return { entry, archived: isArchivedEntry(entry), members };
