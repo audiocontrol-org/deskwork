@@ -4210,7 +4210,7 @@ Surfaced by audit-barrage run `20260530T120643794Z-graphical-entries` (claude). 
 ### AUDIT-20260530-83 — [P6-3 claude] Integration test bypasses the entry-creation CLI, weakening the "add 2 entries" + "state-intact" claims
 
 Finding-ID: AUDIT-20260530-83 (cross-model: AUDIT-BARRAGE-claude-P6-3)
-Status:     open
+Status:     fixed-0bc4763
 Severity:   low
 Surface:    `packages/cli/test/custom-pipeline-lane-integration.test.ts:130-152` (`writeSidecarFile`), workplan step 6.6.1
 
