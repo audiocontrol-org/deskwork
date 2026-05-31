@@ -4064,7 +4064,7 @@ Surfaced by audit-barrage run `20260530T120247811Z-graphical-entries` (claude). 
 ### AUDIT-20260530-73 — [P6-2 codex] Required-field copy builders can copy placeholder commands
 
 Finding-ID: AUDIT-20260530-73 (cross-model: AUDIT-BARRAGE-codex-P6-2)
-Status:     open
+Status:     fixed-115a5383f774
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:95-103,182-189`; `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:88-102,205-228`
 
