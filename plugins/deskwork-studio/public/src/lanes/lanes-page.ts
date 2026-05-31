@@ -89,7 +89,14 @@ function readFieldCurrent(form: HTMLElement, name: string): string {
   const el = form.querySelector<HTMLInputElement | HTMLSelectElement>(
     `[data-lanes-field="${name}"]`,
   );
-  return el?.dataset.current ?? '';
+  // Trim symmetrically with `readFieldValue` so the diff comparison
+  // in `buildUpdateCommand` is apples-to-apples. Pre-fix the live
+  // value was trimmed but `dataset.current` was raw, producing a
+  // spurious `--flag` whenever the stored value carried surrounding
+  // whitespace. Closes AUDIT-20260530-69. Normalization-on-save, if
+  // desired, must be an explicit operator action — not a side
+  // effect of one-sided trimming in the diff path.
+  return el?.dataset.current?.trim() ?? '';
 }
 
 function buildCreateCommand(values: NewFormValues): string {
