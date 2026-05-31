@@ -42,7 +42,6 @@
  */
 
 import { existsSync } from 'node:fs';
-import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { walkOpenFindings } from './audit-log-walker.js';
 import {
@@ -50,6 +49,7 @@ import {
   type UncheckedTask,
 } from './tdd-enforcement.js';
 import type { OpenFinding } from './types.js';
+import { resolveFeatureRoot } from '../util/feature-root.js';
 
 const CANONICAL_AUDIT_ID_RE = /\bAUDIT-\d{8}-\d+/;
 
@@ -103,47 +103,20 @@ export class FeatureRootNotFoundError extends Error {
   }
 }
 
-async function findFeatureRoot(
-  docsRoot: string,
-  featureSlug: string,
-): Promise<{ root: string | undefined; versionsChecked: readonly string[] }> {
-  if (!existsSync(docsRoot)) {
-    return { root: undefined, versionsChecked: [] };
-  }
-  let topEntries: ReadonlyArray<string>;
-  try {
-    // Per AUDIT-20260530-06 (determinism) + AUDIT-20260530-08
-    // (semantic correctness): sort lexicographically DESCENDING so
-    // the walker picks the lex-greatest version dir (biases toward
-    // the active `1.0` over archived `0.x` / `0.19.0`). Lex-ascending
-    // — the pre-AUDIT-08 fix — was deterministic but picked the
-    // oldest version, the silent-wrong-pick the round-2 audit
-    // caught. Lex-greatest isn't semver-correct (`0.10.0` > `0.9.0`
-    // lex-wise is wrong by version intuition), but it's a workable
-    // default until a semver-aware sort lands.
-    topEntries = [...(await readdir(docsRoot))].sort().reverse();
-  } catch {
-    return { root: undefined, versionsChecked: [] };
-  }
-  const versionsChecked: string[] = [];
-  for (const version of topEntries) {
-    const inProgress = join(docsRoot, version, '001-IN-PROGRESS');
-    if (!existsSync(inProgress)) continue;
-    versionsChecked.push(version);
-    const featureDir = join(inProgress, featureSlug);
-    if (existsSync(featureDir)) return { root: featureDir, versionsChecked };
-  }
-  return { root: undefined, versionsChecked };
-}
+// Per AUDIT-20260530-15: the local `findFeatureRoot` walker was
+// extracted into the shared `resolveFeatureRoot` helper. Both this
+// file and `audit-barrage-lift.ts` now call the same function, so
+// any future change (semver-aware sort, ambiguity-error, ...) lives
+// in one place and can't drift between the two verbs.
 
 export async function checkWorkplanAwareGate(
   args: CheckWorkplanAwareGateArgs,
 ): Promise<WorkplanAwareGateResult> {
   const docsRoot = join(args.repoRoot, 'docs');
-  const { root: featureRoot, versionsChecked } = await findFeatureRoot(
+  const { root: featureRoot, versionsChecked } = await resolveFeatureRoot({
     docsRoot,
-    args.featureSlug,
-  );
+    slug: args.featureSlug,
+  });
   if (featureRoot === undefined) {
     throw new FeatureRootNotFoundError(
       args.featureSlug,

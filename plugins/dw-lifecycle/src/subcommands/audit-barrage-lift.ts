@@ -34,7 +34,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 import { repoRoot } from '../repo.js';
 import {
@@ -42,6 +42,7 @@ import {
   type ExtractedFinding,
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
+import { resolveFeatureRoot as resolveFeatureRootShared } from '../scope-discovery/util/feature-root.js';
 
 export interface AuditBarrageLiftCliOptions {
   readonly featureSlug: string;
@@ -169,27 +170,15 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
   return { ok: true, opts };
 }
 
+// Per AUDIT-20260530-15: this verb's local `resolveFeatureRoot`
+// walker was extracted into the shared `resolveFeatureRoot` helper
+// (in scope-discovery/util/feature-root.ts). Both this file and
+// workplan-aware-gate.ts now call the same function, so any future
+// change to the resolution logic lives in one place.
 async function resolveFeatureRoot(rootDir: string, slug: string): Promise<string | null> {
   const docsRoot = join(rootDir, 'docs');
-  if (!existsSync(docsRoot)) return null;
-  let topEntries: ReadonlyArray<string>;
-  try {
-    // Per AUDIT-20260530-06 (determinism) + AUDIT-20260530-08
-    // (semantic correctness): sort lex-DESCENDING (see same fix in
-    // workplan-aware-gate.ts) so the gate and the lift always pick
-    // the lex-greatest version dir — biasing toward the active
-    // `1.0` over archived `0.x`.
-    topEntries = [...(await readdir(docsRoot))].sort().reverse();
-  } catch {
-    return null;
-  }
-  for (const version of topEntries) {
-    const inProgress = join(docsRoot, version, '001-IN-PROGRESS');
-    if (!existsSync(inProgress)) continue;
-    const featureDir = join(inProgress, slug);
-    if (existsSync(featureDir)) return featureDir;
-  }
-  return null;
+  const { root } = await resolveFeatureRootShared({ docsRoot, slug });
+  return root ?? null;
 }
 
 function highestExistingNn(auditLogText: string, date: string): number {

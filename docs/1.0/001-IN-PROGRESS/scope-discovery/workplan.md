@@ -398,16 +398,16 @@ Closes AUDIT-20260530-07. Surface: plugins/dw-lifecycle/src/scope-discovery/prom
 
 Closes AUDIT-20260530-15 (claude-01 + claude-02 + codex-01 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:112-120` (`findFeatureRoot`) and `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:174-180` (`resolveFeatureRoot`).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-15 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)` in subject
+- [x] Step 1: 6 tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` for the new shared helper — single-version, multi-version lex-greatest pick, no-match, missing-docsRoot, 001-IN-PROGRESS shape check, cross-invocation determinism.
+- [x] Step 2: confirmed tests fail pre-fix (helper didn't exist; red phase).
+- [x] Step 3: NEW `plugins/dw-lifecycle/src/scope-discovery/util/feature-root.ts` extracts the walker; both `workplan-aware-gate.ts` (`findFeatureRoot` removed) and `audit-barrage-lift.ts` (`resolveFeatureRoot` becomes a thin wrapper) now call the shared helper.
+- [x] Step 4: tests pass; plugin suite 2430/2430 (+6 new). Existing gate + lift behavior preserved verbatim.
+- [x] Step 5: commit with `Closes AUDIT-20260530-15` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/feature-root.test.ts` exits 0
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
