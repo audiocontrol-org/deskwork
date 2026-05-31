@@ -1371,17 +1371,16 @@ Closes AUDIT-20260530-91 (cross-model: AUDIT-BARRAGE-claude-P7T7.2). Surface: `p
 
 Closes AUDIT-20260530-92 (cross-model: AUDIT-BARRAGE-codex-P7T7.2). Surface: `packages/core/src/groups/index.ts:11`, `packages/core/src/groups/types.ts:39-45`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260530-92 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)` in subject
+Disposition: duplicate of AUDIT-20260530-90 (claude). Both describe the same `isPopulatedGroupEntry` barrel-export gap. Already fixed by commit `b642cd6` (Task 7.3/7.4 implementation) — see Task 0.65.
+
+- [x] Step 1-5: already addressed (see Task 0.65 disposition)
+- [x] Status flipped
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `packages/core/test/groups/` (predicate tests via barrel)
+- [x] `npx vitest run` exits 0
+- [x] Status flipped to `fixed-b642cd6 (duplicate of AUDIT-20260530-90; already fixed by Task 7.3/7.4 implementation commit)`
 
 
 

@@ -4337,7 +4337,7 @@ Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (claude). 
 ### AUDIT-20260530-92 — [P7T7.2 codex] `isPopulatedGroupEntry` is implemented but not exported from the public groups entrypoint
 
 Finding-ID: AUDIT-20260530-92 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)
-Status:     open
+Status:     fixed-b642cd6 (duplicate of AUDIT-20260530-90; already fixed by Task 7.3/7.4 implementation commit)
 Severity:   medium
 Surface:    `packages/core/src/groups/index.ts:11`, `packages/core/src/groups/types.ts:39-45`
 
