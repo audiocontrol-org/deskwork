@@ -768,6 +768,156 @@ describe('runPromoteFindings — auto-apply (Phase 15 Task 4b)', () => {
       idemFix.cleanup();
     }
   });
+
+  // Phase 19 Task 5.110 (fix-finding-AUDIT-20260601-76) — informational
+  // severity filter on the auto-promote path.
+  //
+  // Step 0 — working-code invariant: pre-fix, the auto-apply path scopes
+  // EVERY open finding as a code-defect fix-task regardless of severity.
+  // HIGH/MEDIUM/LOW findings SHOULD continue to be scoped after the fix;
+  // only `informational` findings are excluded (they're celebrations of
+  // positive properties, not bugs to fix). The fix MUST NOT break the
+  // HIGH/MEDIUM/LOW scoping path.
+  describe('runPromoteFindings — informational severity filter (AUDIT-20260601-76)', () => {
+    function makeMixedSeverityFixture(): ReturnType<typeof makeFixture> {
+      const root = mkdtempSync(join(tmpdir(), 'pf-mixed-'));
+      const featureSlug = 'demo-feature';
+      const featureDir = join(root, 'docs', '1.0', '001-IN-PROGRESS', featureSlug);
+      mkdirSync(featureDir, { recursive: true });
+      writeFileSync(
+        join(featureDir, 'workplan.md'),
+        [
+          '# Workplan',
+          '',
+          '## Phase 19: current',
+          '',
+          '### Task 19.1: ongoing',
+          '',
+          '- [ ] Step 1.',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      writeFileSync(
+        join(featureDir, 'audit-log.md'),
+        [
+          '# Audit Log',
+          '',
+          '### A HIGH finding',
+          '',
+          'Finding-ID: AUDIT-20260601-90',
+          'Status: open',
+          'Severity: high',
+          'Surface: src/foo.ts:10',
+          '',
+          'Body of HIGH.',
+          '',
+          '### A MEDIUM finding',
+          '',
+          'Finding-ID: AUDIT-20260601-91',
+          'Status: open',
+          'Severity: medium',
+          'Surface: src/bar.ts:20',
+          '',
+          'Body of MEDIUM.',
+          '',
+          '### A LOW finding',
+          '',
+          'Finding-ID: AUDIT-20260601-92',
+          'Status: open',
+          'Severity: low',
+          'Surface: src/baz.ts:30',
+          '',
+          'Body of LOW.',
+          '',
+          '### An INFORMATIONAL finding',
+          '',
+          'Finding-ID: AUDIT-20260601-93',
+          'Status: open',
+          'Severity: informational',
+          'Surface: whole release commit',
+          '',
+          'Positive signal — the release commit is clean.',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      return {
+        root,
+        featureSlug,
+        cleanup: () => rmSync(root, { recursive: true, force: true }),
+      };
+    }
+
+    it('excludes informational findings from auto-promote scoping', async () => {
+      const f = makeMixedSeverityFixture();
+      try {
+        const { args, diskWrites } = makeRunArgs(
+          {
+            verb: 'auto-apply',
+            featureSlug: f.featureSlug,
+            bucket: 'open',
+            limit: 10,
+          },
+          f,
+          new Map<string, string>(),
+        );
+        const exit = await runPromoteFindings(args);
+        expect(exit).toBe(0);
+        const workplanPath = join(
+          f.root,
+          'docs',
+          '1.0',
+          '001-IN-PROGRESS',
+          f.featureSlug,
+          'workplan.md',
+        );
+        const newWp = diskWrites.get(workplanPath) ?? '';
+        // The informational finding MUST NOT be scoped as a fix-task.
+        expect(newWp).not.toMatch(/fix-finding-AUDIT-20260601-93/);
+      } finally {
+        f.cleanup();
+      }
+    });
+
+    // Step 1b — regression-lock test (Option D, HIGH severity per
+    // AUDIT-20260601-76). Confirms the working-code invariant the
+    // filter MUST preserve: HIGH/MEDIUM/LOW findings continue to be
+    // scoped as fix-tasks. A regression that filters out non-
+    // informational findings would fail this assertion.
+    it('REGRESSION: HIGH / MEDIUM / LOW findings continue to be scoped (Option D invariant)', async () => {
+      const f = makeMixedSeverityFixture();
+      try {
+        const { args, diskWrites } = makeRunArgs(
+          {
+            verb: 'auto-apply',
+            featureSlug: f.featureSlug,
+            bucket: 'open',
+            limit: 10,
+          },
+          f,
+          new Map<string, string>(),
+        );
+        const exit = await runPromoteFindings(args);
+        expect(exit).toBe(0);
+        const workplanPath = join(
+          f.root,
+          'docs',
+          '1.0',
+          '001-IN-PROGRESS',
+          f.featureSlug,
+          'workplan.md',
+        );
+        const newWp = diskWrites.get(workplanPath) ?? '';
+        // The HIGH / MEDIUM / LOW findings MUST all be scoped.
+        expect(newWp).toMatch(/fix-finding-AUDIT-20260601-90/);
+        expect(newWp).toMatch(/fix-finding-AUDIT-20260601-91/);
+        expect(newWp).toMatch(/fix-finding-AUDIT-20260601-92/);
+      } finally {
+        f.cleanup();
+      }
+    });
+  });
 });
 
 /**

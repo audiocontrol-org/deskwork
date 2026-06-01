@@ -746,19 +746,24 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 ### Task 5.110 (fix-finding-AUDIT-20260601-76): AUDIT-20260601-76 — Auto-promotion swept a positive `informational` "clean repor…
 
-Closes AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.108 (`fix-finding-AUDIT-20260601-74`), `@@ -741,6 +741,74 @@` hunk; cross-ref audit-log AUDIT-20260601-74 (`Severity: informational`).
+Closes AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/subcommands/promote-findings.ts:385-387` (auto-apply finding filter). Severity: high.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)` in subject
+**Step 0 — working-code invariant.** Pre-fix, the auto-apply path scopes EVERY open finding (not already in workplan) as a code-defect fix-task regardless of severity. HIGH/MEDIUM/LOW findings MUST continue to be scoped after the fix; only `informational` findings are excluded (they record positive signals, not bugs). The fix is severity-narrow on purpose — a regression that broadens the filter would silently drop real findings.
+
+- [x] Step 1: failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` — 'excludes informational findings from auto-promote scoping' asserts an informational finding is NOT scoped.
+- [x] Step 1b: regression-lock test 'REGRESSION: HIGH / MEDIUM / LOW findings continue to be scoped (Option D invariant)' pins the working-code behavior.
+- [x] Step 2: confirmed RED (1 failed | 26 passed) before implementation.
+- [x] Step 3: implemented filter `(f.severity ?? '').toLowerCase() !== 'informational'` in `promote-findings.ts` auto-apply path.
+- [x] Step 4: GREEN — 27/27 subcommand tests; full plugin suite 2624/2624; tsc clean.
+- [ ] Step 5: commit with `Closes AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Test block count for this finding is ≥2 (Option D — HIGH severity invariant).
+- [x] Failing tests exist at `subcommand.test.ts` — bug-repro + regression-lock.
+- [x] `npx vitest run` exits 0 against the fix.
+- [x] HIGH/MEDIUM/LOW scoping path unchanged (regression-lock confirms).
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
 
 ### Task 5.106 (fix-finding-AUDIT-20260601-72): AUDIT-20260601-72 — v0.32.1 tags and ships the GH-386 stdin fix while open HIGH …
 

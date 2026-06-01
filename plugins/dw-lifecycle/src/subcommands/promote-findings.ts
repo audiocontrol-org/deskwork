@@ -382,8 +382,20 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
     const CANONICAL_AUDIT_ID_RE = /\bAUDIT-\d{8}-\d+/;
     const canonicalOf = (id: string): string =>
       CANONICAL_AUDIT_ID_RE.exec(id)?.[0] ?? id;
+    // Phase 19 Task 5.110 (fix-finding-AUDIT-20260601-76): exclude
+    // `informational` findings from the auto-promote scoping. An
+    // informational entry records a positive signal (a clean release,
+    // a passing invariant) — not a bug. Scoping it as a code-defect
+    // fix-task hands the next implementer a placeholder test path
+    // with no bug to anchor against, and the audit-log entry stays
+    // `Status: open` forever (no `fixed-<sha>` can land for the
+    // absence-of-a-defect), blocking the workplan-aware gate.
+    // HIGH / MEDIUM / LOW findings continue to be scoped — the filter
+    // is severity-narrow on purpose (Option D regression-lock).
     const newFindings = findings.filter(
-      (f) => !alreadyScoped.has(canonicalOf(f.findingId)),
+      (f) =>
+        !alreadyScoped.has(canonicalOf(f.findingId)) &&
+        (f.severity ?? '').toLowerCase() !== 'informational',
     );
     if (newFindings.length === 0) {
       stdout.write(
