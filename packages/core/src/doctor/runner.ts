@@ -26,6 +26,7 @@ import legacyStageArtifactPath from './rules/legacy-stage-artifact-path.ts';
 import laneConfigMissingTemplate from './rules/lane-config-missing-template.ts';
 import entryLaneMissing from './rules/entry-lane-missing.ts';
 import entryAnchorShape from './rules/entry-anchor-shape.ts';
+import entryAddressReasonMissing from './rules/entry-address-reason-missing.ts';
 import { loadProjectRules, mergeRules } from './project-rules.ts';
 import type {
   DoctorContext,
@@ -56,6 +57,7 @@ export const RULES: ReadonlyArray<DoctorRule> = [
   laneConfigMissingTemplate,
   entryLaneMissing,
   entryAnchorShape,
+  entryAddressReasonMissing,
   missingFrontmatterId,
   orphanFrontmatterId,
   duplicateId,

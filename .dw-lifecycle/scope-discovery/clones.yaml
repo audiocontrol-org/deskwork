@@ -1,4 +1,4 @@
-generated_at: 2026-05-31T14:47:09.057Z
+generated_at: 2026-06-01T05:36:51.122Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -287,17 +287,31 @@ clones:
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:96:111
     disposition: pending
     reason: null
+  - id: 625fa6768724
+    lines: 43
+    members:
+      - packages/core/src/doctor/rules/entry-address-reason-missing.ts:120:162
+      - packages/core/src/doctor/rules/entry-anchor-shape.ts:97:139
+    disposition: keep-with-reason
+    reason: intentional mirror of entry-anchor-shape per AUDIT-20260601-08 precedent — both are journal-walking safety-net rules sharing audit-loop body shape (readdir → file-loop → extract-candidate → emit-finding)
+  - id: 815de683e339
+    lines: 10
+    members:
+      - packages/core/src/doctor/rules/entry-address-reason-missing.ts:85:94
+      - packages/core/src/doctor/rules/entry-anchor-shape.ts:74:83
+    disposition: keep-with-reason
+    reason: intentional mirror of entry-anchor-shape per AUDIT-20260601-08 precedent — both are journal-walking safety-net rules with identical readdir+ENOENT boilerplate
   - id: 8fd1c4d33bd7
     lines: 10
     members:
-      - packages/core/src/doctor/rules/lane-config-missing-template.ts:129:138
+      - packages/core/src/doctor/rules/lane-config-missing-template.ts:130:139
       - packages/core/src/pipelines/operations/rename-migration.ts:166:175
     disposition: keep-with-reason
     reason: tmp+rename inlining is the documented project pattern for callers that do not need commitPipelineTemplate/commitLaneConfig's verb-and-validator wrapper; lane-config-missing-template.ts already inlines for the same reason
   - id: e1b16a900b51
     lines: 18
     members:
-      - packages/core/src/doctor/rules/lane-config-missing-template.ts:315:332
+      - packages/core/src/doctor/rules/lane-config-missing-template.ts:305:322
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:158:174
     disposition: keep-with-reason
     reason: Doctor rule contract boilerplate (end of plan choices array + apply()'s plan.kind guard + payload coercion); each rule independently implements the DoctorRule interface against the same contract, so shape similarity is interface-driven not duplication; extracting a base class would violate composition-over-inheritance
@@ -339,8 +353,8 @@ clones:
   - id: 189be54baaa8
     lines: 9
     members:
-      - packages/core/src/doctor/runner.ts:182:190
-      - packages/core/src/doctor/runner.ts:209:217
+      - packages/core/src/doctor/runner.ts:188:196
+      - packages/core/src/doctor/runner.ts:215:223
     disposition: pending
     reason: null
   - id: 41b3f9fce647
@@ -353,7 +367,7 @@ clones:
   - id: 5c72154b2f6d
     lines: 9
     members:
-      - packages/core/src/entry/annotations.ts:327:335
+      - packages/core/src/entry/annotations.ts:397:405
       - packages/core/src/review/pipeline.ts:358:366
     disposition: pending
     reason: null
