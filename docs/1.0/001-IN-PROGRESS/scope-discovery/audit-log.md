@@ -1580,3 +1580,16 @@ Severity:   high
 Surface:    commit `2c30cd1d` subject `docs(audit-log): flip AUDIT-20260601-18 to fixed-b7103a34` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (appended AUDIT-27 lift section) + `workplan.md:729-744` (new Task 5.61)
 
 The commit subject describes a single action — flipping AUDIT-18's status to `fixed`. But the diff actually does three independent things: (1) the status flip; (2) appends an entire new audit-barrage lift section introducing AUDIT-20260601-27, severity `blocking`; (3) adds workplan Task 5.61 for that finding. Bundling a *closure* and a fresh *blocking-finding open* under a subject that mentions only the closure violates the project's own "one fix per commit / the commit message describes what was actually verified, not the broad scope" discipline (`.claude/rules/ui-verification.md` § Commit discipline) — here inverted: the subject is *narrower* than the change, hiding a blocking finding from anyone scanning `git log --oneline`. An operator triaging by subject will not see that this commit opened a blocking item. A reasonable fix is to split the flip and the lift into two commits, or rewrite the subject to name both (`docs(audit-log): flip AUDIT-18 fixed; lift AUDIT-27 (blocking)`).
+
+## 2026-06-01 — audit-barrage lift (20260601T032841284Z-scope-discovery)
+
+### AUDIT-20260601-29 — Commit subject is doubly misaligned with the diff — claims an AUDIT-05 flip absent from the diff, and hides the AUDIT-28 lift + new Task 5.62 it actually performs
+
+Finding-ID: AUDIT-20260601-29 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    commit `f51bcb12` subject `docs: flip AUDIT-20260601-05 to acknowledged-informational + tick AUDIT-18 task` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1572-1582` (AUDIT-28 append) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (@@ -726,+726 new Task 5.62)
+
+The subject makes two claims: (1) flip AUDIT-20260601-05 to acknowledged-informational, (2) tick the AUDIT-18 task. Claim (2) is in the diff (Task 5.52 / AUDIT-18 is ticked, `@@ -862,19 +879,19 @@`). Claim (1) is **not present anywhere in the diff** — there is no hunk touching AUDIT-05's `Status:` line in `audit-log.md`. Meanwhile the diff performs two actions the subject never mentions: it appends an entirely new lift section introducing AUDIT-20260601-28, and it adds workplan Task 5.62 for that finding.
+
+This is the *exact* shape that the just-lifted AUDIT-20260601-28 flags against commit `2c30cd1d` ("subject narrower than change; hides a finding from `git log --oneline`"). The corrective finding has, in the very next commit, been reproduced — and made worse, because here the subject also *overclaims* an action (the AUDIT-05 flip) that the diff doesn't contain. An operator triaging by subject would believe AUDIT-05 was dispositioned (it wasn't, per this diff) and would not know a new finding + task were added. The fix is to make the subject describe what the commit actually does, and to land the AUDIT-05 flip if it was intended (it is missing).

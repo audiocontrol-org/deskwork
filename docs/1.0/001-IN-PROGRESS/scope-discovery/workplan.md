@@ -727,6 +727,23 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.63 (fix-finding-AUDIT-20260601-29): AUDIT-20260601-29 — Commit subject is doubly misaligned with the diff — claims a…
+
+Closes AUDIT-20260601-29 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + codex-01; cross-model). Surface: commit `f51bcb12` subject `docs: flip AUDIT-20260601-05 to acknowledged-informational + tick AUDIT-18 task` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1572-1582` (AUDIT-28 append) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (@@ -726,+726 new Task 5.62).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-29 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + codex-01; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.62 (fix-finding-AUDIT-20260601-28): AUDIT-20260601-28 — Commit subject claims only the AUDIT-18 flip, but the diff a…
 
 Closes AUDIT-20260601-28 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01; cross-model). Surface: commit `2c30cd1d` subject `docs(audit-log): flip AUDIT-20260601-18 to fixed-b7103a34` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (appended AUDIT-27 lift section) + `workplan.md:729-744` (new Task 5.61).
@@ -2552,3 +2569,109 @@ Replace the 5-CLI bash composition with the single verb invocation.
 - `promote-findings --auto` (Phase 13) — not-engaged-disposition branch.
 - `check-open-findings` (Phase 15 Task 1) — post-disposition sanity check.
 - `check-fix-task-tdd` pattern (Phase 13 Task 3) — commit-msg gate template the new gate mirrors.
+
+## Phase 18: Loop usability — template generalization + parser robustness + stochasticity framing
+
+**Motivating context** (2026-06-01 operator directives, end of Phase 17 dogfood):
+
+Phase 17 mechanization is structurally complete: the gates fire, refuse the right things, and validated end-to-end on this very repo. The dogfood ALSO surfaced concrete usability gaps that turn the autonomous loop into a recursive fix-trap for any non-trivial finding shape. Five tractable fixes close those gaps; this phase scopes all five.
+
+Operator's framing on the underlying issue (3): *"If the fixes keep throwing HIGH issues, that's a failure of the fixes, not a problem of recursion depth."* That's the diagnostic frame. Task 3 below scopes the process discipline; the operator hasn't yet picked among three options for HOW. Implementation waits on the pick.
+
+Operator's framing on stochasticity (6): *"The audit barrage is stochastic — it doesn't have to be perfect every time. As long as at least 1 audit is successfully executed, that should count as a successful audit barrage. Auditing as a practice should statistically yield better code."* The code already enforces this (`isModelRunHealthy` per-model, `anyModelEmitted = results.some(...)` for the run); what's missing is operator-facing language that celebrates partial-coverage instead of apologizing for it.
+
+Operator's framing on slushed MEDIUMs (2 / GH #385): *"I don't really care if mediums get slushed after the dampener fires — we can address those in a burndown session at the end of a larger cycle at operator's discretion. I'm not looking for perfection, I'm looking for no showstoppers and a good faith effort at writing good code."* That's the operator-supplied substantive `wontfix` reason for GH #385.
+
+### Task 1: AUDIT-02 template generalization — fix-task template + doctor rule handle non-bug findings
+
+The fix-task template assumes every finding is bug-with-failing-test. Real findings come in five shapes: (a) code defect requiring a failing test; (b) coverage gap requiring NEW tests (no pre-existing bug to repro); (c) pin-only / contract-stability finding (test added that would fail under future regression); (d) registry/hygiene finding (no test possible — disposition is config edit); (e) commit-history / docs / process finding (no test possible — disposition is amend / clarify / acknowledge). Pre-fix, shapes (b)–(e) launder through the template's "Failing test exists at ..." AC with placeholder strings the `fix-task-tdd-discipline` doctor rule would correctly reject. Each `[x]`-checked task with a placeholder test path is a recurring AUDIT-02 violation — the loop's most prolific source of recursive findings this session.
+
+The fix has two parts: **template** (the fix-task renderer learns shape (a)–(e) variants) AND **doctor rule** (the `fix-task-tdd-discipline` rule learns to skip task blocks whose disposition explicitly states non-bug-class).
+
+- [ ] Step 1: extend `workplan-task-renderer.ts` to emit five variants based on a `findingShape` argument: `code-defect` (current template), `coverage-gap`, `pin-only`, `registry-hygiene`, `commit-history-or-docs`. AC text + Step prose specific to each.
+- [ ] Step 2: extend `promote-findings --auto` (or the proposal-file shape) to infer the shape from the finding's Surface + Severity + body. Heuristics: surface ends in `clones.yaml` / `workplan.md` / commit SHA → hygiene; finding body says "no test possible / informational / process feedback" → commit-history-or-docs; surface is a TEST file + finding says "missing test coverage" → coverage-gap; etc. Fall through to `code-defect` when no heuristic matches (safest default — still TDD-able).
+- [ ] Step 3: extend `tdd-enforcement.ts` (the library the doctor rule + commit-msg gate compose). Add a `findingShape` field parseable from the task block's heading or first prose line. When shape is non-bug, skip the test-file-existence and vitest-run checks; instead validate the disposition statement (substantive reason ≥40 chars, no banned-phrase list).
+- [ ] Step 4: failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` covering each shape's allow/refuse paths. RED first, GREEN after the implementation lands.
+- [ ] Step 5: SKILL.md (implement skill) Step 6 prose update — name the 5 finding shapes + reference the doctor-rule's disposition checks.
+- [ ] Step 6: commit with `Closes AUDIT-20260601-02` in subject.
+
+**Acceptance Criteria:**
+- [ ] Workplan-task-renderer emits a non-bug-shape variant when promote-findings infers a non-bug finding shape.
+- [ ] Doctor rule (`fix-task-tdd-discipline`) skips test-file checks for non-bug variants; validates disposition statement instead.
+- [ ] Commit-msg gate (`check-fix-task-tdd`) follows the same logic.
+- [ ] Regression test: a non-bug task block with the non-bug marker + a substantive disposition passes both gates; a non-bug task block with a placeholder string disposition fails both.
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+
+### Task 2: Close GH #385 with operator-supplied wontfix rationale
+
+GH #385 (dampener counter doesn't reset on material-diff-range expansion). Operator's substantive disposition: *"I don't really care if mediums get slushed after the dampener fires — we can address those in a burndown session at the end of a larger cycle at operator's discretion. I'm not looking for perfection, I'm looking for no showstoppers and a good faith effort at writing good code."*
+
+- [ ] Step 1: comment on GH #385 with the operator's framing verbatim.
+- [ ] Step 2: close the issue with state=`wontfix` (or its GH equivalent — typically `closed not-planned`).
+- [ ] Step 3: link the operator's rationale in any future workplan notes that touch dampener semantics so the trade-off stays discoverable.
+
+**Acceptance Criteria:**
+- [ ] GH #385 is closed with the rationale comment in place.
+- [ ] No additional code change required (this task is a disposition, not a fix).
+
+### Task 3: Shallow-fix process discipline — pending operator pick
+
+**Open thread.** Operator's diagnostic: *"If the fixes keep throwing HIGH issues, that's a failure of the fixes, not a problem of recursion depth."* This session's pattern bore that out: v1 sentinel fix didn't enumerate the migration/clone state matrix; v1 audit-barrage-lift fix didn't enumerate the run-success states. Each fix was incomplete because the agent didn't pause to walk the failure-mode matrix before coding.
+
+Three candidate process disciplines (operator picks; implementation waits):
+
+- **Option A — Mandatory state-matrix write-up** before coding any discrimination fix (boot/non-boot, stale/current, healthy/unhealthy, etc.). Forces enumeration. Cost: small friction per fix. Surface: dispatch-wrapper prelude OR fix-task template Step 0.
+- **Option B — Pre-fix `/dw-lifecycle:review` pass** that critiques the *fix plan* before code lands. Same mechanism used post-implementation, one stage earlier. Cost: a second review-cycle per fix. Surface: optional flag on `/dw-lifecycle:implement` or a fix-task Step 0.
+- **Option C — Sub-agent dispatch instruction** with "enumerate the failure modes" as the first paragraph of the prompt template. Forces the agent to write out the failure modes BEFORE proposing a fix. Cost: token overhead per dispatch; one prompt change. Surface: dispatch-wrapper prelude.
+
+- [ ] Step 1: operator picks among A/B/C (or a fourth option).
+- [ ] Step 2: implement the picked discipline.
+- [ ] Step 3: regression test against a fixture that demonstrates the discipline catches an incomplete-enumeration fix.
+- [ ] Step 4: SKILL.md update.
+
+**Acceptance Criteria:**
+- [ ] Operator-picked discipline is implemented + the agent's behavior demonstrably enumerates state matrices before discrimination fixes.
+
+### Task 4: apply-audit-flips trailer parser — handle comma-separated Closes references
+
+apply-audit-flips' parser only picks up the FIRST AUDIT-id from comma-separated trailers (e.g. `Closes AUDIT-A, AUDIT-B, AUDIT-C` flips only A). Manual flips have been required this session for every commit closing >1 finding. Closes the recurring friction.
+
+- [ ] Step 1: failing test at the existing parser test file. Commit subject `"fix: ... Closes AUDIT-20260601-01, AUDIT-20260601-02, AUDIT-20260601-03"` should yield 3 AUDIT-ids, not 1.
+- [ ] Step 2: extend the trailer regex to match comma- AND newline-separated AUDIT-ids in both subject and body.
+- [ ] Step 3: also handle the parenthetical cross-model annotation case: `Closes AUDIT-20260601-01 (claude-01 + codex-01; cross-model)` — the parens shouldn't terminate the ID scan.
+- [ ] Step 4: regression coverage for: single ID; comma-separated IDs; newline-separated; cross-model parenthesized; mixed.
+- [ ] Step 5: commit with `Refs: this-workplan-task` in subject (this is a parser improvement, not a fix-finding task; no AUDIT-id to close).
+
+**Acceptance Criteria:**
+- [ ] All five shapes of trailer parse correctly.
+- [ ] Existing single-ID behavior unchanged.
+
+### Task 5: Stochasticity framing — soften the partial-coverage stderr summary
+
+Per operator directive 6: a 1-healthy-model barrage IS a successful audit, not degraded. Today's stderr line *"audit-barrage: 1/3 models produced output"* reads as apology; should read as celebration.
+
+- [ ] Step 1: rewrite `renderSummaryLine` in `audit-barrage.ts`. New shape: *"audit-barrage: 1 of 3 models emitted findings — barrage successful (run dir: ...)"* OR equivalent. Explicitly frame partial-coverage as success when ≥1 model emitted.
+- [ ] Step 2: keep the all-models-failed case framed as failure (that IS an outage).
+- [ ] Step 3: SKILL.md prose pass on the audit-barrage skill to mirror the celebrate-not-apologize framing. Reference operator-directive: *"auditing as a practice should statistically yield better code"* in the skill's intro.
+
+**Acceptance Criteria:**
+- [ ] Operator-facing stderr summary celebrates ≥1-healthy as success.
+- [ ] All-models-failed still surfaces as outage.
+
+### Phase 18 — Out of Scope
+
+- **Per-run diff metadata for dampener material-expansion detection** — GH #385 is closed as `wontfix` per operator framing; the metadata + dispositioner override are deliberately not built.
+- **Recursive-fix depth cap mechanism** — per operator's diagnostic, the recursion problem is shallow fixes, not recursion itself. Task 3 addresses the upstream cause; no downstream cap is added.
+- **Refactoring the live audit-barrage CLIs** — the underlying claude/codex/gemini CLIs are intermittent; we accept the stochasticity per Task 5's framing.
+- **Migrating already-shipped placeholder-test workplan tasks** — Tasks 5.35/5.36/5.37/5.42/5.43 (this session's non-bug findings scoped through the bug template) stay as historical record. Task 1's template + doctor rule applies forward only.
+
+### Phase 18 — Existing primitives this composes over
+
+- `workplan-task-renderer.ts` (Phase 13 Task 1) — Task 1 Step 1 extends with shape variants.
+- `tdd-enforcement.ts` (Phase 13 Task 3) — Task 1 Step 3 extends with non-bug disposition validation.
+- `check-fix-task-tdd` commit-msg gate (Phase 13) — Task 1 reuses the gate; only the underlying library changes.
+- `fix-task-tdd-discipline` doctor rule (Phase 13) — Task 1 Step 3 same.
+- `promote-findings --auto` (Phase 13 Task 1, with #377 fix) — Task 1 Step 2 extends with shape inference.
+- `apply-audit-flips` (Phase 13 Task 4) — Task 4 extends the trailer parser.
+- `audit-barrage` CLI (Phase 12, Phase 16 Task 2 `tip.sha`) — Task 5 rewords the stderr summary; CLI behavior unchanged.
+- `isModelRunHealthy` (Phase 17 retro AUDIT-08 centralization) — Task 5 references; predicate unchanged.
