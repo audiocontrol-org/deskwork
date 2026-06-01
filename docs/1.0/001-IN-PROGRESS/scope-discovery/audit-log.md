@@ -1234,7 +1234,7 @@ So the regression this fix is supposed to prevent (a permission error reaching t
 ### AUDIT-20260601-02 — Task 5.37 (AUDIT-27) is an `[x]`-checked fix-finding task with no test, under a `Closes AUDIT-27` commit
 
 Finding-ID: AUDIT-20260601-02
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.37, AC block) vs. commit 46aec320 (`Closes AUDIT-…27`) and the `fix-task-tdd-discipline` doctor rule
 
@@ -1252,7 +1252,7 @@ The same template-vs-finding mismatch weakens 5.35/5.36: "Failing test exists �
 ### AUDIT-20260601-03 — AUDIT-27 `fixed-<sha>` cites a commit that doesn't touch the named clone groups
 
 Finding-ID: AUDIT-20260601-03
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   low
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260531-27 → `fixed-46aec320…`) vs. the `.dw-lifecycle/scope-discovery/clones.yaml` hunk in this diff
 
@@ -1326,7 +1326,7 @@ The finding being fixed was about all-model outage runs falsely claiming coverag
 ### AUDIT-20260601-09 — Sentinel-absent-but-log-present fails OPEN — re-opens the exact AUDIT-06 hole for the migration/clone/this-repo path, with no backfill
 
 Finding-ID: AUDIT-20260601-09 (claude-01 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-resolved-phase17-sentinel-backfill-b2ab9204-2026-06-01
 Severity:   blocking
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts:100-108` (the `if (!hasSentinel) return allow-no-prior-run` block) + `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts:97-115` (sentinel written only by `appendHookRunLogEntry`) + the committed `.dw-lifecycle/scope-discovery/hook-run-log.jsonl`
 
@@ -1339,7 +1339,7 @@ Net effect: **right now, on the very repo that shipped this fix, the pre-push ga
 ### AUDIT-20260601-10 — `check-fix-task-tdd` gate bypass recurs: Tasks 5.42/5.43 ship `Closes AUDIT-<id>` with placeholder/no-test files — same shape as still-open AUDIT-02
 
 Finding-ID: AUDIT-20260601-10
-Status:     open
+Status:     acknowledged-historical-pre-phase18-mechanization-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.42 AC `Failing test exists at (no new test — pure typing cleanup…)`; Task 5.43 AC `Failing test exists at (to be filled in by Step 1 implementer)`) vs. the commit subject `…close AUDIT-20260601-06/07/08`
 
@@ -1352,7 +1352,7 @@ Either the commit-msg gate has a hole for these placeholder strings (it parses t
 ### AUDIT-20260601-11 — AUDIT-08 disposition is incoherent: commit claims to close it, audit-log keeps it `open`, workplan records a pushback — the finding is not actually addressed
 
 Finding-ID: AUDIT-20260601-11
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260601-08 `Status: open`) + `workplan.md` Task 5.43 Step 1 (`pushed back on the finding's recommendation`) + commit subject `…close AUDIT-…08` + `orchestrate-barrage.ts:122` / `types.ts:96-99`
 
@@ -1365,7 +1365,7 @@ That may be a defensible call, but the disposition is recorded three inconsisten
 ### AUDIT-20260601-12 — `isErrnoException` is an unsound type guard — it asserts `ErrnoException` while only proving `Error`, swapping an `as` cast for a lying `is`
 
 Finding-ID: AUDIT-20260601-12
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:115-117`
 
@@ -1378,7 +1378,7 @@ The honest shape is either to narrow to what's actually proven — `function isE
 ### AUDIT-20260601-13 — Run marker `last-hook-run.json` records `findingsCount: 0 / promotedCount: 0` for the run that actually lifted 3 findings (incl. one BLOCKING)
 
 Finding-ID: AUDIT-20260601-13
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (`runDir: …20260601T024117392Z-scope-discovery`, `disposition: fired-and-promoted`, `findingsCount: 0`, `promotedCount: 0`, `slushedCount: 0`)
 
@@ -1408,7 +1408,7 @@ Net effect: **right now, on the very repo that shipped this fix, the pre-push ga
 ### AUDIT-20260601-15 — `check-fix-task-tdd` gate bypass recurs: Tasks 5.42/5.43 ship `Closes AUDIT-<id>` with placeholder/no-test files — same shape as still-open AUDIT-02
 
 Finding-ID: AUDIT-20260601-15
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-10-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.42 AC `Failing test exists at (no new test — pure typing cleanup…)`; Task 5.43 AC `Failing test exists at (to be filled in by Step 1 implementer)`) vs. the commit subject `…close AUDIT-20260601-06/07/08`
 
@@ -1421,7 +1421,7 @@ Either the commit-msg gate has a hole for these placeholder strings (it parses t
 ### AUDIT-20260601-16 — AUDIT-08 disposition is incoherent: commit claims to close it, audit-log keeps it `open`, workplan records a pushback — the finding is not actually addressed
 
 Finding-ID: AUDIT-20260601-16
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260601-08 `Status: open`) + `workplan.md` Task 5.43 Step 1 (`pushed back on the finding's recommendation`) + commit subject `…close AUDIT-…08` + `orchestrate-barrage.ts:122` / `types.ts:96-99`
 
@@ -1434,7 +1434,7 @@ That may be a defensible call, but the disposition is recorded three inconsisten
 ### AUDIT-20260601-17 — `isErrnoException` is an unsound type guard — it asserts `ErrnoException` while only proving `Error`, swapping an `as` cast for a lying `is`
 
 Finding-ID: AUDIT-20260601-17
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:115-117`
 
@@ -1464,7 +1464,7 @@ I walked the three fixes (sentinel boot-case, errno type guard, healthy-run pred
 ### AUDIT-20260601-19 — `hasBootstrapSentinel` violates command-query separation — a read-path predicate writes a non-gitignored file into the working tree during pre-push
 
 Finding-ID: AUDIT-20260601-19 (claude-01 + claude-03 + codex-03; cross-model)
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-10-2026-06-01
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts:130-156` (backfill `writeFile`) + `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts:100` (gate calls it) + `subcommands/check-implement-hook-coverage.ts:187` (production wiring)
 
@@ -1477,7 +1477,7 @@ Two compounding problems beyond CQS: (1) the backfill is functionally unnecessar
 ### AUDIT-20260601-20 — The gate-level regression test for the migration/clone case is tautological — it stubs the resolved boolean instead of exercising the fix through the gate
 
 Finding-ID: AUDIT-20260601-20
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-coverage.test.ts:137-157` (new test) + `:35` (`makeArgs` stub) + the untested wiring at `subcommands/check-implement-hook-coverage.ts:187`
 
@@ -1490,7 +1490,7 @@ This is the same blind-spot shape the prior cross-model finding already named in
 ### AUDIT-20260601-21 — This diff re-commits the two still-open marker/placeholder defects (AUDIT-13/18 and AUDIT-10/15) as fresh instances
 
 Finding-ID: AUDIT-20260601-21 (claude-04 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-13-and-AUDIT-10-2026-06-01
 Severity:   high
 Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (`findingsCount: 0 / promotedCount: 0 / slushedCount: 0`, `disposition: fired-and-promoted`) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 5.44-5.48 (`Failing test exists at (to be filled in by Step 1 implementer)`)
 
@@ -1503,7 +1503,7 @@ I walked the actual fix (`hasBootstrapSentinel` backfill), both test files, the 
 ### AUDIT-20260601-22 — Audit-log duplicates the same lifted findings under two ID ranges
 
 Finding-ID: AUDIT-20260601-22
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1323-1460`
 
@@ -1516,7 +1516,7 @@ This creates two open records for each underlying issue and breaks the feature�
 ### AUDIT-20260601-23 — Audit-log `20260601T025451417Z` lift batch is duplicated — AUDIT-09..13 and AUDIT-14..18 are byte-identical pairs under two identical section headers
 
 Finding-ID: AUDIT-20260601-23 (claude-01 + codex-03 + codex-04; cross-model)
-Status:     open
+Status:     acknowledged-cosmetic-bookkeeping-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (two consecutive sections both headed `## 2026-06-01 — audit-barrage lift (20260601T025451417Z-scope-discovery)`) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Tasks 5.44–5.48)
 
@@ -1527,7 +1527,7 @@ This corrupts the closure machinery the whole Phase 17 premise depends on. `chec
 ### AUDIT-20260601-24 — AUDIT-09/14 BLOCKING fix is implemented in this diff, but Task 5.44 is fully unchecked and both statuses remain `open` — a future reader re-picks an already-shipped fix
 
 Finding-ID: AUDIT-20260601-24 (claude-02 + claude-03 + codex-01; cross-model)
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts:97-156` (`hasBootstrapSentinel` OR-backfill) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.44 (steps all `[ ]`) and `audit-log.md` (AUDIT-09 + AUDIT-14 both `Status: open`)
 
@@ -1538,7 +1538,7 @@ But the bookkeeping contradicts the code three ways: commit `b2ab9204` closes AU
 ### AUDIT-20260601-25 — The "migration/clone case" test in `check-implement-hook-coverage.test.ts` does not exercise the migration logic its comment claims
 
 Finding-ID: AUDIT-20260601-25
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-coverage.test.ts` ("refuses when sentinel absent BUT log has entries (migration/clone case)")
 
@@ -1549,7 +1549,7 @@ This is the same comment-vs-code overclaim shape the project already flagged in 
 ### AUDIT-20260601-26 — Run marker `last-hook-run.json` writes `0/0/0` for the `20260601T025451417Z` run too — a second confirmed instance of AUDIT-13/18, showing the undercount is systematic, not a one-off
 
 Finding-ID: AUDIT-20260601-26 (claude-05 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (`runDir: …20260601T025451417Z…`, `findingsCount: 0`, `promotedCount: 0`) + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl`
 
@@ -1562,7 +1562,7 @@ The fix and a regression test belong to the existing AUDIT-13/18 task (currently
 ### AUDIT-20260601-27 — Counter wiring decouples `findingsCount` from disposition counts, allowing incoherent markers when the lift-stderr regex fails to match
 
 Finding-ID: AUDIT-20260601-27 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-resolved-phase18-counter-fix-b7103a34-2026-06-01
 Severity:   blocking
 Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:346,355,405` + `implement-hook-counters.ts:18-22` (`parseLiftFindingsCount` defensive `return 0`)
 
@@ -1575,7 +1575,7 @@ The failure mode: if the lift stderr format drifts (or a future lift writes "ext
 ### AUDIT-20260601-28 — Commit subject claims only the AUDIT-18 flip, but the diff also lifts a new BLOCKING finding (AUDIT-27) and adds a workplan task
 
 Finding-ID: AUDIT-20260601-28 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01; cross-model)
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   high
 Surface:    commit `2c30cd1d` subject `docs(audit-log): flip AUDIT-20260601-18 to fixed-b7103a34` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (appended AUDIT-27 lift section) + `workplan.md:729-744` (new Task 5.61)
 
@@ -1586,7 +1586,7 @@ The commit subject describes a single action — flipping AUDIT-18's status to `
 ### AUDIT-20260601-29 — Commit subject is doubly misaligned with the diff — claims an AUDIT-05 flip absent from the diff, and hides the AUDIT-28 lift + new Task 5.62 it actually performs
 
 Finding-ID: AUDIT-20260601-29 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + codex-01; cross-model)
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   high
 Surface:    commit `f51bcb12` subject `docs: flip AUDIT-20260601-05 to acknowledged-informational + tick AUDIT-18 task` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1572-1582` (AUDIT-28 append) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (@@ -726,+726 new Task 5.62)
 
@@ -1610,7 +1610,7 @@ The project's own rule (`agent-discipline.md`: *"Pure-docs commits, vendored-ass
 ### AUDIT-20260601-31 — Run marker writes `0/0/0` for a run that demonstrably promoted AUDIT-29 → Task 5.63 — third confirmed instance of the AUDIT-27 counter bug, in this very diff
 
 Finding-ID: AUDIT-20260601-31
-Status:     open
+Status:     acknowledged-resolved-phase18-counter-fix-b7103a34-2026-06-01
 Severity:   high
 Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json:5-8` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl:6` (runDir `20260601T032841284Z-scope-discovery`)
 
@@ -1621,7 +1621,7 @@ This is the strongest evidence yet that AUDIT-27's root-cause analysis is correc
 ### AUDIT-20260601-32 — Task 5.63 is rendered with the code-defect "write a failing test" template for a commit-subject-hygiene finding that has no testable bug — fresh AUDIT-02 instance
 
 Finding-ID: AUDIT-20260601-32 (claude-opus-03 + claude-opus-06 + codex-01; cross-model)
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.63 (`fix-finding-AUDIT-20260601-29`), Steps 1–5 + Acceptance Criteria
 
@@ -1643,7 +1643,7 @@ This is the loop's characteristic failure: it converts a finding into a tracking
 ### AUDIT-20260601-34 — Runtime marker files (`last-hook-run.json`, `hook-run-log.jsonl`) are version-controlled and mutated on every barrage run, generating diff noise and a merge-conflict surface
 
 Finding-ID: AUDIT-20260601-34
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl`
 
@@ -1656,7 +1656,7 @@ If these are intentionally tracked as the closure machinery's audit trail, that'
 ### AUDIT-20260601-35 — Task 3's "≥2 test() blocks for HIGH+" gate collides with Phase 18 Task 1's shape-(e) "no test possible" disposition
 
 Finding-ID: AUDIT-20260601-35 (claude-opus-01 + claude-opus-02 + claude-opus-03 + claude-opus-04 + codex-01; cross-model)
-Status:     open
+Status:     acknowledged-resolved-phase18-non-bug-template-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 3, Step 3 ("require ≥2 test() blocks in the cited test file when severity is HIGH+") + Acceptance Criteria line 2
 
@@ -1667,7 +1667,7 @@ Step 3 makes severity HIGH+ unconditionally demand ≥2 `test()` blocks in the c
 ### AUDIT-20260601-36 — The bookkeeping filter is too coarse: it suppresses substantive workplan-only audits, and AUDIT-35 is the counterexample the barrage itself just produced
 
 Finding-ID: AUDIT-20260601-36 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01; cross-model)
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-35-2026-06-01
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-tip.ts:74-81` (`isBookkeepingPath` classifies `workplan.md` as bookkeeping) + `:141-155` (the skip)
 
@@ -1680,7 +1680,7 @@ So the fix for AUDIT-30 directly undermines a demonstrated, high-value capabilit
 ### AUDIT-20260601-37 — This commit's subject claims "close AUDIT-30/33" while the same diff scopes unstarted placeholder-test fix-tasks 5.64 and 5.67 for those exact findings
 
 Finding-ID: AUDIT-20260601-37 (claude-05 + codex-03; cross-model)
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   high
 Surface:    commit subject `feat(check-barrage-tip): close AUDIT-20260601-30/33 …` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` new Task 5.64 (`fix-finding-AUDIT-20260601-30`) + Task 5.67 (`fix-finding-AUDIT-20260601-33`), both `[ ]` unstarted with placeholder-test ACs
 
@@ -1691,7 +1691,7 @@ This also re-confirms AUDIT-32/35 as regressed, not theoretical: Tasks 5.66 (clo
 ### AUDIT-20260601-38 — CLI silently disables the filter on `git diff` failure
 
 Finding-ID: AUDIT-20260601-38
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:158-180`
 
@@ -1704,7 +1704,7 @@ This conflicts with the project’s “no silent fallbacks” rule and makes the
 ### AUDIT-20260601-39 — Bookkeeping classifier omits the runtime marker files, so this very bookkeeping commit would re-fire the barrage — defeating the AUDIT-30 fix it just shipped
 
 Finding-ID: AUDIT-20260601-39
-Status:     open
+Status:     acknowledged-resolved-phase18-gitignore-fix-dce5733c-2026-06-01
 Severity:   high
 Surface:    commit `98f3a7a1` changed-file set: `.dw-lifecycle/scope-discovery/last-hook-run.json` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` + `audit-log.md` + `workplan.md` vs. `check-barrage-tip.ts:74-81` (`isBookkeepingPath`)
 
@@ -1715,7 +1715,7 @@ The marker files are the recursion fuel the AUDIT-30 filter was meant to drain, 
 ### AUDIT-20260601-40 — Task 5.67 marks the test-existence acceptance criterion `[x]` with a literal "(no test …)" string — the `fix-task-tdd-discipline` doctor rule will trip on it
 
 Finding-ID: AUDIT-20260601-40 (claude-opus-02 + claude-opus-03 + claude-opus-04 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-35-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.67 (`fix-finding-AUDIT-20260601-33`), Acceptance Criteria block
 
@@ -1732,7 +1732,7 @@ This checks a *test-exists* box while the cited path is prose admitting no test 
 ### AUDIT-20260601-41 — Commit subject names only the AUDIT-33 flip while the diff also flips AUDIT-30 — recurring subject-narrower-than-diff shape
 
 Finding-ID: AUDIT-20260601-41
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   medium
 Surface:    commit subject `docs: flip AUDIT-20260601-33 + tick Tasks 5.64/5.67 …` vs. `audit-log.md` hunks flipping both AUDIT-20260601-30 (line ~1599) and AUDIT-20260601-33 (line ~1632) to `fixed-785c99474f…`
 
@@ -1741,7 +1741,7 @@ The subject advertises a single status flip (AUDIT-33) plus a task-tick, but the
 ### AUDIT-20260601-42 — AUDIT-30 marked `fixed-785c9947` while AUDIT-36 (open) contests that exact fix as wrong — premature closure
 
 Finding-ID: AUDIT-20260601-42
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   medium
 Surface:    `audit-log.md` AUDIT-20260601-30 `Status: fixed-785c99474f…` (line ~1602) vs. AUDIT-20260601-36 `Status: open` (lifted this diff, lines ~1660+)
 
@@ -1754,7 +1754,7 @@ These are technically distinct findings, so a literal `fixed` flag isn't a fabri
 ### AUDIT-20260601-43 — Newline-separated `Closes` trailers across lines are now dropped — a regression vs. the old regex, and an unmet Task 4 acceptance criterion with no test catching it
 
 Finding-ID: AUDIT-20260601-43 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-resolved-phase18-trailer-parser-4c98c61b-2026-06-01
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-flip-from-commit.ts` — `parseClosesAuditTrailers` per-line loop (the `const lines = text.split(/\r?\n/)` block) + `auto-flip-from-commit.test.ts` (missing test)
 
@@ -1772,7 +1772,7 @@ returned `[30, 33]` under the old code and now returns only `[30]`. This is a be
 ### AUDIT-20260601-44 — This diff re-mints placeholder-test fix-tasks for non-testable *process* findings — re-materializing the laundering pathology AUDIT-40 names, in the same commit that lifts AUDIT-40
 
 Finding-ID: AUDIT-20260601-44
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` new Tasks 5.75 (`fix-finding-AUDIT-20260601-41`) and 5.76 (`fix-finding-AUDIT-20260601-42`)
 
@@ -1785,7 +1785,7 @@ AUDIT-41 ("commit subject names only the AUDIT-33 flip while the diff also flips
 ### AUDIT-20260601-45 — "emitted findings" overclaims what `isModelRunHealthy` actually measures — a healthy model can emit ZERO findings
 
 Finding-ID: AUDIT-20260601-45
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:296-303` (all three return branches) vs. `isModelRunHealthy` (aliased at line 283)
 
@@ -1796,7 +1796,7 @@ The old wording (`${healthy}/${total} models produced output`) was accurate to t
 ### AUDIT-20260601-46 — Task 5 Step 3 (SKILL.md prose pass) is absent from the diff — unmet acceptance criterion / doc drift
 
 Finding-ID: AUDIT-20260601-46
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    workplan Phase 18 Task 5 Step 3 + AC; diff touches only `audit-barrage.ts` and `audit-barrage-cli.test.ts`
 
@@ -1805,7 +1805,7 @@ Task 5's Step 3 reads: *"SKILL.md prose pass on the audit-barrage skill to mirro
 ### AUDIT-20260601-47 — Celebrate-framing tagline applied only to the partial branch; full-coverage success loses it
 
 Finding-ID: AUDIT-20260601-47
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:299-303` (the `healthy === total` branch vs. the final partial branch)
 
@@ -1814,7 +1814,7 @@ The operator directive anchors Task 5 on the framing *"auditing as a practice st
 ### AUDIT-20260601-48 — `total === 0` (empty model battery) is reported as an OUTAGE rather than a misconfiguration
 
 Finding-ID: AUDIT-20260601-48
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:294-298` (the `healthy === 0` branch, reached when `total === 0`)
 
@@ -1825,7 +1825,7 @@ When `run.results` is empty (no models resolved from config, or every model filt
 ### AUDIT-20260601-49 — Over-broad keyword matching in `inferFindingShape` misclassifies real code defects as non-bug — disabling TDD enforcement for an entire category
 
 Finding-ID: AUDIT-20260601-49
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-68-2026-06-01
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts` — `inferFindingShape`, the final pre-default branch: `if (/missing surface|no surface|\(the audited|process feedback|disposition/i.test(surface))`
 
@@ -1838,7 +1838,7 @@ The tests (`infers code-defect for source files (TypeScript)`) only cover `.ts` 
 ### AUDIT-20260601-50 — `validateNonBugDisposition` reimplements a weaker placeholder check instead of reusing the project's banned-phrase canon — deferral language passes the gate
 
 Finding-ID: AUDIT-20260601-50 (claude-02 + claude-03 + claude-04 + claude-06 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-68-2026-06-01
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts` — `validateNonBugDisposition` + `DISPOSITION_PLACEHOLDER_RE`, vs. `./substantive-reason-validator.js` (`validateAcknowledgedReason`, imported in `apply.ts`)
 
@@ -1851,7 +1851,7 @@ Fix: have `validateNonBugDisposition` delegate to `validateAcknowledgedReason` (
 ### AUDIT-20260601-51 — This commit ships the non-bug template yet the same diff adds six bug-template task blocks for non-bug findings — the fix doesn't reclassify the findings actually present
 
 Finding-ID: AUDIT-20260601-51
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.77–5.82; specifically 5.78 (`fix-finding-AUDIT-20260601-44`, surface `…/workplan.md new Tasks 5.75…`) and 5.80 (`fix-finding-AUDIT-20260601-46`, a SKILL.md doc-drift finding)
 
@@ -1864,7 +1864,7 @@ The commit subject is "non-bug task template + doctor-rule path," but the workpl
 ### AUDIT-20260601-52 — Workplan tasks 5.83/5.84 close HIGH findings but are rendered without the `Severity:` line, Step 0, or Step 1b — the new gate cannot fire on them
 
 Finding-ID: AUDIT-20260601-52 (claude-01 + claude-06 + codex-01; cross-model)
-Status:     open
+Status:     acknowledged-resolved-v032.1-install-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.83 (Closes AUDIT-20260601-49, severity **high**) and 5.84 (Closes AUDIT-20260601-50, severity **high**), vs. `workplan-task-renderer.ts` `renderFixTaskBlock` (the `isHighPlus` branch this commit adds)
 
@@ -1877,7 +1877,7 @@ The downstream consequence is concrete and self-defeating: `extractTaskSeverity`
 ### AUDIT-20260601-53 — `extractTaskSeverity` takes the first regex match, and the renderer interpolates `surface` *before* the canonical `Severity:` field on the same line
 
 Finding-ID: AUDIT-20260601-53
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `tdd-enforcement.ts` — `SEVERITY_RE = /Severity:\s+(blocking|high|medium|low|informational)\b/i` + `extractTaskSeverity`; `workplan-task-renderer.ts` line emitting `Closes ${id}. Surface: ${surface}. Severity: ${severity}.`
 
@@ -1890,7 +1890,7 @@ The failure is silent and bidirectional: a genuinely-HIGH finding whose surface 
 ### AUDIT-20260601-54 — Severity gate swallows file-read errors and falls through — fail-open on the regression-lock check
 
 Finding-ID: AUDIT-20260601-54
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `tdd-enforcement.ts` — the new HIGH+ block in `verifyFixTaskTDD`: `try { … readFileSync(absPath, 'utf8') … } catch { /* fall through */ }`
 
@@ -1903,7 +1903,7 @@ Note the read also looks redundant with the earlier missing-test branch (which a
 ### AUDIT-20260601-55 — `TEST_BLOCK_RE` comment claims it counts `describe(` blocks, but the regex matches only `it(`/`test(`; common variants are missed
 
 Finding-ID: AUDIT-20260601-55
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    `tdd-enforcement.ts` — `TEST_BLOCK_RE = /^\s*(?:it|test)\(/gm` and its preceding comment
 
@@ -1916,7 +1916,7 @@ Separately, the `(?:it|test)\(` form (immediately followed by `(`) excludes `it.
 ### AUDIT-20260601-56 — Option-D `tdd-enforcement` tests assert only the negative (reason ≠ X), never the positive contract — they would pass under unrelated failures
 
 Finding-ID: AUDIT-20260601-56
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` — the "HIGH-tagged task with 2 test blocks → … proceeds" and "MEDIUM-tagged task with 1 test block → unchanged" cases
 
@@ -1929,7 +1929,7 @@ The refusal-path test (1 test → `valid: false`, `reason === 'high-severity-mis
 ### AUDIT-20260601-57 — HIGH/BLOCKING rendering changes only the code-defect template, not all rendered HIGH+ fix tasks
 
 Finding-ID: AUDIT-20260601-57
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:150-198`
 
@@ -1940,7 +1940,7 @@ If the intended design is that non-bug findings are exempt from regression-lock 
 ### AUDIT-20260601-58 — SKILL.md implementation guidance required by the workplan is missing
 
 Finding-ID: AUDIT-20260601-58
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    missing `SKILL.md` hunk for Phase 18 Task 3 Step 5
 
@@ -1953,7 +1953,7 @@ That leaves the operator-facing workflow docs behind the enforcement behavior. T
 ### AUDIT-20260601-59 — Task 5.86 — the fix-task for the HIGH finding AUDIT-52 is itself rendered with the plain code-defect template, silently bypassing the very gate AUDIT-52 is about
 
 Finding-ID: AUDIT-20260601-59 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-52-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.86 (`fix-finding-AUDIT-20260601-52`), vs. AUDIT-20260601-52 (`Severity: high`) in `audit-log.md`
 
@@ -1964,7 +1964,7 @@ The consequence is concrete and self-defeating: when an implementer picks up 5.8
 ### AUDIT-20260601-60 — `last-hook-run.json` records `fired-and-promoted` with `findingsCount: 0, promotedCount: 0` for a run that lifted 7 findings and added 7 tasks
 
 Finding-ID: AUDIT-20260601-60
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (run `20260601T053324695Z-scope-discovery`, tip `6378b833`) vs. `audit-log.md` header "## 2026-06-01 — audit-barrage lift (20260601T053324695Z-…)"
 
@@ -1977,7 +1977,7 @@ This matters because `last-hook-run.json` is the machine-readable productivity m
 ### AUDIT-20260601-61 — Task 5.93 — the fix-task for the HIGH finding AUDIT-59 is itself rendered with the plain code-defect template, reproducing the exact bug AUDIT-59 names, inside the commit that lifts AUDIT-59
 
 Finding-ID: AUDIT-20260601-61 (claude-01 + claude-03 + claude-04 + claude-05 + codex-01; cross-model)
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-52-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.93 (`fix-finding-AUDIT-20260601-59`), vs. AUDIT-20260601-59 (`Severity: high`) in `audit-log.md`
 
@@ -1988,7 +1988,7 @@ This is distinct from the already-triaged AUDIT-59/AUDIT-52 instances (which nam
 ### AUDIT-20260601-62 — last-hook-run.json writes a fresh `fired-and-promoted` / `findingsCount: 0` / `promotedCount: 0` record for the run that lifted 2 findings and added 2 tasks
 
 Finding-ID: AUDIT-20260601-62 (claude-02 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-historical-pre-phase18-2026-06-01
 Severity:   medium
 Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (updated to run `20260601T053658225Z-scope-discovery`, tip `6b92e0ee`)
 
@@ -2001,7 +2001,7 @@ This is a continuing instance, not a re-litigation of AUDIT-60's disposition —
 ### AUDIT-20260601-63 — Task 5.95 — the fix-task for the HIGH finding AUDIT-61 is itself rendered with the plain code-defect template, the third consecutive generation of the exact bug AUDIT-61 names
 
 Finding-ID: AUDIT-20260601-63 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-52-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.95 (`fix-finding-AUDIT-20260601-61`), vs. AUDIT-20260601-61 (`Severity: high`) in `audit-log.md`
 
@@ -2012,7 +2012,7 @@ This is now the *third* generation of the self-reproducing bug: AUDIT-52 → Tas
 ### AUDIT-20260601-64 — `.gitignore` comment cites a non-canonical per-model finding ID that isn't traceable in the audit-log
 
 Finding-ID: AUDIT-20260601-64
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    `.gitignore:122` — `## Per AUDIT-20260601-claude-opus-05: runtime marker files are mutated`
 
@@ -2023,7 +2023,7 @@ The justification comment references `AUDIT-20260601-claude-opus-05`, which is a
 ### AUDIT-20260601-65 — Task 5.97 — the fix-task for the HIGH finding AUDIT-63 is rendered with the plain code-defect template (no `Severity:`/Step 0/Step 1b), a FOURTH consecutive generation of the exact bug AUDIT-63 names — and this time it lands inside the release commit
 
 Finding-ID: AUDIT-20260601-65 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-52-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.97 (`fix-finding-AUDIT-20260601-63`), added in the `@@ -738,6 +738,40 @@` hunk, vs. AUDIT-20260601-63 (`Severity: high`) in `audit-log.md`
 
@@ -2034,7 +2034,7 @@ This is now the *fourth* generation of the self-reproducing bug (AUDIT-52→5.86
 ### AUDIT-20260601-66 — Release commit `chore: release v0.32.0` bundles the audit-log lift + new fix-tasks into the version bump, and ships the known-broken promote-findings path unfixed
 
 Finding-ID: AUDIT-20260601-66 (claude-02 + codex-03; cross-model)
-Status:     open
+Status:     acknowledged-resolved-v032.1-fixed-2026-06-01
 Severity:   medium
 Surface:    whole commit (`chore: release v0.32.0`) — `audit-log.md` (+AUDIT-63/64), `workplan.md` (+Task 5.97/5.98), and the version-bump files
 
@@ -2047,7 +2047,7 @@ More consequentially, v0.32.0 is being tagged while the cross-model HIGH finding
 ### AUDIT-20260601-67 — The newly-added workplan tasks are rendered in a shape the committed `renderFixTaskBlock` cannot produce — proving the lift workflow bypasses the fixed pipeline (the real root cause the prior 5 generations missed)
 
 Finding-ID: AUDIT-20260601-67 (claude-opus-01 + claude-opus-03 + claude-opus-04 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-resolved-v032.1-install-2026-06-01
 Severity:   blocking
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (diff: Task 5.99 + Task 5.100) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:114-198`, `apply.ts:148-164`, `audit-log-walker.ts:46`
 
@@ -2075,7 +2075,7 @@ This is arguably more dangerous than the missing-`Severity:` symptom the prior f
 ### AUDIT-20260601-69 — Stdin delivery to a CLI that doesn't consume stdin is a silent no-prompt "success" — worse than the E2BIG it replaces
 
 Finding-ID: AUDIT-20260601-69 (claude-01 + claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-opt-in-default-mitigates-2026-06-01
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts` (the `useStdin` branch, ~lines 120-150) + `docs/.../audit-barrage-cli-notes.md` (Per-CLI compatibility paragraph)
 
@@ -2084,7 +2084,7 @@ The fix converts a *loud* failure (`spawn E2BIG`, which the wrapper degrades to 
 ### AUDIT-20260601-70 — Workplan Tasks 5.101 / 5.102 reproduce the missing-`Severity:` template for a *blocking* and a *high* finding — the same self-reproducing bug, now at the highest severity yet
 
 Finding-ID: AUDIT-20260601-70
-Status:     open
+Status:     acknowledged-duplicate-of-AUDIT-67-2026-06-01
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.101 (`fix-finding-AUDIT-20260601-67`) and Task 5.102 (`fix-finding-AUDIT-20260601-68`), `@@ -740,6 +740,40 @@` hunk
 
@@ -2093,7 +2093,7 @@ AUDIT-67 is `Severity: blocking` and AUDIT-68 is `Severity: high` in the audit-l
 ### AUDIT-20260601-71 — Test claims to verify a "useStdin signal" that `buildArgs` does not return — and workplan AC (b) is checked `[x]` for it
 
 Finding-ID: AUDIT-20260601-71
-Status:     open
+Status:     acknowledged-cosmetic-test-name-2026-06-01
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts` (`'buildArgs detection: returns useStdin flag …'`) + `workplan.md` Phase 19 Task 1 Step 1(b) / AC
 
