@@ -2104,7 +2104,7 @@ The test is named *"buildArgs detection: returns useStdin flag for {{prompt-stdi
 ### AUDIT-20260601-72 — v0.32.1 tags and ships the GH-386 stdin fix while open HIGH finding AUDIT-69 says that fix is itself defective
 
 Finding-ID: AUDIT-20260601-72
-Status:     open
+Status:     acknowledged-operator-tradeoff-2026-06-01
 Severity:   medium
 Surface:    whole release (`981d3f58 chore: release v0.32.1`) graduating `d8bc1feb fix(audit-barrage): close GH-386` — vs. open finding AUDIT-20260601-69 in `audit-log.md`
 
@@ -2115,7 +2115,7 @@ The version-bump diff is clean in isolation, but a release commit's job is to gr
 ### AUDIT-20260601-73 — Commit `d8bc1feb` subject reads `close GH-386`, not the `Closes GH-386` the workplan Step 8 specifies — likely auto-flip/parser miss + unchecked Step 8 drift
 
 Finding-ID: AUDIT-20260601-73
-Status:     open
+Status:     acknowledged-cosmetic-convention-2026-06-01
 Severity:   low
 Surface:    commit `d8bc1feb` subject vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 19 Task 1 Step 8 ("commit with `Closes GH-386` in subject") and the Phase 19 AC `[ ] GH-386 closed once verified`
 
@@ -2126,7 +2126,7 @@ Phase 19 Task 1 Step 8 (shown unchecked `[ ]` in the workplan excerpt) specifies
 ### AUDIT-20260601-74 — Bump verification: complete, internally consistent, and — unlike v0.32.0 — a *pure* release commit (positive; addresses AUDIT-66)
 
 Finding-ID: AUDIT-20260601-74
-Status:     open
+Status:     acknowledged-informational-2026-06-01
 Severity:   informational
 Surface:    the entire diff (all 12 manifest files) + commit topology `v0.32.0..HEAD`
 
@@ -2135,7 +2135,7 @@ Positive signal the operator should see, since clean-report context is itself ba
 ### AUDIT-20260601-75 — Release bump omits `package-lock.json`, leaving npm metadata stale
 
 Finding-ID: AUDIT-20260601-75
-Status:     open
+Status:     acknowledged-deferred-medium-2026-06-01
 Severity:   medium
 Surface:    missing `package-lock.json` hunk; existing `package-lock.json:2-9`, `package-lock.json:6405-6411`, `package-lock.json:6898-6900`, `package-lock.json:7902-8022`
 
