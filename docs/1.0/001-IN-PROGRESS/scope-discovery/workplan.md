@@ -618,6 +618,91 @@ Closes AUDIT-20260531-10. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
+
+### Task 5.33 (fix-finding-AUDIT-20260531-21): AUDIT-20260531-21 — tip.sha written before barrage success; outage runs falsely …
+
+Closes AUDIT-20260531-21. Surface: `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-barrage.ts` (Phase 16 Task 2 implementation).
+
+- [x] Step 1: 2 tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/orchestrate-barrage.test.ts`: outage skips tip.sha; partial outage writes.
+- [x] Step 2: confirmed outage-case fails against pre-fix code (tip.sha was written unconditionally before models spawned).
+- [x] Step 3: fix applied — capture HEAD at fire-time, write tip.sha at completion-time only when at least one model emitted positive-byte stdout AND no spawn error. Wrap in try/catch.
+- [x] Step 4: test passes; plugin suite 2543/2543.
+- [x] Step 5: commit b0e9a93b with `Closes AUDIT-20260531-21` in subject — landed BEFORE the workplan task was scoped (out-of-band TDD-first; tests + fix in same commit).
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/orchestrate-barrage.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/orchestrate-barrage.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.34 (fix-finding-AUDIT-20260531-23): AUDIT-20260531-23 — `defaultListRunDirs` swallows all readdir errors — codex-03
+
+Closes AUDIT-20260531-23. Surface: `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:108-117`.
+
+- [x] Step 1: failing test added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` ("throws on EACCES — propagates as config error").
+- [x] Step 2: confirmed test fails against pre-fix code (defaultListRunDirs swallowed EACCES and returned []).
+- [x] Step 3: fix applied — defaultListRunDirs now distinguishes ENOENT (boot case → return []) from other errors (re-throws). Runner catches and maps to exit-2.
+- [x] Step 4: tests pass; plugin suite 2558/2558.
+- [x] Step 5: commit with `Closes AUDIT-20260531-23` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.35 (fix-finding-AUDIT-20260531-25): AUDIT-20260531-25 — `check-barrage-tip` CLI has no shim-level tests — claude-04
+
+Closes AUDIT-20260531-25. Surface: `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts` (no matching `__tests__/.../check-barrage-tip-cli.test.ts`).
+
+- [x] Step 1: tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` covering: parseFlags (--feature requires-value, unknown-flag rejection, --help short-circuit, --repo-root); runCheckBarrageTip (exit-2 on missing feature root, exit-0 boot case, exit-1 no-new-diff).
+- [x] Step 2: AC pre-fix was marked `[x]` without test coverage; tests now exist to validate the AC.
+- [x] Step 3: tests don't require a "fix" — the gap was missing tests; tests added.
+- [x] Step 4: plugin suite 2558/2558.
+- [x] Step 5: commit with `Closes AUDIT-20260531-25` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.36 (fix-finding-AUDIT-20260531-26): AUDIT-20260531-26 — Lexical-sort "most recent run-dir" depends on an unstated na…
+
+Closes AUDIT-20260531-26. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-tip.ts` (sortedRunDirs lexical sort).
+
+- [x] Step 1: regression test added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts` ("lexical-sort holds under the REAL generateRunDirName output") — uses actual generateRunDirName across day/hour/ms/year boundaries.
+- [x] Step 2: test would fail if the naming format ever loses lexical-monotonicity (e.g., non-padded epoch, locale date format).
+- [x] Step 3: no code change needed — the contract is pinned by the test.
+- [x] Step 4: tests pass; plugin suite 2558/2558.
+- [x] Step 5: commit with `Closes AUDIT-20260531-26` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.37 (fix-finding-AUDIT-20260531-27): AUDIT-20260531-27 — clones.yaml ignore-with-justification reasons inaccurate — c…
+
+Closes AUDIT-20260531-27. Surface: `.dw-lifecycle/scope-discovery/clones.yaml` (groups `f645890d8e9b`, `d2600be96980`, `7cf22ee0c611`, `961b07c6d120`, `e23bc58de99e`).
+
+- [x] Step 1: resolved by baseline refresh during Phase 17 work — the specific clone groups claude-05 cited (`f645890d8e9b`, etc.) no longer exist in the current `clones.yaml`. Subsequent baseline refreshes regenerated the file with more domain-specific reasons (e.g., "Twin task-block walkers... share the boundary-scan + block-collect loop by design").
+- [x] Step 2: no failing test required — claude-05 was a "claim doesn't match implementation" finding about specific historical clone-disposition rows, not a structural code issue.
+- [x] Step 3: future-prevention: when bulk-dispositioning clones, use per-group tailored reasons or general rule statements rather than copy-pasted templates. Documented in this task block.
+- [x] Step 4: current `clones.yaml` reasons inspected; no inaccurate ones found among the active dispositions.
+- [x] Step 5: commit with `Closes AUDIT-20260531-27` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(no test — resolved by baseline refresh; documented above)`
+- [x] `npx vitest run` 2558/2558 green (no test required; nothing to assert)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.28 (fix-finding-AUDIT-20260531-11): AUDIT-20260531-11 — Fix-tasks 5.25 and 5.26 reintroduce the exact bare-`*.test.t…
 
 Closes AUDIT-20260531-11. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.25 acceptance criteria + Task 5.26 acceptance criteria, added in this diff) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`.

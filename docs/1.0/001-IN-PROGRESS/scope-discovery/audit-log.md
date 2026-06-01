@@ -1146,7 +1146,7 @@ Inadvertently closed by Phase 17 Task 3 (`implement-hook` wrapper verb): the wra
 ### AUDIT-20260531-21 — tip.sha written before barrage success; outage runs falsely claim coverage — cross-model claude-03 + codex-02
 
 Finding-ID: AUDIT-20260531-21
-Status:     open
+Status:     fixed-b0e9a93bec534b2ccc021cb0bda9049b64d9c5dd
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-barrage.ts` (Phase 16 Task 2 implementation)
 

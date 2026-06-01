@@ -1,4 +1,4 @@
-generated_at: 2026-06-01T01:52:33.612Z
+generated_at: 2026-06-01T02:21:08.986Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1195,9 +1195,9 @@ clones:
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:335:353
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:146:164
-      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:182:200
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:208:226
       - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:189:207
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:190:208
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:157:175
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
@@ -1238,7 +1238,7 @@ clones:
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:112:120
-      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:150:158
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:165:173
       - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:183:191
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:157:165
     disposition: pending

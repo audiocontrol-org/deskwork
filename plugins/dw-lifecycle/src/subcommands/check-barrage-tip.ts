@@ -105,14 +105,29 @@ export interface RunArgs {
   readonly gitRevListCount?: (range: string) => Promise<number>;
 }
 
-async function defaultListRunDirs(auditRunsDir: string): Promise<string[]> {
+/**
+ * Per AUDIT-20260531-23 (codex-03): distinguish ENOENT (directory
+ * doesn't exist yet — legitimate boot case → return empty) from other
+ * errors (EACCES, malformed scaffold → config error that the runner
+ * surfaces as exit 2). Pre-fix, this swallowed ALL errors and returned
+ * [], silently masking permission problems as "no prior runs."
+ */
+export async function defaultListRunDirs(auditRunsDir: string): Promise<string[]> {
   try {
     const entries = await readdir(auditRunsDir, { withFileTypes: true });
     return entries
       .filter((e) => e.isDirectory())
       .map((e) => join(auditRunsDir, e.name));
-  } catch {
-    return [];
+  } catch (err) {
+    const errno = err as NodeJS.ErrnoException;
+    if (errno.code === 'ENOENT') {
+      // Boot case: audit-runs/ doesn't exist yet. Return empty so the
+      // library reports `hasNewDiff: true` (fail-safe to fire).
+      return [];
+    }
+    // EACCES, ENOTDIR, EIO, etc. — re-throw so the runner can map to
+    // exit-2 config error per the SKILL.md failure-path policy.
+    throw err;
   }
 }
 
@@ -169,12 +184,23 @@ export async function runCheckBarrageTip(args: RunArgs): Promise<number> {
   const readTipSha = args.readTipSha ?? defaultReadTipSha;
   const gitRevListCount =
     args.gitRevListCount ?? ((range: string) => defaultGitRevListCount(range, repoRootResolved));
-  const result = await checkBarrageTip({
-    auditRunsDir,
-    listRunDirs,
-    readTipSha,
-    gitRevListCount,
-  });
+  let result;
+  try {
+    result = await checkBarrageTip({
+      auditRunsDir,
+      listRunDirs,
+      readTipSha,
+      gitRevListCount,
+    });
+  } catch (err) {
+    // Per AUDIT-20260531-23: scaffold/permissions errors propagate
+    // through listRunDirs to here; map to exit 2 (config error).
+    const errno = err as NodeJS.ErrnoException;
+    args.stderr.write(
+      `check-barrage-tip: scaffold error reading audit-runs/ — ${errno.code ?? 'unknown'}: ${errno.message ?? err}\n`,
+    );
+    return 2;
+  }
   args.stderr.write(`check-barrage-tip: ${result.reason}\n`);
   return result.hasNewDiff ? 0 : 1;
 }

@@ -32,6 +32,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { checkBarrageTip } from '../../../scope-discovery/promote-findings/check-barrage-tip.js';
+import { generateRunDirName } from '../../../scope-discovery/audit-barrage/run-artifacts.js';
 
 function makeStubs(opts: {
   runDirs: string[];
@@ -140,5 +141,40 @@ describe('checkBarrageTip — Phase 16 Task 3 (new-diff guard)', () => {
     expect(result.lastTipSha).toBe('sha-31');
     expect(result.newCommitCount).toBe(5);
     expect(result.hasNewDiff).toBe(true);
+  });
+
+  // Phase 17 retro-fix — AUDIT-20260531-26 (claude-07): pin the
+  // lexical-sort assumption to the REAL `generateRunDirName` output
+  // (not hand-written literal strings). If the naming function ever
+  // changes to a non-lexically-monotonic format, this test fails.
+  it('lexical-sort holds under the REAL generateRunDirName output (AUDIT-26)', async () => {
+    // Construct timestamps across day/hour/minute boundaries to exercise
+    // the format's monotonicity claim.
+    const t1 = new Date('2026-05-29T23:59:59.999Z');
+    const t2 = new Date('2026-05-30T00:00:00.000Z'); // day boundary
+    const t3 = new Date('2026-05-30T00:00:00.001Z'); // ms boundary
+    const t4 = new Date('2026-12-31T23:59:59.999Z'); // year boundary
+    const names = [
+      generateRunDirName(t1, 'feat'),
+      generateRunDirName(t2, 'feat'),
+      generateRunDirName(t3, 'feat'),
+      generateRunDirName(t4, 'feat'),
+    ];
+    const sorted = [...names].sort();
+    // Verify lexical sort produces chronological order.
+    expect(sorted).toEqual(names);
+    // Then verify the library picks the last (most-recent) when given
+    // the shuffled set.
+    const shuffled = [names[2]!, names[0]!, names[3]!, names[1]!];
+    const auditRunsDir = '/tmp/audit-runs';
+    const fullPaths = shuffled.map((n) => `${auditRunsDir}/${n}`);
+    const result = await checkBarrageTip({
+      auditRunsDir,
+      listRunDirs: async () => fullPaths,
+      readTipSha: async (path: string) => `tip-${path.split('/').pop()}`,
+      gitRevListCount: async () => 1,
+    });
+    // Latest = t4 (year boundary; highest year > later months).
+    expect(result.lastTipSha).toBe(`tip-${names[3]}`);
   });
 });
