@@ -1880,3 +1880,165 @@ Run the new semantic against this feature's own loop before shipping.
 - `promote-findings --auto` (Phase 13 Task 1) — unchanged; called from the disposition gate.
 - `check-open-findings` (Phase 15 Task 1) — unchanged; called as the post-disposition sanity check.
 - `audit-barrage` CLI (Phase 12 + Phase 15 Task 4a `--output-run-dir`) — extended with `tip.sha` write in Task 2.
+
+## Phase 17: Audit-barrage mechanization — single verb + commit-msg gate + pre-push gate
+
+**Motivating case** (this session, 2026-05-31): the /dwi loop that implemented Phase 16 (which closed #383's audit-coverage hole) itself shipped 2 task-completion commits — c9849b6 (Phase 16 substantive work) and dde415a (docs closure) — WITHOUT invoking the audit-barrage hook. The Step 6 bash composition in SKILL.md is a sequence of 5 CLI calls; the agent skipped them entirely. Phase 16's gate is correct (always-fire on new diff), but Phase 16 doesn't enforce that the agent invokes the gate. Discretion remained, and discretion was abused on the very implementation of the phase that was supposed to remove discretion.
+
+**Root cause:** the Step 6 hook is documented as prose + bash composition. The agent's compliance is a matter of reading the SKILL.md and choosing to invoke the steps. That's policy, not mechanization. The operator's directive (2026-05-31, verbatim):
+
+> *"When to run the barrage should not be a matter of policy and the agent should have no discretion. It must be mechanized with teeth."*
+
+**Three-layer mechanization** (each closes a different failure mode):
+
+| Layer | Failure mode it prevents | Mechanism |
+|---|---|---|
+| 1 — Single CLI verb (`implement-hook`) | "I forgot a step in the bash composition" | One verb wraps check-barrage-tip + render + barrage + lift + dampener + slush-or-promote + check-open-findings. No bash to skip individual steps. |
+| 2 — Commit-msg gate (`check-implement-hook-ran`) | "I forgot to run the hook entirely" | Refuses any commit when `last-hook-run.json`'s `tip` doesn't match the current HEAD (i.e., a commit landed without a subsequent hook run). |
+| 3 — Pre-push gate | "I bypassed the commit-msg gate via --no-verify" | Walks unpushed commits; refuses push if any commit lacks a hook-run record between it and the next commit. |
+
+**Marker file design.** The verb writes `.dw-lifecycle/scope-discovery/last-hook-run.json` after every successful invocation:
+
+```json
+{
+  "tip": "<sha at hook-fire time>",
+  "timestamp": "<ISO 8601>",
+  "runDir": "<absolute path or null when new-diff-skip>",
+  "disposition": "fired-and-promoted | fired-and-slushed | no-new-diff-skip | barrage-outage",
+  "findingsCount": 0,
+  "promotedCount": 0,
+  "slushedCount": 0
+}
+```
+
+The marker is the audit trail. The commit-msg gate reads `marker.tip` and compares against `git rev-parse HEAD`. If they match, the agent ran the hook since the prior commit; the new commit is allowed.
+
+**Operator-decided semantic** (the contract this phase enforces):
+
+> The audit-barrage hook MUST fire between every pair of task-completion commits. There is no agent-side flag, no policy override, no *"I'll run it later."* The gate refuses the commit; the agent runs the hook; the agent re-tries the commit.
+
+**Loop-discipline framing:** Phase 16 closed the *"the barrage was skipped because the dampener engaged"* hole. Phase 17 closes the *"the barrage was skipped because the agent forgot"* hole. The two failure modes share the same root (audit-coverage gaps), and Phase 17 is the structural completion of Phase 16's intent.
+
+### Task 1: TDD spec — failing test for the commit-msg gate
+
+Write the failing regression test FIRST per project TDD discipline.
+
+- [ ] Step 1: NEW test file `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-ran.test.ts`. Sibling-pattern with `check-fix-task-tdd.test.ts`.
+- [ ] Step 2: Fixture scenario A — marker present, `tip` matches HEAD → gate allows (exit 0).
+- [ ] Step 3: Fixture scenario B — marker absent → gate refuses (exit 1) with cure message *"run `dw-lifecycle implement-hook --feature <slug>` then re-commit."*
+- [ ] Step 4: Fixture scenario C — marker present, `tip` ≠ HEAD (stale marker from prior commit) → gate refuses with same cure.
+- [ ] Step 5: Fixture scenario D — first commit after `.dw-lifecycle/scope-discovery/` opt-in (no prior runs) → gate allows (boot case; the FIRST commit can't have a prior-hook marker).
+- [ ] Step 6: Confirm all four scenarios are RED pre-implementation.
+
+**Acceptance Criteria:**
+- [ ] Test file exists; vitest reports the new tests as failing pre-fix.
+- [ ] Each scenario asserts exactly one observable outcome (allow vs refuse + cure message).
+
+### Task 2: `last-hook-run.json` marker schema + I/O library
+
+- [ ] Step 1: NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-marker.ts`. Exports `readHookRunMarker({featureSlug, repoRoot})` and `writeHookRunMarker({featureSlug, repoRoot, marker})`. Atomic write via tmp + rename. Zod schema validates the marker shape on read; corrupted marker → return `null` (treat as no-prior-run).
+- [ ] Step 2: Marker stored at `.dw-lifecycle/scope-discovery/last-hook-run.json` (project-scoped, NOT per-feature — one marker per project root). Rationale: the commit-msg gate fires from any worktree against any feature; a single project-wide marker keeps the gate's lookup trivial.
+- [ ] Step 3: Library tests covering: write + read round-trip; corrupted JSON → null; missing file → null; schema-mismatch → null.
+
+**Acceptance Criteria:**
+- [ ] Marker writes atomically (no torn-write race condition).
+- [ ] Reads tolerate missing/corrupted markers without throwing.
+- [ ] Schema is enforced via zod.
+
+### Task 3: `dw-lifecycle implement-hook` CLI verb
+
+The single verb that IS the hook. Wraps the entire Step 6 sequence.
+
+- [ ] Step 1: NEW CLI shim `plugins/dw-lifecycle/src/subcommands/implement-hook.ts`. Composes (in order): `check-barrage-tip` → `audit-barrage-render` → `audit-barrage --output-run-dir` → `audit-barrage-lift --apply` → `check-barrage-dampener` (branch on result) → either `slush-remaining --apply` OR `promote-findings --auto` → `check-open-findings`. Writes marker on completion.
+- [ ] Step 2: Exit codes: 0 = success (hook ran cleanly OR skipped for no-new-diff); 1 = hook failed mid-flight (any step in the chain returned non-zero per the SKILL.md failure-path policy); 2 = config error (feature not found, repo not initialized, etc.). Each non-zero exit surfaces the underlying step's stderr.
+- [ ] Step 3: Marker write on EVERY exit-0 path — including the no-new-diff skip case. Disposition field distinguishes (`no-new-diff-skip` vs `fired-and-{promoted,slushed}` vs `barrage-outage`). The skip case still writes the marker because the gate needs to see the hook was invoked; the disposition tells the operator no work was done.
+- [ ] Step 4: Wire into `src/cli.ts` dispatcher as `implement-hook`.
+- [ ] Step 5: CLI tests covering: full happy path (mocked sub-CLIs); each failure-path exit; marker write on no-new-diff-skip; marker NOT written on early config-error exit.
+
+**Acceptance Criteria:**
+- [ ] Single verb replaces the 5-line bash composition in SKILL.md Step 6.
+- [ ] Marker written on every legitimate exit path (success + skip), not on config-error exits.
+- [ ] Failure-path semantics from Phase 16 SKILL.md preserved (which steps stop the loop, which degrade gracefully).
+
+### Task 4: Commit-msg gate (`check-implement-hook-ran`)
+
+The teeth that close the discretion loophole.
+
+- [ ] Step 1: NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts`. Reads marker; reads HEAD via injected `gitHeadResolver`; returns discriminated union (`allow-no-prior-run` / `allow-marker-matches-head` / `refuse-marker-missing` / `refuse-marker-stale`).
+- [ ] Step 2: NEW CLI shim `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts`. Exit 0 = allow; exit 1 = refuse (with cure message); exit 2 = config error. Mirrors `check-fix-task-tdd`'s shape.
+- [ ] Step 3: Wire into `src/cli.ts` dispatcher.
+- [ ] Step 4: Wire into the project's `prepare-commit-msg` (or `commit-msg`) hook — adopt the same pattern as `check-fix-task-tdd-discipline`. The hook fires on every commit; refuses when the gate refuses.
+- [ ] Step 5: Library + CLI tests (4 scenarios from Task 1).
+
+**Acceptance Criteria:**
+- [ ] Gate refuses commit when marker is missing or stale.
+- [ ] Gate allows commit when marker.tip === HEAD.
+- [ ] Gate allows on first commit after opt-in (no prior runs).
+- [ ] Cure message names the fix verbatim: `"run dw-lifecycle implement-hook --feature <slug> then re-commit"`.
+
+### Task 5: Pre-push gate
+
+Catches commits that bypassed the commit-msg gate via `--no-verify`.
+
+- [ ] Step 1: NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts`. Walks `git log <remote-tip>..HEAD --reverse` and for each commit checks: was there a hook run between that commit and its parent? The marker is project-scoped (not per-commit), so this requires a different mechanism: every successful `implement-hook` run also appends an entry to `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (JSONL: one JSON object per line, with `{sha, timestamp, disposition}`). The pre-push gate walks the log and verifies each unpushed commit has a matching entry.
+- [ ] Step 2: NEW CLI shim. Exit 0 = all unpushed commits backed; exit 1 = refuse (lists commits without hook runs); exit 2 = config error.
+- [ ] Step 3: Wire into the project's `pre-push` hook.
+- [ ] Step 4: Tests against fixture jsonl logs + fixture commit ranges.
+
+**Acceptance Criteria:**
+- [ ] Pre-push refuses when any unpushed commit lacks a corresponding hook-run entry.
+- [ ] The refusal lists which commits are unbacked.
+- [ ] Cure: `"git reset --soft <tip-of-good-history>"` + run implement-hook for each commit then re-push — OR add the commits to a documented exception list (not v1).
+
+### Task 6: SKILL.md Step 6 swap
+
+Replace the 5-CLI bash composition with the single verb invocation.
+
+- [ ] Step 1: Rewrite Step 6 in `plugins/dw-lifecycle/skills/implement/SKILL.md`. The new prose: *"After every task-completion commit, run `dw-lifecycle implement-hook --feature <slug>`. The verb handles new-diff detection, barrage firing, lift, disposition (slush vs promote), and the gate sanity check. The commit-msg gate refuses subsequent commits if the verb hasn't run."*
+- [ ] Step 2: Move the operator-acknowledged trade-offs (MEDIUM-slushing under Rule B; first-barrage Rule A slushing; per-iteration cost) from inline prose into a separate "Behavior reference" section. Step 6 becomes mechanically simple; the operator-facing semantic stays documented.
+- [ ] Step 3: Move the failure-path policy block into the verb's own documentation. The verb's stderr names which step failed; the SKILL.md just references it.
+- [ ] Step 4: Cross-reference the commit-msg gate + pre-push gate.
+
+**Acceptance Criteria:**
+- [ ] Step 6 prose is one paragraph + one CLI invocation, not a bash block.
+- [ ] Operator-acknowledged trade-offs still documented (in a behavior-reference section).
+- [ ] Cross-references to the two gates are explicit.
+
+### Task 7: Live verification + dogfood
+
+- [ ] Step 1: After v0.31.0 ships, run a /dwi iteration with the new verb. Verify the marker writes on a successful hook run; verify the commit-msg gate refuses a no-marker commit; verify the pre-push gate refuses a `--no-verify`-bypassed commit.
+- [ ] Step 2: Confirm the operator-facing UX of the cure messages — they should name the exact command to run.
+- [ ] Step 3: File any tooling-feedback entries from the dogfood.
+
+**Acceptance Criteria:**
+- [ ] All three gate layers (verb, commit-msg, pre-push) verified live.
+- [ ] Cure messages tested by deliberately tripping the gates.
+
+### Task 8: Cross-references + docs
+
+- [ ] Step 1: Update `.claude/rules/agent-discipline.md` § "Audit-barrage" — note that the hook is now mechanized via commit-msg + pre-push gates; the agent has no discretion at the firing decision.
+- [ ] Step 2: Update `ROADMAP.md` § "Recently shipped" with Phase 17 once it lands.
+- [ ] Step 3: Update the implement skill's description to reference the new verb.
+- [ ] Step 4: Document the motivating case in the Phase 17 commit message body (this session's missed-hook-runs on c9849b6 + dde415a).
+
+**Acceptance Criteria:**
+- [ ] Agent-discipline rule names the mechanization.
+- [ ] ROADMAP reflects the shipped state.
+- [ ] Implement skill description discoverable.
+
+### Phase 17 — Out of Scope
+
+- **Changing what the audit-barrage hook does internally.** Phase 17 wraps the existing chain; the chain itself (check-barrage-tip → render → fire → lift → dampener → slush/promote) is unchanged from Phase 16.
+- **Per-task-type opt-out flag.** No `--skip-hook` for "this commit doesn't need an audit." Per operator directive (*"the agent should have no discretion"*), there is no opt-out.
+- **Retroactive enforcement on historical commits.** The gate fires on NEW commits only. Pre-Phase-17 commits without hook runs are part of the history; the next /dwi iteration after Phase 17 ships will catch up by auditing the accumulated diff.
+- **Operator-driven manual marker edits.** The marker is agent-written, not operator-edited. If the marker is corrupted, the gate fails fast; the agent fixes by re-running the verb.
+
+### Phase 17 — Existing primitives this composes over
+
+- `check-barrage-tip` (Phase 16) — first step of the implement-hook verb.
+- `audit-barrage-render` + `audit-barrage` + `audit-barrage-lift` (Phase 12 + Phase 15) — middle of the chain.
+- `check-barrage-dampener` (Phase 15) — disposition branch decision.
+- `slush-remaining` (Phase 15 + #380) — engaged-disposition branch.
+- `promote-findings --auto` (Phase 13) — not-engaged-disposition branch.
+- `check-open-findings` (Phase 15 Task 1) — post-disposition sanity check.
+- `check-fix-task-tdd` pattern (Phase 13 Task 3) — commit-msg gate template the new gate mirrors.
