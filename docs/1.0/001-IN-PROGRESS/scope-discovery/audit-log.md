@@ -1127,3 +1127,93 @@ Surface:    Missing surface: project `commit-msg` / `pre-push` hook wiring
 The workplan and SKILL.md both state `check-implement-hook-ran` is *"wired into the project's commit-msg hook chain"* and `check-implement-hook-coverage` is *"wired into the pre-push hook."* The diff adds the CLI subcommands but no corresponding hook-script changes. Without actual hook installation, Phase 17 ships the verbs but not the mechanized enforcement — the entire teeth premise is unwired. The agent could keep skipping the hook and nothing would refuse.
 
 Fix: update `install-scope-discovery-hooks` (or sibling installer) to emit `commit-msg` and `pre-push` hook entries that invoke the two gates. Mirror the pattern `check-fix-task-tdd-discipline` uses. Tests or fixtures should prove both commands actually get called.
+
+## 2026-05-31 — audit-barrage retro-lift (Phase 16 dogfood, run 20260601T020147844Z)
+
+Fired against the v0.29.3..v0.30.0 range (Phase 16 substantive work) per operator directive — the original Phase 16 ship missed its own barrage. claude + codex produced findings; gemini emitted no output. Cross-model agreement on the most serious finding (claude-01 + codex-01) was already inadvertently closed by Phase 17's wrapper verb. The remaining cross-model agreement (claude-03 + codex-02) on tip.sha timing was a real bug; fixed in this commit.
+
+### AUDIT-20260531-20 — Step 6 bash composition collapses exit-1 (skip) and exit-2 (config error) — cross-model claude-01 + codex-01
+
+Finding-ID: AUDIT-20260531-20
+Status:     verified-2026-05-31
+Severity:   high
+Surface:    `plugins/dw-lifecycle/skills/implement/SKILL.md` Phase-16 Step 6 bash (since replaced by `dw-lifecycle implement-hook` verb in Phase 17)
+
+The Phase 16 Step 6 bash composition used `if ! dw-lifecycle check-barrage-tip; then skip; else fire`. In bash `!` is true for any non-zero, so exit-1 (legitimate "no new diff") and exit-2 (config error) both fell into the skip branch — directly contradicting the SKILL.md failure-path policy that said exit-2 must STOP. Re-creates the silent-skip failure mode #383 was named to close.
+
+Inadvertently closed by Phase 17 Task 3 (`implement-hook` wrapper verb): the wrapper explicitly checks `tipCheck.status === 2` (exit 2 → STOP/return 2) vs `tipCheck.status === 1` (exit 1 → write marker, return 0). The bash composition this finding describes was deleted from SKILL.md by Phase 17 Task 6 and replaced with the single-verb invocation that calls the wrapper. **Verified-2026-05-31 because the failing bash no longer exists in shipped code.**
+
+### AUDIT-20260531-21 — tip.sha written before barrage success; outage runs falsely claim coverage — cross-model claude-03 + codex-02
+
+Finding-ID: AUDIT-20260531-21
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-barrage.ts` (Phase 16 Task 2 implementation)
+
+`orchestrateBarrage` wrote `<runDir>/tip.sha` immediately after `createRunDir`, BEFORE the LLM CLIs spawned. If every model subsequently failed (zero-byte outputs), the run was an outage per the failure-path policy — but the tip.sha was already written. The next iteration's `check-barrage-tip` saw tip.sha matching HEAD and skipped. Result: the audit-coverage hole #383 was meant to close was re-created for the all-models-failed path.
+
+Additionally (claude-03 angle): the `writeFile` was unwrapped — a filesystem failure (disk full, race) would throw an uncaught exception ABOVE the model-spawn block, aborting the entire barrage with zero captured output. Strictly worse than the documented fail-safe contract.
+
+Fix: capture HEAD at fire-time (preserves the "audited up through X" semantic if commits land during the ~60s barrage) but write tip.sha at completion-time, ONLY when at least one model produced output. Wrap the write in try/catch — write failure degrades to "no tip recorded" → next iteration fail-safes to fire. Three regression tests pin the contract (outage skips tip.sha write; partial outage writes; null resolver skips).
+
+### AUDIT-20260531-22 — Audit diff range decoupled from tip-tracking range — claude-02
+
+Finding-ID: AUDIT-20260531-22
+Status:     acknowledged-fixed-by-phase-17-wrapper
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/implement/SKILL.md` Phase-16 Step 6 (since replaced by `implement-hook` wrapper)
+
+`checkBarrageTip` computes `lastTipSha` but Phase 16's bash never plumbed it to the `diff` var in the prompt. The agent could compute the diff over a different range than the guard checked, silently auditing fewer commits than the guard "knew" were new.
+
+Inadvertently closed by Phase 17's wrapper verb. `runImplementHook` calls `readLatestBarrageTip()` (same lookup as `check-barrage-tip`) and computes `git diff <tip>..<head>` using that range — the audited range and the guarded range are now bound together at the wrapper level. Direct invocation of `audit-barrage` outside the wrapper could still diverge, but the SKILL.md no longer documents that path; operators are directed to use `implement-hook`. **Acknowledged-fixed-by-phase-17-wrapper.**
+
+### AUDIT-20260531-23 — `defaultListRunDirs` swallows all readdir errors — codex-03
+
+Finding-ID: AUDIT-20260531-23
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:108-117`
+
+`defaultListRunDirs` returns `[]` on any readdir failure (ENOENT, EACCES, malformed scaffold). A missing `.dw-lifecycle/scope-discovery/audit-runs/` directory is treated identically to an empty one — both fail-safe to "no prior runs" → fire. That contradicts the documented failure-path policy ("missing audit-runs dir is a config error and should STOP"). The CLI should distinguish ENOENT from a present-but-empty directory; the former should propagate as exit-2 config error.
+
+### AUDIT-20260531-24 — Phase 16 Step 6 bash doesn't enforce STOP policy for disposition failures — claude-06
+
+Finding-ID: AUDIT-20260531-24
+Status:     verified-2026-05-31
+Severity:   low
+Surface:    `plugins/dw-lifecycle/skills/implement/SKILL.md` Phase-16 Step 6 (since replaced)
+
+The Phase 16 bash had no `set -e` or per-command `||` exit-trapping, so `slush-remaining --apply` failure would fall through to `check-open-findings` instead of stopping. Documented policy said STOP, bash didn't encode it. Same shape as claude-01: structural mechanization undermined by unstructured shell.
+
+Inadvertently closed by Phase 17 wrapper: each `invokeDwl` returns `{stdout, stderr, status}` and the wrapper explicitly checks `status !== 0` on every step, returning exit 1 on any failure. The bash composition this finding describes was deleted. **Verified-2026-05-31.**
+
+### AUDIT-20260531-25 — `check-barrage-tip` CLI has no shim-level tests — claude-04
+
+Finding-ID: AUDIT-20260531-25
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts` (no matching `__tests__/.../check-barrage-tip-cli.test.ts`)
+
+The Phase 16 Task 3 AC `[x] CLI exit codes match the contract` is marked complete but only the pure-fn library has tests. The CLI shim's `parseFlags` (unknown-flag rejection, `--feature` requires-value, help short-circuit), the `featureRoot === undefined` → exit-2 path, and the `defaultGitRevListCount`'s MAX_SAFE_INTEGER fail-safe are untested. Per the project's TDD discipline + "TDD spec tests have systematic blind spots" memory, an `[x]`-checked AC asserting exit-code behavior with no exit-code test is an over-claim.
+
+Tracking for v0.32.x: add `check-barrage-tip-cli.test.ts` mirroring the `check-barrage-dampener` CLI test pattern. Lower-priority because the library logic IS tested + the bash composition this CLI feeds has been replaced by the typed wrapper.
+
+### AUDIT-20260531-26 — Lexical-sort "most recent run-dir" depends on an unstated naming contract — claude-07
+
+Finding-ID: AUDIT-20260531-26
+Status:     open
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-tip.ts` (sortedRunDirs lexical sort)
+
+`checkBarrageTip` relies on `[...runDirs].sort()` picking the chronologically-latest run, which only holds if `createRunDir`'s naming uses fixed-width lexically-monotonic timestamps. The naming function is in a separate file (not exercised by current tests). If a future contributor changes the naming to epoch-millis without padding or a locale date format, "most recent" silently picks the wrong dir.
+
+Tracking for v0.32.x: add a test that constructs run-dirs with the *actual* `generateRunDirName` output (not hand-written `2026-05-31-1200-feat` literals) to pin the naming contract.
+
+### AUDIT-20260531-27 — clones.yaml ignore-with-justification reasons inaccurate — claude-05
+
+Finding-ID: AUDIT-20260531-27
+Status:     open
+Severity:   low
+Surface:    `.dw-lifecycle/scope-discovery/clones.yaml` (groups `f645890d8e9b`, `d2600be96980`, `7cf22ee0c611`, `961b07c6d120`, `e23bc58de99e`)
+
+Phase 16's bulk-disposition of CLI-shim clones used a copy-pasted reason naming "check-barrage-dampener / slush-remaining" specifically — but several groups pair check-barrage-tip with check-open-findings or re-audit-fixed-findings, not the named siblings. The reason claim doesn't match the implementation; same shape as AUDIT-15. Tracking for cleanup: either tailor each reason to its actual members or use a general rule statement.

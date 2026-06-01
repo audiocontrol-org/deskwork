@@ -200,4 +200,52 @@ describe('orchestrateBarrage', () => {
     const entries = await readdir(run.runDir);
     expect(entries).not.toContain('tip.sha');
   });
+
+  // Per AUDIT-20260531 cross-model finding (claude-03 + codex-02):
+  // an outage run (all models 0 bytes) MUST NOT leave a tip.sha,
+  // otherwise the next check-barrage-tip iteration sees "no new diff"
+  // and skips — silently re-creating the #383 audit-coverage hole
+  // for the outage path.
+  it('skips the tip.sha write when ALL models produce zero bytes (outage)', async () => {
+    const run = await orchestrateBarrage({
+      repoRoot: tmp,
+      runDirOverride: tmp,
+      featureSlug: 'sample',
+      prompt: 'AUDIT',
+      models: [
+        fakeCli({
+          name: 'mock-silent',
+          // Model exits immediately with no stdout
+          script: `process.exit(0);`,
+        }),
+      ],
+      tipShaResolver: async () => 'abcdef1234567890',
+    });
+    const entries = await readdir(run.runDir);
+    expect(entries).not.toContain('tip.sha');
+    // Verify the run's tracked outcome: zero stdout bytes.
+    expect(run.results[0]?.stdoutBytes).toBe(0);
+  });
+
+  it('writes tip.sha when at least ONE model emits (partial outage)', async () => {
+    const run = await orchestrateBarrage({
+      repoRoot: tmp,
+      runDirOverride: tmp,
+      featureSlug: 'sample',
+      prompt: 'AUDIT',
+      models: [
+        fakeCli({
+          name: 'silent',
+          script: `process.exit(0);`,
+        }),
+        fakeCli({
+          name: 'noisy',
+          script: `process.stdout.write('AUDIT-x-01: real finding');`,
+        }),
+      ],
+      tipShaResolver: async () => 'cafef00d',
+    });
+    const tipText = await readFile(join(run.runDir, 'tip.sha'), 'utf8');
+    expect(tipText.trim()).toBe('cafef00d');
+  });
 });

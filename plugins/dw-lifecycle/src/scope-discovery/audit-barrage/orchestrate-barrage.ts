@@ -78,13 +78,19 @@ export async function orchestrateBarrage(
 
   // Phase 16 Task 2 (#383): record HEAD at fire-time so the new-diff
   // guard (`check-barrage-tip`) knows which commits this barrage
-  // covers. Resolver failure (no git, detached worktree, etc.) → skip
-  // the write; next-iteration guard fail-safes to fire on missing.
+  // covers. Resolver failure (no git, detached worktree, etc.) →
+  // captured as null; tip.sha is not written.
+  //
+  // Per AUDIT-20260531-claude-03 + codex-02 (cross-model): the
+  // tip.sha is captured at fire-time (so commits landing DURING the
+  // barrage don't silently get marked as covered) but written ONLY
+  // after the barrage completes AND at least one model produced
+  // output. An outage run leaves no tip.sha; the next iteration's
+  // guard fail-safes to fire (preserving audit coverage). The write
+  // is wrapped in try/catch — a write failure degrades to "no tip
+  // recorded" rather than crashing the barrage.
   const tipShaResolver = input.tipShaResolver ?? defaultTipShaResolver;
-  const tipSha = await tipShaResolver(input.repoRoot);
-  if (tipSha !== null) {
-    await writeFile(join(runDir, 'tip.sha'), `${tipSha}\n`, 'utf8');
-  }
+  const fireTimeTipSha = await tipShaResolver(input.repoRoot);
 
   const spawnInputs: ReadonlyArray<SpawnInput> = input.models.map((model) => {
     const stem = safeModelName(model.name);
@@ -99,6 +105,27 @@ export async function orchestrateBarrage(
   const results: ReadonlyArray<ModelRunResult> = await Promise.all(
     spawnInputs.map(spawnCliAgainstModel),
   );
+
+  // Per AUDIT-20260531-claude-03 + codex-02: only write tip.sha when
+  // the barrage actually produced audit coverage (at least one model
+  // emitted bytes). An all-models-failed (outage) run intentionally
+  // omits tip.sha; the next iteration's check-barrage-tip then sees
+  // missing → fail-safes to fire (per AUDIT-20260531-fail-safe-rule).
+  // Write is wrapped so a filesystem failure (disk full, race) degrades
+  // to "no tip recorded" rather than aborting the run.
+  if (fireTimeTipSha !== null) {
+    const anyModelEmitted = results.some((r) => r.stdoutBytes > 0 && r.spawnError === undefined);
+    if (anyModelEmitted) {
+      try {
+        await writeFile(join(runDir, 'tip.sha'), `${fireTimeTipSha}\n`, 'utf8');
+      } catch {
+        // Swallow per the claude-03 contract: tip.sha write failure
+        // is non-fatal; the next iteration fail-safes to fire on
+        // missing tip. The audit-runs/<runDir>/ artifacts remain
+        // intact for operator triage.
+      }
+    }
+  }
 
   // Assemble the BarrageRun, write INDEX.md, return the same record.
   // `indexPath` is derived from `runDir` up front (same derivation
