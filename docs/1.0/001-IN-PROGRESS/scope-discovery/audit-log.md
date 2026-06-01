@@ -2041,3 +2041,60 @@ Surface:    whole commit (`chore: release v0.32.0`) — `audit-log.md` (+AUDIT-6
 The single commit subject `chore: release v0.32.0` conflates two unrelated concerns: (a) a pure version bump across `package.json`/`plugin.json`/`marketplace.json` (0.31.2 → 0.32.0, internally consistent — verified all 13 references match), and (b) a substantive audit-log lift that adds two new findings and two new workplan fix-tasks. A release commit that also mutates feature-tracking artifacts breaks the "one fix per commit / release commits are pure bumps" hygiene the project relies on, and it means `git rev-list <prior-tag>..v0.32.0` for `close-shipped`/`apply-audit-flips` will see a release commit carrying finding content it has to parse around.
 
 More consequentially, v0.32.0 is being tagged while the cross-model HIGH finding (AUDIT-52/59/61/63 — the missing-`Severity:` renderer bug) remains **unfixed in the released artifact**, and the release commit itself *reproduces* that bug one more time via Task 5.97 (Finding-01 above). So the released `promote-findings` path is known-broken: any HIGH finding promoted post-release will keep emitting fail-open single-test fix-tasks. The root-cause one-liner that all four findings name (`finding.severity` → `renderFixTaskBlock`) is absent from this diff. A reasonable fix is to split the release bump from the finding-lift into separate commits and to land the renderer fix before (or with) the tag, so the release does not ship the self-reproducing defect.
+
+## 2026-06-01 — audit-barrage lift (20260601T154719256Z-scope-discovery)
+
+### AUDIT-20260601-67 — The newly-added workplan tasks are rendered in a shape the committed `renderFixTaskBlock` cannot produce — proving the lift workflow bypasses the fixed pipeline (the real root cause the prior 5 generations missed)
+
+Finding-ID: AUDIT-20260601-67 (claude-opus-01 + claude-opus-03 + claude-opus-04 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   blocking
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (diff: Task 5.99 + Task 5.100) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:114-198`, `apply.ts:148-164`, `audit-log-walker.ts:46`
+
+The prior findings AUDIT-52/59/61/63/65 all assert the root cause is *"the promote-findings/apply.ts lift path does not thread `finding.severity` into `renderFixTaskBlock`."* I read the committed code. **That diagnosis is false.** `walkOpenFindings` parses and threads severity (`audit-log-walker.ts:46` — `if (entry.severity !== undefined) finding.severity = entry.severity`). `apply.ts:154-158` infers the shape and passes the full finding to `renderFixTaskBlock`. The renderer reads `finding.severity` (`workplan-task-renderer.ts:157`) and the code-defect branch **unconditionally** emits a `. Severity: ${severity}.` suffix on line 162, plus Step 0/Step 1b when `isHighPlus`. The committed renderer literally cannot emit a code-defect task without a `Severity:` line.
+
+Yet Task 5.99 and Task 5.100 in this diff have `Closes … Surface: …` with **no `. Severity:` suffix**, the pre-Phase-18 5-step body, and no `(non-bug)` heading marker. That output matches *neither* committed template. Worse: `inferFindingShape` (`workplan-task-renderer.ts:68-86`) routes by surface string — AUDIT-65's surface contains `` `workplan.md` `` (matches line 72) and AUDIT-66's surface contains `` `audit-log.md` `` (matches line 71), so the committed pipeline would render **both** as the `non-bug` template (`**Shape**: non-bug`, 3 steps, disposition prose). The diff shows the old code-defect template instead. This is conclusive: these tasks were produced **outside the committed code path** — hand-authored during the "in-loop barrage" lift (cf. commit subjects "marker churn from in-loop barrage"), or by a stale compiled `dist`/installed artifact running pre-Phase-18 code. Either way, Phase 18 Task 1 (non-bug shape) and Phase 18 Task 3 (severity/Step 0/Step 1b) are **inert with respect to the workflow that actually generates these tasks.** That is why the loop never terminates: every generation "fixes" a renderer that was already correct while the bypassing workflow re-emits the broken shape. Fix: make the in-loop lift invoke the committed `promote-findings apply` pipeline (or rebuild/republish the artifact the bin shim runs), and add an integration test asserting the *workflow-produced* task — not the unit-tested renderer in isolation — carries the `Severity:` line.
+
+---
+
+### AUDIT-20260601-68 — `inferFindingShape` mis-classifies by symptom location, not fix location — a latent bug that ships untested code fixes the moment the pipeline IS used
+
+Finding-ID: AUDIT-20260601-68
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:68-86` (inference), exercised against AUDIT-20260601-65's surface
+
+`inferFindingShape` keys the bug-vs-non-bug decision off the finding's `Surface` string. AUDIT-65's *symptom* manifests in `workplan.md` (a rendered task), so its surface names `workplan.md` and the classifier returns `non-bug` (line 72). But AUDIT-65's *fix* — per its own body — is in `.ts` source (`renderFixTaskBlock` / the lift path); it is a genuine code defect that needs a failing test. If the committed `apply.ts` pipeline were used (the fix to Finding-01), AUDIT-65 would be rendered with the `non-bug` template: disposition prose, no failing test, the commit-msg gate validating prose instead of running vitest. A real code fix would ship with zero test coverage and pass the gate. The classifier confuses "where the bug shows up" with "where the bug lives."
+
+This is arguably more dangerous than the missing-`Severity:` symptom the prior findings chase, because it survives their proposed fix. A finding can have a documentation-shaped surface and a code-shaped fix simultaneously (every "the rendered task is wrong" finding is exactly this). A reasonable fix: shape inference must not be derivable from surface alone — either (a) the lift must record the *fix-target* path distinctly from the *symptom* surface, or (b) any finding whose body names a source file (`.ts`/`.tsx`/`.js`) is forced to `code-defect` regardless of where the surface points, or (c) shape becomes an operator-supplied field on the proposal rather than an inferred one.
+
+---
+
+## 2026-06-01 — audit-barrage lift (20260601T155245013Z-scope-discovery)
+
+### AUDIT-20260601-69 — Stdin delivery to a CLI that doesn't consume stdin is a silent no-prompt "success" — worse than the E2BIG it replaces
+
+Finding-ID: AUDIT-20260601-69 (claude-01 + claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts` (the `useStdin` branch, ~lines 120-150) + `docs/.../audit-barrage-cli-notes.md` (Per-CLI compatibility paragraph)
+
+The fix converts a *loud* failure (`spawn E2BIG`, which the wrapper degrades to an outage disposition the operator can see) into a *silent* one. When `useStdin` is true the code does `child.stdin.end(input.prompt)` and relies on the child reading the prompt off stdin. But nothing verifies the child actually consumed it. A CLI that opens with `stdio[0]='pipe'` but does **not** read the audit prompt from stdin (reads it as something else, or ignores it) will run with an *empty/absent prompt*, exit 0, and be recorded by the barrage as a healthy audit producing a confident "no findings" — exactly the silent-wrong-result the project's "fallbacks hide failure modes" guideline forbids. The docs admit this is unverified: *"all three CLIs … emit a 'reading additional input from stdin' message … but live verification per CLI is still required."* That assumption is load-bearing for correctness and is not gated in code. A reasonable fix: assert the prompt was drained (e.g., size of bytes written vs. an acknowledgment), or require an explicit per-model `delivery: stdin` opt-in plus a smoke that confirms the CLI echoes prompt-derived content, rather than inferring delivery from a stderr banner. Until then, the stdin path can pass the barrage while silently auditing nothing.
+
+### AUDIT-20260601-70 — Workplan Tasks 5.101 / 5.102 reproduce the missing-`Severity:` template for a *blocking* and a *high* finding — the same self-reproducing bug, now at the highest severity yet
+
+Finding-ID: AUDIT-20260601-70
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.101 (`fix-finding-AUDIT-20260601-67`) and Task 5.102 (`fix-finding-AUDIT-20260601-68`), `@@ -740,6 +740,40 @@` hunk
+
+AUDIT-67 is `Severity: blocking` and AUDIT-68 is `Severity: high` in the audit-log. This diff renders **both** fix-tasks with the plain 5-step code-defect template: `Closes … Surface: …`, then `Step 1: write failing test` … `Step 5: commit`, with **no `Severity:` line, no Step 0 working-code invariant, no Step 1b regression-lock test**, and a single-test AC (`npx vitest run <test-file-path> exits 0`). This is the documented self-reproducing defect (AUDIT-52→5.86, 59→5.93, 61→5.95, 63→5.97, 65→5.99) continuing — and AUDIT-67 explicitly diagnosed the root cause as *the lift workflow bypassing the committed `renderFixTaskBlock` pipeline* (hand-authored or stale `dist`). The fact that 5.101/5.102 emerge **again** without a `Severity:` line is empirical confirmation of that diagnosis: when an implementer picks up 5.101, `extractTaskSeverity` returns `null`, the `severity === 'high' || 'blocking'` guard is skipped, and the fix to a *blocking* finding can ship fail-open with one test. Per AUDIT-67's own instruction, no further HIGH/blocking findings should be promoted through the bypassing path until the in-loop lift invokes the committed `apply` pipeline (or the artifact the bin shim runs is rebuilt/republished). This diff promotes two more anyway.
+
+### AUDIT-20260601-71 — Test claims to verify a "useStdin signal" that `buildArgs` does not return — and workplan AC (b) is checked `[x]` for it
+
+Finding-ID: AUDIT-20260601-71
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts` (`'buildArgs detection: returns useStdin flag …'`) + `workplan.md` Phase 19 Task 1 Step 1(b) / AC
+
+The test is named *"buildArgs detection: returns useStdin flag for {{prompt-stdin}} templates"* and its comment says *"Export the placeholder-detection result alongside the args array … buildArgs returns just string[]. Post-fix: still returns string[]."* The test then only asserts arg-stripping (`ba('-e SCRIPT {{prompt-stdin}}', 'hello')` → `['-e', 'SCRIPT']`). It does **not** test any `useStdin` signal — because `buildArgs` returns no such signal; detection lives separately in `spawnCliAgainstModel` via `.includes()` (the root of Finding-02). The test name and comment describe a contract the implementation doesn't have, so this is a test-that-doesn't-test-its-claimed-contract. The corresponding workplan line (Step 1 *"(b) buildArgs detection returns `useStdin` signal"*) is checked `[x]`, asserting a behavior that was never built. Either make `buildArgs` return `{ args, useStdin }` (single source of truth, fixes Finding-02 too) or rename the test and AC to "buildArgs strips the stdin placeholder" to match what was actually built.

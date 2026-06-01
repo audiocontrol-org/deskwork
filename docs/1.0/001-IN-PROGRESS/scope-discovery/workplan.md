@@ -741,6 +741,57 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.103 (fix-finding-AUDIT-20260601-69): AUDIT-20260601-69 — Stdin delivery to a CLI that doesn't consume stdin is a sile…
+
+Closes AUDIT-20260601-69 (claude-01 + claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts` (the `useStdin` branch, ~lines 120-150) + `docs/.../audit-barrage-cli-notes.md` (Per-CLI compatibility paragraph).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-69 (claude-01 + claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.104 (fix-finding-AUDIT-20260601-70): AUDIT-20260601-70 — Workplan Tasks 5.101 / 5.102 reproduce the missing-`Severity…
+
+Closes AUDIT-20260601-70. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.101 (`fix-finding-AUDIT-20260601-67`) and Task 5.102 (`fix-finding-AUDIT-20260601-68`), `@@ -740,6 +740,40 @@` hunk.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-70` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.105 (fix-finding-AUDIT-20260601-71): AUDIT-20260601-71 — Test claims to verify a "useStdin signal" that `buildArgs` d…
+
+Closes AUDIT-20260601-71. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts` (`'buildArgs detection: returns useStdin flag …'`) + `workplan.md` Phase 19 Task 1 Step 1(b) / AC.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-71` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.101 (fix-finding-AUDIT-20260601-67): AUDIT-20260601-67 — The newly-added workplan tasks are rendered in a shape the c…
 
 Closes AUDIT-20260601-67 (claude-opus-01 + claude-opus-03 + claude-opus-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (diff: Task 5.99 + Task 5.100) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:114-198`, `apply.ts:148-164`, `audit-log-walker.ts:46`.
