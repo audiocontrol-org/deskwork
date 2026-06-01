@@ -28,7 +28,11 @@ import {
   type DiffSliceFetcher,
   type DiffSlicePayload,
 } from './sidebar-render.ts';
-import { buildSidebarThread } from './thread-render.ts';
+import {
+  buildSidebarThread,
+  expandThreadForRoot,
+  findThreadRootByCommentId,
+} from './thread-render.ts';
 import { groupCommentsIntoThreads, type Thread } from './threads.ts';
 import { cssEscapeForSelector } from './css-escape.ts';
 import {
@@ -472,10 +476,44 @@ export function createAnnotationsController(
       for (const thread of unanchoredThreads) {
         addSidebarThread(thread, 'unresolved');
       }
+      maybeApplyHashPermalink();
       updateResolvedFooter();
     } catch (e) {
       showToast(`Failed to load annotations: ${e instanceof Error ? e.message : String(e)}`, true);
     }
+  }
+
+  // ---- Permalinks (Phase 8 Task 8.2 Step 8.2.3) ----
+
+  /**
+   * Parse `#comment/<id>` out of the current `window.location.hash`
+   * and scroll the corresponding sidebar item into view. When the
+   * targeted comment is part of a thread with replies (root OR
+   * reply), expand the thread so the operator lands inside an
+   * already-open thread rather than staring at a collapsed badge.
+   *
+   * Called once at the end of `loadAnnotations()` so the initial
+   * paint settles before we scroll, AND from the `hashchange`
+   * listener wired at the bottom of `createAnnotationsController`
+   * so subsequent permalink clicks within the same page session
+   * also resolve.
+   *
+   * No-op when the hash isn't `#comment/<id>` shape or the id
+   * doesn't resolve to a sidebar item.
+   */
+  function maybeApplyHashPermalink(): void {
+    const hash = window.location.hash;
+    const match = /^#comment\/(.+)$/.exec(hash);
+    if (match === null) return;
+    const commentId = decodeURIComponent(match[1] ?? '');
+    if (commentId === '') return;
+    const item = sidebarIndex.get(commentId);
+    if (item === undefined) return;
+    const rootLi = findThreadRootByCommentId(sidebarList, commentId);
+    if (rootLi !== null) expandThreadForRoot(rootLi);
+    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    item.classList.add('active');
+    setTimeout(() => item.classList.remove('active'), 1800);
   }
 
   // ---- Resolve / re-open ----
@@ -648,6 +686,14 @@ export function createAnnotationsController(
       setTimeout(() => setActiveHighlight(id, false), 1800);
     }
   }
+
+  // Phase 8 Task 8.2 Step 8.2.3 — re-resolve `#comment/<id>` when
+  // the operator clicks a permalink while the page is already
+  // loaded. The initial-load case is handled by the explicit
+  // `maybeApplyHashPermalink()` call inside `loadAnnotations`.
+  window.addEventListener('hashchange', () => {
+    maybeApplyHashPermalink();
+  });
 
   return {
     closeComposer,
