@@ -223,6 +223,13 @@ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
           : {}),
         ...(stored.category !== undefined ? { category: stored.category } : {}),
         ...(stored.anchor !== undefined ? { anchor: stored.anchor } : {}),
+        // Phase 8 Step 8.4.1 — attachments patch field. The fold path
+        // (`applyEdits` below) treats a present array as a full
+        // replacement of the prior value, identical to every other
+        // edit-comment field's full-replace semantics.
+        ...(stored.attachments !== undefined
+          ? { attachments: [...stored.attachments] }
+          : {}),
       };
     case 'delete-comment':
       return {
@@ -399,11 +406,19 @@ function applyEdits(
   // text/category edit unchanged.
   const anchorPrefix = comment.anchorPrefix;
   const anchorSuffix = comment.anchorSuffix;
-  // Phase 8 Step 8.1.1 — replyTo / attachments / spatialAnchor are
-  // immutable through `edit-comment` (the edit schema doesn't expose
-  // them); preserve unchanged the same way prefix/suffix are.
+  // Phase 8 Step 8.1.1 — replyTo / spatialAnchor remain immutable
+  // through `edit-comment` (the edit schema doesn't expose them);
+  // preserve unchanged the same way prefix/suffix are.
+  //
+  // Phase 8 Step 8.4.1 — `attachments` IS now mutable via
+  // `edit-comment` (a screenshot attached after the comment was
+  // originally posted lands as an `edit-comment` event carrying the
+  // full intended attachment list). Full-replacement semantics: a
+  // present `attachments` field on the edit REPLACES the prior list;
+  // an absent `attachments` PRESERVES the prior list. Callers wishing
+  // to add a single screenshot pass `[...prior, newPath]`.
   const replyTo = comment.replyTo;
-  const attachments = comment.attachments;
+  let attachments = comment.attachments;
   const spatialAnchor = comment.spatialAnchor;
   for (const e of edits) {
     if (e.type !== 'edit-comment') continue;
@@ -411,6 +426,7 @@ function applyEdits(
     if (e.range !== undefined) range = { start: e.range.start, end: e.range.end };
     if (e.category !== undefined) category = e.category;
     if (e.anchor !== undefined) anchor = e.anchor;
+    if (e.attachments !== undefined) attachments = [...e.attachments];
   }
   const out: CommentAnnotation = {
     id: comment.id,

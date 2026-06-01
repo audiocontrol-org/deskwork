@@ -199,6 +199,9 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
         ...(fields.fields.range !== undefined ? { range: fields.fields.range } : {}),
         ...(fields.fields.category !== undefined ? { category: fields.fields.category } : {}),
         ...(fields.fields.anchor !== undefined ? { anchor: fields.fields.anchor } : {}),
+        ...(fields.fields.attachments !== undefined
+          ? { attachments: fields.fields.attachments }
+          : {}),
       };
       return { kind: 'ok', draft };
     }
@@ -230,6 +233,12 @@ export interface ParseEditFieldsResult {
   range?: { start: number; end: number };
   category?: NonNullable<CommentDraft['category']>;
   anchor?: string;
+  /**
+   * Phase 8 Step 8.4.1 — attaching a screenshot to an existing comment
+   * mutates `attachments[]` via this patch field. Full-replacement
+   * semantics match every other field on this patch.
+   */
+  attachments?: string[];
 }
 
 export type ParseEditFieldsOutcome =
@@ -280,16 +289,40 @@ export function parseEditCommentFields(body: unknown): ParseEditFieldsOutcome {
     out.anchor = obj.anchor;
   }
 
+  if (obj.attachments !== undefined) {
+    if (!Array.isArray(obj.attachments)) {
+      return {
+        kind: 'err',
+        status: 400,
+        message: 'attachments must be an array of strings',
+      };
+    }
+    const arr: string[] = [];
+    for (const item of obj.attachments) {
+      if (typeof item !== 'string') {
+        return {
+          kind: 'err',
+          status: 400,
+          message: 'attachments entries must be strings',
+        };
+      }
+      arr.push(item);
+    }
+    out.attachments = arr;
+  }
+
   if (
     out.text === undefined &&
     out.range === undefined &&
     out.category === undefined &&
-    out.anchor === undefined
+    out.anchor === undefined &&
+    out.attachments === undefined
   ) {
     return {
       kind: 'err',
       status: 400,
-      message: 'at least one of text / range / category / anchor is required',
+      message:
+        'at least one of text / range / category / anchor / attachments is required',
     };
   }
 

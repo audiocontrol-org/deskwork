@@ -184,6 +184,16 @@ const EditCommentAnnotation = z.object({
   range: RangeSchema.optional(),
   category: AnnotationCategoryEnum.optional(),
   anchor: z.string().optional(),
+  // Phase 8 Step 8.4.1 — attaching a screenshot to an existing comment
+  // mutates `attachments[]` via this patch shape. The full-replacement
+  // semantics mirror every other field on this annotation: a present
+  // `attachments` array REPLACES the prior value in the folded view
+  // (`applyEdits` in `entry/annotations.ts`); an absent `attachments`
+  // preserves the prior value. Callers wishing to APPEND a screenshot
+  // pass `[...priorAttachments, newPath]` and the writer records the
+  // full intended state — keeps the journal events self-contained
+  // without forcing a fold-time append heuristic.
+  attachments: z.array(z.string()).optional(),
 });
 
 const DeleteCommentAnnotation = z.object({

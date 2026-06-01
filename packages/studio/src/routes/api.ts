@@ -531,6 +531,9 @@ export function createApiRouter(ctx: StudioContext): Hono {
       ...(parsed.fields.range !== undefined ? { range: parsed.fields.range } : {}),
       ...(parsed.fields.category !== undefined ? { category: parsed.fields.category } : {}),
       ...(parsed.fields.anchor !== undefined ? { anchor: parsed.fields.anchor } : {}),
+      ...(parsed.fields.attachments !== undefined
+        ? { attachments: parsed.fields.attachments }
+        : {}),
     });
     try {
       await addEntryAnnotation(ctx.projectRoot, entryId, minted);

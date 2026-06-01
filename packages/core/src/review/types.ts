@@ -278,6 +278,14 @@ export interface EditCommentAnnotation extends AnnotationBase {
   category?: AnnotationCategory;
   /** New anchor (selected-text quote) — replaces the prior value when present. */
   anchor?: string;
+  /**
+   * Phase 8 Step 8.4.1 — new attachment list. Replaces the prior value
+   * when present (full-replacement semantics, identical to every other
+   * field on this patch). Callers wishing to APPEND a screenshot pass
+   * `[...priorAttachments, newRelativePath]`; the writer records the
+   * full intended state so the journal event is self-describing.
+   */
+  attachments?: string[];
 }
 
 /**
