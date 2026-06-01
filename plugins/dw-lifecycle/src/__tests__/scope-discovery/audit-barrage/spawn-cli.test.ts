@@ -234,3 +234,93 @@ describe('spawnCliAgainstModel', () => {
     await new Promise((r) => setTimeout(r, 50));
   });
 });
+
+// Phase 19 Task 1 (GH #386) — stdin-based prompt delivery for large
+// prompts that exceed OS ARG_MAX (~256KB on macOS). The {{prompt-stdin}}
+// placeholder swaps argv-substitution for child-process stdin writes,
+// bypassing the argv size limit entirely.
+//
+// Option D discipline (HIGH severity): Step 0 invariant — small-prompt
+// argv invocations via {{prompt}} MUST continue to work; the fix MUST
+// NOT break the back-compat path. Test cases below pin both axes.
+describe('Phase 19 (#386) — {{prompt-stdin}} placeholder', () => {
+  let tmp: string;
+
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'spawn-cli-stdin-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  it('delivers prompt via stdin when argsTemplate uses {{prompt-stdin}}', async () => {
+    // Fake CLI: reads stdin to completion, writes it back to stdout.
+    // The script body uses base64 to avoid the whitespace-split issue.
+    const script = `let buf=''; process.stdin.on('data', c => buf += c); process.stdin.on('end', () => process.stdout.write(buf));`;
+    const b64 = Buffer.from(script, 'utf8').toString('base64');
+    const evalArg = `eval(Buffer.from('${b64}','base64').toString('utf8'))`;
+    const model: ModelConfig = {
+      name: 'fake-stdin',
+      binary: NODE_BIN,
+      argsTemplate: `-e ${evalArg} {{prompt-stdin}}`,
+      timeoutSeconds: 5,
+    };
+    // A multi-MB prompt — exceeds ARG_MAX on macOS (~256KB).
+    const largePrompt = 'A'.repeat(1024 * 1024); // 1MB
+    const result = await spawnCliAgainstModel({
+      model,
+      prompt: largePrompt,
+      stdoutPath: join(tmp, 'out.md'),
+      stderrPath: join(tmp, 'stderr.txt'),
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.spawnError).toBeUndefined();
+    const captured = await readFile(join(tmp, 'out.md'), 'utf8');
+    expect(captured.length).toBe(largePrompt.length);
+    expect(captured.startsWith('A'.repeat(100))).toBe(true);
+  });
+
+  it('REGRESSION: {{prompt}} argv-substitution path STILL works with small prompts (working-code invariant)', async () => {
+    // Same fake-CLI shape used by the existing tests — confirms the
+    // argv path is untouched by the stdin extension.
+    const script = `process.stdout.write('echo: ' + process.argv[1]);`;
+    const b64 = Buffer.from(script, 'utf8').toString('base64');
+    const evalArg = `eval(Buffer.from('${b64}','base64').toString('utf8'))`;
+    const model: ModelConfig = {
+      name: 'fake-argv',
+      binary: NODE_BIN,
+      argsTemplate: `-e ${evalArg} {{prompt}}`,
+      timeoutSeconds: 5,
+    };
+    const smallPrompt = 'hello small-argv world';
+    const result = await spawnCliAgainstModel({
+      model,
+      prompt: smallPrompt,
+      stdoutPath: join(tmp, 'out.md'),
+      stderrPath: join(tmp, 'stderr.txt'),
+    });
+    expect(result.exitCode).toBe(0);
+    const captured = await readFile(join(tmp, 'out.md'), 'utf8');
+    expect(captured).toBe(`echo: ${smallPrompt}`);
+  });
+
+  it('buildArgs detection: returns useStdin flag for {{prompt-stdin}} templates', async () => {
+    // The orchestrator needs to know whether to wire stdio[0]='pipe'.
+    // Export the placeholder-detection result alongside the args array.
+    const { buildArgs: ba } = await import(
+      '../../../scope-discovery/audit-barrage/spawn-cli.js'
+    );
+    // Pre-fix: buildArgs returns just string[]. Post-fix: still
+    // returns string[] but inspect-able for the placeholder.
+    // The test below verifies the spawn-cli end-to-end path detects
+    // stdin correctly; this unit-level check pins that {{prompt-stdin}}
+    // strips the placeholder from the args.
+    const argsArgv = ba('-e SCRIPT {{prompt}}', 'hello');
+    expect(argsArgv).toEqual(['-e', 'SCRIPT', 'hello']);
+    // After fix: a {{prompt-stdin}} arg should be stripped entirely
+    // (the prompt goes via stdin, not argv).
+    const argsStdin = ba('-e SCRIPT {{prompt-stdin}}', 'hello');
+    expect(argsStdin).toEqual(['-e', 'SCRIPT']);
+  });
+});

@@ -740,6 +740,40 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.101 (fix-finding-AUDIT-20260601-67): AUDIT-20260601-67 — The newly-added workplan tasks are rendered in a shape the c…
+
+Closes AUDIT-20260601-67 (claude-opus-01 + claude-opus-03 + claude-opus-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (diff: Task 5.99 + Task 5.100) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:114-198`, `apply.ts:148-164`, `audit-log-walker.ts:46`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-67 (claude-opus-01 + claude-opus-03 + claude-opus-04 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.102 (fix-finding-AUDIT-20260601-68): AUDIT-20260601-68 — `inferFindingShape` mis-classifies by symptom location, not …
+
+Closes AUDIT-20260601-68. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:68-86` (inference), exercised against AUDIT-20260601-65's surface.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-68` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.99 (fix-finding-AUDIT-20260601-65): AUDIT-20260601-65 — Task 5.97 — the fix-task for the HIGH finding AUDIT-63 is re…
 
 Closes AUDIT-20260601-65 (claude-01 + claude-03 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.97 (`fix-finding-AUDIT-20260601-63`), added in the `@@ -738,6 +738,40 @@` hunk, vs. AUDIT-20260601-63 (`Severity: high`) in `audit-log.md`.
@@ -3313,3 +3347,44 @@ Per operator directive 6: a 1-healthy-model barrage IS a successful audit, not d
 - `apply-audit-flips` (Phase 13 Task 4) — Task 4 extends the trailer parser.
 - `audit-barrage` CLI (Phase 12, Phase 16 Task 2 `tip.sha`) — Task 5 rewords the stderr summary; CLI behavior unchanged.
 - `isModelRunHealthy` (Phase 17 retro AUDIT-08 centralization) — Task 5 references; predicate unchanged.
+
+## Phase 19: audit-barrage E2BIG via stdin prompt delivery (GH #386)
+
+GH #386 from the graphical-entries team: `audit-barrage` spawn-time failures with `spawn ENAMETOOLONG` / `E2BIG` when the rendered prompt exceeds the OS `ARG_MAX` ceiling (~256KB on macOS). Wrapper degrades to outage disposition but cross-model coverage is lost on every large-diff iteration.
+
+**Severity: HIGH.** The barrage is the third independent audit surface (in-band self-audit + SDD review + cross-model barrage); losing it on large diffs eliminates the genetic-diversity signal the workflow depends on.
+
+**Fix shape:** alternative `{{prompt-stdin}}` placeholder. When `args_template` carries it, `spawn-cli.ts` writes the rendered prompt to `child.stdin` instead of substituting into argv. The argv path (`{{prompt}}`) is preserved as the working-code default — the stdin path is opt-in per model.
+
+### Task 1: stdin-delivery placeholder + spawn-helper integration (fix-finding-GH-386)
+
+**Severity: high.**
+
+**Step 0: working-code invariant.** Small-prompt argv invocations via `{{prompt}}` substitute the prompt into argv as a single element. The CLIs invoked today (`claude`, `codex`, `gemini`) accept this shape and have been live-verified. The fix MUST NOT break that path — any regression on small prompts is a sin of commission worse than failing on E2BIG.
+
+- [x] Step 1: failing tests in `spawn-cli.test.ts` — (a) 1MB prompt delivered via stdin when `args_template` uses `{{prompt-stdin}}`, (b) buildArgs detection returns `useStdin` signal, (c) regression-lock: small-prompt `{{prompt}}` argv path still works unchanged.
+- [x] Step 1b: regression-lock test (Option D — HIGH severity). The {{prompt}} argv path's working-code invariant is pinned by an explicit test that survives any future refactor.
+- [x] Step 2: confirmed RED before implementation (2 failed | 15 passed).
+- [x] Step 3: extended `buildArgs` to strip `{{prompt-stdin}}` tokens; extended `spawnCliAgainstModel` to detect the placeholder and conditionally set `stdio[0] = 'pipe'`, then `child.stdin.end(prompt)`. Two-branch spawn preserves TypeScript stdio-tuple narrowing.
+- [x] Step 4: GREEN — 17/17 spawn-cli tests pass.
+- [x] Step 5: config-loader relaxed to accept either `{{prompt}}` OR `{{prompt-stdin}}` (mutually exclusive — both is ambiguous and rejected). Config-loader tests extended (23/23 pass).
+- [x] Step 6: documented in `audit-barrage-cli-notes.md` as an opt-in escape hatch for operators hitting E2BIG. Plugin-default config NOT changed — preserves the working invariant pending live verification per CLI.
+- [x] Step 7: full plugin test suite 2622/2622 pass; `tsc --noEmit` clean.
+- [ ] Step 8: commit with `Closes GH-386` in subject.
+
+**Acceptance Criteria:**
+- [x] Test block count for this finding is ≥2 (Option D — HIGH severity).
+- [x] Failing tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts`.
+- [x] `npx vitest run` exits 0 (passes against the fix).
+- [x] `{{prompt}}` argv-substitution path unchanged (regression-lock test confirms).
+- [x] `{{prompt-stdin}}` placeholder routes the prompt via `child.stdin`.
+- [x] Config-loader accepts either placeholder; rejects both-present.
+- [ ] GH-386 closed once verified in a release.
+
+### Phase 19 — Out of Scope
+
+- **Per-CLI fallback ordering** — explicitly out of scope per the issue body.
+- **Diff truncation** — explicitly out of scope per the issue body.
+- **Single-CLI design** — explicitly out of scope per the issue body.
+- **Flipping plugin-default config to `{{prompt-stdin}}`** — requires live verification per CLI (claude / codex / gemini) before changing the default. Operators who hit E2BIG can opt in via the project-side override; the default stays `{{prompt}}` to preserve the working-code invariant.
+- **Option B (temp-file via shell wrapper)** — explicitly NOT picked due to shell-injection risk.

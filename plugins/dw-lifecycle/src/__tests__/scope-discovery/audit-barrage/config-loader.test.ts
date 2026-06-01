@@ -126,10 +126,28 @@ describe('parseConfig — per-entry validation', () => {
     ).toThrow(/\.args_template missing or not a non-empty string/);
   });
 
-  it('rejects an args_template that lacks {{prompt}}', () => {
+  it('rejects an args_template that lacks both {{prompt}} and {{prompt-stdin}}', () => {
     expect(() =>
       parseConfig(entry({ args_template: '-p no-placeholder' }), '<inline>'),
-    ).toThrow(/args_template must contain the literal '\{\{prompt\}\}'/);
+    ).toThrow(/must contain either '\{\{prompt\}\}'.+or '\{\{prompt-stdin\}\}'/);
+  });
+
+  // Phase 19 Task 1 (GH #386) — stdin-delivery placeholder
+  it('accepts an args_template that uses {{prompt-stdin}} instead of {{prompt}}', () => {
+    const config = parseConfig(
+      entry({ args_template: '-p {{prompt-stdin}}' }),
+      '<inline>',
+    );
+    expect(config.models[0]?.argsTemplate).toBe('-p {{prompt-stdin}}');
+  });
+
+  it('rejects an args_template that contains BOTH placeholders (ambiguous)', () => {
+    expect(() =>
+      parseConfig(
+        entry({ args_template: '-p {{prompt}} --extra {{prompt-stdin}}' }),
+        '<inline>',
+      ),
+    ).toThrow(/contains BOTH .+ mutually exclusive/);
   });
 
   it('rejects a missing timeout_seconds', () => {

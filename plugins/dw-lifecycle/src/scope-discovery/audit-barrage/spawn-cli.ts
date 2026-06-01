@@ -117,9 +117,39 @@ export async function spawnCliAgainstModel(
         .catch(rejectResult);
     };
 
-    const child = spawn(input.model.binary, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    // Phase 19 Task 1 (GH #386): detect whether the argsTemplate
+    // uses {{prompt-stdin}}. When yes, the prompt is delivered via
+    // child.stdin instead of argv — bypasses the OS ARG_MAX limit
+    // (~256KB on macOS) that would otherwise fail with spawn E2BIG
+    // on large diffs. The stdin path requires `pipe` for stdio[0]
+    // so we can write to it. The two branches are written as
+    // separate `spawn` calls to preserve the literal stdio tuple
+    // shape, which lets TypeScript narrow `child.stdout` /
+    // `child.stderr` to non-null on both paths.
+    const useStdin = input.model.argsTemplate.includes('{{prompt-stdin}}');
+    const child = useStdin
+      ? spawn(input.model.binary, args, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
+      : spawn(input.model.binary, args, {
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+    if (useStdin && child.stdin !== null) {
+      // Write the prompt to stdin and close. Per Phase 19 Task 1:
+      // back-pressure aware via `write` callback would be more
+      // correct for multi-GB prompts, but the OS pipe buffer is
+      // ~64KB and Node node-stream handles back-pressure
+      // automatically — `end()` waits until the write drains.
+      child.stdin.on('error', (err) => {
+        // EPIPE if the child exits before reading the prompt — common
+        // when the child rejects the prompt or crashes early. Don't
+        // crash the orchestrator; the close event will surface the
+        // child's actual outcome via exitCode.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _ = err;
+      });
+      child.stdin.end(input.prompt);
+    }
 
     // ENOENT / permission denied / etc. — record as spawn error and
     // return without aborting siblings. `finish()` clears every timer
@@ -206,7 +236,15 @@ export function buildArgs(
   prompt: string,
 ): ReadonlyArray<string> {
   const tokens = argsTemplate.trim().split(/\s+/).filter((t) => t.length > 0);
-  return tokens.map((tok) => tok.split('{{prompt}}').join(prompt));
+  // Phase 19 Task 1 (GH #386): tokens containing {{prompt-stdin}} are
+  // STRIPPED from args entirely (the prompt is delivered via stdin
+  // by spawnCliAgainstModel). The bare-token form is the common
+  // case; the intra-token form (e.g. `--input={{prompt-stdin}}`)
+  // would be unusable since stdin doesn't appear in argv. Stripping
+  // bare-token-only matches the practical config shape and is
+  // strictly safer than substituting an empty string into argv.
+  const stdinFiltered = tokens.filter((tok) => tok !== '{{prompt-stdin}}');
+  return stdinFiltered.map((tok) => tok.split('{{prompt}}').join(prompt));
 }
 
 async function closeStreams(

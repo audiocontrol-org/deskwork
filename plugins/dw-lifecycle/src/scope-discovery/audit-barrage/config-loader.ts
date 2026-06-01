@@ -57,6 +57,12 @@ export const DEFAULT_CONFIG_PATH = join(
 );
 
 const PROMPT_PLACEHOLDER = '{{prompt}}';
+// Phase 19 Task 1 (GH #386): alternative placeholder for stdin-based
+// prompt delivery — when present, the spawn helper writes the prompt
+// to child.stdin instead of substituting it into argv. Bypasses the
+// OS ARG_MAX limit (~256KB on macOS) that fails with spawn E2BIG on
+// large diffs.
+const PROMPT_STDIN_PLACEHOLDER = '{{prompt-stdin}}';
 
 /**
  * Loaded audit-barrage config. The top-level shape mirrors the YAML;
@@ -209,10 +215,26 @@ function parseEntry(
   const name = requireNonEmptyString(raw, 'name', prefix);
   const binary = requireNonEmptyString(raw, 'binary', prefix);
   const argsTemplate = requireNonEmptyString(raw, 'args_template', prefix);
-  if (!argsTemplate.includes(PROMPT_PLACEHOLDER)) {
+  // Phase 19 Task 1 (GH #386): args_template must contain EITHER
+  // {{prompt}} (argv-substitution, default) OR {{prompt-stdin}} (stdin
+  // delivery, used by CLIs that accept the prompt on stdin to bypass
+  // ARG_MAX). The two placeholders are mutually exclusive per entry
+  // since the spawn helper picks the delivery path off the template;
+  // a template carrying both is ambiguous and rejected.
+  const hasArgvPlaceholder = argsTemplate.includes(PROMPT_PLACEHOLDER);
+  const hasStdinPlaceholder = argsTemplate.includes(PROMPT_STDIN_PLACEHOLDER);
+  if (!hasArgvPlaceholder && !hasStdinPlaceholder) {
     throw new Error(
-      `${prefix}.args_template must contain the literal '${PROMPT_PLACEHOLDER}' ` +
-        `placeholder (the spawn helper substitutes the rendered prompt at that token)`,
+      `${prefix}.args_template must contain either '${PROMPT_PLACEHOLDER}' (argv ` +
+        `substitution) or '${PROMPT_STDIN_PLACEHOLDER}' (stdin delivery) — the spawn ` +
+        `helper picks the delivery path off the placeholder`,
+    );
+  }
+  if (hasArgvPlaceholder && hasStdinPlaceholder) {
+    throw new Error(
+      `${prefix}.args_template contains BOTH '${PROMPT_PLACEHOLDER}' and ` +
+        `'${PROMPT_STDIN_PLACEHOLDER}' — these are mutually exclusive (one delivery ` +
+        `path per entry)`,
     );
   }
   const timeoutSeconds = requirePositiveInteger(raw, 'timeout_seconds', prefix);
