@@ -4547,7 +4547,7 @@ That makes the durable machine-readable summary contradict the human-readable au
 ### AUDIT-20260601-07 — spatialAnchor schema accepts semantically-invalid per-kind combinations; the "renderer enforces at use time" it defers to does not exist
 
 Finding-ID: AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
-Status:     open
+Status:     fixed-c708ab27
 Severity:   high
 Surface:    `packages/core/src/schema/draft-annotation.ts:39-46` (`SpatialAnchorSchema`); docstring claims at `review/types.ts:69-72` and `draft-annotation.ts:34-37`
 
@@ -4556,3 +4556,57 @@ Surface:    `packages/core/src/schema/draft-annotation.ts:39-46` (`SpatialAnchor
 This is the bug-factory shape the project guidelines name explicitly ("never implement fallbacks ... validation gaps are bug-factories; throw instead"). The new test file reinforces the gap rather than catching it: it exercises only valid combinations plus an unknown-`kind` rejection (`draft-annotation-thread-anchor.test.ts:75-130`), never asserting that a `pixel` without coordinates or a `dom-selector` without a selector is rejected — so the loose behavior is now codified as "correct." A reasonable fix is `z.discriminatedUnion('kind', [...])` (or `.superRefine`) so `pixel` requires `x`+`y` and forbids `selector`, while `dom-selector`/`svg-element` require `selector` and forbid `x`/`y`. That moves enforcement to the one place every write path already passes through, instead of a downstream consumer that may never be written.
 
 ---
+
+## 2026-06-01 — audit-barrage lift (20260601T051152916Z-graphical-entries)
+
+### AUDIT-20260601-08 — Schema tightening on append-only journal data ships with no read-back-compat path or doctor migration
+
+Finding-ID: AUDIT-20260601-08
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/schema/draft-annotation.ts:56-90` (new `SpatialAnchor*Schema` + `z.discriminatedUnion`); cross-cut with `packages/core/src/entry/annotations.ts` read-bridge
+
+This change converts the spatial-anchor schema from "every field optional" to a `.strict()` discriminated union, and the same schema sits on the **read** path (journal events parse through it → `StoredComment` → `cloneSpatialAnchor`). Under the prior loose schema, a persisted anchor like `{kind:'pixel'}` or `{kind:'pixel', selector:'#x'}` parsed successfully and is now permanently in the append-only `entry-annotation` journal. After this commit those same shapes fail `safeParse` on read — so the fix that prevents *new* bad data also makes any *existing* loose anchor unreadable, with no migration to repair or quarantine it.
+
+The original finding AUDIT-20260601-07 stressed exactly this property ("annotations land in the append-only journal where bad data is permanent"). The project already has the right pattern for this situation — Step 1.5.3 in this same workplan describes "doctor-managed migration with audit-preserving cutover window" for the W3C anchor migration — yet this diff adds no doctor rule, no read-side compatibility shim, and no note that the tightening is safe only because no writer exists yet. Practical risk today is low (per AUDIT-20260601-07 the anchor fields are referenced in only four files and there is no writer/renderer), which is precisely why **now** is the moment to pair the tightening with a doctor rule: once a writer lands and loose anchors accumulate, this becomes a breaking migration instead of a one-line guard. A reasonable fix: add an `entry-anchor-shape` doctor rule that reports legacy loose anchors, or a read-side normalizer, and state in the schema header that the strict cutover assumes zero pre-existing loose anchors on disk.
+
+### AUDIT-20260601-09 — `cloneSpatialAnchor` switch has no exhaustiveness guard; the lockstep contract is only implicitly enforced
+
+Finding-ID: AUDIT-20260601-09
+Status:     open
+Severity:   low
+Surface:    `packages/core/src/entry/annotations.ts:67-79` (`cloneSpatialAnchor`)
+
+The rewritten switch returns from each of the three `case` arms with no `default` and no trailing `return` / `assertNever(input)`:
+
+```ts
+switch (input.kind) {
+  case 'pixel':        return { kind: 'pixel', x: input.x, y: input.y };
+  case 'dom-selector': return { kind: 'dom-selector', selector: input.selector };
+  case 'svg-element':  return { kind: 'svg-element', selector: input.selector };
+}
+```
+
+This compiles today only because the inferred `StoredSpatialAnchor` union is exhaustive. The header comment and the schema docstring both say adding a `kind` "requires updating both this schema and the TS union in lockstep" — but this function is a *third* site that must change, and nothing forces it. Whether a future 4th `kind` is caught here depends entirely on `noImplicitReturns` being enabled; if it is off (or the union is widened by hand), the switch falls through and returns `undefined` typed as `SpatialAnchor`, a silent corruption on the read bridge. A `default: assertNever(input)` makes the lockstep contract a hard compile error at this site instead of a flag-dependent accident, matching the "names/structure reveal intent" posture the rest of the change adopts.
+
+### AUDIT-20260601-10 — Negative tests assert `success === false` without pinning the failure to the anchor, so they can pass for the wrong reason
+
+Finding-ID: AUDIT-20260601-10
+Status:     open
+Severity:   low
+Surface:    `packages/core/test/schema/draft-annotation-thread-anchor.test.ts:138-194` (six new `rejects spatialAnchor …` cases)
+
+Each new negative case spreads `COMMENT_BASE`, overrides `spatialAnchor`, and asserts only `expect(parsed.success).toBe(false)`. None inspect *why* the parse failed (e.g. `parsed.error.issues[0].path` containing `spatialAnchor`, or the discriminator/strict issue code). Because the assertion is "the whole annotation failed to validate," any unrelated future change that makes `COMMENT_BASE` itself invalid — a newly-required sibling field, a renamed key — would keep all six green while silently no longer exercising the anchor enforcement they claim to cover. The probe would then assert the *mechanism it imagines* rather than the contract (the exact failure mode the project's `ui-verification.md` spec-compliance section names).
+
+The fix is one line per case: assert the error path includes `spatialAnchor` (and ideally the issue code — `invalid_union_discriminator` for bad `kind`, `unrecognized_keys` for the strict forbidden-field cases). That ties each test to the per-kind contract it is named for, so a regression in the anchor schema specifically — not just "the comment is invalid" — is what turns the test red.
+
+### AUDIT-20260601-11 — AUDIT-20260601-07 remains open in the durable audit log even though the workplan records it as closed
+
+Finding-ID: AUDIT-20260601-11
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4537-4544`; `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1482-1497`
+
+The workplan entry says “Closes AUDIT-20260601-07” and records the schema/type/test fix as complete, but the audit log entry added in the same diff still has `Status:     open`. The workplan acceptance criteria also leaves “Audit-log Status flipped to fixed-<sha>” unchecked, so the durable state now says both “closed by implementation” and “still open” depending on which project record is read.
+
+This matters because the audit log is the source later barrage/import tooling will scan for unresolved findings. Leaving `AUDIT-20260601-07` open after committing the fix means the same issue can be re-triaged as active despite the code and tests having moved. A reasonable fix is to update the audit-log status to the actual fixed commit SHA once known, or avoid wording the workplan as “Closes” until the audit record is updated in the same close-shipped step.
