@@ -21,6 +21,8 @@
  * override the root via `runDirOverride`.
  */
 
+import { execFileSync } from 'node:child_process';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   createRunDir,
@@ -34,6 +36,26 @@ import { spawnCliAgainstModel, type SpawnInput } from './spawn-cli.js';
 import type { BarrageInput, BarrageRun, ModelRunResult } from './types.js';
 
 const DEFAULT_RUNS_ROOT = '.dw-lifecycle/scope-discovery/audit-runs';
+
+/**
+ * Phase 16 Task 2 default: read HEAD via `git rev-parse HEAD` against
+ * `repoRoot`. Returns `null` on any failure (no git repo, detached
+ * worktree, etc.); the orchestrator then skips the `tip.sha` write and
+ * the next-iteration guard fail-safes to fire.
+ */
+async function defaultTipShaResolver(repoRoot: string): Promise<string | null> {
+  try {
+    const stdout = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const trimmed = stdout.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Run a complete barrage and return the resulting BarrageRun record.
@@ -53,6 +75,16 @@ export async function orchestrateBarrage(
   const parentRunsDir = input.runDirOverride ?? join(input.repoRoot, DEFAULT_RUNS_ROOT);
   const runDir = await createRunDir(parentRunsDir, runDirName);
   const promptPath = await writePromptFile(runDir, input.prompt);
+
+  // Phase 16 Task 2 (#383): record HEAD at fire-time so the new-diff
+  // guard (`check-barrage-tip`) knows which commits this barrage
+  // covers. Resolver failure (no git, detached worktree, etc.) → skip
+  // the write; next-iteration guard fail-safes to fire on missing.
+  const tipShaResolver = input.tipShaResolver ?? defaultTipShaResolver;
+  const tipSha = await tipShaResolver(input.repoRoot);
+  if (tipSha !== null) {
+    await writeFile(join(runDir, 'tip.sha'), `${tipSha}\n`, 'utf8');
+  }
 
   const spawnInputs: ReadonlyArray<SpawnInput> = input.models.map((model) => {
     const stem = safeModelName(model.name);

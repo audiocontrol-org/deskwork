@@ -1,4 +1,4 @@
-generated_at: 2026-05-31T08:52:57.864Z
+generated_at: 2026-06-01T00:21:20.948Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1190,18 +1190,19 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:149:157
     disposition: pending
     reason: null
-  - id: 8ad42316183a
+  - id: 7857aab69a30
     lines: 19
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:335:353
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:146:164
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:182:200
       - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:229:247
-    disposition: pending
-    reason: null
+    disposition: ignore-with-justification
+    reason: "CLI-shim boilerplate (parseFlags + isAbsolute/resolve patterns) inherited from sibling subcommands check-barrage-dampener / slush-remaining. Extraction is not warranted: per-CLI argv parsing keeps each subcommand self-contained and the duplication is structural to argv handling, not behavioral logic."
   - id: 4295f8a2a16b
     lines: 9
     members:
@@ -1230,20 +1231,21 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:162:168
     disposition: keep-with-reason
     reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
-  - id: 556bc77bbdf7
+  - id: 9ff68ec0ae0c
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:112:120
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:150:158
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:157:165
-    disposition: pending
-    reason: null
-  - id: a75b6b496767
-    lines: 9
+    disposition: ignore-with-justification
+    reason: "CLI-shim boilerplate (parseFlags + isAbsolute/resolve patterns) inherited from sibling subcommands check-barrage-dampener / slush-remaining. Extraction is not warranted: per-CLI argv parsing keeps each subcommand self-contained and the duplication is structural to argv handling, not behavioral logic."
+  - id: 024f5cb22e2b
+    lines: 10
     members:
-      - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:64:72
-      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:86:94
-    disposition: pending
-    reason: null
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:63:72
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:61:70
+    disposition: ignore-with-justification
+    reason: "CLI-shim boilerplate (parseFlags + isAbsolute/resolve patterns) inherited from sibling subcommands check-barrage-dampener / slush-remaining. Extraction is not warranted: per-CLI argv parsing keeps each subcommand self-contained and the duplication is structural to argv handling, not behavioral logic."
   - id: dc5aa4894209
     lines: 14
     members:
@@ -1258,6 +1260,41 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:122:131
     disposition: pending
     reason: null
+  - id: f645890d8e9b
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:56:64
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:51:59
+    disposition: ignore-with-justification
+    reason: "CLI-shim boilerplate (parseFlags + isAbsolute/resolve patterns) inherited from sibling subcommands check-barrage-dampener / slush-remaining. Extraction is not warranted: per-CLI argv parsing keeps each subcommand self-contained and the duplication is structural to argv handling, not behavioral logic."
+  - id: e23bc58de99e
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:62:70
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:86:94
+    disposition: ignore-with-justification
+    reason: "CLI-shim boilerplate (parseFlags + isAbsolute/resolve patterns) inherited from sibling subcommands check-barrage-dampener / slush-remaining. Extraction is not warranted: per-CLI argv parsing keeps each subcommand self-contained and the duplication is structural to argv handling, not behavioral logic."
+  - id: 961b07c6d120
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:70:78
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:102:157
+    disposition: ignore-with-justification
+    reason: "CLI-shim boilerplate (parseFlags + isAbsolute/resolve patterns) inherited from sibling subcommands check-barrage-dampener / slush-remaining. Extraction is not warranted: per-CLI argv parsing keeps each subcommand self-contained and the duplication is structural to argv handling, not behavioral logic."
+  - id: d2600be96980
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:76:83
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:121
+    disposition: ignore-with-justification
+    reason: "CLI-shim boilerplate (parseFlags + isAbsolute/resolve patterns) inherited from sibling subcommands check-barrage-dampener / slush-remaining. Extraction is not warranted: per-CLI argv parsing keeps each subcommand self-contained and the duplication is structural to argv handling, not behavioral logic."
+  - id: 7cf22ee0c611
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:77:83
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:123:131
+    disposition: ignore-with-justification
+    reason: "CLI-shim boilerplate (parseFlags + isAbsolute/resolve patterns) inherited from sibling subcommands check-barrage-dampener / slush-remaining. Extraction is not warranted: per-CLI argv parsing keeps each subcommand self-contained and the duplication is structural to argv handling, not behavioral logic."
   - id: a430638c6638
     lines: 9
     members:

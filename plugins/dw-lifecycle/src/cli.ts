@@ -39,6 +39,7 @@ import { promoteDeferrals } from './subcommands/promote-deferrals.js';
 import { promoteFindings } from './subcommands/promote-findings.js';
 import { checkOpenFindingsCli } from './subcommands/check-open-findings.js';
 import { checkBarrageDampenerCli } from './subcommands/check-barrage-dampener.js';
+import { checkBarrageTipCli } from './subcommands/check-barrage-tip.js';
 import { slushRemainingCli } from './subcommands/slush-remaining.js';
 import { applyAuditFlipsCli } from './subcommands/apply-audit-flips.js';
 import { closeShippedAuditFindingsCli } from './subcommands/close-shipped-audit-findings.js';
@@ -105,6 +106,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'promote-findings': promoteFindings,
   'check-open-findings': checkOpenFindingsCli,
   'check-barrage-dampener': checkBarrageDampenerCli,
+  'check-barrage-tip': checkBarrageTipCli,
   'slush-remaining': slushRemainingCli,
   'apply-audit-flips': applyAuditFlipsCli,
   'close-shipped-audit-findings': closeShippedAuditFindingsCli,

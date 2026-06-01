@@ -159,4 +159,45 @@ describe('orchestrateBarrage', () => {
     expect(indexText).toContain('### bad');
     expect(indexText).toContain('spawn error:');
   });
+
+  // Phase 16 Task 2 (#383): the orchestrator writes `<runDir>/tip.sha`
+  // at fire-time so the new-diff guard (`check-barrage-tip`) on the
+  // next iteration can answer "have new commits accumulated since
+  // this barrage?" The tipShaResolver is injectable; the default
+  // calls `git rev-parse HEAD` against repoRoot.
+  it('writes tip.sha with the resolver-returned HEAD sha', async () => {
+    const run = await orchestrateBarrage({
+      repoRoot: tmp,
+      runDirOverride: tmp,
+      featureSlug: 'sample',
+      prompt: 'AUDIT',
+      models: [
+        fakeCli({
+          name: 'mock',
+          script: `process.stdout.write('ok');`,
+        }),
+      ],
+      tipShaResolver: async () => 'cafef00dcafef00dcafef00dcafef00dcafef00d',
+    });
+    const tipText = await readFile(join(run.runDir, 'tip.sha'), 'utf8');
+    expect(tipText.trim()).toBe('cafef00dcafef00dcafef00dcafef00dcafef00d');
+  });
+
+  it('skips the tip.sha write when the resolver returns null', async () => {
+    const run = await orchestrateBarrage({
+      repoRoot: tmp,
+      runDirOverride: tmp,
+      featureSlug: 'sample',
+      prompt: 'AUDIT',
+      models: [
+        fakeCli({
+          name: 'mock',
+          script: `process.stdout.write('ok');`,
+        }),
+      ],
+      tipShaResolver: async () => null,
+    });
+    const entries = await readdir(run.runDir);
+    expect(entries).not.toContain('tip.sha');
+  });
 });

@@ -64,6 +64,16 @@ export interface BarrageInput {
   readonly prompt: string;
   readonly models: ReadonlyArray<ModelConfig>;
   readonly runDirOverride?: string;
+  /**
+   * Per Phase 16 Task 2 (#383): the audit-barrage records HEAD at
+   * fire-time so the new-diff guard (`check-barrage-tip`) can decide
+   * on the next iteration whether new commits have accumulated since
+   * this run. Defaults to `git rev-parse HEAD` against `repoRoot`;
+   * tests override. Returning `null` (resolver failed) skips the
+   * `tip.sha` write — the next-iteration guard then fail-safes to
+   * fire (NEVER skip on missing tip; that would re-create #383).
+   */
+  readonly tipShaResolver?: (repoRoot: string) => Promise<string | null>;
 }
 
 /**
