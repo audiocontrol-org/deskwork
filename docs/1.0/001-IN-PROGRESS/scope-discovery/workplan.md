@@ -734,6 +734,57 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.83 (fix-finding-AUDIT-20260601-49): AUDIT-20260601-49 — Over-broad keyword matching in `inferFindingShape` misclassi…
+
+Closes AUDIT-20260601-49. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts` — `inferFindingShape`, the final pre-default branch: `if (/missing surface|no surface|\(the audited|process feedback|disposition/i.test(surface))`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-49` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.84 (fix-finding-AUDIT-20260601-50): AUDIT-20260601-50 — `validateNonBugDisposition` reimplements a weaker placeholde…
+
+Closes AUDIT-20260601-50 (claude-02 + claude-03 + claude-04 + claude-06 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts` — `validateNonBugDisposition` + `DISPOSITION_PLACEHOLDER_RE`, vs. `./substantive-reason-validator.js` (`validateAcknowledgedReason`, imported in `apply.ts`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-50 (claude-02 + claude-03 + claude-04 + claude-06 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.85 (fix-finding-AUDIT-20260601-51): AUDIT-20260601-51 — This commit ships the non-bug template yet the same diff add…
+
+Closes AUDIT-20260601-51. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.77–5.82; specifically 5.78 (`fix-finding-AUDIT-20260601-44`, surface `…/workplan.md new Tasks 5.75…`) and 5.80 (`fix-finding-AUDIT-20260601-46`, a SKILL.md doc-drift finding).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-51` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.79 (fix-finding-AUDIT-20260601-45): AUDIT-20260601-45 — "emitted findings" overclaims what `isModelRunHealthy` actua…
 
 Closes AUDIT-20260601-45. Surface: `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:296-303` (all three return branches) vs. `isModelRunHealthy` (aliased at line 283).

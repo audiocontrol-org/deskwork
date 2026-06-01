@@ -1819,3 +1819,42 @@ Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:294-298` (the `healthy === 0` branch, reached when `total === 0`)
 
 When `run.results` is empty (no models resolved from config, or every model filtered out before spawn), `total === 0` and `healthy === 0`, so the function returns `audit-barrage: OUTAGE — 0/0 models emitted findings`. The `healthy === 0` check precedes the `healthy === total` check, so the empty case short-circuits to OUTAGE. But an empty battery is a *configuration* problem (the `models:` list was empty / unresolved), not a *runtime outage* (models ran and all failed). Conflating the two sends the operator to the wrong diagnosis — they'll go looking at CLI auth / PATH for an outage when the actual fix is the config. A cheap guard (`if (total === 0) return '…no models configured — check audit-barrage-config.yaml…'`) before the OUTAGE branch separates the two failure modes. Not blocking, but it's a divide-by-context error class that the `0/0` string makes invisible.
+
+## 2026-06-01 — audit-barrage lift (20260601T052918482Z-scope-discovery)
+
+### AUDIT-20260601-49 — Over-broad keyword matching in `inferFindingShape` misclassifies real code defects as non-bug — disabling TDD enforcement for an entire category
+
+Finding-ID: AUDIT-20260601-49
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts` — `inferFindingShape`, the final pre-default branch: `if (/missing surface|no surface|\(the audited|process feedback|disposition/i.test(surface))`
+
+`inferFindingShape` decides shape by *substring presence anywhere in the surface text*, with no positive check that the surface is actually a non-source artifact — it only falls through to `code-defect` as a default. The `disposition` alternative is the problem: any finding whose surface prose contains the word "disposition" is classified `non-bug`, regardless of whether it points at real source code. This project is saturated with disposition-handling code (`dispose-clone.ts`, `substantive-reason-validator.ts`, `check-disposition-survivor.ts`, the very `validateNonBugDisposition` added in this diff). A genuine code defect with surface `plugins/.../substantive-reason-validator.ts:42 — disposition reason check is wrong` matches `disposition` and is rendered with the non-bug template — **no failing test required**, exactly the TDD bypass the feature is meant to prevent. The same class hits `workplan`/`audit-log` keywords: a code bug in the code that *generates* `workplan.md` gets `non-bug` because "workplan.md" appears in its description.
+
+The tests (`infers code-defect for source files (TypeScript)`) only cover `.ts` surfaces that happen to contain none of the non-bug keywords, so this collision is entirely unguarded. The fix is to gate shape on *surface type* not *keyword presence*: first positively detect a source-file extension (`\.(ts|tsx|js|mjs|cjs)(:|$|\s)`) and return `code-defect` before any keyword scan, and narrow `disposition` to an anchored phrase (e.g. `disposition (mis)?match` / `process feedback`) rather than the bare word.
+
+---
+
+### AUDIT-20260601-50 — `validateNonBugDisposition` reimplements a weaker placeholder check instead of reusing the project's banned-phrase canon — deferral language passes the gate
+
+Finding-ID: AUDIT-20260601-50 (claude-02 + claude-03 + claude-04 + claude-06 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts` — `validateNonBugDisposition` + `DISPOSITION_PLACEHOLDER_RE`, vs. `./substantive-reason-validator.js` (`validateAcknowledgedReason`, imported in `apply.ts`)
+
+The acknowledged-disposition path in `promote-findings` runs through `validateAcknowledgedReason` (the "≥40 chars; banned-phrase canon" validator the agent-discipline rules describe). The new non-bug disposition gate does **not** reuse it — it rolls its own check whose only banned content is `to be filled in|TBD|placeholder|<.+?>|\(.+?\)`. That canon is strictly weaker: a disposition like `"we will accept this for now and revisit it in a later phase of the project"` is >40 chars, contains none of those tokens, and returns `valid: true`. The exact deferral language the project's "Just for now is bullshit" rule bans ("for now", "defer", "follow-up", "later phase") sails through the very gate built to operationalize anti-deferral discipline. Two validators with divergent canons guarding the same concept (a substantive disposition reason) is both a correctness hole and a DRY violation that will drift further apart.
+
+Fix: have `validateNonBugDisposition` delegate to `validateAcknowledgedReason` (or the shared canon it wraps) for the substance check, keeping only the length/extraction logic local. That gives the non-bug path the same banned-phrase enforcement the acknowledged path already has.
+
+---
+
+### AUDIT-20260601-51 — This commit ships the non-bug template yet the same diff adds six bug-template task blocks for non-bug findings — the fix doesn't reclassify the findings actually present
+
+Finding-ID: AUDIT-20260601-51
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.77–5.82; specifically 5.78 (`fix-finding-AUDIT-20260601-44`, surface `…/workplan.md new Tasks 5.75…`) and 5.80 (`fix-finding-AUDIT-20260601-46`, a SKILL.md doc-drift finding)
+
+The commit subject is "non-bug task template + doctor-rule path," but the workplan hunk in the very same diff inserts six task blocks rendered with the *old* bug template — `Step 1: write failing test exercising the bug`, AC `npx vitest run <test-file-path> exits 0`. At least two are unambiguously non-bug: 5.78 closes AUDIT-44 (a pure process finding) and its surface literally contains `workplan.md` — which `inferFindingShape` would classify `non-bug` — yet it renders the bug template; 5.80 closes AUDIT-46, a "SKILL.md prose pass is missing" doc-drift finding with no failing test possible. This is precisely the laundering pathology AUDIT-44 named, reproduced inside the commit that purports to fix it. The visible inconsistency means either the promotion that wrote these tasks ran on pre-commit code (a timing artifact the operator must reconcile by regenerating through the new `apply.ts` path) or `inferFindingShape`'s literal `workplan\.md` pattern missed the prose-form surfaces. Note the latter is independently real: a surface phrased `workplan Phase 18 Task 5 Step 3` (AUDIT-46) contains no `workplan.md` token and falls through to `code-defect`. Before any of 5.77–5.82 is checked `[x]`, the non-bug ones must be re-rendered through the new template, or they will deadlock the `check-fix-task-tdd` gate they were just built to avoid.
+
+---

@@ -9,7 +9,11 @@ function finding(overrides: Partial<OpenFinding> = {}): OpenFinding {
   const base: OpenFinding = {
     findingId: 'AUDIT-20260529-42',
     heading: 'Validator misses negative balance edge case',
-    severity: 'high',
+    // Per Phase 18 Task 3 (Option D): default fixture is MEDIUM
+    // severity so the canonical renderer test exercises the non-
+    // regression-lock path. Explicit HIGH/BLOCKING tests below
+    // exercise the Option D variant.
+    severity: 'medium',
     surface: 'src/balance.ts:42',
     body: 'Body text.',
     lineNumber: 100,
@@ -189,5 +193,38 @@ describe('renderFixTaskBlock — non-bug variant (Phase 18 Task 1)', () => {
     expect(block).toContain('Step 1: write failing test');
     // Original AC line
     expect(block).toContain('Failing test exists at');
+  });
+});
+
+// Phase 18 Task 3 — Option D regression-lock discipline (HIGH+ only)
+describe('renderFixTaskBlock — HIGH/BLOCKING severity (Phase 18 Task 3)', () => {
+  it('emits Severity: line so the doctor rule can extract it', () => {
+    const block = renderFixTaskBlock(finding({ severity: 'high' }), { taskNumber: '5.99' });
+    expect(block.toLowerCase()).toContain('severity: high');
+  });
+
+  it('HIGH severity → emits Step 0 invariant write-up + Step 1b regression-lock test', () => {
+    const block = renderFixTaskBlock(finding({ severity: 'high' }), { taskNumber: '5.99' });
+    expect(block).toContain('Step 0: working-code invariant');
+    expect(block).toContain('Step 1b: write a regression-lock test');
+    expect(block.toLowerCase()).toContain('test block count for this finding is ≥2');
+  });
+
+  it('BLOCKING severity → same Option D treatment as HIGH', () => {
+    const block = renderFixTaskBlock(finding({ severity: 'blocking' }), { taskNumber: '5.99' });
+    expect(block).toContain('Step 0: working-code invariant');
+    expect(block).toContain('Step 1b: write a regression-lock test');
+  });
+
+  it('MEDIUM severity → NO Step 0 / Step 1b (Option D is HIGH-only)', () => {
+    const block = renderFixTaskBlock(finding({ severity: 'medium' }), { taskNumber: '5.99' });
+    expect(block).not.toContain('Step 0: working-code invariant');
+    expect(block).not.toContain('Step 1b:');
+  });
+
+  it('LOW severity → unchanged (no Option D discipline)', () => {
+    const block = renderFixTaskBlock(finding({ severity: 'low' }), { taskNumber: '5.99' });
+    expect(block).not.toContain('Step 0: working-code invariant');
+    expect(block).not.toContain('Step 1b:');
   });
 });

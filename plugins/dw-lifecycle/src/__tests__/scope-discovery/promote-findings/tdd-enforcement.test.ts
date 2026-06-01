@@ -403,3 +403,103 @@ Closes AUDIT-20260529-42.
     expect(result.reason).not.toBe('non-bug-placeholder-disposition');
   });
 });
+
+// Phase 18 Task 3 — Option D severity gating (HIGH-only ≥2 tests)
+describe('extractTaskSeverity / countTestBlocks / HIGH-severity gate (Phase 18 Task 3)', () => {
+  it('extractTaskSeverity reads the Severity: line emitted by the renderer', async () => {
+    const { extractTaskSeverity } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    expect(
+      extractTaskSeverity('### Task 5.99 (fix-finding-AUDIT-X-01): foo\n\nCloses X. Severity: high.\n'),
+    ).toBe('high');
+    expect(
+      extractTaskSeverity('### Task 5.99: foo\n\nCloses X. Severity: blocking.\n'),
+    ).toBe('blocking');
+    expect(
+      extractTaskSeverity('### Task 5.99: foo\n\nCloses X. Severity: medium.\n'),
+    ).toBe('medium');
+    expect(extractTaskSeverity('no severity line here')).toBeNull();
+  });
+
+  it('countTestBlocks counts it() and test() forms in vitest content', async () => {
+    const { countTestBlocks } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    expect(countTestBlocks('')).toBe(0);
+    expect(countTestBlocks('  it("a", () => { });')).toBe(1);
+    expect(countTestBlocks('  test("b", () => {})\n  it("c", () => {})')).toBe(2);
+    expect(countTestBlocks('it("a");\nit("b");\ntest("c");\nit("d");')).toBe(4);
+  });
+
+  it('HIGH-tagged task with only 1 test block → high-severity-missing-regression-lock', async () => {
+    const { verifyFixTaskTDD } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const tmp = mkdtempSync(join(tmpdir(), 'dwl-opt-d-1-'));
+    writeFileSync(
+      join(tmp, 'one-test.test.ts'),
+      `import { it } from 'vitest';\nit("only one", () => {});\n`,
+      'utf8',
+    );
+    const block = `### Task 5.99 (fix-finding-AUDIT-20260601-99): high bug
+
+Closes AUDIT-20260601-99. Severity: high. Surface: src/x.ts.
+
+- [ ] Step 0: working-code invariant — what current code does correctly.
+- [ ] Step 1: failing test added at \`one-test.test.ts\` covering the bug.`;
+    const result = await verifyFixTaskTDD({ workplanTaskBlock: block, repoRoot: tmp });
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBe('high-severity-missing-regression-lock');
+  });
+
+  it('HIGH-tagged task with 2 test blocks → bug-repro test path proceeds (no regression-lock refusal)', async () => {
+    const { verifyFixTaskTDD } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const tmp = mkdtempSync(join(tmpdir(), 'dwl-opt-d-2-'));
+    writeFileSync(
+      join(tmp, 'two-tests.test.ts'),
+      `import { it } from 'vitest';\nit("bug", () => {});\nit("regression-lock", () => {});\n`,
+      'utf8',
+    );
+    const block = `### Task 5.99 (fix-finding-AUDIT-20260601-99): high bug
+
+Closes AUDIT-20260601-99. Severity: high. Surface: src/x.ts.
+
+- [ ] Step 1: failing test added at \`two-tests.test.ts\` covering the bug + regression-lock.`;
+    const result = await verifyFixTaskTDD({ workplanTaskBlock: block, repoRoot: tmp });
+    // Without an injected runner, the path returns valid=true after
+    // confirming the file exists and has ≥2 test blocks.
+    expect(result.reason).not.toBe('high-severity-missing-regression-lock');
+  });
+
+  it('MEDIUM-tagged task with only 1 test block → unchanged behavior (Option D is HIGH-only)', async () => {
+    const { verifyFixTaskTDD } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const tmp = mkdtempSync(join(tmpdir(), 'dwl-opt-d-3-'));
+    writeFileSync(
+      join(tmp, 'one-test.test.ts'),
+      `import { it } from 'vitest';\nit("only one", () => {});\n`,
+      'utf8',
+    );
+    const block = `### Task 5.99 (fix-finding-AUDIT-20260601-99): medium bug
+
+Closes AUDIT-20260601-99. Severity: medium. Surface: src/x.ts.
+
+- [ ] Step 1: failing test added at \`one-test.test.ts\`.`;
+    const result = await verifyFixTaskTDD({ workplanTaskBlock: block, repoRoot: tmp });
+    // MEDIUM passes the regression-lock check unconditionally.
+    expect(result.reason).not.toBe('high-severity-missing-regression-lock');
+  });
+});

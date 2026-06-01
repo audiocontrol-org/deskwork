@@ -150,22 +150,49 @@ export function renderFixTaskBlock(
   }
 
   // code-defect (default): the historical TDD-first template.
+  // Per Phase 18 Task 3 (Option D — operator-picked 2026-06-01): HIGH
+  // / BLOCKING findings get a Step 0 invariant write-up AND a second
+  // regression-lock test. The doctor rule reads the `Severity:` field
+  // emitted here to enforce the ≥2-tests requirement.
+  const severity = (finding.severity ?? 'medium').toLowerCase();
+  const isHighPlus = severity === 'high' || severity === 'blocking';
   const lines: string[] = [
     `### Task ${taskNumber} (fix-finding-${canonicalId}): ${title}`,
     '',
-    `Closes ${id}. Surface: ${surface}.`,
+    `Closes ${id}. Surface: ${surface}. Severity: ${severity}.`,
     '',
+  ];
+  if (isHighPlus) {
+    lines.push(
+      `- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.`,
+    );
+  }
+  lines.push(
     `- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)`,
-    `- [ ] Step 2: confirm test fails against current code (verify the bug repros)`,
+  );
+  if (isHighPlus) {
+    lines.push(
+      `- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes`,
+    );
+  }
+  lines.push(
+    `- [ ] Step 2: confirm test${isHighPlus ? '(s)' : ''} fail${isHighPlus ? '' : 's'} against current code (verify the bug repros${isHighPlus ? ' + the regression-lock test passes pre-fix' : ''})`,
     `- [ ] Step 3: implement the fix`,
-    `- [ ] Step 4: confirm test passes`,
+    `- [ ] Step 4: confirm ${isHighPlus ? 'all tests pass (bug-repro flips green; regression-lock stays green)' : 'test passes'}`,
     `- [ ] Step 5: commit with \`Closes ${id}\` in subject`,
     '',
     '**Acceptance Criteria:**',
     '',
     `- [ ] Failing test exists at \`(to be filled in by Step 1 implementer)\` (cited in Step 1)`,
+  );
+  if (isHighPlus) {
+    lines.push(
+      `- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline`,
+    );
+  }
+  lines.push(
     `- [ ] \`npx vitest run <test-file-path>\` exits 0 (passes against the fix)`,
     `- [ ] Audit-log Status flipped to \`fixed-<sha>\` via the close-shipped-audit-findings step`,
-  ];
+  );
   return lines.join('\n');
 }

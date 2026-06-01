@@ -39,7 +39,12 @@ export type TddCheckReason =
   // (docs/registry/commit-history) use a disposition-prose path
   // instead of a test path. The reasons below cover that variant.
   | 'non-bug-missing-disposition'
-  | 'non-bug-placeholder-disposition';
+  | 'non-bug-placeholder-disposition'
+  // Per Phase 18 Task 3 (Option D — picked 2026-06-01): HIGH+
+  // findings must carry a regression-lock test in addition to the
+  // bug-repro test. The reason below fires when only the single
+  // bug-repro test is present.
+  | 'high-severity-missing-regression-lock';
 
 export interface TddCheckResult {
   readonly valid: boolean;
@@ -62,6 +67,14 @@ const NON_BUG_MARKER_RE = /\(fix-finding-AUDIT-\d{8}-\d+\)\s*\(non-bug\)/i;
 const MIN_DISPOSITION_PROSE_CHARS = 40;
 const DISPOSITION_PLACEHOLDER_RE =
   /\b(?:to be filled in|TBD|placeholder|<.+?>|\(.+?\))\b|^\s*$/i;
+
+// Per Phase 18 Task 3 (Option D): severity is emitted in the task
+// block's "Severity: <value>." line by the renderer. Pull it back
+// out to decide whether the ≥2-tests regression-lock rule applies.
+const SEVERITY_RE = /Severity:\s+(blocking|high|medium|low|informational)\b/i;
+// Count vitest test blocks in a test file: `it(`, `test(`, or
+// `describe('...', () => {` containing nested it/test.
+const TEST_BLOCK_RE = /^\s*(?:it|test)\(/gm;
 
 export interface VitestRunner {
   (testFilePath: string, repoRoot: string): Promise<VitestRunResult>;
@@ -148,6 +161,28 @@ export function validateNonBugDisposition(taskBlock: string): TddCheckResult {
   return { valid: true, dispositionPreview: prose };
 }
 
+/**
+ * Per Phase 18 Task 3 (Option D): extract the `Severity: <value>`
+ * field emitted by the renderer. Returns lowercase severity, or
+ * null when not present (older task blocks pre-Phase-18 won't have it).
+ */
+export function extractTaskSeverity(taskBlock: string): string | null {
+  const m = SEVERITY_RE.exec(taskBlock);
+  return m === null ? null : m[1]!.toLowerCase();
+}
+
+/**
+ * Per Phase 18 Task 3 (Option D): count vitest test blocks (`it(` or
+ * `test(`) in a test file's content. Used to enforce the ≥2-tests
+ * requirement for HIGH+ severity fix-tasks.
+ */
+export function countTestBlocks(testFileContent: string): number {
+  TEST_BLOCK_RE.lastIndex = 0;
+  let count = 0;
+  while (TEST_BLOCK_RE.exec(testFileContent) !== null) count += 1;
+  return count;
+}
+
 export async function verifyFixTaskTDD(
   args: VerifyFixTaskTddArgs,
 ): Promise<TddCheckResult> {
@@ -167,6 +202,28 @@ export async function verifyFixTaskTDD(
       reason: 'missing-test-file',
       testFilePath,
     };
+  }
+  // Per Phase 18 Task 3 (Option D — picked 2026-06-01): HIGH+
+  // findings require a regression-lock test in addition to the bug-
+  // repro test. Read the cited test file and count `it(`/`test(`
+  // blocks. ≥2 required for HIGH+; MEDIUM/LOW/info unchanged.
+  const severity = extractTaskSeverity(args.workplanTaskBlock);
+  if (severity === 'high' || severity === 'blocking') {
+    try {
+      const { readFileSync } = await import('node:fs');
+      const content = readFileSync(absPath, 'utf8');
+      const testCount = countTestBlocks(content);
+      if (testCount < 2) {
+        return {
+          valid: false,
+          reason: 'high-severity-missing-regression-lock',
+          testFilePath,
+        };
+      }
+    } catch {
+      // If we can't read the file (race / permissions), fall through
+      // to the runner check; that path already handles failures.
+    }
   }
   const runner = args.runVitest;
   if (runner === undefined) {
