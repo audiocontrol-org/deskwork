@@ -37,97 +37,23 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    - If a step is independent of others, consider `superpowers:dispatching-parallel-agents` to fan out.
    - Every sub-agent dispatched in this loop (implementer, reviewer, code-explorer, code-architect, etc.) MUST be routed through the dispatch wrapper — see "Dispatch-wrapper engagement" below.
    - When the task body is complete, mark its checkboxes and commit.
-6. **End-of-task audit-barrage hook.** After the task-completion commit lands AND before any between-task work, fire an audit-barrage pass against the new diff (since the last barrage's tip), lift the surfaced findings into the audit-log, and let the dampener decide their disposition (scope as fix-tasks or slush). Per the Phase 15 operator directive (*"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do. Audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path"*), AND per Phase 16 (#383) which closed the audit-coverage hole, the hook **fires on every iteration with new diff**. The dampener no longer gates whether the barrage runs — it controls disposition (slush vs promote) of the lifted findings.
-
-   The dampener engages via **either** of two rules: **(1)** the last 2 consecutive barrages each surfaced 0 HIGH+ open findings (the N-quiet rule), OR **(2)** the most recent barrage surfaced 0 HIGH+ AND 0 MEDIUM open findings (the single-run rule added 2026-05-31). The dampener engaging means *"recent runs were quiet on real bugs — new findings (on this iteration's new diff) get slushed rather than promoted."* It does NOT mean *"the auditor has gone quiet on real bugs"* in a sense that would justify skipping audits on new work — that framing was the structural bug #383 closed.
+6. **End-of-task audit-barrage hook.** After every task-completion commit, run:
 
    ```bash
-   # 0. New-diff guard. The ONLY legitimate skip condition: no new diff
-   #    since the most-recent barrage's tip.sha. Idle iterations (docs-
-   #    only commits, no source changes) don't re-fire uselessly. Every
-   #    OTHER iteration fires the barrage.
-   if ! dw-lifecycle check-barrage-tip --feature <slug>; then
-     # No new diff; skip the hook entirely. No barrage, no disposition.
-     :
-   else
-     # 1. Render the prompt from the project's audit-barrage template (or override).
-     #    The vars JSON carries feature_slug, workplan_summary, diff,
-     #    audit_log_excerpt, commit_subjects. The agent builds it from session
-     #    context: slug from --feature; workplan_summary from workplan.md tail;
-     #    diff from `git diff <task-start-sha>..HEAD`; audit_log_excerpt from
-     #    audit-log.md tail; commit_subjects from `git log --format=%s
-     #    <task-start-sha>..HEAD`. No operator prompts on the happy path.
-     VARS=$(mktemp).json
-     # ...write vars JSON to "$VARS"...
-     PROMPT=$(mktemp).md
-     dw-lifecycle audit-barrage-render \
-       --feature <slug> \
-       --vars-file "$VARS" \
-       --output "$PROMPT"
-
-     # 2. Fire the barrage. --output-run-dir prints JUST the run-dir path on
-     #    stdout (suppressing the JSON) so bash captures it cleanly.
-     #    audit-barrage records HEAD at fire-time as <RUN_DIR>/tip.sha so
-     #    the next iteration's check-barrage-tip can see this run's anchor.
-     RUN_DIR=$(dw-lifecycle audit-barrage \
-       --feature <slug> \
-       --prompt-file "$PROMPT" \
-       --output-run-dir)
-
-     # 3. Lift findings into audit-log.md. Sequential AUDIT-<date>-<NN> IDs
-     #    continue from the highest existing for today.
-     dw-lifecycle audit-barrage-lift \
-       --feature <slug> \
-       --run-dir "$RUN_DIR" \
-       --apply
-
-     # 4. Disposition gate (Phase 16, post-#383). The dampener now controls
-     #    disposition only — fire-vs-skip was decided by check-barrage-tip
-     #    in Step 0. Engaged → slush new findings (operator-acknowledged
-     #    trade-off: nit-noise auto-disposed without operator attention).
-     #    Not engaged → promote as fix-tasks.
-     if ! dw-lifecycle check-barrage-dampener --feature <slug>; then
-       # Engaged. Slush ONLY the most-recent barrage section's MED/LOW
-       # findings (per #380 latest-scope). HIGHs are NEVER slushed
-       # (severity filter, defense-in-depth).
-       dw-lifecycle slush-remaining --feature <slug> --apply
-     else
-       # Not engaged. Auto-scope findings at the workplan's next-unchecked
-       # position. Each new fix-finding task lands BEFORE the first existing
-       # unchecked task, so the workplan-aware gate's positions [0..N-1]
-       # are exactly the fix-tasks for the open finding IDs.
-       dw-lifecycle promote-findings --feature <slug> --auto
-     fi
-
-     # 5. Sanity-check the gate now allows pickup. Either zero open findings
-     #    (slush case) or open-findings-scoped-as-next (promote case).
-     dw-lifecycle check-open-findings --feature <slug>
-   fi
+   dw-lifecycle implement-hook --feature <slug>
    ```
 
-   **Slush vs promote disposition (operator directive, baked into /dwi):** *"Do work, audit barrage, if 0 HIGH and 0 MEDIUM findings on the NEW work, put new findings in slush. If there have been 2 consecutive audits on the new work with 0 HIGH findings, then put new findings in slush."* The dampener's two engagement rules mechanize this exactly. When engaged, `slush-remaining --apply` flips MED/LOW/INFO `Status: open` findings in the most-recent barrage section to `acknowledged-slush-pile-<YYYY-MM-DD>` AND ticks the matching workplan fix-task blocks' checkboxes — so the workplan-aware gate (Step 2) sees zero open findings and the loop continues. The audit-log entries stay as historical record per the preservation rule. **HIGHs are NEVER slushed**: the severity filter is defense-in-depth (the dampener's invariant already prevents HIGHs from being in the most-recent section when engaged, but the filter ensures `--scope all` and any future legacy paths still preserve them). When the dampener is NOT engaged, `promote-findings --auto` scopes the findings as fix-tasks at the head of the workplan and the next iteration's gate sees them as the next-N work.
+   This single verb is the entire hook. It composes the new-diff guard (`check-barrage-tip`), prompt rendering (`audit-barrage-render`), parallel CLI fan-out (`audit-barrage`), finding extraction (`audit-barrage-lift`), dampener evaluation (`check-barrage-dampener`), and disposition (either `slush-remaining --apply` when the dampener is engaged or `promote-findings --auto` when it isn't), then writes a marker file the commit-msg gate verifies. Exit 0 = hook ran cleanly OR new-diff guard skipped; exit 1 = mid-flight failure; exit 2 = config error.
 
-   **Operator-acknowledged trade-offs (2026-05-31 framing — these are CHOICES, not bugs):**
+   **The hook is mechanized with teeth (Phase 17).** The agent has no discretion at the firing decision:
 
-   - **MEDIUM bugs slush under Rule B.** Sequence: barrage N is 0 HIGH+ (counter=1, no slush yet) → barrage N+1 lands 0 HIGH + 3 MEDIUMs. Rule B fires (2 consecutive 0-HIGH) → 3 real MEDIUMs go to slush even though they're real bugs. Same trade as the existing post-#380 severity filter (HIGHs only preserved); the operator explicitly accepts the cost.
-   - **First-barrage slushing.** A clean feature start's first barrage that comes back 0 HIGH + 0 MEDIUM fires Rule A immediately. LOWs land in slush with no history. Consistent with the single-run-rule's explicit "no history required" semantic.
-   - **Per-iteration barrage cost when dampened.** Pre-Phase-16, a dampened iteration was zero cost (skipped). Post-Phase-16, every iteration with new diff fires a barrage. Cost is on subscription-auth CLIs (no per-call billing); the autonomous-loop context means the operator isn't waiting. Cross-model audit coverage on new work is the third audit surface's whole reason for existing. The loop-stop is unchanged — workplan-exhaustion still stops the loop; the dampener was never the stop mechanism.
+   - **Layer 1 — single verb (this step).** No bash composition to forget; one verb either runs or it doesn't.
+   - **Layer 2 — commit-msg gate (`check-implement-hook-ran`).** Refuses the next commit if `last-hook-run.json` doesn't show a run since the parent commit. Wired into the project's `commit-msg` hook chain. Cure message names the verb literally.
+   - **Layer 3 — pre-push gate (`check-implement-hook-coverage`).** Walks `<remote>/<branch>..HEAD`; refuses the push if any unpushed commit lacks a matching `hook-run-log.jsonl` entry. Catches `--no-verify` bypasses of Layer 2.
 
-   **Failure-path policy (fail loud; do not pause the loop on findings):**
+   When `.dw-lifecycle/scope-discovery/` is absent in the project, all three layers silently allow (scope-discovery is opt-in).
 
-   - `check-barrage-tip` exit 2 (config error: missing feature root, missing audit-runs dir): STOP loop, surface error. The .dw-lifecycle scaffold is incomplete or the slug is wrong.
-   - `audit-barrage-render` non-zero: stop loop, surface error. The vars JSON is malformed or the template has unsubstituted EXPECTED_VARS. Fix the vars + re-run the hook.
-   - `audit-barrage` exit 1 (every CLI failed: spawn errors, zero-byte outputs): the barrage was an outage, NOT a finding. The hook continues without lifting (the loop forward-progresses; missing the barrage is friction for the operator to investigate, not a stop-the-loop event). Surface a single-line warning in the per-task report.
-   - `audit-barrage` exit 0 but some models failed spawn (claude/codex/gemini partially installed): proceed with the healthy models' findings (degraded barrage; cross-model agreement is weaker but still emits findings).
-   - `audit-barrage-lift` exit 0 with zero findings: "nothing new this round" — proceed to Step 7 (scope-widen) without firing promote-findings OR slush-remaining (the dampener-gate is moot when there are no findings to dispose).
-   - `audit-barrage-lift` non-zero (extraction succeeded but write to audit-log failed: drift, permissions, parser error): STOP loop, surface error, exit non-zero. The per-task report shows the failure so the operator can investigate post-facto.
-   - `slush-remaining --apply` non-zero: STOP loop, surface error. The dampener engaged, but writing the slush flips failed. Investigate audit-log permissions / parser drift.
-   - `promote-findings --auto` non-zero: STOP loop, surface error. Per the operator directive, findings ARE guardrails; failing to scope them is a structural failure of the loop, not an operator decision point.
-   - `check-open-findings` non-zero post-disposition: STOP loop, surface error. The auto-scoping (promote) or auto-slushing landed but the gate still refuses — investigate the workplan + audit-log state.
-
-   **Per-task report shape includes:** `new-diff` (commit count since last barrage), `barrage status` (e.g. `2/3 models healthy`), `findings extracted` (count), `disposition` (`slushed: N` / `promoted: N` / `nothing-to-dispose`), `gate result` (`allowed: open-findings-scoped-as-next` / `allowed: no-open-findings` / `refused: <mode>`).
-
-   When `.dw-lifecycle/scope-discovery/` is absent in the project, the hook is silently skipped (scope-discovery is opt-in; no audit-barrage config means no barrage).
+   **See the "Audit-barrage hook behavior reference" section below** for the disposition rules, operator-acknowledged trade-offs, failure-path policy, and per-task report shape. Step 6 itself is mechanically simple now; the semantic detail is documented separately.
 
 7. Auto-invoke scope-widen between tasks (default behavior) unless `--no-scope-widen` was passed:
    - Runs after the task-completion commit lands and BEFORE the next task starts.
@@ -153,6 +79,63 @@ There is **no `--skip-audit-barrage-hook` flag.** Per Phase 15's operator direct
 - The implementation is short enough (one or two tasks) that running widen between every task is more noise than signal.
 
 Default = run scope-widen between tasks. Skipping is the exception, not the rule.
+
+## Audit-barrage hook behavior reference
+
+The detailed semantics of the `dw-lifecycle implement-hook` verb invoked in Step 6. Step 6 itself is mechanically simple; this section is the operator-facing reference.
+
+### Disposition rules
+
+The dampener engages via **either** of two rules:
+
+1. **N-quiet rule.** The last 2 consecutive barrages each surfaced 0 HIGH+ open findings.
+2. **Single-run rule** (added 2026-05-31). The most recent barrage surfaced 0 HIGH+ AND 0 MEDIUM open findings — a single clean run is signal enough.
+
+The dampener engaging means *"recent runs were quiet on real bugs — new findings (on this iteration's new diff) get slushed rather than promoted."* It does NOT mean *"the auditor has gone quiet on real bugs"* in a sense that would justify skipping audits on new work — that framing was the structural bug #383 closed.
+
+Per the operator's 2026-05-31 directive (baked into /dwi): *"Do work, audit barrage, if 0 HIGH and 0 MEDIUM findings on the NEW work, put new findings in slush. If there have been 2 consecutive audits on the new work with 0 HIGH findings, then put new findings in slush."* The two rules mechanize this exactly.
+
+When engaged, `slush-remaining --apply` flips MED/LOW/INFO `Status: open` findings in the most-recent barrage section to `acknowledged-slush-pile-<YYYY-MM-DD>` AND ticks the matching workplan fix-task blocks' checkboxes — so the workplan-aware gate (Step 2) sees zero open findings and the loop continues. The audit-log entries stay as historical record per the preservation rule. **HIGHs are NEVER slushed**: the severity filter is defense-in-depth (the dampener's invariant already prevents HIGHs from being in the most-recent section when engaged, but the filter ensures `--scope all` and any future legacy paths still preserve them).
+
+When the dampener is NOT engaged, `promote-findings --auto` scopes the findings as fix-tasks at the head of the workplan and the next iteration's gate sees them as the next-N work.
+
+### Operator-acknowledged trade-offs (2026-05-31 framing — these are CHOICES, not bugs)
+
+- **MEDIUM bugs slush under Rule B.** Sequence: barrage N is 0 HIGH+ (counter=1, no slush yet) → barrage N+1 lands 0 HIGH + 3 MEDIUMs. Rule B fires (2 consecutive 0-HIGH) → 3 real MEDIUMs go to slush even though they're real bugs. Same trade as the existing post-#380 severity filter (HIGHs only preserved); the operator explicitly accepts the cost.
+- **First-barrage slushing.** A clean feature start's first barrage that comes back 0 HIGH + 0 MEDIUM fires Rule A immediately. LOWs land in slush with no history. Consistent with the single-run-rule's explicit "no history required" semantic.
+- **Per-iteration barrage cost when dampened.** Pre-Phase-16, a dampened iteration was zero cost (skipped). Post-Phase-16, every iteration with new diff fires a barrage. Cost is on subscription-auth CLIs (no per-call billing); the autonomous-loop context means the operator isn't waiting. Cross-model audit coverage on new work is the third audit surface's whole reason for existing. The loop-stop is unchanged — workplan-exhaustion still stops the loop; the dampener was never the stop mechanism.
+
+### Failure-path policy (fail loud; do not pause the loop on findings)
+
+The `implement-hook` verb maps internal failures to one of three outcomes:
+
+- **Exit 0** — hook ran cleanly OR new-diff guard skipped. Marker written. The commit-msg gate will allow the next commit.
+- **Exit 1** — mid-flight failure. Marker NOT written. The commit-msg gate will refuse the next commit until the operator re-runs successfully.
+- **Exit 2** — config error (missing slug, feature root not found). Marker NOT written.
+
+Inside the chain, the per-step semantics are:
+
+- `check-barrage-tip` no-new-diff (exit 1) → write marker with disposition=`no-new-diff-skip`; exit 0.
+- `audit-barrage-render` non-zero → exit 1; the vars JSON is malformed or the template has unsubstituted markers. Fix and re-run.
+- `audit-barrage` exit 1 (every CLI failed) → write marker with disposition=`barrage-outage`; exit 0. The hook forward-progresses (per *"barrage was an outage, NOT a finding"*); the operator investigates.
+- `audit-barrage` exit 0 but partial spawn failures → proceed with healthy models (degraded barrage; cross-model agreement weaker but findings still emit).
+- `audit-barrage-lift` exit 0 with zero findings → proceed to Step 7 (scope-widen) without firing disposition (nothing to dispose).
+- `audit-barrage-lift` non-zero → exit 1; write to audit-log failed (drift/permissions/parser).
+- `slush-remaining --apply` non-zero → exit 1; flips failed.
+- `promote-findings --auto` non-zero → exit 1; scoping failed (per operator directive, findings are guardrails; failing to scope is structural).
+- `check-open-findings` non-zero post-disposition → exit 1; auto-scoping landed but gate still refuses (investigate).
+
+### Per-task report shape
+
+After every `implement-hook` invocation, the per-task report includes:
+
+- `new-diff` — commit count since last barrage (0 = skip case).
+- `barrage status` — e.g. `2/3 models healthy`.
+- `findings extracted` — total count.
+- `disposition` — `slushed: N` / `promoted: N` / `nothing-to-dispose` / `no-new-diff-skip`.
+- `gate result` — `allowed: open-findings-scoped-as-next` / `allowed: no-open-findings` / `refused: <mode>`.
+
+The verb writes `last-hook-run.json` after every legitimate exit (success + skip + outage) and appends to `hook-run-log.jsonl` so the pre-push gate can walk a multi-commit range.
 
 ## Dispatch-wrapper engagement
 

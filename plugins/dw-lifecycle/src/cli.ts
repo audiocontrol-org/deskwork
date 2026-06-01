@@ -41,6 +41,7 @@ import { checkOpenFindingsCli } from './subcommands/check-open-findings.js';
 import { checkBarrageDampenerCli } from './subcommands/check-barrage-dampener.js';
 import { checkBarrageTipCli } from './subcommands/check-barrage-tip.js';
 import { checkImplementHookRanCli } from './subcommands/check-implement-hook-ran.js';
+import { checkImplementHookCoverageCli } from './subcommands/check-implement-hook-coverage.js';
 import { implementHookCli } from './subcommands/implement-hook.js';
 import { slushRemainingCli } from './subcommands/slush-remaining.js';
 import { applyAuditFlipsCli } from './subcommands/apply-audit-flips.js';
@@ -110,6 +111,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'check-barrage-dampener': checkBarrageDampenerCli,
   'check-barrage-tip': checkBarrageTipCli,
   'check-implement-hook-ran': checkImplementHookRanCli,
+  'check-implement-hook-coverage': checkImplementHookCoverageCli,
   'implement-hook': implementHookCli,
   'slush-remaining': slushRemainingCli,
   'apply-audit-flips': applyAuditFlipsCli,

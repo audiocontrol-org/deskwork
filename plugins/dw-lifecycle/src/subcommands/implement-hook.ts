@@ -47,6 +47,7 @@ import {
   type HookDisposition,
   type HookRunMarker,
 } from '../scope-discovery/promote-findings/hook-run-marker.js';
+import { appendHookRunLogEntry } from '../scope-discovery/promote-findings/hook-run-log.js';
 
 export interface ImplementHookCliOptions {
   readonly featureSlug: string;
@@ -447,6 +448,21 @@ async function writeMarkerSafe(args: MarkerWriteArgs): Promise<void> {
     await writeHookRunMarker({ repoRoot: args.repoRoot, marker });
   } catch (err) {
     args.stderr.write(`implement-hook: marker write failed: ${(err as Error).message}\n`);
+    return;
+  }
+  // Also append to the per-run history log used by the pre-push gate
+  // (Phase 17 Task 5). The single marker tracks "latest run"; the log
+  // tracks every run by tip, which is what the pre-push gate needs to
+  // walk a multi-commit range.
+  try {
+    await appendHookRunLogEntry(args.repoRoot, {
+      tip: marker.tip,
+      timestamp: marker.timestamp,
+      disposition: marker.disposition,
+      runDir: marker.runDir,
+    });
+  } catch (err) {
+    args.stderr.write(`implement-hook: hook-run-log append failed: ${(err as Error).message}\n`);
   }
 }
 

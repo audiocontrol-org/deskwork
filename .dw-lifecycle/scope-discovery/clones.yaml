@@ -1,4 +1,4 @@
-generated_at: 2026-06-01T01:29:48.142Z
+generated_at: 2026-06-01T01:39:26.091Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1190,17 +1190,18 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:149:157
     disposition: pending
     reason: null
-  - id: 8be8fcbb0efc
+  - id: b7e746a25294
     lines: 19
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:335:353
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:146:164
       - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:182:200
       - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:189:207
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:148:166
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:525:543
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:541:559
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:229:247
     disposition: pending
@@ -1238,7 +1239,7 @@ clones:
     members:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:112:120
       - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:150:158
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:182:190
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:183:191
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:157:165
     disposition: pending
     reason: null
@@ -1246,7 +1247,7 @@ clones:
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:63:72
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:78:87
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:79:88
     disposition: pending
     reason: null
   - id: dc5aa4894209
@@ -1267,7 +1268,7 @@ clones:
     lines: 34
     members:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:55:88
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:72:105
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:73:106
     disposition: pending
     reason: null
   - id: a430638c6638
@@ -1278,18 +1279,40 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:88:96
     disposition: keep-with-reason
     reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every subcommand by convention.
+  - id: 9f9c5b9009b8
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:66:75
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:79:94
+    disposition: pending
+    reason: null
+  - id: bef89978806b
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:82:89
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:94:101
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:121
+    disposition: pending
+    reason: null
+  - id: 373ba2a9115d
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:83:91
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:74:82
+    disposition: pending
+    reason: null
   - id: 90c51e757597
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:60:68
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:79:94
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:80:94
     disposition: pending
     reason: null
   - id: ba294b0620a2
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:51:59
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:73:81
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:74:82
     disposition: pending
     reason: null
   - id: d641fc42624b
@@ -1414,28 +1437,21 @@ clones:
   - id: ddc1fbf772ac
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:79:87
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:80:88
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:86:94
     disposition: pending
     reason: null
   - id: dbcaeca8aacd
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:87:95
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:88:96
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:102:157
-    disposition: pending
-    reason: null
-  - id: fafc9eaaa502
-    lines: 8
-    members:
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:93:100
-      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:121
     disposition: pending
     reason: null
   - id: 7c810f52eec2
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:94:100
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:95:101
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:123:131
     disposition: pending
     reason: null
