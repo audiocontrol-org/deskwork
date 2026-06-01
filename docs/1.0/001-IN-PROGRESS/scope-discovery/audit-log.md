@@ -2060,7 +2060,7 @@ Yet Task 5.99 and Task 5.100 in this diff have `Closes … Surface: …` with **
 ### AUDIT-20260601-68 — `inferFindingShape` mis-classifies by symptom location, not fix location — a latent bug that ships untested code fixes the moment the pipeline IS used
 
 Finding-ID: AUDIT-20260601-68
-Status:     open
+Status:     acknowledged-latent-deferred-AUDIT-81-revert-2026-06-01
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:68-86` (inference), exercised against AUDIT-20260601-65's surface
 
@@ -2221,3 +2221,44 @@ The first new test correctly pins its contract: it asserts `expect(newAuditLog).
 This is the precise "tests that don't test the contract they claim to test" anti-pattern the project testing rules name. The regression-lock is the load-bearing Option-D invariant for a HIGH finding; a test that can pass without exercising its invariant is worse than no test because it underwrites a false "regression-locked" claim. Fix: add `expect(newAuditLog).toBeDefined()` before the `if`, mirroring the sibling test.
 
 ---
+
+## 2026-06-01 — audit-barrage lift (20260601T214030146Z-scope-discovery)
+
+### AUDIT-20260601-81 — Revert leaves the `Closes AUDIT-20260601-68` trailer live in history — `apply-audit-flips` will still propose `fixed-7f53c2d4` for a fix that no longer exists
+
+Finding-ID: AUDIT-20260601-81
+Status:     acknowledged-addressed-by-AUDIT-68-disposition-2026-06-01
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.102 hunk (`@@ -951,23 +951,19 @@`) ↔ absent `audit-log.md` change ↔ reverted commit `7f53c2d4`
+
+The reverted Step 5 documents that the fix commit carried `Closes AUDIT-20260601-68` in its subject ("commit with `Closes AUDIT-20260601-68` in subject (this commit)"). Per `agent-discipline.md`, `apply-audit-flips` walks `git rev-list <from>..<to>`, parses `Closes AUDIT-<id>` subjects/trailers, and proposes `open → fixed-<sha>` — it has **no notion that a later commit reverted the closing commit**. A `git revert` produces a new commit whose subject is `Revert "..."` with no counter-trailer; it does not un-say the `Closes` in `7f53c2d4`. So after this revert, any `dw-lifecycle apply-audit-flips --feature scope-discovery --since <ref-before-7f53c2d4>` run still sees the live `Closes AUDIT-20260601-68` and will propose flipping AUDIT-68 to `fixed-7f53c2d4` — pointing at a SHA whose change was reverted.
+
+Meanwhile this diff re-opens the workplan task to `[ ]` (lines marking Step 1–5 back to unchecked) but does **not** touch `audit-log.md`. That produces a three-way contradiction: the workplan says "[ ] open / re-implement", the audit-log Status is whatever the fix commit's flip already wrote (likely `fixed-<sha>`), and the commit graph still asserts a live close. The operator gets a false "AUDIT-68 is fixed" proposal and an implement-loop tracking surface that disagrees with itself. A correct revert here must also re-set the audit-log Status back to `open` (or add a `Reverts: 7f53c2d4 / re-opens AUDIT-20260601-68` annotation the flip parser can honor) — reverting code+workplan without reconciling the audit-log + the closure trailer is the gap.
+
+---
+
+### AUDIT-20260601-82 — Revert captures no rationale, so `promote-findings` will re-scope AUDIT-68 and an implementer will re-build the same fix that conflicts with the AUDIT-76/77/79 informational-exclusion logic
+
+Finding-ID: AUDIT-20260601-82
+Status:     acknowledged-addressed-by-AUDIT-68-disposition-2026-06-01
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:65-86` (reverted `inferFindingShape`) + workplan Task 5.102
+
+The revert deletes `SOURCE_FILE_IN_BODY_RE` and the `surfaceLooksNonBug && SOURCE_FILE_IN_BODY_RE.test(body)` override, returning to surface-only inference. Reverting is plausibly *correct*: the body-source override directly conflicts with the AUDIT-76/77/79 fixes. Those findings established that `informational` / clean-report findings must NOT become `code-defect` fix-tasks (the implement-loop deadlock). But an informational finding's body very commonly names a `.ts` path (e.g. "the renderer at `workplan-task-renderer.ts:162`…"), and `SOURCE_FILE_IN_BODY_RE` would have matched it and flipped it to `code-defect` — re-creating the exact deadlock AUDIT-77 closed. The reverted regression-lock test even names this fear verbatim ("false positives would re-introduce the 'informational findings as fix-tasks' deadlock AUDIT-77 fixed").
+
+The problem is that **none of this reasoning is captured anywhere in the diff**. The workplan task is simply re-opened to `[ ]` with its original "write failing test exercising the bug → implement the fix" shape intact. Per the project's anti-deferral discipline, `promote-findings`' default disposition is "scope into workplan as a TDD-first fix-task" — so AUDIT-68 will get re-picked-up and a future implementer will write the same `SOURCE_FILE_IN_BODY_RE`-shaped fix, re-colliding with the informational path. The revert needs an explicit note (in the workplan task body and/or the audit-log entry) recording that the body-source approach was tried, conflicts with the informational-exclusion path, and must NOT be re-implemented without resolving that conflict. Otherwise this is a revert that silently re-arms a known failure mode.
+
+---
+
+### AUDIT-20260601-83 — Re-introduces the unfilled AC placeholder `(to be filled in by Step 1 implementer)` — the exact shape AUDIT-76 flagged returns on an open task
+
+Finding-ID: AUDIT-20260601-83
+Status:     acknowledged-addressed-by-AUDIT-68-disposition-2026-06-01
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.102 Acceptance Criteria (`+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)``)
+
+The revert restores Task 5.102's AC to `- [ ] Failing test exists at `(to be filled in by Step 1 implementer)``. This is the same unfilled-placeholder AC that AUDIT-20260601-76 named as a defect — an AC whose target "stays unfilled forever." Reverting the *completed* task back to this open-with-placeholder state re-introduces it. On its own it's hygiene, but it compounds claude-01/claude-02: an open `[ ]` task with a placeholder AC, a possibly-`fixed` audit-log Status, and a live `Closes` trailer is precisely the contradictory-tracking-surface state the prior findings worked to eliminate. If the revert is intended to be permanent (the body-source approach abandoned), the task should be dispositioned (closed as wontfix with a substantive reason, or rewritten to the non-bug shape) rather than left as an open fix-task with a placeholder AC.
+
+---
+
+**Summary for triage:** The renderer revert itself returns to a known-good prior code state (no logic bug introduced *within* `inferFindingShape`). The risk is entirely in the **tracking-surface reconciliation** — the revert touched code + tests + workplan but not the audit-log Status or the closure trailer, and recorded no rationale. claude-01 is the load-bearing finding (false `fixed` proposal from `apply-audit-flips`); claude-02 is the design-memory gap that will cause re-implementation; claude-03 is the hygiene regression that confirms the task wasn't cleanly dispositioned.

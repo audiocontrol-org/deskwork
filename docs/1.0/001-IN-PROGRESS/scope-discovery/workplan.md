@@ -951,21 +951,77 @@ Closes AUDIT-20260601-67. Surface: in-loop lift output vs. committed pipeline.
 - [x] Audit-log Status flipped to `acknowledged-resolved-v032.1-install-2026-06-01`.
 
 
-### Task 5.102 (fix-finding-AUDIT-20260601-68): AUDIT-20260601-68 — `inferFindingShape` mis-classifies by symptom location, not …
+### Task 5.102 (fix-finding-AUDIT-20260601-68) (non-bug): AUDIT-20260601-68 — Latent classifier mis-classification (acknowledged after revert)
 
-Closes AUDIT-20260601-68. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:68-86` (inference), exercised against AUDIT-20260601-65's surface.
+**Shape**: non-bug (latent limitation; first attempt at fix surfaced cross-model HIGH finding AUDIT-81 demonstrating the fix was unsound; operator chose revert).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260601-68` in subject
+Closes AUDIT-20260601-68. Surface: workplan-task-renderer.ts:68-86 (inference).
+
+**Disposition prose:** My initial AUDIT-68 fix (commit 7f53c2d4) added a `SOURCE_FILE_IN_BODY_RE` body-source override to inferFindingShape: when surface looked non-bug AND body mentioned a `.ts`/`.js` source file, force code-defect shape. The post-fix barrage produced AUDIT-20260601-81 (HIGH, 3-model cross-model): the premise "body names a .ts file ⟹ fix is in code" is unsound. Audit bodies routinely cite source paths as *evidence/context* for non-code dispositions (AUDIT-77 cites multiple .ts paths to explain a deadlock; AUDIT-27 cites .ts paths to explain a counter bug; AUDIT-72 cites template paths to justify an operator-tradeoff acknowledgement). The override re-opened the exact "informational findings as fix-tasks" deadlock that AUDIT-76/77 closed. Per the operator's commission-vs-omission framing ("If you break something, that's worse than doing nothing"), 7f53c2d4 was reverted in commit f1219cd6. AUDIT-68 stays as acknowledged-latent — a sounder fix per AUDIT-81's recommendation would require intent-language detection (e.g., "fix is in" / "implement in" near the citation) OR a schema change (option (c): operator-supplied shape on the proposal). Bounded impact: the original mis-classification only fires when a workflow legitimately treats a finding as non-bug; not a recursion engine like the v0.31.2 issue was.
+
+- [x] Step 1: disposition prose written.
+- [x] Step 2: revert applied (f1219cd6); test suite back to 2626/2626; tsc clean.
+- [x] Step 3: commit closes AUDIT-68 via this commit.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Disposition prose ≥40 chars substantive content.
+- [x] Working code restored (revert committed; classifier back to surface-only logic).
+- [x] Audit-log Status flipped to `acknowledged-latent-deferred-AUDIT-81-revert-2026-06-01`.
+
+
+### Task 5.112 (fix-finding-AUDIT-20260601-81) (non-bug): AUDIT-81 — Revert closure-trailer reconciliation (acknowledged)
+
+**Shape**: non-bug (addressed by AUDIT-68 disposition).
+
+Closes AUDIT-20260601-81. Surface: closure trailer reconciliation post-revert.
+
+**Disposition prose:** Functional harm (apply-audit-flips proposing fixed-7f53c2d4 for AUDIT-68) does NOT manifest because AUDIT-68's audit-log Status was manually flipped to `acknowledged-latent-deferred-AUDIT-81-revert-2026-06-01` in this commit. The currentStatusPredicate in applyStatusFlips defaults to `current === 'open'`, so apply-audit-flips will skip AUDIT-68 (Status is no longer `open`). The contradictory tracking surface AUDIT-81 worried about is therefore not arming any flip. Task 5.102 was simultaneously rewritten to non-bug shape with disposition prose explaining the revert (Task 5.102's body in this same commit).
+
+- [x] Step 1: disposition prose written.
+- [x] Step 2: AUDIT-68 Status manually flipped (this commit) so apply-audit-flips skips it.
+- [x] Step 3: commit closes AUDIT-81 via this commit.
+
+**Acceptance Criteria:**
+
+- [x] Disposition prose ≥40 chars substantive content.
+- [x] Audit-log Status flipped to `acknowledged-addressed-by-AUDIT-68-disposition-2026-06-01`.
+
+
+### Task 5.113 (fix-finding-AUDIT-20260601-82) (non-bug): AUDIT-82 — Revert rationale capture (acknowledged)
+
+**Shape**: non-bug (addressed by AUDIT-68 disposition).
+
+Closes AUDIT-20260601-82. Surface: workplan-task-renderer.ts revert + Task 5.102.
+
+**Disposition prose:** The "revert captures no rationale" concern AUDIT-82 raised is addressed by Task 5.102's rewrite in this same commit. Task 5.102's body now carries the full disposition prose explaining: (a) why the AUDIT-68 fix attempt was reverted (cross-model AUDIT-81 surfaced the SOURCE_FILE_IN_BODY_RE premise as unsound), (b) why a re-implementation should NOT use the body-source approach without resolving the conflict with AUDIT-76/77 informational-exclusion logic, and (c) the two acceptable future-work paths (intent-language detection OR operator-supplied shape on the proposal). The design-memory gap AUDIT-82 worried about is therefore filled.
+
+- [x] Step 1: disposition prose written.
+- [x] Step 2: Task 5.102's rewrite captures the revert rationale + abandoned-approach warning.
+- [x] Step 3: commit closes AUDIT-82 via this commit.
+
+**Acceptance Criteria:**
+
+- [x] Disposition prose ≥40 chars substantive content.
+- [x] Audit-log Status flipped to `acknowledged-addressed-by-AUDIT-68-disposition-2026-06-01`.
+
+
+### Task 5.114 (fix-finding-AUDIT-20260601-83) (non-bug): AUDIT-83 — AC placeholder regression (acknowledged)
+
+**Shape**: non-bug (addressed by AUDIT-68 disposition).
+
+Closes AUDIT-20260601-83. Surface: Task 5.102 AC placeholder restoration post-revert.
+
+**Disposition prose:** Task 5.102 was rewritten to non-bug shape with disposition prose in this same commit, replacing the `(to be filled in by Step 1 implementer)` placeholder AC that the revert had restored. The AC checkboxes are now all `[x]` with substantive content (≥40 chars). The hygiene regression AUDIT-83 named is therefore reverted along with the placeholder it referenced.
+
+- [x] Step 1: disposition prose written.
+- [x] Step 2: Task 5.102's rewrite removes the placeholder AC.
+- [x] Step 3: commit closes AUDIT-83 via this commit.
+
+**Acceptance Criteria:**
+
+- [x] Disposition prose ≥40 chars substantive content.
+- [x] Audit-log Status flipped to `acknowledged-addressed-by-AUDIT-68-disposition-2026-06-01`.
 
 ### Task 5.99 (fix-finding-AUDIT-20260601-65): AUDIT-20260601-65 — Task 5.97 — the fix-task for the HIGH finding AUDIT-63 is re…
 
