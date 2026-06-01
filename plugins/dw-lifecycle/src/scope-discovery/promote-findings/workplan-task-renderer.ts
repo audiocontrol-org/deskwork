@@ -65,49 +65,24 @@ export interface RenderFixTaskBlockOpts {
  *   - commit SHAs (commit-history findings)
  *   - "Missing surface:" / "no surface" prose (process findings)
  */
-// Phase 19 (fix-finding-AUDIT-20260601-68): a finding can have a
-// documentation-shaped surface AND a code-shaped fix simultaneously
-// (e.g. "the rendered task in workplan.md is wrong" — the symptom
-// is in workplan.md but the FIX is in `.ts` source). Inferring shape
-// from surface alone would misclassify those as `non-bug` and ship
-// a real code defect without test coverage. The body-source check
-// looks for filename references with TypeScript/JavaScript source
-// extensions in path-like contexts (preceded by `/` or backtick, or
-// followed by `:line`). Backtick-wrapped extension mentions like
-// "`.ts`" are NOT a path; the regex requires the path prefix.
-const SOURCE_FILE_IN_BODY_RE =
-  /(?:^|[\s`'"/])(?:[\w./-]*?)[\w-]+\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)(?:[:`'"\s]|$)/i;
-
 export function inferFindingShape(finding: OpenFinding): FindingShape {
   const surface = finding.surface?.toLowerCase() ?? '';
-  const body = finding.body ?? '';
-  const surfaceLooksNonBug = isNonBugSurface(surface);
-
-  // AUDIT-68 override: when the surface suggests non-bug but the
-  // body names a source file (.ts/.tsx/.js/etc.), the fix lives in
-  // code — return code-defect to force TDD discipline.
-  if (surfaceLooksNonBug && SOURCE_FILE_IN_BODY_RE.test(body)) {
-    return 'code-defect';
-  }
-  return surfaceLooksNonBug ? 'non-bug' : 'code-defect';
-}
-
-function isNonBugSurface(surface: string): boolean {
   // Per-feature docs files
-  if (/(?:^|\/|`|\s)audit-log\.md/.test(surface)) return true;
-  if (/(?:^|\/|`|\s)workplan\.md/.test(surface)) return true;
-  if (/(?:^|\/|`|\s)tooling-feedback\.md/.test(surface)) return true;
-  if (/(?:^|\/|`|\s)clones\.yaml/.test(surface)) return true;
-  if (/\.dw-lifecycle\//.test(surface)) return true;
-  if (/last-hook-run\.json/.test(surface)) return true;
-  if (/hook-run-log\.jsonl/.test(surface)) return true;
+  if (/(?:^|\/|`|\s)audit-log\.md/.test(surface)) return 'non-bug';
+  if (/(?:^|\/|`|\s)workplan\.md/.test(surface)) return 'non-bug';
+  if (/(?:^|\/|`|\s)tooling-feedback\.md/.test(surface)) return 'non-bug';
+  if (/(?:^|\/|`|\s)clones\.yaml/.test(surface)) return 'non-bug';
+  if (/\.dw-lifecycle\//.test(surface)) return 'non-bug';
+  if (/last-hook-run\.json/.test(surface)) return 'non-bug';
+  if (/hook-run-log\.jsonl/.test(surface)) return 'non-bug';
   // Commit-history findings — "commit <sha>" or "subject" framings
-  if (/\bcommit\b.*\b[0-9a-f]{7,40}\b/i.test(surface)) return true;
+  if (/\bcommit\b.*\b[0-9a-f]{7,40}\b/i.test(surface)) return 'non-bug';
   // Process findings explicitly naming "missing surface" or "no surface"
   if (/missing surface|no surface|\(the audited|process feedback|disposition/i.test(surface)) {
-    return true;
+    return 'non-bug';
   }
-  return false;
+  // Default: source-file or unknown → code-defect (safest, still TDD-able).
+  return 'code-defect';
 }
 
 const HEADING_MAX_LENGTH = 80;
