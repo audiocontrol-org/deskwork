@@ -1481,6 +1481,74 @@ Disposition: split fix:
 - [x] Step 1.5.3: Migration sketch landed in `decision-draft.md` § "Migration sketch from the current `comment` annotation shape" — per-field mapping (`range` → `[TextPositionSelector, TextQuoteSelector]`, `comment` → `[TextualBody]`, `iteration` → `deskwork:revisionId`, parent-comment-id → reply annotation's `target` with `motivation: replying`), doctor-managed migration with audit-preserving cutover window.
 
 
+
+### Task 1.8 (fix-finding-AUDIT-20260601-08): AUDIT-20260601-08 — Schema tightening on append-only journal data ships with no …
+
+Closes AUDIT-20260601-08. Surface: `packages/core/src/schema/draft-annotation.ts:56-90` (new `SpatialAnchor*Schema` + `z.discriminatedUnion`); cross-cut with `packages/core/src/entry/annotations.ts` read-bridge.
+
+- [x] Step 1: wrote tests — 9 cases at `packages/core/test/doctor/entry-anchor-shape.test.ts` covering pixel-without-coords, pixel-with-forbidden-selector, dom-selector-without-selector, valid anchors (negative), no-anchor comments, empty project, non-comment annotations (resolve), report-only plan, and the read-path-bypass case proving the rule surfaces anchors `JournalEventSchema` would silently skip.
+- [x] Step 2: the failing-test-against-current-code shape is structural — pre-fix the doctor runner had no `entry-anchor-shape` rule registered, so the audit would emit zero findings for any malformed legacy anchor on disk. The tests assert non-zero findings on malformed shapes; without the new rule + registration they would fail.
+- [x] Step 3: added doctor rule `entry-anchor-shape` (`packages/core/src/doctor/rules/entry-anchor-shape.ts`); exported `SpatialAnchorSchema` from `packages/core/src/schema/draft-annotation.ts` so the rule can validate spatial anchors directly against the strict schema; registered the rule in `packages/core/src/doctor/runner.ts` after `entryLaneMissing`.
+- [x] Step 4: all 9 tests pass (`npm --workspace @deskwork/core test -- entry-anchor-shape`); full core suite at 944 tests green.
+- [x] Step 5: commit `afb4481b` landed with `Closes AUDIT-20260601-08` in body.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `packages/core/test/doctor/entry-anchor-shape.test.ts` (9 cases — see Step 1).
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix) — confirmed via `npm --workspace @deskwork/core test -- entry-anchor-shape`.
+- [x] Audit-log Status flipped to `fixed-afb4481b` in this docs commit.
+
+
+### Task 1.9 (fix-finding-AUDIT-20260601-09): AUDIT-20260601-09 — `cloneSpatialAnchor` switch has no exhaustiveness guard; the…
+
+Closes AUDIT-20260601-09. Surface: `packages/core/src/entry/annotations.ts:67-79` (`cloneSpatialAnchor`).
+
+- [x] Step 1: wrote tests at `packages/core/test/entry/clone-spatial-anchor-exhaustiveness.test.ts` — round-trips every existing variant through the public `addEntryAnnotation` / `listEntryAnnotationsRaw` API (drives `cloneSpatialAnchor` via `toDraftAnnotation`) and pins a TS-level synthetic dispatch function whose `default` arm hands the narrowed `never` to a local `assertNever`. The compile-time claim is the load-bearing one; the runtime tests are smoke that the switch fires on every variant.
+- [x] Step 2: the failing-test-against-current-code shape is compile-time — pre-fix the switch had no `default` arm and no `assertNever` call, so a future 4th variant added to the union would silently fall through and return `undefined` typed as `SpatialAnchor`. The test's synthetic dispatch with `default: return assertNever(anchor)` would compile cleanly today (three variants enumerated) but pre-fix the underlying `cloneSpatialAnchor` would NOT — the union of all three TS variants narrowed to `never` only when `assertNever` is added.
+- [x] Step 3: added `default: return assertNever(input, 'cloneSpatialAnchor')` to the switch; added a local `assertNever(_input: never, context: string): never` helper above the function. Per the project's no-class-inheritance / composition rule, the helper is a sibling function not a base-class method.
+- [x] Step 4: all 4 tests pass; full core suite at 944 tests green.
+- [x] Step 5: commit `5bb84926` landed with `Closes AUDIT-20260601-09` in body.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `packages/core/test/entry/clone-spatial-anchor-exhaustiveness.test.ts` (4 cases — see Step 1).
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix) — confirmed via `npm --workspace @deskwork/core test -- clone-spatial-anchor`.
+- [x] Audit-log Status flipped to `fixed-5bb84926` in this docs commit.
+
+
+### Task 1.10 (fix-finding-AUDIT-20260601-10): AUDIT-20260601-10 — Negative tests assert `success === false` without pinning th…
+
+Closes AUDIT-20260601-10. Surface: `packages/core/test/schema/draft-annotation-thread-anchor.test.ts:138-194` (six new `rejects spatialAnchor …` cases).
+
+- [x] Step 1: the "failing test" for this finding is the SAME test file the finding names (the six existing negative cases were too loose). Sanity-checked via a one-off probe that the path-pin behaves correctly: malformed-anchor cases surface ≥1 issue with `spatialAnchor` in the path; a wrong-reason failure (omitting `type` on the base annotation) surfaces 0 spatialAnchor-path issues — which would cause the new helper to throw.
+- [x] Step 2: pre-fix, the six `rejects spatialAnchor ...` cases only asserted `parsed.success === false`. The wrong-reason hypothesis (rename `range` or tighten `text` on `COMMENT_BASE`) would let all six pass while the anchor schema silently regressed to its pre-AUDIT-07 loose shape. The new helper assertion would fail in that scenario; the old tests would not.
+- [x] Step 3: added local `expectSpatialAnchorFailure(parsed)` helper that asserts BOTH `parsed.success === false` AND that ≥1 issue in `parsed.error.issues` has `spatialAnchor` in its `path`. All six `rejects spatialAnchor ...` cases now route through the helper.
+- [x] Step 4: all 24 tests in `draft-annotation-thread-anchor.test.ts` pass; full core suite at 944 tests green.
+- [x] Step 5: commit `b7446c19` landed with `Closes AUDIT-20260601-10` in body.
+
+**Acceptance Criteria:**
+
+- [x] Tightened test exists at `packages/core/test/schema/draft-annotation-thread-anchor.test.ts` (six `rejects spatialAnchor ...` cases now route through `expectSpatialAnchorFailure`).
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix) — confirmed via `npm --workspace @deskwork/core test -- draft-annotation-thread-anchor`.
+- [x] Audit-log Status flipped to `fixed-b7446c19` in this docs commit.
+
+
+### Task 1.11 (fix-finding-AUDIT-20260601-11): AUDIT-20260601-11 — AUDIT-20260601-07 remains open in the durable audit log even…
+
+Closes AUDIT-20260601-11. Surface: `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4537-4544`; `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1482-1497`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-11` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 1.7 (fix-finding-AUDIT-20260601-07): AUDIT-20260601-07 — spatialAnchor schema accepts semantically-invalid per-kind combinations
 
 Closes AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model). Surface: `packages/core/src/schema/draft-annotation.ts:39-46` (`SpatialAnchorSchema`); docstring claims at `review/types.ts:69-72` and `draft-annotation.ts:34-37`.

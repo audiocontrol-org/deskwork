@@ -4562,7 +4562,7 @@ This is the bug-factory shape the project guidelines name explicitly ("never imp
 ### AUDIT-20260601-08 — Schema tightening on append-only journal data ships with no read-back-compat path or doctor migration
 
 Finding-ID: AUDIT-20260601-08
-Status:     open
+Status:     fixed-afb4481b (doctor rule `entry-anchor-shape` landed at `packages/core/src/doctor/rules/entry-anchor-shape.ts`; companion test at `packages/core/test/doctor/entry-anchor-shape.test.ts` — 9 cases covering pixel-without-coords, mixed-shape, dom-selector-without-selector, valid anchors, no-anchor comments, empty project, non-comment annotations, report-only plan, and the read-path-bypass case proving the rule surfaces anchors the JournalEventSchema would silently skip. The rule reads raw journal JSON, isolates comment annotations with present spatialAnchor, and safeParses against the exported strict `SpatialAnchorSchema` — emitting one `error` finding per malformed legacy anchor with entry UUID + annotation id + project-relative journal path + offending shape. Rule registered in the doctor runner after `entryLaneMissing`.)
 Severity:   medium
 Surface:    `packages/core/src/schema/draft-annotation.ts:56-90` (new `SpatialAnchor*Schema` + `z.discriminatedUnion`); cross-cut with `packages/core/src/entry/annotations.ts` read-bridge
 
@@ -4573,7 +4573,7 @@ The original finding AUDIT-20260601-07 stressed exactly this property ("annotati
 ### AUDIT-20260601-09 — `cloneSpatialAnchor` switch has no exhaustiveness guard; the lockstep contract is only implicitly enforced
 
 Finding-ID: AUDIT-20260601-09
-Status:     open
+Status:     fixed-5bb84926 (switch now has `default: return assertNever(input, 'cloneSpatialAnchor')`. `assertNever`'s parameter is typed `never`, so the call site only type-checks when every variant of `SpatialAnchor` is handled by the cases above. A future 4th variant added to the union without updating the switch becomes a compile error at the call site — exactly the hard compile-time enforcement the finding asked for, replacing the prior implicit lockstep contract. Companion test at `packages/core/test/entry/clone-spatial-anchor-exhaustiveness.test.ts` round-trips every existing variant through the public `addEntryAnnotation` / `listEntryAnnotationsRaw` API and pins a TS-level synthetic dispatch function whose `default` arm hands the narrowed `never` to a local `assertNever`, proving the `SpatialAnchor` union is fully enumerated by three kinds.)
 Severity:   low
 Surface:    `packages/core/src/entry/annotations.ts:67-79` (`cloneSpatialAnchor`)
 
@@ -4592,7 +4592,7 @@ This compiles today only because the inferred `StoredSpatialAnchor` union is exh
 ### AUDIT-20260601-10 — Negative tests assert `success === false` without pinning the failure to the anchor, so they can pass for the wrong reason
 
 Finding-ID: AUDIT-20260601-10
-Status:     open
+Status:     fixed-b7446c19 (each of the six `rejects spatialAnchor ...` cases now goes through a local `expectSpatialAnchorFailure(parsed)` helper that asserts BOTH `parsed.success === false` AND that at least one issue in `parsed.error.issues` has `spatialAnchor` in its `path`. Path-based pinning is more resilient than code-based pinning because the specific issue code varies by the kind of corruption — missing-coords yields `invalid_type` on `x`/`y`; extra fields yields `unrecognized_keys` on the parent; wrong kind yields `invalid_union_discriminator` — but the path always names `spatialAnchor` when the failure is anchor-shape related. Sanity-checked via a one-off probe that confirmed each malformed-anchor case surfaces ≥1 issue with `spatialAnchor` in the path; a wrong-reason failure (omitting `type` on the base annotation) surfaces 0 spatialAnchor-path issues, which would cause the helper to throw — exactly the resilience the original tests lacked.)
 Severity:   low
 Surface:    `packages/core/test/schema/draft-annotation-thread-anchor.test.ts:138-194` (six new `rejects spatialAnchor …` cases)
 
@@ -4603,7 +4603,7 @@ The fix is one line per case: assert the error path includes `spatialAnchor` (an
 ### AUDIT-20260601-11 — AUDIT-20260601-07 remains open in the durable audit log even though the workplan records it as closed
 
 Finding-ID: AUDIT-20260601-11
-Status:     open
+Status:     fixed-2fb0bac9 (Status flip landed in 2fb0bac9 immediately after the gate surfaced this finding; AUDIT-07's audit-log entry now correctly carries `fixed-c708ab27`)
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4537-4544`; `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1482-1497`
 
