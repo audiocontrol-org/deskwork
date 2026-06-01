@@ -951,19 +951,23 @@ Closes AUDIT-20260601-67. Surface: in-loop lift output vs. committed pipeline.
 - [x] Audit-log Status flipped to `acknowledged-resolved-v032.1-install-2026-06-01`.
 
 
-### Task 5.102 (fix-finding-AUDIT-20260601-68): AUDIT-20260601-68 — `inferFindingShape` mis-classifies by symptom location, not …
+### Task 5.102 (fix-finding-AUDIT-20260601-68): AUDIT-20260601-68 — `inferFindingShape` body-source override
 
-Closes AUDIT-20260601-68. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:68-86` (inference), exercised against AUDIT-20260601-65's surface.
+Closes AUDIT-20260601-68. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:68-86` (inference). Severity: high.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260601-68` in subject
+**Step 0 — working-code invariant.** Pre-fix, `inferFindingShape` keys off `finding.surface` only. Surfaces matching `workplan.md`/`audit-log.md`/etc. return `non-bug`; everything else (source-file paths, undefined surfaces) returns `code-defect`. The HIGH/MEDIUM/LOW classifier behavior MUST remain unchanged for surfaces that already determined shape unambiguously — the fix is severity-narrow: ONLY findings whose surface looks non-bug AND whose body names a `.ts/.tsx/.js/etc.` source file flip to `code-defect`.
+
+- [x] Step 1: failing tests at `workplan-task-renderer.test.ts` — three positive tests (workplan.md+.ts body, audit-log.md+.tsx body, .js body) assert code-defect override.
+- [x] Step 1b: regression-lock tests (Option D, HIGH severity) — two negative tests (workplan.md without source-file mention, commit-history without source-file mention) assert `non-bug` shape is preserved.
+- [x] Step 2: confirmed RED (3 failed | 24 passed) before implementation.
+- [x] Step 3: added `SOURCE_FILE_IN_BODY_RE` matching path-prefixed source extensions; refactored `inferFindingShape` to compose `isNonBugSurface()` + body-source override.
+- [x] Step 4: GREEN — 27/27 renderer tests; full plugin suite 2631/2631; tsc clean.
+- [x] Step 5: commit with `Closes AUDIT-20260601-68` in subject (this commit).
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] Test block count for this finding is ≥2 (Option D — HIGH severity invariant).
+- [x] Failing tests exist at `workplan-task-renderer.test.ts` — bug-repro (3) + regression-lock (2).
 - [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 

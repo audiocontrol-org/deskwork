@@ -161,6 +161,75 @@ describe('inferFindingShape — Phase 18 Task 1 (AUDIT-02)', () => {
   it('infers code-defect when surface is undefined (safest default — still TDD-able)', () => {
     expect(inferFindingShape(finding({ surface: undefined }))).toBe('code-defect');
   });
+
+  // Phase 19 Task 5.113 (fix-finding-AUDIT-20260601-68): when a
+  // finding's surface is non-bug-shaped (e.g. workplan.md) but its
+  // body names a source file (`.ts`/`.tsx`/`.js`), the fix lives in
+  // code and the classifier MUST return code-defect. Inferring shape
+  // from surface alone misclassifies findings whose symptom shows up
+  // in a doc but whose fix is in `.ts`.
+  describe('inferFindingShape — body source-file override (AUDIT-68)', () => {
+    it('returns code-defect when surface is workplan.md but body names a .ts file', () => {
+      expect(
+        inferFindingShape(
+          finding({
+            surface: 'docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md Task 5.95',
+            body: 'The rendered task in workplan.md lacks `Severity:` line. The fix is in `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:162` — the renderer needs to thread severity through.',
+          }),
+        ),
+      ).toBe('code-defect');
+    });
+
+    it('returns code-defect when surface is audit-log.md but body names a .tsx file', () => {
+      expect(
+        inferFindingShape(
+          finding({
+            surface: 'audit-log.md AUDIT-NN',
+            body: 'The lift step in `src/components/Foo.tsx` mishandles X.',
+          }),
+        ),
+      ).toBe('code-defect');
+    });
+
+    it('returns code-defect when body names a .js file (JavaScript-source variant)', () => {
+      expect(
+        inferFindingShape(
+          finding({
+            surface: 'workplan.md',
+            body: 'scripts/bump-version.js needs to also touch package-lock.json.',
+          }),
+        ),
+      ).toBe('code-defect');
+    });
+
+    // Regression-lock: keep the non-bug shape for findings whose
+    // surface is non-source AND body has NO source-file mentions.
+    // Option D invariant: the body-source check MUST be narrow — a
+    // mention of `.ts` inside backticks but NOT as a file path
+    // should NOT trigger code-defect (false positives would re-introduce
+    // the "informational findings as fix-tasks" deadlock AUDIT-77 fixed).
+    it('REGRESSION: surface=workplan.md + body has no .ts file mentions → non-bug (Option D invariant)', () => {
+      expect(
+        inferFindingShape(
+          finding({
+            surface: 'docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md Task 5.99',
+            body: 'The task heading mentions AUDIT-20260601-63 but the AC says AUDIT-20260601-64 — convention divergence.',
+          }),
+        ),
+      ).toBe('non-bug');
+    });
+
+    it('REGRESSION: surface=commit-history + body has no source-file mentions → non-bug', () => {
+      expect(
+        inferFindingShape(
+          finding({
+            surface: 'commit abcdef1 subject `chore: release v0.32.1`',
+            body: 'Subject reads `(AUDIT-76)` not the documented `Closes AUDIT-20260601-76 (...)`.',
+          }),
+        ),
+      ).toBe('non-bug');
+    });
+  });
 });
 
 describe('renderFixTaskBlock — non-bug variant (Phase 18 Task 1)', () => {
