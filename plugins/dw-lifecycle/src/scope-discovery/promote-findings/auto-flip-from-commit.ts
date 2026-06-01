@@ -33,22 +33,41 @@ export interface ProposedFlip {
   readonly newStatus: string;
 }
 
-const CLOSES_AUDIT_RE = /\bcloses\b[\s:]+((?:AUDIT-\d{8}-\d+(?:[\s,]+)?)+)/gi;
+// Per Phase 18 Task 4: anchor extraction at each `closes` verb, then
+// scan FORWARD for AUDIT-ids until we hit a line boundary OR another
+// `closes` clause. Inside that span, separators between AUDIT-ids
+// can be: commas, slashes, whitespace, parenthetical annotations
+// (e.g. `(claude-01 + codex-01; cross-model)`), or mixed-reference
+// noise like `#384`. The scan ignores anything that isn't a literal
+// AUDIT-YYYYMMDD-N pattern.
+const CLOSES_VERB_RE = /\bcloses\b[\s:]+/gi;
 const AUDIT_ID_RE = /AUDIT-\d{8}-\d+/g;
 
 /**
- * Extract every `Closes AUDIT-<id>` (or `Closes: AUDIT-X, AUDIT-Y`)
- * reference from a commit message. Deduplicates within the input;
- * preserves order of first occurrence.
+ * Extract every `Closes AUDIT-<id>` reference from a commit message.
+ * Handles single-ID, comma-separated trailer, slash-separated
+ * shorthand, parenthetical cross-model annotations, and mixed-
+ * reference forms (`Closes #N, AUDIT-X`). Deduplicates; preserves
+ * order of first occurrence.
+ *
+ * Per Phase 18 Task 4: the extraction span starts at each `closes`
+ * verb and extends to the next line break OR the next `closes`
+ * verb. Within the span, every AUDIT-id pattern match contributes,
+ * regardless of separator (`,` / `/` / parens / spaces).
  */
 export function parseClosesAuditTrailers(text: string): readonly string[] {
   const out: string[] = [];
   const seen = new Set<string>();
-  const matches = text.matchAll(CLOSES_AUDIT_RE);
-  for (const m of matches) {
-    const idsList = m[1] ?? '';
-    const ids = idsList.matchAll(AUDIT_ID_RE);
-    for (const idMatch of ids) {
+  // Find each `closes` verb occurrence; for each, scan the rest of
+  // its line for AUDIT-ids.
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    CLOSES_VERB_RE.lastIndex = 0;
+    const verbMatch = CLOSES_VERB_RE.exec(line);
+    if (verbMatch === null) continue;
+    const tail = line.slice(verbMatch.index + verbMatch[0].length);
+    AUDIT_ID_RE.lastIndex = 0;
+    for (const idMatch of tail.matchAll(AUDIT_ID_RE)) {
       const id = idMatch[0];
       if (!seen.has(id)) {
         seen.add(id);

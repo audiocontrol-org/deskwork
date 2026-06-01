@@ -205,3 +205,64 @@ describe('proposeFlipsForCommits — multi-commit walker', () => {
     expect(flips).toEqual([]);
   });
 });
+
+// Phase 18 Task 4 — extended trailer-shape coverage. Pre-fix, the
+// parser only caught the first AUDIT-id in messages like:
+//   "Closes AUDIT-20260601-30/33"           (slash-separated)
+//   "Closes AUDIT-X (annotation), AUDIT-Y"  (parens-broken chain)
+//   "Closes #384, AUDIT-X"                  (mixed-reference)
+// All three required manual flips this session. This batch pins
+// the corrected behavior.
+describe('parseClosesAuditTrailers — Phase 18 Task 4 extended shapes', () => {
+  it('extracts both IDs from a slash-separated form: "AUDIT-X/AUDIT-Y"', () => {
+    // The slash is shorthand for "and." Treat it as a separator.
+    const ids = parseClosesAuditTrailers(
+      'fix(thing): land batch Closes AUDIT-20260601-30/AUDIT-20260601-33',
+    );
+    expect(ids).toEqual(['AUDIT-20260601-30', 'AUDIT-20260601-33']);
+  });
+
+  it('extracts both IDs when one carries a parenthetical cross-model annotation', () => {
+    const ids = parseClosesAuditTrailers(
+      'fix(thing): land Closes AUDIT-20260601-30 (claude-01 + codex-01; cross-model), AUDIT-20260601-33',
+    );
+    expect(ids).toEqual(['AUDIT-20260601-30', 'AUDIT-20260601-33']);
+  });
+
+  it('extracts AUDIT-id when mixed with a hash-issue reference', () => {
+    // "Closes #384, AUDIT-X" — the #384 is a GH issue reference; the
+    // AUDIT-X is a finding ID. Both ARE "Closes" targets; we only
+    // care about extracting the AUDIT-ids here.
+    const ids = parseClosesAuditTrailers(
+      'fix(thing): land Closes #384, AUDIT-20260601-18',
+    );
+    expect(ids).toEqual(['AUDIT-20260601-18']);
+  });
+
+  it('extracts multiple IDs from a Closes line with mixed separators (comma + slash + space)', () => {
+    const ids = parseClosesAuditTrailers(
+      'fix: Closes AUDIT-20260601-01, AUDIT-20260601-02/AUDIT-20260601-03 AUDIT-20260601-04',
+    );
+    expect(ids).toEqual([
+      'AUDIT-20260601-01',
+      'AUDIT-20260601-02',
+      'AUDIT-20260601-03',
+      'AUDIT-20260601-04',
+    ]);
+  });
+
+  it('REGRESSION: still extracts a single AUDIT-id from a plain subject (working-code invariant)', () => {
+    // Working-code invariant: the original single-ID case must still
+    // work after the multi-ID extensions land. This regression-lock
+    // pins it per Option D discipline.
+    const ids = parseClosesAuditTrailers('feat(foo): land Closes AUDIT-20260529-12 inline');
+    expect(ids).toEqual(['AUDIT-20260529-12']);
+  });
+
+  it('REGRESSION: still extracts comma-separated trailer (working-code invariant)', () => {
+    const ids = parseClosesAuditTrailers(
+      ['feat: x', '', 'Closes: AUDIT-X-001, AUDIT-X-002'].join('\n').replace(/AUDIT-X-/g, 'AUDIT-20260530-'),
+    );
+    expect(ids).toEqual(['AUDIT-20260530-001', 'AUDIT-20260530-002']);
+  });
+});

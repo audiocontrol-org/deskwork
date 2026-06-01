@@ -1698,3 +1698,53 @@ Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:158-180`
 `defaultListDiffFiles` catches every `git diff --name-only` failure and returns `[]`. The library interprets an empty file list as “no signal” and fires the barrage. That means a broken git invocation, bad repository root, corrupted ref, or unexpected environment issue becomes indistinguishable from a real non-bookkeeping diff.
 
 This conflicts with the project’s “no silent fallbacks” rule and makes the new behavior hard to debug: operators will see the barrage firing on bookkeeping commits with no clue that the classifier failed. The safer shape is to let the error propagate through `runCheckBarrageTip`’s existing try/catch and exit-2 config-error path, or return an explicit diagnostic result that names the failed `git diff`.
+
+## 2026-06-01 — audit-barrage lift (20260601T045901883Z-scope-discovery)
+
+### AUDIT-20260601-39 — Bookkeeping classifier omits the runtime marker files, so this very bookkeeping commit would re-fire the barrage — defeating the AUDIT-30 fix it just shipped
+
+Finding-ID: AUDIT-20260601-39
+Status:     open
+Severity:   high
+Surface:    commit `98f3a7a1` changed-file set: `.dw-lifecycle/scope-discovery/last-hook-run.json` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` + `audit-log.md` + `workplan.md` vs. `check-barrage-tip.ts:74-81` (`isBookkeepingPath`)
+
+This commit is pure bookkeeping (flip two `Status:` lines, tick workplan tasks). The AUDIT-30 fix shipped in 785c9947 was supposed to stop the barrage from auditing exactly this shape of commit. But per AUDIT-36's own cite, `isBookkeepingPath` recognizes only `workplan.md`, `audit-log.md`, and `tooling-feedback.md` — **not** the two runtime marker files. Every barrage run rewrites `last-hook-run.json` and appends to `hook-run-log.jsonl` (both tracked, both mutated in this diff at the top two hunks), so any bookkeeping commit that bundles those marker deltas carries files the classifier sees as *non*-bookkeeping → the diff is no longer all-bookkeeping → the barrage fires.
+
+The marker files are the recursion fuel the AUDIT-30 filter was meant to drain, and they are excluded from the filter. This is observable directly in the diff: commit 98f3a7a1 bundles marker mutations with a docs flip, and under the new classifier it would still fire. The fix must add the marker-file paths (and anything else the hook itself writes) to `isBookkeepingPath`, OR — better, per AUDIT-34 — stop tracking `last-hook-run.json` so it never enters a commit's changed-file set. Until then AUDIT-30 is fixed in name only for the common case.
+
+### AUDIT-20260601-40 — Task 5.67 marks the test-existence acceptance criterion `[x]` with a literal "(no test …)" string — the `fix-task-tdd-discipline` doctor rule will trip on it
+
+Finding-ID: AUDIT-20260601-40 (claude-opus-02 + claude-opus-03 + claude-opus-04 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.67 (`fix-finding-AUDIT-20260601-33`), Acceptance Criteria block
+
+Task 5.67 is checked complete (`[x]` on every step) with this AC:
+
+```
+- [x] Failing test exists at `(no test — bookkeeping disposition for an informational finding; …)`
+- [x] `npx vitest run` 2583/2583 green (no test required)
+- [x] Audit-log Status flipped to `fixed-785c9947`
+```
+
+This checks a *test-exists* box while the cited path is prose admitting no test exists. Per `agent-discipline.md`, the `fix-task-tdd-discipline` doctor rule "walks every `[x]`-checked fix-finding task across every feature and flags violations" by resolving the cited test file. When it walks Task 5.67 it will resolve the literal string `(no test — bookkeeping disposition…)` as a path, find nothing, and flag the task — blocking the loop or forcing a bypass. This is the laundering deadlock AUDIT-32/35 predicted, now *materialized and checked complete* in the tree rather than merely specced. The honest shape is a shape-(e) disposition task (no test-existence AC at all), which Phase 18 Task 1 is supposed to render — and which must land before this task is checked, not after.
+
+### AUDIT-20260601-41 — Commit subject names only the AUDIT-33 flip while the diff also flips AUDIT-30 — recurring subject-narrower-than-diff shape
+
+Finding-ID: AUDIT-20260601-41
+Status:     open
+Severity:   medium
+Surface:    commit subject `docs: flip AUDIT-20260601-33 + tick Tasks 5.64/5.67 …` vs. `audit-log.md` hunks flipping both AUDIT-20260601-30 (line ~1599) and AUDIT-20260601-33 (line ~1632) to `fixed-785c99474f…`
+
+The subject advertises a single status flip (AUDIT-33) plus a task-tick, but the diff flips **two** statuses: AUDIT-30 *and* AUDIT-33, both to `fixed-785c9947`. This is the same subject-narrower-than-the-diff pattern the loop keeps reproducing (AUDIT-28/29 lineage) — an operator scanning `git log --oneline` for the AUDIT-30 disposition will not find it referenced in any subject in this range. Low-cost fix: subjects that flip N statuses name all N (e.g. `docs: flip AUDIT-30 + AUDIT-33 to fixed-785c9947 + tick 5.64/5.67`). The cheap precision is the difference between a greppable audit trail and one that requires reading every diff.
+
+### AUDIT-20260601-42 — AUDIT-30 marked `fixed-785c9947` while AUDIT-36 (open) contests that exact fix as wrong — premature closure
+
+Finding-ID: AUDIT-20260601-42
+Status:     open
+Severity:   medium
+Surface:    `audit-log.md` AUDIT-20260601-30 `Status: fixed-785c99474f…` (line ~1602) vs. AUDIT-20260601-36 `Status: open` (lifted this diff, lines ~1660+)
+
+This diff flips AUDIT-30 to `fixed-785c9947` (the bookkeeping-filter commit), while the same diff lifts AUDIT-36 as `open` — and AUDIT-36's entire thesis is that the 785c9947 filter is *too coarse* and "directly undermines a demonstrated, high-value capability of the barrage," with AUDIT-35 as a concrete example of signal it now suppresses. Marking AUDIT-30 unqualified-`fixed` while an open finding argues the fix introduced a regression is the failure mode the project's `re-audit-fixed-findings` discipline exists to catch: a fix that "did not actually fix" (here: fixed recursion by breaking workplan-contradiction detection).
+
+These are technically distinct findings, so a literal `fixed` flag isn't a fabrication — but the operator reading the open-findings queue gets a misleading "AUDIT-30 done" signal next to an open finding that the AUDIT-30 fix is wrong. Recommend either holding AUDIT-30 at `fixed-pending-verification` until AUDIT-36 is dispositioned, or adding an inline cross-reference on AUDIT-30's entry noting its fix is contested by AUDIT-36 so the two are read together.

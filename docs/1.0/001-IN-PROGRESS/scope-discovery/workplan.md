@@ -731,6 +731,74 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.73 (fix-finding-AUDIT-20260601-39): AUDIT-20260601-39 — Bookkeeping classifier omits the runtime marker files, so th…
+
+Closes AUDIT-20260601-39. Surface: commit `98f3a7a1` changed-file set: `.dw-lifecycle/scope-discovery/last-hook-run.json` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` + `audit-log.md` + `workplan.md` vs. `check-barrage-tip.ts:74-81` (`isBookkeepingPath`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-39` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.74 (fix-finding-AUDIT-20260601-40): AUDIT-20260601-40 — Task 5.67 marks the test-existence acceptance criterion `[x]…
+
+Closes AUDIT-20260601-40 (claude-opus-02 + claude-opus-03 + claude-opus-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.67 (`fix-finding-AUDIT-20260601-33`), Acceptance Criteria block.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-40 (claude-opus-02 + claude-opus-03 + claude-opus-04 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.75 (fix-finding-AUDIT-20260601-41): AUDIT-20260601-41 — Commit subject names only the AUDIT-33 flip while the diff a…
+
+Closes AUDIT-20260601-41. Surface: commit subject `docs: flip AUDIT-20260601-33 + tick Tasks 5.64/5.67 …` vs. `audit-log.md` hunks flipping both AUDIT-20260601-30 (line ~1599) and AUDIT-20260601-33 (line ~1632) to `fixed-785c99474f…`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-41` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.76 (fix-finding-AUDIT-20260601-42): AUDIT-20260601-42 — AUDIT-30 marked `fixed-785c9947` while AUDIT-36 (open) conte…
+
+Closes AUDIT-20260601-42. Surface: `audit-log.md` AUDIT-20260601-30 `Status: fixed-785c99474f…` (line ~1602) vs. AUDIT-20260601-36 `Status: open` (lifted this diff, lines ~1660+).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-42` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.70 (fix-finding-AUDIT-20260601-36): AUDIT-20260601-36 — The bookkeeping filter is too coarse: it suppresses substant…
 
 Closes AUDIT-20260601-36 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-tip.ts:74-81` (`isBookkeepingPath` classifies `workplan.md` as bookkeeping) + `:141-155` (the skip).
