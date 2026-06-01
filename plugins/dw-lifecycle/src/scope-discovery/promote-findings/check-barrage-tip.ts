@@ -48,6 +48,36 @@ export interface BarrageTipCheckArgs {
    * tip.sha is available.
    */
   readonly gitRevListCount: (range: string) => Promise<number>;
+  /**
+   * Phase 18 Task 6 (per AUDIT-20260601-30 / claude-opus-01, HIGH):
+   * the bookkeeping-commit filter. When provided, the library checks
+   * the changed files in the diff range; if ALL files match
+   * bookkeeping patterns (audit-log.md / workplan.md / .dw-lifecycle/
+   * marker files), the barrage is skipped (the diff has no
+   * substantive source code worth auditing).
+   *
+   * Working-code invariant the filter must NOT break: ANY non-
+   * bookkeeping file → fire. Mixed diffs ALSO fire (conservative —
+   * the source change deserves audit). When this arg is omitted,
+   * behavior is unchanged (pre-Phase-18-Task-6 callers continue to
+   * fire on any new diff).
+   */
+  readonly listDiffFiles?: (range: string) => Promise<string[]>;
+}
+
+/**
+ * Per Phase 18 Task 6 / AUDIT-30: a path is "bookkeeping" iff it's
+ * an audit-log, a workplan, a tooling-feedback log, or any file
+ * under `.dw-lifecycle/`. Source files (including tests) → not
+ * bookkeeping → barrage should fire.
+ */
+function isBookkeepingPath(relPath: string): boolean {
+  if (relPath.startsWith('.dw-lifecycle/')) return true;
+  // Per-feature docs files: audit-log.md, workplan.md, tooling-feedback.md.
+  if (/(?:^|\/)audit-log\.md$/.test(relPath)) return true;
+  if (/(?:^|\/)workplan\.md$/.test(relPath)) return true;
+  if (/(?:^|\/)tooling-feedback\.md$/.test(relPath)) return true;
+  return false;
 }
 
 export interface BarrageTipCheckResult {
@@ -102,6 +132,26 @@ export async function checkBarrageTip(
         `No new diff since last barrage (tip ${tipSha.slice(0, 8)}); ` +
         `nothing to audit. Skip the hook.`,
     };
+  }
+  // Phase 18 Task 6 / AUDIT-30: bookkeeping-only diff filter. When the
+  // caller supplies `listDiffFiles`, check whether ALL changed files
+  // match bookkeeping patterns. If so, skip the barrage — auditing
+  // workplan/audit-log/.dw-lifecycle changes produces self-referential
+  // meta-findings (the "recursive fix-trap" claude-opus-01 named).
+  if (args.listDiffFiles !== undefined) {
+    const files = await args.listDiffFiles(`${tipSha}..HEAD`);
+    if (files.length > 0 && files.every(isBookkeepingPath)) {
+      return {
+        hasNewDiff: false,
+        lastTipSha: tipSha,
+        newCommitCount,
+        reason:
+          `${newCommitCount} new commit${newCommitCount === 1 ? '' : 's'} since ` +
+          `last barrage (tip ${tipSha.slice(0, 8)}), but ALL changed files are ` +
+          `bookkeeping (audit-log/workplan/.dw-lifecycle/). Skip the hook to ` +
+          `avoid self-referential meta-findings.`,
+      };
+    }
   }
   return {
     hasNewDiff: true,

@@ -1274,7 +1274,7 @@ The test is a reasonable monotonicity pin, but it only proves the property for t
 ### AUDIT-20260601-05 — Task 5.33 documents fix-landed-before-scoped (retroactive back-fill)
 
 Finding-ID: AUDIT-20260601-05
-Status:     open
+Status:     acknowledged-informational-process-feedback-2026-06-01
 Severity:   informational
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.33 Step 5)
 
@@ -1593,3 +1593,60 @@ Surface:    commit `f51bcb12` subject `docs: flip AUDIT-20260601-05 to acknowled
 The subject makes two claims: (1) flip AUDIT-20260601-05 to acknowledged-informational, (2) tick the AUDIT-18 task. Claim (2) is in the diff (Task 5.52 / AUDIT-18 is ticked, `@@ -862,19 +879,19 @@`). Claim (1) is **not present anywhere in the diff** — there is no hunk touching AUDIT-05's `Status:` line in `audit-log.md`. Meanwhile the diff performs two actions the subject never mentions: it appends an entirely new lift section introducing AUDIT-20260601-28, and it adds workplan Task 5.62 for that finding.
 
 This is the *exact* shape that the just-lifted AUDIT-20260601-28 flags against commit `2c30cd1d` ("subject narrower than change; hides a finding from `git log --oneline`"). The corrective finding has, in the very next commit, been reproduced — and made worse, because here the subject also *overclaims* an action (the AUDIT-05 flip) that the diff doesn't contain. An operator triaging by subject would believe AUDIT-05 was dispositioned (it wasn't, per this diff) and would not know a new finding + task were added. The fix is to make the subject describe what the commit actually does, and to land the AUDIT-05 flip if it was intended (it is missing).
+
+## 2026-06-01 — audit-barrage lift (20260601T043917048Z-scope-discovery)
+
+### AUDIT-20260601-30 — Recursive non-convergence: the autonomous barrage is auditing its own bookkeeping commits, minting self-referential meta-findings that never close
+
+Finding-ID: AUDIT-20260601-30
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1583-1595` (AUDIT-29 lift) + `workplan.md` (Task 5.63) + the audited commit range as a whole
+
+Look at what the last seven findings in the audit-log actually are. AUDIT-23 = audit-log duplicated; AUDIT-24/25 = bookkeeping-vs-code incoherence; AUDIT-26/27 = the run-marker counter wiring; AUDIT-28 = commit `2c30cd1d` subject narrower than diff; AUDIT-29 = commit `f51bcb12` subject narrower than diff. **Not one of them is about Phase 18 feature code** — and there is no Phase 18 feature code, because every task in the diff (`workplan.md` Tasks 5.62, 5.63, Phase 18 Tasks 1–5) is `[ ]` unstarted. The barrage is firing against commits whose entire content is audit-log appends + workplan task additions, then producing findings *about those appends*, which are committed as more audit-log appends, which become the next commit the barrage examines. This diff is the loop eating its own tail: it lifts AUDIT-29 (a finding about a docs commit's subject) and scopes Task 5.63, which when committed will be another docs commit whose subject the next run will audit → AUDIT-30, ad infinitum.
+
+The project's own rule (`agent-discipline.md`: *"Pure-docs commits, vendored-asset commits, and version-bump commits don't need review"*) says these commits should not be in scope at all. The barrage has no gate enforcing that, so it spends model budget generating commit-hygiene meta-findings on bookkeeping commits faster than the operator can close them — the literal "recursive fix-trap" Phase 18's motivating context names, here demonstrated rather than hypothesized. A reasonable fix: gate the implement-hook barrage to skip runs whose diff touches only `audit-log.md` / `workplan.md` / `.dw-lifecycle/` marker files (a docs-only / bookkeeping-only diff classifier), so the loop only fires on commits that change source under audit.
+
+### AUDIT-20260601-31 — Run marker writes `0/0/0` for a run that demonstrably promoted AUDIT-29 → Task 5.63 — third confirmed instance of the AUDIT-27 counter bug, in this very diff
+
+Finding-ID: AUDIT-20260601-31
+Status:     open
+Severity:   high
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json:5-8` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl:6` (runDir `20260601T032841284Z-scope-discovery`)
+
+Not re-litigating the open AUDIT-13/18/26/27 shape — supplying the next confirmed data point, which this diff makes uniquely clean. The new `last-hook-run.json` records `disposition: "fired-and-promoted"` with `findingsCount: 0, promotedCount: 0, slushedCount: 0` for runDir `20260601T032841284Z`. But that exact runDir is the one whose lift appends the `## 2026-06-01 — audit-barrage lift (20260601T032841284Z-scope-discovery)` section to `audit-log.md` (AUDIT-29) **and** adds `workplan.md` Task 5.63 in the same diff. So this run found ≥1 finding and promoted exactly 1 — yet the marker asserts it promoted zero. `promotedCount` and the lifted/scoped reality are in direct contradiction inside a single diff.
+
+This is the strongest evidence yet that AUDIT-27's root-cause analysis is correct: `findingsCount`/`promotedCount` are sourced from a tally that never gets populated on the promote path. AUDIT-26 had to reach back to a prior runDir for its second instance; here the lift, the workplan task, and the `0/0/0` marker are all in the same commit, so no cross-run inference is needed. The regression test for the AUDIT-27/Task-5.62 fix should assert that a hook run lifting AUDIT-29-shaped output writes `promotedCount === 1`, using this run as the fixture.
+
+### AUDIT-20260601-32 — Task 5.63 is rendered with the code-defect "write a failing test" template for a commit-subject-hygiene finding that has no testable bug — fresh AUDIT-02 instance
+
+Finding-ID: AUDIT-20260601-32 (claude-opus-03 + claude-opus-06 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.63 (`fix-finding-AUDIT-20260601-29`), Steps 1–5 + Acceptance Criteria
+
+Task 5.63's body is: *"Step 1: write failing test exercising the bug … Step 2: confirm test fails … Step 4: confirm test passes"* with AC *"Failing test exists at `(to be filled in by Step 1 implementer)`"* and *"`npx vitest run <test-file-path>` exits 0"*. But AUDIT-29 is a **commit-history / process finding** — *"commit `f51bcb12` subject is misaligned with the diff."* There is no code defect and no failing test you can write: you cannot author a vitest that exercises "the commit message didn't describe the diff." This is shape (e) ("commit-history / docs / process finding — no test possible") in Phase 18 Task 1's own taxonomy, laundered through the code-defect template — the exact AUDIT-02 violation Phase 18 Task 1 exists to fix.
+
+The significance is that `promote-findings --auto` is *still* minting placeholder-test tasks for non-bug findings (Phase 18 Task 1's shape inference is unimplemented — `[ ]`), and is now doing it for findings that are themselves about bookkeeping hygiene. When Task 5.63 is checked `[x]` with that placeholder AC, the `fix-task-tdd-discipline` doctor rule and `check-fix-task-tdd` gate will either correctly reject it (blocking the loop) or be bypassed (laundering the violation). Either way it reinforces that Phase 18 Task 1 should land before any more non-bug findings are promoted, and that Tasks 5.62/5.63 should be re-rendered as shape-(e) disposition tasks (substantive acknowledgement, no test path) once it does.
+
+### AUDIT-20260601-33 — AUDIT-29's substantive complaint — the AUDIT-05 flip `f51bcb12` claimed but never made — is not landed in this diff; only a meta-task about it is added
+
+Finding-ID: AUDIT-20260601-33
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (no hunk touches AUDIT-20260601-05's `Status:` line) vs. `workplan.md` Task 5.63
+
+AUDIT-29 raised two things: (1) a process complaint (commit subject misaligned), and (2) a substantive gap — *"the AUDIT-05 flip … is **not present anywhere in the diff** … The fix is … to land the AUDIT-05 flip if it was intended (it is missing)."* This diff responds to (1) by scoping Task 5.63, but does nothing about (2): there is no hunk anywhere in the diff that flips `AUDIT-20260601-05` to `acknowledged-informational`. So the actual action commit `f51bcb12` overclaimed remains undone, and an operator scanning open findings still cannot tell whether AUDIT-05 was dispositioned.
+
+This is the loop's characteristic failure: it converts a finding into a tracking task but does not perform the one-line substantive action the finding asked for. The AUDIT-05 status flip is a trivial edit (`Status: open` → `Status: acknowledged-informational-<reason>`) that should have landed directly rather than being deferred behind a placeholder-test task. Recommend: make the AUDIT-05 flip in this branch now, and let Task 5.63 reduce to confirming the subject-history record rather than carrying the substantive action.
+
+### AUDIT-20260601-34 — Runtime marker files (`last-hook-run.json`, `hook-run-log.jsonl`) are version-controlled and mutated on every barrage run, generating diff noise and a merge-conflict surface
+
+Finding-ID: AUDIT-20260601-34
+Status:     open
+Severity:   low
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl`
+
+Every run rewrites `last-hook-run.json` in place (tip + timestamp + runDir + the three counts) and appends a line to `hook-run-log.jsonl`. Because both are tracked, each barrage fire produces a diff against them — and `last-hook-run.json` in particular is a single-record file that two concurrent worktrees/sessions would clobber and that rebases will conflict on. The `hook-run-log.jsonl` append-only file is the more defensible audit trail; the single-record `last-hook-run.json` is derivable from the log's last line, so committing it duplicates state and adds a guaranteed-conflict file to every branch that runs the hook.
+
+If these are intentionally tracked as the closure machinery's audit trail, that's a defensible call — but `last-hook-run.json` being both tracked and last-write-wins is a hygiene smell. Consider gitignoring `last-hook-run.json` (regenerate from the log tail) and keeping only the append-only `hook-run-log.jsonl` under version control, or documenting in the scope-discovery rules why both are tracked despite the conflict surface.

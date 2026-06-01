@@ -728,6 +728,91 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.64 (fix-finding-AUDIT-20260601-30): AUDIT-20260601-30 — Recursive non-convergence: the autonomous barrage is auditin…
+
+Closes AUDIT-20260601-30. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1583-1595` (AUDIT-29 lift) + `workplan.md` (Task 5.63) + the audited commit range as a whole.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-30` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.65 (fix-finding-AUDIT-20260601-31): AUDIT-20260601-31 — Run marker writes `0/0/0` for a run that demonstrably promot…
+
+Closes AUDIT-20260601-31. Surface: `.dw-lifecycle/scope-discovery/last-hook-run.json:5-8` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl:6` (runDir `20260601T032841284Z-scope-discovery`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-31` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.66 (fix-finding-AUDIT-20260601-32): AUDIT-20260601-32 — Task 5.63 is rendered with the code-defect "write a failing …
+
+Closes AUDIT-20260601-32 (claude-opus-03 + claude-opus-06 + codex-01; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.63 (`fix-finding-AUDIT-20260601-29`), Steps 1–5 + Acceptance Criteria.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-32 (claude-opus-03 + claude-opus-06 + codex-01; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.67 (fix-finding-AUDIT-20260601-33): AUDIT-20260601-33 — AUDIT-29's substantive complaint — the AUDIT-05 flip `f51bcb…
+
+Closes AUDIT-20260601-33. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (no hunk touches AUDIT-20260601-05's `Status:` line) vs. `workplan.md` Task 5.63.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-33` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.68 (fix-finding-AUDIT-20260601-34): AUDIT-20260601-34 — Runtime marker files (`last-hook-run.json`, `hook-run-log.js…
+
+Closes AUDIT-20260601-34. Surface: `.dw-lifecycle/scope-discovery/last-hook-run.json` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-34` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.63 (fix-finding-AUDIT-20260601-29): AUDIT-20260601-29 — Commit subject is doubly misaligned with the diff — claims a…
 
 Closes AUDIT-20260601-29 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + codex-01; cross-model). Surface: commit `f51bcb12` subject `docs: flip AUDIT-20260601-05 to acknowledged-informational + tick AUDIT-18 task` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1572-1582` (AUDIT-28 append) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (@@ -726,+726 new Task 5.62).

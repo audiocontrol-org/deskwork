@@ -38,6 +38,7 @@ function makeStubs(opts: {
   runDirs: string[];
   tipShas: Record<string, string | null>;
   newCommits: Record<string, number>;
+  diffFiles?: Record<string, string[]>;
 }) {
   return {
     listRunDirs: async () => opts.runDirs,
@@ -47,6 +48,12 @@ function makeStubs(opts: {
       const tip = range.split('..')[0] ?? '';
       return opts.newCommits[tip] ?? 0;
     },
+    listDiffFiles: opts.diffFiles
+      ? async (range: string) => {
+          const tip = range.split('..')[0] ?? '';
+          return opts.diffFiles?.[tip] ?? [];
+        }
+      : undefined,
   };
 }
 
@@ -140,6 +147,110 @@ describe('checkBarrageTip — Phase 16 Task 3 (new-diff guard)', () => {
     });
     expect(result.lastTipSha).toBe('sha-31');
     expect(result.newCommitCount).toBe(5);
+    expect(result.hasNewDiff).toBe(true);
+  });
+
+  // Phase 18 Task 6 — AUDIT-20260601-30 (claude-opus-01, HIGH):
+  // bookkeeping-commit filter. The barrage should NOT fire when the
+  // diff touches only audit-log.md / workplan.md / .dw-lifecycle/
+  // marker files. Without this filter, each bookkeeping commit triggers
+  // a barrage → meta-findings → more bookkeeping → ad infinitum
+  // (the literal "recursive fix-trap" claude-opus-01 named).
+  it('Phase 18 Task 6: SKIPS when diff is entirely bookkeeping files (audit-log + workplan only)', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/2026-06-01-prior'],
+      tipShas: { '/tmp/audit-runs/2026-06-01-prior': 'priorsha1234' },
+      newCommits: { priorsha1234: 2 },
+      diffFiles: {
+        priorsha1234: [
+          'docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md',
+          'docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md',
+        ],
+      },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(false);
+    expect(result.reason.toLowerCase()).toMatch(/bookkeeping/);
+  });
+
+  it('Phase 18 Task 6: SKIPS when diff is entirely .dw-lifecycle marker files', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/prior'],
+      tipShas: { '/tmp/audit-runs/prior': 'tip001' },
+      newCommits: { tip001: 1 },
+      diffFiles: {
+        tip001: [
+          '.dw-lifecycle/scope-discovery/last-hook-run.json',
+          '.dw-lifecycle/scope-discovery/hook-run-log.jsonl',
+        ],
+      },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(false);
+    expect(result.reason.toLowerCase()).toMatch(/bookkeeping/);
+  });
+
+  // Phase 18 Task 6 — REGRESSION LOCK (per Option D discipline).
+  // Working-code invariant: the barrage fires on every source-code
+  // change. The fix must NOT break that. ANY non-bookkeeping file in
+  // the diff → fire. This regression-lock pins the working invariant.
+  it('Phase 18 Task 6 REGRESSION: FIRES when diff touches any source file (working-code invariant)', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/prior'],
+      tipShas: { '/tmp/audit-runs/prior': 'srctip001' },
+      newCommits: { srctip001: 1 },
+      diffFiles: {
+        srctip001: ['plugins/dw-lifecycle/src/subcommands/audit-barrage.ts'],
+      },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(true);
+  });
+
+  it('Phase 18 Task 6 REGRESSION: FIRES on mixed diff (any source file → fire)', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/prior'],
+      tipShas: { '/tmp/audit-runs/prior': 'mixedtip' },
+      newCommits: { mixedtip: 3 },
+      diffFiles: {
+        mixedtip: [
+          'docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md',
+          'plugins/dw-lifecycle/src/scope-discovery/promote-findings/some-source.ts',
+          '.dw-lifecycle/scope-discovery/last-hook-run.json',
+        ],
+      },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    // Mixed → still fires (the source change deserves audit).
+    expect(result.hasNewDiff).toBe(true);
+  });
+
+  it('Phase 18 Task 6 backward-compat: when listDiffFiles is NOT injected, behavior is unchanged (fires on any diff)', async () => {
+    // Pre-Phase-18 callers don't supply listDiffFiles. The library must
+    // default to the existing behavior (fire iff newCommitCount > 0)
+    // without the bookkeeping filter being applied.
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/prior'],
+      tipShas: { '/tmp/audit-runs/prior': 'compatsha' },
+      newCommits: { compatsha: 1 },
+      // diffFiles intentionally omitted
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
     expect(result.hasNewDiff).toBe(true);
   });
 

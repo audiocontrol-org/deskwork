@@ -106,6 +106,8 @@ export interface RunArgs {
   readonly readTipSha?: (runDir: string) => Promise<string | null>;
   /** Injectable for tests; defaults to git rev-list --count, bound to projectRoot. */
   readonly gitRevListCount?: (range: string) => Promise<number>;
+  /** Injectable for tests; defaults to `git diff --name-only <range>` against projectRoot. */
+  readonly listDiffFiles?: (range: string) => Promise<string[]>;
 }
 
 /**
@@ -153,6 +155,32 @@ async function defaultReadTipSha(runDir: string): Promise<string | null> {
   }
 }
 
+/**
+ * Phase 18 Task 6 / AUDIT-30: default `listDiffFiles` invokes
+ * `git diff --name-only <range>` and parses the result. On git
+ * failure, returns the empty array — the library treats empty-files
+ * as "no signal" and falls back to firing (fail-safe to audit).
+ */
+function defaultListDiffFiles(range: string, cwd: string): Promise<string[]> {
+  return Promise.resolve(
+    (() => {
+      try {
+        const stdout = execFileSync('git', ['diff', '--name-only', range], {
+          cwd,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        return stdout
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l.length > 0);
+      } catch {
+        return [];
+      }
+    })(),
+  );
+}
+
 function defaultGitRevListCount(range: string, cwd: string): Promise<number> {
   return Promise.resolve(
     (() => {
@@ -196,6 +224,8 @@ export async function runCheckBarrageTip(args: RunArgs): Promise<number> {
   const readTipSha = args.readTipSha ?? defaultReadTipSha;
   const gitRevListCount =
     args.gitRevListCount ?? ((range: string) => defaultGitRevListCount(range, repoRootResolved));
+  const listDiffFiles =
+    args.listDiffFiles ?? ((range: string) => defaultListDiffFiles(range, repoRootResolved));
   // Per AUDIT-20260601-07 (claude-02): typed binding for the result
   // (was a `let result;` evolving-any). Try/catch wraps the call so
   // injected-dependency throws map to exit-2 config errors.
@@ -206,6 +236,7 @@ export async function runCheckBarrageTip(args: RunArgs): Promise<number> {
       listRunDirs,
       readTipSha,
       gitRevListCount,
+      listDiffFiles,
     });
   } catch (err) {
     // Per AUDIT-20260531-23: errors propagate from injected
