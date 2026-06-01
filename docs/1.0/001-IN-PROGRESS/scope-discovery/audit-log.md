@@ -1858,3 +1858,92 @@ Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks
 The commit subject is "non-bug task template + doctor-rule path," but the workplan hunk in the very same diff inserts six task blocks rendered with the *old* bug template — `Step 1: write failing test exercising the bug`, AC `npx vitest run <test-file-path> exits 0`. At least two are unambiguously non-bug: 5.78 closes AUDIT-44 (a pure process finding) and its surface literally contains `workplan.md` — which `inferFindingShape` would classify `non-bug` — yet it renders the bug template; 5.80 closes AUDIT-46, a "SKILL.md prose pass is missing" doc-drift finding with no failing test possible. This is precisely the laundering pathology AUDIT-44 named, reproduced inside the commit that purports to fix it. The visible inconsistency means either the promotion that wrote these tasks ran on pre-commit code (a timing artifact the operator must reconcile by regenerating through the new `apply.ts` path) or `inferFindingShape`'s literal `workplan\.md` pattern missed the prose-form surfaces. Note the latter is independently real: a surface phrased `workplan Phase 18 Task 5 Step 3` (AUDIT-46) contains no `workplan.md` token and falls through to `code-defect`. Before any of 5.77–5.82 is checked `[x]`, the non-bug ones must be re-rendered through the new template, or they will deadlock the `check-fix-task-tdd` gate they were just built to avoid.
 
 ---
+
+## 2026-06-01 — audit-barrage lift (20260601T053324695Z-scope-discovery)
+
+### AUDIT-20260601-52 — Workplan tasks 5.83/5.84 close HIGH findings but are rendered without the `Severity:` line, Step 0, or Step 1b — the new gate cannot fire on them
+
+Finding-ID: AUDIT-20260601-52 (claude-01 + claude-06 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.83 (Closes AUDIT-20260601-49, severity **high**) and 5.84 (Closes AUDIT-20260601-50, severity **high**), vs. `workplan-task-renderer.ts` `renderFixTaskBlock` (the `isHighPlus` branch this commit adds)
+
+The same diff that introduces the Option-D HIGH+ treatment also inserts task blocks for two HIGH findings — 5.83 (AUDIT-49) and 5.84 (AUDIT-50), both `Severity: high` in the audit-log — and renders them with the **plain code-defect template**: `Closes AUDIT-…. Surface: ….` (no `Severity:` field), `Step 1: write failing test`, `Step 2: confirm test fails`, with no `Step 0: working-code invariant` and no `Step 1b: write a regression-lock test`. This is the exact regression the new renderer code is meant to prevent, shipped inside the commit that adds the prevention.
+
+The downstream consequence is concrete and self-defeating: `extractTaskSeverity` keys on a `Severity:\s+…` line (`tdd-enforcement.ts` `SEVERITY_RE`). These two blocks carry no such line, so `extractTaskSeverity` returns `null`, the `severity === 'high' || severity === 'blocking'` guard in `verifyFixTaskTDD` is skipped, and the ≥2-test regression-lock requirement **never applies** to the commits that will close AUDIT-49/50. The HIGH findings most in need of the new gate are precisely the ones that bypass it. This is the recurrence of the AUDIT-51 laundering pathology, now in the Option-D dimension. The fix: regenerate these blocks through the post-commit `renderFixTaskBlock` so they carry `Severity: high.` + Step 0 + Step 1b before any of 5.83–5.85 is checked `[x]`, and confirm `promote-findings`/`apply.ts` actually threads `finding.severity` into the renderer (if it doesn't, that's the root cause of the missing `Severity:` lines).
+
+---
+
+### AUDIT-20260601-53 — `extractTaskSeverity` takes the first regex match, and the renderer interpolates `surface` *before* the canonical `Severity:` field on the same line
+
+Finding-ID: AUDIT-20260601-53
+Status:     open
+Severity:   medium
+Surface:    `tdd-enforcement.ts` — `SEVERITY_RE = /Severity:\s+(blocking|high|medium|low|informational)\b/i` + `extractTaskSeverity`; `workplan-task-renderer.ts` line emitting `Closes ${id}. Surface: ${surface}. Severity: ${severity}.`
+
+`SEVERITY_RE` is non-global; `extractTaskSeverity` calls `SEVERITY_RE.exec(taskBlock)` and returns the **first** match. The renderer places the operator-supplied `surface` string *ahead* of the canonical `Severity:` token on the same line. A finding whose `surface` text contains a severity keyword in the pattern `Severity: <word>` — entirely plausible for findings *about* the severity machinery itself (this very audit ships findings whose surface prose discusses severity gates) — will cause `extractTaskSeverity` to capture the surface's severity rather than the finding's true severity.
+
+The failure is silent and bidirectional: a genuinely-HIGH finding whose surface mentions "Severity: low" reads as `low` and escapes the ≥2-test gate; a MEDIUM finding whose surface mentions "Severity: high" reads as `high` and gets gated unexpectedly. The renderer tests only exercise surfaces with no embedded severity token (`src/x.ts`), so the collision is unguarded. Fix: anchor the extraction to the canonical position (e.g. match `Severity:` only at the end of the Closes line, or emit the severity on its own dedicated line that the regex anchors with `^`), rather than relying on first-match-wins over the free-text surface.
+
+---
+
+### AUDIT-20260601-54 — Severity gate swallows file-read errors and falls through — fail-open on the regression-lock check
+
+Finding-ID: AUDIT-20260601-54
+Status:     open
+Severity:   medium
+Surface:    `tdd-enforcement.ts` — the new HIGH+ block in `verifyFixTaskTDD`: `try { … readFileSync(absPath, 'utf8') … } catch { /* fall through */ }`
+
+The added severity gate reads the cited test file and counts test blocks, but wraps the read in `try { … } catch { }` with the comment *"If we can't read the file (race / permissions), fall through to the runner check."* For a HIGH/BLOCKING finding, a read failure means the ≥2-test regression-lock requirement is silently skipped — the gate fails **open**. This is the "fallback that hides a failure mode" pattern the project guidelines explicitly call a bug-factory: an operator who introduces a permission/race condition gets a green gate on a HIGH commit with no signal that the regression-lock invariant was never checked.
+
+Note the read also looks redundant with the earlier missing-test branch (which already resolves `testFilePath` and presumably `existsSync`-guards `absPath`), so by the time control reaches this block the file is expected to exist — making a read error genuinely exceptional and exactly the case that should surface, not swallow. Fix: on read failure for a HIGH+ task, return `valid: false` with a distinct reason (e.g. `high-severity-test-file-unreadable`) rather than falling through; or, if the file was already validated upstream, drop the try/catch and let the genuinely-exceptional error propagate.
+
+---
+
+### AUDIT-20260601-55 — `TEST_BLOCK_RE` comment claims it counts `describe(` blocks, but the regex matches only `it(`/`test(`; common variants are missed
+
+Finding-ID: AUDIT-20260601-55
+Status:     open
+Severity:   low
+Surface:    `tdd-enforcement.ts` — `TEST_BLOCK_RE = /^\s*(?:it|test)\(/gm` and its preceding comment
+
+The comment above the regex reads: *"Count vitest test blocks in a test file: `it(`, `test(`, or `describe('...', () => {` containing nested it/test."* The regex does **not** match `describe(` at all — it matches only lines beginning with `it(` or `test(`. The comment describes behavior the code doesn't implement, which will mislead the next maintainer.
+
+Separately, the `(?:it|test)\(` form (immediately followed by `(`) excludes `it.skip(`, `it.only(`, `it.each(`, `test.each(`, and `it.concurrent(`. Excluding `.skip`/`.only` is arguably correct, but excluding `test.each`/`it.each` means a HIGH task whose two tests are written as parameterized `it.each` blocks counts as 0 and is wrongly refused. Either tighten the comment to match the regex, or broaden the regex to `^\s*(?:it|test)(?:\.\w+)?\s*[(.]` if parameterized forms should count. Low severity but it's a correctness-vs-documentation drift in a gate.
+
+---
+
+### AUDIT-20260601-56 — Option-D `tdd-enforcement` tests assert only the negative (reason ≠ X), never the positive contract — they would pass under unrelated failures
+
+Finding-ID: AUDIT-20260601-56
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` — the "HIGH-tagged task with 2 test blocks → … proceeds" and "MEDIUM-tagged task with 1 test block → unchanged" cases
+
+Both passing-path tests assert only `expect(result.reason).not.toBe('high-severity-missing-regression-lock')` and never assert `result.valid` or the actual expected `reason`. Per the project testing rule against "tests that don't test the contract they claim to test," these would stay green even if the function regressed to returning `valid: false` for some *other* reason (e.g. a broken runner path, a future new refusal branch), because any reason other than the one string satisfies the assertion. The test's name promises "proceeds" / "allow," but the assertion doesn't verify proceeding.
+
+The refusal-path test (1 test → `valid: false`, `reason === 'high-severity-missing-regression-lock'`) is correctly specified; the two allow-path tests should mirror that rigor — assert the concrete expected outcome (e.g. `valid === true` for the no-runner branch, or the specific reason it does return), not merely the absence of one reason. As written, the suite locks in only half the contract.
+
+---
+
+### AUDIT-20260601-57 — HIGH/BLOCKING rendering changes only the code-defect template, not all rendered HIGH+ fix tasks
+
+Finding-ID: AUDIT-20260601-57
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:150-198`
+
+The Option D renderer logic is placed only after the early non-bug branch returns. That means a HIGH or BLOCKING finding classified as `non-bug` will not receive the new `Severity:` line, Step 0 invariant block, Step 1b regression-lock language, or ≥2-test acceptance criterion. The workplan acceptance criterion says “Rendered HIGH+ fix-task blocks include a Step 0 invariant write-up section,” without limiting that to `code-defect` shapes.
+
+If the intended design is that non-bug findings are exempt from regression-lock tests, the spec and tests need to say that explicitly. As written, the implementation leaves a whole rendered-task shape outside the new severity contract, and the doctor rule cannot enforce HIGH+ behavior for those blocks because the renderer never emits the severity field there.
+
+### AUDIT-20260601-58 — SKILL.md implementation guidance required by the workplan is missing
+
+Finding-ID: AUDIT-20260601-58
+Status:     open
+Severity:   medium
+Surface:    missing `SKILL.md` hunk for Phase 18 Task 3 Step 5
+
+The feature scope explicitly includes Step 5: update the implement skill’s `SKILL.md` Step 6 prose to name the HIGH-severity regression-lock requirement and reference the operator’s commission-vs-omission framing. The diff changes renderer code, TDD enforcement, tests, and workplan/audit artifacts, but contains no `SKILL.md` change.
+
+That leaves the operator-facing workflow docs behind the enforcement behavior. The next implement session can follow the skill and still miss the new HIGH+ two-test discipline until the gate rejects the work. The fix is to update the relevant implement skill prose in the same change set so the documented workflow and enforcement rule match.

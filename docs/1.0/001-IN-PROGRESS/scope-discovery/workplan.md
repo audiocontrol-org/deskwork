@@ -735,6 +735,125 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.86 (fix-finding-AUDIT-20260601-52): AUDIT-20260601-52 — Workplan tasks 5.83/5.84 close HIGH findings but are rendere…
+
+Closes AUDIT-20260601-52 (claude-01 + claude-06 + codex-01; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.83 (Closes AUDIT-20260601-49, severity **high**) and 5.84 (Closes AUDIT-20260601-50, severity **high**), vs. `workplan-task-renderer.ts` `renderFixTaskBlock` (the `isHighPlus` branch this commit adds).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-52 (claude-01 + claude-06 + codex-01; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.87 (fix-finding-AUDIT-20260601-53): AUDIT-20260601-53 — `extractTaskSeverity` takes the first regex match, and the r…
+
+Closes AUDIT-20260601-53. Surface: `tdd-enforcement.ts` — `SEVERITY_RE = /Severity:\s+(blocking|high|medium|low|informational)\b/i` + `extractTaskSeverity`; `workplan-task-renderer.ts` line emitting `Closes ${id}. Surface: ${surface}. Severity: ${severity}.`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-53` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.88 (fix-finding-AUDIT-20260601-54): AUDIT-20260601-54 — Severity gate swallows file-read errors and falls through — …
+
+Closes AUDIT-20260601-54. Surface: `tdd-enforcement.ts` — the new HIGH+ block in `verifyFixTaskTDD`: `try { … readFileSync(absPath, 'utf8') … } catch { /* fall through */ }`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-54` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.89 (fix-finding-AUDIT-20260601-55): AUDIT-20260601-55 — `TEST_BLOCK_RE` comment claims it counts `describe(` blocks,…
+
+Closes AUDIT-20260601-55. Surface: `tdd-enforcement.ts` — `TEST_BLOCK_RE = /^\s*(?:it|test)\(/gm` and its preceding comment.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-55` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.90 (fix-finding-AUDIT-20260601-56): AUDIT-20260601-56 — Option-D `tdd-enforcement` tests assert only the negative (r…
+
+Closes AUDIT-20260601-56. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts` — the "HIGH-tagged task with 2 test blocks → … proceeds" and "MEDIUM-tagged task with 1 test block → unchanged" cases.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-56` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.91 (fix-finding-AUDIT-20260601-57): AUDIT-20260601-57 — HIGH/BLOCKING rendering changes only the code-defect templat…
+
+Closes AUDIT-20260601-57. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:150-198`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-57` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.92 (fix-finding-AUDIT-20260601-58): AUDIT-20260601-58 — SKILL.md implementation guidance required by the workplan is…
+
+Closes AUDIT-20260601-58. Surface: missing `SKILL.md` hunk for Phase 18 Task 3 Step 5.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-58` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.83 (fix-finding-AUDIT-20260601-49): AUDIT-20260601-49 — Over-broad keyword matching in `inferFindingShape` misclassi…
 
 Closes AUDIT-20260601-49. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts` — `inferFindingShape`, the final pre-default branch: `if (/missing surface|no surface|\(the audited|process feedback|disposition/i.test(surface))`.
