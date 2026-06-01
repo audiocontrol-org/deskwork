@@ -48,6 +48,11 @@ import {
   type HookRunMarker,
 } from '../scope-discovery/promote-findings/hook-run-marker.js';
 import { appendHookRunLogEntry } from '../scope-discovery/promote-findings/hook-run-log.js';
+import {
+  parseLiftFindingsCount,
+  parseSlushCounts,
+  parsePromoteCount,
+} from './implement-hook-counters.js';
 
 export interface ImplementHookCliOptions {
   readonly featureSlug: string;
@@ -333,6 +338,12 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
     args.stderr.write('implement-hook: audit-barrage-lift failed; aborting.\n');
     return 1;
   }
+  // Per GH #384 / AUDIT-20260601-18: the canonical findings count
+  // comes from the lift's stderr ("extracted N finding(s)"), NOT
+  // from the disposition step. Pre-fix, findingsCount was only set
+  // inside the slush/promote branches, so even successful lifts
+  // showed findings=0 when the regex didn't match.
+  const findingsCountFromLift = parseLiftFindingsCount(liftResult.stderr);
 
   // Step 5: dampener.
   const auditLogText = await safeReadText(auditLogPath);
@@ -341,7 +352,7 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
 
   // Step 6: disposition branch.
   let disposition: HookDisposition;
-  let findingsCount = 0;
+  let findingsCount = findingsCountFromLift;
   let promotedCount = 0;
   let slushedCount = 0;
 
@@ -363,11 +374,12 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
       return 1;
     }
     disposition = 'fired-and-slushed';
-    // Count slushes from the stderr summary if available (best-effort).
-    const m = /flipped:\s*(\d+),\s*skipped:\s*(\d+)/.exec(slushResult.stderr);
-    if (m !== null) {
-      slushedCount = Number.parseInt(m[1]!, 10);
-      findingsCount = slushedCount + Number.parseInt(m[2]!, 10);
+    // Per GH #384: pull from the shared parser. slush-remaining
+    // writes "flipped: N, skipped: M HIGH(s)" to stderr; the parser
+    // returns null when not found. Caller maps null → 0.
+    const slush = parseSlushCounts(slushResult.stderr);
+    if (slush !== null) {
+      slushedCount = slush.flipped;
     }
   } else {
     const promoteResult = invokeDwl(
@@ -387,11 +399,10 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
       return 1;
     }
     disposition = 'fired-and-promoted';
-    const m = /promoted:\s*(\d+)/.exec(promoteResult.stderr);
-    if (m !== null) {
-      promotedCount = Number.parseInt(m[1]!, 10);
-      findingsCount = promotedCount;
-    }
+    // Per GH #384 / AUDIT-20260601-18: promote-findings writes
+    // "Auto-applied: N finding(s)" to STDOUT (not stderr). Pre-fix
+    // regex was "promoted: N" against stderr — wrong on both axes.
+    promotedCount = parsePromoteCount(promoteResult.stdout);
   }
 
   // Step 7: sanity check.

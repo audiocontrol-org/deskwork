@@ -1300,7 +1300,7 @@ Note this boot case is also **looser than its sibling**: the commit-msg gate's `
 ### AUDIT-20260601-07 — New runner catch block in `check-barrage-tip.ts` introduces an untyped `let` and `as` casts against the project's strict-typing rules
 
 Finding-ID: AUDIT-20260601-07
-Status:     open
+Status:     fixed-47e326480531076a1cad74829311e43e3b40ef2d
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts` (`runCheckBarrageTip` — `let result;` declaration ~line 187 + `const errno = err as NodeJS.ErrnoException;` in the new catch ~line 200; also the matching `err as NodeJS.ErrnoException` in `defaultListRunDirs`)
 
@@ -1313,7 +1313,7 @@ For the operator's signal: I checked the `orchestrate-barrage.ts` deferred-write
 ### AUDIT-20260601-08 — Outage detection treats stderr-only model output as no audit coverage
 
 Finding-ID: AUDIT-20260601-08
-Status:     open
+Status:     acknowledged-pushback-by-design-shared-isModelRunHealthy-2026-06-01
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-barrage.ts:106-124`
 
@@ -1395,7 +1395,7 @@ I walked the three fixes (sentinel boot-case, errno type guard, healthy-run pred
 ### AUDIT-20260601-14 — Sentinel-absent-but-log-present fails OPEN — re-opens the exact AUDIT-06 hole for the migration/clone/this-repo path, with no backfill
 
 Finding-ID: AUDIT-20260601-14 (claude-01 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-b2ab920429b2c3220ba85e1836da69ad5dd257af
 Severity:   blocking
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts:100-108` (the `if (!hasSentinel) return allow-no-prior-run` block) + `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts:97-115` (sentinel written only by `appendHookRunLogEntry`) + the committed `.dw-lifecycle/scope-discovery/hook-run-log.jsonl`
 
@@ -1458,3 +1458,101 @@ This matters because the marker is the operator-facing "what did the last hook d
 ---
 
 I walked the three fixes (sentinel boot-case, errno type guard, healthy-run predicate centralization), their tests, the workplan task blocks, the audit-log status flips, and the committed `.dw-lifecycle` artifacts. The `types.ts` centralization itself is clean (single predicate, both call sites converge, no behavior drift), and the `check-barrage-tip.ts` typed `let result: BarrageTipCheckResult` is a real improvement. My highest-confidence concern is **claude-01**: the sentinel fix is fail-open on this exact repo and every fresh clone right now (verified against the live tree), which re-opens the BLOCKING hole it was meant to close.
+
+## 2026-06-01 — audit-barrage lift (20260601T030312885Z-scope-discovery)
+
+### AUDIT-20260601-19 — `hasBootstrapSentinel` violates command-query separation — a read-path predicate writes a non-gitignored file into the working tree during pre-push
+
+Finding-ID: AUDIT-20260601-19 (claude-01 + claude-03 + codex-03; cross-model)
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts:130-156` (backfill `writeFile`) + `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts:100` (gate calls it) + `subcommands/check-implement-hook-coverage.ts:187` (production wiring)
+
+The fix gives `hasBootstrapSentinel` a disk-write side effect: when the sentinel is absent but the log is non-empty it `writeFile`s the sentinel (lines 143-147). That function is named like a pure query (`has…`) and is invoked by the **pre-push gate** (`check-implement-hook-coverage.ts:100` → wired at `subcommands/check-implement-hook-coverage.ts:187`). I verified `git check-ignore -v .dw-lifecycle/scope-discovery/.implement-hook-bootstrapped` exits 1 — the sentinel is **not gitignored**. So the first time an operator on a fresh clone/migration attempts a push, the gate silently creates an *untracked, non-ignored* file in their working tree. That pollutes `git status`, risks accidental `git add .`/commit of the sentinel, and mutates state during an operation operators reasonably expect to be read-only.
+
+Two compounding problems beyond CQS: (1) the backfill is functionally unnecessary for correctness — the `if (log.length > 0) return true` decision is already made by reading the log; the write only "converges" the sentinel, which is the durability the original AUDIT-06 fix wanted, but that durability should be earned by the *write path* (`appendHookRunLogEntry`), not smuggled into a predicate; (2) the `catch {}` on the backfill write (lines 148-151) swallows all errors silently — on a read-only checkout or permission-denied dir, the gate keeps working (correct) but leaves no diagnostic that the sentinel never persisted, so the "converge to present" guarantee silently doesn't hold. Reasonable fix: either gitignore `.implement-hook-bootstrapped` *and* keep the write, or drop the backfill from the predicate entirely (return `log.length > 0`) and let `appendHookRunLogEntry` own all sentinel writes. If the write stays, the function should be renamed to signal the mutation (`ensureBootstrapSentinel`) so callers in any future read-only/dry-run/`--check` context don't unknowingly mutate the tree.
+
+---
+
+### AUDIT-20260601-20 — The gate-level regression test for the migration/clone case is tautological — it stubs the resolved boolean instead of exercising the fix through the gate
+
+Finding-ID: AUDIT-20260601-20
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-coverage.test.ts:137-157` (new test) + `:35` (`makeArgs` stub) + the untested wiring at `subcommands/check-implement-hook-coverage.ts:187`
+
+The new test claims to cover "sentinel absent BUT log has entries (migration/clone case)," but `makeArgs` injects `hasBootstrapSentinel: async () => opts.bootstrapped ?? true` (test line 35), and the test passes `bootstrapped: true` — which is also the default. So the test feeds the gate the **already-resolved** post-fix boolean and asserts the gate refuses uncovered commits. That was already the behavior, already covered by the "mature project" case; the new test re-asserts it and guards nothing new. The actual fix — *deriving* `bootstrapped: true` from a non-empty log when the sentinel file is absent — lives in `hasBootstrapSentinel` (hook-run-log.ts), and the only place that fixed function meets the gate is the CLI glue at `subcommands/check-implement-hook-coverage.ts:187` (`() => hasBootstrapSentinel(repoRootResolved)`), which has no test.
+
+This is the same blind-spot shape the prior cross-model finding already named in the gate's own suite ("never `bootstrapped: false` + `logTips: ['x']`"). The diff adds a test whose *name* describes the dangerous case but whose *injected input* sidesteps it. The honest regression test would not stub `hasBootstrapSentinel` at all for this scenario — it would run the gate against a real (or fake-fs) repo with a non-empty `hook-run-log.jsonl` and no sentinel file, proving the integrated path resolves to refuse. As written, if someone changed the wiring at line 187 to stop calling the fixed function (or passed the old sentinel-only check), every test here would stay green while the BLOCKING fail-open silently returned. The unit test in `hook-run-log.test.ts:139-165` does cover the function in isolation, so the gap is specifically the *integration*, which is exactly where AUDIT-14 said the live regression bit.
+
+---
+
+### AUDIT-20260601-21 — This diff re-commits the two still-open marker/placeholder defects (AUDIT-13/18 and AUDIT-10/15) as fresh instances
+
+Finding-ID: AUDIT-20260601-21 (claude-04 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (`findingsCount: 0 / promotedCount: 0 / slushedCount: 0`, `disposition: fired-and-promoted`) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 5.44-5.48 (`Failing test exists at (to be filled in by Step 1 implementer)`)
+
+Not re-litigating dispositions — flagging that this commit produces **new instances** of two findings already `open` in the log. (1) The marker bug (AUDIT-13/18): `last-hook-run.json` now points at runDir `20260601T025451417Z` — the run whose lift section in this very diff adds AUDIT-09…18, one of them BLOCKING — yet records `0/0/0` with disposition `fired-and-promoted`. The count-vs-reality contradiction the open finding named is reproduced verbatim for the new run, confirming the tally bug is unaddressed and continues to mislead any downstream reader keying on `promotedCount`. (2) The placeholder-AC bug (AUDIT-10/15): Tasks 5.44-5.48 each ship `Failing test exists at (to be filled in by Step 1 implementer)` — five fresh parenthetical-prose test paths generated by the promote-findings template. These tasks are still unchecked, so the `check-fix-task-tdd` gate isn't tripped *yet*, but the diff demonstrates the root cause (template emits non-path placeholder strings) is structurally live and will keep manufacturing gate-bypass candidates until the template is fixed to reject `^\(.*\)$` test-path values. Surfacing so the operator sees the two open findings are accreting instances, not stable.
+
+---
+
+I walked the actual fix (`hasBootstrapSentinel` backfill), both test files, the gate library + its production wiring, and the committed `.dw-lifecycle` artifacts — and verified two claims against the live tree (production wiring at `subcommands/…:187` does pass the fixed function, so the BLOCKING fail-open is genuinely closed at runtime; and the backfilled sentinel is not gitignored). The runtime fix is real and the unit test for `hasBootstrapSentinel` is sound. My highest-confidence concerns are **claude-01** (a query predicate that writes a non-ignored file into the working tree during pre-push) and **claude-02** (the gate-level regression test stubs the very boolean the fix computes, so the integration that AUDIT-14 said bit in production stays unguarded).
+
+### AUDIT-20260601-22 — Audit-log duplicates the same lifted findings under two ID ranges
+
+Finding-ID: AUDIT-20260601-22
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1323-1460`
+
+The diff appends the same audit-barrage lift twice for the same runDir `20260601T025451417Z-scope-discovery`: first as AUDIT-20260601-09 through -13, then again as AUDIT-20260601-14 through -18. The bodies are substantively identical, including the same sentinel finding, TDD bypass finding, disposition finding, errno type-guard finding, and marker-count finding.
+
+This creates two open records for each underlying issue and breaks the feature’s tracking surfaces: the workplan only creates fix tasks for AUDIT-09 through AUDIT-13, while AUDIT-14 through AUDIT-18 remain open duplicates with no corresponding task block. The reasonable fix is to keep one canonical lifted section and remove or disposition the duplicate IDs consistently so issue picking, close-shipped-audit-findings, and future audits do not process the same finding twice.
+
+## 2026-06-01 — audit-barrage lift (20260601T030416879Z-scope-discovery)
+
+### AUDIT-20260601-23 — Audit-log `20260601T025451417Z` lift batch is duplicated — AUDIT-09..13 and AUDIT-14..18 are byte-identical pairs under two identical section headers
+
+Finding-ID: AUDIT-20260601-23 (claude-01 + codex-03 + codex-04; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (two consecutive sections both headed `## 2026-06-01 — audit-barrage lift (20260601T025451417Z-scope-discovery)`) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Tasks 5.44–5.48)
+
+The diff appends the *same* lift batch to the audit-log twice. There are two sections with the identical header `## 2026-06-01 — audit-barrage lift (20260601T025451417Z-scope-discovery)`. The first contains AUDIT-20260601-09/-10/-11/-12/-13; the second contains AUDIT-20260601-14/-15/-16/-17/-18. The pairs are byte-identical: -09 ≡ -14 (sentinel fail-open, blocking), -10 ≡ -15 (gate bypass), -11 ≡ -16 (AUDIT-08 disposition), -12 ≡ -17 (isErrnoException), -13 ≡ -18 (marker counts). Two barrage runs cannot share one `runDir` timestamp, so this is not two independent runs — it is one batch lifted/appended twice (a lift idempotency bug or a copy-paste during the lift).
+
+This corrupts the closure machinery the whole Phase 17 premise depends on. `check-open-findings` counts `Status: open` entries to gate `/dw-lifecycle:implement` pickup; the duplication inflates the open count from 5 to 10. Worse, `promote-findings` only scoped the *first* copy: workplan Tasks 5.44–5.48 cover AUDIT-09..13, while AUDIT-14..18 have **no** workplan tasks at all (only -14 is closed, via the b2ab9204 commit). So five orphan `open` findings now exist with no fix-task to ever flip them to `fixed-<sha>` through the normal flow — they will sit `open` forever and permanently jam the open-findings gate. The fix: dedup the audit-log section (delete one of the two `20260601T025451417Z` batches), and add an idempotency guard to the lift so a re-run against an already-lifted runDir is a no-op rather than a re-append.
+
+### AUDIT-20260601-24 — AUDIT-09/14 BLOCKING fix is implemented in this diff, but Task 5.44 is fully unchecked and both statuses remain `open` — a future reader re-picks an already-shipped fix
+
+Finding-ID: AUDIT-20260601-24 (claude-02 + claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts:97-156` (`hasBootstrapSentinel` OR-backfill) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.44 (steps all `[ ]`) and `audit-log.md` (AUDIT-09 + AUDIT-14 both `Status: open`)
+
+The blocking sentinel-fail-open finding's prescribed fix — "treat a non-empty log as implying bootstrapped … and backfill the sentinel on read" — is *present and correct* in this very diff. `hasBootstrapSentinel` returns `true` when the sentinel exists OR `readHookRunLog(...).length > 0`, and backfills the sentinel file (`hook-run-log.ts:140-150`); `hook-run-log.test.ts` adds the matching "returns true AND backfills … (migration/clone)" test. At runtime on this repo (log has 2 entries) the pre-push gate now refuses unbacked commits. The hole is closed.
+
+But the bookkeeping contradicts the code three ways: commit `b2ab9204` closes AUDIT-**14**; the audit-log keeps **both** AUDIT-09 and AUDIT-14 at `Status: open`; and Task 5.44 (the workplan task for AUDIT-09) has every step `[ ]` with a `(to be filled in by Step 1 implementer)` test path. This is the inverse of the AUDIT-16 incoherence: there the commit claimed a close the code didn't make; here the code made the fix but the trail says `open`/unstarted. A future session walking `Status: open` (per the project's own "read the categories before declaring all-clear" rule) will re-pick a BLOCKING item and re-implement a fix that already shipped. Disposition: flip AUDIT-09 and AUDIT-14 to `fixed-b2ab9204…` (they are duplicates of each other — see claude-01) and check off Task 5.44 citing `hook-run-log.test.ts` as the existing test.
+
+### AUDIT-20260601-25 — The "migration/clone case" test in `check-implement-hook-coverage.test.ts` does not exercise the migration logic its comment claims
+
+Finding-ID: AUDIT-20260601-25
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-coverage.test.ts` ("refuses when sentinel absent BUT log has entries (migration/clone case)")
+
+The test's comment says it covers the case where "a fresh clone or migrating project will have a non-empty log … but no sentinel file … The gate must NOT fail-open here." But the test injects `bootstrapped: true` into `makeArgs`, with the comment conceding "The injected stub here directly returns the post-backfill state: bootstrapped: true because log is non-empty." So the assertion (`refuse-uncovered-commits`) only re-exercises the already-covered "sentinel present + log non-empty → refuse" path. The actual migration conversion — `hasBootstrapSentinel` turning (sentinel absent, log present) into `true` — is never driven here; it is tested only in `hook-run-log.test.ts`. The gate's *integration* with the real `hasBootstrapSentinel` (where a stub returning `false` for absent-sentinel would fail open) is not pinned.
+
+This is the same comment-vs-code overclaim shape the project already flagged in AUDIT-04 (test comments asserting boundaries the timestamps don't cross). A test whose comment claims to guard the migration fail-open, but whose stub hard-codes the safe answer, would not fail if someone reverted `hasBootstrapSentinel`'s OR-rule. Either inject `bootstrapped: false` + a non-empty `logTips` and assert the gate still refuses (which requires the gate, not the stub, to apply the OR-rule), or correct the comment to state it only covers the post-backfill state.
+
+### AUDIT-20260601-26 — Run marker `last-hook-run.json` writes `0/0/0` for the `20260601T025451417Z` run too — a second confirmed instance of AUDIT-13/18, showing the undercount is systematic, not a one-off
+
+Finding-ID: AUDIT-20260601-26 (claude-05 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (`runDir: …20260601T025451417Z…`, `findingsCount: 0`, `promotedCount: 0`) + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl`
+
+Not re-litigating AUDIT-13/18 (already `open`); flagging that this diff supplies a *second, distinct* instance that strengthens it from "one bad marker" to "the marker is always wrong." AUDIT-13/18 concerned runDir `20260601T024117392Z` (counts `0` but 3 findings lifted). The committed marker in *this* diff points at the newer runDir `20260601T025451417Z` with `disposition: "fired-and-promoted"` and `findingsCount: 0 / promotedCount: 0 / slushedCount: 0` — yet that run is exactly the one whose lift produced AUDIT-09..18 in the audit-log (5+ findings, one BLOCKING). Two consecutive `fired-and-promoted` runs both recording `0` promoted establishes that `findingsCount`/`promotedCount` are wired to a tally that is never populated, not that one run happened to promote nothing.
+
+The fix and a regression test belong to the existing AUDIT-13/18 task (currently Task 5.48, unchecked): assert that an implement-hook run lifting N findings writes a marker with `findingsCount === N` and `promotedCount === N`. The second instance is the evidence that the test must assert non-zero counts against a real lift, not just parse the marker shape.
