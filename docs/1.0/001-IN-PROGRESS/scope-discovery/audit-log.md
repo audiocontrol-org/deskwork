@@ -2148,12 +2148,76 @@ That makes the release commit internally inconsistent for npm consumers and CI p
 ### AUDIT-20260601-76 — Auto-promotion swept a positive `informational` "clean report" (AUDIT-74) into a code-defect fix-task demanding a failing test
 
 Finding-ID: AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-6f9daf0d1f2515a35255ee42580ab2298a5cb74d
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.108 (`fix-finding-AUDIT-20260601-74`), `@@ -741,6 +741,74 @@` hunk; cross-ref audit-log AUDIT-20260601-74 (`Severity: informational`)
 
 Task 5.108 promotes **AUDIT-20260601-74 into the fix queue as a code defect**, but AUDIT-74 is explicitly a *positive, clean report*: its own audit-log body reads *"Positive signal the operator should see… I checked three things and all came back clean,"* `Severity: informational`, and it exists only to record that the v0.32.1 bump *resolved* the prior AUDIT-66 hygiene complaint. There is no bug. Yet the rendered task says `Closes AUDIT-20260601-74`, `Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)`, `Step 3: implement the fix`, with the Surface being *"the entire diff (all 12 manifest files)."* An implementer who picks up 5.108 literally cannot write "a test exercising the bug" because there is no bug and no file:line — they will either fabricate a meaningless test to satisfy the gate, or the AC placeholder `(to be filled in by Step 1 implementer)` stays unfilled forever.
 
 This is a sharper regression than the missing-`Severity:` shape the prior findings chase, because it promotes the *absence* of a defect as a defect. Worse, the audit-log records AUDIT-74 itself with `Status: open` — and per `agent-discipline.md`, `dw-lifecycle check-open-findings` refuses `/dw-lifecycle:implement` pickup while ≥1 `Status: open` finding exists. A positive "no findings" entry that can never be "fixed" will block the implement loop indefinitely. The promote-findings auto path must exclude `Severity: informational` (and positive/clean-report findings) from the scope-into-workplan default — a clean report is a disposition outcome, not a unit of work. A reasonable fix: `inferFindingShape` / the auto-promote filter classifies `informational` findings as `acknowledged` (record-only, no fix-task), never `code-defect`.
+
+---
+
+## 2026-06-01 — audit-barrage lift (20260601T171337618Z-scope-discovery)
+
+### AUDIT-20260601-77 — Fix creates a hard implement-loop deadlock for any open `informational` finding — the exact symptom AUDIT-76 named, made worse
+
+Finding-ID: AUDIT-20260601-77 (claude-01 + claude-02 + claude-04 + codex-01; cross-model)
+Status:     fixed-a9d7c042bd0c41b172e0bc8f8bee8b4705e61f9f
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/promote-findings.ts:395-399` (the new filter) ↔ `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:127-164` (coverage gate) ↔ `audit-log-walker.ts:4` (no severity filter)
+
+AUDIT-76 named **two** symptoms: (a) an implementer forced to fabricate a test for a non-bug, and (b) a positive informational entry that stays `Status: open` and "will block the implement loop indefinitely" via `check-open-findings`. This diff fixes (a) by excluding `informational` from `newFindings` — but it does **not** flip the finding's Status, and that makes (b) strictly worse.
+
+I traced the interaction in code. `walkOpenFindings` (audit-log-walker.ts) returns every `Status: open` entry regardless of severity — severity is read (`entry.severity`) but never used as a filter. `checkWorkplanAwareGate` (workplan-aware-gate.ts:132) allows only when `findings.length === 0`; otherwise (lines 155-191) it demands that each open finding have a matching `fix-finding-AUDIT-<id>` task in the next N unchecked workplan tasks, else returns `coverage-mismatch` with the unscoped ID in `missingIds` → `runCheckOpenFindings` exit 1 → `/dw-lifecycle:implement` refused. **Before this fix**, the informational finding got scoped (badly, as a fake code-defect) and the coverage check passed. **After this fix**, `promote-findings --apply` permanently refuses to scope it, so `missingIds` permanently contains it, so the gate refuses *forever*. The refusal message (check-open-findings.ts:127) even tells the operator to "run `promote-findings --apply` to scope them" — pointing at the exact verb that now skips it. That is an automated deadlock whose cure message is a no-op; the only escape is an undocumented manual hand-edit of the audit-log Status.
+
+The correct fix is the one AUDIT-76 itself proposed: classify `informational` as `acknowledged` (record-only) and flip its Status out of `open` (or have the gate/walker treat informational as non-gating), so `walkOpenFindings` no longer returns it. Filtering it out of `newFindings` without dispositioning its Status addresses the test-fabrication harm while converting a soft block into a hard one.
+
+---
+
+### AUDIT-20260601-78 — Commit subject `(AUDIT-76)` diverges from the workplan's own Step 5 `Closes AUDIT-20260601-76 (...)`, defeating the auto-flip parser — recurrence of AUDIT-73
+
+Finding-ID: AUDIT-20260601-78
+Status:     acknowledged-non-bug-resolved-2026-06-01
+Severity:   low
+Surface:    commit subject `fix(promote-findings): exclude informational findings from auto-promote (AUDIT-76)` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.110 Step 5
+
+Task 5.110 Step 5 (rendered `[ ]` in this diff) specifies the closing subject must read `Closes AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)`. The actual commit subject is the short parenthetical `(AUDIT-76)` — no `Closes` keyword, truncated ID. Per `agent-discipline.md`, `apply-audit-flips` parses `Closes <id>`; a `Closes`-anchored matcher against the canonical `AUDIT-20260601-76` will not match `(AUDIT-76)`, so the `open → fixed-<sha>` flip for this entry likely never fires. This is the same closure-hygiene shape already logged as AUDIT-73 for `d8bc1feb`, recurring one commit later. Cheap to verify: `dw-lifecycle apply-audit-flips --feature scope-discovery --since 0b37a1e6` should propose a flip for AUDIT-20260601-76 — if it reports nothing, the subject mismatch is confirmed.
+
+---
+
+## 2026-06-01 — audit-barrage lift (20260601T172628161Z-scope-discovery)
+
+### AUDIT-20260601-79 — Already-scoped informational findings (the AUDIT-74 case that motivated this whole thread) are NOT remediated by this fix
+
+Finding-ID: AUDIT-20260601-79 (claude-01 + claude-03 + claude-04 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/promote-findings.ts:411-415` (the `informationalFindings` filter)
+
+The new `informationalFindings` filter carries the `!alreadyScoped.has(canonicalOf(f.findingId))` predicate:
+
+```js
+const informationalFindings = findings.filter(
+  (f) =>
+    !alreadyScoped.has(canonicalOf(f.findingId)) &&
+    (f.severity ?? '').toLowerCase() === 'informational',
+);
+```
+
+This means any informational finding that was *already* scoped by a pre-fix run is excluded from the auto-flip and keeps `Status: open` forever. That is exactly the situation that started this chain: AUDIT-20260601-74 was swept into Task 5.108 as a broken code-defect task (per AUDIT-76's own body) *before* this remediation existed. After this fix, AUDIT-74 is `alreadyScoped`, so it is filtered out of `informationalFindings`, never flipped, and remains `Status: open` tied to an uncompletable `Closes AUDIT-74` task whose Step 1 demands "a failing test exercising the bug" for a finding with no bug and no `file:line`. The fix handles the forward case (new informational findings) but leaves the originating instance unresolved. A reasonable fix: flip informational findings out of `open` regardless of `alreadyScoped`, and/or have the remediation detect and neutralize the already-scoped broken fix-task (e.g. rewrite it to the non-bug disposition shape). Without that, the operator must still hand-edit the audit-log Status for AUDIT-74 — the undocumented escape AUDIT-77 explicitly called out as the failure mode.
+
+---
+
+### AUDIT-20260601-80 — Regression-lock test runs all its assertions inside an unguarded `if`, so it passes vacuously if the audit-log isn't written
+
+Finding-ID: AUDIT-20260601-80
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/subcommand.test.ts` — the `'REGRESSION: HIGH / MEDIUM / LOW Status entries are NOT auto-flipped'` test (the `if (newAuditLog !== undefined)` block)
+
+The first new test correctly pins its contract: it asserts `expect(newAuditLog).toBeDefined()` *before* entering the `if` block, so a missing write fails the test. The regression-lock test does **not** — every assertion (`highSection` / `medSection` / `lowSection` still `open`) lives inside `if (newAuditLog !== undefined) { ... }` with no preceding `toBeDefined()`. If `diskWrites` never receives the audit-log path (e.g. a future refactor gates the write differently, or the fixture is changed to omit informational findings so no flip fires and no write happens), the `if` is skipped, zero assertions execute, and the test reports green while verifying nothing.
+
+This is the precise "tests that don't test the contract they claim to test" anti-pattern the project testing rules name. The regression-lock is the load-bearing Option-D invariant for a HIGH finding; a test that can pass without exercising its invariant is worse than no test because it underwrites a false "regression-locked" claim. Fix: add `expect(newAuditLog).toBeDefined()` before the `if`, mirroring the sibling test.
 
 ---
