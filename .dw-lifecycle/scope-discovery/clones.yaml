@@ -1,4 +1,4 @@
-generated_at: 2026-06-01T06:24:48.358Z
+generated_at: 2026-06-01T07:18:30.957Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -575,60 +575,25 @@ clones:
       - packages/studio/src/pages/shortform-review.ts:92:105
     disposition: pending
     reason: null
-  - id: ddade15dffd2
-    lines: 12
+  - id: e2b6e847597b
+    lines: 7
     members:
-      - packages/studio/src/routes/api.ts:260:271
-      - packages/studio/src/routes/api.ts:374:385
-    disposition: pending
-    reason: null
-  - id: 71cfaeb7da22
-    lines: 10
-    members:
-      - packages/studio/src/routes/api.ts:262:271
-      - packages/studio/src/routes/api.ts:329:338
-    disposition: pending
-    reason: null
-  - id: b50718db746d
-    lines: 11
-    members:
-      - packages/studio/src/routes/api.ts:262:386
-      - packages/studio/src/routes/api.ts:414:424
-    disposition: pending
-    reason: null
+      - packages/studio/src/routes/api.ts:341:347
+      - packages/studio/src/routes/api.ts:520:526
+    disposition: ignore-with-justification
+    reason: Surface-level structural similarity between POST /annotate and PATCH /comments preamble (different parser functions parseEntryAnnotationBody vs parseEditCommentFields, different mint paths downstream); extracting a shared parser-callback wrapper would obscure each route's distinct validation contract for a 7-line saving
   - id: 918b3c68f28e
     lines: 9
     members:
-      - packages/studio/src/routes/api.ts:278:286
-      - packages/studio/src/routes/api.ts:398:406
-    disposition: pending
-    reason: null
-  - id: 87dabae13c21
-    lines: 6
-    members:
-      - packages/studio/src/routes/api.ts:314:319
-      - packages/studio/src/routes/api.ts:453:458
-    disposition: ignore-with-justification
-    reason: established UUID validation pattern in this routes file; six-line clone is the entryId-validate prefix shared with put-body / patch-comment / delete-comment
-  - id: a858e789a3a1
-    lines: 10
-    members:
-      - packages/studio/src/routes/api.ts:359:368
-      - packages/studio/src/routes/api.ts:407:416
+      - packages/studio/src/routes/api.ts:354:362
+      - packages/studio/src/routes/api.ts:539:547
     disposition: pending
     reason: null
   - id: 29e3abdb5a22
     lines: 15
     members:
-      - packages/studio/src/routes/api.ts:392:286
-      - packages/studio/src/routes/api.ts:426:440
-    disposition: pending
-    reason: null
-  - id: 87cabafecb0f
-    lines: 10
-    members:
-      - packages/studio/src/routes/api.ts:414:271
-      - packages/studio/src/routes/api.ts:476:485
+      - packages/studio/src/routes/api.ts:533:362
+      - packages/studio/src/routes/api.ts:557:571
     disposition: pending
     reason: null
   - id: 3dac81177cbc

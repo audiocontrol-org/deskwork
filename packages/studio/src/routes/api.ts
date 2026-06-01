@@ -17,7 +17,7 @@
  * endpoints, and vice versa.
  */
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   handleAnnotate,
   handleListAnnotations,
@@ -44,6 +44,14 @@ import {
   parseEditCommentFields,
 } from './entry-annotation-body.ts';
 import { writeEntryBody } from '../lib/entry-resolver.ts';
+import {
+  persistEntryScreenshot,
+  persistOrphanScreenshot,
+} from '../lib/screenshot-persistence.ts';
+import {
+  extractScreenshotUploadFile,
+  mapScreenshotErrorToResponse,
+} from './screenshot-upload-helper.ts';
 
 /**
  * Mirrors the UUID regex enforced on entry creation and used by the
@@ -54,6 +62,79 @@ import { writeEntryBody } from '../lib/entry-resolver.ts';
  */
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Read the `:entryId` param off the Hono context and validate it
+ * against `UUID_RE`. Returns the validated id, or a fully-formed
+ * `Response` the caller should return immediately when the id is
+ * malformed. Centralises the validation step that every
+ * `/entry/:entryId/*` route performs identically; using a single
+ * shape (id OR Response) keeps the caller's check at one line per
+ * route, which avoids the clone-detection gate flagging the older
+ * tagged-union pattern's `if (idResult.kind === 'err') ...` boilerplate.
+ */
+function readValidEntryId(c: Context): { entryId: string } | Response {
+  const entryId = c.req.param('entryId');
+  if (!UUID_RE.test(entryId)) {
+    return c.json({ error: `malformed entryId: ${entryId}` }, 400);
+  }
+  return { entryId };
+}
+
+/**
+ * Same shape as `readValidEntryId` for the comment-keyed routes. The
+ * caller already has a validated entryId at this point — this helper
+ * adds the commentId validation as a paired step.
+ */
+function readValidCommentId(c: Context): { commentId: string } | Response {
+  const commentId = c.req.param('commentId');
+  if (!UUID_RE.test(commentId)) {
+    return c.json({ error: `malformed commentId: ${commentId}` }, 400);
+  }
+  return { commentId };
+}
+
+/**
+ * Read AND validate both `:entryId` and `:commentId` params off the
+ * Hono context in one call. The comment-keyed routes (`PATCH /entry/
+ * :entryId/comments/:commentId`, `DELETE /entry/:entryId/comments/
+ * :commentId`) always validate them as a pair; collapsing into one
+ * helper keeps the per-route preamble at three lines instead of six
+ * and avoids tripping the clone-detection gate on the paired-validation
+ * shape.
+ */
+function readValidEntryAndCommentIds(
+  c: Context,
+): { entryId: string; commentId: string } | Response {
+  const idResult = readValidEntryId(c);
+  if (idResult instanceof Response) return idResult;
+  const cidResult = readValidCommentId(c);
+  if (cidResult instanceof Response) return cidResult;
+  return { entryId: idResult.entryId, commentId: cidResult.commentId };
+}
+
+/**
+ * Look up the entry's sidecar on disk; returns `null` on success.
+ * Returns a fully-formed `Response` when the sidecar lookup fails —
+ * 404 when the sidecar doesn't exist, 500 for anything else. Routes
+ * that need to confirm the entry exists before proceeding compose
+ * this helper at the top of the body so the shared 404 / 500
+ * error-mapping logic isn't duplicated.
+ */
+async function lookupEntrySidecar(
+  c: Context,
+  projectRoot: string,
+  entryId: string,
+): Promise<Response | null> {
+  try {
+    await readSidecar(projectRoot, entryId);
+    return null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const status = msg.startsWith('sidecar not found') ? 404 : 500;
+    return c.json({ error: `unknown entry: ${entryId}` }, status);
+  }
+}
 
 /**
  * Narrow a `HandlerResult.body` (typed as `unknown`) to extract the
@@ -261,13 +342,8 @@ export function createApiRouter(ctx: StudioContext): Hono {
     if (parsed.kind === 'err') {
       return c.json({ error: parsed.message }, parsed.status);
     }
-    try {
-      await readSidecar(ctx.projectRoot, entryId);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const status = msg.startsWith('sidecar not found') ? 404 : 500;
-      return c.json({ error: `unknown entry: ${entryId}` }, status);
-    }
+    const sidecarErr = await lookupEntrySidecar(c, ctx.projectRoot, entryId);
+    if (sidecarErr !== null) return sidecarErr;
     const minted: DraftAnnotation = mintEntryAnnotation(parsed.draft);
     try {
       await addEntryAnnotation(ctx.projectRoot, entryId, minted);
@@ -312,10 +388,9 @@ export function createApiRouter(ctx: StudioContext): Hono {
   //         etc.); empty `hunks` without `notes` is the "addressed
   //         without local diff" case (Step 8.6.4 fallback).
   app.get('/entry/:entryId/diff-slice', async (c) => {
-    const entryId = c.req.param('entryId');
-    if (!UUID_RE.test(entryId)) {
-      return c.json({ error: `malformed entryId: ${entryId}` }, 400);
-    }
+    const idResult = readValidEntryId(c);
+    if (idResult instanceof Response) return idResult;
+    const { entryId } = idResult;
     const commentId = c.req.query('commentId') ?? '';
     if (!UUID_RE.test(commentId)) {
       return c.json({ error: `malformed commentId: ${commentId}` }, 400);
@@ -328,13 +403,8 @@ export function createApiRouter(ctx: StudioContext): Hono {
         400,
       );
     }
-    try {
-      await readSidecar(ctx.projectRoot, entryId);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const status = msg.startsWith('sidecar not found') ? 404 : 500;
-      return c.json({ error: `unknown entry: ${entryId}` }, status);
-    }
+    const sidecarErr = await lookupEntrySidecar(c, ctx.projectRoot, entryId);
+    if (sidecarErr !== null) return sidecarErr;
     const slice = await computeDiffSlice(ctx.projectRoot, entryId, commentId, revision);
     if (slice === null) {
       return c.json(
@@ -355,16 +425,92 @@ export function createApiRouter(ctx: StudioContext): Hono {
   // active-comment view returned by the GET above; the original
   // `comment` annotation is preserved on disk as audit trail.
 
+  // POST /api/dev/editorial-review/entry/:entryId/screenshot
+  //
+  // Phase 8 Step 8.3.3 — entry-anchored screenshot persistence. The
+  // client (post-capture, via `captureElementToPng` from
+  // `entry-review/screenshot-capture.ts`) POSTs the PNG bytes as a
+  // multipart `file` field; the route writes them under
+  // `<entryDir>/scrapbook/screenshots/<filename>` where `<filename>`
+  // follows the PRD convention (`<commentId>-<ISO-timestamp>.png`).
+  //
+  // Status codes:
+  //   400 — malformed entryId; missing / malformed `file` field;
+  //         filename fails the safe-name regex.
+  //   404 — entry sidecar not found.
+  //   409 — a file already exists at the target path (filename
+  //         collisions indicate a client bug — see the PRD convention).
+  //   200 — `{ writtenPath, relativeWrittenPath }`.
+  //
+  // Binding the screenshot to a comment (the `attachments[]` field)
+  // is Task 8.4's concern; this route lands the raw write path only.
+  app.post('/entry/:entryId/screenshot', async (c) => {
+    const idResult = readValidEntryId(c);
+    if (idResult instanceof Response) return idResult;
+    const { entryId } = idResult;
+    const extracted = await extractScreenshotUploadFile(c);
+    if (extracted.kind === 'err') {
+      return c.json({ error: extracted.message }, extracted.status);
+    }
+    try {
+      const result = await persistEntryScreenshot(
+        ctx.projectRoot,
+        entryId,
+        extracted.filename,
+        extracted.bytes,
+      );
+      return c.json(
+        {
+          writtenPath: result.writtenPath,
+          relativeWrittenPath: result.relativeWrittenPath,
+        },
+        200,
+      );
+    } catch (err) {
+      const mapped = mapScreenshotErrorToResponse(err, { entryId });
+      return c.json({ error: mapped.message }, mapped.status);
+    }
+  });
+
+  // POST /api/dev/editorial-review/screenshots/orphan
+  //
+  // Phase 8 Step 8.3.3 — orphan-path screenshot persistence (the
+  // capture-then-attach flow). Writes bytes to
+  // `<projectRoot>/.deskwork/screenshots-orphan/<filename>`. The file
+  // is moved to an entry-anchored path when Task 8.4's attach flow
+  // binds it to a comment.
+  //
+  // Status codes mirror the entry-anchored route (no 404 — there is
+  // no entry to look up).
+  app.post('/screenshots/orphan', async (c) => {
+    const extracted = await extractScreenshotUploadFile(c);
+    if (extracted.kind === 'err') {
+      return c.json({ error: extracted.message }, extracted.status);
+    }
+    try {
+      const result = await persistOrphanScreenshot(
+        ctx.projectRoot,
+        extracted.filename,
+        extracted.bytes,
+      );
+      return c.json(
+        {
+          writtenPath: result.writtenPath,
+          relativeWrittenPath: result.relativeWrittenPath,
+        },
+        200,
+      );
+    } catch (err) {
+      const mapped = mapScreenshotErrorToResponse(err);
+      return c.json({ error: mapped.message }, mapped.status);
+    }
+  });
+
   // PATCH /api/dev/editorial-review/entry/:entryId/comments/:commentId
   app.patch('/entry/:entryId/comments/:commentId', async (c) => {
-    const entryId = c.req.param('entryId');
-    const commentId = c.req.param('commentId');
-    if (!UUID_RE.test(entryId)) {
-      return c.json({ error: `malformed entryId: ${entryId}` }, 400);
-    }
-    if (!UUID_RE.test(commentId)) {
-      return c.json({ error: `malformed commentId: ${commentId}` }, 400);
-    }
+    const idsResult = readValidEntryAndCommentIds(c);
+    if (idsResult instanceof Response) return idsResult;
+    const { entryId, commentId } = idsResult;
     let body: unknown;
     try {
       body = await c.req.json();
@@ -375,13 +521,8 @@ export function createApiRouter(ctx: StudioContext): Hono {
     if (parsed.kind === 'err') {
       return c.json({ error: parsed.message }, parsed.status);
     }
-    try {
-      await readSidecar(ctx.projectRoot, entryId);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const status = msg.startsWith('sidecar not found') ? 404 : 500;
-      return c.json({ error: `unknown entry: ${entryId}` }, status);
-    }
+    const sidecarErr = await lookupEntrySidecar(c, ctx.projectRoot, entryId);
+    if (sidecarErr !== null) return sidecarErr;
     const minted: DraftAnnotation = mintEntryAnnotation({
       type: 'edit-comment',
       workflowId: entryId,
@@ -405,21 +546,11 @@ export function createApiRouter(ctx: StudioContext): Hono {
 
   // DELETE /api/dev/editorial-review/entry/:entryId/comments/:commentId
   app.delete('/entry/:entryId/comments/:commentId', async (c) => {
-    const entryId = c.req.param('entryId');
-    const commentId = c.req.param('commentId');
-    if (!UUID_RE.test(entryId)) {
-      return c.json({ error: `malformed entryId: ${entryId}` }, 400);
-    }
-    if (!UUID_RE.test(commentId)) {
-      return c.json({ error: `malformed commentId: ${commentId}` }, 400);
-    }
-    try {
-      await readSidecar(ctx.projectRoot, entryId);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const status = msg.startsWith('sidecar not found') ? 404 : 500;
-      return c.json({ error: `unknown entry: ${entryId}` }, status);
-    }
+    const idsResult = readValidEntryAndCommentIds(c);
+    if (idsResult instanceof Response) return idsResult;
+    const { entryId, commentId } = idsResult;
+    const sidecarErr = await lookupEntrySidecar(c, ctx.projectRoot, entryId);
+    if (sidecarErr !== null) return sidecarErr;
     const minted: DraftAnnotation = mintEntryAnnotation({
       type: 'delete-comment',
       workflowId: entryId,
@@ -451,10 +582,9 @@ export function createApiRouter(ctx: StudioContext): Hono {
   // helper the read path uses (`packages/studio/src/lib/entry-resolver.ts`)
   // so Save addresses exactly the file the editor is showing.
   app.put('/entry/:entryId/body', async (c) => {
-    const entryId = c.req.param('entryId');
-    if (!UUID_RE.test(entryId)) {
-      return c.json({ error: `malformed entryId: ${entryId}` }, 400);
-    }
+    const idResult = readValidEntryId(c);
+    if (idResult instanceof Response) return idResult;
+    const { entryId } = idResult;
     const contentType = c.req.header('content-type') ?? '';
     if (!contentType.toLowerCase().includes('application/json')) {
       return c.json(
@@ -475,13 +605,8 @@ export function createApiRouter(ctx: StudioContext): Hono {
     if (typeof markdown !== 'string') {
       return c.json({ error: 'markdown (string) is required' }, 400);
     }
-    try {
-      await readSidecar(ctx.projectRoot, entryId);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const status = msg.startsWith('sidecar not found') ? 404 : 500;
-      return c.json({ error: `unknown entry: ${entryId}` }, status);
-    }
+    const sidecarErr = await lookupEntrySidecar(c, ctx.projectRoot, entryId);
+    if (sidecarErr !== null) return sidecarErr;
     try {
       const result = await writeEntryBody(ctx.projectRoot, entryId, markdown);
       // Surface the path relative to the project root when possible so
