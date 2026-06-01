@@ -42,10 +42,29 @@ export function buildAddressStamp(
     `won't fix · v${addr.version}`;
   stamp.appendChild(mark);
   stamp.appendChild(label);
-  if (addr.reason) {
+  // Phase 8 Step 8.5.3 — back-compat read path for addressed
+  // annotations that lack a `reason` field (legacy data
+  // pre-Step-8.1.2). Per the Step 8.1.2 schema tightening (commit
+  // 91954561) every NEW addressed annotation must carry a non-empty
+  // reason; the CLI-parse-time gate (Step 8.5.2) refuses
+  // addressed-without-reason BEFORE the journal-write. The only path
+  // that reaches the read side with a missing/empty reason on an
+  // addressed annotation is legacy data already on disk; surface the
+  // legacy-data marker explicitly so the operator sees the gap during
+  // triage rather than a silent omission. `deferred` and `wontfix`
+  // have always had optional reason, so this marker is scoped to
+  // `addressed`.
+  const hasReason = typeof addr.reason === 'string' && addr.reason.length > 0;
+  if (hasReason) {
     const reason = document.createElement('span');
     reason.className = 'er-marginalia-stamp-reason';
-    reason.textContent = addr.reason;
+    reason.textContent = addr.reason ?? '';
+    stamp.appendChild(reason);
+  } else if (addr.disposition === 'addressed') {
+    const reason = document.createElement('span');
+    reason.className = 'er-marginalia-stamp-reason';
+    reason.dataset.legacyMissingReason = 'true';
+    reason.textContent = 'no reason recorded';
     stamp.appendChild(reason);
   }
   return stamp;
