@@ -49,6 +49,10 @@ import {
   persistOrphanScreenshot,
 } from '../lib/screenshot-persistence.ts';
 import {
+  attachScreenshotToCommentServer,
+  promoteOrphanToEntry,
+} from '../lib/screenshot-attach.ts';
+import {
   extractScreenshotUploadFile,
   mapScreenshotErrorToResponse,
 } from './screenshot-upload-helper.ts';
@@ -111,6 +115,47 @@ function readValidEntryAndCommentIds(
   const cidResult = readValidCommentId(c);
   if (cidResult instanceof Response) return cidResult;
   return { entryId: idResult.entryId, commentId: cidResult.commentId };
+}
+
+/**
+ * Read the request body as a JSON object. Returns the parsed object,
+ * or a fully-formed `Response` the caller should return immediately
+ * when the parse fails (400 invalid JSON body) OR the parsed value
+ * is not a plain object (400 expected JSON object body).
+ *
+ * Pulled up to a shared helper after the Phase 8 Step 8.4 routes
+ * tripped the clone-detection gate on the let-body-try-catch-typeof
+ * shape that previously lived inline at five+ call sites.
+ */
+/**
+ * Map an annotation-write exception to an HTTP response. The append
+ * path (`addEntryAnnotation` / `attachScreenshotToCommentServer`)
+ * surfaces "unknown commentId ..." as 404 — every other error is
+ * 500. Pulled up after the Phase 8 Step 8.4 attach route tripped
+ * the clone-detection gate against the four+ existing catch-blocks
+ * with this exact shape.
+ */
+function mapAnnotationWriteError(c: Context, err: unknown): Response {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes('unknown commentId')) {
+    return c.json({ error: msg }, 404);
+  }
+  return c.json({ error: msg }, 500);
+}
+
+async function readJsonObjectBody(
+  c: Context,
+): Promise<Record<string, unknown> | Response> {
+  let parsed: unknown;
+  try {
+    parsed = await c.req.json();
+  } catch {
+    return c.json({ error: 'invalid JSON body' }, 400);
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return c.json({ error: 'expected JSON object body' }, 400);
+  }
+  return parsed as Record<string, unknown>;
 }
 
 /**
@@ -348,13 +393,10 @@ export function createApiRouter(ctx: StudioContext): Hono {
     try {
       await addEntryAnnotation(ctx.projectRoot, entryId, minted);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       // edit-comment / delete-comment writes that reference an unknown
-      // commentId surface here as a 404; everything else is a 500.
-      if (msg.includes('unknown commentId')) {
-        return c.json({ error: msg }, 404);
-      }
-      return c.json({ error: msg }, 500);
+      // commentId surface as 404 via mapAnnotationWriteError; everything
+      // else is a 500.
+      return mapAnnotationWriteError(c, err);
     }
     return c.json({ annotation: minted });
   });
@@ -506,6 +548,150 @@ export function createApiRouter(ctx: StudioContext): Hono {
     }
   });
 
+  // POST /api/dev/editorial-review/entry/:entryId/comment/:commentId/attach
+  //
+  // Phase 8 Step 8.4.1 — bind a previously-persisted screenshot path
+  // to an existing comment's `attachments[]` field. Request body:
+  // JSON object with `{ relativePath: string }` — the project-root-
+  // relative path the screenshot was persisted at (matches the
+  // `relativeWrittenPath` field returned by the Step 8.3.3
+  // entry-screenshot endpoint).
+  //
+  // The server reads the comment's current attachments via the
+  // folded annotation list, composes `[...prior, relativePath]`,
+  // mints an `edit-comment` annotation carrying the full intended
+  // list, and appends it to the journal. Returns the minted
+  // annotation + the post-attach attachments[] so the client can
+  // patch its in-memory cache without re-fetching.
+  //
+  // Status codes:
+  //   400 — malformed entryId / commentId; missing or non-string
+  //         relativePath; empty relativePath.
+  //   404 — unknown entry sidecar; OR commentId not present in the
+  //         entry's stream.
+  //   200 — `{ annotation, attachments }`.
+  app.post('/entry/:entryId/comment/:commentId/attach', async (c) => {
+    const idsResult = readValidEntryAndCommentIds(c);
+    if (idsResult instanceof Response) return idsResult;
+    const { entryId, commentId } = idsResult;
+    const body = await readJsonObjectBody(c);
+    if (body instanceof Response) return body;
+    const relativePath = Reflect.get(body, 'relativePath');
+    if (typeof relativePath !== 'string' || relativePath.length === 0) {
+      return c.json(
+        { error: 'relativePath (non-empty string) is required' },
+        400,
+      );
+    }
+    const sidecarErr = await lookupEntrySidecar(c, ctx.projectRoot, entryId);
+    if (sidecarErr !== null) return sidecarErr;
+    try {
+      const result = await attachScreenshotToCommentServer(
+        ctx.projectRoot,
+        entryId,
+        commentId,
+        relativePath,
+      );
+      return c.json(
+        {
+          annotation: result.annotation,
+          attachments: result.attachments,
+        },
+        200,
+      );
+    } catch (err) {
+      return mapAnnotationWriteError(c, err);
+    }
+  });
+
+  // POST /api/dev/editorial-review/screenshots/orphan/:filename/promote-to-entry/:entryId/comment/:commentId
+  //
+  // Phase 8 Step 8.4.1 + 8.4.2 — move an orphan-path screenshot to
+  // an entry-anchored path AND attach it to the named comment. Request
+  // body is OPTIONAL JSON `{ sourceEntry?: string }`: when present and
+  // different from `:entryId`, a `<filename>.meta.json` sidecar lands
+  // next to the moved file naming the source entry (the cross-entry
+  // case).
+  //
+  // Status codes:
+  //   400 — malformed entryId / commentId / filename / sourceEntry.
+  //   404 — entry sidecar not found; OR commentId not in entry stream;
+  //         OR orphan file not present.
+  //   409 — file already exists at the destination path.
+  //   200 — `{ annotation, attachments, writtenPath, relativeWrittenPath, sidecarMetaPath }`.
+  app.post(
+    '/screenshots/orphan/:filename/promote-to-entry/:entryId/comment/:commentId',
+    async (c) => {
+      const filename = c.req.param('filename');
+      const idsResult = readValidEntryAndCommentIds(c);
+      if (idsResult instanceof Response) return idsResult;
+      const { entryId, commentId } = idsResult;
+      let body: unknown = {};
+      // Body is optional. Only attempt JSON parse when content-type
+      // hints at it — a bare POST without a body is the in-entry
+      // (non-cross-entry) common case.
+      const contentType = c.req.header('content-type') ?? '';
+      if (contentType.toLowerCase().includes('application/json')) {
+        try {
+          body = await c.req.json();
+        } catch {
+          return c.json({ error: 'invalid JSON body' }, 400);
+        }
+        if (typeof body !== 'object' || body === null) {
+          return c.json({ error: 'expected JSON object body' }, 400);
+        }
+      }
+      const sourceRaw = Reflect.get(body, 'sourceEntry');
+      const sourceEntry =
+        typeof sourceRaw === 'string' && sourceRaw.length > 0
+          ? sourceRaw
+          : undefined;
+      try {
+        const result = await promoteOrphanToEntry(
+          ctx.projectRoot,
+          filename,
+          entryId,
+          commentId,
+          sourceEntry !== undefined ? { sourceEntry } : {},
+        );
+        return c.json(
+          {
+            annotation: result.annotation,
+            attachments: result.attachments,
+            writtenPath: result.writtenPath,
+            relativeWrittenPath: result.relativeWrittenPath,
+            sidecarMetaPath: result.sidecarMetaPath,
+          },
+          200,
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.startsWith('malformed ')) {
+          return c.json({ error: msg }, 400);
+        }
+        if (msg.startsWith('screenshot filename') || msg === 'screenshot filename is required') {
+          return c.json({ error: msg }, 400);
+        }
+        if (msg.startsWith('orphan screenshot not found')) {
+          return c.json({ error: msg }, 404);
+        }
+        if (msg.startsWith('sidecar not found')) {
+          return c.json({ error: `unknown entry: ${entryId}` }, 404);
+        }
+        if (msg.includes('unknown commentId')) {
+          return c.json({ error: msg }, 404);
+        }
+        if (msg.startsWith('screenshot already exists at ')) {
+          return c.json({ error: msg }, 409);
+        }
+        if (msg.startsWith('screenshot sidecar metadata already exists at ')) {
+          return c.json({ error: msg }, 409);
+        }
+        return c.json({ error: msg }, 500);
+      }
+    },
+  );
+
   // PATCH /api/dev/editorial-review/entry/:entryId/comments/:commentId
   app.patch('/entry/:entryId/comments/:commentId', async (c) => {
     const idsResult = readValidEntryAndCommentIds(c);
@@ -538,11 +724,7 @@ export function createApiRouter(ctx: StudioContext): Hono {
     try {
       await addEntryAnnotation(ctx.projectRoot, entryId, minted);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('unknown commentId')) {
-        return c.json({ error: msg }, 404);
-      }
-      return c.json({ error: msg }, 500);
+      return mapAnnotationWriteError(c, err);
     }
     return c.json({ annotation: minted });
   });
@@ -562,11 +744,7 @@ export function createApiRouter(ctx: StudioContext): Hono {
     try {
       await addEntryAnnotation(ctx.projectRoot, entryId, minted);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('unknown commentId')) {
-        return c.json({ error: msg }, 404);
-      }
-      return c.json({ error: msg }, 500);
+      return mapAnnotationWriteError(c, err);
     }
     return c.json({ annotation: minted });
   });
@@ -595,15 +773,8 @@ export function createApiRouter(ctx: StudioContext): Hono {
         400,
       );
     }
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: 'invalid JSON body' }, 400);
-    }
-    if (typeof body !== 'object' || body === null) {
-      return c.json({ error: 'expected JSON object body' }, 400);
-    }
+    const body = await readJsonObjectBody(c);
+    if (body instanceof Response) return body;
     const markdown = Reflect.get(body, 'markdown');
     if (typeof markdown !== 'string') {
       return c.json({ error: 'markdown (string) is required' }, 400);
