@@ -4610,3 +4610,45 @@ Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4537-4544`;
 The workplan entry says “Closes AUDIT-20260601-07” and records the schema/type/test fix as complete, but the audit log entry added in the same diff still has `Status:     open`. The workplan acceptance criteria also leaves “Audit-log Status flipped to fixed-<sha>” unchecked, so the durable state now says both “closed by implementation” and “still open” depending on which project record is read.
 
 This matters because the audit log is the source later barrage/import tooling will scan for unresolved findings. Leaving `AUDIT-20260601-07` open after committing the fix means the same issue can be re-triaged as active despite the code and tests having moved. A reasonable fix is to update the audit-log status to the actual fixed commit SHA once known, or avoid wording the workplan as “Closes” until the audit record is updated in the same close-shipped step.
+
+## 2026-06-01 — audit-barrage lift (20260601T052715681Z-graphical-entries)
+
+### AUDIT-20260601-12 — Workplan Task 1.11 is an all-unchecked stub that contradicts its own audit-log `fixed-2fb0bac9` status
+
+Finding-ID: AUDIT-20260601-12 (claude-01 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md` (new Task 1.11 block) vs `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md` (AUDIT-20260601-11 entry)
+
+The same diff that marks the audit-log entry `Status: fixed-2fb0bac9 (Status flip landed in 2fb0bac9 …)` also adds Task 1.11 to the workplan with **every checkbox unchecked** — all five steps are `- [ ]`, and the acceptance criteria still carry the literal template placeholder `Failing test exists at \`(to be filled in by Step 1 implementer)\``. So the durable state again says two contradictory things: the audit log says AUDIT-20260601-11 is fixed-and-closed, the workplan says it is an untouched stub. This is *precisely* the workplan-vs-audit-log inconsistency that AUDIT-20260601-11 was itself filed about (AUDIT-07 closed in the workplan while open in the log) — now regressed in the inverse direction for the meta-finding's own task.
+
+Compounding this: Task 1.11's template ("Step 1: write failing test exercising the bug … Step 2: confirm test fails against current code") was generated mechanically and never adapted. AUDIT-20260601-11 is a docs-only status-line flip — there is no code bug to write a failing test against, and indeed no test was written (the fix was the one-line status edit in 2fb0bac9). The unchecked TDD template is therefore both internally incoherent and unfollowable as written.
+
+A reasonable fix: either check off Task 1.11's steps and rewrite its acceptance criteria to reflect what AUDIT-11 actually required (a docs status-flip, verified by reading the audit-log line — not a vitest run), or mark it explicitly as a docs-only finding that the TDD task shape does not apply to. Leaving it as a placeholder stub means the next barrage/import pass that scans the workplan for incomplete tasks will re-flag AUDIT-11 as active while the log says it is closed — the exact re-triage failure AUDIT-11 warned about.
+
+---
+
+### AUDIT-20260601-13 — `entry-anchor-shape` swallows non-ENOENT directory-read errors and reports "clean", diverging from the sibling read path that throws
+
+Finding-ID: AUDIT-20260601-13 (claude-02 + claude-03 + claude-04 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/entry-anchor-shape.ts:97-117` (the `readdir` try/catch)
+
+The rule's directory read catches every error and returns an empty findings array:
+
+```ts
+try { names = await readdir(journalDir); }
+catch (err) {
+  const error = err as NodeJS.ErrnoException;
+  if (error.code === 'ENOENT') return [];
+  // Directory-level read failure — nothing useful this rule can say.
+  return [];   // <-- swallows EACCES, ENOTDIR, EIO, etc.
+}
+```
+
+The sibling reader `packages/core/src/journal/read.ts:14-20` handles the identical situation by re-throwing anything that is not ENOENT. So a permission error (EACCES) or an I/O fault on the journal directory makes `readJournalEvents` fail loudly, but makes this *safety-net data-integrity rule* report zero findings — i.e. "no malformed anchors found." For a rule whose entire stated purpose is to be the durable safety net that surfaces unreadable legacy data the operator can't otherwise see, silently reporting "clean" on an IO failure is the fallback-hides-failure shape the project guidelines forbid ("Never implement fallbacks … throw … Errors let us know that something isn't implemented"). It is also self-inconsistent: a transient permission glitch produces a green doctor run that the operator will trust.
+
+A reasonable fix is to mirror `read.ts`: return `[]` only on ENOENT, and either re-throw the non-ENOENT error or emit it as an `error`-severity finding ("could not read journal directory: …") so the operator sees that the check could not run rather than that it ran and found nothing.
+
+---

@@ -1,0 +1,606 @@
+Reading additional input from stdin...
+OpenAI Codex v0.133.0
+--------
+workdir: /Users/orion/work/deskwork-work/graphical-entries
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e8198-7780-7be3-8972-b58b2f7d0003
+--------
+user
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface bugs, design issues, missed edge cases, and code-quality concerns in the work product captured in the diff below.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+graphical-entries
+
+## Feature scope (workplan / PRD summary)
+
+- [ ] Step 12.3.1: "Save markup" exports the composed canvas (base + markup) as PNG to `<entryDir>/scrapbook/screenshots/<comment-id>-<timestamp>-marked.png`.
+- [ ] Step 12.3.2: The raw capture stays at `<comment-id>-<timestamp>.png` (untouched).
+- [ ] Step 12.3.3: Comment annotation's `attachments[]` array updated to reference the marked file path.
+- [ ] Step 12.3.4: Attachment metadata gains `originalAttachment: <raw-file-path>` so the operator can re-mark the raw or compare versions.
+
+### Task 12.4: Studio rendering of marked attachments
+
+- [ ] Step 12.4.1: Comment renders the marked version by default with a small "original" toggle in the chrome.
+- [ ] Step 12.4.2: Clicking the marked version opens a full-size lightbox; clicking the toggle in the lightbox swaps to raw.
+
+### Task 12.5: Re-mark workflow
+
+- [ ] Step 12.5.1: Operator can re-mark an existing screenshot: opens the markup editor pre-loaded with the raw + prior markup (loaded as separate layer for further editing).
+- [ ] Step 12.5.2: Save creates a new file (e.g. `<comment-id>-<timestamp>-marked-v2.png`); the comment's `attachments[]` updates to the new version; prior versions preserved in the journal.
+
+### Task 12.6: Integration test + mobile verification
+
+- [ ] Step 12.6.1: Tmp-fixture: capture a fixture screenshot; mark with each of the 5 tools; save; verify the marked file persists alongside raw; verify the comment renders both versions.
+- [ ] Step 12.6.2: Touch-screen verification: run a Playwright test against an iPhone-class viewport; assert each tool works with touch input (no hover-only interaction).
+
+**Acceptance Criteria:**
+
+- [ ] Markup editor supports all five tools (arrow / box / freehand / text-label / blur-region) + undo / redo.
+- [ ] Marked screenshot persists alongside the raw capture; comment annotation references both via `attachments[]` + `originalAttachment`.
+- [ ] Re-mark workflow preserves prior markup versions in the journal.
+- [ ] Touch-screen markup works without hover-only interactions.
+
+## Closing milestone: scope-discovery v1 dogfood TF summary + audit handoff
+
+**Deliverable:** Final TF entry in `tooling-feedback.md` summarizing the dogfood result (what worked / what didn't / what needs follow-up); closing comment on the feature PR linking the log; handoff to the scope-discovery team to import as `AUDIT-<date>-<NN>` entries in their audit log. Per PRD § Secondary deliverable.
+
+### Task C.1: Aggregate TF entries + identify patterns
+
+- [ ] Step C.1.1: Walk every TF-NNN entry in `tooling-feedback.md`; tabulate by category (A / AM / CL / GATE / DSC / MISC) + severity (high / medium / low).
+- [ ] Step C.1.2: Identify recurring patterns — same root cause surfacing in multiple TF entries; promote those to GH issues if not already filed.
+- [ ] Step C.1.3: Tabulate dispositions: how many TF entries closed by an in-flight fix during this feature vs how many remain open at feature-close.
+
+### Task C.2: Write final TF summary
+
+- [ ] Step C.2.1: Append the closure entry to `tooling-feedback.md` (next TF-NNN id) with title shape `TF-NNN · MISC · n/a · Dogfood closure summary`.
+- [ ] Step C.2.2: Body: what worked (which protocol layers caught friction proactively); what didn't (which surfaces fell through to operator catch); what needs follow-up (recurring patterns justifying a v1.1 audit cycle).
+- [ ] Step C.2.3: Include a one-line summary per still-open TF entry naming the gap; list closed TF entries with their closing-commit SHAs.
+
+### Task C.3: Closing comment on the feature PR
+
+- [ ] Step C.3.1: Comment on the graphical-entries PR linking `tooling-feedback.md` + naming the total TF count + how many promoted to GH issues.
+- [ ] Step C.3.2: Tag the deskwork team for the audit-log import.
+
+### Task C.4: Audit-log handoff
+
+- [ ] Step C.4.1: The deskwork team imports the closure into `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` as `AUDIT-<date>-<NN>` entries — mirror of how the audiocontrol pilot's TF-001..TF-016 imported into AUDIT-20260525-05..09.
+- [ ] Step C.4.2: Each AUDIT entry references its source TF entry + summarizes the friction shape + the suggested fix.
+- [ ] Step C.4.3: The aggregated audit-log entries become the v1.1 workplan input for scope-discovery.
+
+**Acceptance Criteria:**
+
+- [ ] `tooling-feedback.md` carries a TF closure summary entry.
+- [ ] The feature PR has a closing comment with TF count + promoted-issue count.
+- [ ] The scope-discovery team has imported AUDIT entries derived from this feature's TF log.
+
+
+## Commit subjects in the audited range
+
+fix(graphical-entries): spatialAnchor as discriminated union to enforce per-kind shape — AUDIT-20260601-07
+config(graphical-entries): project-override audit-barrage to disable gemini
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+The new function's own docstring (`:88-93`) frames the rationale as *"for state-mutating verbs the project convention is to refuse loudly,"* which would arguably exempt `list`. But that rationale doesn't match what was implemented: `handleShow` is read-only and **was** guarded (`:191`). So the line drawn is not "mutating vs read" — it's "every verb except `list`." That asymmetry is the defect: a user who fat-fingers `group list mygroup` (meaning `group show mygroup`) gets a full list with no error, while the same stray positional on any other verb exits 2. The new `extra-positional-refused.test.ts` covers all seven guarded verbs but not `list`, so the gap is unguarded by tests too. Fix: either call `assertExactPositional(rest, 0, 'list')` (threading `rest` into `handleList`), or correct the docstring to state that `list` is intentionally exempt and why — the current docstring asserts a "state-mutating" boundary the code doesn't actually follow.
+
+---
+
+### AUDIT-20260601-02 — `withJournalRollback` rolls back the sidecar but never the journal — a non-atomic / partial journal-append failure leaves a corrupt journal fragment with the sidecar reverted, the inverse of the inconsistency it set out to fix
+
+Finding-ID: AUDIT-20260601-02
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `packages/core/src/sidecar/with-journal-rollback.ts:91-116` (helper) + the six mutator call sites
+
+The helper's contract is "snapshot the sidecar, run mutate (sidecar-write + journal-append), restore the sidecar on throw." The only failure path it compensates is one where the sidecar write succeeded and the journal append failed *before mutating the journal* — which is precisely the failure mode the regression test induces (`mutator-rollback-on-journal-fail.test.ts:103-113` pre-creates `review-journal/history` as a file so the journal's `mkdir` throws ENOTDIR with nothing written). But the name `withJournalRollback` and the header's framing ("compensating-write helper for the sidecar-write + journal-append sequence") imply the *journal* is what gets rolled back. It isn't — the journal file is never snapshotted or touched. If `appendJournalEvent` fails *after* writing partial bytes (disk-full mid-write, interrupted append, a serializer that writes-then-throws), the journal retains a corrupt/partial line that nothing cleans up, while the sidecar is reverted to its pre-mutation state. That is sidecar-says-unchanged / journal-says-partially-mutated — an inconsistency in the opposite direction from the one being closed, and it is entirely unguarded by the test (which only exercises the pre-write mkdir failure).
+
+The fix as shipped is correct for the tested failure mode and is a reasonable generalization of the AUDIT-79 lane pattern, so this is not a blocking defect. But the operator should know the protection is one-sided: it assumes journal-append is all-or-nothing. Two reasonable hardenings: (a) rename to something like `withSidecarRollbackOnJournalFailure` so the name states what is actually restored (the journal-rollback name is an over-claim per the project's naming-reveals-intent guidance), and (b) if journal-append is in fact non-atomic, the helper should also capture and restore the journal-history file, or document in the header that journal atomicity is a precondition. As written, the docstring's "best-effort" caveat applies only to the *restore* side, not to the unaddressed partial-journal-write case.
+
+---
+
+### AUDIT-20260601-03 — `withJournalRollback`'s snapshot/restore clobbers a concurrent successful write to the same sidecar
+
+Finding-ID: AUDIT-20260601-03
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   informational
+Surface:    `packages/core/src/sidecar/with-journal-rollback.ts:108-116`
+
+The helper reads the sidecar body synchronously into `snapshot` (`:113`), then `await`s `mutate()`. On failure it overwrites the file with the captured `snapshot.body` (`restoreSidecar`, `:71-83`). If a second mutation against the same group UUID interleaves — snapshots the same original body, writes its own update successfully, and the first mutation's journal append *then* fails — the first mutation's rollback restores the stale original body, silently discarding the second mutation's committed write. The same race applies to the `create` rollback's `unlinkSync` (`:75`), which could delete a file a concurrent create just wrote.
+
+deskwork is a single-operator CLI with no documented concurrent-invocation model, so the practical likelihood is low and I would not block on it. I surface it because the helper is now a shared primitive (`packages/core/src/sidecar/`) that the header invites other entry mutators to adopt ("any sidecar-write-followed-by-journal-append call site"); a future caller in a server context (the studio writes to the same tree) could hit this. If the studio ever performs group mutations in-process, this becomes a real lost-update window. Worth a one-line note in the header that the helper assumes no concurrent mutation of the same UUID.
+
+---
+
+### AUDIT-20260601-04 — clones.yaml regeneration replaced operator-authored "why not extract" rationales with terse one-liners, weakening the audit trail for future revisit decisions
+
+Finding-ID: AUDIT-20260601-04
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   informational
+Surface:    `.dw-lifecycle/scope-discovery/clones.yaml:116-127` (ids `7fd4d02355a8`, `40b2115a7171`)
+
+Two `keep-with-reason` dispositions lost their substantive justification in this refresh. The prior reason for the group/pipeline and group/lane dispatcher clones was a specific paragraph — *"Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit"* — which records the actual engineering reason the clone is intentional. The replacements are *"Sibling verb-dispatch convention across group/lane/pipeline CRUD modules; shared shape is deliberate, not duplication"* and *"Sibling per-verb update-handler shape … parallel emit/fail handling is deliberate, not duplication."* These assert the conclusion ("deliberate, not duplication") but drop the *why-not-extract* argument that lets a future reader decide whether the disposition still holds as the code evolves.
+
+This isn't a disposition-survivor violation (no `keep-with-reason → pending` transition, so the gate is satisfied) and it's a curation call, not a bug. But per the project's "no IOU / preserve the rationale" posture, the terser reasons are a small regression in the durable record: the next contributor evaluating whether to finally extract a shared dispatcher helper now has less of the original reasoning to push against. Consider retaining the per-verb-family specificity sentence in at least one of the two reasons so the rationale survives the line-number churn that triggered the re-hash.
+
+## 2026-06-01 — audit-barrage lift (20260601T032129888Z-graphical-entries)
+
+### AUDIT-20260601-05 — `entry-lane-missing.audit()` swallows every non-ENOENT read failure and returns `[]`, making a schema-tightening GATE report false-clean
+
+Finding-ID: AUDIT-20260601-05 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/entry-lane-missing.ts` (the `audit()` try/catch around `readAllSidecarsPartitioned`, ~lines 76-86)
+
+The rule's whole purpose, per its own header, is to be the GATE that lets Step 8.0.2 tighten `resolveEntryTemplate` to throw on a missing `lane`: *"until canary projects report zero `entry-lane-missing` findings, the resolver retains its migration-window default."* That makes a **false-zero the dangerous direction** — a zero count is read as "safe to tighten." But the audit wraps the sidecar read in `try { … } catch { return []; }`. The comment frames the catch as benign ("Nothing useful this rule can say — leave the report empty"), yet any genuine failure (permission error on `.deskwork/entries/`, an I/O fault, a future change in the reader's error contract) is silently converted to "no findings." An operator (or the 8.0.2 implementer) reading a green `entry-lane-missing` cannot distinguish "every entry has a lane" from "the rule couldn't read the directory."
+
+The ENOENT case is already handled by the reader returning `[]` (the empty-project test exercises that), so this catch only ever fires on *unexpected* errors — exactly the ones a gate rule should surface, not bury. Per the project's "fallbacks/swallowed errors are bug-factories" guidance, this should emit a finding (e.g. severity `error`, message naming the read failure) rather than return `[]`, so a read fault blocks the gate instead of opening it. The swallow is also untested — the "empty project" test removes the dir (ENOENT path), never the non-ENOENT path.
+
+### AUDIT-20260601-06 — Hook summary says zero findings even though the same diff slush-records four audit findings
+
+Finding-ID: AUDIT-20260601-06
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json:5-8`; `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4469-4519`
+
+The hook metadata records `"disposition": "fired-and-slushed"` but also `"findingsCount": 0`, `"promotedCount": 0`, and `"slushedCount": 0`. In the same diff, the audit log appends four findings from that run, all with `Status: acknowledged-slush-pile-2026-06-01`.
+
+That makes the durable machine-readable summary contradict the human-readable audit log. Any later aggregation that relies on `last-hook-run.json` will conclude this run produced no findings and no slush entries, while the audit log says it produced four. The counts should reflect the actual parsed results, e.g. findings 4, promoted 0, slushed 4, or the disposition should not claim a slush action occurred.
+
+## 2026-06-01 — audit-barrage lift (20260601T033039763Z-graphical-entries)
+
+### AUDIT-20260601-07 — spatialAnchor schema accepts semantically-invalid per-kind combinations; the "renderer enforces at use time" it defers to does not exist
+
+Finding-ID: AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/schema/draft-annotation.ts:39-46` (`SpatialAnchorSchema`); docstring claims at `review/types.ts:69-72` and `draft-annotation.ts:34-37`
+
+`SpatialAnchorSchema` is a flat `z.object` with every position field independently optional: `selector`, `x`, `y` are each `.optional()` regardless of `kind`. So every one of these parses successfully today: `{kind:'pixel'}` (no coordinates), `{kind:'dom-selector'}` (no selector), `{kind:'pixel', selector:'#x'}` (selector on a pixel anchor), `{kind:'svg-element', x:1, y:2}` (coordinates on a selector anchor). The schema's own docstring acknowledges the gap — *"All fields are optional at the schema level ... the renderer enforces that the right combination is present for each `kind` at use time"* — but a grep across `packages/` shows the three new fields are referenced in only four files (the schema, the TS interface, the read-bridge, and the test). **There is no renderer.** The "enforces at use time" consumer the schema delegates correctness to does not exist, so nothing validates the combination anywhere, and these annotations land in the append-only `entry-annotation` journal (`journal-events.ts:111-116`) where bad data is permanent.
+
+This is the bug-factory shape the project guidelines name explicitly ("never implement fallbacks ... validation gaps are bug-factories; throw instead"). The new test file reinforces the gap rather than catching it: it exercises only valid combinations plus an unknown-`kind` rejection (`draft-annotation-thread-anchor.test.ts:75-130`), never asserting that a `pixel` without coordinates or a `dom-selector` without a selector is rejected — so the loose behavior is now codified as "correct." A reasonable fix is `z.discriminatedUnion('kind', [...])` (or `.superRefine`) so `pixel` requires `x`+`y` and forbids `selector`, while `dom-selector`/`svg-element` require `selector` and forbid `x`/`y`. That moves enforcement to the one place every write path already passes through, instead of a downstream consumer that may never be written.
+
+---
+
+
+## Diff under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/.dw-lifecycle/scope-discovery/audit-barrage-config.yaml b/.dw-lifecycle/scope-discovery/audit-barrage-config.yaml
+new file mode 100644
+index 00000000..0b08c678
+--- /dev/null
++++ b/.dw-lifecycle/scope-discovery/audit-barrage-config.yaml
+@@ -0,0 +1,30 @@
++# Audit-barrage model battery — project override for graphical-entries.
++#
++# Overrides the plugin default at:
++#   plugins/dw-lifecycle/templates/audit-barrage-config.yaml
++#
++# Disabled gemini effective 2026-06-01 — gemini-cli was failing 94.1% of runs
++# (16 of 17 across the graphical-entries Phase 0 audit cycle) on two cascading
++# error modes: (1) ClassifierStrategy JSON-routing failures in
++# @google/gemini-cli-core/.../baseLlmClient.js#generateJson (retry exhaustion
++# on empty/unparsable JSON); (2) "exhausted your capacity on this model" API
++# quota errors after the routing failure. Stderrs captured under
++# audit-runs/*/stderr/gemini.txt show the consistent pattern. The audit-barrage
++# was effectively a 2/3 fleet (claude + codex) in practice; making that explicit
++# here so the orchestrator's "models attempted" count and the dampener counter
++# don't get polluted by a model that always fails.
++#
++# Re-enable when the gemini-cli upstream fixes the JSON-mode routing
++# reliability OR our gemini account has sustained quota. See
++# https://github.com/audiocontrol-org/deskwork/issues (the LLM-CLI-failure
++# tooling-feedback context).
++
++models:
++  - name: claude
++    binary: claude
++    args_template: "-p {{prompt}}"
++    timeout_seconds: 300
++  - name: codex
++    binary: codex
++    args_template: "exec {{prompt}}"
++    timeout_seconds: 300
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+index b4e45f1e..142a7a14 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+@@ -4517,3 +4517,42 @@ Surface:    `.dw-lifecycle/scope-discovery/clones.yaml:116-127` (ids `7fd4d02355
+ Two `keep-with-reason` dispositions lost their substantive justification in this refresh. The prior reason for the group/pipeline and group/lane dispatcher clones was a specific paragraph — *"Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit"* — which records the actual engineering reason the clone is intentional. The replacements are *"Sibling verb-dispatch convention across group/lane/pipeline CRUD modules; shared shape is deliberate, not duplication"* and *"Sibling per-verb update-handler shape … parallel emit/fail handling is deliberate, not duplication."* These assert the conclusion ("deliberate, not duplication") but drop the *why-not-extract* argument that lets a future reader decide whether the disposition still holds as the code evolves.
+ 
+ This isn't a disposition-survivor violation (no `keep-with-reason → pending` transition, so the gate is satisfied) and it's a curation call, not a bug. But per the project's "no IOU / preserve the rationale" posture, the terser reasons are a small regression in the durable record: the next contributor evaluating whether to finally extract a shared dispatcher helper now has less of the original reasoning to push against. Consider retaining the per-verb-family specificity sentence in at least one of the two reasons so the rationale survives the line-number churn that triggered the re-hash.
++
++## 2026-06-01 — audit-barrage lift (20260601T032129888Z-graphical-entries)
++
++### AUDIT-20260601-05 — `entry-lane-missing.audit()` swallows every non-ENOENT read failure and returns `[]`, making a schema-tightening GATE report false-clean
++
++Finding-ID: AUDIT-20260601-05 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)
++Status:     acknowledged-slush-pile-2026-06-01
++Severity:   medium
++Surface:    `packages/core/src/doctor/rules/entry-lane-missing.ts` (the `audit()` try/catch around `readAllSidecarsPartitioned`, ~lines 76-86)
++
++The rule's whole purpose, per its own header, is to be the GATE that lets Step 8.0.2 tighten `resolveEntryTemplate` to throw on a missing `lane`: *"until canary projects report zero `entry-lane-missing` findings, the resolver retains its migration-window default."* That makes a **false-zero the dangerous direction** — a zero count is read as "safe to tighten." But the audit wraps the sidecar read in `try { … } catch { return []; }`. The comment frames the catch as benign ("Nothing useful this rule can say — leave the report empty"), yet any genuine failure (permission error on `.deskwork/entries/`, an I/O fault, a future change in the reader's error contract) is silently converted to "no findings." An operator (or the 8.0.2 implementer) reading a green `entry-lane-missing` cannot distinguish "every entry has a lane" from "the rule couldn't read the directory."
++
++The ENOENT case is already handled by the reader returning `[]` (the empty-project test exercises that), so this catch only ever fires on *unexpected* errors — exactly the ones a gate rule should surface, not bury. Per the project's "fallbacks/swallowed errors are bug-factories" guidance, this should emit a finding (e.g. severity `error`, message naming the read failure) rather than return `[]`, so a read fault blocks the gate instead of opening it. The swallow is also untested — the "empty project" test removes the dir (ENOENT path), never the non-ENOENT path.
++
++### AUDIT-20260601-06 — Hook summary says zero findings even though the same diff slush-records four audit findings
++
++Finding-ID: AUDIT-20260601-06
++Status:     acknowledged-slush-pile-2026-06-01
++Severity:   medium
++Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json:5-8`; `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4469-4519`
++
++The hook metadata records `"disposition": "fired-and-slushed"` but also `"findingsCount": 0`, `"promotedCount": 0`, and `"slushedCount": 0`. In the same diff, the audit log appends four findings from that run, all with `Status: acknowledged-slush-pile-2026-06-01`.
++
++That makes the durable machine-readable summary contradict the human-readable audit log. Any later aggregation that relies on `last-hook-run.json` will conclude this run produced no findings and no slush entries, while the audit log says it produced four. The counts should reflect the actual parsed results, e.g. findings 4, promoted 0, slushed 4, or the disposition should not claim a slush action occurred.
++
++## 2026-06-01 — audit-barrage lift (20260601T033039763Z-graphical-entries)
++
++### AUDIT-20260601-07 — spatialAnchor schema accepts semantically-invalid per-kind combinations; the "renderer enforces at use time" it defers to does not exist
++
++Finding-ID: AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
++Status:     open
++Severity:   high
++Surface:    `packages/core/src/schema/draft-annotation.ts:39-46` (`SpatialAnchorSchema`); docstring claims at `review/types.ts:69-72` and `draft-annotation.ts:34-37`
++
++`SpatialAnchorSchema` is a flat `z.object` with every position field independently optional: `selector`, `x`, `y` are each `.optional()` regardless of `kind`. So every one of these parses successfully today: `{kind:'pixel'}` (no coordinates), `{kind:'dom-selector'}` (no selector), `{kind:'pixel', selector:'#x'}` (selector on a pixel anchor), `{kind:'svg-element', x:1, y:2}` (coordinates on a selector anchor). The schema's own docstring acknowledges the gap — *"All fields are optional at the schema level ... the renderer enforces that the right combination is present for each `kind` at use time"* — but a grep across `packages/` shows the three new fields are referenced in only four files (the schema, the TS interface, the read-bridge, and the test). **There is no renderer.** The "enforces at use time" consumer the schema delegates correctness to does not exist, so nothing validates the combination anywhere, and these annotations land in the append-only `entry-annotation` journal (`journal-events.ts:111-116`) where bad data is permanent.
++
++This is the bug-factory shape the project guidelines name explicitly ("never implement fallbacks ... validation gaps are bug-factories; throw instead"). The new test file reinforces the gap rather than catching it: it exercises only valid combinations plus an unknown-`kind` rejection (`draft-annotation-thread-anchor.test.ts:75-130`), never asserting that a `pixel` without coordinates or a `dom-selector` without a selector is rejected — so the loose behavior is now codified as "correct." A reasonable fix is `z.discriminatedUnion('kind', [...])` (or `.superRefine`) so `pixel` requires `x`+`y` and forbids `selector`, while `dom-selector`/`svg-element` require `selector` and forbid `x`/`y`. That moves enforcement to the one place every write path already passes through, instead of a downstream consumer that may never be written.
++
++---
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+index 0de2a9d3..c87e94de 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+@@ -1480,6 +1480,23 @@ Disposition: split fix:
+ - [x] Step 1.5.2: Decision: **adopt W3C as the structural base; extend with the `deskwork:` namespace for project-specific fields** (Option B). Rationale recorded in `decision-draft.md` § "W3C Web Annotation Data Model adoption — three options considered" — the picked libraries already emit W3C-shaped JSON, Phase 8's planned fields fit the JSON-LD extension pattern, threaded replies land natively via `motivation: replying`.
+ - [x] Step 1.5.3: Migration sketch landed in `decision-draft.md` § "Migration sketch from the current `comment` annotation shape" — per-field mapping (`range` → `[TextPositionSelector, TextQuoteSelector]`, `comment` → `[TextualBody]`, `iteration` → `deskwork:revisionId`, parent-comment-id → reply annotation's `target` with `motivation: replying`), doctor-managed migration with audit-preserving cutover window.
+ 
++
++### Task 1.7 (fix-finding-AUDIT-20260601-07): AUDIT-20260601-07 — spatialAnchor schema accepts semantically-invalid per-kind combinations
++
++Closes AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model). Surface: `packages/core/src/schema/draft-annotation.ts:39-46` (`SpatialAnchorSchema`); docstring claims at `review/types.ts:69-72` and `draft-annotation.ts:34-37`.
++
++- [x] Step 1: write failing tests — six negative cases added to `packages/core/test/schema/draft-annotation-thread-anchor.test.ts` covering missing-coords pixel, missing-selector dom-selector, missing-selector svg-element, selector-on-pixel, x/y-on-svg-element, and x/y-on-dom-selector. Each would have parsed successfully against the pre-fix flat-optional schema (the bug-factory pattern AUDIT-20260601-07 named).
++- [x] Step 2: confirmed test cases fail against pre-fix code path by construction — every position field was independently `.optional()`, so any combination of fields parsed regardless of `kind`.
++- [x] Step 3: implemented the fix — `SpatialAnchorSchema` rewritten as `z.discriminatedUnion('kind', [PixelSchema, DomSelectorSchema, SvgElementSchema])`. Each variant declares only its required fields and uses `.strict()` to reject unknown fields (zod's default strip behavior would have silently dropped selector-on-pixel etc.). Companion changes: TS `SpatialAnchor` rewritten as a discriminated union of `SpatialAnchorPixel | SpatialAnchorDomSelector | SpatialAnchorSvgElement`; `cloneSpatialAnchor` in `entry/annotations.ts` rewritten as a kind-switch.
++- [x] Step 4: confirmed all 24 tests in `draft-annotation-thread-anchor.test.ts` pass post-fix; the full core suite (931 tests) and full workspace suite (1896 tests) remain green.
++- [x] Step 5: commit lands with `Closes AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` in body.
++
++**Acceptance Criteria:**
++
++- [x] Failing test exists at `packages/core/test/schema/draft-annotation-thread-anchor.test.ts` (six new `it('rejects spatialAnchor ...')` cases covering required-field omissions and forbidden-field presence per kind).
++- [x] `npm --workspace @deskwork/core test` exits 0 (passes against the fix; 931 tests).
++- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
++
+ ### Task 1.6: Write decision document
+ 
+ - [x] Step 1.6.1: Decision brief landed at [`docs/studio-design/ACCEPTED/2026-05-26-graphical-review-prior-art/brief.md`](../../../studio-design/ACCEPTED/2026-05-26-graphical-review-prior-art/brief.md) per the project's design-archive contract. The prior `PROPOSED/2026-05-25-graphical-review-prior-art/` directory is retired — `candidates.md` (Task 1.1 matrix) moved into the ACCEPTED entry alongside `evidence.md` (the verbose backing, formerly `decision-draft.md`) and the new `brief.md` (focused summary per the design-standards convention).
+diff --git a/packages/core/src/entry/annotations.ts b/packages/core/src/entry/annotations.ts
+index b97dbcd1..b4c4134c 100644
+--- a/packages/core/src/entry/annotations.ts
++++ b/packages/core/src/entry/annotations.ts
+@@ -60,18 +60,22 @@ type StoredSpatialAnchor = NonNullable<StoredComment['spatialAnchor']>;
+  * representation independent of the journal-event payload so later
+  * mutations on either side don't leak.
+  *
+- * Accepts the Zod-inferred {@link StoredSpatialAnchor} shape (where
+- * optional fields are `T | undefined`) and emits the canonical TS
+- * {@link SpatialAnchor} shape (where optional fields are `T?` under
+- * `exactOptionalPropertyTypes`). The bridge handles the same shape
+- * mismatch documented above for `toDraftAnnotation`.
++ * Post-AUDIT-20260601-07, {@link SpatialAnchor} is a discriminated
++ * union — each `kind` declares only the fields its variant requires
++ * — so the clone path narrows on `input.kind` and emits the matching
++ * variant. The Zod-inferred {@link StoredSpatialAnchor} shape is also
++ * a discriminated union (the schema is a `z.discriminatedUnion`), so
++ * the narrow flows symmetrically.
+  */
+ function cloneSpatialAnchor(input: StoredSpatialAnchor): SpatialAnchor {
+-  const out: SpatialAnchor = { kind: input.kind };
+-  if (input.selector !== undefined) out.selector = input.selector;
+-  if (input.x !== undefined) out.x = input.x;
+-  if (input.y !== undefined) out.y = input.y;
+-  return out;
++  switch (input.kind) {
++    case 'pixel':
++      return { kind: 'pixel', x: input.x, y: input.y };
++    case 'dom-selector':
++      return { kind: 'dom-selector', selector: input.selector };
++    case 'svg-element':
++      return { kind: 'svg-element', selector: input.selector };
++  }
+ }
+ 
+ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
+diff --git a/packages/core/src/review/types.ts b/packages/core/src/review/types.ts
+index f4168d0e..53a25eed 100644
+--- a/packages/core/src/review/types.ts
++++ b/packages/core/src/review/types.ts
+@@ -53,27 +53,46 @@ export interface DraftRange {
+  * the raw markdown source, a `spatialAnchor` locates the comment on
+  * the entry's primary visual surface — a mockup, an image, an SVG
+  * diagram, anything rendered as the entry's content. The three `kind`s
+- * are mutually exclusive in interpretation:
++ * are mutually exclusive in interpretation AND in shape — each variant
++ * declares only the fields its kind requires, and the runtime
++ * `SpatialAnchorSchema` in `schema/draft-annotation.ts` enforces the
++ * per-kind shape at parse time (AUDIT-20260601-07):
+  *
+  *   - `pixel` — `x`/`y` are pixel coordinates against the rendered
+  *     visual's intrinsic dimensions. Used for image-style entries
+- *     where DOM selectors are not meaningful.
++ *     where DOM selectors are not meaningful. No `selector` field.
+  *   - `dom-selector` — `selector` is a CSS selector that identifies
+- *     the anchored element within the rendered HTML mockup.
++ *     the anchored element within the rendered HTML mockup. No
++ *     `x`/`y` fields.
+  *   - `svg-element` — `selector` is a CSS selector that resolves to
+- *     an SVG element (e.g. `g.layer-2 > rect[id="logo"]`).
++ *     an SVG element (e.g. `g.layer-2 > rect[id="logo"]`). No `x`/`y`
++ *     fields.
+  *
+- * All fields are optional at the schema level so legacy comments
+- * without spatial anchors continue to parse; the renderer enforces
+- * that the right combination is present for each `kind` at use time.
++ * The TS type is a discriminated union over `kind` so consumers narrow
++ * structurally and the compiler refuses access to fields that don't
++ * belong to the narrowed variant.
+  */
+-export interface SpatialAnchor {
+-  kind: 'pixel' | 'dom-selector' | 'svg-element';
+-  selector?: string;
+-  x?: number;
+-  y?: number;
++export interface SpatialAnchorPixel {
++  kind: 'pixel';
++  x: number;
++  y: number;
+ }
+ 
++export interface SpatialAnchorDomSelector {
++  kind: 'dom-selector';
++  selector: string;
++}
++
++export interface SpatialAnchorSvgElement {
++  kind: 'svg-element';
++  selector: string;
++}
++
++export type SpatialAnchor =
++  | SpatialAnchorPixel
++  | SpatialAnchorDomSelector
++  | SpatialAnchorSvgElement;
++
+ interface AnnotationBase {
+   /** ISO-8601 timestamp when the annotation was recorded. */
+   createdAt: string;
+diff --git a/packages/core/src/schema/draft-annotation.ts b/packages/core/src/schema/draft-annotation.ts
+index 6169e2e4..c80c2a95 100644
+--- a/packages/core/src/schema/draft-annotation.ts
++++ b/packages/core/src/schema/draft-annotation.ts
+@@ -33,17 +33,61 @@ const RangeSchema = z.object({
+  * Mirror of {@link import('../review/types.ts').SpatialAnchor}.
+  *
+  * Three `kind`s — `pixel`, `dom-selector`, `svg-element` — capture
+- * which surface the anchor lives on. All position fields are optional
+- * at the schema level (the renderer enforces the right combination
+- * per `kind`). Adding `kind` values requires updating both this
+- * schema and the TS interface in lockstep.
++ * which surface the anchor lives on. The schema enforces the per-kind
++ * shape via `z.discriminatedUnion('kind', [...])` at parse time
++ * (AUDIT-20260601-07): each variant requires exactly the fields its
++ * kind needs and forbids the others.
++ *
++ *   - `pixel` — `{ x, y }` REQUIRED; `selector` is not declared on this
++ *     variant (z.object's strict-on-unknown behavior rejects it).
++ *   - `dom-selector` — `{ selector }` REQUIRED; `x`/`y` are not declared
++ *     on this variant.
++ *   - `svg-element` — `{ selector }` REQUIRED; `x`/`y` are not declared
++ *     on this variant.
++ *
++ * Bad shapes — `{kind:'pixel'}` (no coords), `{kind:'dom-selector'}`
++ * (no selector), `{kind:'pixel', selector:'#x'}` (selector on pixel),
++ * `{kind:'svg-element', x, y}` (coords on selector kind) — all fail
++ * `safeParse`. Annotations land in the append-only journal where bad
++ * data is permanent; per-kind enforcement at the schema is the only
++ * place to keep that data sane.
++ *
++ * Adding `kind` values requires updating both this schema and the TS
++ * discriminated union in `review/types.ts` in lockstep.
+  */
+-const SpatialAnchorSchema = z.object({
+-  kind: z.enum(['pixel', 'dom-selector', 'svg-element']),
+-  selector: z.string().optional(),
+-  x: z.number().optional(),
+-  y: z.number().optional(),
+-});
++// Each variant uses `.strict()` so unknown fields are REJECTED at
++// parse time, not silently stripped (zod's `z.object` default).
++// Without `.strict()`, `{kind:'pixel', selector:'#x'}` would parse —
++// the selector field would be stripped — and the bug-factory pattern
++// would persist for fields-on-the-wrong-kind cases. `.strict()` is the
++// hard wall that makes the per-kind shape contract truly enforced.
++const SpatialAnchorPixelSchema = z
++  .object({
++    kind: z.literal('pixel'),
++    x: z.number(),
++    y: z.number(),
++  })
++  .strict();
++
++const SpatialAnchorDomSelectorSchema = z
++  .object({
++    kind: z.literal('dom-selector'),
++    selector: z.string(),
++  })
++  .strict();
++
++const SpatialAnchorSvgElementSchema = z
++  .object({
++    kind: z.literal('svg-element'),
++    selector: z.string(),
++  })
++  .strict();
++
++const SpatialAnchorSchema = z.discriminatedUnion('kind', [
++  SpatialAnchorPixelSchema,
++  SpatialAnchorDomSelectorSchema,
++  SpatialAnchorSvgElementSchema,
++]);
+ 
+ const BaseFields = {
+   /** ISO-8601 timestamp when the annotation was recorded. */
+diff --git a/packages/core/test/schema/draft-annotation-thread-anchor.test.ts b/packages/core/test/schema/draft-annotation-thread-anchor.test.ts
+index 433bd5ff..52285eea 100644
+--- a/packages/core/test/schema/draft-annotation-thread-anchor.test.ts
++++ b/packages/core/test/schema/draft-annotation-thread-anchor.test.ts
+@@ -128,6 +128,67 @@ describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () =
+     expect(parsed.success).toBe(false);
+   });
+ 
++  // AUDIT-20260601-07 — discriminated-union shape enforcement.
++  // The pre-fix schema parsed all four of these as valid because every
++  // position field was independently optional; the discriminated-union
++  // refactor makes each variant declare only the fields its kind needs.
++  // Annotations land in the append-only journal where bad data is
++  // permanent, so the schema is the only enforcement point.
++
++  it('rejects spatialAnchor kind "pixel" without coordinates', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: { kind: 'pixel' },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(false);
++  });
++
++  it('rejects spatialAnchor kind "dom-selector" without selector', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: { kind: 'dom-selector' },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(false);
++  });
++
++  it('rejects spatialAnchor kind "svg-element" without selector', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: { kind: 'svg-element' },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(false);
++  });
++
++  it('rejects spatialAnchor kind "pixel" carrying a selector field', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: { kind: 'pixel', x: 10, y: 20, selector: '#header' },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(false);
++  });
++
++  it('rejects spatialAnchor kind "svg-element" carrying x/y fields', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: { kind: 'svg-element', selector: '#shape', x: 1, y: 2 },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(false);
++  });
++
++  it('rejects spatialAnchor kind "dom-selector" carrying x/y fields', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: { kind: 'dom-selector', selector: '#header', x: 1, y: 2 },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(false);
++  });
++
+   it('parses a comment with all three new fields set together', () => {
+     const input = {
+       ...COMMENT_BASE,
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...). Use `blocking` only for issues that would break the feature's stated goals in obvious ways; `high` for correctness bugs adopters will hit; `medium` for design issues that compound over time; `low` for hygiene; `informational` for context you think the operator should see but isn't itself a bug.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
+
+codex
+### AUDIT-20260601-07 remains open in the durable audit log even though the workplan records it as closed
+
+Finding-ID: AUDIT-BARRAGE-codex-01  
+Status:     open  
+Severity:   medium  
+Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4537-4544`; `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1482-1497`
+
+The workplan entry says “Closes AUDIT-20260601-07” and records the schema/type/test fix as complete, but the audit log entry added in the same diff still has `Status:     open`. The workplan acceptance criteria also leaves “Audit-log Status flipped to fixed-<sha>” unchecked, so the durable state now says both “closed by implementation” and “still open” depending on which project record is read.
+
+This matters because the audit log is the source later barrage/import tooling will scan for unresolved findings. Leaving `AUDIT-20260601-07` open after committing the fix means the same issue can be re-triaged as active despite the code and tests having moved. A reasonable fix is to update the audit-log status to the actual fixed commit SHA once known, or avoid wording the workplan as “Closes” until the audit record is updated in the same close-shipped step.
+tokens used
+24,058

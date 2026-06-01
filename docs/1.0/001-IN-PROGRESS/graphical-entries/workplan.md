@@ -1537,17 +1537,15 @@ Closes AUDIT-20260601-10. Surface: `packages/core/test/schema/draft-annotation-t
 
 Closes AUDIT-20260601-11. Surface: `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4537-4544`; `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1482-1497`.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260601-11` in subject
+Disposition: closed by commit `2fb0bac9` — Status flip landed immediately after the gate surfaced this finding. The AUDIT-07 entry now carries `fixed-c708ab27`. This was a real coordination gap (the Task 1.7 implementer ticked the workplan but missed the audit-log Status flip); 2fb0bac9 closes it. Going forward, dispatch prompts should explicitly include the audit-log Status flip in the same docs commit.
+
+- [x] Step 1-5: closed via commit 2fb0bac9 (no code change needed; pure docs flip)
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test: N/A — this was a docs-coordination finding.
+- [x] Test passes: N/A.
+- [x] Audit-log Status flipped to `fixed-2fb0bac9` per disposition.
 
 ### Task 1.7 (fix-finding-AUDIT-20260601-07): AUDIT-20260601-07 — spatialAnchor schema accepts semantically-invalid per-kind combinations
 
