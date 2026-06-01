@@ -1947,3 +1947,27 @@ Surface:    missing `SKILL.md` hunk for Phase 18 Task 3 Step 5
 The feature scope explicitly includes Step 5: update the implement skill’s `SKILL.md` Step 6 prose to name the HIGH-severity regression-lock requirement and reference the operator’s commission-vs-omission framing. The diff changes renderer code, TDD enforcement, tests, and workplan/audit artifacts, but contains no `SKILL.md` change.
 
 That leaves the operator-facing workflow docs behind the enforcement behavior. The next implement session can follow the skill and still miss the new HIGH+ two-test discipline until the gate rejects the work. The fix is to update the relevant implement skill prose in the same change set so the documented workflow and enforcement rule match.
+
+## 2026-06-01 — audit-barrage lift (20260601T053658225Z-scope-discovery)
+
+### AUDIT-20260601-59 — Task 5.86 — the fix-task for the HIGH finding AUDIT-52 is itself rendered with the plain code-defect template, silently bypassing the very gate AUDIT-52 is about
+
+Finding-ID: AUDIT-20260601-59 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.86 (`fix-finding-AUDIT-20260601-52`), vs. AUDIT-20260601-52 (`Severity: high`) in `audit-log.md`
+
+AUDIT-52 (high) is the finding that says: HIGH fix-tasks are being rendered without a `Severity:` line / Step 0 / Step 1b, so `extractTaskSeverity` returns `null` and the ≥2-test regression-lock gate never fires. This diff then adds **Task 5.86 — the fix-task for AUDIT-52 — and renders it with the exact plain template the finding describes**: `Closes AUDIT-20260601-52 …. Surface: …`, then `Step 1: write failing test`, `Step 2: confirm test fails`, … with **no `Severity: high.` line, no Step 0 working-code invariant, no Step 1b regression-lock test**, and an AC of a single `npx vitest run <test-file-path> exits 0`.
+
+The consequence is concrete and self-defeating: when an implementer picks up 5.86 to fix the HIGH finding AUDIT-52, `extractTaskSeverity(taskBlock)` finds no `Severity:` line, returns `null`, the `severity === 'high' || severity === 'blocking'` guard in `verifyFixTaskTDD` is skipped, and the ≥2-test requirement is **never applied** — the fix to the missing-severity-gate finding can itself ship with one test, fail-open and silent. This is empirical proof of AUDIT-52's hypothesized root cause: the `promote-findings`/`apply.ts` path did **not** thread `finding.severity` into `renderFixTaskBlock` (every one of 5.86–5.92 lacks a `Severity:` line despite the audit-log carrying explicit severities). Fix: thread `finding.severity` into the renderer so 5.86 emits `Severity: high.` + Step 0 + Step 1b before it is checked `[x]`; this single root-cause fix also corrects 5.83/5.84 (AUDIT-52's original instance).
+
+### AUDIT-20260601-60 — `last-hook-run.json` records `fired-and-promoted` with `findingsCount: 0, promotedCount: 0` for a run that lifted 7 findings and added 7 tasks
+
+Finding-ID: AUDIT-20260601-60
+Status:     open
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (run `20260601T053324695Z-scope-discovery`, tip `6378b833`) vs. `audit-log.md` header "## 2026-06-01 — audit-barrage lift (20260601T053324695Z-…)"
+
+The updated `last-hook-run.json` points `runDir` at `20260601T053324695Z-scope-discovery` and carries `disposition: "fired-and-promoted"` with `findingsCount: 0` and `promotedCount: 0`. But that same run is the one whose audit-log lift adds AUDIT-52…58 (7 findings) and whose workplan hunk adds Tasks 5.86…5.92 (7 promoted fix-tasks). The recorded counts contradict the artifacts produced in the same commit, and `promotedCount: 0` is internally inconsistent with the `fired-and-promoted` disposition (a disposition that asserts promotion happened, paired with a zero promotion count).
+
+This matters because `last-hook-run.json` is the machine-readable productivity marker — any tooling or operator reading it to answer "did the last barrage find anything?" gets `0/0` while the audit-log shows 7 findings lifted and 7 tasks scoped. Either the counts are stale/uninstrumented for the manual-lift path (the commit subject "audit-log/workplan updates from latest barrage" suggests the lift was authored by hand, with the hook only stamping the marker), or the count fields are simply not populated. Fix: either have the lift path write the true `findingsCount`/`promotedCount`, or change the disposition to one that doesn't claim promotion when the counts are zero — don't let `fired-and-promoted, 0, 0` stand as a self-contradicting record.

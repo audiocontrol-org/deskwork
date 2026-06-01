@@ -736,6 +736,40 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.93 (fix-finding-AUDIT-20260601-59): AUDIT-20260601-59 — Task 5.86 — the fix-task for the HIGH finding AUDIT-52 is it…
+
+Closes AUDIT-20260601-59 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.86 (`fix-finding-AUDIT-20260601-52`), vs. AUDIT-20260601-52 (`Severity: high`) in `audit-log.md`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-59 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.94 (fix-finding-AUDIT-20260601-60): AUDIT-20260601-60 — `last-hook-run.json` records `fired-and-promoted` with `find…
+
+Closes AUDIT-20260601-60. Surface: `.dw-lifecycle/scope-discovery/last-hook-run.json` (run `20260601T053324695Z-scope-discovery`, tip `6378b833`) vs. `audit-log.md` header "## 2026-06-01 — audit-barrage lift (20260601T053324695Z-…)".
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-60` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.86 (fix-finding-AUDIT-20260601-52): AUDIT-20260601-52 — Workplan tasks 5.83/5.84 close HIGH findings but are rendere…
 
 Closes AUDIT-20260601-52 (claude-01 + claude-06 + codex-01; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.83 (Closes AUDIT-20260601-49, severity **high**) and 5.84 (Closes AUDIT-20260601-50, severity **high**), vs. `workplan-task-renderer.ts` `renderFixTaskBlock` (the `isHighPlus` branch this commit adds).
