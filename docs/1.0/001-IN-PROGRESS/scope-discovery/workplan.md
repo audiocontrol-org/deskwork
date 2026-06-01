@@ -744,6 +744,44 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.111 (fix-finding-AUDIT-20260601-77): AUDIT-20260601-77 — Fix creates a hard implement-loop deadlock for any open `inf…
+
+Closes AUDIT-20260601-77 (claude-01 + claude-02 + claude-04 + codex-01; cross-model). Surface: `plugins/dw-lifecycle/src/subcommands/promote-findings.ts:395-399` (the new filter) ↔ `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts:127-164` (coverage gate) ↔ `audit-log-walker.ts:4` (no severity filter). Severity: high.
+
+- [x] Step 0: working-code invariant — pre-fix, informational findings were filtered from auto-promote but their `Status: open` stayed put. `walkOpenFindings` returned them; the coverage gate's `missingIds` stayed permanently non-empty → `/dw-lifecycle:implement` refused indefinitely. HIGH/MEDIUM/LOW Status entries continue to be NEVER auto-flipped (those require an explicit task → commit cycle to leave `open` — the regression-lock invariant).
+- [x] Step 1: failing test at `subcommand.test.ts` — 'auto-flips informational findings to acknowledged-informational-<date> (AUDIT-77)' asserts the audit-log Status flips out of `open`.
+- [x] Step 1b: regression-lock test 'REGRESSION: HIGH / MEDIUM / LOW Status entries are NOT auto-flipped (Option D invariant)' pins the working-code invariant.
+- [x] Step 2: confirmed RED (1 failed | 28 passed) before implementation.
+- [x] Step 3: implemented `applyStatusFlips` call for informational findings in `promote-findings.ts` auto-apply path. Two-part disposition: filter out of `newFindings` AND flip Status to `acknowledged-informational-<YYYY-MM-DD>`.
+- [x] Step 4: GREEN — 29/29 subcommand tests; full plugin suite 2626/2626; tsc clean.
+- [ ] Step 5: commit with `Closes AUDIT-20260601-77 (claude-01 + claude-02 + claude-04 + codex-01; cross-model)` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Test block count for this finding is ≥2 (Option D — HIGH severity invariant).
+- [x] Failing tests exist at `subcommand.test.ts` — bug-repro + regression-lock.
+- [x] `npx vitest run` exits 0 against the fix.
+- [x] HIGH/MEDIUM/LOW Status entries remain `open` after auto-apply (regression-lock confirms).
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+
+
+### Task 5.112 (fix-finding-AUDIT-20260601-78) (non-bug): AUDIT-20260601-78 — Commit subject `(AUDIT-76)` diverges from the workplan's own…
+
+Closes AUDIT-20260601-78. Surface: commit subject `fix(promote-findings): exclude informational findings from auto-promote (AUDIT-76)` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.110 Step 5.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Closes AUDIT-20260601-78` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
 ### Task 5.110 (fix-finding-AUDIT-20260601-76): AUDIT-20260601-76 — Auto-promotion swept a positive `informational` "clean repor…
 
 Closes AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/subcommands/promote-findings.ts:385-387` (auto-apply finding filter). Severity: high.

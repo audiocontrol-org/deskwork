@@ -32,6 +32,7 @@ import {
   InvalidProposalFileError,
 } from '../scope-discovery/promote-findings/proposal-file.js';
 import { applyProposal, ApplyProposalError } from '../scope-discovery/promote-findings/apply.js';
+import { applyStatusFlips } from '../scope-discovery/promote-findings/audit-log-editor.js';
 import {
   AutoPositionError,
   computeAutoPosition,
@@ -382,21 +383,61 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
     const CANONICAL_AUDIT_ID_RE = /\bAUDIT-\d{8}-\d+/;
     const canonicalOf = (id: string): string =>
       CANONICAL_AUDIT_ID_RE.exec(id)?.[0] ?? id;
-    // Phase 19 Task 5.110 (fix-finding-AUDIT-20260601-76): exclude
-    // `informational` findings from the auto-promote scoping. An
-    // informational entry records a positive signal (a clean release,
-    // a passing invariant) — not a bug. Scoping it as a code-defect
-    // fix-task hands the next implementer a placeholder test path
-    // with no bug to anchor against, and the audit-log entry stays
-    // `Status: open` forever (no `fixed-<sha>` can land for the
-    // absence-of-a-defect), blocking the workplan-aware gate.
-    // HIGH / MEDIUM / LOW findings continue to be scoped — the filter
-    // is severity-narrow on purpose (Option D regression-lock).
+    // Phase 19 Tasks 5.110/5.111 (fix-finding-AUDIT-20260601-76/77):
+    // informational findings record positive signals (clean release,
+    // passing invariant) — not bugs. Two-part disposition:
+    //
+    //   1. Filter them out of `newFindings` so they're not scoped as
+    //      code-defect fix-tasks (the rendered "write a failing test"
+    //      template makes no sense for an absence-of-a-defect entry).
+    //
+    //   2. Auto-flip their Status from `open` to
+    //      `acknowledged-informational-<YYYY-MM-DD>` so
+    //      `walkOpenFindings` stops returning them and the
+    //      workplan-aware gate no longer sees them as unscoped
+    //      open findings. AUDIT-77 documents what happens if (2)
+    //      is omitted: the gate refuses forever (`missingIds`
+    //      permanently non-empty), and the refusal message points
+    //      at `promote-findings --apply` which is the verb that
+    //      filtered them out — an undocumented hand-edit of the
+    //      audit-log is the only escape.
+    //
+    // HIGH/MEDIUM/LOW Status entries are NEVER auto-flipped — those
+    // findings require an explicit task → commit cycle to leave
+    // `open` (Option D regression-lock).
+    const informationalFindings = findings.filter(
+      (f) =>
+        !alreadyScoped.has(canonicalOf(f.findingId)) &&
+        (f.severity ?? '').toLowerCase() === 'informational',
+    );
     const newFindings = findings.filter(
       (f) =>
         !alreadyScoped.has(canonicalOf(f.findingId)) &&
         (f.severity ?? '').toLowerCase() !== 'informational',
     );
+    if (informationalFindings.length > 0) {
+      const today = now.toISOString().slice(0, 10);
+      const informationalStatus = `acknowledged-informational-${today}`;
+      try {
+        await applyStatusFlips({
+          auditLogPath,
+          flips: informationalFindings.map((f) => ({
+            findingId: f.findingId,
+            newStatus: informationalStatus,
+          })),
+          read: args.read.auditLog,
+          write: args.write.auditLog,
+        });
+      } catch (err) {
+        stderr.write(
+          `promote-findings --auto: failed to flip informational findings: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+        return 1;
+      }
+      stdout.write(
+        `Auto-flipped: ${informationalFindings.length} informational finding(s) to ${informationalStatus}.\n`,
+      );
+    }
     if (newFindings.length === 0) {
       stdout.write(
         `promote-findings --auto: no new findings to scope on feature ${opts.featureSlug} (${findings.length} open finding(s) already scoped in workplan).\n`,

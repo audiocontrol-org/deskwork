@@ -880,6 +880,109 @@ describe('runPromoteFindings — auto-apply (Phase 15 Task 4b)', () => {
       }
     });
 
+    // Phase 19 Task 5.111 (fix-finding-AUDIT-20260601-77) —
+    // auto-flip informational findings out of `open` so the
+    // workplan-aware gate doesn't deadlock on them.
+    //
+    // Step 0 — working-code invariant: pre-AUDIT-77-fix, informational
+    // findings were filtered from auto-promote BUT their Status stayed
+    // `open`. walkOpenFindings would return them; coverage gate would
+    // refuse forever (missingIds permanently non-empty). Post-fix, the
+    // auto-apply path MUST flip informational findings to
+    // `acknowledged-informational-<YYYY-MM-DD>` so they leave the
+    // `Status: open` set. The HIGH/MEDIUM/LOW path is unchanged —
+    // those Status flips happen only via the explicit task → commit
+    // cycle, never via auto-apply (regression-lock).
+    it('auto-flips informational findings to acknowledged-informational-<date> (AUDIT-77)', async () => {
+      const f = makeMixedSeverityFixture();
+      try {
+        const { args, diskWrites } = makeRunArgs(
+          {
+            verb: 'auto-apply',
+            featureSlug: f.featureSlug,
+            bucket: 'open',
+            limit: 10,
+          },
+          f,
+          new Map<string, string>(),
+        );
+        const exit = await runPromoteFindings(args);
+        expect(exit).toBe(0);
+        const auditLogPath = join(
+          f.root,
+          'docs',
+          '1.0',
+          '001-IN-PROGRESS',
+          f.featureSlug,
+          'audit-log.md',
+        );
+        const newAuditLog = diskWrites.get(auditLogPath);
+        // Audit-log MUST be written — auto-flip lands on the
+        // informational entry's Status line.
+        expect(newAuditLog).toBeDefined();
+        if (newAuditLog !== undefined) {
+          // The informational finding's Status flipped to
+          // acknowledged-informational-<YYYY-MM-DD>.
+          const informationalSection = newAuditLog.slice(
+            newAuditLog.indexOf('AUDIT-20260601-93'),
+          );
+          expect(informationalSection).toMatch(
+            /Status:\s+acknowledged-informational-\d{4}-\d{2}-\d{2}/,
+          );
+        }
+      } finally {
+        f.cleanup();
+      }
+    });
+
+    it('REGRESSION: HIGH / MEDIUM / LOW Status entries are NOT auto-flipped (Option D invariant)', async () => {
+      const f = makeMixedSeverityFixture();
+      try {
+        const { args, diskWrites } = makeRunArgs(
+          {
+            verb: 'auto-apply',
+            featureSlug: f.featureSlug,
+            bucket: 'open',
+            limit: 10,
+          },
+          f,
+          new Map<string, string>(),
+        );
+        const exit = await runPromoteFindings(args);
+        expect(exit).toBe(0);
+        const auditLogPath = join(
+          f.root,
+          'docs',
+          '1.0',
+          '001-IN-PROGRESS',
+          f.featureSlug,
+          'audit-log.md',
+        );
+        const newAuditLog = diskWrites.get(auditLogPath);
+        if (newAuditLog !== undefined) {
+          // HIGH/MEDIUM/LOW Status lines remain `open` — only the
+          // task → commit cycle should flip them.
+          const highSection = newAuditLog.slice(
+            newAuditLog.indexOf('AUDIT-20260601-90'),
+            newAuditLog.indexOf('AUDIT-20260601-91'),
+          );
+          expect(highSection).toMatch(/Status:\s+open/);
+          const medSection = newAuditLog.slice(
+            newAuditLog.indexOf('AUDIT-20260601-91'),
+            newAuditLog.indexOf('AUDIT-20260601-92'),
+          );
+          expect(medSection).toMatch(/Status:\s+open/);
+          const lowSection = newAuditLog.slice(
+            newAuditLog.indexOf('AUDIT-20260601-92'),
+            newAuditLog.indexOf('AUDIT-20260601-93'),
+          );
+          expect(lowSection).toMatch(/Status:\s+open/);
+        }
+      } finally {
+        f.cleanup();
+      }
+    });
+
     // Step 1b — regression-lock test (Option D, HIGH severity per
     // AUDIT-20260601-76). Confirms the working-code invariant the
     // filter MUST preserve: HIGH/MEDIUM/LOW findings continue to be
