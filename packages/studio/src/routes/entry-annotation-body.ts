@@ -82,6 +82,29 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
       }
       if (typeof text !== 'string') return err('comment.text is required');
       const category = asCategory(obj.category);
+      // Phase 8 Step 8.4.1 — a brand-new `comment` annotation may
+      // carry `attachments[]` if it was created via the
+      // capture-then-create flow (the screenshot is pre-attached at
+      // POST time, not via a follow-up edit-comment). Validate the
+      // shape identically to the edit-comment patch.
+      let attachments: string[] | undefined;
+      if (obj.attachments !== undefined) {
+        if (!Array.isArray(obj.attachments)) {
+          return err('comment.attachments must be an array of strings');
+        }
+        const arr: string[] = [];
+        for (const item of obj.attachments) {
+          if (typeof item !== 'string') {
+            return err('comment.attachments entries must be strings');
+          }
+          arr.push(item);
+        }
+        attachments = arr;
+      }
+      const replyTo =
+        typeof obj.replyTo === 'string' && obj.replyTo.length > 0
+          ? obj.replyTo
+          : undefined;
       const draft: AnnotationDraftFromBody = {
         type: 'comment',
         workflowId,
@@ -90,6 +113,8 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
         text,
         ...(category !== null ? { category } : {}),
         ...(typeof obj.anchor === 'string' ? { anchor: obj.anchor } : {}),
+        ...(attachments !== undefined ? { attachments } : {}),
+        ...(replyTo !== undefined ? { replyTo } : {}),
       };
       return { kind: 'ok', draft };
     }
