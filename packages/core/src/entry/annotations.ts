@@ -35,6 +35,7 @@ import type { JournalEvent } from '../schema/journal-events.ts';
 import type {
   CommentAnnotation,
   DraftAnnotation,
+  SpatialAnchor,
 } from '../review/types.ts';
 
 /**
@@ -51,6 +52,27 @@ import type {
  * casts; no `any`.
  */
 type StoredAnnotation = Extract<JournalEvent, { kind: 'entry-annotation' }>['annotation'];
+type StoredComment = Extract<StoredAnnotation, { type: 'comment' }>;
+type StoredSpatialAnchor = NonNullable<StoredComment['spatialAnchor']>;
+
+/**
+ * Defensive copy for {@link SpatialAnchor} — keeps the in-memory
+ * representation independent of the journal-event payload so later
+ * mutations on either side don't leak.
+ *
+ * Accepts the Zod-inferred {@link StoredSpatialAnchor} shape (where
+ * optional fields are `T | undefined`) and emits the canonical TS
+ * {@link SpatialAnchor} shape (where optional fields are `T?` under
+ * `exactOptionalPropertyTypes`). The bridge handles the same shape
+ * mismatch documented above for `toDraftAnnotation`.
+ */
+function cloneSpatialAnchor(input: StoredSpatialAnchor): SpatialAnchor {
+  const out: SpatialAnchor = { kind: input.kind };
+  if (input.selector !== undefined) out.selector = input.selector;
+  if (input.x !== undefined) out.x = input.x;
+  if (input.y !== undefined) out.y = input.y;
+  return out;
+}
 
 function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
   const base = {
@@ -68,6 +90,14 @@ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
         text: stored.text,
         ...(stored.category !== undefined ? { category: stored.category } : {}),
         ...(stored.anchor !== undefined ? { anchor: stored.anchor } : {}),
+        // Phase 8 Step 8.1.1 — pass new optional fields through.
+        ...(stored.replyTo !== undefined ? { replyTo: stored.replyTo } : {}),
+        ...(stored.attachments !== undefined
+          ? { attachments: [...stored.attachments] }
+          : {}),
+        ...(stored.spatialAnchor !== undefined
+          ? { spatialAnchor: cloneSpatialAnchor(stored.spatialAnchor) }
+          : {}),
       };
       return out;
     }
@@ -295,6 +325,12 @@ function applyEdits(
   // text/category edit unchanged.
   const anchorPrefix = comment.anchorPrefix;
   const anchorSuffix = comment.anchorSuffix;
+  // Phase 8 Step 8.1.1 — replyTo / attachments / spatialAnchor are
+  // immutable through `edit-comment` (the edit schema doesn't expose
+  // them); preserve unchanged the same way prefix/suffix are.
+  const replyTo = comment.replyTo;
+  const attachments = comment.attachments;
+  const spatialAnchor = comment.spatialAnchor;
   for (const e of edits) {
     if (e.type !== 'edit-comment') continue;
     if (e.text !== undefined) text = e.text;
@@ -314,6 +350,11 @@ function applyEdits(
     ...(anchor !== undefined ? { anchor } : {}),
     ...(anchorPrefix !== undefined ? { anchorPrefix } : {}),
     ...(anchorSuffix !== undefined ? { anchorSuffix } : {}),
+    ...(replyTo !== undefined ? { replyTo } : {}),
+    ...(attachments !== undefined ? { attachments: [...attachments] } : {}),
+    ...(spatialAnchor !== undefined
+      ? { spatialAnchor: cloneSpatialAnchor(spatialAnchor) }
+      : {}),
   };
   return out;
 }

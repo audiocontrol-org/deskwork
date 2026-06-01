@@ -46,6 +46,34 @@ export interface DraftRange {
   end: number;
 }
 
+/**
+ * Spatial anchor for graphical-entry comments (Phase 8 Step 8.1.1).
+ *
+ * Where a textual comment's `range` + `anchor` locates the comment in
+ * the raw markdown source, a `spatialAnchor` locates the comment on
+ * the entry's primary visual surface — a mockup, an image, an SVG
+ * diagram, anything rendered as the entry's content. The three `kind`s
+ * are mutually exclusive in interpretation:
+ *
+ *   - `pixel` — `x`/`y` are pixel coordinates against the rendered
+ *     visual's intrinsic dimensions. Used for image-style entries
+ *     where DOM selectors are not meaningful.
+ *   - `dom-selector` — `selector` is a CSS selector that identifies
+ *     the anchored element within the rendered HTML mockup.
+ *   - `svg-element` — `selector` is a CSS selector that resolves to
+ *     an SVG element (e.g. `g.layer-2 > rect[id="logo"]`).
+ *
+ * All fields are optional at the schema level so legacy comments
+ * without spatial anchors continue to parse; the renderer enforces
+ * that the right combination is present for each `kind` at use time.
+ */
+export interface SpatialAnchor {
+  kind: 'pixel' | 'dom-selector' | 'svg-element';
+  selector?: string;
+  x?: number;
+  y?: number;
+}
+
 interface AnnotationBase {
   /** ISO-8601 timestamp when the annotation was recorded. */
   createdAt: string;
@@ -97,6 +125,30 @@ export interface CommentAnnotation extends AnnotationBase {
    * field. Optional for back-compat.
    */
   anchorSuffix?: string;
+  /**
+   * Phase 8 Step 8.1.1 — threading. The id of the root `comment`
+   * annotation this comment replies to. Absent when the comment is
+   * itself a root (top-level) comment. Threading is single-level:
+   * a reply's `replyTo` always points at a root comment, never at
+   * another reply.
+   */
+  replyTo?: string;
+  /**
+   * Phase 8 Step 8.1.1 — screenshot attachments. Relative paths under
+   * `<entryDir>/scrapbook/screenshots/`, each pointing at an
+   * operator-attached screenshot bound to this comment. Stored as
+   * relative paths so the entry tree is portable. Empty / absent
+   * when the comment has no attachments.
+   */
+  attachments?: string[];
+  /**
+   * Phase 8 Step 8.1.1 — spatial anchor for graphical entries. When
+   * present, the comment is anchored on the entry's primary visual
+   * (mockup, image, SVG) per the {@link SpatialAnchor} contract.
+   * Independent of `range` — a comment may carry both (a markdown
+   * range AND a spatial pin) or neither.
+   */
+  spatialAnchor?: SpatialAnchor;
 }
 
 export interface EditAnnotation extends AnnotationBase {

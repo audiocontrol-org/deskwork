@@ -28,6 +28,23 @@ const RangeSchema = z.object({
   end: z.number().int().nonnegative(),
 });
 
+/**
+ * Phase 8 Step 8.1.1 — spatial anchor for graphical-entry comments.
+ * Mirror of {@link import('../review/types.ts').SpatialAnchor}.
+ *
+ * Three `kind`s — `pixel`, `dom-selector`, `svg-element` — capture
+ * which surface the anchor lives on. All position fields are optional
+ * at the schema level (the renderer enforces the right combination
+ * per `kind`). Adding `kind` values requires updating both this
+ * schema and the TS interface in lockstep.
+ */
+const SpatialAnchorSchema = z.object({
+  kind: z.enum(['pixel', 'dom-selector', 'svg-element']),
+  selector: z.string().optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+});
+
 const BaseFields = {
   /** ISO-8601 timestamp when the annotation was recorded. */
   createdAt: z.string().datetime(),
@@ -48,6 +65,12 @@ const CommentAnnotation = z.object({
   text: z.string(),
   category: AnnotationCategoryEnum.optional(),
   anchor: z.string().optional(),
+  // Phase 8 Step 8.1.1 — additive fields. Existing single-comment
+  // annotations without any of these continue to parse unchanged.
+  // The TS source-of-truth lives at `review/types.ts:CommentAnnotation`.
+  replyTo: z.string().optional(),
+  attachments: z.array(z.string()).optional(),
+  spatialAnchor: SpatialAnchorSchema.optional(),
 });
 
 const EditAnnotation = z.object({
