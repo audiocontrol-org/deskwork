@@ -116,6 +116,25 @@ export async function run(argv: string[]): Promise<void> {
       2,
     );
   }
+  // Phase 8 Step 8.5.2 — `--auto-dispositions=addressed` has no
+  // per-comment `reason` input, so it cannot satisfy the Step 8.1.2
+  // contract (`addressed` requires non-empty `reason`). Refuse it at
+  // parse time with the same friendly error shape used by the file
+  // parser. Operators who want to bulk-address every comment must use
+  // an explicit dispositions file with a per-comment reason; the flag
+  // remains useful for `deferred` and `wontfix` bulk operations.
+  if (flags['auto-dispositions'] === 'addressed') {
+    fail(
+      `--auto-dispositions=addressed is refused: per Phase 8 Step 8.1.2, `
+      + `every addressed disposition must carry a non-empty 'reason'. The `
+      + `--auto-dispositions flag has no per-comment reason input. Write a `
+      + `dispositions file instead, with shape:\n`
+      + `  { "<commentId>": { "disposition": "addressed", "reason": "<text>" } }\n`
+      + `then pass --dispositions <path>. The --auto-dispositions flag still `
+      + `works for 'deferred' and 'wontfix' where 'reason' is optional.`,
+      2,
+    );
+  }
 
   if (
     flags.kind !== undefined &&
