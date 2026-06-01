@@ -1170,7 +1170,7 @@ Inadvertently closed by Phase 17's wrapper verb. `runImplementHook` calls `readL
 ### AUDIT-20260531-23 — `defaultListRunDirs` swallows all readdir errors — codex-03
 
 Finding-ID: AUDIT-20260531-23
-Status:     open
+Status:     fixed-46aec320dc31371e16b4ab687850f044bb39fb9c
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:108-117`
 
@@ -1190,7 +1190,7 @@ Inadvertently closed by Phase 17 wrapper: each `invokeDwl` returns `{stdout, std
 ### AUDIT-20260531-25 — `check-barrage-tip` CLI has no shim-level tests — claude-04
 
 Finding-ID: AUDIT-20260531-25
-Status:     open
+Status:     fixed-46aec320dc31371e16b4ab687850f044bb39fb9c
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts` (no matching `__tests__/.../check-barrage-tip-cli.test.ts`)
 
@@ -1201,7 +1201,7 @@ Tracking for v0.32.x: add `check-barrage-tip-cli.test.ts` mirroring the `check-b
 ### AUDIT-20260531-26 — Lexical-sort "most recent run-dir" depends on an unstated naming contract — claude-07
 
 Finding-ID: AUDIT-20260531-26
-Status:     open
+Status:     fixed-46aec320dc31371e16b4ab687850f044bb39fb9c
 Severity:   informational
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-tip.ts` (sortedRunDirs lexical sort)
 
@@ -1212,7 +1212,7 @@ Tracking for v0.32.x: add a test that constructs run-dirs with the *actual* `gen
 ### AUDIT-20260531-27 — clones.yaml ignore-with-justification reasons inaccurate — claude-05
 
 Finding-ID: AUDIT-20260531-27
-Status:     open
+Status:     fixed-46aec320dc31371e16b4ab687850f044bb39fb9c
 Severity:   low
 Surface:    `.dw-lifecycle/scope-discovery/clones.yaml` (groups `f645890d8e9b`, `d2600be96980`, `7cf22ee0c611`, `961b07c6d120`, `e23bc58de99e`)
 

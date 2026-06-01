@@ -650,7 +650,7 @@ Closes AUDIT-20260531-23. Surface: `plugins/dw-lifecycle/src/subcommands/check-b
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.35 (fix-finding-AUDIT-20260531-25): AUDIT-20260531-25 — `check-barrage-tip` CLI has no shim-level tests — claude-04
@@ -667,7 +667,7 @@ Closes AUDIT-20260531-25. Surface: `plugins/dw-lifecycle/src/subcommands/check-b
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.36 (fix-finding-AUDIT-20260531-26): AUDIT-20260531-26 — Lexical-sort "most recent run-dir" depends on an unstated na…
@@ -684,7 +684,7 @@ Closes AUDIT-20260531-26. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.37 (fix-finding-AUDIT-20260531-27): AUDIT-20260531-27 — clones.yaml ignore-with-justification reasons inaccurate — c…
@@ -701,7 +701,7 @@ Closes AUDIT-20260531-27. Surface: `.dw-lifecycle/scope-discovery/clones.yaml` (
 
 - [x] Failing test exists at `(no test — resolved by baseline refresh; documented above)`
 - [x] `npx vitest run` 2558/2558 green (no test required; nothing to assert)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 5.28 (fix-finding-AUDIT-20260531-11): AUDIT-20260531-11 — Fix-tasks 5.25 and 5.26 reintroduce the exact bare-`*.test.t…
 
