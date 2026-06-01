@@ -56,6 +56,24 @@ type StoredComment = Extract<StoredAnnotation, { type: 'comment' }>;
 type StoredSpatialAnchor = NonNullable<StoredComment['spatialAnchor']>;
 
 /**
+ * Local exhaustiveness guard. If a future `SpatialAnchor` variant is
+ * added to the discriminated union (e.g. `audio-region`,
+ * `video-frame`) but the matching `case` is not added to
+ * `cloneSpatialAnchor` below, the compiler now flags the missing arm at
+ * the `assertNever` call site (parameter `_input` is typed `never`).
+ * Without this guard, the rewritten switch would silently fall through
+ * the switch with no `default` arm, returning `undefined` at runtime —
+ * the lockstep contract between the TS union and the clone path would
+ * be enforced only by convention.
+ *
+ * AUDIT-20260601-09 — companion guard to the AUDIT-20260601-07
+ * discriminated-union refactor.
+ */
+function assertNever(_input: never, context: string): never {
+  throw new Error(`Unhandled discriminated-union variant in ${context}`);
+}
+
+/**
  * Defensive copy for {@link SpatialAnchor} — keeps the in-memory
  * representation independent of the journal-event payload so later
  * mutations on either side don't leak.
@@ -66,6 +84,11 @@ type StoredSpatialAnchor = NonNullable<StoredComment['spatialAnchor']>;
  * variant. The Zod-inferred {@link StoredSpatialAnchor} shape is also
  * a discriminated union (the schema is a `z.discriminatedUnion`), so
  * the narrow flows symmetrically.
+ *
+ * Per AUDIT-20260601-09, the `default` arm calls `assertNever` so
+ * adding a new {@link SpatialAnchor} variant without updating this
+ * switch is a compile-time error (the parameter narrows to `never`
+ * only when every variant is handled above).
  */
 function cloneSpatialAnchor(input: StoredSpatialAnchor): SpatialAnchor {
   switch (input.kind) {
@@ -75,6 +98,8 @@ function cloneSpatialAnchor(input: StoredSpatialAnchor): SpatialAnchor {
       return { kind: 'dom-selector', selector: input.selector };
     case 'svg-element':
       return { kind: 'svg-element', selector: input.selector };
+    default:
+      return assertNever(input, 'cloneSpatialAnchor');
   }
 }
 
