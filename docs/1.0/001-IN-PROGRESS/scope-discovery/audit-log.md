@@ -1086,8 +1086,8 @@ Fired against the Phase 17 substantive diff (775fd2a..f5981de — 4 commits: doc
 
 ### AUDIT-20260531-16 — Pre-push gate checks the wrong SHA (inverted parent-vs-self direction)
 
-Finding-ID: AUDIT-20260531-16 (codex-01; cross-model=1/3)
-Status:     open
+Finding-ID: AUDIT-20260531-16
+Status:     fixed-94756787408f4fecd0b28f35b6a4cd5deff425be
 Severity:   blocking
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts:78-91`
 
@@ -1097,8 +1097,8 @@ Fix: require `tipsSeen.has(commit.sha)` for each unpushed commit. Update fixture
 
 ### AUDIT-20260531-17 — `allow-no-prior-run` declared but never returned; opted-in fresh project deadlocks
 
-Finding-ID: AUDIT-20260531-17 (codex-02; cross-model=1/3)
-Status:     open
+Finding-ID: AUDIT-20260531-17
+Status:     fixed-94756787408f4fecd0b28f35b6a4cd5deff425be
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts:42-83`
 
@@ -1108,8 +1108,8 @@ Fix: when marker is missing AND the hook-run-log is empty, return `allow-no-prio
 
 ### AUDIT-20260531-18 — Marker write failures swallowed; exit-0 returned without the marker
 
-Finding-ID: AUDIT-20260531-18 (codex-03; cross-model=1/3)
-Status:     open
+Finding-ID: AUDIT-20260531-18
+Status:     fixed-94756787408f4fecd0b28f35b6a4cd5deff425be
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` writeMarkerSafe + callers
 
@@ -1119,8 +1119,8 @@ Fix: make marker write failure surface non-zero. Either bubble the error (return
 
 ### AUDIT-20260531-19 — SKILL.md claims hooks are wired but the actual wiring is missing from the diff
 
-Finding-ID: AUDIT-20260531-19 (codex-04; cross-model=1/3)
-Status:     open
+Finding-ID: AUDIT-20260531-19
+Status:     fixed-94756787408f4fecd0b28f35b6a4cd5deff425be
 Severity:   high
 Surface:    Missing surface: project `commit-msg` / `pre-push` hook wiring
 
