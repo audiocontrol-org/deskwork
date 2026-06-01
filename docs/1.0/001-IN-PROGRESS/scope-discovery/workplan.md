@@ -738,6 +738,40 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.97 (fix-finding-AUDIT-20260601-63): AUDIT-20260601-63 — Task 5.95 — the fix-task for the HIGH finding AUDIT-61 is it…
+
+Closes AUDIT-20260601-63 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.95 (`fix-finding-AUDIT-20260601-61`), vs. AUDIT-20260601-61 (`Severity: high`) in `audit-log.md`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-63 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.98 (fix-finding-AUDIT-20260601-64): AUDIT-20260601-64 — `.gitignore` comment cites a non-canonical per-model finding…
+
+Closes AUDIT-20260601-64. Surface: `.gitignore:122` — `## Per AUDIT-20260601-claude-opus-05: runtime marker files are mutated`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-64` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.95 (fix-finding-AUDIT-20260601-61): AUDIT-20260601-61 — Task 5.93 — the fix-task for the HIGH finding AUDIT-59 is it…
 
 Closes AUDIT-20260601-61 (claude-01 + claude-03 + claude-04 + claude-05 + codex-01; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.93 (`fix-finding-AUDIT-20260601-59`), vs. AUDIT-20260601-59 (`Severity: high`) in `audit-log.md`.

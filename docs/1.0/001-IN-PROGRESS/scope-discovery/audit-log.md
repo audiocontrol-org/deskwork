@@ -1995,3 +1995,25 @@ Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (updated to run `
 The diff repoints `last-hook-run.json` at run `20260601T053658225Z` with `disposition: "fired-and-promoted"` while leaving `findingsCount: 0` and `promotedCount: 0` untouched. That same run is the one whose audit-log lift (in the same commit) adds AUDIT-59 + AUDIT-60 (2 findings) and whose workplan hunk adds Tasks 5.93 + 5.94 (2 promoted fix-tasks). So the commit that *documents* AUDIT-60 (the "0/0 fired-and-promoted is self-contradicting" finding) simultaneously *reproduces* AUDIT-60 on the new run: a disposition asserting promotion happened, paired with a zero promotion count, contradicting the artifacts produced in the same commit.
 
 This is a continuing instance, not a re-litigation of AUDIT-60's disposition — AUDIT-60 named run `…053324695Z`; this writes the identical broken shape for run `…053658225Z`. Any tooling/operator reading `last-hook-run.json` to answer "did the last barrage find anything?" gets `0/0` while the audit-log shows 2 findings lifted and 2 tasks scoped. The count fields are evidently not populated on the manual/in-loop lift path (commit subject "marker churn from in-loop barrage"). Fix: the lift path must write the true `findingsCount`/`promotedCount`, or the marker must not carry `fired-and-promoted` when the counts are zero.
+
+## 2026-06-01 — audit-barrage lift (20260601T054510655Z-scope-discovery)
+
+### AUDIT-20260601-63 — Task 5.95 — the fix-task for the HIGH finding AUDIT-61 is itself rendered with the plain code-defect template, the third consecutive generation of the exact bug AUDIT-61 names
+
+Finding-ID: AUDIT-20260601-63 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.95 (`fix-finding-AUDIT-20260601-61`), vs. AUDIT-20260601-61 (`Severity: high`) in `audit-log.md`
+
+AUDIT-61 (high, cross-model) is itself the finding whose thesis is: *HIGH fix-tasks are rendered without a `Severity:` line / Step 0 / Step 1b, so `extractTaskSeverity` returns `null` and the ≥2-test regression-lock gate never fires.* This diff then adds **Task 5.95 — the fix-task for AUDIT-61 — rendered with the exact plain template the finding describes**: `Closes AUDIT-20260601-61 …. Surface: …`, then `Step 1: write failing test`, `Step 2: confirm test fails`, …, with **no `Severity: high.` line, no Step 0 working-code invariant, no Step 1b regression-lock test**, and a single-test AC (`npx vitest run <test-file-path> exits 0`).
+
+This is now the *third* generation of the self-reproducing bug: AUDIT-52 → Task 5.86, AUDIT-59 → Task 5.93, and now AUDIT-61 → Task 5.95 — each HIGH finding's own remediation task reproduces the missing-severity template. It is empirical proof the root cause is **still unfixed as of this commit**: the `promote-findings`/`apply.ts` lift path still does not thread `finding.severity` from the audit-log entry into `renderFixTaskBlock`. When an implementer picks up 5.95, `extractTaskSeverity(taskBlock)` finds no `Severity:` line → returns `null` → the `severity === 'high' || 'blocking'` guard is skipped → the ≥2-test requirement is never applied; the fix to the missing-severity-gate finding can ship with one test, fail-open and silent. This diff adds documentation and another broken fix-task but does **not** contain the one-line root-cause fix every finding names. Fix: thread `finding.severity` into the renderer so 5.95 emits `Severity: high.` + Step 0 + Step 1b before it is checked `[x]` — and do it before promoting any more HIGH findings.
+
+### AUDIT-20260601-64 — `.gitignore` comment cites a non-canonical per-model finding ID that isn't traceable in the audit-log
+
+Finding-ID: AUDIT-20260601-64
+Status:     open
+Severity:   low
+Surface:    `.gitignore:122` — `## Per AUDIT-20260601-claude-opus-05: runtime marker files are mutated`
+
+The justification comment references `AUDIT-20260601-claude-opus-05`, which is a raw per-model barrage finding ID, not a canonical `AUDIT-<YYYYMMDD>-NN` audit-log entry. Per the project's own audit-barrage triage convention (agent-discipline.md § "How to triage findings"), per-model IDs get *lifted into* the canonical `AUDIT-<date>-NN` scheme and the per-model names are recorded inside that entry's `Finding-ID:` header. A future reader grepping `audit-log.md` for `claude-opus-05` will not find a corresponding canonical entry; the comment points at an ephemeral run-local artifact. Fix: cite the canonical `AUDIT-<date>-NN` ID this finding was lifted into (or, if it was never lifted, lift it and reference that), so the gitignore rationale is traceable to a durable record.
