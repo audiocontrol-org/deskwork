@@ -83,7 +83,17 @@ const SpatialAnchorSvgElementSchema = z
   })
   .strict();
 
-const SpatialAnchorSchema = z.discriminatedUnion('kind', [
+/**
+ * AUDIT-20260601-08 — exported so the `entry-anchor-shape` doctor rule
+ * (`doctor/rules/entry-anchor-shape.ts`) can validate spatial anchors
+ * on legacy journal events that bypass the full `DraftAnnotationSchema`
+ * read path. The rule reads raw journal JSON, isolates each comment
+ * annotation's `spatialAnchor`, and `safeParse`s against this schema
+ * specifically so it can surface malformed legacy shapes (the strict
+ * `JournalEventSchema.safeParse` in `journal/read.ts` silently SKIPS
+ * such events; the doctor rule needs to SURFACE them).
+ */
+export const SpatialAnchorSchema = z.discriminatedUnion('kind', [
   SpatialAnchorPixelSchema,
   SpatialAnchorDomSelectorSchema,
   SpatialAnchorSvgElementSchema,
