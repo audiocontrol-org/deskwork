@@ -159,12 +159,57 @@ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
         resolved: stored.resolved,
       };
     case 'address':
+      // Phase 8 Step 8.1.2 (Part 2) — `AddressAnnotation` is now a
+      // discriminated union over `disposition`. The compiler can't pick
+      // a single variant from `stored.disposition` (which is the full
+      // enum) at the object-literal site, so each disposition branches
+      // explicitly. The `addressed` variant requires non-empty
+      // `reason`; the read-side schema (`DraftAnnotationSchema`'s
+      // top-level `.superRefine`) has already rejected the event if
+      // the contract was violated on disk, so reaching this branch
+      // with `disposition === 'addressed'` and a missing reason is
+      // unreachable — but the type system needs the explicit narrow.
+      if (stored.disposition === 'addressed') {
+        // `stored.reason` is `string | undefined` from the schema's
+        // optional declaration; the runtime superRefine enforced
+        // non-empty when disposition === 'addressed', so a missing
+        // reason here would have failed the read-side parse and never
+        // reached this code path.
+        if (typeof stored.reason !== 'string' || stored.reason.length === 0) {
+          throw new Error(
+            `toDraftAnnotation: addressed annotation ${stored.id} reached the ` +
+              `read fold path without a non-empty reason — the Phase 8 Step ` +
+              `8.1.2 contract on DraftAnnotationSchema's top-level superRefine ` +
+              `should have rejected this event before it reached toDraftAnnotation. ` +
+              `This indicates a bypassed schema parse (e.g. legacy data read ` +
+              `directly) or a schema regression.`,
+          );
+        }
+        return {
+          ...base,
+          type: 'address',
+          commentId: stored.commentId,
+          version: stored.version,
+          disposition: 'addressed',
+          reason: stored.reason,
+        };
+      }
+      if (stored.disposition === 'deferred') {
+        return {
+          ...base,
+          type: 'address',
+          commentId: stored.commentId,
+          version: stored.version,
+          disposition: 'deferred',
+          ...(stored.reason !== undefined ? { reason: stored.reason } : {}),
+        };
+      }
       return {
         ...base,
         type: 'address',
         commentId: stored.commentId,
         version: stored.version,
-        disposition: stored.disposition,
+        disposition: 'wontfix',
         ...(stored.reason !== undefined ? { reason: stored.reason } : {}),
       };
     case 'edit-comment':

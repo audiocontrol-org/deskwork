@@ -303,12 +303,17 @@ describe('Other annotation types — unaffected by Phase 8 Step 8.1.1', () => {
   });
 
   it('still parses an address annotation', () => {
+    // Phase 8 Step 8.1.2 (Part 2) — `addressed` disposition now
+    // requires a non-empty `reason`. Test updated to supply one so
+    // the "still parses" guarantee for the address-type variant
+    // continues to hold under the tightened contract.
     const parsed = DraftAnnotationSchema.safeParse({
       ...BASE,
       type: 'address',
       commentId: 'cmt_abc123',
       version: 3,
       disposition: 'addressed',
+      reason: 'addressed by adding section X at line 42',
     });
     expect(parsed.success).toBe(true);
   });

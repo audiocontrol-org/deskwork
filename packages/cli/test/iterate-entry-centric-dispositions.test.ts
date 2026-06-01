@@ -178,8 +178,15 @@ describe('deskwork iterate — entry-centric dispositions (#198)', () => {
       '# v1 outline\n\nFirst draft body, tightened intro.\n',
     );
 
+    // Phase 8 Step 8.1.2 (Part 2) — `addressed` disposition requires a
+    // non-empty `reason`. The dispositions file supplies one explicitly;
+    // Step 8.5.2 will add a CLI-parse-time gate that surfaces a clearer
+    // error for missing-reason files.
     const dispPath = writeDispositions({
-      [COMMENT_ID]: { disposition: 'addressed' },
+      [COMMENT_ID]: {
+        disposition: 'addressed',
+        reason: 'addressed by adding tightened intro paragraph',
+      },
     });
 
     const res = run([
@@ -381,7 +388,21 @@ describe('deskwork iterate — --auto-dispositions (#226)', () => {
   const C1 = 'c2260001-0000-4000-8000-000000000001';
   const C2 = 'c2260002-0000-4000-8000-000000000002';
 
-  it('applies addressed to every unresolved comment', () => {
+  it('--auto-dispositions=addressed surfaces the Phase 8 Step 8.1.2 reason contract (forward-pointing: Step 8.5.2 will turn this into a CLI-parse-time refusal with a friendlier message)', () => {
+    // Phase 8 Step 8.1.2 (Part 2) — `addressed` disposition now requires
+    // a non-empty `reason` at the write-side schema boundary
+    // (`DraftAnnotationSchema`'s top-level `.superRefine`). The
+    // `--auto-dispositions=addressed` flag has no per-comment reason
+    // input, so every iteration hits the contract throw. Step 8.5.2
+    // will retire this flag's `addressed`-without-reason path with a
+    // CLI-parse-time refusal that names the contract before any write
+    // is attempted; until then, this test pins the post-Step-8.1.2
+    // shape: the iteration fails with a non-zero exit and the stderr
+    // surfaces the contract violation.
+    //
+    // Sibling tests `applies deferred when that value is requested`
+    // (below) and `rejects an invalid value with exit 2` (below) still
+    // exercise the flag's non-contract-affected branches.
     writeSidecar({ uuid: UUID, slug: 'auto-addressed', currentStage: 'Outlining' });
     writeStageArtifact('auto-addressed', 'Outlining', '# v1\n\nbody.\n');
     seedEntryComment(UUID, C1, 'first comment');
@@ -395,21 +416,8 @@ describe('deskwork iterate — --auto-dispositions (#226)', () => {
       '--auto-dispositions=addressed',
       'auto-addressed',
     ]);
-    expect(res.stderr).toBe('');
-    expect(res.code).toBe(0);
-
-    const out = JSON.parse(res.stdout) as { addressedComments: string[] };
-    expect(out.addressedComments.sort()).toEqual([C1, C2].sort());
-
-    // Confirm two address-typed annotations landed in the journal.
-    const events = readJournalEvents();
-    const addresses = events.filter(
-      (e) => e.kind === 'entry-annotation' && e.annotation?.type === 'address',
-    );
-    expect(addresses).toHaveLength(2);
-    expect(
-      addresses.every((e) => e.annotation?.disposition === 'addressed'),
-    ).toBe(true);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/reason is required.*addressed/);
   });
 
   it('applies deferred when that value is requested', () => {

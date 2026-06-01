@@ -210,15 +210,49 @@ export interface ResolveAnnotation extends AnnotationBase {
  * Per-iteration agent disposition for a comment. Written when a new
  * version addresses (or defers) an operator comment. Latest-wins when
  * rendering the sidebar badge.
+ *
+ * Phase 8 Step 8.1.2 (Part 2) — `reason` is REQUIRED (non-empty) on every
+ * `disposition === 'addressed'` instance, per the PRD acceptance
+ * criterion ("required free-text disposition reason captured at iterate
+ * time"). `deferred` / `wontfix` continue to accept an optional reason.
+ *
+ * Modeled as a discriminated union on `disposition`. The runtime schema
+ * (`DraftAnnotationSchema` in `schema/draft-annotation.ts`) enforces the
+ * non-empty-`reason`-when-`addressed` constraint via a top-level
+ * `superRefine` (a nested discriminated union would collide with the
+ * outer `type` discriminator); the TS type achieves the same
+ * compile-time discrimination via the three-variant union below.
  */
-export interface AddressAnnotation extends AnnotationBase {
+interface AddressAnnotationAddressed extends AnnotationBase {
   type: 'address';
   commentId: string;
   /** Version the disposition was recorded against (the just-produced version). */
   version: number;
-  disposition: 'addressed' | 'deferred' | 'wontfix';
+  disposition: 'addressed';
+  /** Required non-empty free-text reason — Phase 8 Step 8.1.2 contract. */
+  reason: string;
+}
+
+interface AddressAnnotationDeferred extends AnnotationBase {
+  type: 'address';
+  commentId: string;
+  version: number;
+  disposition: 'deferred';
   reason?: string;
 }
+
+interface AddressAnnotationWontfix extends AnnotationBase {
+  type: 'address';
+  commentId: string;
+  version: number;
+  disposition: 'wontfix';
+  reason?: string;
+}
+
+export type AddressAnnotation =
+  | AddressAnnotationAddressed
+  | AddressAnnotationDeferred
+  | AddressAnnotationWontfix;
 
 /**
  * Edit a previously-recorded `comment` annotation. Append-only: the

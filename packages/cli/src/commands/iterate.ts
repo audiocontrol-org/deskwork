@@ -227,14 +227,52 @@ async function runLongformIterate(
     );
     for (const [commentId, entry] of Object.entries(dispositions)) {
       if (!knownCommentIds.has(commentId)) continue;
-      const ann: DraftAnnotation = mintEntryAnnotation({
-        type: 'address',
-        workflowId: uuid,
-        commentId,
-        version: result.version,
-        disposition: entry.disposition,
-        ...(entry.reason !== undefined ? { reason: entry.reason } : {}),
-      });
+      // Phase 8 Step 8.1.2 (Part 2) — `AddressAnnotation` is a
+      // discriminated union over `disposition`. Each branch emits the
+      // matching variant explicitly so the compiler can narrow.
+      // Per the Step 8.1.2 contract, `addressed` requires non-empty
+      // `reason`; the runtime write-side schema enforces this at
+      // `JournalEventSchema.safeParse`. The CLI-side gating (clear
+      // error before write) is Step 8.5.2's scope.
+      const ann: DraftAnnotation = ((): DraftAnnotation => {
+        if (entry.disposition === 'addressed') {
+          if (typeof entry.reason !== 'string' || entry.reason.length === 0) {
+            // Compile-defensive: the schema will reject this at write
+            // time. Step 8.5.2 will gate this at CLI-parse time with a
+            // friendlier error shape.
+            throw new Error(
+              `--dispositions[${commentId}].reason is required (non-empty) ` +
+                `when disposition === 'addressed' (Phase 8 Step 8.1.2 contract)`,
+            );
+          }
+          return mintEntryAnnotation({
+            type: 'address',
+            workflowId: uuid,
+            commentId,
+            version: result.version,
+            disposition: 'addressed',
+            reason: entry.reason,
+          });
+        }
+        if (entry.disposition === 'deferred') {
+          return mintEntryAnnotation({
+            type: 'address',
+            workflowId: uuid,
+            commentId,
+            version: result.version,
+            disposition: 'deferred',
+            ...(entry.reason !== undefined ? { reason: entry.reason } : {}),
+          });
+        }
+        return mintEntryAnnotation({
+          type: 'address',
+          workflowId: uuid,
+          commentId,
+          version: result.version,
+          disposition: 'wontfix',
+          ...(entry.reason !== undefined ? { reason: entry.reason } : {}),
+        });
+      })();
       await addEntryAnnotation(projectRoot, uuid, ann);
       addressed.push(commentId);
     }
@@ -382,14 +420,64 @@ async function runShortformIterate(
     );
     for (const [commentId, entry] of Object.entries(dispositions)) {
       if (!workflowComments.has(commentId)) continue;
-      const ann = mintAnnotation({
+      // Phase 8 Step 8.1.2 (Part 2) — narrow per disposition variant.
+      // Same shape as the longform-path narrow above. See the comment
+      // there for the contract rationale. The typed local binding is
+      // needed because the `'addressed'` / `'deferred'` / `'wontfix'`
+      // string literals widen to `string` in `mintAnnotation`'s
+      // generic context unless given an explicit contextual type.
+      if (entry.disposition === 'addressed') {
+        if (typeof entry.reason !== 'string' || entry.reason.length === 0) {
+          throw new Error(
+            `--dispositions[${commentId}].reason is required (non-empty) ` +
+              `when disposition === 'addressed' (Phase 8 Step 8.1.2 contract)`,
+          );
+        }
+        const draftAddressed: Omit<
+          Extract<DraftAnnotation, { type: 'address'; disposition: 'addressed' }>,
+          'id' | 'createdAt'
+        > = {
+          type: 'address',
+          workflowId: workflow.id,
+          commentId,
+          version: newVersion.version,
+          disposition: 'addressed',
+          reason: entry.reason,
+        };
+        const ann = mintAnnotation(draftAddressed);
+        appendAnnotation(projectRoot, config, ann);
+        addressed.push(commentId);
+        continue;
+      }
+      if (entry.disposition === 'deferred') {
+        const draftDeferred: Omit<
+          Extract<DraftAnnotation, { type: 'address'; disposition: 'deferred' }>,
+          'id' | 'createdAt'
+        > = {
+          type: 'address',
+          workflowId: workflow.id,
+          commentId,
+          version: newVersion.version,
+          disposition: 'deferred',
+          ...(entry.reason !== undefined ? { reason: entry.reason } : {}),
+        };
+        const ann = mintAnnotation(draftDeferred);
+        appendAnnotation(projectRoot, config, ann);
+        addressed.push(commentId);
+        continue;
+      }
+      const draftWontfix: Omit<
+        Extract<DraftAnnotation, { type: 'address'; disposition: 'wontfix' }>,
+        'id' | 'createdAt'
+      > = {
         type: 'address',
         workflowId: workflow.id,
         commentId,
         version: newVersion.version,
-        disposition: entry.disposition,
+        disposition: 'wontfix',
         ...(entry.reason !== undefined ? { reason: entry.reason } : {}),
-      });
+      };
+      const ann = mintAnnotation(draftWontfix);
       appendAnnotation(projectRoot, config, ann);
       addressed.push(commentId);
     }

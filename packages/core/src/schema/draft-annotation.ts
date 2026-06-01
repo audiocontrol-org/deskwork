@@ -161,6 +161,18 @@ const AddressAnnotation = z.object({
   commentId: z.string(),
   version: z.number().int(),
   disposition: z.enum(['addressed', 'deferred', 'wontfix']),
+  /**
+   * Phase 8 Step 8.1.2 (Part 2) — `reason` becomes REQUIRED (non-empty)
+   * when `disposition === 'addressed'`. The base shape keeps `reason`
+   * declared as `z.string().optional()` so this ZodObject remains a
+   * valid member of `DraftAnnotationSchema`'s outer
+   * `z.discriminatedUnion('type', ...)` (which requires plain
+   * `ZodObject` members — `.superRefine` returns `ZodEffects`, which
+   * the outer union cannot accept as a direct member). The conditional
+   * required-ness is enforced via the top-level `superRefine` chained
+   * on `DraftAnnotationSchema` below — same place every
+   * `address`-typed value passes through during `safeParse`.
+   */
   reason: z.string().optional(),
 });
 
@@ -187,14 +199,58 @@ const ArchiveCommentAnnotation = z.object({
   priorStage: z.string().optional(),
 });
 
-export const DraftAnnotationSchema = z.discriminatedUnion('type', [
-  CommentAnnotation,
-  EditAnnotation,
-  ApproveAnnotation,
-  RejectAnnotation,
-  ResolveAnnotation,
-  AddressAnnotation,
-  EditCommentAnnotation,
-  DeleteCommentAnnotation,
-  ArchiveCommentAnnotation,
-]);
+/**
+ * Phase 8 Step 8.1.2 (Part 2) — `reason` is REQUIRED (non-empty) on every
+ * `address` annotation whose `disposition === 'addressed'`. Per the PRD
+ * acceptance criterion ("required free-text disposition reason captured
+ * at iterate time"), the studio's disposition-trace affordance (Task
+ * 8.6) renders the reason as the header line on the inline diff
+ * expansion — an `addressed` claim without a reason has no operator-
+ * readable label to show next to the diff slice.
+ *
+ * `deferred` and `wontfix` continue to accept an OPTIONAL `reason`. The
+ * contract is intentionally scoped to `addressed` only.
+ *
+ * Why a top-level `.superRefine` rather than nesting a
+ * `z.discriminatedUnion('disposition', ...)` inside the `address`
+ * variant: zod's `discriminatedUnion` requires plain `ZodObject`
+ * members; a nested discriminated union would collapse three
+ * `type: 'address'` variants into the outer discriminator and collide,
+ * AND wrapping the inner `AddressAnnotation` with `.superRefine`
+ * would return `ZodEffects` (also disallowed as a direct member of
+ * the outer discriminated union). Pulling the refinement up to the
+ * top-level schema is the idiomatic zod escape hatch and keeps every
+ * variant a plain object — same shape every consumer expects.
+ *
+ * Legacy data (annotations on disk that pre-date this tightening)
+ * fails `safeParse` and is silently SKIPPED by
+ * `JournalEventSchema.safeParse` in `journal/read.ts` — same shape as
+ * the AUDIT-20260601-07 cutover. The companion doctor rule
+ * `entry-address-reason-missing` (Part 1 of this step) SURFACES the
+ * legacy data BEFORE it disappears from the read stream.
+ */
+export const DraftAnnotationSchema = z
+  .discriminatedUnion('type', [
+    CommentAnnotation,
+    EditAnnotation,
+    ApproveAnnotation,
+    RejectAnnotation,
+    ResolveAnnotation,
+    AddressAnnotation,
+    EditCommentAnnotation,
+    DeleteCommentAnnotation,
+    ArchiveCommentAnnotation,
+  ])
+  .superRefine((val, ctx) => {
+    if (val.type !== 'address') return;
+    if (val.disposition !== 'addressed') return;
+    if (typeof val.reason !== 'string' || val.reason.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reason'],
+        message:
+          "`reason` is required (non-empty) when `disposition === 'addressed'` " +
+          '(Phase 8 Step 8.1.2 contract)',
+      });
+    }
+  });

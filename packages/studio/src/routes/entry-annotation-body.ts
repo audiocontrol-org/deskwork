@@ -140,22 +140,49 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
         return err('address.commentId is required');
       }
       if (typeof version !== 'number') return err('address.version is required');
-      if (
-        disposition !== 'addressed' &&
-        disposition !== 'deferred' &&
-        disposition !== 'wontfix'
-      ) {
-        return err("address.disposition must be 'addressed' | 'deferred' | 'wontfix'");
+      // Phase 8 Step 8.1.2 (Part 2) — `AnnotationDraftFromBody` is a
+      // discriminated union over `disposition` for the `address`
+      // variant. Each branch emits the matching variant and enforces
+      // the contract: `addressed` requires non-empty `reason`.
+      if (disposition === 'addressed') {
+        if (typeof obj.reason !== 'string' || obj.reason.length === 0) {
+          return err(
+            "address.reason is required (non-empty) when disposition === 'addressed' (Phase 8 Step 8.1.2)",
+          );
+        }
+        const draft: AnnotationDraftFromBody = {
+          type: 'address',
+          workflowId,
+          commentId,
+          version,
+          disposition: 'addressed',
+          reason: obj.reason,
+        };
+        return { kind: 'ok', draft };
       }
-      const draft: AnnotationDraftFromBody = {
-        type: 'address',
-        workflowId,
-        commentId,
-        version,
-        disposition,
-        ...(typeof obj.reason === 'string' ? { reason: obj.reason } : {}),
-      };
-      return { kind: 'ok', draft };
+      if (disposition === 'deferred') {
+        const draft: AnnotationDraftFromBody = {
+          type: 'address',
+          workflowId,
+          commentId,
+          version,
+          disposition: 'deferred',
+          ...(typeof obj.reason === 'string' ? { reason: obj.reason } : {}),
+        };
+        return { kind: 'ok', draft };
+      }
+      if (disposition === 'wontfix') {
+        const draft: AnnotationDraftFromBody = {
+          type: 'address',
+          workflowId,
+          commentId,
+          version,
+          disposition: 'wontfix',
+          ...(typeof obj.reason === 'string' ? { reason: obj.reason } : {}),
+        };
+        return { kind: 'ok', draft };
+      }
+      return err("address.disposition must be 'addressed' | 'deferred' | 'wontfix'");
     }
     case 'edit-comment': {
       const commentId = obj.commentId;
