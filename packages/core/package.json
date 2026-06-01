@@ -125,6 +125,10 @@
       "types": "./dist/entry/create.d.ts",
       "default": "./dist/entry/create.js"
     },
+    "./entry/diff-slice": {
+      "types": "./dist/entry/diff-slice.d.ts",
+      "default": "./dist/entry/diff-slice.js"
+    },
     "./entry/induct": {
       "types": "./dist/entry/induct.d.ts",
       "default": "./dist/entry/induct.js"
@@ -227,6 +231,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "diff": "^7.0.0",
     "github-slugger": "^2.0.0",
     "rehype-slug": "^6.0.0",
     "rehype-stringify": "^10.0.0",
@@ -238,6 +243,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@types/diff": "^7.0.0",
     "@types/node": "^22.10.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0",
