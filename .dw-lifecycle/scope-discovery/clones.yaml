@@ -1,4 +1,4 @@
-generated_at: 2026-06-01T02:21:08.986Z
+generated_at: 2026-06-01T02:31:59.063Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1195,7 +1195,7 @@ clones:
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:335:353
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:146:164
-      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:208:226
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:213:231
       - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:190:208
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:157:175

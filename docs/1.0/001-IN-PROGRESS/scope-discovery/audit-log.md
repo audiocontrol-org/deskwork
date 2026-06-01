@@ -1217,3 +1217,67 @@ Severity:   low
 Surface:    `.dw-lifecycle/scope-discovery/clones.yaml` (groups `f645890d8e9b`, `d2600be96980`, `7cf22ee0c611`, `961b07c6d120`, `e23bc58de99e`)
 
 Phase 16's bulk-disposition of CLI-shim clones used a copy-pasted reason naming "check-barrage-dampener / slush-remaining" specifically — but several groups pair check-barrage-tip with check-open-findings or re-audit-fixed-findings, not the named siblings. The reason claim doesn't match the implementation; same shape as AUDIT-15. Tracking for cleanup: either tailor each reason to its actual members or use a general rule statement.
+
+## 2026-06-01 — audit-barrage lift (20260601T022303926Z-scope-discovery)
+
+### AUDIT-20260601-01 — The actual AUDIT-23 "runner maps to exit-2" behavior has no test
+
+Finding-ID: AUDIT-20260601-01 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts` (new try/catch in `runCheckBarrageTip`, ~lines 187-203) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` (the three `runCheckBarrageTip` tests)
+
+The stated AUDIT-23 fix is two-part: (a) `defaultListRunDirs` re-throws non-ENOENT, and (b) "Runner catches and maps to exit-2" (workplan Task 5.34 Step 3). Part (b) is the *new catch block* added to `runCheckBarrageTip` that writes the scaffold-error line and `return 2`. That branch is **uncovered**. The `defaultListRunDirs` EACCES test calls the unit directly; it never goes through `runCheckBarrageTip`. The three `runCheckBarrageTip` tests inject only non-throwing stubs (`listRunDirs: async () => []` and `=> fullPaths`). The one test that asserts exit 2 ("does not resolve to a feature root") exercises the *resolveFeatureRoot* path that fires **before** the try block — not the new catch.
+
+So the regression this fix is supposed to prevent (a permission error reaching the runner and being surfaced as exit-2 rather than silently masked as "no prior runs") has no test that would fail if the catch were deleted. A test injecting `listRunDirs: async () => { throw Object.assign(new Error('denied'), {code:'EACCES'}); }` into `runCheckBarrageTip` and asserting `exit === 2` + the stderr message would close the gap. This matters because AUDIT-25 in the same diff is specifically about "CLI exit codes match the contract with no tests exercising the shim" — and the headline exit-code path of the sibling fix is exactly the one left untested.
+
+### AUDIT-20260601-02 — Task 5.37 (AUDIT-27) is an `[x]`-checked fix-finding task with no test, under a `Closes AUDIT-27` commit
+
+Finding-ID: AUDIT-20260601-02
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.37, AC block) vs. commit 46aec320 (`Closes AUDIT-…27`) and the `fix-task-tdd-discipline` doctor rule
+
+Task 5.37 is tagged `(fix-finding-AUDIT-20260531-27)`, is fully `[x]`-checked, and its acceptance criteria read:
+
+```
+- [x] Failing test exists at `(no test — resolved by baseline refresh; documented above)`
+- [x] `npx vitest run` 2558/2558 green (no test required; nothing to assert)
+```
+
+Per the project's own machinery (`.claude/rules/agent-discipline.md` → "Audit findings: scope-don't-defer + TDD enforcement"), `check-fix-task-tdd` "refuses `Closes AUDIT-<id>` commits where the cited workplan task block's test file is missing, empty, or whose vitest exits non-zero," and the `fix-task-tdd-discipline` doctor rule "walks every `[x]`-checked fix-finding task across every feature and flags violations." Task 5.37 has no test file — its cited path is the literal string `(no test — resolved by baseline refresh; documented above)`. So this `[x]`-checked fix-finding task with a `Closes` commit should be flagged by the doctor rule (and arguably should have blocked the commit). Either the gate has a hole for clones.yaml/docs-class findings that it silently passes, or the gate was bypassed.
+
+The same template-vs-finding mismatch weakens 5.35/5.36: "Failing test exists … (passes against the fix)" is self-contradictory for a coverage-gap (5.35) or pin-only (5.36) finding where no bug existed and nothing ever failed. The fix-finding task template assumes every finding is a bug-with-failing-test; AUDIT-25/26/27 are not. The template should grow an explicit non-bug disposition, or these findings shouldn't be forced through the fix-task shape — otherwise the AC checkboxes assert something untrue.
+
+### AUDIT-20260601-03 — AUDIT-27 `fixed-<sha>` cites a commit that doesn't touch the named clone groups
+
+Finding-ID: AUDIT-20260601-03
+Status:     open
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260531-27 → `fixed-46aec320…`) vs. the `.dw-lifecycle/scope-discovery/clones.yaml` hunk in this diff
+
+AUDIT-27 is flipped to `fixed-46aec320dc…`, and that commit's subject claims to close it. But the clones.yaml change in *this* diff is only a `generated_at` bump plus two line-range edits for `check-barrage-tip.ts` members — none of the cited groups (`f645890d8e9b`, `d2600be96980`, `7cf22ee0c611`, `961b07c6d120`, `e23bc58de99e`) are removed or re-worded here. Task 5.37 itself states the resolution was "a baseline refresh during Phase 17 work" — i.e., a *different* commit. So the `fixed-<sha>` provenance points at 46aec320, which is not the commit that actually made the cited groups disappear.
+
+This is the mechanical-flip limitation: `apply-audit-flips` keys on the `Closes` trailer, so attaching `Closes AUDIT-27` to 46aec320 produces a provenance pointer that won't lead a future reader to the change that resolved it. Mildly ironic given AUDIT-27's own shape was "claim doesn't match implementation." Lowest-cost fix: cite the actual baseline-refresh SHA in the audit-log entry, or note in the entry that the resolution predates the close commit.
+
+### AUDIT-20260601-04 — Test comments overclaim what the timestamps exercise
+
+Finding-ID: AUDIT-20260601-04
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts` (the AUDIT-26 lexical-sort test)
+
+The comment says the timestamps "exercise … day/hour/minute boundaries" and labels `t4` (`2026-12-31T23:59:59.999Z`) as a "year boundary." Neither holds: the four values cross a day boundary (t1→t2) and a millisecond boundary (t2→t3), but never an hour or minute boundary, and there is no 2027 date so `t4` is simply the latest moment in 2026, not a year boundary. The inline note "highest year > later months" is incoherent (all four are 2026).
+
+The test is a reasonable monotonicity pin, but it only proves the property for these four points under the *current* `generateRunDirName` format. It would not catch a regression that breaks lexical ordering specifically at an hour/minute rollover or across an actual year change, despite the comment asserting those are covered. Either add a `2027-…` timestamp (real year boundary) and an hour/minute-crossing pair, or correct the comment to describe what is actually tested. Comment-vs-code drift here is exactly the "test that doesn't test the contract it claims" smell.
+
+### AUDIT-20260601-05 — Task 5.33 documents fix-landed-before-scoped (retroactive back-fill)
+
+Finding-ID: AUDIT-20260601-05
+Status:     open
+Severity:   informational
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.33 Step 5)
+
+Task 5.33 Step 5 states the AUDIT-21 fix "landed BEFORE the workplan task was scoped (out-of-band TDD-first; tests + fix in same commit)." This is an honest note, but it records the reverse of the discipline the triad in `agent-discipline.md` is built to enforce: scope into the workplan *first*, then implement TDD-first, with `check-open-findings` refusing pickup while a finding is open. Here the commit shipped and the task block was back-filled afterward to match. TDD held *within* the commit (test + fix together), but the scope-first ordering did not.
+
+Surfacing this as a process signal, not a code defect: when a fix is genuinely out-of-band, the audit trail ends up looking like the task block was reverse-engineered from the commit. If that's acceptable for hot fixes, fine — but it's worth the operator deciding explicitly, because the same pattern at scale erodes the "the workplan drives the implementation loop" invariant the closure triad depends on.

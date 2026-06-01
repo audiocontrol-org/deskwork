@@ -76,10 +76,20 @@ describe('defaultListRunDirs — Phase 17 retro-fix (AUDIT-23)', () => {
     ]);
   });
 
-  it('throws on EACCES (permission denied) — propagates as config error', async () => {
+  // Per AUDIT-20260601-01 (claude-02): chmod-based tests are non-
+  // portable — root UID in CI containers bypasses POSIX permissions
+  // and Windows doesn't enforce mode bits at all. We test the
+  // propagation contract via an INJECTED stub that throws synthetic
+  // EACCES; the real-fs chmod test is kept but guarded against root.
+  it('throws on EACCES (permission denied) — propagates as config error [skipif-root]', async () => {
+    // Skip under root: chmod 0o000 doesn't deny readdir for root.
+    if (process.getuid?.() === 0) {
+      // Treat as informational pass; the injected-stub test below
+      // covers the propagation contract portably.
+      return;
+    }
     const auditRunsDir = join(tmp, 'audit-runs');
     await mkdir(auditRunsDir, { recursive: true });
-    // Strip all permissions. POSIX readdir(2) fails with EACCES.
     await chmod(auditRunsDir, 0o000);
     let thrown: unknown = null;
     try {
@@ -87,7 +97,6 @@ describe('defaultListRunDirs — Phase 17 retro-fix (AUDIT-23)', () => {
     } catch (err) {
       thrown = err;
     }
-    // Restore permissions before assert (so cleanup works even on test fail).
     await chmod(auditRunsDir, 0o700);
     expect(thrown).not.toBeNull();
     const errno = thrown as NodeJS.ErrnoException;
@@ -208,5 +217,54 @@ describe('runCheckBarrageTip — Phase 17 retro-fix (AUDIT-25)', () => {
     });
     expect(exit).toBe(1);
     expect(stderr.text).toMatch(/no new diff/i);
+  });
+
+  // Per AUDIT-20260601-01 (claude-01): the runner's catch block had
+  // no test coverage. The library test exercised defaultListRunDirs
+  // directly but never went through runCheckBarrageTip's try/catch.
+  // This test injects a stub that throws synthetic EACCES, asserting
+  // exit=2 + the domain-neutral error message reaches stderr.
+  it('exits 2 when listRunDirs throws (synthetic EACCES) — covers the runner catch', async () => {
+    const featureRoot = join(tmp, 'docs', '1.0', '001-IN-PROGRESS', 'test-feat');
+    await mkdir(featureRoot, { recursive: true });
+    const stdout = new StringStream();
+    const stderr = new StringStream();
+    const exit = await runCheckBarrageTip({
+      opts: { featureSlug: 'test-feat' },
+      projectRoot: tmp,
+      stdout,
+      stderr,
+      listRunDirs: async () => {
+        const e = new Error('permission denied') as NodeJS.ErrnoException;
+        e.code = 'EACCES';
+        throw e;
+      },
+      readTipSha: async () => null,
+      gitRevListCount: async () => 0,
+    });
+    expect(exit).toBe(2);
+    // Per claude-03: message must be domain-neutral (not hardcoded to
+    // "audit-runs/"), so that git/tip-sha errors aren't mis-attributed.
+    expect(stderr.text).toMatch(/error during barrage-tip check/i);
+    expect(stderr.text).toContain('EACCES');
+  });
+
+  it('exits 2 when readTipSha throws (covers the catch for malformed sidecar)', async () => {
+    const featureRoot = join(tmp, 'docs', '1.0', '001-IN-PROGRESS', 'test-feat');
+    await mkdir(featureRoot, { recursive: true });
+    const stdout = new StringStream();
+    const stderr = new StringStream();
+    const exit = await runCheckBarrageTip({
+      opts: { featureSlug: 'test-feat' },
+      projectRoot: tmp,
+      stdout,
+      stderr,
+      listRunDirs: async () => ['/audit-runs/r1'],
+      readTipSha: async () => {
+        throw new Error('malformed sidecar');
+      },
+      gitRevListCount: async () => 0,
+    });
+    expect(exit).toBe(2);
   });
 });

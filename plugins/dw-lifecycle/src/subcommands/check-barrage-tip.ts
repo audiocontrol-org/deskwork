@@ -193,11 +193,16 @@ export async function runCheckBarrageTip(args: RunArgs): Promise<number> {
       gitRevListCount,
     });
   } catch (err) {
-    // Per AUDIT-20260531-23: scaffold/permissions errors propagate
-    // through listRunDirs to here; map to exit 2 (config error).
+    // Per AUDIT-20260531-23: errors propagate from injected
+    // listRunDirs (config/permissions issues) OR readTipSha (malformed
+    // sidecar) OR gitRevListCount (git missing / not a repo). Per
+    // AUDIT-20260601-01 (claude-03): use a domain-neutral message so
+    // operators don't get pointed at audit-runs/ when the error is
+    // actually in git or the tip-sha file. Map to exit 2 in all cases
+    // — these are all config/scaffold problems the loop should STOP on.
     const errno = err as NodeJS.ErrnoException;
     args.stderr.write(
-      `check-barrage-tip: scaffold error reading audit-runs/ — ${errno.code ?? 'unknown'}: ${errno.message ?? err}\n`,
+      `check-barrage-tip: error during barrage-tip check — ${errno.code ?? 'unknown'}: ${errno.message ?? err}\n`,
     );
     return 2;
   }

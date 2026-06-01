@@ -147,25 +147,36 @@ describe('checkBarrageTip — Phase 16 Task 3 (new-diff guard)', () => {
   // lexical-sort assumption to the REAL `generateRunDirName` output
   // (not hand-written literal strings). If the naming function ever
   // changes to a non-lexically-monotonic format, this test fails.
-  it('lexical-sort holds under the REAL generateRunDirName output (AUDIT-26)', async () => {
-    // Construct timestamps across day/hour/minute boundaries to exercise
-    // the format's monotonicity claim.
-    const t1 = new Date('2026-05-29T23:59:59.999Z');
+  //
+  // Per AUDIT-20260601-04 (claude-06): timestamps EXACTLY exercise
+  // the boundaries claimed — day, ms, minute, hour, and a real year
+  // boundary (2026 → 2027). Pre-fix the comment claimed "year
+  // boundary" for a same-year timestamp, which is the same comment-
+  // vs-code drift smell as AUDIT-15.
+  it('lexical-sort holds under the REAL generateRunDirName output across all boundary types', async () => {
+    const t1 = new Date('2026-05-29T23:59:59.999Z'); // pre-day
     const t2 = new Date('2026-05-30T00:00:00.000Z'); // day boundary
     const t3 = new Date('2026-05-30T00:00:00.001Z'); // ms boundary
-    const t4 = new Date('2026-12-31T23:59:59.999Z'); // year boundary
+    const t4 = new Date('2026-05-30T00:01:00.000Z'); // minute boundary
+    const t5 = new Date('2026-05-30T01:00:00.000Z'); // hour boundary
+    const t6 = new Date('2026-12-31T23:59:59.999Z'); // pre-year
+    const t7 = new Date('2027-01-01T00:00:00.000Z'); // REAL year boundary
     const names = [
       generateRunDirName(t1, 'feat'),
       generateRunDirName(t2, 'feat'),
       generateRunDirName(t3, 'feat'),
       generateRunDirName(t4, 'feat'),
+      generateRunDirName(t5, 'feat'),
+      generateRunDirName(t6, 'feat'),
+      generateRunDirName(t7, 'feat'),
     ];
     const sorted = [...names].sort();
-    // Verify lexical sort produces chronological order.
+    // Verify lexical sort produces chronological order across all
+    // boundary types: day, ms, minute, hour, and the real year boundary.
     expect(sorted).toEqual(names);
     // Then verify the library picks the last (most-recent) when given
     // the shuffled set.
-    const shuffled = [names[2]!, names[0]!, names[3]!, names[1]!];
+    const shuffled = [names[3]!, names[0]!, names[6]!, names[2]!, names[5]!, names[1]!, names[4]!];
     const auditRunsDir = '/tmp/audit-runs';
     const fullPaths = shuffled.map((n) => `${auditRunsDir}/${n}`);
     const result = await checkBarrageTip({
@@ -174,7 +185,7 @@ describe('checkBarrageTip — Phase 16 Task 3 (new-diff guard)', () => {
       readTipSha: async (path: string) => `tip-${path.split('/').pop()}`,
       gitRevListCount: async () => 1,
     });
-    // Latest = t4 (year boundary; highest year > later months).
-    expect(result.lastTipSha).toBe(`tip-${names[3]}`);
+    // Latest = t7 (2027-01-01 — across the year boundary).
+    expect(result.lastTipSha).toBe(`tip-${names[6]}`);
   });
 });
