@@ -45,6 +45,7 @@ export interface UncoveredCommit {
 export type CheckImplementHookCoverageResult =
   | { readonly kind: 'allow-not-opted-in'; readonly reason: string }
   | { readonly kind: 'allow-no-unpushed-commits'; readonly reason: string }
+  | { readonly kind: 'allow-no-prior-run'; readonly reason: string }
   | { readonly kind: 'allow-all-commits-backed'; readonly checkedCount: number; readonly reason: string }
   | {
       readonly kind: 'refuse-uncovered-commits';
@@ -73,6 +74,20 @@ export async function checkImplementHookCoverage(
     };
   }
   const log = await args.readLog();
+  // Boot case (mirrors check-implement-hook-ran's `allow-no-prior-run`):
+  // if no implement-hook has ever run, every unpushed commit looks
+  // uncovered. Allow the push so the project can bootstrap; the
+  // discipline kicks in after the first hook run. Without this, a
+  // freshly-wired project can't push at all until implement-hook runs,
+  // and implement-hook may need its own push to ship the new verb.
+  if (log.length === 0) {
+    return {
+      kind: 'allow-no-prior-run',
+      reason:
+        `Hook-run log is empty — no implement-hook has run yet. ` +
+        `Allowing push to bootstrap; discipline engages after the first hook run.`,
+    };
+  }
   // Index log entries by `tip` for O(1) per-commit lookup.
   const tipsSeen = new Set<string>();
   for (const entry of log) {

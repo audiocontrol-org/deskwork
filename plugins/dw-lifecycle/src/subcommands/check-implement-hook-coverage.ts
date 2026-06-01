@@ -141,6 +141,7 @@ function summarize(result: CheckImplementHookCoverageResult): string {
   switch (result.kind) {
     case 'allow-not-opted-in':
     case 'allow-no-unpushed-commits':
+    case 'allow-no-prior-run':
     case 'allow-all-commits-backed':
       return `check-implement-hook-coverage: ${result.reason}`;
     case 'refuse-uncovered-commits': {

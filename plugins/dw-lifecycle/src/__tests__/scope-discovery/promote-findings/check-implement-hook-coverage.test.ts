@@ -93,9 +93,25 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
     expect(result.cure).toContain('dw-lifecycle implement-hook');
   });
 
-  it('refuses with all uncovered commits listed when multiple bypass', async () => {
-    // All three commits bypassed — log is empty; none of c1/c2/c3
-    // appear as tips, so all three are uncovered.
+  it('allows boot case when log is empty (mirrors check-implement-hook-rans allow-no-prior-run)', async () => {
+    // Without this boot case, a freshly-wired project deadlocks: pre-
+    // push refuses because no log entries exist, but the first
+    // implement-hook run needs an existing push (or a prior commit to
+    // mark). Same shape as the commit-msg gate's `allow-no-prior-run`.
+    const result = await checkImplementHookCoverage(
+      makeArgs({
+        unpushed: [
+          { sha: 'commit-A', parentSha: 'base', subject: 'first commit' },
+        ],
+        logTips: [],
+      }),
+    );
+    expect(result.kind).toBe('allow-no-prior-run');
+  });
+
+  it('refuses with all uncovered commits listed when multiple bypass AFTER first hook run', async () => {
+    // Log has at least one entry (some prior hook ran). Now a fresh
+    // batch of commits lands without hook runs — those are uncovered.
     const result = await checkImplementHookCoverage(
       makeArgs({
         unpushed: [
@@ -103,7 +119,7 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
           { sha: 'c2', parentSha: 'c1', subject: 'second bypass' },
           { sha: 'c3', parentSha: 'c2', subject: 'third bypass' },
         ],
-        logTips: [],
+        logTips: ['some-prior-tip'], // log non-empty, but doesn't cover c1/c2/c3
       }),
     );
     expect(result.kind).toBe('refuse-uncovered-commits');
