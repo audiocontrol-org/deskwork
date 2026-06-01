@@ -28,6 +28,9 @@ import {
   type DiffSliceFetcher,
   type DiffSlicePayload,
 } from './sidebar-render.ts';
+import { buildSidebarThread } from './thread-render.ts';
+import { groupCommentsIntoThreads, type Thread } from './threads.ts';
+import { cssEscapeForSelector } from './css-escape.ts';
 import {
   createCommentEditApi,
   createEditDeleteHandlers,
@@ -200,9 +203,15 @@ export function createAnnotationsController(
     if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  function addSidebarItem(annotation: CommentAnnotation, status: AnnotationStatus): void {
-    sidebarEmpty.hidden = true;
-    const li = buildSidebarItem(annotation, status, {
+  /**
+   * Per-card render deps shared by `addSidebarItem` (single comment)
+   * and `addSidebarThread` (root + replies). Centralizing the deps
+   * payload keeps the two entry points in lockstep — adding a new
+   * dep (e.g. an attachment-preview callback in a later task) hits
+   * one site instead of two.
+   */
+  function sidebarItemDeps(): Parameters<typeof buildSidebarItem>[2] {
+    return {
       draftBody,
       addressByCommentId,
       fetchDiffSlice,
@@ -212,9 +221,38 @@ export function createAnnotationsController(
       onHoverEnter: (id) => setActiveHighlight(id, true),
       onHoverLeave: (id) => setActiveHighlight(id, false),
       onScrollTo: (id) => scrollToHighlight(id),
-    });
+    };
+  }
+
+  function addSidebarItem(annotation: CommentAnnotation, status: AnnotationStatus): void {
+    sidebarEmpty.hidden = true;
+    const li = buildSidebarItem(annotation, status, sidebarItemDeps());
     sidebarList.appendChild(li);
     sidebarIndex.set(annotation.id, li);
+  }
+
+  /**
+   * Phase 8 Task 8.2 — render an entire thread (root + replies) as
+   * a single sidebar item. The root card carries the reply-count
+   * badge + collapsed-replies container per `thread-render.ts`.
+   * Reply cards inside the thread are indexed in `sidebarIndex` by
+   * their own comment id so the per-comment Resolve / Edit / Delete
+   * round-trips continue to find their <li> targets.
+   */
+  function addSidebarThread(thread: Thread, status: AnnotationStatus): void {
+    sidebarEmpty.hidden = true;
+    const li = buildSidebarThread(thread, status, sidebarItemDeps());
+    sidebarList.appendChild(li);
+    sidebarIndex.set(thread.root.id, li);
+    // Index reply cards too — each reply has its own sidebar <li>
+    // nested inside the root, and per-comment Resolve / Edit /
+    // Delete need to be able to find that nested element by id.
+    for (const reply of thread.replies) {
+      const replyEl = li.querySelector<HTMLElement>(
+        `.er-marginalia-item--reply[data-annotation-id="${cssEscapeForSelector(reply.id)}"]`,
+      );
+      if (replyEl !== null) sidebarIndex.set(reply.id, replyEl);
+    }
   }
 
   // ---- Composer ----
@@ -395,16 +433,44 @@ export function createAnnotationsController(
       rebased.sort((a, b) => b.ann.version - a.ann.version);
       unanchored.sort((a, b) => b.version - a.version);
 
-      for (const a of current) {
-        wrapRange(draftBody, a.range, a.id);
-        addSidebarItem(a, 'current');
+      // Phase 8 Task 8.2 — group comments into threads BEFORE
+      // rendering so each root + its replies render as a single
+      // sidebar item (sidebar-grouped placement). Each per-status
+      // bucket is grouped independently — a reply whose root falls
+      // in a different status bucket renders as an orphan reply at
+      // its own status (the renderer surfaces the broken-thread
+      // state visibly so the operator can resolve it). This
+      // bucket-local grouping matches the existing per-status
+      // ordering invariants (current first, then rebased by
+      // version-desc, then unanchored).
+      const currentThreads = groupCommentsIntoThreads(current);
+      const rebasedThreads = groupCommentsIntoThreads(
+        rebased.map((r) => r.ann),
+      );
+      const unanchoredThreads = groupCommentsIntoThreads(unanchored);
+      const rebasedRangeById = new Map<string, DraftRange>();
+      for (const r of rebased) rebasedRangeById.set(r.ann.id, r.range);
+
+      for (const thread of currentThreads) {
+        wrapRange(draftBody, thread.root.range, thread.root.id);
+        for (const reply of thread.replies) {
+          if (reply.range !== undefined) {
+            wrapRange(draftBody, reply.range, reply.id);
+          }
+        }
+        addSidebarThread(thread, 'current');
       }
-      for (const r of rebased) {
-        wrapRange(draftBody, r.range, r.ann.id);
-        addSidebarItem(r.ann, 'rebased');
+      for (const thread of rebasedThreads) {
+        const rootRange = rebasedRangeById.get(thread.root.id) ?? thread.root.range;
+        wrapRange(draftBody, rootRange, thread.root.id);
+        for (const reply of thread.replies) {
+          const replyRange = rebasedRangeById.get(reply.id) ?? reply.range;
+          wrapRange(draftBody, replyRange, reply.id);
+        }
+        addSidebarThread(thread, 'rebased');
       }
-      for (const a of unanchored) {
-        addSidebarItem(a, 'unresolved');
+      for (const thread of unanchoredThreads) {
+        addSidebarThread(thread, 'unresolved');
       }
       updateResolvedFooter();
     } catch (e) {

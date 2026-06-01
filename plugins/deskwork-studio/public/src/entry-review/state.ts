@@ -33,6 +33,42 @@ export interface CommentAnnotation {
   createdAt: string;
   /** Quote text captured at comment time. */
   anchor?: string;
+  /**
+   * #200 — W3C TextQuoteSelector context for re-anchoring when the
+   * `anchor` quote re-occurs in a later revision. ~64 chars before
+   * (`anchorPrefix`) and after (`anchorSuffix`) the quote at capture
+   * time. Optional on the wire so legacy comments parse unchanged.
+   */
+  anchorPrefix?: string;
+  anchorSuffix?: string;
+  /**
+   * Phase 8 Step 8.1.1 — threading. Present on REPLY comments and
+   * holds the id of the root comment this is a reply to. Absent on
+   * root comments. Threading is single-level (see Task 8.2 — replies
+   * to replies flatten under the original root); a value here that
+   * doesn't resolve to a known root comment is treated as an orphan
+   * reply at render time, not a parse failure.
+   */
+  replyTo?: string;
+  /**
+   * Phase 8 Step 8.1.1 — screenshot attachments bound to this
+   * comment, stored as relative paths under
+   * `<entryDir>/scrapbook/screenshots/`. Empty / absent when none.
+   */
+  attachments?: string[];
+  /**
+   * Phase 8 Step 8.1.1 — spatial anchor for graphical entries. When
+   * present, the comment is anchored on the entry's primary visual.
+   * The renderer in Task 8.2 doesn't yet surface the spatial anchor
+   * UI; the field is carried through so the read path can light it
+   * up in a later task without a schema-shape migration.
+   */
+  spatialAnchor?: {
+    kind: 'pixel' | 'dom-selector' | 'svg-element';
+    selector?: string;
+    x?: number;
+    y?: number;
+  };
 }
 
 export interface ResolveAnnotation {
