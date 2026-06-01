@@ -174,7 +174,7 @@ Every recent Phase has been a piece of this. The pieces aren't a feature backlog
 | TDD commit-msg gate (Phase 13 T3) | Refuses fix-task commits without a failing test first |
 | `apply-audit-flips` + `close-shipped-audit-findings` (Phase 13 T4) | Closure mechanization — commits flip statuses; releases propose verification |
 | `slush-remaining` HIGH-filter + latest-scope (#380, v0.29.3) | Severity filter is defense-in-depth; latest-scope matches operator's "this barrage's findings" intent |
-| Phase 16 (#383, in flight) | Audit-barrage always fires on new diff; dampener controls disposition, not gating. Closes the audit-coverage hole revealed by the graphical-entries 70-task burndown. |
+| Phase 16 (#383, shipped) | Audit-barrage always fires on new diff; dampener controls disposition, not gating. Closes the audit-coverage hole revealed by the graphical-entries 70-task burndown. |
 
 The mechanical pieces — implement, audit, scope-findings, slush-nits, close-shipped — are largely complete. The loop is structurally self-correcting today: every commit gets cross-model audited (post-Phase-16); every finding gets scoped or slushed; every fix is TDD-gated; every release is verification-tracked.
 
