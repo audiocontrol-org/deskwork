@@ -333,38 +333,68 @@ describe('deriveBarrageExitCode', () => {
 });
 
 describe('renderSummaryLine', () => {
-  it('reports healthy / total counts and the run dir', () => {
-    const line = renderSummaryLine({
+  function runWith(healthy: number, total: number): {
+    runDir: string;
+    timestamp: string;
+    featureSlug: string;
+    promptPath: string;
+    indexPath: string;
+    results: Array<{
+      name: string;
+      exitCode: number;
+      durationMs: number;
+      stdoutBytes: number;
+      stderrBytes: number;
+      stdoutPath: string;
+      stderrPath: string;
+      timedOut: boolean;
+      spawnError?: string;
+    }>;
+  } {
+    const results = [];
+    for (let i = 0; i < total; i += 1) {
+      const isHealthy = i < healthy;
+      results.push({
+        name: `m${i}`,
+        exitCode: isHealthy ? 0 : -2,
+        durationMs: 1,
+        stdoutBytes: isHealthy ? 5 : 0,
+        stderrBytes: 0,
+        stdoutPath: `/tmp/run-dir/m${i}.md`,
+        stderrPath: `/tmp/run-dir/stderr/m${i}.txt`,
+        timedOut: false,
+        ...(isHealthy ? {} : { spawnError: 'ENOENT' }),
+      });
+    }
+    return {
       runDir: '/tmp/run-dir',
       timestamp: '20260528T120000Z',
       featureSlug: 'sample',
       promptPath: '/tmp/run-dir/PROMPT.md',
       indexPath: '/tmp/run-dir/INDEX.md',
-      results: [
-        {
-          name: 'a',
-          exitCode: 0,
-          durationMs: 1,
-          stdoutBytes: 5,
-          stderrBytes: 0,
-          stdoutPath: '/tmp/run-dir/a.md',
-          stderrPath: '/tmp/run-dir/stderr/a.txt',
-          timedOut: false,
-        },
-        {
-          name: 'b',
-          exitCode: -2,
-          durationMs: 1,
-          stdoutBytes: 0,
-          stderrBytes: 0,
-          stdoutPath: '/tmp/run-dir/b.md',
-          stderrPath: '/tmp/run-dir/stderr/b.txt',
-          timedOut: false,
-          spawnError: 'ENOENT',
-        },
-      ],
-    });
-    expect(line).toContain('1/2');
-    expect(line).toContain('/tmp/run-dir');
+      results,
+    };
+  }
+
+  // Per Phase 18 Task 5 (operator directive 2026-06-01): the
+  // audit-barrage is stochastic. ≥1 healthy model = barrage success.
+  // Frame partial coverage as success, not apology.
+  it('Phase 18 Task 5: frames partial coverage (1/3) as success, not apology', () => {
+    const line = renderSummaryLine(runWith(1, 3));
+    expect(line).toContain('1 of 3 models emitted');
+    expect(line.toLowerCase()).toContain('successful');
+    expect(line.toLowerCase()).toMatch(/statistically.*better code/);
+  });
+
+  it('Phase 18 Task 5: frames full coverage (3/3) as success without the "X of Y" qualifier', () => {
+    const line = renderSummaryLine(runWith(3, 3));
+    expect(line.toLowerCase()).toContain('successful');
+    expect(line).toContain('3/3');
+  });
+
+  it('Phase 18 Task 5: frames all-models-failed (0/total) as OUTAGE (preserves the failure signal)', () => {
+    const line = renderSummaryLine(runWith(0, 3));
+    expect(line.toUpperCase()).toContain('OUTAGE');
+    expect(line).toContain('0/3');
   });
 });

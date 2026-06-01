@@ -283,11 +283,24 @@ const isHealthyModelRun = isModelRunHealthy;
 
 /**
  * Render the one-line stderr summary describing the run outcome.
+ *
+ * Per Phase 18 Task 5 (operator directive 2026-06-01): a 1-healthy-
+ * model barrage IS a successful audit, not degraded. The audit-
+ * barrage is stochastic — auditing as a PRACTICE statistically
+ * yields better code, not zero-defect-per-run. Frame partial
+ * coverage as success when ≥1 model emitted; only frame the all-
+ * models-failed case as outage.
  */
 export function renderSummaryLine(run: BarrageRun): string {
   const total = run.results.length;
   const healthy = run.results.filter(isHealthyModelRun).length;
-  return `audit-barrage: ${healthy}/${total} models produced output (run dir: ${run.runDir})`;
+  if (healthy === 0) {
+    return `audit-barrage: OUTAGE — 0/${total} models emitted findings (run dir: ${run.runDir})`;
+  }
+  if (healthy === total) {
+    return `audit-barrage: barrage successful — ${healthy}/${total} models emitted findings (run dir: ${run.runDir})`;
+  }
+  return `audit-barrage: barrage successful — ${healthy} of ${total} models emitted findings; auditing as a practice statistically yields better code (run dir: ${run.runDir})`;
 }
 
 /**
