@@ -1447,7 +1447,7 @@ The honest shape is either to narrow to what's actually proven — `function isE
 ### AUDIT-20260601-18 — Run marker `last-hook-run.json` records `findingsCount: 0 / promotedCount: 0` for the run that actually lifted 3 findings (incl. one BLOCKING)
 
 Finding-ID: AUDIT-20260601-18
-Status:     open
+Status:     fixed-b7103a34
 Severity:   medium
 Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (`runDir: …20260601T024117392Z-scope-discovery`, `disposition: fired-and-promoted`, `findingsCount: 0`, `promotedCount: 0`, `slushedCount: 0`)
 
@@ -1556,3 +1556,16 @@ Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (`runDir: …2026
 Not re-litigating AUDIT-13/18 (already `open`); flagging that this diff supplies a *second, distinct* instance that strengthens it from "one bad marker" to "the marker is always wrong." AUDIT-13/18 concerned runDir `20260601T024117392Z` (counts `0` but 3 findings lifted). The committed marker in *this* diff points at the newer runDir `20260601T025451417Z` with `disposition: "fired-and-promoted"` and `findingsCount: 0 / promotedCount: 0 / slushedCount: 0` — yet that run is exactly the one whose lift produced AUDIT-09..18 in the audit-log (5+ findings, one BLOCKING). Two consecutive `fired-and-promoted` runs both recording `0` promoted establishes that `findingsCount`/`promotedCount` are wired to a tally that is never populated, not that one run happened to promote nothing.
 
 The fix and a regression test belong to the existing AUDIT-13/18 task (currently Task 5.48, unchecked): assert that an implement-hook run lifting N findings writes a marker with `findingsCount === N` and `promotedCount === N`. The second instance is the evidence that the test must assert non-zero counts against a real lift, not just parse the marker shape.
+
+## 2026-06-01 — audit-barrage lift (20260601T032111359Z-scope-discovery)
+
+### AUDIT-20260601-27 — Counter wiring decouples `findingsCount` from disposition counts, allowing incoherent markers when the lift-stderr regex fails to match
+
+Finding-ID: AUDIT-20260601-27 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   blocking
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:346,355,405` + `implement-hook-counters.ts:18-22` (`parseLiftFindingsCount` defensive `return 0`)
+
+Pre-fix, the promote branch set `findingsCount = promotedCount` and the slush branch set `findingsCount = slushedCount + skipped`, so the marker's findings count was *derived from* the disposition counts and could never be smaller than them. The fix inverts the dependency: `findingsCount` is now sourced solely from `parseLiftFindingsCount(liftResult.stderr)` (line 346), while `promotedCount`/`slushedCount` are parsed independently from the disposition step's output (lines 382, 405). Both lift-count parsing (`/extracted\s+(\d+)\s+finding/`) and promote-count parsing have a defensive `return 0` on no-match (`implement-hook-counters.ts:20, 54`).
+
+The failure mode: if the lift stderr format drifts (or a future lift writes "extracted N findings" to stdout instead, mirroring the exact stream-mismatch bug #384 was fixing), `parseLiftFindingsCount` silently returns 0 — but the promote branch may still parse `Auto-applied: 4 finding(s)` and write `findingsCount: 0, promotedCount: 4`. That marker asserts the hook promoted more findings than it found, which is impossible and strictly *more* contradictory than the pre-fix bug it replaces. A reasonable fix is a reconciliation invariant before writing the marker — `findingsCount = Math.max(findingsCountFromLift, promotedCount, slushedCount)` — or an assertion that fails loudly when `promotedCount > findingsCount`, so a regex drift surfaces as a crash rather than a quietly-wrong marker.

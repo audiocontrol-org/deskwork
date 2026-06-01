@@ -725,6 +725,23 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.61 (fix-finding-AUDIT-20260601-27): AUDIT-20260601-27 — Counter wiring decouples `findingsCount` from disposition co…
+
+Closes AUDIT-20260601-27 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:346,355,405` + `implement-hook-counters.ts:18-22` (`parseLiftFindingsCount` defensive `return 0`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-27 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.57 (fix-finding-AUDIT-20260601-23): AUDIT-20260601-23 — Audit-log `20260601T025451417Z` lift batch is duplicated — A…
 
 Closes AUDIT-20260601-23 (claude-01 + codex-03 + codex-04; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (two consecutive sections both headed `## 2026-06-01 — audit-barrage lift (20260601T025451417Z-scope-discovery)`) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Tasks 5.44–5.48).
