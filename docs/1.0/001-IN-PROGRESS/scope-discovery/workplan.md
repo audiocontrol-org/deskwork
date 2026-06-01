@@ -726,6 +726,23 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.62 (fix-finding-AUDIT-20260601-28): AUDIT-20260601-28 — Commit subject claims only the AUDIT-18 flip, but the diff a…
+
+Closes AUDIT-20260601-28 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01; cross-model). Surface: commit `2c30cd1d` subject `docs(audit-log): flip AUDIT-20260601-18 to fixed-b7103a34` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (appended AUDIT-27 lift section) + `workplan.md:729-744` (new Task 5.61).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-28 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.61 (fix-finding-AUDIT-20260601-27): AUDIT-20260601-27 — Counter wiring decouples `findingsCount` from disposition co…
 
 Closes AUDIT-20260601-27 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:346,355,405` + `implement-hook-counters.ts:18-22` (`parseLiftFindingsCount` defensive `return 0`).
@@ -862,19 +879,19 @@ Closes AUDIT-20260601-17. Surface: `plugins/dw-lifecycle/src/subcommands/check-b
 
 ### Task 5.52 (fix-finding-AUDIT-20260601-18): AUDIT-20260601-18 — Run marker `last-hook-run.json` records `findingsCount: 0 / …
 
-Closes AUDIT-20260601-18. Surface: `.dw-lifecycle/scope-discovery/last-hook-run.json` (`runDir: …20260601T024117392Z-scope-discovery`, `disposition: fired-and-promoted`, `findingsCount: 0`, `promotedCount: 0`, `slushedCount: 0`).
+Closes AUDIT-20260601-18 (= GH #384). Surface: `.dw-lifecycle/scope-discovery/last-hook-run.json` + `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` counter parsing.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260601-18` in subject
+- [x] Step 1: 12 failing tests added at `plugins/dw-lifecycle/src/__tests__/subcommands/implement-hook-counters.test.ts` covering parseLiftFindingsCount, parseSlushCounts, parsePromoteCount across singular/plural/zero/no-match shapes.
+- [x] Step 2: confirmed tests RED pre-implementation (module didn't exist).
+- [x] Step 3: extracted pure-fn `implement-hook-counters.ts` module with the three parsers. parsePromoteCount now reads STDOUT (not stderr) and looks for `Auto-applied: N` (not `promoted: N`). findingsCount derived from lift's stderr in implement-hook.ts before the disposition branch.
+- [x] Step 4: 12 tests GREEN; full plugin suite 2578/2578.
+- [x] Step 5: commit b7103a34 with `Closes #384, AUDIT-20260601-18` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/subcommands/implement-hook-counters.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/subcommands/implement-hook-counters.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-b7103a34` (manual flip — apply-audit-flips' trailer parser missed the `#384, AUDIT-18` form)
 
 
 ### Task 5.53 (fix-finding-AUDIT-20260601-19): AUDIT-20260601-19 — `hasBootstrapSentinel` violates command-query separation — a…
