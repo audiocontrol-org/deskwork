@@ -732,6 +732,108 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+
+### Task 5.79 (fix-finding-AUDIT-20260601-45): AUDIT-20260601-45 — "emitted findings" overclaims what `isModelRunHealthy` actua…
+
+Closes AUDIT-20260601-45. Surface: `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:296-303` (all three return branches) vs. `isModelRunHealthy` (aliased at line 283).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-45` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.80 (fix-finding-AUDIT-20260601-46): AUDIT-20260601-46 — Task 5 Step 3 (SKILL.md prose pass) is absent from the diff …
+
+Closes AUDIT-20260601-46. Surface: workplan Phase 18 Task 5 Step 3 + AC; diff touches only `audit-barrage.ts` and `audit-barrage-cli.test.ts`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-46` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.81 (fix-finding-AUDIT-20260601-47): AUDIT-20260601-47 — Celebrate-framing tagline applied only to the partial branch…
+
+Closes AUDIT-20260601-47. Surface: `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:299-303` (the `healthy === total` branch vs. the final partial branch).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-47` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.82 (fix-finding-AUDIT-20260601-48): AUDIT-20260601-48 — `total === 0` (empty model battery) is reported as an OUTAGE…
+
+Closes AUDIT-20260601-48. Surface: `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:294-298` (the `healthy === 0` branch, reached when `total === 0`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-48` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+### Task 5.77 (fix-finding-AUDIT-20260601-43): AUDIT-20260601-43 — Newline-separated `Closes` trailers across lines are now dro…
+
+Closes AUDIT-20260601-43 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-flip-from-commit.ts` — `parseClosesAuditTrailers` per-line loop (the `const lines = text.split(/\r?\n/)` block) + `auto-flip-from-commit.test.ts` (missing test).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-43 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.78 (fix-finding-AUDIT-20260601-44): AUDIT-20260601-44 — This diff re-mints placeholder-test fix-tasks for non-testab…
+
+Closes AUDIT-20260601-44. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` new Tasks 5.75 (`fix-finding-AUDIT-20260601-41`) and 5.76 (`fix-finding-AUDIT-20260601-42`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-44` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.73 (fix-finding-AUDIT-20260601-39): AUDIT-20260601-39 — Bookkeeping classifier omits the runtime marker files, so th…
 
 Closes AUDIT-20260601-39. Surface: commit `98f3a7a1` changed-file set: `.dw-lifecycle/scope-discovery/last-hook-run.json` + `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` + `audit-log.md` + `workplan.md` vs. `check-barrage-tip.ts:74-81` (`isBookkeepingPath`).

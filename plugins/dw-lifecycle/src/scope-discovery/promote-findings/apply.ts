@@ -26,7 +26,10 @@
  */
 
 import { validateAcknowledgedReason } from './substantive-reason-validator.js';
-import { renderFixTaskBlock } from './workplan-task-renderer.js';
+import {
+  inferFindingShape,
+  renderFixTaskBlock,
+} from './workplan-task-renderer.js';
 import { applyTaskBlocks } from './workplan-editor.js';
 import { applyStatusFlips } from './audit-log-editor.js';
 import type {
@@ -144,8 +147,14 @@ function preValidate(args: ApplyProposalArgs): PreValidated {
     }
     if (item.disposition === 'promote-to-workplan') {
       const fields = asPromoteFields(item.fields);
+      // Per Phase 18 Task 1 (AUDIT-02 closure): infer the shape so
+      // non-bug findings (audit-log/workplan/registry/commit-history
+      // surfaces) get the non-bug template instead of being forced
+      // through the bug-with-failing-test shape.
+      const findingShape = inferFindingShape(item.finding);
       const taskBlock = renderFixTaskBlock(item.finding, {
         taskNumber: args.taskNumberFor(item, idx),
+        findingShape,
       });
       insertions.push({
         findingId: item.finding.findingId,

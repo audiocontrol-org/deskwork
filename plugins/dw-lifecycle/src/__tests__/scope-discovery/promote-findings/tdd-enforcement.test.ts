@@ -308,3 +308,98 @@ describe('findCompletedFixFindingTasks — renderer-output shape (AUDIT-20260530
     expect(tasks[0]?.findingId).toBe('AUDIT-20260530-01');
   });
 });
+
+// Phase 18 Task 1 — non-bug task block validation (AUDIT-02)
+describe('isNonBugTaskBlock / validateNonBugDisposition — Phase 18 Task 1', () => {
+  it('detects the (non-bug) marker in a task heading', async () => {
+    const { isNonBugTaskBlock } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    const block = `### Task 5.99 (fix-finding-AUDIT-20260601-29) (non-bug): Commit subject misaligned
+
+Body prose.`;
+    expect(isNonBugTaskBlock(block)).toBe(true);
+  });
+
+  it('does NOT detect (non-bug) on a plain bug-template task block', async () => {
+    const { isNonBugTaskBlock } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    const block = `### Task 13.7 (fix-finding-AUDIT-20260529-42): Validator bug
+
+Body prose.`;
+    expect(isNonBugTaskBlock(block)).toBe(false);
+  });
+
+  it('verifyFixTaskTDD returns valid=true for non-bug task with substantive disposition prose', async () => {
+    const { verifyFixTaskTDD } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    const block = `### Task 5.99 (fix-finding-AUDIT-20260601-29) (non-bug): Commit subject misaligned
+
+Closes AUDIT-20260601-29.
+
+- [ ] Step 1: amend the commit message to mention all three audit-log flips it landed (AUDIT-05, AUDIT-07, AUDIT-08); the original subject only named one. This is a history-rewrite if branch is mutable, otherwise an inline acknowledgement in the audit-log entry.
+- [ ] Step 2: apply the action named in Step 1.`;
+    const result = await verifyFixTaskTDD({
+      workplanTaskBlock: block,
+      repoRoot: '/tmp',
+    });
+    expect(result.valid).toBe(true);
+    expect(result.dispositionPreview).toBeTruthy();
+  });
+
+  it('verifyFixTaskTDD returns valid=false for non-bug task with placeholder disposition', async () => {
+    const { verifyFixTaskTDD } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    const block = `### Task 5.99 (fix-finding-AUDIT-20260601-29) (non-bug): Subject
+
+- [ ] Step 1: write the disposition prose (to be filled in by Step 1 implementer)`;
+    const result = await verifyFixTaskTDD({
+      workplanTaskBlock: block,
+      repoRoot: '/tmp',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBe('non-bug-placeholder-disposition');
+  });
+
+  it('verifyFixTaskTDD returns valid=false for non-bug task with too-short disposition', async () => {
+    const { verifyFixTaskTDD } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    const block = `### Task 5.99 (fix-finding-AUDIT-20260601-29) (non-bug): Subject
+
+- [ ] Step 1: did it`;
+    const result = await verifyFixTaskTDD({
+      workplanTaskBlock: block,
+      repoRoot: '/tmp',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBe('non-bug-placeholder-disposition');
+  });
+
+  // REGRESSION LOCK (Option D discipline): the original code-defect
+  // template still validates correctly post-fix. Working-code invariant.
+  it('REGRESSION: bug-template tasks still go through the test-file path (working-code invariant)', async () => {
+    const { verifyFixTaskTDD } = await import(
+      '../../../scope-discovery/promote-findings/tdd-enforcement.js'
+    );
+    const block = `### Task 13.7 (fix-finding-AUDIT-20260529-42): Validator bug
+
+Closes AUDIT-20260529-42.
+
+- [ ] Step 1: failing test added at \`src/__tests__/validator.test.ts\` covering the edge case.`;
+    const result = await verifyFixTaskTDD({
+      workplanTaskBlock: block,
+      repoRoot: '/tmp',
+    });
+    // Will hit either no-test-file-cited (if path extraction fails)
+    // or missing-test-file (if path is extracted but doesn't exist
+    // in /tmp). EITHER WAY the result is the bug-template path,
+    // not the non-bug path. That's the regression-lock.
+    expect(result.valid).toBe(false);
+    expect(result.reason).not.toBe('non-bug-missing-disposition');
+    expect(result.reason).not.toBe('non-bug-placeholder-disposition');
+  });
+});

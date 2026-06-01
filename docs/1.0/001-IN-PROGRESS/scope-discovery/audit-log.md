@@ -1748,3 +1748,74 @@ Surface:    `audit-log.md` AUDIT-20260601-30 `Status: fixed-785c99474f…` (line
 This diff flips AUDIT-30 to `fixed-785c9947` (the bookkeeping-filter commit), while the same diff lifts AUDIT-36 as `open` — and AUDIT-36's entire thesis is that the 785c9947 filter is *too coarse* and "directly undermines a demonstrated, high-value capability of the barrage," with AUDIT-35 as a concrete example of signal it now suppresses. Marking AUDIT-30 unqualified-`fixed` while an open finding argues the fix introduced a regression is the failure mode the project's `re-audit-fixed-findings` discipline exists to catch: a fix that "did not actually fix" (here: fixed recursion by breaking workplan-contradiction detection).
 
 These are technically distinct findings, so a literal `fixed` flag isn't a fabrication — but the operator reading the open-findings queue gets a misleading "AUDIT-30 done" signal next to an open finding that the AUDIT-30 fix is wrong. Recommend either holding AUDIT-30 at `fixed-pending-verification` until AUDIT-36 is dispositioned, or adding an inline cross-reference on AUDIT-30's entry noting its fix is contested by AUDIT-36 so the two are read together.
+
+## 2026-06-01 — audit-barrage lift (20260601T051353751Z-scope-discovery)
+
+### AUDIT-20260601-43 — Newline-separated `Closes` trailers across lines are now dropped — a regression vs. the old regex, and an unmet Task 4 acceptance criterion with no test catching it
+
+Finding-ID: AUDIT-20260601-43 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-flip-from-commit.ts` — `parseClosesAuditTrailers` per-line loop (the `const lines = text.split(/\r?\n/)` block) + `auto-flip-from-commit.test.ts` (missing test)
+
+The rewrite splits the message into lines and *requires a `closes` verb on each line* before scanning that line's tail for AUDIT-ids. AUDIT-ids that sit on a line with no `closes` verb are silently skipped (`if (verbMatch === null) continue;`). The old regex `/\bcloses\b[\s:]+((?:AUDIT-\d{8}-\d+(?:[\s,]+)?)+)/gi` used `[\s,]+` between ids — and `\s` matches `\n` — so it *did* span lines. Concretely, the multi-line git-footer shape
+
+```
+Closes AUDIT-20260601-30
+AUDIT-20260601-33
+```
+
+returned `[30, 33]` under the old code and now returns only `[30]`. This is a behavior regression introduced by the Task 4 change, and it directly violates the task's own acceptance criteria: workplan Task 4 Step 2 ("match comma- **AND newline-separated** AUDIT-ids in both subject and body") and Step 4 ("regression coverage for: … **newline-separated**"). The diff's tests never exercise ids-on-separate-lines — the test labeled `REGRESSION: still extracts comma-separated trailer` puts both ids on the *same* line (`'Closes: AUDIT-X-001, AUDIT-X-002'`). So the AC is unmet and unguarded. The fix: either scan the post-`closes` span across line boundaries (closer to the original semantics) or add a genuine across-line test and make it pass. The recurring "manual flip required for multi-ID commits" friction this task set out to kill will resurface for any contributor who writes a standard multi-line trailer footer.
+
+---
+
+### AUDIT-20260601-44 — This diff re-mints placeholder-test fix-tasks for non-testable *process* findings — re-materializing the laundering pathology AUDIT-40 names, in the same commit that lifts AUDIT-40
+
+Finding-ID: AUDIT-20260601-44
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` new Tasks 5.75 (`fix-finding-AUDIT-20260601-41`) and 5.76 (`fix-finding-AUDIT-20260601-42`)
+
+AUDIT-41 ("commit subject names only the AUDIT-33 flip while the diff also flips AUDIT-30") and AUDIT-42 ("AUDIT-30 marked `fixed` while AUDIT-36 contests it — premature closure") are pure *process / bookkeeping* findings — there is no code defect and therefore no "failing test exercising the bug" that can exist. Yet Tasks 5.75 and 5.76 are rendered with the code-defect template verbatim: *"Step 1: write failing test exercising the bug,"* *"Step 4: confirm test passes,"* and the AC *"`npx vitest run <test-file-path>` exits 0."* This is precisely the shape AUDIT-40 (lifted in this same diff, lines ~1660 of `audit-log.md`) and the prior AUDIT-32/35 findings flagged as the laundering deadlock: `promote-findings --auto` minting test-shaped tasks for non-testable findings, which will then deadlock the `check-fix-task-tdd` gate when checked `[x]`. The shape didn't just persist — it regressed into two fresh instances in the very diff that documents the problem. Phase 18 Task 1 (shape inference, still `[ ]`) must land before any further non-bug promotion; until then these task blocks are arrival-stale and will trip the doctor rule or force a gate bypass.
+
+---
+
+## 2026-06-01 — audit-barrage lift (20260601T052226490Z-scope-discovery)
+
+### AUDIT-20260601-45 — "emitted findings" overclaims what `isModelRunHealthy` actually measures — a healthy model can emit ZERO findings
+
+Finding-ID: AUDIT-20260601-45
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:296-303` (all three return branches) vs. `isModelRunHealthy` (aliased at line 283)
+
+All three new return strings describe the `healthy` count as `models emitted findings`. But `healthy` is computed by `run.results.filter(isHealthyModelRun)`, and the predicate measures *output produced + clean exit*, not *findings emitted* — the test helper `runWith` encodes "healthy" as `exitCode: 0, stdoutBytes: 5` and "unhealthy" as a spawn error. A model that exits 0 and writes a confident "I checked X, Y, Z and they are clean — no findings" report is `healthy` but emitted **zero** findings. The audit prompt explicitly blesses that case ("Treat clean 'no findings' reports as signal too" / the `### No findings` block), so it is a real, expected run shape — not a corner case.
+
+The old wording (`${healthy}/${total} models produced output`) was accurate to the predicate. The reframe swapped in `emitted findings`, which is now strictly an over-claim: the OUTAGE branch can read `0/3 models emitted findings` even when up to 3 models ran cleanly and all reported no findings (an audit *success*, mislabeled as an outage), and the success branches assert findings that may not exist. Fix: revert the noun to what the predicate measures — `produced output` / `responded` / `models healthy` — or, if "emitted findings" is genuinely wanted, change `isModelRunHealthy` to parse for at least one finding block before counting it healthy (a much larger change, and one that would mis-handle the legitimate clean-report case). The cheap, correct fix is the wording.
+
+### AUDIT-20260601-46 — Task 5 Step 3 (SKILL.md prose pass) is absent from the diff — unmet acceptance criterion / doc drift
+
+Finding-ID: AUDIT-20260601-46
+Status:     open
+Severity:   medium
+Surface:    workplan Phase 18 Task 5 Step 3 + AC; diff touches only `audit-barrage.ts` and `audit-barrage-cli.test.ts`
+
+Task 5's Step 3 reads: *"SKILL.md prose pass on the audit-barrage skill to mirror the celebrate-not-apologize framing. Reference operator-directive: 'auditing as a practice statistically yields better code' in the skill's intro."* The single commit in the audited range (`feat(audit-barrage): reframe stderr summary …`) modifies the subcommand and its test but contains **no** `skills/audit-barrage/SKILL.md` hunk. The operator-facing skill prose still carries the old framing while the stderr line now says the opposite, which is exactly the spec-vs-implementation drift the project's documentation rules call out: the code now celebrates partial coverage, but the skill that documents the code does not. Either the SKILL.md change belongs in this commit (and was dropped), or the task is being checked complete with one of its steps unmet. Land the prose pass before the task block is marked `[x]`, or split it into a tracked follow-up step — not a silent gap.
+
+### AUDIT-20260601-47 — Celebrate-framing tagline applied only to the partial branch; full-coverage success loses it
+
+Finding-ID: AUDIT-20260601-47
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:299-303` (the `healthy === total` branch vs. the final partial branch)
+
+The operator directive anchors Task 5 on the framing *"auditing as a practice statistically yields better code."* That tagline is present only in the partial-coverage return (line 302) and absent from the full-coverage return (line 300), which reads `barrage successful — N/N models emitted findings`. The test `frames full coverage (3/3) as success without the "X of Y" qualifier` asserts only `successful` + `3/3` and deliberately does **not** check the tagline, so the inconsistency is locked in by the test rather than caught by it. The result: the *best* outcome (every model healthy) gets the *least* celebratory copy, while a degraded 1-of-3 run gets the full statistical-practice message. If the celebrate-not-apologize framing is the point, the tagline (or the rationale) should appear on every non-outage branch, or the copy should be factored so the success framing is shared and only the count clause varies.
+
+### AUDIT-20260601-48 — `total === 0` (empty model battery) is reported as an OUTAGE rather than a misconfiguration
+
+Finding-ID: AUDIT-20260601-48
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:294-298` (the `healthy === 0` branch, reached when `total === 0`)
+
+When `run.results` is empty (no models resolved from config, or every model filtered out before spawn), `total === 0` and `healthy === 0`, so the function returns `audit-barrage: OUTAGE — 0/0 models emitted findings`. The `healthy === 0` check precedes the `healthy === total` check, so the empty case short-circuits to OUTAGE. But an empty battery is a *configuration* problem (the `models:` list was empty / unresolved), not a *runtime outage* (models ran and all failed). Conflating the two sends the operator to the wrong diagnosis — they'll go looking at CLI auth / PATH for an outage when the actual fix is the config. A cheap guard (`if (total === 0) return '…no models configured — check audit-barrage-config.yaml…'`) before the OUTAGE branch separates the two failure modes. Not blocking, but it's a divide-by-context error class that the `0/0` string makes invisible.

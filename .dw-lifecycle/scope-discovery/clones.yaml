@@ -1,4 +1,4 @@
-generated_at: 2026-06-01T05:10:37.113Z
+generated_at: 2026-06-01T05:22:25.317Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1058,8 +1058,8 @@ clones:
   - id: 6018afb62ce2
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:157:165
-      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:242:250
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:232:240
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:317:325
     disposition: ignore-with-justification
     reason: Twin task-block walkers (findCompletedFixFindingTasks + findUncheckedTasksInOrder) share the boundary-scan + block-collect loop by design — one filters to [x]-checked fix-finding tasks for the TDD doctor rule, the other filters to unchecked tasks for the workplan-aware gate. Extracting a shared primitive would couple two consumers with different downstream contracts; the duplication is the documented Phase 13/15 split.
   - id: d724eab25113
@@ -1224,13 +1224,13 @@ clones:
     lines: 7
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:179:185
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:298:304
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:311:317
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + readFile-then-parse-then-validate). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: ec4640c729a3
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:297:303
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:310:316
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:162:168
     disposition: keep-with-reason
     reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"

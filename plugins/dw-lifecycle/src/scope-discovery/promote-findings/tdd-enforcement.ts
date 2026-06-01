@@ -34,7 +34,12 @@ export type TddCheckReason =
   | 'no-test-file-cited'
   | 'missing-test-file'
   | 'test-failing'
-  | 'vitest-invocation-error';
+  | 'vitest-invocation-error'
+  // Per Phase 18 Task 1 (AUDIT-02 closure): non-bug-class findings
+  // (docs/registry/commit-history) use a disposition-prose path
+  // instead of a test path. The reasons below cover that variant.
+  | 'non-bug-missing-disposition'
+  | 'non-bug-placeholder-disposition';
 
 export interface TddCheckResult {
   readonly valid: boolean;
@@ -42,7 +47,21 @@ export interface TddCheckResult {
   readonly testFilePath?: string;
   /** Captured stdout/stderr from vitest when test failed (for reporting). */
   readonly vitestOutput?: string;
+  /** Per AUDIT-02: surfaced for non-bug variants so the caller can show the disposition prose to the operator. */
+  readonly dispositionPreview?: string;
 }
+
+/**
+ * Per Phase 18 Task 1 (AUDIT-02): the workplan-task-renderer marks
+ * non-bug fix-tasks with `(non-bug)` after the canonical fix-finding
+ * tag in the heading. The doctor rule + commit-msg gate honor this
+ * marker by validating disposition prose instead of running vitest
+ * against a placeholder test path.
+ */
+const NON_BUG_MARKER_RE = /\(fix-finding-AUDIT-\d{8}-\d+\)\s*\(non-bug\)/i;
+const MIN_DISPOSITION_PROSE_CHARS = 40;
+const DISPOSITION_PLACEHOLDER_RE =
+  /\b(?:to be filled in|TBD|placeholder|<.+?>|\(.+?\))\b|^\s*$/i;
 
 export interface VitestRunner {
   (testFilePath: string, repoRoot: string): Promise<VitestRunResult>;
@@ -78,9 +97,65 @@ export function extractTestFilePath(taskBlock: string): string | null {
   return null;
 }
 
+/**
+ * Per Phase 18 Task 1 (AUDIT-02 closure): detect the `(non-bug)`
+ * marker in a task block heading. When present, the doctor rule +
+ * commit-msg gate skip the test-file checks and validate the Step 1
+ * disposition prose instead.
+ */
+export function isNonBugTaskBlock(taskBlock: string): boolean {
+  return NON_BUG_MARKER_RE.test(taskBlock);
+}
+
+/**
+ * Per Phase 18 Task 1: extract the disposition prose from a non-bug
+ * task block's Step 1 line. Returns the prose minus the leading
+ * "Step 1: " stem; or null when no Step 1 exists.
+ */
+export function extractDispositionProse(taskBlock: string): string | null {
+  const m = /^- \[[ x]\] Step 1:\s*(.+?)$/m.exec(taskBlock);
+  if (m === null) return null;
+  return m[1]?.trim() ?? null;
+}
+
+/**
+ * Per Phase 18 Task 1: validate a non-bug task's Step 1 disposition
+ * prose. Requirements:
+ *   - present (non-null)
+ *   - ≥40 chars of substantive content
+ *   - no placeholder phrases (`to be filled in`, `TBD`, etc.)
+ *   - no naked `<placeholder>` or `(parenthetical-only)` content
+ */
+export function validateNonBugDisposition(taskBlock: string): TddCheckResult {
+  const prose = extractDispositionProse(taskBlock);
+  if (prose === null || prose.length === 0) {
+    return { valid: false, reason: 'non-bug-missing-disposition' };
+  }
+  if (prose.length < MIN_DISPOSITION_PROSE_CHARS) {
+    return {
+      valid: false,
+      reason: 'non-bug-placeholder-disposition',
+      dispositionPreview: prose,
+    };
+  }
+  if (DISPOSITION_PLACEHOLDER_RE.test(prose)) {
+    return {
+      valid: false,
+      reason: 'non-bug-placeholder-disposition',
+      dispositionPreview: prose,
+    };
+  }
+  return { valid: true, dispositionPreview: prose };
+}
+
 export async function verifyFixTaskTDD(
   args: VerifyFixTaskTddArgs,
 ): Promise<TddCheckResult> {
+  // Per Phase 18 Task 1: non-bug-class task blocks bypass the test
+  // checks and validate disposition prose instead.
+  if (isNonBugTaskBlock(args.workplanTaskBlock)) {
+    return validateNonBugDisposition(args.workplanTaskBlock);
+  }
   const testFilePath = extractTestFilePath(args.workplanTaskBlock);
   if (testFilePath === null) {
     return { valid: false, reason: 'no-test-file-cited' };
