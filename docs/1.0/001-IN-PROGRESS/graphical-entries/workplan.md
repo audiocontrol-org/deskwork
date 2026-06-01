@@ -1480,6 +1480,23 @@ Disposition: split fix:
 - [x] Step 1.5.2: Decision: **adopt W3C as the structural base; extend with the `deskwork:` namespace for project-specific fields** (Option B). Rationale recorded in `decision-draft.md` § "W3C Web Annotation Data Model adoption — three options considered" — the picked libraries already emit W3C-shaped JSON, Phase 8's planned fields fit the JSON-LD extension pattern, threaded replies land natively via `motivation: replying`.
 - [x] Step 1.5.3: Migration sketch landed in `decision-draft.md` § "Migration sketch from the current `comment` annotation shape" — per-field mapping (`range` → `[TextPositionSelector, TextQuoteSelector]`, `comment` → `[TextualBody]`, `iteration` → `deskwork:revisionId`, parent-comment-id → reply annotation's `target` with `motivation: replying`), doctor-managed migration with audit-preserving cutover window.
 
+
+### Task 1.7 (fix-finding-AUDIT-20260601-07): AUDIT-20260601-07 — spatialAnchor schema accepts semantically-invalid per-kind combinations
+
+Closes AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model). Surface: `packages/core/src/schema/draft-annotation.ts:39-46` (`SpatialAnchorSchema`); docstring claims at `review/types.ts:69-72` and `draft-annotation.ts:34-37`.
+
+- [x] Step 1: write failing tests — six negative cases added to `packages/core/test/schema/draft-annotation-thread-anchor.test.ts` covering missing-coords pixel, missing-selector dom-selector, missing-selector svg-element, selector-on-pixel, x/y-on-svg-element, and x/y-on-dom-selector. Each would have parsed successfully against the pre-fix flat-optional schema (the bug-factory pattern AUDIT-20260601-07 named).
+- [x] Step 2: confirmed test cases fail against pre-fix code path by construction — every position field was independently `.optional()`, so any combination of fields parsed regardless of `kind`.
+- [x] Step 3: implemented the fix — `SpatialAnchorSchema` rewritten as `z.discriminatedUnion('kind', [PixelSchema, DomSelectorSchema, SvgElementSchema])`. Each variant declares only its required fields and uses `.strict()` to reject unknown fields (zod's default strip behavior would have silently dropped selector-on-pixel etc.). Companion changes: TS `SpatialAnchor` rewritten as a discriminated union of `SpatialAnchorPixel | SpatialAnchorDomSelector | SpatialAnchorSvgElement`; `cloneSpatialAnchor` in `entry/annotations.ts` rewritten as a kind-switch.
+- [x] Step 4: confirmed all 24 tests in `draft-annotation-thread-anchor.test.ts` pass post-fix; the full core suite (931 tests) and full workspace suite (1896 tests) remain green.
+- [x] Step 5: commit lands with `Closes AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` in body.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `packages/core/test/schema/draft-annotation-thread-anchor.test.ts` (six new `it('rejects spatialAnchor ...')` cases covering required-field omissions and forbidden-field presence per kind).
+- [x] `npm --workspace @deskwork/core test` exits 0 (passes against the fix; 931 tests).
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+
 ### Task 1.6: Write decision document
 
 - [x] Step 1.6.1: Decision brief landed at [`docs/studio-design/ACCEPTED/2026-05-26-graphical-review-prior-art/brief.md`](../../../studio-design/ACCEPTED/2026-05-26-graphical-review-prior-art/brief.md) per the project's design-archive contract. The prior `PROPOSED/2026-05-25-graphical-review-prior-art/` directory is retired — `candidates.md` (Task 1.1 matrix) moved into the ACCEPTED entry alongside `evidence.md` (the verbose backing, formerly `decision-draft.md`) and the new `brief.md` (focused summary per the design-standards convention).

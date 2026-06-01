@@ -53,26 +53,45 @@ export interface DraftRange {
  * the raw markdown source, a `spatialAnchor` locates the comment on
  * the entry's primary visual surface — a mockup, an image, an SVG
  * diagram, anything rendered as the entry's content. The three `kind`s
- * are mutually exclusive in interpretation:
+ * are mutually exclusive in interpretation AND in shape — each variant
+ * declares only the fields its kind requires, and the runtime
+ * `SpatialAnchorSchema` in `schema/draft-annotation.ts` enforces the
+ * per-kind shape at parse time (AUDIT-20260601-07):
  *
  *   - `pixel` — `x`/`y` are pixel coordinates against the rendered
  *     visual's intrinsic dimensions. Used for image-style entries
- *     where DOM selectors are not meaningful.
+ *     where DOM selectors are not meaningful. No `selector` field.
  *   - `dom-selector` — `selector` is a CSS selector that identifies
- *     the anchored element within the rendered HTML mockup.
+ *     the anchored element within the rendered HTML mockup. No
+ *     `x`/`y` fields.
  *   - `svg-element` — `selector` is a CSS selector that resolves to
- *     an SVG element (e.g. `g.layer-2 > rect[id="logo"]`).
+ *     an SVG element (e.g. `g.layer-2 > rect[id="logo"]`). No `x`/`y`
+ *     fields.
  *
- * All fields are optional at the schema level so legacy comments
- * without spatial anchors continue to parse; the renderer enforces
- * that the right combination is present for each `kind` at use time.
+ * The TS type is a discriminated union over `kind` so consumers narrow
+ * structurally and the compiler refuses access to fields that don't
+ * belong to the narrowed variant.
  */
-export interface SpatialAnchor {
-  kind: 'pixel' | 'dom-selector' | 'svg-element';
-  selector?: string;
-  x?: number;
-  y?: number;
+export interface SpatialAnchorPixel {
+  kind: 'pixel';
+  x: number;
+  y: number;
 }
+
+export interface SpatialAnchorDomSelector {
+  kind: 'dom-selector';
+  selector: string;
+}
+
+export interface SpatialAnchorSvgElement {
+  kind: 'svg-element';
+  selector: string;
+}
+
+export type SpatialAnchor =
+  | SpatialAnchorPixel
+  | SpatialAnchorDomSelector
+  | SpatialAnchorSvgElement;
 
 interface AnnotationBase {
   /** ISO-8601 timestamp when the annotation was recorded. */

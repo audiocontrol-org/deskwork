@@ -33,17 +33,61 @@ const RangeSchema = z.object({
  * Mirror of {@link import('../review/types.ts').SpatialAnchor}.
  *
  * Three `kind`s — `pixel`, `dom-selector`, `svg-element` — capture
- * which surface the anchor lives on. All position fields are optional
- * at the schema level (the renderer enforces the right combination
- * per `kind`). Adding `kind` values requires updating both this
- * schema and the TS interface in lockstep.
+ * which surface the anchor lives on. The schema enforces the per-kind
+ * shape via `z.discriminatedUnion('kind', [...])` at parse time
+ * (AUDIT-20260601-07): each variant requires exactly the fields its
+ * kind needs and forbids the others.
+ *
+ *   - `pixel` — `{ x, y }` REQUIRED; `selector` is not declared on this
+ *     variant (z.object's strict-on-unknown behavior rejects it).
+ *   - `dom-selector` — `{ selector }` REQUIRED; `x`/`y` are not declared
+ *     on this variant.
+ *   - `svg-element` — `{ selector }` REQUIRED; `x`/`y` are not declared
+ *     on this variant.
+ *
+ * Bad shapes — `{kind:'pixel'}` (no coords), `{kind:'dom-selector'}`
+ * (no selector), `{kind:'pixel', selector:'#x'}` (selector on pixel),
+ * `{kind:'svg-element', x, y}` (coords on selector kind) — all fail
+ * `safeParse`. Annotations land in the append-only journal where bad
+ * data is permanent; per-kind enforcement at the schema is the only
+ * place to keep that data sane.
+ *
+ * Adding `kind` values requires updating both this schema and the TS
+ * discriminated union in `review/types.ts` in lockstep.
  */
-const SpatialAnchorSchema = z.object({
-  kind: z.enum(['pixel', 'dom-selector', 'svg-element']),
-  selector: z.string().optional(),
-  x: z.number().optional(),
-  y: z.number().optional(),
-});
+// Each variant uses `.strict()` so unknown fields are REJECTED at
+// parse time, not silently stripped (zod's `z.object` default).
+// Without `.strict()`, `{kind:'pixel', selector:'#x'}` would parse —
+// the selector field would be stripped — and the bug-factory pattern
+// would persist for fields-on-the-wrong-kind cases. `.strict()` is the
+// hard wall that makes the per-kind shape contract truly enforced.
+const SpatialAnchorPixelSchema = z
+  .object({
+    kind: z.literal('pixel'),
+    x: z.number(),
+    y: z.number(),
+  })
+  .strict();
+
+const SpatialAnchorDomSelectorSchema = z
+  .object({
+    kind: z.literal('dom-selector'),
+    selector: z.string(),
+  })
+  .strict();
+
+const SpatialAnchorSvgElementSchema = z
+  .object({
+    kind: z.literal('svg-element'),
+    selector: z.string(),
+  })
+  .strict();
+
+const SpatialAnchorSchema = z.discriminatedUnion('kind', [
+  SpatialAnchorPixelSchema,
+  SpatialAnchorDomSelectorSchema,
+  SpatialAnchorSvgElementSchema,
+]);
 
 const BaseFields = {
   /** ISO-8601 timestamp when the annotation was recorded. */

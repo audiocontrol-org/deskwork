@@ -4517,3 +4517,42 @@ Surface:    `.dw-lifecycle/scope-discovery/clones.yaml:116-127` (ids `7fd4d02355
 Two `keep-with-reason` dispositions lost their substantive justification in this refresh. The prior reason for the group/pipeline and group/lane dispatcher clones was a specific paragraph — *"Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit"* — which records the actual engineering reason the clone is intentional. The replacements are *"Sibling verb-dispatch convention across group/lane/pipeline CRUD modules; shared shape is deliberate, not duplication"* and *"Sibling per-verb update-handler shape … parallel emit/fail handling is deliberate, not duplication."* These assert the conclusion ("deliberate, not duplication") but drop the *why-not-extract* argument that lets a future reader decide whether the disposition still holds as the code evolves.
 
 This isn't a disposition-survivor violation (no `keep-with-reason → pending` transition, so the gate is satisfied) and it's a curation call, not a bug. But per the project's "no IOU / preserve the rationale" posture, the terser reasons are a small regression in the durable record: the next contributor evaluating whether to finally extract a shared dispatcher helper now has less of the original reasoning to push against. Consider retaining the per-verb-family specificity sentence in at least one of the two reasons so the rationale survives the line-number churn that triggered the re-hash.
+
+## 2026-06-01 — audit-barrage lift (20260601T032129888Z-graphical-entries)
+
+### AUDIT-20260601-05 — `entry-lane-missing.audit()` swallows every non-ENOENT read failure and returns `[]`, making a schema-tightening GATE report false-clean
+
+Finding-ID: AUDIT-20260601-05 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/entry-lane-missing.ts` (the `audit()` try/catch around `readAllSidecarsPartitioned`, ~lines 76-86)
+
+The rule's whole purpose, per its own header, is to be the GATE that lets Step 8.0.2 tighten `resolveEntryTemplate` to throw on a missing `lane`: *"until canary projects report zero `entry-lane-missing` findings, the resolver retains its migration-window default."* That makes a **false-zero the dangerous direction** — a zero count is read as "safe to tighten." But the audit wraps the sidecar read in `try { … } catch { return []; }`. The comment frames the catch as benign ("Nothing useful this rule can say — leave the report empty"), yet any genuine failure (permission error on `.deskwork/entries/`, an I/O fault, a future change in the reader's error contract) is silently converted to "no findings." An operator (or the 8.0.2 implementer) reading a green `entry-lane-missing` cannot distinguish "every entry has a lane" from "the rule couldn't read the directory."
+
+The ENOENT case is already handled by the reader returning `[]` (the empty-project test exercises that), so this catch only ever fires on *unexpected* errors — exactly the ones a gate rule should surface, not bury. Per the project's "fallbacks/swallowed errors are bug-factories" guidance, this should emit a finding (e.g. severity `error`, message naming the read failure) rather than return `[]`, so a read fault blocks the gate instead of opening it. The swallow is also untested — the "empty project" test removes the dir (ENOENT path), never the non-ENOENT path.
+
+### AUDIT-20260601-06 — Hook summary says zero findings even though the same diff slush-records four audit findings
+
+Finding-ID: AUDIT-20260601-06
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json:5-8`; `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4469-4519`
+
+The hook metadata records `"disposition": "fired-and-slushed"` but also `"findingsCount": 0`, `"promotedCount": 0`, and `"slushedCount": 0`. In the same diff, the audit log appends four findings from that run, all with `Status: acknowledged-slush-pile-2026-06-01`.
+
+That makes the durable machine-readable summary contradict the human-readable audit log. Any later aggregation that relies on `last-hook-run.json` will conclude this run produced no findings and no slush entries, while the audit log says it produced four. The counts should reflect the actual parsed results, e.g. findings 4, promoted 0, slushed 4, or the disposition should not claim a slush action occurred.
+
+## 2026-06-01 — audit-barrage lift (20260601T033039763Z-graphical-entries)
+
+### AUDIT-20260601-07 — spatialAnchor schema accepts semantically-invalid per-kind combinations; the "renderer enforces at use time" it defers to does not exist
+
+Finding-ID: AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/schema/draft-annotation.ts:39-46` (`SpatialAnchorSchema`); docstring claims at `review/types.ts:69-72` and `draft-annotation.ts:34-37`
+
+`SpatialAnchorSchema` is a flat `z.object` with every position field independently optional: `selector`, `x`, `y` are each `.optional()` regardless of `kind`. So every one of these parses successfully today: `{kind:'pixel'}` (no coordinates), `{kind:'dom-selector'}` (no selector), `{kind:'pixel', selector:'#x'}` (selector on a pixel anchor), `{kind:'svg-element', x:1, y:2}` (coordinates on a selector anchor). The schema's own docstring acknowledges the gap — *"All fields are optional at the schema level ... the renderer enforces that the right combination is present for each `kind` at use time"* — but a grep across `packages/` shows the three new fields are referenced in only four files (the schema, the TS interface, the read-bridge, and the test). **There is no renderer.** The "enforces at use time" consumer the schema delegates correctness to does not exist, so nothing validates the combination anywhere, and these annotations land in the append-only `entry-annotation` journal (`journal-events.ts:111-116`) where bad data is permanent.
+
+This is the bug-factory shape the project guidelines name explicitly ("never implement fallbacks ... validation gaps are bug-factories; throw instead"). The new test file reinforces the gap rather than catching it: it exercises only valid combinations plus an unknown-`kind` rejection (`draft-annotation-thread-anchor.test.ts:75-130`), never asserting that a `pixel` without coordinates or a `dom-selector` without a selector is rejected — so the loose behavior is now codified as "correct." A reasonable fix is `z.discriminatedUnion('kind', [...])` (or `.superRefine`) so `pixel` requires `x`+`y` and forbids `selector`, while `dom-selector`/`svg-element` require `selector` and forbid `x`/`y`. That moves enforcement to the one place every write path already passes through, instead of a downstream consumer that may never be written.
+
+---

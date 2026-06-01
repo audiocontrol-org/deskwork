@@ -128,6 +128,67 @@ describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () =
     expect(parsed.success).toBe(false);
   });
 
+  // AUDIT-20260601-07 — discriminated-union shape enforcement.
+  // The pre-fix schema parsed all four of these as valid because every
+  // position field was independently optional; the discriminated-union
+  // refactor makes each variant declare only the fields its kind needs.
+  // Annotations land in the append-only journal where bad data is
+  // permanent, so the schema is the only enforcement point.
+
+  it('rejects spatialAnchor kind "pixel" without coordinates', () => {
+    const input = {
+      ...COMMENT_BASE,
+      spatialAnchor: { kind: 'pixel' },
+    };
+    const parsed = DraftAnnotationSchema.safeParse(input);
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects spatialAnchor kind "dom-selector" without selector', () => {
+    const input = {
+      ...COMMENT_BASE,
+      spatialAnchor: { kind: 'dom-selector' },
+    };
+    const parsed = DraftAnnotationSchema.safeParse(input);
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects spatialAnchor kind "svg-element" without selector', () => {
+    const input = {
+      ...COMMENT_BASE,
+      spatialAnchor: { kind: 'svg-element' },
+    };
+    const parsed = DraftAnnotationSchema.safeParse(input);
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects spatialAnchor kind "pixel" carrying a selector field', () => {
+    const input = {
+      ...COMMENT_BASE,
+      spatialAnchor: { kind: 'pixel', x: 10, y: 20, selector: '#header' },
+    };
+    const parsed = DraftAnnotationSchema.safeParse(input);
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects spatialAnchor kind "svg-element" carrying x/y fields', () => {
+    const input = {
+      ...COMMENT_BASE,
+      spatialAnchor: { kind: 'svg-element', selector: '#shape', x: 1, y: 2 },
+    };
+    const parsed = DraftAnnotationSchema.safeParse(input);
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects spatialAnchor kind "dom-selector" carrying x/y fields', () => {
+    const input = {
+      ...COMMENT_BASE,
+      spatialAnchor: { kind: 'dom-selector', selector: '#header', x: 1, y: 2 },
+    };
+    const parsed = DraftAnnotationSchema.safeParse(input);
+    expect(parsed.success).toBe(false);
+  });
+
   it('parses a comment with all three new fields set together', () => {
     const input = {
       ...COMMENT_BASE,

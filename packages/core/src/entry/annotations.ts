@@ -60,18 +60,22 @@ type StoredSpatialAnchor = NonNullable<StoredComment['spatialAnchor']>;
  * representation independent of the journal-event payload so later
  * mutations on either side don't leak.
  *
- * Accepts the Zod-inferred {@link StoredSpatialAnchor} shape (where
- * optional fields are `T | undefined`) and emits the canonical TS
- * {@link SpatialAnchor} shape (where optional fields are `T?` under
- * `exactOptionalPropertyTypes`). The bridge handles the same shape
- * mismatch documented above for `toDraftAnnotation`.
+ * Post-AUDIT-20260601-07, {@link SpatialAnchor} is a discriminated
+ * union — each `kind` declares only the fields its variant requires
+ * — so the clone path narrows on `input.kind` and emits the matching
+ * variant. The Zod-inferred {@link StoredSpatialAnchor} shape is also
+ * a discriminated union (the schema is a `z.discriminatedUnion`), so
+ * the narrow flows symmetrically.
  */
 function cloneSpatialAnchor(input: StoredSpatialAnchor): SpatialAnchor {
-  const out: SpatialAnchor = { kind: input.kind };
-  if (input.selector !== undefined) out.selector = input.selector;
-  if (input.x !== undefined) out.x = input.x;
-  if (input.y !== undefined) out.y = input.y;
-  return out;
+  switch (input.kind) {
+    case 'pixel':
+      return { kind: 'pixel', x: input.x, y: input.y };
+    case 'dom-selector':
+      return { kind: 'dom-selector', selector: input.selector };
+    case 'svg-element':
+      return { kind: 'svg-element', selector: input.selector };
+  }
 }
 
 function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
