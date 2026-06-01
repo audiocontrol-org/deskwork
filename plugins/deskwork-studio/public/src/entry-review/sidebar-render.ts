@@ -207,9 +207,17 @@ function attachDiffToggle(
  * lands when the studio CSS picks up the per-line `data-kind` —
  * the markup is shape-stable so CSS can evolve independently.
  *
- * Step 8.6.4 fallback ("addressed without local diff — see the
- * disposition reason") is added in the next commit (separate
- * concern, separate test).
+ * Step 8.6.4 empty-diff-slice fallback: when the server returns
+ * `hunks: []` AND no `notes` value, the body renders the inline
+ * message `"addressed without local diff — see the disposition
+ * reason"`. This case happens when the operator addressed a comment
+ * on a region the new revision didn't change (e.g. a comment about
+ * voice on paragraph 2 that got addressed by rewriting paragraph 5
+ * — there's no local diff at the anchor, but the reason names where
+ * the fix landed). The fallback marker carries the
+ * `er-marginalia-diff-empty` class so CSS can style it distinctly
+ * from the populated-hunk view; a `data-empty-slice="true"`
+ * attribute makes the case scriptable for diagnostic tools.
  */
 function renderDiffExpansion(payload: DiffSlicePayload): HTMLElement {
   const expansion = document.createElement('div');
@@ -224,10 +232,22 @@ function renderDiffExpansion(payload: DiffSlicePayload): HTMLElement {
   const body = document.createElement('div');
   body.className = 'er-marginalia-diff-body';
   if (payload.notes !== undefined && payload.hunks.length === 0) {
+    // Server explicitly explained the empty slice (first revision,
+    // spatial-anchor not-yet-supported, etc.) — render the note.
     const notes = document.createElement('div');
     notes.className = 'er-marginalia-diff-notes';
     notes.textContent = payload.notes;
     body.appendChild(notes);
+  } else if (payload.hunks.length === 0) {
+    // Step 8.6.4 — addressed without local diff. The comment was
+    // anchored on a region the new revision didn't touch; the
+    // disposition reason names where the fix actually landed.
+    const fallback = document.createElement('div');
+    fallback.className = 'er-marginalia-diff-empty';
+    fallback.dataset.emptySlice = 'true';
+    fallback.textContent =
+      'addressed without local diff — see the disposition reason';
+    body.appendChild(fallback);
   } else {
     for (const hunk of payload.hunks) {
       const block = document.createElement('pre');
