@@ -1223,7 +1223,7 @@ Phase 16's bulk-disposition of CLI-shim clones used a copy-pasted reason naming 
 ### AUDIT-20260601-01 — The actual AUDIT-23 "runner maps to exit-2" behavior has no test
 
 Finding-ID: AUDIT-20260601-01 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-a1324a32f507e15984eafd7aea13a1139982798e
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts` (new try/catch in `runCheckBarrageTip`, ~lines 187-203) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip-cli.test.ts` (the three `runCheckBarrageTip` tests)
 
@@ -1263,7 +1263,7 @@ This is the mechanical-flip limitation: `apply-audit-flips` keys on the `Closes`
 ### AUDIT-20260601-04 — Test comments overclaim what the timestamps exercise
 
 Finding-ID: AUDIT-20260601-04
-Status:     open
+Status:     fixed-a1324a32f507e15984eafd7aea13a1139982798e
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts` (the AUDIT-26 lexical-sort test)
 
