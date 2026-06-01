@@ -2142,3 +2142,18 @@ Surface:    missing `package-lock.json` hunk; existing `package-lock.json:2-9`, 
 The diff bumps every visible package/plugin manifest from `0.32.0` to `0.32.1` (`package.json:2`, `packages/*/package.json:2`, `plugins/*/package.json:2`, plugin manifests, and `.claude-plugin/marketplace.json`), but it does not include `package-lock.json`. This repo has a committed npm lockfile, and the current lockfile metadata is stale: root is still `0.24.2`, workspace packages are still `0.24.2`, and internal workspace dependency specs such as `@deskwork/core` remain `0.24.2`.
 
 That makes the release commit internally inconsistent for npm consumers and CI paths that use the lockfile. A clean release bump should regenerate and commit the lockfile so root package metadata, workspace package versions, and internal workspace dependency ranges match the manifest changes in this diff.
+
+## 2026-06-01 — audit-barrage lift (20260601T163121339Z-scope-discovery)
+
+### AUDIT-20260601-76 — Auto-promotion swept a positive `informational` "clean report" (AUDIT-74) into a code-defect fix-task demanding a failing test
+
+Finding-ID: AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.108 (`fix-finding-AUDIT-20260601-74`), `@@ -741,6 +741,74 @@` hunk; cross-ref audit-log AUDIT-20260601-74 (`Severity: informational`)
+
+Task 5.108 promotes **AUDIT-20260601-74 into the fix queue as a code defect**, but AUDIT-74 is explicitly a *positive, clean report*: its own audit-log body reads *"Positive signal the operator should see… I checked three things and all came back clean,"* `Severity: informational`, and it exists only to record that the v0.32.1 bump *resolved* the prior AUDIT-66 hygiene complaint. There is no bug. Yet the rendered task says `Closes AUDIT-20260601-74`, `Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)`, `Step 3: implement the fix`, with the Surface being *"the entire diff (all 12 manifest files)."* An implementer who picks up 5.108 literally cannot write "a test exercising the bug" because there is no bug and no file:line — they will either fabricate a meaningless test to satisfy the gate, or the AC placeholder `(to be filled in by Step 1 implementer)` stays unfilled forever.
+
+This is a sharper regression than the missing-`Severity:` shape the prior findings chase, because it promotes the *absence* of a defect as a defect. Worse, the audit-log records AUDIT-74 itself with `Status: open` — and per `agent-discipline.md`, `dw-lifecycle check-open-findings` refuses `/dw-lifecycle:implement` pickup while ≥1 `Status: open` finding exists. A positive "no findings" entry that can never be "fixed" will block the implement loop indefinitely. The promote-findings auto path must exclude `Severity: informational` (and positive/clean-report findings) from the scope-into-workplan default — a clean report is a disposition outcome, not a unit of work. A reasonable fix: `inferFindingShape` / the auto-promote filter classifies `informational` findings as `acknowledged` (record-only, no fix-task), never `code-defect`.
+
+---

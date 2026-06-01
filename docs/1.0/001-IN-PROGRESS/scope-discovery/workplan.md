@@ -743,6 +743,23 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.110 (fix-finding-AUDIT-20260601-76): AUDIT-20260601-76 — Auto-promotion swept a positive `informational` "clean repor…
+
+Closes AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.108 (`fix-finding-AUDIT-20260601-74`), `@@ -741,6 +741,74 @@` hunk; cross-ref audit-log AUDIT-20260601-74 (`Severity: informational`).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.106 (fix-finding-AUDIT-20260601-72): AUDIT-20260601-72 — v0.32.1 tags and ships the GH-386 stdin fix while open HIGH …
 
 Closes AUDIT-20260601-72. Surface: whole release (`981d3f58 chore: release v0.32.1`) graduating `d8bc1feb fix(audit-barrage): close GH-386` — vs. open finding AUDIT-20260601-69 in `audit-log.md`.
