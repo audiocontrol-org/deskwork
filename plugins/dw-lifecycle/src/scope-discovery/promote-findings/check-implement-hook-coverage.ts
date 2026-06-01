@@ -34,6 +34,23 @@ export interface CheckImplementHookCoverageArgs {
   readonly readLog: () => Promise<HookRunLogEntry[]>;
   /** Returns true when the project opted into scope-discovery. */
   readonly isScopeDiscoveryOptedIn: () => Promise<boolean>;
+  /**
+   * Per AUDIT-20260601-06 (cross-model claude+codex, BLOCKING): the
+   * boot-case must NOT trigger on log emptiness alone. The pre-push
+   * gate exists specifically to catch --no-verify commits; on a
+   * fresh project those would sail through if log-empty == allow.
+   * Worse, the failure mode is re-triggerable: deleting the log file
+   * (errant git clean, .dw-lifecycle reset) silently reverts the gate
+   * to a no-op.
+   *
+   * Fix: a one-time bootstrap sentinel file. Written by the FIRST
+   * successful implement-hook run; persists thereafter. The gate
+   * checks for the sentinel's presence (not log emptiness). A
+   * deleted log can be recovered; a deleted sentinel cannot
+   * re-trigger fail-open because the gate sees "sentinel present
+   * but log empty" → refuse (the log was corrupted; not a boot).
+   */
+  readonly hasBootstrapSentinel: () => Promise<boolean>;
 }
 
 export interface UncoveredCommit {
@@ -74,18 +91,36 @@ export async function checkImplementHookCoverage(
     };
   }
   const log = await args.readLog();
-  // Boot case (mirrors check-implement-hook-ran's `allow-no-prior-run`):
-  // if no implement-hook has ever run, every unpushed commit looks
-  // uncovered. Allow the push so the project can bootstrap; the
-  // discipline kicks in after the first hook run. Without this, a
-  // freshly-wired project can't push at all until implement-hook runs,
-  // and implement-hook may need its own push to ship the new verb.
-  if (log.length === 0) {
+  // Boot case — per AUDIT-20260601-06 (BLOCKING, claude-01 + codex-01),
+  // the trigger MUST be a persistent bootstrap sentinel, NOT log
+  // emptiness. The sentinel is written by the FIRST successful
+  // implement-hook run; absent = boot case (allow). Once present,
+  // an empty log means the log was corrupted/deleted (refuse — a
+  // --no-verify push must not pass via log truncation).
+  const hasSentinel = await args.hasBootstrapSentinel();
+  if (!hasSentinel) {
     return {
       kind: 'allow-no-prior-run',
       reason:
-        `Hook-run log is empty — no implement-hook has run yet. ` +
+        `Bootstrap sentinel absent — no implement-hook has ever run on this project. ` +
         `Allowing push to bootstrap; discipline engages after the first hook run.`,
+    };
+  }
+  // Sentinel present but log empty: the log was deleted or corrupted
+  // post-bootstrap. Refuse rather than fail-open.
+  if (log.length === 0) {
+    return {
+      kind: 'refuse-uncovered-commits',
+      uncovered: unpushed.map((c) => ({
+        sha: c.sha,
+        parentSha: c.parentSha,
+        subject: c.subject,
+      })),
+      cure:
+        `Bootstrap sentinel present but hook-run-log is empty (log was deleted ` +
+        `or corrupted post-bootstrap). For each unpushed commit, check out the ` +
+        `commit and run \`${CURE_VERB}\` to backfill the log entry, OR ` +
+        `restore the log from version control / backup.`,
     };
   }
   // Index log entries by `tip` for O(1) per-commit lookup.

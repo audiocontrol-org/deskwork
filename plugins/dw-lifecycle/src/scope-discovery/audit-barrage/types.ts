@@ -77,6 +77,29 @@ export interface BarrageInput {
 }
 
 /**
+ * Per AUDIT-20260601-08 (claude-03): the "model produced liftable
+ * output" contract was duplicated between `isHealthyModelRun`
+ * (audit-barrage.ts CLI exit-code derivation) and the inline
+ * `anyModelEmitted` check in `orchestrateBarrage` (tip.sha gate).
+ * Same logic, two call sites — drift risk. Centralizing here makes
+ * the contract structural rather than accidental: both the CLI's
+ * exit-code derivation AND the orchestrator's tip.sha gate use this
+ * single predicate.
+ *
+ * Contract: a model produced liftable output iff stdoutBytes > 0
+ * AND no spawn failure. Rationale:
+ *   - The audit-barrage-lift reads stdout (each model's `.md` file).
+ *     Findings live there.
+ *   - stderr is diagnostic / progress info, NOT findings. Not lifted.
+ *   - A non-zero CLI exit with positive stdout is still triagable
+ *     content (operator may want to lift); kept healthy.
+ *   - A spawn error has zero captured content by definition; unhealthy.
+ */
+export function isModelRunHealthy(result: ModelRunResult): boolean {
+  return result.stdoutBytes > 0 && result.spawnError === undefined;
+}
+
+/**
  * Outcome of one model's CLI invocation.
  *
  * Exit-code sentinels:

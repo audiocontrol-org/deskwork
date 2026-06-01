@@ -24,7 +24,10 @@ import { execFileSync } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { repoRoot } from '../repo.js';
-import { readHookRunLog } from '../scope-discovery/promote-findings/hook-run-log.js';
+import {
+  readHookRunLog,
+  hasBootstrapSentinel,
+} from '../scope-discovery/promote-findings/hook-run-log.js';
 import {
   checkImplementHookCoverage,
   type CheckImplementHookCoverageResult,
@@ -181,6 +184,7 @@ export async function runCheckImplementHookCoverage(args: RunArgs): Promise<numb
     resolveUnpushedCommits: async () => resolveCommits(repoRootResolved, range),
     readLog: () => readHookRunLog(repoRootResolved),
     isScopeDiscoveryOptedIn: () => defaultIsScopeDiscoveryOptedIn(repoRootResolved),
+    hasBootstrapSentinel: () => hasBootstrapSentinel(repoRootResolved),
   });
   args.stderr.write(`${summarize(result)}\n`);
   if (result.kind.startsWith('allow')) return 0;

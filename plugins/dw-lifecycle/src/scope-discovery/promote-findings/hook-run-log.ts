@@ -18,11 +18,25 @@
  * (`check-implement-hook-coverage.ts`) consumes the parsed entries.
  */
 
-import { mkdir, readFile, appendFile } from 'node:fs/promises';
+import { mkdir, readFile, appendFile, writeFile, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { z } from 'zod';
 
 const HOOK_RUN_LOG_REL_PATH = '.dw-lifecycle/scope-discovery/hook-run-log.jsonl';
+
+/**
+ * Per AUDIT-20260601-06: the pre-push gate's boot case MUST gate on a
+ * persistent sentinel, not log emptiness. The sentinel is written by
+ * the first successful implement-hook run and never deleted; it
+ * outlives errant `git clean`s or `.dw-lifecycle` resets that might
+ * truncate the log.
+ */
+const BOOTSTRAP_SENTINEL_REL_PATH =
+  '.dw-lifecycle/scope-discovery/.implement-hook-bootstrapped';
+
+export function bootstrapSentinelPathFor(repoRoot: string): string {
+  return join(repoRoot, BOOTSTRAP_SENTINEL_REL_PATH);
+}
 
 const DISPOSITIONS = [
   'fired-and-promoted',
@@ -75,7 +89,10 @@ export async function readHookRunLog(repoRoot: string): Promise<HookRunLogEntry[
 
 /**
  * Append a single entry to the log. Creates the parent dir + file on
- * first call. Atomic-append (Node's appendFile uses O_APPEND).
+ * first call. Atomic-append (Node's appendFile uses O_APPEND). Also
+ * writes the bootstrap sentinel if absent (per AUDIT-20260601-06 —
+ * the FIRST successful run creates the sentinel that the pre-push
+ * gate uses to distinguish boot case from log-deleted state).
  */
 export async function appendHookRunLogEntry(
   repoRoot: string,
@@ -85,4 +102,28 @@ export async function appendHookRunLogEntry(
   const path = hookRunLogPathFor(repoRoot);
   await mkdir(dirname(path), { recursive: true });
   await appendFile(path, `${JSON.stringify(entry)}\n`, 'utf8');
+  // First-run sentinel: idempotent write. Once present, it stays —
+  // even if the log is later deleted.
+  const sentinelPath = bootstrapSentinelPathFor(repoRoot);
+  try {
+    await stat(sentinelPath);
+  } catch {
+    // Sentinel missing → write it. Content is a one-line marker with
+    // the first-run tip for forensic value; presence is what counts.
+    await writeFile(sentinelPath, `${entry.tip}\n${entry.timestamp}\n`, 'utf8');
+  }
+}
+
+/**
+ * Returns true when the project has been bootstrapped (the sentinel
+ * file exists). Per AUDIT-20260601-06: the pre-push gate uses this
+ * to distinguish "boot case" from "log was deleted post-bootstrap."
+ */
+export async function hasBootstrapSentinel(repoRoot: string): Promise<boolean> {
+  try {
+    await stat(bootstrapSentinelPathFor(repoRoot));
+    return true;
+  } catch {
+    return false;
+  }
 }

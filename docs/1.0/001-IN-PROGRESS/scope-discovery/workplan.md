@@ -703,6 +703,108 @@ Closes AUDIT-20260531-27. Surface: `.dw-lifecycle/scope-discovery/clones.yaml` (
 - [x] `npx vitest run` 2558/2558 green (no test required; nothing to assert)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
+
+
+### Task 5.41 (fix-finding-AUDIT-20260601-06): AUDIT-20260601-06 — Pre-push coverage gate fails OPEN on an empty hook-run-log —…
+
+Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts`.
+
+- [x] Step 1: 2 new tests in `check-implement-hook-coverage.test.ts` — "allows boot case when bootstrap sentinel absent" + "refuses when sentinel present but log empty (post-bootstrap log deletion attack)".
+- [x] Step 2: confirmed tests would have failed pre-fix (the old `log.length === 0 → allow` collapsed both cases into a fail-open).
+- [x] Step 3: replaced log-emptiness boot trigger with a persistent `bootstrap.sentinel` file written by the FIRST successful implement-hook run. Pre-push gate now checks sentinel presence; sentinel+empty-log → refuse (post-bootstrap log deletion can't re-open the gate).
+- [x] Step 4: 8 tests green in check-implement-hook-coverage.test.ts (+ full 2562/2562).
+- [x] Step 5: commit with `Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model)` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-coverage.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-coverage.test.ts` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.42 (fix-finding-AUDIT-20260601-07): AUDIT-20260601-07 — New runner catch block in `check-barrage-tip.ts` introduces …
+
+Closes AUDIT-20260601-07. Surface: `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts`.
+
+- [x] Step 1: introduced shared `isErrnoException(err): err is NodeJS.ErrnoException` type guard at the top of check-barrage-tip.ts.
+- [x] Step 2: replaced both `as NodeJS.ErrnoException` casts with the type guard (defaultListRunDirs catch + runCheckBarrageTip catch).
+- [x] Step 3: typed the `let result;` as `let result: BarrageTipCheckResult;`. No more evolving-any.
+- [x] Step 4: tsc clean; plugin suite 2562/2562.
+- [x] Step 5: commit with `Closes AUDIT-20260601-07` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(no new test — pure typing cleanup; existing tests cover the runtime paths)`
+- [x] `npx vitest run` 2562/2562 green
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.43 (fix-finding-AUDIT-20260601-08): AUDIT-20260601-08 — Outage detection treats stderr-only model output as no audit…
+
+Closes AUDIT-20260601-08. Surface: `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-barrage.ts:106-124`.
+
+- [x] Step 1: pushed back on the finding's recommendation (broaden the check) — the lifter reads STDOUT only; broadening to include stderr would mean the gate writes tip.sha for outputs that aren't actually liftable.
+- [x] Step 2: addressed the underlying concern (drift between orchestrator gate + CLI healthy-count) by centralizing the `isModelRunHealthy` predicate in `types.ts`. Both call sites now use the shared helper; the contract is structural rather than accidental.
+- [x] Step 3: `isHealthyModelRun` in audit-barrage.ts is now an alias of `isModelRunHealthy`; orchestrate-barrage's inline check replaced with `results.some(isModelRunHealthy)`.
+- [x] Step 4: tsc clean; plugin suite 2562/2562 (existing tests cover both call sites).
+- [x] Step 5: commit with `Closes AUDIT-20260601-08` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+### Task 5.38 (fix-finding-AUDIT-20260601-02): AUDIT-20260601-02 — Task 5.37 (AUDIT-27) is an `[x]`-checked fix-finding task wi…
+
+Closes AUDIT-20260601-02. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.37, AC block) vs. commit 46aec320 (`Closes AUDIT-…27`) and the `fix-task-tdd-discipline` doctor rule.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-02` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.39 (fix-finding-AUDIT-20260601-03): AUDIT-20260601-03 — AUDIT-27 `fixed-<sha>` cites a commit that doesn't touch the…
+
+Closes AUDIT-20260601-03. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260531-27 → `fixed-46aec320…`) vs. the `.dw-lifecycle/scope-discovery/clones.yaml` hunk in this diff.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-03` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.40 (fix-finding-AUDIT-20260601-05): AUDIT-20260601-05 — Task 5.33 documents fix-landed-before-scoped (retroactive ba…
+
+Closes AUDIT-20260601-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.33 Step 5).
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-05` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.28 (fix-finding-AUDIT-20260531-11): AUDIT-20260531-11 — Fix-tasks 5.25 and 5.26 reintroduce the exact bare-`*.test.t…
 
 Closes AUDIT-20260531-11. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.25 acceptance criteria + Task 5.26 acceptance criteria, added in this diff) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`.

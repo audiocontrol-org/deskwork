@@ -1,4 +1,4 @@
-generated_at: 2026-06-01T02:31:59.063Z
+generated_at: 2026-06-01T02:53:39.635Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1195,9 +1195,9 @@ clones:
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:335:353
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:146:164
-      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:213:231
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:231:249
       - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:190:208
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:194:212
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:157:175
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
@@ -1224,13 +1224,13 @@ clones:
     lines: 7
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:179:185
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:302:308
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:298:304
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + readFile-then-parse-then-validate). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: ec4640c729a3
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:301:307
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:297:303
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:162:168
     disposition: keep-with-reason
     reason: "Phase 12 Task 2: audit-barrage CLI subcommand shares CLI shim boilerplate with orchestrator-turn by design (sibling CLI verbs with same parseFlags + main pattern)"
@@ -1238,7 +1238,7 @@ clones:
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:112:120
-      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:165:173
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:177:185
       - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:183:191
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:157:165
     disposition: pending
@@ -1267,7 +1267,7 @@ clones:
   - id: 87d757d3458e
     lines: 34
     members:
-      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:55:88
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:58:91
       - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:73:106
     disposition: pending
     reason: null
@@ -1282,14 +1282,14 @@ clones:
   - id: 9f9c5b9009b8
     lines: 10
     members:
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:66:75
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:69:78
       - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:79:94
     disposition: pending
     reason: null
   - id: bef89978806b
     lines: 8
     members:
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:82:89
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:85:92
       - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:94:101
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:121
     disposition: pending
@@ -1297,7 +1297,7 @@ clones:
   - id: 373ba2a9115d
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:83:91
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:86:94
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:75:83
     disposition: pending
     reason: null

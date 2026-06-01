@@ -1281,3 +1281,42 @@ Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.33 St
 Task 5.33 Step 5 states the AUDIT-21 fix "landed BEFORE the workplan task was scoped (out-of-band TDD-first; tests + fix in same commit)." This is an honest note, but it records the reverse of the discipline the triad in `agent-discipline.md` is built to enforce: scope into the workplan *first*, then implement TDD-first, with `check-open-findings` refusing pickup while a finding is open. Here the commit shipped and the task block was back-filled afterward to match. TDD held *within* the commit (test + fix together), but the scope-first ordering did not.
 
 Surfacing this as a process signal, not a code defect: when a fix is genuinely out-of-band, the audit trail ends up looking like the task block was reverse-engineered from the commit. If that's acceptable for hot fixes, fine — but it's worth the operator deciding explicitly, because the same pattern at scale erodes the "the workplan drives the implementation loop" invariant the closure triad depends on.
+
+## 2026-06-01 — audit-barrage lift (20260601T024117392Z-scope-discovery)
+
+### AUDIT-20260601-06 — Pre-push coverage gate fails OPEN on an empty hook-run-log — defeats its own acceptance criterion and is re-triggerable by log loss
+
+Finding-ID: AUDIT-20260601-06 (claude-01 + codex-01; cross-model)
+Status:     open
+Severity:   blocking
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts` (new `if (log.length === 0) return { kind: 'allow-no-prior-run' }` block, immediately after `const log = await args.readLog();`)
+
+This diff adds a boot case to the **pre-push** coverage gate: when the hook-run-log is empty, *every* unpushed commit is allowed through (`allow-no-prior-run`), regardless of count. That directly contradicts this feature's stated acceptance criteria — *"Pre-push refuses when any unpushed commit lacks a corresponding hook-run entry"* and *"The refusal lists which commits are unbacked."* For the empty-log case, no commit is refused and nothing is listed. The renamed test (`...AFTER first hook run`, now seeding `logTips: ['some-prior-tip']`) confirms the refusal path is only reachable once the log is non-empty.
+
+Two concrete failure modes follow. (a) **`--no-verify` bypass window:** the pre-push gate was specifically designed to catch commits made with `--no-verify` (which skip the commit-msg gate, so they never append a log entry). On a fresh project the log is empty, so a batch of `--no-verify` commits — the exact thing the gate exists to catch — sails through. The first feature's worth of commits is unguarded. (b) **Re-triggerable fail-open:** because the trigger is purely `log.length === 0`, deleting or truncating `.dw-lifecycle/.../hook-run-log` (an errant `git clean`, a `.dw-lifecycle` reset, or the agent itself) silently reverts the gate to a no-op on the next push. Phase 17's premise is *"no opt-out … the strictness IS the discipline"* and *"the agent should have no discretion"*; a deletable fail-open path is exactly a discretion path.
+
+Note this boot case is also **looser than its sibling**: the commit-msg gate's `allow-no-prior-run` (AUDIT-17 fix) requires *both* marker-missing *and* log-empty, and concerns a single commit; this coverage-gate version triggers on log-empty alone and waves through *all* unpushed commits. A more robust design would gate on a one-time bootstrap sentinel (written by the first successful `implement-hook` run) rather than on log emptiness, so that an emptied log can't re-open the gate and a `--no-verify`-only fresh project still gets caught. At minimum this should be an explicit operator decision recorded in the workplan, because it weakens the AC the task is checked off against.
+
+### AUDIT-20260601-07 — New runner catch block in `check-barrage-tip.ts` introduces an untyped `let` and `as` casts against the project's strict-typing rules
+
+Finding-ID: AUDIT-20260601-07
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts` (`runCheckBarrageTip` — `let result;` declaration ~line 187 + `const errno = err as NodeJS.ErrnoException;` in the new catch ~line 200; also the matching `err as NodeJS.ErrnoException` in `defaultListRunDirs`)
+
+The AUDIT-23 fix replaced `const result = await checkBarrageTip(...)` with a bare `let result;` declared above a try/catch and assigned inside the try. `let result;` with no annotation is an evolving-`any` binding — tsc won't flag it, but it sidesteps the project's *"Never bypass typing — No `any`"* rule by leaving the result implicitly typed where it was previously a typed `const`. The new catch block also adds `const errno = err as NodeJS.ErrnoException;`, a net-new `as Type` cast in shipped code despite the explicit *"no `as Type`"* guideline.
+
+Neither is a runtime bug — the message interpolation (`errno.code ?? 'unknown'`, `errno.message ?? err`) is null-safe for non-Error throws. But the cleaner shapes are available and worth using since this region is being touched: hoist the typed result via `let result: CheckBarrageTipResult` (or wrap the call in an IIFE that returns the typed value), and replace the `as` casts with a small `isErrno(err): err is NodeJS.ErrnoException` type guard shared by `defaultListRunDirs` and the runner (both now narrow `unknown` to `ErrnoException` by assertion). Folding both call sites onto one guard also removes the duplicated cast pattern the clones.yaml baseline is already tracking in this file.
+
+For the operator's signal: I checked the `orchestrate-barrage.ts` deferred-write logic (the `anyModelEmitted = stdoutBytes > 0 && spawnError === undefined` guard fails *safe* — an outage or partial-crash run omits `tip.sha` and the next iteration re-fires, which is the correct direction), the two new orchestrate-barrage tests (distinct model names, per-test `tmp`, assertions match the contract), the lexical-sort test (now pinned to real `generateRunDirName` output across a genuine 2026→2027 boundary, closing AUDIT-04's comment-drift), and the `summarize` switch (the new `allow-no-prior-run` case is wired into the allow group, so no fall-through). Those are clean. The two findings above are the only net-new concerns I'd put in front of you.
+
+### AUDIT-20260601-08 — Outage detection treats stderr-only model output as no audit coverage
+
+Finding-ID: AUDIT-20260601-08
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-barrage.ts:106-124`
+
+The new `tip.sha` write is gated on `results.some((r) => r.stdoutBytes > 0 && r.spawnError === undefined)`. That assumes audit coverage exists only when a model emits positive-byte stdout. If a CLI emits its findings or useful failure text to stderr with exit 0, or exits nonzero after producing output the operator still lifts, this code suppresses `tip.sha` and causes the next iteration to re-audit the same range indefinitely.
+
+The finding being fixed was about all-model outage runs falsely claiming coverage. The implementation overcorrects by equating “coverage” with stdout bytes only. Reasonable fix: base the marker on the same success/output contract used by the barrage lift and outage classification, or explicitly count any captured model output that the pipeline considers liftable. The tests added at `orchestrate-barrage.test.ts:205-251` only cover zero-stdout and positive-stdout cases, so they pin the narrow behavior rather than the broader audit-coverage contract.

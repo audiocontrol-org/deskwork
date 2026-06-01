@@ -29,12 +29,13 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadAuditBarrageConfig } from '../scope-discovery/audit-barrage/config-loader.js';
 import { orchestrateBarrage } from '../scope-discovery/audit-barrage/orchestrate-barrage.js';
-import type {
-  BarrageInput,
-  BarrageResult,
-  BarrageRun,
-  ModelConfig,
-  ModelRunResult,
+import {
+  isModelRunHealthy,
+  type BarrageInput,
+  type BarrageResult,
+  type BarrageRun,
+  type ModelConfig,
+  type ModelRunResult,
 } from '../scope-discovery/audit-barrage/types.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 
@@ -274,16 +275,11 @@ export function deriveBarrageExitCode(run: BarrageRun): 0 | 1 {
   return anyHealthy ? 0 : 1;
 }
 
-/**
- * "Produced output" for the verb's exit-code contract: positive
- * stdout bytes AND no spawn failure. Non-zero CLI exits + timeouts
- * fall on the healthy side — the captured content is still triagable.
- * A spawn error has nothing to capture by definition, so it stays
- * unhealthy regardless of byte counts.
- */
-function isHealthyModelRun(result: ModelRunResult): boolean {
-  return result.stdoutBytes > 0 && result.spawnError === undefined;
-}
+// Per AUDIT-20260601-08: the "model produced liftable output"
+// contract is centralized in `isModelRunHealthy` (types.ts). Same
+// predicate used by the orchestrator's tip.sha gate — drift-proof
+// by construction.
+const isHealthyModelRun = isModelRunHealthy;
 
 /**
  * Render the one-line stderr summary describing the run outcome.

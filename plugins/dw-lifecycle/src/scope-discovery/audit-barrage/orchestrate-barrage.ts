@@ -33,7 +33,12 @@ import {
   writePromptFile,
 } from './run-artifacts.js';
 import { spawnCliAgainstModel, type SpawnInput } from './spawn-cli.js';
-import type { BarrageInput, BarrageRun, ModelRunResult } from './types.js';
+import {
+  isModelRunHealthy,
+  type BarrageInput,
+  type BarrageRun,
+  type ModelRunResult,
+} from './types.js';
 
 const DEFAULT_RUNS_ROOT = '.dw-lifecycle/scope-discovery/audit-runs';
 
@@ -114,7 +119,11 @@ export async function orchestrateBarrage(
   // Write is wrapped so a filesystem failure (disk full, race) degrades
   // to "no tip recorded" rather than aborting the run.
   if (fireTimeTipSha !== null) {
-    const anyModelEmitted = results.some((r) => r.stdoutBytes > 0 && r.spawnError === undefined);
+    // Per AUDIT-20260601-08: same predicate as the CLI's exit-code
+    // derivation (isModelRunHealthy in types.ts) — sourced from the
+    // single shared helper so the orchestrator's tip.sha gate and
+    // the audit-barrage CLI's healthy-count can't silently drift.
+    const anyModelEmitted = results.some(isModelRunHealthy);
     if (anyModelEmitted) {
       try {
         await writeFile(join(runDir, 'tip.sha'), `${fireTimeTipSha}\n`, 'utf8');

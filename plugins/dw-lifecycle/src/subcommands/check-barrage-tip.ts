@@ -29,7 +29,10 @@ import { readdir, readFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { repoRoot } from '../repo.js';
 import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
-import { checkBarrageTip } from '../scope-discovery/promote-findings/check-barrage-tip.js';
+import {
+  checkBarrageTip,
+  type BarrageTipCheckResult,
+} from '../scope-discovery/promote-findings/check-barrage-tip.js';
 
 export interface CheckBarrageTipCliOptions {
   readonly featureSlug: string;
@@ -106,6 +109,16 @@ export interface RunArgs {
 }
 
 /**
+ * Per AUDIT-20260601-07 (claude-02): shared type guard replaces the
+ * scattered `as NodeJS.ErrnoException` casts. Narrows `unknown` to
+ * `ErrnoException` shape without crossing the project's "no `as
+ * Type`" rule.
+ */
+function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error;
+}
+
+/**
  * Per AUDIT-20260531-23 (codex-03): distinguish ENOENT (directory
  * doesn't exist yet — legitimate boot case → return empty) from other
  * errors (EACCES, malformed scaffold → config error that the runner
@@ -119,8 +132,7 @@ export async function defaultListRunDirs(auditRunsDir: string): Promise<string[]
       .filter((e) => e.isDirectory())
       .map((e) => join(auditRunsDir, e.name));
   } catch (err) {
-    const errno = err as NodeJS.ErrnoException;
-    if (errno.code === 'ENOENT') {
+    if (isErrnoException(err) && err.code === 'ENOENT') {
       // Boot case: audit-runs/ doesn't exist yet. Return empty so the
       // library reports `hasNewDiff: true` (fail-safe to fire).
       return [];
@@ -184,7 +196,10 @@ export async function runCheckBarrageTip(args: RunArgs): Promise<number> {
   const readTipSha = args.readTipSha ?? defaultReadTipSha;
   const gitRevListCount =
     args.gitRevListCount ?? ((range: string) => defaultGitRevListCount(range, repoRootResolved));
-  let result;
+  // Per AUDIT-20260601-07 (claude-02): typed binding for the result
+  // (was a `let result;` evolving-any). Try/catch wraps the call so
+  // injected-dependency throws map to exit-2 config errors.
+  let result: BarrageTipCheckResult;
   try {
     result = await checkBarrageTip({
       auditRunsDir,
@@ -200,9 +215,12 @@ export async function runCheckBarrageTip(args: RunArgs): Promise<number> {
     // operators don't get pointed at audit-runs/ when the error is
     // actually in git or the tip-sha file. Map to exit 2 in all cases
     // — these are all config/scaffold problems the loop should STOP on.
-    const errno = err as NodeJS.ErrnoException;
+    // Per AUDIT-20260601-07: use the shared isErrnoException type
+    // guard rather than `as NodeJS.ErrnoException`.
+    const code = isErrnoException(err) ? err.code ?? 'unknown' : 'unknown';
+    const message = isErrnoException(err) ? err.message : String(err);
     args.stderr.write(
-      `check-barrage-tip: error during barrage-tip check — ${errno.code ?? 'unknown'}: ${errno.message ?? err}\n`,
+      `check-barrage-tip: error during barrage-tip check — ${code}: ${message}\n`,
     );
     return 2;
   }

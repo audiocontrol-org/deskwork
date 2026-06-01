@@ -16,6 +16,7 @@ function makeArgs(opts: {
   unpushed: Array<{ sha: string; parentSha: string; subject: string }>;
   logTips: string[];
   optedIn?: boolean;
+  bootstrapped?: boolean;
 }) {
   return {
     resolveUnpushedCommits: async () => opts.unpushed,
@@ -29,6 +30,9 @@ function makeArgs(opts: {
         }),
       ),
     isScopeDiscoveryOptedIn: async () => opts.optedIn ?? true,
+    // Default: assume bootstrapped (mature project state). Boot-case
+    // tests pass `bootstrapped: false` explicitly.
+    hasBootstrapSentinel: async () => opts.bootstrapped ?? true,
   };
 }
 
@@ -93,20 +97,65 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
     expect(result.cure).toContain('dw-lifecycle implement-hook');
   });
 
-  it('allows boot case when log is empty (mirrors check-implement-hook-rans allow-no-prior-run)', async () => {
-    // Without this boot case, a freshly-wired project deadlocks: pre-
-    // push refuses because no log entries exist, but the first
-    // implement-hook run needs an existing push (or a prior commit to
-    // mark). Same shape as the commit-msg gate's `allow-no-prior-run`.
+  it('allows boot case when bootstrap sentinel absent (per AUDIT-20260601-06)', async () => {
+    // The sentinel is the load-bearing trigger for boot case (NOT
+    // log emptiness). Absent sentinel = first invocation = allow.
     const result = await checkImplementHookCoverage(
       makeArgs({
         unpushed: [
           { sha: 'commit-A', parentSha: 'base', subject: 'first commit' },
         ],
         logTips: [],
+        bootstrapped: false,
       }),
     );
     expect(result.kind).toBe('allow-no-prior-run');
+  });
+
+  it('refuses when sentinel present but log empty (post-bootstrap log deletion attack)', async () => {
+    // Per AUDIT-20260601-06: the bug pre-fix was that log emptiness
+    // alone triggered allow. That made the gate re-triggerable by
+    // deleting the log file (errant git clean, .dw-lifecycle reset).
+    // Post-fix: sentinel present + log empty = refuse (the log was
+    // corrupted post-bootstrap).
+    const result = await checkImplementHookCoverage(
+      makeArgs({
+        unpushed: [
+          { sha: 'commit-A', parentSha: 'base', subject: 'bypass after log delete' },
+        ],
+        logTips: [], // log deleted/truncated
+        bootstrapped: true, // but sentinel remains
+      }),
+    );
+    expect(result.kind).toBe('refuse-uncovered-commits');
+    if (result.kind !== 'refuse-uncovered-commits') return;
+    expect(result.uncovered.length).toBe(1);
+    expect(result.cure.toLowerCase()).toMatch(/bootstrap sentinel/);
+    expect(result.cure.toLowerCase()).toMatch(/deleted|corrupted/);
+  });
+
+  it('refuses --no-verify commits on a fresh-bootstrapped project (the original AUDIT-06 attack)', async () => {
+    // The exact attack the BLOCKING finding described: fresh project,
+    // user does `git commit --no-verify` for a batch, then pushes.
+    // Pre-fix: log empty → allow ALL of them.
+    // Post-fix: once any hook run has occurred (sentinel written),
+    // subsequent --no-verify commits are refused.
+    const result = await checkImplementHookCoverage(
+      makeArgs({
+        unpushed: [
+          { sha: 'c1', parentSha: 'base', subject: '--no-verify bypass 1' },
+          { sha: 'c2', parentSha: 'c1', subject: '--no-verify bypass 2' },
+          { sha: 'c3', parentSha: 'c2', subject: '--no-verify bypass 3' },
+        ],
+        // Log has one prior hook run (from when the project bootstrapped),
+        // but none of the --no-verify commits are in it.
+        logTips: ['bootstrap-tip'],
+        bootstrapped: true,
+      }),
+    );
+    expect(result.kind).toBe('refuse-uncovered-commits');
+    if (result.kind !== 'refuse-uncovered-commits') return;
+    expect(result.uncovered.length).toBe(3);
   });
 
   it('refuses with all uncovered commits listed when multiple bypass AFTER first hook run', async () => {
