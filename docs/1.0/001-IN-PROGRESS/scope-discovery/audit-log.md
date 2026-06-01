@@ -2017,3 +2017,27 @@ Severity:   low
 Surface:    `.gitignore:122` — `## Per AUDIT-20260601-claude-opus-05: runtime marker files are mutated`
 
 The justification comment references `AUDIT-20260601-claude-opus-05`, which is a raw per-model barrage finding ID, not a canonical `AUDIT-<YYYYMMDD>-NN` audit-log entry. Per the project's own audit-barrage triage convention (agent-discipline.md § "How to triage findings"), per-model IDs get *lifted into* the canonical `AUDIT-<date>-NN` scheme and the per-model names are recorded inside that entry's `Finding-ID:` header. A future reader grepping `audit-log.md` for `claude-opus-05` will not find a corresponding canonical entry; the comment points at an ephemeral run-local artifact. Fix: cite the canonical `AUDIT-<date>-NN` ID this finding was lifted into (or, if it was never lifted, lift it and reference that), so the gitignore rationale is traceable to a durable record.
+
+## 2026-06-01 — audit-barrage lift (20260601T054805981Z-scope-discovery)
+
+### AUDIT-20260601-65 — Task 5.97 — the fix-task for the HIGH finding AUDIT-63 is rendered with the plain code-defect template (no `Severity:`/Step 0/Step 1b), a FOURTH consecutive generation of the exact bug AUDIT-63 names — and this time it lands inside the release commit
+
+Finding-ID: AUDIT-20260601-65 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.97 (`fix-finding-AUDIT-20260601-63`), added in the `@@ -738,6 +738,40 @@` hunk, vs. AUDIT-20260601-63 (`Severity: high`) in `audit-log.md`
+
+AUDIT-63 (high, cross-model) is the finding whose entire thesis is: *HIGH fix-tasks are rendered without a `Severity:` line / Step 0 / Step 1b, so `extractTaskSeverity` returns `null` and the ≥2-test regression-lock gate never fires* — and it explicitly closes with *"thread `finding.severity` into the renderer … and do it before promoting any more HIGH findings."* This diff then adds **Task 5.97 — the fix-task for AUDIT-63 itself — rendered with the exact plain template the finding describes**: `Closes AUDIT-20260601-63 …. Surface: …`, then `Step 1: write failing test`, `Step 2: confirm test fails`, …, with **no `Severity: high.` line, no Step 0 working-code invariant, no Step 1b regression-lock test**, and a single-test AC (`npx vitest run <test-file-path> exits 0`). It directly violates AUDIT-63's own instruction not to promote further HIGH findings through the broken path.
+
+This is now the *fourth* generation of the self-reproducing bug (AUDIT-52→5.86, AUDIT-59→5.93, AUDIT-61→5.95, and now AUDIT-63→5.97). It is empirical proof the root cause is **still unfixed as of v0.32.0**: the `promote-findings`/`apply.ts` lift path does not thread `finding.severity` from the audit-log entry into `renderFixTaskBlock`. When an implementer picks up 5.97, `extractTaskSeverity(taskBlock)` finds no `Severity:` line → returns `null` → the `severity === 'high' || 'blocking'` guard is skipped → the ≥2-test requirement never applies; the fix to the missing-severity-gate finding can ship with one test, fail-open and silent. Contrast Task 5.98 (AUDIT-64, `Severity: low`), where the plain template is correct — the bug is specific to HIGH+ findings. Fix: thread `finding.severity` into the renderer so 5.97 emits `Severity: high.` + Step 0 + Step 1b before it is checked `[x]`, and re-render the prior broken HIGH fix-tasks (5.86/5.93/5.95).
+
+### AUDIT-20260601-66 — Release commit `chore: release v0.32.0` bundles the audit-log lift + new fix-tasks into the version bump, and ships the known-broken promote-findings path unfixed
+
+Finding-ID: AUDIT-20260601-66 (claude-02 + codex-03; cross-model)
+Status:     open
+Severity:   medium
+Surface:    whole commit (`chore: release v0.32.0`) — `audit-log.md` (+AUDIT-63/64), `workplan.md` (+Task 5.97/5.98), and the version-bump files
+
+The single commit subject `chore: release v0.32.0` conflates two unrelated concerns: (a) a pure version bump across `package.json`/`plugin.json`/`marketplace.json` (0.31.2 → 0.32.0, internally consistent — verified all 13 references match), and (b) a substantive audit-log lift that adds two new findings and two new workplan fix-tasks. A release commit that also mutates feature-tracking artifacts breaks the "one fix per commit / release commits are pure bumps" hygiene the project relies on, and it means `git rev-list <prior-tag>..v0.32.0` for `close-shipped`/`apply-audit-flips` will see a release commit carrying finding content it has to parse around.
+
+More consequentially, v0.32.0 is being tagged while the cross-model HIGH finding (AUDIT-52/59/61/63 — the missing-`Severity:` renderer bug) remains **unfixed in the released artifact**, and the release commit itself *reproduces* that bug one more time via Task 5.97 (Finding-01 above). So the released `promote-findings` path is known-broken: any HIGH finding promoted post-release will keep emitting fail-open single-test fix-tasks. The root-cause one-liner that all four findings name (`finding.severity` → `renderFixTaskBlock`) is absent from this diff. A reasonable fix is to split the release bump from the finding-lift into separate commits and to land the renderer fix before (or with) the tag, so the release does not ship the self-reproducing defect.

@@ -739,6 +739,40 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.99 (fix-finding-AUDIT-20260601-65): AUDIT-20260601-65 — Task 5.97 — the fix-task for the HIGH finding AUDIT-63 is re…
+
+Closes AUDIT-20260601-65 (claude-01 + claude-03 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.97 (`fix-finding-AUDIT-20260601-63`), added in the `@@ -738,6 +738,40 @@` hunk, vs. AUDIT-20260601-63 (`Severity: high`) in `audit-log.md`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-65 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.100 (fix-finding-AUDIT-20260601-66): AUDIT-20260601-66 — Release commit `chore: release v0.32.0` bundles the audit-lo…
+
+Closes AUDIT-20260601-66 (claude-02 + codex-03; cross-model). Surface: whole commit (`chore: release v0.32.0`) — `audit-log.md` (+AUDIT-63/64), `workplan.md` (+Task 5.97/5.98), and the version-bump files.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-66 (claude-02 + codex-03; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.97 (fix-finding-AUDIT-20260601-63): AUDIT-20260601-63 — Task 5.95 — the fix-task for the HIGH finding AUDIT-61 is it…
 
 Closes AUDIT-20260601-63 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.95 (`fix-finding-AUDIT-20260601-61`), vs. AUDIT-20260601-61 (`Severity: high`) in `audit-log.md`.
