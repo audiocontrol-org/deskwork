@@ -134,6 +134,29 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
     expect(result.cure.toLowerCase()).toMatch(/deleted|corrupted/);
   });
 
+  it('refuses when sentinel absent BUT log has entries (migration/clone case) — per AUDIT-06-followon', async () => {
+    // Per the BLOCKING follow-on finding: a fresh clone or migrating
+    // project will have a non-empty log (from pre-sentinel-code) but
+    // no sentinel file (not committed, not derivable from git). The
+    // gate must NOT fail-open here. The real CLI's
+    // `hasBootstrapSentinel` backfills the sentinel from a non-empty
+    // log. The injected stub here directly returns the post-backfill
+    // state: bootstrapped: true because log is non-empty.
+    const result = await checkImplementHookCoverage(
+      makeArgs({
+        unpushed: [
+          { sha: 'c1', parentSha: 'base', subject: '--no-verify on fresh clone' },
+        ],
+        // Log has prior entries from before the sentinel code shipped.
+        logTips: ['pre-sentinel-tip'],
+        // Stub returns true per the OR-rule: sentinel exists OR log non-empty.
+        bootstrapped: true,
+      }),
+    );
+    // Must REFUSE the unbacked commit, not fail-open.
+    expect(result.kind).toBe('refuse-uncovered-commits');
+  });
+
   it('refuses --no-verify commits on a fresh-bootstrapped project (the original AUDIT-06 attack)', async () => {
     // The exact attack the BLOCKING finding described: fresh project,
     // user does `git commit --no-verify` for a batch, then pushes.

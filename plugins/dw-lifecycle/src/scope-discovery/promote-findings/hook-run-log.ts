@@ -115,15 +115,42 @@ export async function appendHookRunLogEntry(
 }
 
 /**
- * Returns true when the project has been bootstrapped (the sentinel
- * file exists). Per AUDIT-20260601-06: the pre-push gate uses this
- * to distinguish "boot case" from "log was deleted post-bootstrap."
+ * Returns true when the project has been bootstrapped. Per AUDIT-
+ * 20260601-06: the pre-push gate uses this to distinguish boot from
+ * post-bootstrap-log-deletion.
+ *
+ * Per AUDIT-20260601-claude-01 (BLOCKING follow-on): the sentinel
+ * file alone is insufficient signal because it isn't committed and
+ * isn't derivable from git state. Fresh clones, migrating projects,
+ * and pre-sentinel-code installs all have a non-empty log but no
+ * sentinel — that combination must NOT fail-open. Fix: treat a
+ * non-empty log as ALSO implying bootstrapped, AND backfill the
+ * sentinel on read so it converges to "present" on first use.
  */
 export async function hasBootstrapSentinel(repoRoot: string): Promise<boolean> {
+  // Sentinel present → definitively bootstrapped.
   try {
     await stat(bootstrapSentinelPathFor(repoRoot));
     return true;
   } catch {
+    // Sentinel absent — but a non-empty log is also bootstrapped
+    // (migrating projects, fresh clones, etc.). Backfill the
+    // sentinel so subsequent reads see it present.
+    const log = await readHookRunLog(repoRoot);
+    if (log.length > 0) {
+      const first = log[0]!;
+      try {
+        await writeFile(
+          bootstrapSentinelPathFor(repoRoot),
+          `${first.tip}\n${first.timestamp}\n`,
+          'utf8',
+        );
+      } catch {
+        // Best-effort backfill — if the write fails, returning true
+        // is still correct (the log evidence is sufficient).
+      }
+      return true;
+    }
     return false;
   }
 }

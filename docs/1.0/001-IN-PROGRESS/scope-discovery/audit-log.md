@@ -1287,7 +1287,7 @@ Surfacing this as a process signal, not a code defect: when a fix is genuinely o
 ### AUDIT-20260601-06 — Pre-push coverage gate fails OPEN on an empty hook-run-log — defeats its own acceptance criterion and is re-triggerable by log loss
 
 Finding-ID: AUDIT-20260601-06 (claude-01 + codex-01; cross-model)
-Status:     open
+Status:     fixed-47e326480531076a1cad74829311e43e3b40ef2d
 Severity:   blocking
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts` (new `if (log.length === 0) return { kind: 'allow-no-prior-run' }` block, immediately after `const log = await args.readLog();`)
 
@@ -1320,3 +1320,141 @@ Surface:    `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/orchestrate-
 The new `tip.sha` write is gated on `results.some((r) => r.stdoutBytes > 0 && r.spawnError === undefined)`. That assumes audit coverage exists only when a model emits positive-byte stdout. If a CLI emits its findings or useful failure text to stderr with exit 0, or exits nonzero after producing output the operator still lifts, this code suppresses `tip.sha` and causes the next iteration to re-audit the same range indefinitely.
 
 The finding being fixed was about all-model outage runs falsely claiming coverage. The implementation overcorrects by equating “coverage” with stdout bytes only. Reasonable fix: base the marker on the same success/output contract used by the barrage lift and outage classification, or explicitly count any captured model output that the pipeline considers liftable. The tests added at `orchestrate-barrage.test.ts:205-251` only cover zero-stdout and positive-stdout cases, so they pin the narrow behavior rather than the broader audit-coverage contract.
+
+## 2026-06-01 — audit-barrage lift (20260601T025451417Z-scope-discovery)
+
+### AUDIT-20260601-09 — Sentinel-absent-but-log-present fails OPEN — re-opens the exact AUDIT-06 hole for the migration/clone/this-repo path, with no backfill
+
+Finding-ID: AUDIT-20260601-09 (claude-01 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   blocking
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts:100-108` (the `if (!hasSentinel) return allow-no-prior-run` block) + `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts:97-115` (sentinel written only by `appendHookRunLogEntry`) + the committed `.dw-lifecycle/scope-discovery/hook-run-log.jsonl`
+
+The AUDIT-06 fix replaced the `log.length === 0 → allow` trigger with a sentinel-presence trigger, on the theory that the sentinel "persists thereafter… outlives errant `git clean`s." But the sentinel is written **only** by `appendHookRunLogEntry` (hook-run-log.ts:107-113), so it exists **only on the machine where the new code has run at least once**. It is not committed and not derivable from the committed state. I verified this on the live tree: `git ls-files` shows `hook-run-log.jsonl` and `last-hook-run.json` are tracked, the sentinel `.implement-hook-bootstrapped` is **not on disk, not tracked, and not gitignored**. The committed log already has one entry (tip `393d68ed`), written by the *pre-fix* code that didn't write a sentinel.
+
+Net effect: **right now, on the very repo that shipped this fix, the pre-push gate is fail-open.** `readLog()` returns a non-empty array, but `hasBootstrapSentinel()` returns `false`, so line 101 takes the `allow-no-prior-run` branch and `summarize`'s `startsWith('allow')` returns exit 0 — every unpushed commit, including a `--no-verify` batch, sails through. The same holds for **every fresh clone** and **every project that bootstrapped before the sentinel code shipped**: log non-empty, sentinel absent → fail-open until some future `implement-hook` run happens to write the sentinel locally. That is precisely the "deletable / re-triggerable fail-open … a discretion path" that AUDIT-06 (BLOCKING) was raised to close; the fix relocated the trigger from "log emptiness" to "sentinel absence" but introduced a *new, larger* fail-open surface (clone + migration), and one the gate cannot self-heal from because the sentinel isn't reconstructable. The minimal correct shape is to treat a non-empty log as implying bootstrapped: `hasBootstrapSentinel` (or the gate) should return `true` when the sentinel exists **OR** the log is non-empty, and backfill the sentinel on read. The test suite has the matching blind spot — `check-implement-hook-coverage.test.ts` adds `bootstrapped: false`/`logTips: []` (boot) and `bootstrapped: true`/`logTips: [...]` (mature) but never `bootstrapped: false` + `logTips: ['x']` (the migration/clone case that currently fails open), so the regression is unguarded.
+
+---
+
+### AUDIT-20260601-10 — `check-fix-task-tdd` gate bypass recurs: Tasks 5.42/5.43 ship `Closes AUDIT-<id>` with placeholder/no-test files — same shape as still-open AUDIT-02
+
+Finding-ID: AUDIT-20260601-10
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.42 AC `Failing test exists at (no new test — pure typing cleanup…)`; Task 5.43 AC `Failing test exists at (to be filled in by Step 1 implementer)`) vs. the commit subject `…close AUDIT-20260601-06/07/08`
+
+AUDIT-20260601-02 is still `open` and names exactly this: a `[x]`-checked fix-finding task whose cited test path is a prose placeholder string should be flagged (and arguably blocked) by `check-fix-task-tdd` + the `fix-task-tdd-discipline` doctor rule, which "refuses `Closes AUDIT-<id>` commits where the cited workplan task block's test file is missing, empty, or whose vitest exits non-zero." This diff reproduces the violation twice in the *same commit that closes 06/07/08*. Task 5.43 (Closes AUDIT-08) has every AC checkbox unchecked and a literal `(to be filled in by Step 1 implementer)` test path while Step 5 ("commit with `Closes AUDIT-20260601-08`") is checked `[x]`. Task 5.42 (Closes AUDIT-07) cites `(no new test — pure typing cleanup; existing tests cover the runtime paths)`. Both are `Closes`-trailer commits with no test file.
+
+Either the commit-msg gate has a hole for these placeholder strings (it parses the test path but doesn't reject the parenthetical-prose sentinel), or it was bypassed for this commit. The irony is sharp: the feature is *simultaneously scoping* Task 5.38 to fix AUDIT-02 (the gate-hole finding) while *committing two more instances* of the hole it describes. This isn't a re-litigation of AUDIT-02's disposition — it's evidence the underlying shape regressed in net-new tasks. The fix is to make `check-fix-task-tdd` reject test-path values that aren't real file paths (e.g. anything matching `^\(.*\)$`), and to give the fix-task template an explicit non-bug disposition for pure-typing/pure-docs findings so they don't have to launder through a fake "failing test exists" AC.
+
+---
+
+### AUDIT-20260601-11 — AUDIT-08 disposition is incoherent: commit claims to close it, audit-log keeps it `open`, workplan records a pushback — the finding is not actually addressed
+
+Finding-ID: AUDIT-20260601-11
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260601-08 `Status: open`) + `workplan.md` Task 5.43 Step 1 (`pushed back on the finding's recommendation`) + commit subject `…close AUDIT-…08` + `orchestrate-barrage.ts:122` / `types.ts:96-99`
+
+The AUDIT-08 "fix" does not change the behavior the finding flagged. Task 5.43 Step 1 explicitly records a pushback ("the lifter reads STDOUT only; broadening… would mean the gate writes tip.sha for outputs that aren't actually liftable") and the code change merely centralizes the *unchanged* predicate `stdoutBytes > 0 && spawnError === undefined` into `isModelRunHealthy` (types.ts:96). So the residual concern AUDIT-08 named — a model that emits exit-0 with stderr-only content, or an operator who lifts from a nonzero-exit run, yields no `tip.sha` and re-audits the same range indefinitely — stands unaddressed by design.
+
+That may be a defensible call, but the disposition is recorded three inconsistent ways: the commit subject says **close**, the audit-log entry still says **`Status: open`**, and the workplan models it as a **fix** (Steps 1-5 checked) while its ACs (`Failing test exists at (to be filled in…)`) are all unchecked. Per the project's own closure machinery, a finding you push back on should land as `acknowledged-<ref>`/`wontfix` with a substantive operator-validated reason — not `open` under a commit that claims to close it. As written, a future reader walking `Status: open` entries will re-pick AUDIT-08, re-investigate, and rediscover that it was silently accepted. Pick one disposition and make all three surfaces agree; if the pushback is accepted, the audit-log status and the workplan AC shape must reflect "accepted trade-off," not "fixed."
+
+---
+
+### AUDIT-20260601-12 — `isErrnoException` is an unsound type guard — it asserts `ErrnoException` while only proving `Error`, swapping an `as` cast for a lying `is`
+
+Finding-ID: AUDIT-20260601-12
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:115-117`
+
+The AUDIT-07 fix replaces `as NodeJS.ErrnoException` with `function isErrnoException(err): err is NodeJS.ErrnoException { return err instanceof Error; }`. `NodeJS.ErrnoException` is `Error & { code?, errno?, syscall?, path? }`; `instanceof Error` establishes only the `Error` half. The guard compiles solely because those extra fields are *optional* — but it returns `true` for any plain `new Error('x')`, narrowing it to a type that promises an `ErrnoException` shape it hasn't verified. That's the same "bypass typing" category AUDIT-07 raised (No `as Type`, no `any`), relocated from an `as` cast to an unsound `is` guard. It happens to be runtime-safe here because both call sites null-guard (`err.code === 'ENOENT'` is just `undefined !== 'ENOENT'` for a non-errno Error; `err.code ?? 'unknown'`), so this is a hygiene/honesty finding, not a bug.
+
+The honest shape is either to narrow to what's actually proven — `function isError(err): err is Error` and read `code` defensively via an `'code' in err` check — or to verify the errno shape: `return err instanceof Error && (typeof (err as { code?: unknown }).code === 'string' || ...)`. As written, the guard's signature overstates its evidence, which is exactly the smell the no-`as` rule exists to prevent; a reviewer trusting the `is ErrnoException` return type elsewhere would assume `.code` is present.
+
+---
+
+### AUDIT-20260601-13 — Run marker `last-hook-run.json` records `findingsCount: 0 / promotedCount: 0` for the run that actually lifted 3 findings (incl. one BLOCKING)
+
+Finding-ID: AUDIT-20260601-13
+Status:     open
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (`runDir: …20260601T024117392Z-scope-discovery`, `disposition: fired-and-promoted`, `findingsCount: 0`, `promotedCount: 0`, `slushedCount: 0`)
+
+The committed marker points at runDir `20260601T024117392Z-scope-discovery` with `disposition: "fired-and-promoted"` but all three counts are `0`. That same runDir is the source the audit-log credits for AUDIT-20260601-06/07/08 (the audit-log section header is literally `2026-06-01 — audit-barrage lift (20260601T024117392Z-scope-discovery)`), and one of those findings is BLOCKING. So the marker claims a run that promoted nothing while the audit trail shows that run produced and lifted three findings. Either the count-tallying writes the marker *before* the lift/promote step populates counts, or the counts are sourced from a different (empty) tally than the one that fed the audit-log.
+
+This matters because the marker is the operator-facing "what did the last hook do" summary, and a downstream reader (or a future automation keying on `promotedCount`) would read `0/0/0` as "clean run, nothing to act on" when in fact a blocking finding was lifted. The disposition label `fired-and-promoted` with `promotedCount: 0` is internally contradictory on its face. Worth tracing where `findingsCount`/`promotedCount` are computed in the implement-hook chain and asserting they equal the count of entries the lift actually appended to `audit-log.md` for that runDir; add a test that a run lifting N findings writes a marker with `findingsCount === N`.
+
+---
+
+I walked the three fixes (sentinel boot-case, errno type guard, healthy-run predicate centralization), their tests, the workplan task blocks, the audit-log status flips, and the committed `.dw-lifecycle` artifacts. The `types.ts` centralization itself is clean (single predicate, both call sites converge, no behavior drift), and the `check-barrage-tip.ts` typed `let result: BarrageTipCheckResult` is a real improvement. My highest-confidence concern is **claude-01**: the sentinel fix is fail-open on this exact repo and every fresh clone right now (verified against the live tree), which re-opens the BLOCKING hole it was meant to close.
+
+## 2026-06-01 — audit-barrage lift (20260601T025451417Z-scope-discovery)
+
+### AUDIT-20260601-14 — Sentinel-absent-but-log-present fails OPEN — re-opens the exact AUDIT-06 hole for the migration/clone/this-repo path, with no backfill
+
+Finding-ID: AUDIT-20260601-14 (claude-01 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   blocking
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts:100-108` (the `if (!hasSentinel) return allow-no-prior-run` block) + `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts:97-115` (sentinel written only by `appendHookRunLogEntry`) + the committed `.dw-lifecycle/scope-discovery/hook-run-log.jsonl`
+
+The AUDIT-06 fix replaced the `log.length === 0 → allow` trigger with a sentinel-presence trigger, on the theory that the sentinel "persists thereafter… outlives errant `git clean`s." But the sentinel is written **only** by `appendHookRunLogEntry` (hook-run-log.ts:107-113), so it exists **only on the machine where the new code has run at least once**. It is not committed and not derivable from the committed state. I verified this on the live tree: `git ls-files` shows `hook-run-log.jsonl` and `last-hook-run.json` are tracked, the sentinel `.implement-hook-bootstrapped` is **not on disk, not tracked, and not gitignored**. The committed log already has one entry (tip `393d68ed`), written by the *pre-fix* code that didn't write a sentinel.
+
+Net effect: **right now, on the very repo that shipped this fix, the pre-push gate is fail-open.** `readLog()` returns a non-empty array, but `hasBootstrapSentinel()` returns `false`, so line 101 takes the `allow-no-prior-run` branch and `summarize`'s `startsWith('allow')` returns exit 0 — every unpushed commit, including a `--no-verify` batch, sails through. The same holds for **every fresh clone** and **every project that bootstrapped before the sentinel code shipped**: log non-empty, sentinel absent → fail-open until some future `implement-hook` run happens to write the sentinel locally. That is precisely the "deletable / re-triggerable fail-open … a discretion path" that AUDIT-06 (BLOCKING) was raised to close; the fix relocated the trigger from "log emptiness" to "sentinel absence" but introduced a *new, larger* fail-open surface (clone + migration), and one the gate cannot self-heal from because the sentinel isn't reconstructable. The minimal correct shape is to treat a non-empty log as implying bootstrapped: `hasBootstrapSentinel` (or the gate) should return `true` when the sentinel exists **OR** the log is non-empty, and backfill the sentinel on read. The test suite has the matching blind spot — `check-implement-hook-coverage.test.ts` adds `bootstrapped: false`/`logTips: []` (boot) and `bootstrapped: true`/`logTips: [...]` (mature) but never `bootstrapped: false` + `logTips: ['x']` (the migration/clone case that currently fails open), so the regression is unguarded.
+
+---
+
+### AUDIT-20260601-15 — `check-fix-task-tdd` gate bypass recurs: Tasks 5.42/5.43 ship `Closes AUDIT-<id>` with placeholder/no-test files — same shape as still-open AUDIT-02
+
+Finding-ID: AUDIT-20260601-15
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.42 AC `Failing test exists at (no new test — pure typing cleanup…)`; Task 5.43 AC `Failing test exists at (to be filled in by Step 1 implementer)`) vs. the commit subject `…close AUDIT-20260601-06/07/08`
+
+AUDIT-20260601-02 is still `open` and names exactly this: a `[x]`-checked fix-finding task whose cited test path is a prose placeholder string should be flagged (and arguably blocked) by `check-fix-task-tdd` + the `fix-task-tdd-discipline` doctor rule, which "refuses `Closes AUDIT-<id>` commits where the cited workplan task block's test file is missing, empty, or whose vitest exits non-zero." This diff reproduces the violation twice in the *same commit that closes 06/07/08*. Task 5.43 (Closes AUDIT-08) has every AC checkbox unchecked and a literal `(to be filled in by Step 1 implementer)` test path while Step 5 ("commit with `Closes AUDIT-20260601-08`") is checked `[x]`. Task 5.42 (Closes AUDIT-07) cites `(no new test — pure typing cleanup; existing tests cover the runtime paths)`. Both are `Closes`-trailer commits with no test file.
+
+Either the commit-msg gate has a hole for these placeholder strings (it parses the test path but doesn't reject the parenthetical-prose sentinel), or it was bypassed for this commit. The irony is sharp: the feature is *simultaneously scoping* Task 5.38 to fix AUDIT-02 (the gate-hole finding) while *committing two more instances* of the hole it describes. This isn't a re-litigation of AUDIT-02's disposition — it's evidence the underlying shape regressed in net-new tasks. The fix is to make `check-fix-task-tdd` reject test-path values that aren't real file paths (e.g. anything matching `^\(.*\)$`), and to give the fix-task template an explicit non-bug disposition for pure-typing/pure-docs findings so they don't have to launder through a fake "failing test exists" AC.
+
+---
+
+### AUDIT-20260601-16 — AUDIT-08 disposition is incoherent: commit claims to close it, audit-log keeps it `open`, workplan records a pushback — the finding is not actually addressed
+
+Finding-ID: AUDIT-20260601-16
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260601-08 `Status: open`) + `workplan.md` Task 5.43 Step 1 (`pushed back on the finding's recommendation`) + commit subject `…close AUDIT-…08` + `orchestrate-barrage.ts:122` / `types.ts:96-99`
+
+The AUDIT-08 "fix" does not change the behavior the finding flagged. Task 5.43 Step 1 explicitly records a pushback ("the lifter reads STDOUT only; broadening… would mean the gate writes tip.sha for outputs that aren't actually liftable") and the code change merely centralizes the *unchanged* predicate `stdoutBytes > 0 && spawnError === undefined` into `isModelRunHealthy` (types.ts:96). So the residual concern AUDIT-08 named — a model that emits exit-0 with stderr-only content, or an operator who lifts from a nonzero-exit run, yields no `tip.sha` and re-audits the same range indefinitely — stands unaddressed by design.
+
+That may be a defensible call, but the disposition is recorded three inconsistent ways: the commit subject says **close**, the audit-log entry still says **`Status: open`**, and the workplan models it as a **fix** (Steps 1-5 checked) while its ACs (`Failing test exists at (to be filled in…)`) are all unchecked. Per the project's own closure machinery, a finding you push back on should land as `acknowledged-<ref>`/`wontfix` with a substantive operator-validated reason — not `open` under a commit that claims to close it. As written, a future reader walking `Status: open` entries will re-pick AUDIT-08, re-investigate, and rediscover that it was silently accepted. Pick one disposition and make all three surfaces agree; if the pushback is accepted, the audit-log status and the workplan AC shape must reflect "accepted trade-off," not "fixed."
+
+---
+
+### AUDIT-20260601-17 — `isErrnoException` is an unsound type guard — it asserts `ErrnoException` while only proving `Error`, swapping an `as` cast for a lying `is`
+
+Finding-ID: AUDIT-20260601-17
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:115-117`
+
+The AUDIT-07 fix replaces `as NodeJS.ErrnoException` with `function isErrnoException(err): err is NodeJS.ErrnoException { return err instanceof Error; }`. `NodeJS.ErrnoException` is `Error & { code?, errno?, syscall?, path? }`; `instanceof Error` establishes only the `Error` half. The guard compiles solely because those extra fields are *optional* — but it returns `true` for any plain `new Error('x')`, narrowing it to a type that promises an `ErrnoException` shape it hasn't verified. That's the same "bypass typing" category AUDIT-07 raised (No `as Type`, no `any`), relocated from an `as` cast to an unsound `is` guard. It happens to be runtime-safe here because both call sites null-guard (`err.code === 'ENOENT'` is just `undefined !== 'ENOENT'` for a non-errno Error; `err.code ?? 'unknown'`), so this is a hygiene/honesty finding, not a bug.
+
+The honest shape is either to narrow to what's actually proven — `function isError(err): err is Error` and read `code` defensively via an `'code' in err` check — or to verify the errno shape: `return err instanceof Error && (typeof (err as { code?: unknown }).code === 'string' || ...)`. As written, the guard's signature overstates its evidence, which is exactly the smell the no-`as` rule exists to prevent; a reviewer trusting the `is ErrnoException` return type elsewhere would assume `.code` is present.
+
+---
+
+### AUDIT-20260601-18 — Run marker `last-hook-run.json` records `findingsCount: 0 / promotedCount: 0` for the run that actually lifted 3 findings (incl. one BLOCKING)
+
+Finding-ID: AUDIT-20260601-18
+Status:     open
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (`runDir: …20260601T024117392Z-scope-discovery`, `disposition: fired-and-promoted`, `findingsCount: 0`, `promotedCount: 0`, `slushedCount: 0`)
+
+The committed marker points at runDir `20260601T024117392Z-scope-discovery` with `disposition: "fired-and-promoted"` but all three counts are `0`. That same runDir is the source the audit-log credits for AUDIT-20260601-06/07/08 (the audit-log section header is literally `2026-06-01 — audit-barrage lift (20260601T024117392Z-scope-discovery)`), and one of those findings is BLOCKING. So the marker claims a run that promoted nothing while the audit trail shows that run produced and lifted three findings. Either the count-tallying writes the marker *before* the lift/promote step populates counts, or the counts are sourced from a different (empty) tally than the one that fed the audit-log.
+
+This matters because the marker is the operator-facing "what did the last hook do" summary, and a downstream reader (or a future automation keying on `promotedCount`) would read `0/0/0` as "clean run, nothing to act on" when in fact a blocking finding was lifted. The disposition label `fired-and-promoted` with `promotedCount: 0` is internally contradictory on its face. Worth tracing where `findingsCount`/`promotedCount` are computed in the implement-hook chain and asserting they equal the count of entries the lift actually appended to `audit-log.md` for that runDir; add a test that a run lifting N findings writes a marker with `findingsCount === N`.
+
+---
+
+I walked the three fixes (sentinel boot-case, errno type guard, healthy-run predicate centralization), their tests, the workplan task blocks, the audit-log status flips, and the committed `.dw-lifecycle` artifacts. The `types.ts` centralization itself is clean (single predicate, both call sites converge, no behavior drift), and the `check-barrage-tip.ts` typed `let result: BarrageTipCheckResult` is a real improvement. My highest-confidence concern is **claude-01**: the sentinel fix is fail-open on this exact repo and every fresh clone right now (verified against the live tree), which re-opens the BLOCKING hole it was meant to close.
