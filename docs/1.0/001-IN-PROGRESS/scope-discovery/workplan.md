@@ -742,6 +742,74 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
+
+### Task 5.106 (fix-finding-AUDIT-20260601-72): AUDIT-20260601-72 — v0.32.1 tags and ships the GH-386 stdin fix while open HIGH …
+
+Closes AUDIT-20260601-72. Surface: whole release (`981d3f58 chore: release v0.32.1`) graduating `d8bc1feb fix(audit-barrage): close GH-386` — vs. open finding AUDIT-20260601-69 in `audit-log.md`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-72` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.107 (fix-finding-AUDIT-20260601-73): AUDIT-20260601-73 — Commit `d8bc1feb` subject reads `close GH-386`, not the `Clo…
+
+Closes AUDIT-20260601-73. Surface: commit `d8bc1feb` subject vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 19 Task 1 Step 8 ("commit with `Closes GH-386` in subject") and the Phase 19 AC `[ ] GH-386 closed once verified`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-73` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.108 (fix-finding-AUDIT-20260601-74): AUDIT-20260601-74 — Bump verification: complete, internally consistent, and — un…
+
+Closes AUDIT-20260601-74. Surface: the entire diff (all 12 manifest files) + commit topology `v0.32.0..HEAD`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-74` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.109 (fix-finding-AUDIT-20260601-75): AUDIT-20260601-75 — Release bump omits `package-lock.json`, leaving npm metadata…
+
+Closes AUDIT-20260601-75. Surface: missing `package-lock.json` hunk; existing `package-lock.json:2-9`, `package-lock.json:6405-6411`, `package-lock.json:6898-6900`, `package-lock.json:7902-8022`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-75` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.103 (fix-finding-AUDIT-20260601-69): AUDIT-20260601-69 — Stdin delivery to a CLI that doesn't consume stdin is a sile…
 
 Closes AUDIT-20260601-69 (claude-01 + claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts` (the `useStdin` branch, ~lines 120-150) + `docs/.../audit-barrage-cli-notes.md` (Per-CLI compatibility paragraph).

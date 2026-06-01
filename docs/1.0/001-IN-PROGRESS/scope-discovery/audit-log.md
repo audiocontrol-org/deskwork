@@ -2098,3 +2098,47 @@ Severity:   low
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts` (`'buildArgs detection: returns useStdin flag …'`) + `workplan.md` Phase 19 Task 1 Step 1(b) / AC
 
 The test is named *"buildArgs detection: returns useStdin flag for {{prompt-stdin}} templates"* and its comment says *"Export the placeholder-detection result alongside the args array … buildArgs returns just string[]. Post-fix: still returns string[]."* The test then only asserts arg-stripping (`ba('-e SCRIPT {{prompt-stdin}}', 'hello')` → `['-e', 'SCRIPT']`). It does **not** test any `useStdin` signal — because `buildArgs` returns no such signal; detection lives separately in `spawnCliAgainstModel` via `.includes()` (the root of Finding-02). The test name and comment describe a contract the implementation doesn't have, so this is a test-that-doesn't-test-its-claimed-contract. The corresponding workplan line (Step 1 *"(b) buildArgs detection returns `useStdin` signal"*) is checked `[x]`, asserting a behavior that was never built. Either make `buildArgs` return `{ args, useStdin }` (single source of truth, fixes Finding-02 too) or rename the test and AC to "buildArgs strips the stdin placeholder" to match what was actually built.
+
+## 2026-06-01 — audit-barrage lift (20260601T162509716Z-scope-discovery)
+
+### AUDIT-20260601-72 — v0.32.1 tags and ships the GH-386 stdin fix while open HIGH finding AUDIT-69 says that fix is itself defective
+
+Finding-ID: AUDIT-20260601-72
+Status:     open
+Severity:   medium
+Surface:    whole release (`981d3f58 chore: release v0.32.1`) graduating `d8bc1feb fix(audit-barrage): close GH-386` — vs. open finding AUDIT-20260601-69 in `audit-log.md`
+
+The version-bump diff is clean in isolation, but a release commit's job is to graduate a body of work to an adopter-reachable tag — so the right question for this diff is *what is it shipping?* `git log v0.32.0..HEAD` shows v0.32.1 carries `d8bc1feb` (the `{{prompt-stdin}}` E2BIG fix for GH-386). That exact fix is the subject of **AUDIT-20260601-69 (Severity: high, cross-model, Status: open)**, which argues the stdin path converts a *loud* failure (`spawn E2BIG`, surfaced as an outage disposition) into a *silent* one: a CLI that opens `stdio[0]='pipe'` but doesn't consume the prompt off stdin runs with an empty prompt, exits 0, and gets recorded as a healthy "no findings" audit. I'm not re-litigating AUDIT-69's content — it's already triaged open. The new, release-specific signal is that **v0.32.1 makes that silent-failure path reachable in a tagged artifact** while the HIGH finding against it is unresolved, and the docs themselves admit the per-CLI stdin-consumption assumption is "still required" to verify but is not gated in code. Per the project's own "Issue closure requires verification in a formally-installed release" rule, tagging the fix is fine *as a candidate*, but the operator should know this release packages an opt-in path that an open HIGH finding says can pass the barrage while auditing nothing. A reasonable disposition: hold the `{{prompt-stdin}}` default off (it already is) and keep GH-386 open against v0.32.1 until AUDIT-69's stdin-drain assertion lands.
+
+---
+
+### AUDIT-20260601-73 — Commit `d8bc1feb` subject reads `close GH-386`, not the `Closes GH-386` the workplan Step 8 specifies — likely auto-flip/parser miss + unchecked Step 8 drift
+
+Finding-ID: AUDIT-20260601-73
+Status:     open
+Severity:   low
+Surface:    commit `d8bc1feb` subject vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 19 Task 1 Step 8 ("commit with `Closes GH-386` in subject") and the Phase 19 AC `[ ] GH-386 closed once verified`
+
+Phase 19 Task 1 Step 8 (shown unchecked `[ ]` in the workplan excerpt) specifies the closing commit subject must contain **`Closes GH-386`**. The actual commit subject is `fix(audit-barrage): close GH-386 — {{prompt-stdin}} placeholder bypasses ARG_MAX` — lowercase `close`, no trailing `s`. The `agent-discipline.md` rule describes `apply-audit-flips` as parsing `Closes <id>` (subject + comma-separated trailer); a `/Closes /`-anchored matcher will not match `close GH-386`, so the audit-log auto-flip from `open → fixed-<sha>` may never fire for this entry. Two cheap things to verify: (a) run `dw-lifecycle apply-audit-flips --feature scope-discovery --since v0.32.0` and confirm it actually proposes a flip for GH-386 — if it reports nothing, the keyword mismatch is real; (b) the workplan still shows Step 8 as `[ ]` even though the commit landed, which is doc drift (the commit happened; the checkbox didn't move). Neither is a code-correctness bug; both are closure-hygiene gaps of the exact shape the hygiene-skill family exists to prevent.
+
+---
+
+### AUDIT-20260601-74 — Bump verification: complete, internally consistent, and — unlike v0.32.0 — a *pure* release commit (positive; addresses AUDIT-66)
+
+Finding-ID: AUDIT-20260601-74
+Status:     open
+Severity:   informational
+Surface:    the entire diff (all 12 manifest files) + commit topology `v0.32.0..HEAD`
+
+Positive signal the operator should see, since clean-report context is itself barrage signal. I checked three things and all came back clean: (1) **Completeness** — `grep '0.32.0'` across every `package.json`/`plugin.json`/`marketplace.json` returns zero matches, so no manifest was left at the old version; all 13 references (4 package versions + 3 plugin versions + 3 marketplace plugin versions + 3 marketplace `ref`s + internal `@deskwork/*` deps) moved to `0.32.1` in lockstep, and the internal dependency graph (`@deskwork/cli`→`core`, `@deskwork/studio`→`core`, plugin shells→their pkgs) stays self-consistent at `0.32.1`. (2) **Semver** — v0.32.1 ships a bug fix (GH-386), so a patch bump is correct. (3) **Commit hygiene** — this release commit is a *pure* version bump; the finding-lift (`80f42674`) and the fix (`d8bc1feb`) are separate commits. That directly resolves the prior cross-model finding **AUDIT-20260601-66**, which flagged that `chore: release v0.32.0` had bundled the audit-log lift into the version bump. The hygiene complaint from the last release was acted on. I would have flagged a stray `0.32.0`, a mismatched internal dep, or a re-bundled lift had any been present; none were.
+
+### AUDIT-20260601-75 — Release bump omits `package-lock.json`, leaving npm metadata stale
+
+Finding-ID: AUDIT-20260601-75
+Status:     open
+Severity:   medium
+Surface:    missing `package-lock.json` hunk; existing `package-lock.json:2-9`, `package-lock.json:6405-6411`, `package-lock.json:6898-6900`, `package-lock.json:7902-8022`
+
+The diff bumps every visible package/plugin manifest from `0.32.0` to `0.32.1` (`package.json:2`, `packages/*/package.json:2`, `plugins/*/package.json:2`, plugin manifests, and `.claude-plugin/marketplace.json`), but it does not include `package-lock.json`. This repo has a committed npm lockfile, and the current lockfile metadata is stale: root is still `0.24.2`, workspace packages are still `0.24.2`, and internal workspace dependency specs such as `@deskwork/core` remain `0.24.2`.
+
+That makes the release commit internally inconsistent for npm consumers and CI paths that use the lockfile. A clean release bump should regenerate and commit the lockfile so root package metadata, workspace package versions, and internal workspace dependency ranges match the manifest changes in this diff.
