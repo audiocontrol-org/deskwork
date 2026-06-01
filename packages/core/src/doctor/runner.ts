@@ -24,6 +24,7 @@ import calendarUuidMissing from './rules/calendar-uuid-missing.ts';
 import legacyTopLevelIdMigration from './rules/legacy-top-level-id-migration.ts';
 import legacyStageArtifactPath from './rules/legacy-stage-artifact-path.ts';
 import laneConfigMissingTemplate from './rules/lane-config-missing-template.ts';
+import entryLaneMissing from './rules/entry-lane-missing.ts';
 import { loadProjectRules, mergeRules } from './project-rules.ts';
 import type {
   DoctorContext,
@@ -52,6 +53,7 @@ export const RULES: ReadonlyArray<DoctorRule> = [
   legacyTopLevelIdMigration,
   legacyStageArtifactPath,
   laneConfigMissingTemplate,
+  entryLaneMissing,
   missingFrontmatterId,
   orphanFrontmatterId,
   duplicateId,

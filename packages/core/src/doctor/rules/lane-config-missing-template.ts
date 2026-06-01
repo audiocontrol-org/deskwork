@@ -51,6 +51,7 @@ import {
 } from '../../pipelines/loader.ts';
 import { LaneConfigSchema, type LaneConfig } from '../../lanes/types.ts';
 import { readAllSidecarsPartitioned } from '../../sidecar/read-all.ts';
+import { isFirstSite } from '../project-scope-gate.ts';
 import type {
   DoctorContext,
   DoctorRule,
@@ -172,17 +173,6 @@ function restoreLaneFile(laneFilePath: string, snapshot: string): void {
   } catch {
     // intentional swallow — see docblock
   }
-}
-
-/**
- * Check whether the current site is the "first" site per the config's
- * insertion order. Used to gate the project-wide scan so multi-site
- * projects don't emit duplicate findings (see header).
- */
-function isFirstSite(ctx: DoctorContext): boolean {
-  const siteIds = Object.keys(ctx.config.sites);
-  if (siteIds.length === 0) return true;
-  return siteIds[0] === ctx.site;
 }
 
 const rule: DoctorRule = {
