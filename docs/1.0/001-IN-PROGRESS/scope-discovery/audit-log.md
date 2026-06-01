@@ -1599,7 +1599,7 @@ This is the *exact* shape that the just-lifted AUDIT-20260601-28 flags against c
 ### AUDIT-20260601-30 — Recursive non-convergence: the autonomous barrage is auditing its own bookkeeping commits, minting self-referential meta-findings that never close
 
 Finding-ID: AUDIT-20260601-30
-Status:     open
+Status:     fixed-785c99474f9d58b5cd9490d4aaec70ebfcfc7269
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1583-1595` (AUDIT-29 lift) + `workplan.md` (Task 5.63) + the audited commit range as a whole
 
@@ -1632,7 +1632,7 @@ The significance is that `promote-findings --auto` is *still* minting placeholde
 ### AUDIT-20260601-33 — AUDIT-29's substantive complaint — the AUDIT-05 flip `f51bcb12` claimed but never made — is not landed in this diff; only a meta-task about it is added
 
 Finding-ID: AUDIT-20260601-33
-Status:     open
+Status:     fixed-785c99474f9d58b5cd9490d4aaec70ebfcfc7269
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (no hunk touches AUDIT-20260601-05's `Status:` line) vs. `workplan.md` Task 5.63
 
@@ -1650,3 +1650,51 @@ Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` + `.dw-lifecycle/
 Every run rewrites `last-hook-run.json` in place (tip + timestamp + runDir + the three counts) and appends a line to `hook-run-log.jsonl`. Because both are tracked, each barrage fire produces a diff against them — and `last-hook-run.json` in particular is a single-record file that two concurrent worktrees/sessions would clobber and that rebases will conflict on. The `hook-run-log.jsonl` append-only file is the more defensible audit trail; the single-record `last-hook-run.json` is derivable from the log's last line, so committing it duplicates state and adds a guaranteed-conflict file to every branch that runs the hook.
 
 If these are intentionally tracked as the closure machinery's audit trail, that's a defensible call — but `last-hook-run.json` being both tracked and last-write-wins is a hygiene smell. Consider gitignoring `last-hook-run.json` (regenerate from the log tail) and keeping only the append-only `hook-run-log.jsonl` under version control, or documenting in the scope-discovery rules why both are tracked despite the conflict surface.
+
+## 2026-06-01 — audit-barrage lift (20260601T044904338Z-scope-discovery)
+
+### AUDIT-20260601-35 — Task 3's "≥2 test() blocks for HIGH+" gate collides with Phase 18 Task 1's shape-(e) "no test possible" disposition
+
+Finding-ID: AUDIT-20260601-35 (claude-opus-01 + claude-opus-02 + claude-opus-03 + claude-opus-04 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 3, Step 3 ("require ≥2 test() blocks in the cited test file when severity is HIGH+") + Acceptance Criteria line 2
+
+Step 3 makes severity HIGH+ unconditionally demand ≥2 `test()` blocks in the cited file. But Phase 18 Task 1's own taxonomy (cited in the just-lifted AUDIT-32) names shape (e): "commit-history / docs / process finding — no test possible." The last four lifted findings (AUDIT-30, 32, 33, and the AUDIT-28/29 lineage) are all HIGH-or-higher **process** findings — "commit subject narrower than diff," "recursive non-convergence." None of them can carry even *one* vitest, let alone two. When `promote-findings` mints a HIGH-severity process finding as a fix-task (which it demonstrably still does — AUDIT-32 flags exactly this happening to Task 5.63), Task 3's gate will demand 2 tests for a finding where 0 are possible. The result is the precise deadlock the project keeps hitting: either the implement-loop is blocked (the HIGH process finding can never be closed because the gate is unsatisfiable), or `check-fix-task-tdd` gets bypassed (laundering the violation). The plan as written has no carve-out tying the ≥2-test requirement to "severity HIGH+ **AND** shape is a testable code defect." Step 3 must compose with Task 1's shape inference — gate on `(severity ∈ {high,blocking}) ∧ (shape ∈ testable-code-defect)`, not severity alone. As specced, Tasks 1 and 3 contradict each other on the most common HIGH finding this loop produces.
+
+## 2026-06-01 — audit-barrage lift (20260601T045252566Z-scope-discovery)
+
+### AUDIT-20260601-36 — The bookkeeping filter is too coarse: it suppresses substantive workplan-only audits, and AUDIT-35 is the counterexample the barrage itself just produced
+
+Finding-ID: AUDIT-20260601-36 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-tip.ts:74-81` (`isBookkeepingPath` classifies `workplan.md` as bookkeeping) + `:141-155` (the skip)
+
+`isBookkeepingPath` treats *any* change to `workplan.md` (and `audit-log.md`, `tooling-feedback.md`) as non-auditable bookkeeping, so a diff whose only changed file is a workplan triggers `hasNewDiff: false`. But the audit-log excerpt in this very feature contains AUDIT-20260601-35 — *"Task 3's ≥2-test gate collides with Task 1's shape-(e) disposition"* — a HIGH cross-model finding whose entire Surface is `workplan.md` Task 3. That finding is a genuine planning-level contradiction between two tasks; it has nothing to do with the recursive-meta-finding pathology AUDIT-30 names. With this filter in place, the barrage run that produced AUDIT-35 would have been **skipped**, because its diff was workplan-only.
+
+So the fix for AUDIT-30 directly undermines a demonstrated, high-value capability of the barrage: catching contradictions introduced during planning. The filter conflates two distinct workplan-edit shapes — (a) mechanical append of a canonical-template fix-task block or lift section (the recursion fuel) versus (b) substantive scope/design edits that can contradict existing tasks (real signal). The implemented classifier suppresses both. A correct fix has to discriminate by *shape of the edit*, not by *filename*: e.g. fire when a workplan hunk adds/edits prose outside the known `### Task N.NN (fix-finding-…)` template skeleton, or when an audit-log hunk does anything other than append a new `## …lift` section. As written, the project is trading a recursion false-positive for a planning-contradiction false-negative, and it already has a concrete example (AUDIT-35) of the signal it will now miss.
+
+---
+
+### AUDIT-20260601-37 — This commit's subject claims "close AUDIT-30/33" while the same diff scopes unstarted placeholder-test fix-tasks 5.64 and 5.67 for those exact findings
+
+Finding-ID: AUDIT-20260601-37 (claude-05 + codex-03; cross-model)
+Status:     open
+Severity:   high
+Surface:    commit subject `feat(check-barrage-tip): close AUDIT-20260601-30/33 …` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` new Task 5.64 (`fix-finding-AUDIT-20260601-30`) + Task 5.67 (`fix-finding-AUDIT-20260601-33`), both `[ ]` unstarted with placeholder-test ACs
+
+The subject asserts AUDIT-30 and AUDIT-33 are *closed* by this commit (the bookkeeping filter closes AUDIT-30; the AUDIT-05 status flip at `audit-log.md:1277` closes AUDIT-33). Yet the same diff *adds* Task 5.64 ("Closes AUDIT-20260601-30 … Step 1: write failing test exercising the bug …") and Task 5.67 ("Closes AUDIT-20260601-33 …") as brand-new, unchecked, placeholder-test task blocks. A commit cannot coherently both close a finding and scope an unstarted task to fix that same finding — one of the two records is wrong the moment it's written. Either the filter/flip genuinely closes them (then 5.64/5.67 are stale on arrival and should not have been promoted), or they remain open (then the subject overclaims, the precise AUDIT-28/29 shape this loop keeps reproducing).
+
+This also re-confirms AUDIT-32/35 as regressed, not theoretical: Tasks 5.66 (closes AUDIT-32, itself a finding *about* the placeholder-test template), 5.67 (closes AUDIT-33, a pure process finding), and 5.68 (closes AUDIT-34, a gitignore-hygiene finding) are each rendered with the code-defect "write a failing test … `npx vitest run <test-file-path>` exits 0" template for findings where no such test can exist. `promote-findings --auto` is still minting test-shaped tasks for non-testable findings — five more instances in this one diff — which is exactly why the still-`[ ]` Phase 18 Task 1 (shape inference) needs to land before any further non-bug promotion, and why these task blocks will deadlock the `check-fix-task-tdd` gate when checked.
+
+### AUDIT-20260601-38 — CLI silently disables the filter on `git diff` failure
+
+Finding-ID: AUDIT-20260601-38
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:158-180`
+
+`defaultListDiffFiles` catches every `git diff --name-only` failure and returns `[]`. The library interprets an empty file list as “no signal” and fires the barrage. That means a broken git invocation, bad repository root, corrupted ref, or unexpected environment issue becomes indistinguishable from a real non-bookkeeping diff.
+
+This conflicts with the project’s “no silent fallbacks” rule and makes the new behavior hard to debug: operators will see the barrage firing on bookkeeping commits with no clue that the classifier failed. The safer shape is to let the error propagate through `runCheckBarrageTip`’s existing try/catch and exit-2 config-error path, or return an explicit diagnostic result that names the failed `git diff`.

@@ -729,21 +729,89 @@ Closes AUDIT-20260601-06 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 
 
-### Task 5.64 (fix-finding-AUDIT-20260601-30): AUDIT-20260601-30 — Recursive non-convergence: the autonomous barrage is auditin…
 
-Closes AUDIT-20260601-30. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:1583-1595` (AUDIT-29 lift) + `workplan.md` (Task 5.63) + the audited commit range as a whole.
+
+### Task 5.70 (fix-finding-AUDIT-20260601-36): AUDIT-20260601-36 — The bookkeeping filter is too coarse: it suppresses substant…
+
+Closes AUDIT-20260601-36 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-tip.ts:74-81` (`isBookkeepingPath` classifies `workplan.md` as bookkeeping) + `:141-155` (the skip).
 
 - [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
 - [ ] Step 2: confirm test fails against current code (verify the bug repros)
 - [ ] Step 3: implement the fix
 - [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260601-30` in subject
+- [ ] Step 5: commit with `Closes AUDIT-20260601-36 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01; cross-model)` in subject
 
 **Acceptance Criteria:**
 
 - [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
 - [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.71 (fix-finding-AUDIT-20260601-37): AUDIT-20260601-37 — This commit's subject claims "close AUDIT-30/33" while the s…
+
+Closes AUDIT-20260601-37 (claude-05 + codex-03; cross-model). Surface: commit subject `feat(check-barrage-tip): close AUDIT-20260601-30/33 …` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` new Task 5.64 (`fix-finding-AUDIT-20260601-30`) + Task 5.67 (`fix-finding-AUDIT-20260601-33`), both `[ ]` unstarted with placeholder-test ACs.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-37 (claude-05 + codex-03; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.72 (fix-finding-AUDIT-20260601-38): AUDIT-20260601-38 — CLI silently disables the filter on `git diff` failure
+
+Closes AUDIT-20260601-38. Surface: `plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:158-180`.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-38` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+### Task 5.69 (fix-finding-AUDIT-20260601-35): AUDIT-20260601-35 — Task 3's "≥2 test() blocks for HIGH+" gate collides with Pha…
+
+Closes AUDIT-20260601-35 (claude-opus-01 + claude-opus-02 + claude-opus-03 + claude-opus-04 + codex-01; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 3, Step 3 ("require ≥2 test() blocks in the cited test file when severity is HIGH+") + Acceptance Criteria line 2.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260601-35 (claude-opus-01 + claude-opus-02 + claude-opus-03 + claude-opus-04 + codex-01; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+### Task 5.64 (fix-finding-AUDIT-20260601-30): AUDIT-20260601-30 — Recursive non-convergence: the autonomous barrage is auditin…
+
+Closes AUDIT-20260601-30 (HIGH cross-model claude-opus-01). Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-tip.ts`.
+
+- [x] Step 1 (Option D — invariant write-up): working-code invariant — `check-barrage-tip` fires the barrage on every new diff. The fix must NOT break that for source-code changes. State matrix: all-bookkeeping → skip (new); all-source → fire (unchanged); mixed → fire (unchanged conservative).
+- [x] Step 2: 2 bug-repro tests + 2 regression-lock tests + 1 backward-compat test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts`.
+- [x] Step 3: implemented `isBookkeepingPath` + optional `listDiffFiles` callback in `checkBarrageTip`. CLI shim defaults to `git diff --name-only`.
+- [x] Step 4: tests pass; plugin suite 2583/2583.
+- [x] Step 5: commit 785c9947 with `Closes AUDIT-20260601-30/33` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts`
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-barrage-tip.test.ts` exits 0 (11/11 green)
+- [x] Audit-log Status flipped to `fixed-785c9947`
 
 
 ### Task 5.65 (fix-finding-AUDIT-20260601-31): AUDIT-20260601-31 — Run marker writes `0/0/0` for a run that demonstrably promot…
@@ -782,19 +850,19 @@ Closes AUDIT-20260601-32 (claude-opus-03 + claude-opus-06 + codex-01; cross-mode
 
 ### Task 5.67 (fix-finding-AUDIT-20260601-33): AUDIT-20260601-33 — AUDIT-29's substantive complaint — the AUDIT-05 flip `f51bcb…
 
-Closes AUDIT-20260601-33. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (no hunk touches AUDIT-20260601-05's `Status:` line) vs. `workplan.md` Task 5.63.
+Closes AUDIT-20260601-33 (MED, claude-opus-04). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-20260601-05 status line.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260601-33` in subject
+- [x] Step 1: no test required — this is a bookkeeping omission, not a code defect. Disposition: directly land the missing flip (Phase 18 Task 1's non-bug template will formalize this shape; for now, document inline).
+- [x] Step 2: confirmed AUDIT-20260601-05 `Status: open` pre-fix.
+- [x] Step 3: flipped to `acknowledged-informational-process-feedback-2026-06-01` (rationale: AUDIT-05 was an informational process-feedback finding about retroactive task back-fill; no code action; bookkeeping disposition is the right shape).
+- [x] Step 4: verified `Status:` line updated; no other audit-log changes.
+- [x] Step 5: committed in 785c9947 alongside AUDIT-30 fix.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `(no test — bookkeeping disposition for an informational finding; Phase 18 Task 1's non-bug template will formalize this shape)`
+- [x] `npx vitest run` 2583/2583 green (no test required)
+- [x] Audit-log Status flipped to `fixed-785c9947`
 
 
 ### Task 5.68 (fix-finding-AUDIT-20260601-34): AUDIT-20260601-34 — Runtime marker files (`last-hook-run.json`, `hook-run-log.js…

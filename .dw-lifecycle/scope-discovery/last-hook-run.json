@@ -1,8 +1,8 @@
 {
-  "tip": "11465f01b3e065fa3f97f11b95ca27df69313240",
-  "timestamp": "2026-06-01T04:41:45.744Z",
-  "runDir": "/Users/orion/work/deskwork-work/scope-discovery/.dw-lifecycle/scope-discovery/audit-runs/20260601T043917048Z-scope-discovery",
-  "disposition": "fired-and-promoted",
+  "tip": "785c99474f9d58b5cd9490d4aaec70ebfcfc7269",
+  "timestamp": "2026-06-01T04:58:27.088Z",
+  "runDir": null,
+  "disposition": "no-new-diff-skip",
   "findingsCount": 0,
   "promotedCount": 0,
   "slushedCount": 0
