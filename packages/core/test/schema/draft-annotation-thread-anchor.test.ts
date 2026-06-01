@@ -134,6 +134,30 @@ describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () =
   // refactor makes each variant declare only the fields its kind needs.
   // Annotations land in the append-only journal where bad data is
   // permanent, so the schema is the only enforcement point.
+  //
+  // AUDIT-20260601-10 — every negative case asserts BOTH that parsing
+  // failed AND that the failure path includes `spatialAnchor`. The
+  // path-based pin makes the test resilient: if `COMMENT_BASE` itself
+  // ever becomes invalid for an unrelated reason (renamed `range`,
+  // tightened `text`), these tests would still pass against a
+  // SpatialAnchor schema that no longer enforces shape — and the
+  // bug-factory pattern AUDIT-20260601-07 named would silently return.
+  // The `expectSpatialAnchorFailure` helper does both checks.
+
+  function expectSpatialAnchorFailure(
+    parsed: ReturnType<typeof DraftAnnotationSchema.safeParse>,
+  ): void {
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    const anchorIssues = parsed.error.issues.filter((i) =>
+      i.path.includes('spatialAnchor'),
+    );
+    // At least one of the surfaced issues must name `spatialAnchor` in
+    // its path — without this, `parsed.success === false` could be true
+    // for a totally unrelated reason (a base-field violation) and the
+    // test would pass for the wrong reason.
+    expect(anchorIssues.length).toBeGreaterThan(0);
+  }
 
   it('rejects spatialAnchor kind "pixel" without coordinates', () => {
     const input = {
@@ -141,7 +165,7 @@ describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () =
       spatialAnchor: { kind: 'pixel' },
     };
     const parsed = DraftAnnotationSchema.safeParse(input);
-    expect(parsed.success).toBe(false);
+    expectSpatialAnchorFailure(parsed);
   });
 
   it('rejects spatialAnchor kind "dom-selector" without selector', () => {
@@ -150,7 +174,7 @@ describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () =
       spatialAnchor: { kind: 'dom-selector' },
     };
     const parsed = DraftAnnotationSchema.safeParse(input);
-    expect(parsed.success).toBe(false);
+    expectSpatialAnchorFailure(parsed);
   });
 
   it('rejects spatialAnchor kind "svg-element" without selector', () => {
@@ -159,7 +183,7 @@ describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () =
       spatialAnchor: { kind: 'svg-element' },
     };
     const parsed = DraftAnnotationSchema.safeParse(input);
-    expect(parsed.success).toBe(false);
+    expectSpatialAnchorFailure(parsed);
   });
 
   it('rejects spatialAnchor kind "pixel" carrying a selector field', () => {
@@ -168,7 +192,7 @@ describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () =
       spatialAnchor: { kind: 'pixel', x: 10, y: 20, selector: '#header' },
     };
     const parsed = DraftAnnotationSchema.safeParse(input);
-    expect(parsed.success).toBe(false);
+    expectSpatialAnchorFailure(parsed);
   });
 
   it('rejects spatialAnchor kind "svg-element" carrying x/y fields', () => {
@@ -177,7 +201,7 @@ describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () =
       spatialAnchor: { kind: 'svg-element', selector: '#shape', x: 1, y: 2 },
     };
     const parsed = DraftAnnotationSchema.safeParse(input);
-    expect(parsed.success).toBe(false);
+    expectSpatialAnchorFailure(parsed);
   });
 
   it('rejects spatialAnchor kind "dom-selector" carrying x/y fields', () => {
@@ -186,7 +210,7 @@ describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () =
       spatialAnchor: { kind: 'dom-selector', selector: '#header', x: 1, y: 2 },
     };
     const parsed = DraftAnnotationSchema.safeParse(input);
-    expect(parsed.success).toBe(false);
+    expectSpatialAnchorFailure(parsed);
   });
 
   it('parses a comment with all three new fields set together', () => {
