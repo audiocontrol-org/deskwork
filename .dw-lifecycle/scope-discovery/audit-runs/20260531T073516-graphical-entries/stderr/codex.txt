@@ -1,0 +1,1386 @@
+Reading additional input from stdin...
+OpenAI Codex v0.133.0
+--------
+workdir: /Users/orion/work/deskwork-work/graphical-entries
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e7cf5-b3b9-7412-a81a-46088a10582c
+--------
+user
+# Audit-barrage - multi-model audit prompt template
+
+You are an independent audit reviewer firing as part of a multi-model audit barrage. Surface bugs, design issues, missed edge cases, and code-quality concerns in the work product captured in the diff below. Do not modify files. Findings must be anchored to specific files/lines in the diff or a missing surface that should be in the diff. If no findings, say so clearly and mention residual risk.
+
+## Feature under audit
+
+graphical-entries
+
+## Feature scope
+
+Task 0.2 of graphical-entries Phase 0 audit-barrage cleanup queue. Closes AUDIT-20260530-26: dashboard swimlane localStorage state had no schema/version segment, so stale valid values survived plugin upgrades. Fix added STORAGE_SCHEMA_VERSION and changed the shared dashboard localStorage prefix to deskwork:dashboard:v2:, then updated affected client tests/fixtures and docs.
+
+## Commit subjects in audited range
+
+ec51035 Closes AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)
+5557ddc Record AUDIT-20260530-26 closure
+
+
+## Recent audit-log excerpt
+
+
+### AUDIT-20260530-26 — [P5-1 claude] No clear-on-version-bump for swimlane localStorage state — schema drift silently persists stale per-operator state
+
+Finding-ID: AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)
+Status:     fixed-ec51035
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts` (`STORAGE_KEY_PREFIX`, `resolveProjectKey`, `readStoredObjectMap`) and the four key suffixes in `swimlane.ts` / `swimlane-collapse.ts` / `swimlane-view-toggle.ts`
+
+The audit scope explicitly names "client-state persistence + restore (localStorage corruption resilience; clear-on-version-bump)" as a focus. Corruption resilience is handled well — every reader (`readStoredObjectMap`, `readStoredSet`, `readStoredLanes`, `readStoredStages`) wraps `JSON.parse` in try/catch and validates the parsed shape, degrading to an empty collection on any failure. But there is **no version segment in the storage keys and no clear-on-version-bump mechanism**. Keys are `deskwork:dashboard:<projectKey>:<suffix>` with no schema-version component anywhere in `swimlane-storage.ts`.
+
+This matters because the corruption guards only protect against *shape* changes (an array becoming an object, an unknown value type). They do not protect against *semantic* drift within a stable shape — e.g., if a future release changes how `view-mode` values map, or repurposes the `stage-collapse` `Record<laneId, string[]>`, the old data parses cleanly and is silently honored, restoring stale or wrong state for every returning operator. Since this is per-operator browser state that survives plugin upgrades indefinitely, there is no natural eviction. The fix is a version token in the key prefix (e.g. `deskwork:dashboard:v1:<projectKey>:<suffix>`) bumped whenever a value's semantics change, so an upgrade starts from clean defaults rather than reinterpreting prior-version state. The absence is auditable here precisely because the operator listed it as expected.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-27 — [P5-1 claude] Rail eye-toggle `.r-eye-btn` is a 14px-wide interactive target with no min-height — below WCAG 2.5.8 while every sibling affordance was sized to 24×24
+
+Finding-ID: AUDIT-20260530-27 (cross-model: AUDIT-BARRAGE-claude-P5-1)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/css/dashboard-swimlane.css` (`.rail-lane .r-eye-btn` rule: `width: 14px; ... padding: 0;`)
+
+The diff is otherwise meticulous about WCAG 2.2 SC 2.5.8 target-size minimums — `.collapse-chev` is `min-width: 24px; min-height: 24px`, `.view-toggle .vt-cell` is `min-height: 24px`, `.swim-compose` is `min-height: 26px` (30px mobile), `.lb-overflow` is `min-width: 24px; min-height: 24px`. But the rail visibility toggle, promoted in the F6 a11y fix from a `<span>` to a real focusable `<button class="r-eye-btn">`, is styled `width: 14px; ... padding: 0;` with no min-height — well under the 24×24 floor. It is a distinct interactive control (its own click handler in `swimlane.ts:bindRailEyeToggles`, with `stopPropagation` so it does not share the row's focus-toggle gesture), so it is independently subject to the target-size rule.
+
+The WCAG 2.5.8 spacing exception (a 24px-diameter undisturbed circle around the target) is the only thing that might save it, and that depends on the eye glyph being far enough from the row's other clickable region — but the whole `.rail-lane` row is itself `role="button"` and clickable, so the eye button sits *inside* another target rather than in clear space, which the spacing exception does not cover. Given the F6 fix deliberately made this a real button for keyboard/AT access, sizing it to 24×24 (min-width/min-height + centered glyph, matching the `.collapse-chev` pattern already in the same file) finishes the job. Low severity because it is reachable and operable, just below the measured-target threshold the rest of the feature honors.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (claude). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/claude.md`.
+
+### AUDIT-20260530-28 — [P5-1 codex] Compose chip copies an invalid command for stage names with spaces
+
+Finding-ID: AUDIT-20260530-28 (cross-model: AUDIT-BARRAGE-codex-P5-1)
+Status:     open
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:90-98; packages/studio/src/pages/dashboard/swimlane-card.ts:297-307
+
+The copied command is assembled as `/deskwork:add <SLUG> --lane ${laneId} --stage ${firstStage}` with no argument quoting or escaping. That works for the current preset first stages (`Ideas`, `Sketched`, `Drafted`, etc.), but pipeline templates allow arbitrary non-empty stage strings, including names with spaces. A custom lane whose first stage is `QA Review` would copy `/deskwork:add <SLUG> --lane qa --stage QA Review`, which a normal argv parser reads as stage `QA` plus an extra `Review` token.
+
+The server puts the raw first stage in `data-first-stage` at `swimlane-card.ts:303-307`, and the client serializes that value directly at `swimlane-compose.ts:90-98`. Fix by using the same command-argument quoting convention the slash-command parser expects, and add a regression with a custom template whose first linear stage contains whitespace and shell-sensitive characters.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-29 — [P5-1 codex] Dashboard localStorage has no schema/version segment despite version-bump reset being in scope
+
+Finding-ID: AUDIT-20260530-29 (cross-model: AUDIT-BARRAGE-codex-P5-1)
+Status:     open
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:21-27; plugins/deskwork-studio/public/src/dashboard/swimlane.ts:64-69; plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:60-65; plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:68-70
+
+The audit scope explicitly calls out “clear-on-version-bump,” but all persisted dashboard keys are stable forever under `deskwork:dashboard:<projectKey>:<suffix>`. The readers tolerate malformed JSON, but they do not distinguish old valid shapes from current valid shapes. If the meaning of `:focus`, `:visibility`, `:lane-collapse`, `:stage-collapse`, or `:view-mode` changes, old operator state continues to apply silently.
+
+This is most visible in `STORAGE_KEY_PREFIX = 'deskwork:dashboard:'`; every controller appends only project key and suffix. A reasonable fix is to add a storage schema version to the prefix or store a version sentinel and clear the known swimlane keys when it mismatches. Tests should seed an older-version key and assert the controller ignores or removes it while preserving current-version state.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-30 — [P5-1 codex] Re-running swimlane initializers stacks duplicate event listeners with stale state closures
+
+Finding-ID: AUDIT-20260530-30 (cross-model: AUDIT-BARRAGE-codex-P5-1)
+Status:     open
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/editorial-studio-client.ts:527-530; plugins/deskwork-studio/public/src/dashboard/swimlane.ts:469-490; plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:464-477; plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:292-312; plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:270-282
+
+`init()` calls four swimlane controllers, and each controller unconditionally binds listeners to existing DOM nodes. `initSwimlane` also replaces `activeState` at lines 480-481, while previously bound handlers still close over their older `state` object. The same shape exists in collapse, view-toggle, and compose: re-invocation binds again without a module guard or per-element sentinel.
+
+Current page boot may call these once, but the code already introduces `reapply*FromStorage` paths and singleton state for client-side refresh-style operations. If a partial DOM re-init calls any initializer twice, clicks can fire multiple handlers and mutate different closure-captured state objects. Fix with per-controller idempotence: a module-level wired guard for whole-page singletons, or `dataset` sentinels per bound element when dynamic DOM replacement is expected.
+
+Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T114826429Z-graphical-entries/codex.md`.
+
+### AUDIT-20260530-31 — [P5-1 gemini] The stage ID slugification logic in `renderStageCol` (and implicitly in `renderListGroup` through shared stage name derivation) still uses `stage.toLowerCase().replace(/[^a-z0-9-]+/g, '-')`. This can lead to DOM ID collisions when a single lane has distinct stage names that slugify to the same value (e.g., `QA Review` and `QA_Review` both become `qa-review`). This issue is explicitly flagged as AUDIT-20260528-07 in the provided `audit-log.md` and remains unfixed in this diff. The proposed fix in AUDIT-20260528-07 is to use `stageNameToFilesystemToken(stage)` or a dedicated DOM-token helper, neither of which is implemented or used in `swimlane-card.ts`.
+
+## Diff under audit
+
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+index e887933..8fb32de 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+@@ -3451,7 +3451,7 @@ Surfaced by audit-barrage run `20260530T114826429Z-graphical-entries` (claude).
+ ### AUDIT-20260530-26 — [P5-1 claude] No clear-on-version-bump for swimlane localStorage state — schema drift silently persists stale per-operator state
+ 
+ Finding-ID: AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)
+-Status:     open
++Status:     fixed-ec51035
+ Severity:   medium
+ Surface:    `plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts` (`STORAGE_KEY_PREFIX`, `resolveProjectKey`, `readStoredObjectMap`) and the four key suffixes in `swimlane.ts` / `swimlane-collapse.ts` / `swimlane-view-toggle.ts`
+ 
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+index ec10b4e..122ac68 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+@@ -143,17 +143,17 @@ Closes AUDIT-20260531-06. Surface: `packages/studio/src/pages/dashboard/swimlane
+ 
+ Closes AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1). Surface: `plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts` (`STORAGE_KEY_PREFIX`, `resolveProjectKey`, `readStoredObjectMap`) and the four key suffixes in `swimlane.ts` / `swimlane-collapse.ts` / `swimlane-view-toggle.ts`.
+ 
+-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+-- [ ] Step 3: implement the fix
+-- [ ] Step 4: confirm test passes
+-- [ ] Step 5: commit with `Closes AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)` in subject
++- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
++- [x] Step 2: confirm test fails against current code (verify the bug repros)
++- [x] Step 3: implement the fix
++- [x] Step 4: confirm test passes
++- [x] Step 5: commit with `Closes AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)` in subject
+ 
+ **Acceptance Criteria:**
+ 
+-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
++- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-client.test.ts` — `AUDIT-20260530-26: ignores stale unversioned dashboard visibility state` (cited in Step 1)
++- [x] `npx vitest run packages/studio/test/dashboard-swimlane-client.test.ts packages/studio/test/dashboard-swimlane-collapse-client.test.ts packages/studio/test/dashboard-swimlane-collapse-list-client.test.ts packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts packages/studio/test/dashboard-swimlane-presets-store-client.test.ts packages/studio/test/dashboard-swimlane-presets-client.test.ts packages/studio/test/dashboard-swimlane-presets-polish-client.test.ts packages/studio/test/dashboard-swimlane-integration-client.test.ts packages/studio/test/dashboard-lane-stack-client.test.ts packages/studio/test/dashboard-swimlane-drag-client.test.ts packages/studio/test/dashboard-swimlane-drag-client-pure.test.ts packages/studio/test/dashboard-swimlane-drag-client-reorder-buttons.test.ts` exits 0 (96 tests pass)
++- [x] Audit-log Status flipped to `fixed-ec51035` via the close-shipped-audit-findings step
+ 
+ 
+ 
+diff --git a/packages/studio/test/__helpers/dashboard-swimlane-drag-fixture.ts b/packages/studio/test/__helpers/dashboard-swimlane-drag-fixture.ts
+index 9dfd53d..1fd363a 100644
+--- a/packages/studio/test/__helpers/dashboard-swimlane-drag-fixture.ts
++++ b/packages/studio/test/__helpers/dashboard-swimlane-drag-fixture.ts
+@@ -30,7 +30,7 @@ if (typeof (globalThis as { CSS?: unknown }).CSS === 'undefined') {
+ }
+ 
+ export const PROJECT_KEY = 'task-5-4-drag-test-key';
+-export const ORDER_STORAGE_KEY = `deskwork:dashboard:${PROJECT_KEY}:lane-order`;
++export const ORDER_STORAGE_KEY = `deskwork:dashboard:v2:${PROJECT_KEY}:lane-order`;
+ 
+ export interface FakeDataTransfer {
+   effectAllowed: string;
+diff --git a/packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts b/packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts
+index 8b3b528..783f8fb 100644
+--- a/packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts
++++ b/packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts
+@@ -18,7 +18,7 @@ import { initSwimlaneViewToggle } from '../../../../plugins/deskwork-studio/publ
+ import type { PresetControllerHooks } from '../../../../plugins/deskwork-studio/public/src/dashboard/swimlane-presets';
+ 
+ export const PROJECT_KEY = 'test-project-key';
+-export const PREFIX = `deskwork:dashboard:${PROJECT_KEY}`;
++export const PREFIX = `deskwork:dashboard:v2:${PROJECT_KEY}`;
+ 
+ interface CSSShim {
+   escape: (id: string) => string;
+diff --git a/packages/studio/test/dashboard-lane-stack-client.test.ts b/packages/studio/test/dashboard-lane-stack-client.test.ts
+index c1bdecf..8fc2fd0 100644
+--- a/packages/studio/test/dashboard-lane-stack-client.test.ts
++++ b/packages/studio/test/dashboard-lane-stack-client.test.ts
+@@ -248,7 +248,7 @@ describe('lane-stack accordion client — AUDIT-20260528-10', () => {
+     defaultChev?.click();
+     // Persisted to localStorage under the expected key.
+     const stored = window.localStorage.getItem(
+-      'deskwork:dashboard:lane-stack-test-key:lane-stack-collapse',
++      'deskwork:dashboard:v2:lane-stack-test-key:lane-stack-collapse',
+     );
+     expect(stored).not.toBeNull();
+     if (stored === null) throw new Error('stored value missing');
+diff --git a/packages/studio/test/dashboard-swimlane-client.test.ts b/packages/studio/test/dashboard-swimlane-client.test.ts
+index a96b459..9997f1e 100644
+--- a/packages/studio/test/dashboard-swimlane-client.test.ts
++++ b/packages/studio/test/dashboard-swimlane-client.test.ts
+@@ -95,6 +95,23 @@ describe('swimlane client controller — AUDIT-02 / AUDIT-04 acceptance', () =>
+     expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(false);
+   });
+ 
++  it('AUDIT-20260530-26: ignores stale unversioned dashboard visibility state', () => {
++    window.localStorage.setItem(
++      'deskwork:dashboard:test-project-key:visibility',
++      JSON.stringify(['qa']),
++    );
++    buildShell(['default', 'mockups', 'qa']);
++    initSwimlane();
++    const qaRow = document.querySelector<HTMLElement>(
++      '[data-rail-lane="qa"]',
++    );
++    const qaChip = document.querySelector<HTMLButtonElement>(
++      '[data-focus-chip="qa"]',
++    );
++    expect(qaRow?.dataset.laneVisible).toBe('true');
++    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(false);
++  });
++
+   it('F5: pressing Enter on a rail row toggles focus (mirrors the click handler)', () => {
+     buildShell(['default', 'mockups', 'qa']);
+     initSwimlane();
+diff --git a/packages/studio/test/dashboard-swimlane-collapse-client.test.ts b/packages/studio/test/dashboard-swimlane-collapse-client.test.ts
+index 3e2da93..fc25571 100644
+--- a/packages/studio/test/dashboard-swimlane-collapse-client.test.ts
++++ b/packages/studio/test/dashboard-swimlane-collapse-client.test.ts
+@@ -253,7 +253,7 @@ describe('swimlane collapse client — Task 5.1A', () => {
+   });
+ 
+   it('lane-collapse persists in localStorage across a simulated reload', () => {
+-    const storageKey = 'deskwork:dashboard:task-5-1a-test-key:lane-collapse';
++    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:lane-collapse';
+     buildShell([
+       { laneId: 'default', laneName: 'Editorial', stages: ['Drafting'] },
+       { laneId: 'mockups', laneName: 'Mockups', stages: ['Sketched'] },
+@@ -295,7 +295,7 @@ describe('swimlane collapse client — Task 5.1A', () => {
+   });
+ 
+   it('stage-collapse persists in localStorage (per-lane scoped) across a simulated reload', () => {
+-    const storageKey = 'deskwork:dashboard:task-5-1a-test-key:stage-collapse';
++    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:stage-collapse';
+     buildShell([
+       { laneId: 'default', laneName: 'Editorial', stages: ['Drafting', 'Final'] },
+       { laneId: 'mockups', laneName: 'Mockups', stages: ['Sketched', 'Approved'] },
+diff --git a/packages/studio/test/dashboard-swimlane-collapse-list-client.test.ts b/packages/studio/test/dashboard-swimlane-collapse-list-client.test.ts
+index 2704126..70b39c5 100644
+--- a/packages/studio/test/dashboard-swimlane-collapse-list-client.test.ts
++++ b/packages/studio/test/dashboard-swimlane-collapse-list-client.test.ts
+@@ -33,7 +33,7 @@ describe('swimlane collapse client — Task 5.1B list-body extension', () => {
+     // Mirror of the per-stage kanban test, scoped to the list-body
+     // shape. Task 5.1B extended `swimlane-collapse.ts` to handle
+     // both `.stage-col` AND `.lb-group` as the toggle parent.
+-    const storageKey = 'deskwork:dashboard:task-5-1a-test-key:stage-collapse';
++    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:stage-collapse';
+     document.body.innerHTML = '';
+     window.localStorage.clear();
+     const shell = document.createElement('section');
+@@ -102,7 +102,7 @@ describe('swimlane collapse client — Task 5.1B list-body extension', () => {
+     // Build a swim that carries BOTH a kanban `.stage-col` AND a
+     // list-body `.lb-group` for the same stage. Persisting one
+     // collapses the other on reload — shared state per lane:stage.
+-    const storageKey = 'deskwork:dashboard:task-5-1a-test-key:stage-collapse';
++    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:stage-collapse';
+     window.localStorage.setItem(storageKey, JSON.stringify({ default: ['Drafting'] }));
+     document.body.innerHTML = '';
+     const shell = document.createElement('section');
+diff --git a/packages/studio/test/dashboard-swimlane-integration-client.test.ts b/packages/studio/test/dashboard-swimlane-integration-client.test.ts
+index 8a5eb81..99ab505 100644
+--- a/packages/studio/test/dashboard-swimlane-integration-client.test.ts
++++ b/packages/studio/test/dashboard-swimlane-integration-client.test.ts
+@@ -189,7 +189,7 @@ describe('Phase 5 Task 5.6 — multi-lane integration (client)', () => {
+ 
+   it('Step 5.6.2: pre-seed visibility-hidden state, mount controllers, chip + swim + rail row all carry the hidden signals', () => {
+     // Pre-seed BEFORE building the shell (controllers read storage on init).
+-    const visibilityKey = `deskwork:dashboard:${PROJECT_KEY}:visibility`;
++    const visibilityKey = `deskwork:dashboard:v2:${PROJECT_KEY}:visibility`;
+     window.localStorage.setItem(visibilityKey, JSON.stringify(['qa']));
+     buildShell();
+     mountAllControllers();
+diff --git a/packages/studio/test/dashboard-swimlane-presets-polish-client.test.ts b/packages/studio/test/dashboard-swimlane-presets-polish-client.test.ts
+index cfafa8d..26549fd 100644
+--- a/packages/studio/test/dashboard-swimlane-presets-polish-client.test.ts
++++ b/packages/studio/test/dashboard-swimlane-presets-polish-client.test.ts
+@@ -40,7 +40,7 @@ import {
+ } from '../../../plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store';
+ 
+ const PROJECT_KEY = 'test-project-key';
+-const PREFIX = `deskwork:dashboard:${PROJECT_KEY}`;
++const PREFIX = `deskwork:dashboard:v2:${PROJECT_KEY}`;
+ 
+ interface CSSShim {
+   escape: (id: string) => string;
+diff --git a/packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts b/packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts
+index 5184f0e..94f1624 100644
+--- a/packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts
++++ b/packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts
+@@ -226,7 +226,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
+ 
+     // localStorage persists.
+     const storedRaw = window.localStorage.getItem(
+-      'deskwork:dashboard:task-5-1b-test-key:view-mode',
++      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+     );
+     expect(storedRaw).not.toBeNull();
+     if (storedRaw === null) return;
+@@ -239,7 +239,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
+     // `view-list` (otherwise the desktop default would resolve the
+     // swim back to kanban regardless of the server-rendered class).
+     window.localStorage.setItem(
+-      'deskwork:dashboard:task-5-1b-test-key:view-mode',
++      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+       JSON.stringify({ default: 'list' }),
+     );
+     buildShell([
+@@ -274,7 +274,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
+     // localStorage only carries the default lane's override.
+     const stored: unknown = JSON.parse(
+       window.localStorage.getItem(
+-        'deskwork:dashboard:task-5-1b-test-key:view-mode',
++        'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+       ) ?? '{}',
+     );
+     expect(stored).toEqual({ default: 'list' });
+@@ -309,7 +309,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
+ 
+   it('per-lane override beats viewport default — mobile with stored kanban shows kanban', () => {
+     window.localStorage.setItem(
+-      'deskwork:dashboard:task-5-1b-test-key:view-mode',
++      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+       JSON.stringify({ default: 'kanban' }),
+     );
+     setMatchMediaMatches(true); // mobile
+@@ -399,7 +399,7 @@ describe('swimlane view-toggle client — Task 5.1B', () => {
+     expect(swim?.classList.contains('view-list')).toBe(false);
+     // No localStorage write either.
+     const storedRaw = window.localStorage.getItem(
+-      'deskwork:dashboard:task-5-1b-test-key:view-mode',
++      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+     );
+     expect(storedRaw).toBeNull();
+   });
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts
+index 7d98cd9..a99f3e9 100644
+--- a/plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts
+@@ -17,9 +17,9 @@
+  *
+  * State is stored per-operator-per-project in localStorage:
+  *
+- *   - `deskwork:dashboard:<projectKey>:lane-collapse`
++ *   - `deskwork:dashboard:v2:<projectKey>:lane-collapse`
+  *     JSON array of lane ids the operator has collapsed.
+- *   - `deskwork:dashboard:<projectKey>:stage-collapse`
++ *   - `deskwork:dashboard:v2:<projectKey>:stage-collapse`
+  *     JSON object mapping lane id → array of collapsed stage names.
+  *     Per-stage collapse state is SHARED across kanban + list-body
+  *     — a stage collapsed in kanban shows collapsed in list-body
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
+index 15294c6..8b77a4e 100644
+--- a/plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
+@@ -12,7 +12,7 @@
+  *   - reorders the per-lane swim + stub pairs inside the bay so the
+  *     bay column matches the new rail order,
+  *   - persists to localStorage as `string[]` of lane ids under
+- *     `deskwork:dashboard:<projectKey>:lane-order` — per-operator,
++ *     `deskwork:dashboard:v2:<projectKey>:lane-order` — per-operator,
+  *     per-project (matches the other 5.x state idioms — visibility,
+  *     focus, view-mode, collapse, compose). PRD `Two split state
+  *     axes for lanes` leaves `.deskwork/lane-order.json` (project-
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts
+index c01cb3f..7227e61 100644
+--- a/plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts
+@@ -3,14 +3,14 @@
+  *
+  * The `swimlane.ts`, `swimlane-collapse.ts`, and `swimlane-view-
+  * toggle.ts` controllers all namespace localStorage entries under
+- * `deskwork:dashboard:<projectKey>:<suffix>` and all resolve the
+- * `<projectKey>` from the bay-shell's `data-project-key` attribute
+- * (falling back to the page pathname when the shell lacks one). The
+- * map-shaped controllers (collapse + view-toggle) additionally read
+- * a `Map<laneId, T>` whose on-disk shape is a JSON object. This
+- * module centralises all three pieces — the key prefix, the project-
+- * key resolver, and the read+parse boilerplate — so the controllers
+- * import a single contract instead of redeclaring it.
++ * `deskwork:dashboard:v<schema>:<projectKey>:<suffix>` and all
++ * resolve the `<projectKey>` from the bay-shell's `data-project-key`
++ * attribute (falling back to the page pathname when the shell lacks
++ * one). The map-shaped controllers (collapse + view-toggle)
++ * additionally read a `Map<laneId, T>` whose on-disk shape is a JSON
++ * object. This module centralises all three pieces — the key prefix,
++ * the project-key resolver, and the read+parse boilerplate — so the
++ * controllers import a single contract instead of redeclaring it.
+  *
+  * Failures (no entry / malformed JSON / wrong root type / unknown
+  * value shape) all collapse to "empty map" — the controllers treat
+@@ -18,13 +18,20 @@
+  * works without it.
+  */
+ 
++/**
++ * Schema version for dashboard localStorage keys. Bump this when the
++ * persisted shapes or restore semantics change so stale per-operator
++ * state is ignored instead of silently replayed into the new UI.
++ */
++export const STORAGE_SCHEMA_VERSION = 2;
++
+ /**
+  * Common prefix for every dashboard localStorage key. Controllers
+- * append `:<projectKey>:<suffix>` to namespace per-operator state
++ * append `<projectKey>:<suffix>` to namespace per-operator state
+  * per-project (so two operators sharing a machine but working on
+  * different projects don't see each other's lane state).
+  */
+-export const STORAGE_KEY_PREFIX = 'deskwork:dashboard:';
++export const STORAGE_KEY_PREFIX = `deskwork:dashboard:v${STORAGE_SCHEMA_VERSION}:`;
+ 
+ /**
+  * Resolve the project key the swimlane controllers use to namespace
+diff --git a/plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts b/plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts
+index 409be80..a57125f 100644
+--- a/plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts
++++ b/plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts
+@@ -11,7 +11,7 @@
+  *     reusing it here keeps the view-default switch aligned with the
+  *     layout switch the operator already perceives.
+  *   - Reads any per-lane operator overrides from localStorage at
+- *     `deskwork:dashboard:<projectKey>:view-mode` (a `Record<laneId,
++ *     `deskwork:dashboard:v2:<projectKey>:view-mode` (a `Record<laneId,
+  *     'kanban' | 'list'>` map).
+  *   - Applies the resolved mode to each swim by swapping `.view-
+  *     kanban` and `.view-list` classes; mirrors `aria-checked` on
+2026-05-31T07:35:38.408257Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:38.408282Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:38.408582Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:38.408590Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:38.408875Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:38.408879Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:38.409163Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:38.409170Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:38.409465Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:38.409469Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:38.410066Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:38.410070Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:39.190913Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:39.190944Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:39.191241Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:39.191250Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:39.191539Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:39.191545Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:39.191837Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:39.191848Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:39.192179Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:39.192183Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:39.192824Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:39.192829Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+codex
+I’ll audit this as a review of the provided change only, and I’ll anchor anything I find to the changed surfaces rather than editing files.
+exec
+/bin/zsh -lc "nl -ba plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts | sed -n '1,120p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+     1	/**
+     2	 * Shared localStorage helpers for the dashboard swimlane controllers.
+     3	 *
+     4	 * The `swimlane.ts`, `swimlane-collapse.ts`, and `swimlane-view-
+     5	 * toggle.ts` controllers all namespace localStorage entries under
+     6	 * `deskwork:dashboard:v<schema>:<projectKey>:<suffix>` and all
+     7	 * resolve the `<projectKey>` from the bay-shell's `data-project-key`
+     8	 * attribute (falling back to the page pathname when the shell lacks
+     9	 * one). The map-shaped controllers (collapse + view-toggle)
+    10	 * additionally read a `Map<laneId, T>` whose on-disk shape is a JSON
+    11	 * object. This module centralises all three pieces — the key prefix,
+    12	 * the project-key resolver, and the read+parse boilerplate — so the
+    13	 * controllers import a single contract instead of redeclaring it.
+    14	 *
+    15	 * Failures (no entry / malformed JSON / wrong root type / unknown
+    16	 * value shape) all collapse to "empty map" — the controllers treat
+    17	 * localStorage as best-effort persistence; in-page state still
+    18	 * works without it.
+    19	 */
+    20	
+    21	/**
+    22	 * Schema version for dashboard localStorage keys. Bump this when the
+    23	 * persisted shapes or restore semantics change so stale per-operator
+    24	 * state is ignored instead of silently replayed into the new UI.
+    25	 */
+    26	export const STORAGE_SCHEMA_VERSION = 2;
+    27	
+    28	/**
+    29	 * Common prefix for every dashboard localStorage key. Controllers
+    30	 * append `<projectKey>:<suffix>` to namespace per-operator state
+    31	 * per-project (so two operators sharing a machine but working on
+    32	 * different projects don't see each other's lane state).
+    33	 */
+    34	export const STORAGE_KEY_PREFIX = `deskwork:dashboard:v${STORAGE_SCHEMA_VERSION}:`;
+    35	
+    36	/**
+    37	 * Resolve the project key the swimlane controllers use to namespace
+    38	 * localStorage entries. The bay-shell carries it as `data-project-
+    39	 * key`; in jsdom + tests with no shell, fall back to the page
+    40	 * pathname for stable isolation.
+    41	 */
+    42	export function resolveProjectKey(shell: HTMLElement): string {
+    43	  const explicit = shell.dataset.projectKey;
+    44	  if (explicit !== undefined && explicit.length > 0) return explicit;
+    45	  return window.location.pathname;
+    46	}
+    47	
+    48	/**
+    49	 * Read a JSON array of strings from localStorage. Returns null on
+    50	 * any read failure (missing entry, parse error, wrong root shape).
+    51	 * Non-string array elements are dropped. Callers pick their own
+    52	 * container type — `swimlane.ts:readStoredSet` projects into a
+    53	 * `Set<string>`; `swimlane-drag.ts:readStoredOrder` keeps the
+    54	 * positional array (lane order is positional, not set-like).
+    55	 *
+    56	 * Centralising the read+parse boilerplate avoids drift between the
+    57	 * two surfaces while letting each caller pick the in-memory shape
+    58	 * that matches its access pattern.
+    59	 */
+    60	export function readStoredStringArray(key: string): readonly string[] | null {
+    61	  try {
+    62	    const raw = window.localStorage.getItem(key);
+    63	    if (raw === null) return null;
+    64	    const parsed: unknown = JSON.parse(raw);
+    65	    if (!Array.isArray(parsed)) return null;
+    66	    const out: string[] = [];
+    67	    for (const item of parsed) {
+    68	      if (typeof item === 'string') out.push(item);
+    69	    }
+    70	    return out;
+    71	  } catch {
+    72	    return null;
+    73	  }
+    74	}
+    75	
+    76	/**
+    77	 * Read a JSON object from localStorage and project it into a
+    78	 * `Map<string, T>` via a per-value type guard. Returns an empty
+    79	 * Map on every read failure (missing entry, parse error, wrong
+    80	 * root shape).
+    81	 *
+    82	 * The value-side guard lets each caller declare its own allowed
+    83	 * value shape (e.g. `(v): v is ViewMode => v === 'kanban' || v ===
+    84	 * 'list'`) without leaking the typed result through a cast.
+    85	 */
+    86	export function readStoredObjectMap<T>(
+    87	  key: string,
+    88	  isValidValue: (value: unknown) => value is T,
+    89	): Map<string, T> {
+    90	  try {
+    91	    const raw = window.localStorage.getItem(key);
+    92	    if (raw === null) return new Map();
+    93	    const parsed: unknown = JSON.parse(raw);
+    94	    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    95	      return new Map();
+    96	    }
+    97	    const out = new Map<string, T>();
+    98	    for (const [k, v] of Object.entries(parsed)) {
+    99	      if (isValidValue(v)) out.set(k, v);
+   100	    }
+   101	    return out;
+   102	  } catch {
+   103	    return new Map();
+   104	  }
+   105	}
+
+exec
+/bin/zsh -lc "rg -n \"STORAGE_KEY_PREFIX|storageKey\\(|lane-order|focus|visibility|lane-collapse|stage-collapse|view-mode|lane-stack-collapse\" plugins/deskwork-studio/public/src/dashboard packages/studio/src packages/studio/test | head -n 160" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+packages/studio/test/dashboard-swimlane-integration.test.ts:23: *     columns match each lane's template; focus-chip strip shows
+packages/studio/test/dashboard-swimlane-integration.test.ts:24: *     3 chips + "All"; lane-visibility rail lists all 3 lanes with
+packages/studio/test/dashboard-swimlane-integration.test.ts:127:  it('Step 5.6.2: focus-chip strip shows 3 lane chips + the "All" chip', async () => {
+packages/studio/test/dashboard-swimlane-integration.test.ts:130:    const chipMatches = r.html.match(/data-focus-chip="[^"]+"/g) ?? [];
+packages/studio/test/dashboard-swimlane-integration.test.ts:132:    expect(r.html).toContain('data-focus-chip="default"');
+packages/studio/test/dashboard-swimlane-integration.test.ts:133:    expect(r.html).toContain('data-focus-chip="mockups"');
+packages/studio/test/dashboard-swimlane-integration.test.ts:134:    expect(r.html).toContain('data-focus-chip="qa"');
+packages/studio/test/dashboard-swimlane-integration.test.ts:135:    expect(r.html).toContain('data-focus-chip-all');
+packages/studio/test/dashboard-swimlane-integration.test.ts:138:  it('Step 5.6.2: lane-visibility rail lists all 3 lanes with .r-eye-btn per row', async () => {
+packages/studio/test/dashboard-swimlane-integration.test.ts:152:    // Server has no knowledge of client-side visibility state — the
+packages/studio/test/dashboard-swimlane-integration.test.ts:156:    // verifies the .is-visibility-hidden modifier is applied to the
+packages/studio/test/dashboard-swimlane-integration.test.ts:217:  it('Step 5.6.6: bay-head emits the lane-sheet trigger in the DOM (server-side presence; CSS toggles visibility per viewport)', async () => {
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:2: * Pure preset-store helpers for the Phase 5 Task 5.5 saveable focus
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:20:  STORAGE_KEY_PREFIX,
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:23:import { reapplyCollapseFromStorage } from './swimlane-collapse.ts';
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:26:const PRESETS_KEY_SUFFIX = ':focus-presets';
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:27:const FOCUS_KEY_SUFFIX = ':focus';
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:28:const VISIBILITY_KEY_SUFFIX = ':visibility';
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:29:const VIEW_MODE_KEY_SUFFIX = ':view-mode';
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:30:const LANE_COLLAPSE_KEY_SUFFIX = ':lane-collapse';
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:31:const STAGE_COLLAPSE_KEY_SUFFIX = ':stage-collapse';
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:40:  readonly focusedLanes: readonly string[];
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:54:  return STORAGE_KEY_PREFIX + projectKey + PRESETS_KEY_SUFFIX;
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:57:function focusKey(projectKey: string): string {
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:58:  return STORAGE_KEY_PREFIX + projectKey + FOCUS_KEY_SUFFIX;
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:61:function visibilityKey(projectKey: string): string {
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:62:  return STORAGE_KEY_PREFIX + projectKey + VISIBILITY_KEY_SUFFIX;
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:66:  return STORAGE_KEY_PREFIX + projectKey + VIEW_MODE_KEY_SUFFIX;
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:70:  return STORAGE_KEY_PREFIX + projectKey + LANE_COLLAPSE_KEY_SUFFIX;
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:74:  return STORAGE_KEY_PREFIX + projectKey + STAGE_COLLAPSE_KEY_SUFFIX;
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:100: * Coerce a per-lane stage-collapse value into the canonical readonly-
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:148: * focused / view-mode / lane-collapse). The stage-collapse axis
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:162:  if (!isStringArray(value.focusedLanes)) return null;
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:176:    focusedLanes: value.focusedLanes,
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:188: * canonical stage-collapse migration (see `coerceStageCollapseState`).
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:249: * Read the EFFECTIVE per-lane view-mode from the live DOM.
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:256: * `view-mode` storage key. Reading from storage would therefore miss
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:287: *   - visibility (`visibleLanes`): rail rows (operator-perceivable
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:289: *   - focus (`focusedLanes`): focus storage key (controller writes
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:291: *   - view-mode (`viewModePerLane`): EFFECTIVE mode from the live
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:298: *   - lane-collapse / stage-collapse: collapse storage keys (the
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:304:  focusedLanes: readonly string[];
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:313:  const hidden = new Set(readJsonArrayOfStrings(visibilityKey(projectKey)));
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:316:  const focusedLanes = readJsonArrayOfStrings(focusKey(projectKey));
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:318:  // view-mode: read EFFECTIVE per-lane mode from the live DOM, not
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:342:    focusedLanes,
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:362: *   1. visibility — gate for focus (hidden lanes can't be focused).
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:363: *   2. view-mode — independent axis; reapply doesn't depend on focus.
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:365: *   4. focus — last, because the visibility pass establishes the
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:366: *      universe of focusable lanes and may force-hide a lane that
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:367: *      the preset's `focusedLanes` then re-includes.
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:380:  writeJsonOrIgnore(visibilityKey(projectKey), hidden);
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:403:  // 4. Focus — focused-lanes array.
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:404:  writeJsonOrIgnore(focusKey(projectKey), preset.focusedLanes);
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:409:  // contract: lane chrome resolves (view-mode + collapse) → focus
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:410:  // pass paints visibility + focus state in lockstep.
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:451:    focusedLanes: snapshot.focusedLanes,
+packages/studio/test/entry-review-marginalia.test.ts:7: *   - The pull-tab on the right edge is rendered (visibility flips
+packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:4: * Client-side controller tests for the mobile lane-visibility sheet —
+packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:21: *     sheet (the operator is still curating visibility from inside).
+packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:22: *   - On close, focus returns to the trigger.
+packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:69:    eye.setAttribute('aria-label', `Toggle visibility for ${id} lane`);
+packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:95:  trigger.setAttribute('aria-label', 'Show lane visibility sheet');
+packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:199:  it('clicking the .r-eye-btn inside the open sheet does NOT close (operator is curating visibility)', () => {
+packages/studio/test/dashboard-swimlane-mobile-sheet-client.test.ts:235:  it('on close, focus returns to the trigger', () => {
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:243:  stub.classList.add('swim-stub', 'is-focus-hidden');
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:255:  strip.classList.add('focus-strip');
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:259:    chip.classList.add('focus-chip', 'active');
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:260:    chip.dataset.focusChip = lane.id;
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:266:  allChip.classList.add('focus-chip', 'active');
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:267:  allChip.dataset.focusChipAll = '';
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:289:    row.classList.add('rail-lane', 'focused');
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:307:    eye.setAttribute('aria-label', `Toggle visibility for ${lane.name} lane`);
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:346:  trigger.setAttribute('aria-label', 'Open lane visibility sheet');
+packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:354: * Build the full bay shell into `document.body`: bay-head + focus
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:7: *   - Task 5.3.2: clicking a HIDDEN lane row flips visibility ON and
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:8: *     adds the lane to focus; Enter on the same row mirrors the click.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:9: *     A visible row preserves the 5.1 focus toggle behavior (no
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:12: *     eye-button triggers the eye-button's visibility contract, NOT
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:16: *     toggles visibility end-to-end (browser-synthesised click runs
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:19: *     NOT empty the focus set when every lane is already focused; a
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:20: *     partial-focus state restores every visible lane.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:21: *   - F6 a11y: the eye-toggle is a real focusable `<button class=
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:27: * size cap. The AUDIT-02 / AUDIT-04 / F5 focus-chip + eye-toggle
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:42:  it('Task 5.3.2: clicking a HIDDEN lane row flips visibility ON and adds the lane to focus', () => {
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:50:      '[data-focus-chip="qa"]',
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:56:    // chip is `.is-visibility-hidden`, the row is `data-lane-visible
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:57:    // ="false"`, and focus is dropped.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:60:    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(true);
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:63:    // restores visibility AND adds the lane to focus. After this
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:64:    // both lane-visible and aria-pressed reflect the focused state,
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:65:    // and the chip is no longer visibility-hidden.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:69:    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(false);
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:73:  it('Task 5.3.2: pressing Enter on a HIDDEN rail row flips visibility ON and focuses (mirrors click)', () => {
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:82:      '[data-focus-chip="mockups"]',
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:87:    expect(mockupsChip?.classList.contains('is-visibility-hidden')).toBe(true);
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:95:    expect(mockupsChip?.classList.contains('is-visibility-hidden')).toBe(false);
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:100:    // button has focus and the operator presses Enter/Space, the
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:102:    // activation. Otherwise the eye-button's visibility-only contract
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:103:    // is silently swallowed and the row's focus-toggle fires instead.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:112:    // Default lane starts visible AND focused.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:117:    // when the eye-button has focus and the operator presses Enter).
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:127:    // The row's focus state must be unchanged — only the eye-button's
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:155:    // The lane is still hidden — the row's unhide-and-focus path did
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:166:    // Initially focused (visible). One click toggles focus off.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:170:    // Visibility unchanged; focus flipped off.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:173:    // Click again to flip focus back on.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:179:  it('AUDIT-06: keyboard Enter on the eye-button toggles visibility (browser-synthesized click runs without row interception)', () => {
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:181:    // behavior on a focused `<button>`: pressing Enter (or Space on
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:188:    // the eye's contract delivers the visibility toggle end-to-end.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:196:      '[data-focus-chip="qa"]',
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:199:    // Start state: visible, focused.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:201:    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(false);
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:214:    // After Enter on a focused <button>, the browser fires a click —
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:215:    // the eye's click handler flips persistent visibility.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:218:    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(true);
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:221:  it('AUDIT-06: keyboard Space on the eye-button toggles visibility (browser-synthesized click runs without row interception)', () => {
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:234:      '[data-focus-chip="mockups"]',
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:245:    // synthesize the keyup-Space click on the focused button.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:251:    expect(mockupsChip?.classList.contains('is-visibility-hidden')).toBe(true);
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:254:  it('AUDIT-09: clicking the All chip is idempotent — all-already-focused stays all-focused (does NOT empty the set)', () => {
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:256:    // "focuses every visible lane" with NO documented toggle-off
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:258:    // emptied the focus set when the operator clicked `All` while
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:259:    // all lanes were already focused. The fix collapses the handler
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:263:    // After init, all three lanes are focused (the default-focus path
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:264:    // when no `?focus=` URL param and no storage value).
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:266:      '[data-focus-chip-all]',
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:271:        `[data-focus-chip="${id}"]`,
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:275:    // Click All while all three are already focused. The fix
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:276:    // guarantees focus stays at all three (idempotent), NOT emptied.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:280:        `[data-focus-chip="${id}"]`,
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:285:    // The All chip itself stays active (every visible lane is focused).
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:290:  it('AUDIT-09: clicking the All chip from a partial-focus state restores every visible lane', () => {
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:292:    // focused, clicking `All` puts every visible lane into focus.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:296:      '[data-focus-chip="qa"]',
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:299:      '[data-focus-chip-all]',
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:301:    // Toggle qa off — focus is now { default, mockups }.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:304:    // Click All — qa is re-focused, default + mockups stay focused.
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:308:        `[data-focus-chip="${id}"]`,
+packages/studio/test/dashboard-swimlane-client-keys.test.ts:321:    // Real focusable <button>, not a <span>.
+packages/studio/test/entry-review-group-members-section-composed.test.ts:121:    expect(html).toContain('data-view-mode="composed"');
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:5: *     AND `<button class="swim-stub">` for every visibility-on lane,
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:6: *     with exactly one carrying `is-focus-hidden` based on the
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:7: *     initial focus state.
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:12: *     a non-empty aria-label. The focus-chip `.is-visibility-hidden`
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:49:  // stub for every visibility-on lane, with exactly one carrying
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:50:  // is-focus-hidden based on initial focus state.
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:51:  it('AUDIT-02: every visibility-on lane emits BOTH <article class="swim"> AND <button class="swim-stub">', async () => {
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:54:    // Default render — all lanes focused.
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:59:    // With nothing in `?focus=`, all 3 swims show and all 3 stubs hide.
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:63:      // swim is NOT focus-hidden
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:68:      // stub IS focus-hidden
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:70:        `<button class="swim-stub is-focus-hidden"[^>]*data-swim-stub="${id}"`,
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:76:  it('AUDIT-02: with ?focus= narrowing, exactly one of {swim, stub} per lane carries is-focus-hidden', async () => {
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:77:    // Focus only default + mockups; qa is focus-off.
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:78:    const r = await getHtml(app, '/dev/editorial-studio?focus=default,mockups');
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:87:        `<button class="swim-stub is-focus-hidden"[^>]*data-swim-stub="${id}"`,
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:91:    // Non-focused — swim hidden, stub visible.
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:93:      /<article class="swim swim--qa-plan[^"]*\bis-focus-hidden\b[^"]*"[^>]*data-lane-id="qa"/,
+packages/studio/test/dashboard-swimlane-audits-render.test.ts:102:  // CSS class `.focus-chip.is-visibility-hidden` is the surface the
+
+exec
+/bin/zsh -lc 'rg -n "deskwork:dashboard:" plugins packages docs | head -n 80' in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:166:`deskwork:dashboard:/dev/editorial-studio:*` keys.
+docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:3458:The audit scope explicitly names "client-state persistence + restore (localStorage corruption resilience; clear-on-version-bump)" as a focus. Corruption resilience is handled well — every reader (`readStoredObjectMap`, `readStoredSet`, `readStoredLanes`, `readStoredStages`) wraps `JSON.parse` in try/catch and validates the parsed shape, degrading to an empty collection on any failure. But there is **no version segment in the storage keys and no clear-on-version-bump mechanism**. Keys are `deskwork:dashboard:<projectKey>:<suffix>` with no schema-version component anywhere in `swimlane-storage.ts`.
+docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:3460:This matters because the corruption guards only protect against *shape* changes (an array becoming an object, an unknown value type). They do not protect against *semantic* drift within a stable shape — e.g., if a future release changes how `view-mode` values map, or repurposes the `stage-collapse` `Record<laneId, string[]>`, the old data parses cleanly and is silently honored, restoring stale or wrong state for every returning operator. Since this is per-operator browser state that survives plugin upgrades indefinitely, there is no natural eviction. The fix is a version token in the key prefix (e.g. `deskwork:dashboard:v1:<projectKey>:<suffix>`) bumped whenever a value's semantics change, so an upgrade starts from clean defaults rather than reinterpreting prior-version state. The absence is auditable here precisely because the operator listed it as expected.
+docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:3497:The audit scope explicitly calls out “clear-on-version-bump,” but all persisted dashboard keys are stable forever under `deskwork:dashboard:<projectKey>:<suffix>`. The readers tolerate malformed JSON, but they do not distinguish old valid shapes from current valid shapes. If the meaning of `:focus`, `:visibility`, `:lane-collapse`, `:stage-collapse`, or `:view-mode` changes, old operator state continues to apply silently.
+docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:3499:This is most visible in `STORAGE_KEY_PREFIX = 'deskwork:dashboard:'`; every controller appends only project key and suffix. A reasonable fix is to add a storage schema version to the prefix or store a version sentinel and clear the known swimlane keys when it mismatches. Tests should seed an older-version key and assert the controller ignores or removes it while preserving current-version state.
+docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1600:- [x] Step 5.1A.1: Lane-level collapse: chevron in each `swim-head` toggles between expanded (full pipeline body) and collapsed (swim-head + compact per-stage count strip). State stored per-lane-per-operator at `deskwork:dashboard:<projectKey>:lane-collapse` (JSON array of lane ids). The `lane-head` (mobile lane-stack) variant ships with Task 5.1B's mobile pass — only the desktop `swim-head` carries the chevron in 5.1A scope.
+docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1601:- [x] Step 5.1A.2: Per-stage collapse: chevron in each `stage-head` (kanban) toggles one stage's content within an expanded lane. Collapsed columns shrink to a 42px vertical strip with the stage name rotated bottom-to-top via `writing-mode: vertical-rl` + `transform: rotate(180deg)`; remaining columns redistribute via the base `flex: 1 1 0` rule. State stored per-lane-per-stage-per-operator at `deskwork:dashboard:<projectKey>:stage-collapse` (JSON `Record<laneId, stageName[]>`). The list-view `lb-group-head` variant ships with Task 5.1B.
+docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1607:- [x] Step 5.1B.2: Viewport-aware defaults: desktop kanban, mobile list (gate: `window.matchMedia('(max-width: 720px)')` — same breakpoint as the existing layout-collapse at `dashboard-swimlane.css:826`). Operator's per-lane choice persists once set at `deskwork:dashboard:<projectKey>:view-mode` (`Record<laneId, 'kanban' | 'list'>`).
+packages/studio/src/pages/dashboard/project-key.ts:7: * `deskwork:dashboard:<projectRoot-hash>:focus` (and
+plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:14: *     `deskwork:dashboard:v2:<projectKey>:view-mode` (a `Record<laneId,
+packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts:229:      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts:242:      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts:277:        'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts:312:      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+packages/studio/test/dashboard-swimlane-view-toggle-client.test.ts:402:      'deskwork:dashboard:v2:task-5-1b-test-key:view-mode',
+packages/studio/test/dashboard-swimlane-client.test.ts:100:      'deskwork:dashboard:test-project-key:visibility',
+plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:6: * `deskwork:dashboard:v<schema>:<projectKey>:<suffix>` and all
+plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:34:export const STORAGE_KEY_PREFIX = `deskwork:dashboard:v${STORAGE_SCHEMA_VERSION}:`;
+plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:20: *   - `deskwork:dashboard:v2:<projectKey>:lane-collapse`
+plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:22: *   - `deskwork:dashboard:v2:<projectKey>:stage-collapse`
+packages/studio/test/dashboard-swimlane-presets-polish-client.test.ts:43:const PREFIX = `deskwork:dashboard:v2:${PROJECT_KEY}`;
+packages/studio/test/dashboard-swimlane-collapse-client.test.ts:256:    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:lane-collapse';
+packages/studio/test/dashboard-swimlane-collapse-client.test.ts:298:    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:stage-collapse';
+packages/studio/test/dashboard-swimlane-integration-client.test.ts:192:    const visibilityKey = `deskwork:dashboard:v2:${PROJECT_KEY}:visibility`;
+packages/studio/test/dashboard-lane-stack-client.test.ts:251:      'deskwork:dashboard:v2:lane-stack-test-key:lane-stack-collapse',
+plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts:15: *     `deskwork:dashboard:v2:<projectKey>:lane-order` — per-operator,
+packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts:21:export const PREFIX = `deskwork:dashboard:v2:${PROJECT_KEY}`;
+packages/studio/test/__helpers/dashboard-swimlane-drag-fixture.ts:33:export const ORDER_STORAGE_KEY = `deskwork:dashboard:v2:${PROJECT_KEY}:lane-order`;
+packages/studio/test/dashboard-swimlane-collapse-list-client.test.ts:36:    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:stage-collapse';
+packages/studio/test/dashboard-swimlane-collapse-list-client.test.ts:105:    const storageKey = 'deskwork:dashboard:v2:task-5-1a-test-key:stage-collapse';
+
+2026-05-31T07:35:46.522530Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:46.522551Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:46.522835Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:46.522843Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:46.523121Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:46.523128Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:46.523410Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:46.523415Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:46.523709Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:46.523714Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:46.524323Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:46.524329Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+codex
+The implementation centralizes the versioned prefix, so I’m checking for any storage surfaces that stayed outside that contract or any tests that only cover one suffix.
+exec
+/bin/zsh -lc "nl -ba plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts | sed -n '1,120p'" in /Users/orion/work/deskwork-work/graphical-entries
+exec
+/bin/zsh -lc "nl -ba plugins/deskwork-studio/public/src/dashboard/lane-stack.ts 2>/dev/null | sed -n '1,120p' || rg -n \"lane-stack-collapse|STORAGE_KEY_PREFIX\" plugins/deskwork-studio/public/src packages/studio/src" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+     1	/**
+     2	 * Lane reorder (drag-to-reorder) controller — Phase 5 Task 5.4.
+     3	 *
+     4	 * Wires HTML5 native drag-and-drop on the lane-visibility rail so the
+     5	 * operator can reorder lanes by dragging a `.rail-lane` row up or
+     6	 * down. The new order:
+     7	 *
+     8	 *   - reorders the rail rows in the DOM (visible reorder),
+     9	 *   - reorders the focus-chip strip (`.focus-chip[data-focus-chip]`)
+    10	 *     to match, so the operator's mental model of "chip order
+    11	 *     mirrors rail order" is preserved across reorder gestures,
+    12	 *   - reorders the per-lane swim + stub pairs inside the bay so the
+    13	 *     bay column matches the new rail order,
+    14	 *   - persists to localStorage as `string[]` of lane ids under
+    15	 *     `deskwork:dashboard:v2:<projectKey>:lane-order` — per-operator,
+    16	 *     per-project (matches the other 5.x state idioms — visibility,
+    17	 *     focus, view-mode, collapse, compose). PRD `Two split state
+    18	 *     axes for lanes` leaves `.deskwork/lane-order.json` (project-
+    19	 *     wide) open as a Phase 6 enhancement; localStorage is the
+    20	 *     Phase 5 ship.
+    21	 *
+    22	 * Per `.claude/rules/affordance-placement.md`, the drag handle is ON
+    23	 * the rail row (`.rail-drag` glyph + `cursor: grab`), not in a
+    24	 * separate toolbar. HTML5 DnD requires `draggable="true"` on the
+    25	 * source root (`.rail-lane`), so the entire row is grabbable —
+    26	 * pragmatic given the browser contract; the visible handle anchors
+    27	 * the operator's mental model.
+    28	 *
+    29	 * Per THESIS Consequence 2 (no sidecar mutation): order is pure
+    30	 * client-side state. No CLI calls; no `writeSidecar`; no
+    31	 * `journal.append`. The order surfaces in the operator's local view
+    32	 * only — collaborators see their own ordering.
+    33	 *
+    34	 * Drop targeting: dragover over a target row computes the cursor's
+    35	 * Y vs the target's `getBoundingClientRect()` midpoint and applies
+    36	 * `.drop-target-above` or `.drop-target-below` for visual feedback
+    37	 * (CSS draws an insertion hairline on the corresponding edge).
+    38	 *
+    39	 * Restoration: on init, the stored order (if any) wins over the
+    40	 * server-rendered order. The validity check (every stored id present
+    41	 * in the live lane set) prevents stale order entries from breaking
+    42	 * the reorder pass when a lane is removed on disk; mismatch
+    43	 * collapses to the server order.
+    44	 *
+    45	 * Per AUDIT-20260528-31, the keyboard-accessible reorder affordance
+    46	 * (per-row `▲` / `▼` buttons) ships alongside this drag controller.
+    47	 * The button controller lives in `swimlane-reorder.ts` and shares the
+    48	 * same `ReorderState` instance so the two paths stay in sync.
+    49	 */
+    50	
+    51	import { resolveProjectKey } from './swimlane-storage.ts';
+    52	import {
+    53	  applyOrderChange,
+    54	  collectRailLanes,
+    55	  computeReorder,
+    56	  initSwimlaneReorderButtons,
+    57	  orderKey,
+    58	  readStoredOrder,
+    59	  reconcileOrder,
+    60	  refreshReorderButtonDisabledState,
+    61	  reorderBay,
+    62	  reorderFocusStrip,
+    63	  reorderRail,
+    64	  type ReorderState,
+    65	} from './swimlane-reorder.ts';
+    66	
+    67	// Re-export the pure `computeReorder` so existing imports (notably
+    68	// the unit test at packages/studio/test/dashboard-swimlane-drag-
+    69	// client.test.ts) keep their module path stable post-split.
+    70	export { computeReorder };
+    71	
+    72	function clearDropTargets(rail: HTMLElement): void {
+    73	  for (const row of rail.querySelectorAll<HTMLElement>('.rail-lane')) {
+    74	    row.classList.remove('drop-target-above', 'drop-target-below');
+    75	  }
+    76	}
+    77	
+    78	function findRowFromTarget(target: EventTarget | null): HTMLElement | null {
+    79	  if (!(target instanceof Element)) return null;
+    80	  const closest = target.closest<HTMLElement>('[data-rail-lane]');
+    81	  return closest;
+    82	}
+    83	
+    84	/**
+    85	 * Shared HTML5-DnD precondition resolver for `dragover` and `drop`:
+    86	 * both events bail when not actively dragging, otherwise resolve the
+    87	 * target lane id from the event and `preventDefault` (required by
+    88	 * HTML5 DnD to allow the subsequent drop). Returns the target row +
+    89	 * id when the event should proceed; null when it should be ignored.
+    90	 */
+    91	function resolveDropTarget(
+    92	  ev: DragEvent,
+    93	  state: ReorderState,
+    94	): { row: HTMLElement; id: string } | null {
+    95	  if (state.draggingId === null) return null;
+    96	  const row = findRowFromTarget(ev.target);
+    97	  if (row === null) return null;
+    98	  const id = row.dataset.railLane;
+    99	  if (id === undefined) return null;
+   100	  ev.preventDefault();
+   101	  return { row, id };
+   102	}
+   103	
+   104	function bindDragHandlers(
+   105	  rail: HTMLElement,
+   106	  projectKey: string,
+   107	  state: ReorderState,
+   108	): void {
+   109	  rail.addEventListener('dragstart', (ev) => {
+   110	    const row = findRowFromTarget(ev.target);
+   111	    if (row === null) return;
+   112	    const id = row.dataset.railLane;
+   113	    if (id === undefined) return;
+   114	    // Per AUDIT-20260528-30 — if a previous drag's `dragend` failed
+   115	    // to fire (browser quirks: disconnect mid-drag, page navigation,
+   116	    // dev-tools-cancellation), a stale `.is-dragging` class may
+   117	    // survive on an old row. Sweep before stamping the new source so
+   118	    // the visual state matches the actual drag.
+   119	    for (const stale of rail.querySelectorAll('.is-dragging')) {
+   120	      stale.classList.remove('is-dragging');
+
+ succeeded in 0ms:
+     1	/**
+     2	 * Mobile lane-stack accordion controller — Phase 5 Task 5.1B
+     3	 * mobile-variant (AUDIT-20260528-10).
+     4	 *
+     5	 * Closes AUDIT-20260528-10: the brief contracts a vertical lane-
+     6	 * stack of accordion sections on mobile (`docs/studio-design/
+     7	 * ACCEPTED/2026-05-27-multi-lane-dashboard-d3-press-bay/brief.md:14`).
+     8	 * This controller wires the `<header class="lane-head">` ↔ `<div
+     9	 * class="lane-body">` accordion contract:
+    10	 *
+    11	 *   - Click anywhere on the lane-head (except inner controls that
+    12	 *     stop propagation) toggles the lane-body's `[hidden]` attribute
+    13	 *     AND flips `aria-expanded` on the head's chevron.
+    14	 *   - Keyboard activation (Enter / Space) on the chevron dispatches
+    15	 *     the same toggle; the chevron is a real `<button>` so Enter is
+    16	 *     free.
+    17	 *   - State is persisted in localStorage namespaced per project so
+    18	 *     the operator's collapsed-lane choices survive reloads.
+    19	 *
+    20	 * The compose chip (`.lh-compose`) and view-toggle (`.lh-view-toggle`)
+    21	 * inside the lane-head share data attributes with the desktop
+    22	 * affordances, so `initSwimlaneCompose` and `initSwimlaneViewToggle`
+    23	 * wire them transparently — no separate binding needed here. Those
+    24	 * controllers stop propagation on their own clicks so the lane-head
+    25	 * accordion handler does NOT fire when an operator taps a chip.
+    26	 *
+    27	 * Per `.claude/rules/affordance-placement.md`: the chevron lives ON
+    28	 * the lane-head, not in a separate toolbar.
+    29	 *
+    30	 * Per the brief: `hidden` attribute (not CSS-only `display: none`)
+    31	 * so screen readers skip collapsed bodies — the accessible-name
+    32	 * contract is preserved without paint-only hide.
+    33	 */
+    34	
+    35	import {
+    36	  resolveProjectKey,
+    37	  STORAGE_KEY_PREFIX,
+    38	} from './swimlane-storage.ts';
+    39	
+    40	const LANE_STACK_COLLAPSE_KEY_SUFFIX = ':lane-stack-collapse';
+    41	
+    42	interface LaneStackState {
+    43	  /** Set of lane ids whose lane-section is collapsed in the mobile lane-stack. */
+    44	  readonly collapsed: Set<string>;
+    45	}
+    46	
+    47	function laneStackCollapseKey(projectKey: string): string {
+    48	  return STORAGE_KEY_PREFIX + projectKey + LANE_STACK_COLLAPSE_KEY_SUFFIX;
+    49	}
+    50	
+    51	function readStoredCollapsed(key: string): Set<string> {
+    52	  try {
+    53	    const raw = window.localStorage.getItem(key);
+    54	    if (raw === null) return new Set();
+    55	    const parsed: unknown = JSON.parse(raw);
+    56	    if (!Array.isArray(parsed)) return new Set();
+    57	    const out = new Set<string>();
+    58	    for (const item of parsed) {
+    59	      if (typeof item === 'string') out.add(item);
+    60	    }
+    61	    return out;
+    62	  } catch {
+    63	    return new Set();
+    64	  }
+    65	}
+    66	
+    67	function writeStoredCollapsed(key: string, value: ReadonlySet<string>): void {
+    68	  try {
+    69	    window.localStorage.setItem(key, JSON.stringify(Array.from(value)));
+    70	  } catch {
+    71	    // localStorage unavailable — in-page state still works.
+    72	  }
+    73	}
+    74	
+    75	/**
+    76	 * Apply the current collapse state to every lane-section in the DOM.
+    77	 * Walks `.lane-section[data-lane-id]` elements and flips the
+    78	 * `[hidden]` attribute on the matching `[data-lane-body]` + the
+    79	 * `aria-expanded` attribute on the matching `[data-collapse-target
+    80	 * ="lane-section"]` chevron.
+    81	 */
+    82	function applyLaneStackState(state: LaneStackState): void {
+    83	  for (const section of document.querySelectorAll<HTMLElement>(
+    84	    '.lane-section[data-lane-id]',
+    85	  )) {
+    86	    const laneId = section.dataset.laneId;
+    87	    if (laneId === undefined) continue;
+    88	    const collapsed = state.collapsed.has(laneId);
+    89	    const body = section.querySelector<HTMLElement>('[data-lane-body]');
+    90	    if (body !== null) {
+    91	      body.hidden = collapsed;
+    92	    }
+    93	    const chev = section.querySelector<HTMLButtonElement>(
+    94	      '.lane-head .collapse-chev[data-collapse-target="lane-section"]',
+    95	    );
+    96	    if (chev !== null) {
+    97	      chev.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    98	      const humanName = chev.dataset.laneName ?? laneId;
+    99	      chev.setAttribute(
+   100	        'aria-label',
+   101	        `${collapsed ? 'Expand' : 'Collapse'} ${humanName} lane`,
+   102	      );
+   103	    }
+   104	  }
+   105	}
+   106	
+   107	function toggleLaneSection(state: LaneStackState, laneId: string): void {
+   108	  if (state.collapsed.has(laneId)) {
+   109	    state.collapsed.delete(laneId);
+   110	  } else {
+   111	    state.collapsed.add(laneId);
+   112	  }
+   113	}
+   114	
+   115	/**
+   116	 * Resolve a click / keyboard activation on a lane-head element into
+   117	 * a lane-section toggle. Returns true when the gesture fired so the
+   118	 * caller can persist + reapply.
+   119	 */
+   120	function dispatchToggle(
+
+exec
+/bin/zsh -lc "nl -ba plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts | sed -n '1,110p'" in /Users/orion/work/deskwork-work/graphical-entries
+exec
+/bin/zsh -lc "nl -ba plugins/deskwork-studio/public/src/dashboard/swimlane.ts | sed -n '1,120p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+     1	/**
+     2	 * Multi-lane swimlane dashboard controller (Phase 5 Task 5.1).
+     3	 *
+     4	 * Wires the bay shell's focus-chip strip + lane-visibility rail to
+     5	 * persistent per-operator state stored in localStorage. The server
+     6	 * renders the initial paint from a `?focus=<csv>` URL param (or "all
+     7	 * focused" when absent); the client controller takes over once
+     8	 * `DOMContentLoaded` fires and:
+     9	 *
+    10	 *   - Reads `?focus=` from `window.location.search`. If present, the
+    11	 *     URL wins on this load AND is written through to localStorage so
+    12	 *     subsequent loads (without the param) see the URL-set focus.
+    13	 *   - Otherwise reads the focus set from localStorage and applies it.
+    14	 *   - Reads the visibility set from localStorage and hides any lane
+    15	 *     the operator has flipped persistently OFF (eye-toggle in the
+    16	 *     rail).
+    17	 *
+    18	 * Click handlers:
+    19	 *
+    20	 *   - Focus chip: toggles whether the lane is in the focus set.
+    21	 *     "All" chip resets focus to every visible lane.
+    22	 *   - Rail eye-toggle (clicking the `.r-eye-btn` button — F6 a11y
+    23	 *     fix promoted the previous `.r-eye` span to a real focusable
+    24	 *     `<button>`): flips persistent visibility.
+    25	 *   - Rail row keyboard activation (F5 a11y fix): Enter / Space on
+    26	 *     a `.rail-lane[role="button"]` toggles focus state (mirrors the
+    27	 *     click handler bound on the same element).
+    28	 *   - Swim-stub: re-adds the lane to focus (the stub removes itself
+    29	 *     once the swimlane renders).
+    30	 *
+    31	 * State keys are namespaced per project root so two operators
+    32	 * sharing a machine but working on different projects don't see
+    33	 * each other's focus state. The project-root hash is server-rendered
+    34	 * onto `<section class="bay-shell" data-project-key>`.
+    35	 *
+    36	 * Out of scope for 5.1: lane-level collapse (5.1A), per-stage
+    37	 * collapse (5.1A), kanban ↔ list toggle (5.1B), compose chip (5.1C),
+    38	 * drag reorder (5.4), preset save (5.5).
+    39	 */
+    40	
+    41	import {
+    42	  readStoredStringArray,
+    43	  resolveProjectKey,
+    44	  STORAGE_KEY_PREFIX,
+    45	} from './swimlane-storage.ts';
+    46	
+    47	const FOCUS_KEY_SUFFIX = ':focus';
+    48	const VISIBILITY_KEY_SUFFIX = ':visibility';
+    49	
+    50	interface SwimlaneState {
+    51	  /** Set of lane ids currently focused. */
+    52	  readonly focused: Set<string>;
+    53	  /**
+    54	   * Set of lane ids the operator has flipped persistently OFF in
+    55	   * the rail. Visibility-off lanes are removed from the focus-chip
+    56	   * strip and don't render in the bay; the operator must flip them
+    57	   * back ON via the rail to see them again.
+    58	   */
+    59	  readonly hidden: Set<string>;
+    60	  /** All lane ids known to the page (server-rendered ordering). */
+    61	  readonly allLanes: readonly string[];
+    62	}
+    63	
+    64	function focusKey(projectKey: string): string {
+    65	  return STORAGE_KEY_PREFIX + projectKey + FOCUS_KEY_SUFFIX;
+    66	}
+    67	
+    68	function visibilityKey(projectKey: string): string {
+    69	  return STORAGE_KEY_PREFIX + projectKey + VISIBILITY_KEY_SUFFIX;
+    70	}
+    71	
+    72	function readStoredSet(key: string): Set<string> | null {
+    73	  // Delegates to the shared string-array reader in swimlane-storage.ts
+    74	  // (the read+parse boilerplate); this surface returns a Set because
+    75	  // the focus + hidden state is set-shaped (membership matters,
+    76	  // order does not). The order surface in swimlane-drag.ts uses the
+    77	  // same reader but keeps the positional array.
+    78	  const items = readStoredStringArray(key);
+    79	  if (items === null) return null;
+    80	  return new Set(items);
+    81	}
+    82	
+    83	function writeStoredSet(key: string, value: ReadonlySet<string>): void {
+    84	  try {
+    85	    window.localStorage.setItem(key, JSON.stringify(Array.from(value)));
+    86	  } catch {
+    87	    // localStorage unavailable — the client controller still works
+    88	    // in-page; the operator just loses persistence across reloads.
+    89	  }
+    90	}
+    91	
+    92	function parseFocusFromUrl(): Set<string> | null {
+    93	  const url = new URL(window.location.href);
+    94	  const list = parseCsvNonEmpty(url.searchParams.get('focus'));
+    95	  return list === null ? null : new Set(list);
+    96	}
+    97	
+    98	/**
+    99	 * Parse a CSV string into a deduped non-empty list of trimmed items.
+   100	 * Returns null when the input is null OR empty after trimming. Shared
+   101	 * by `parseFocusFromUrl` here and (logically) by the server-side
+   102	 * `parseFocusCsv` in the dashboard render path — both implement the
+   103	 * same parsing contract on the same wire format. The shapes are
+   104	 * deliberately near-identical; the duplication is a wire-format
+   105	 * symmetry, not a refactor opportunity (server bundle and client
+   106	 * bundle are separate; cross-bundle imports would force a shared
+   107	 * vendored module).
+   108	 */
+   109	function parseCsvNonEmpty(raw: string | null): string[] | null {
+   110	  if (raw === null) return null;
+   111	  const parts = raw
+   112	    .split(',')
+   113	    .map((p) => p.trim())
+   114	    .filter((p) => p.length > 0);
+   115	  if (parts.length === 0) return null;
+   116	  return parts;
+   117	}
+   118	
+   119	function collectAllLanes(): string[] {
+   120	  const ids: string[] = [];
+
+ succeeded in 0ms:
+     1	/**
+     2	 * Pure preset-store helpers for the Phase 5 Task 5.5 saveable focus
+     3	 * presets feature. Holds the `FocusPreset` type, the storage-key
+     4	 * resolvers, the snapshot + apply + save + delete + list functions —
+     5	 * everything that DOES NOT touch the DOM-bound controller wiring.
+     6	 *
+     7	 * Split from `swimlane-presets.ts` to keep both files under the
+     8	 * project's 300–500 line cap. The controller imports from here; the
+     9	 * jsdom test suite also imports from here so it can verify snapshot
+    10	 * + apply round-trips without instantiating the full controller.
+    11	 *
+    12	 * Per THESIS Consequence 2 (no sidecar mutation): every helper here
+    13	 * operates on localStorage. No CLI calls, no `writeSidecar`, no
+    14	 * `journal.append`. Failures collapse to the read-empty / write-no-op
+    15	 * fallbacks the other Phase 5 controllers already use.
+    16	 */
+    17	
+    18	import {
+    19	  readStoredObjectMap,
+    20	  STORAGE_KEY_PREFIX,
+    21	} from './swimlane-storage.ts';
+    22	import { reapplyFromStorage as reapplySwimlaneFromStorage } from './swimlane.ts';
+    23	import { reapplyCollapseFromStorage } from './swimlane-collapse.ts';
+    24	import { reapplyViewToggleFromStorage } from './swimlane-view-toggle.ts';
+    25	
+    26	const PRESETS_KEY_SUFFIX = ':focus-presets';
+    27	const FOCUS_KEY_SUFFIX = ':focus';
+    28	const VISIBILITY_KEY_SUFFIX = ':visibility';
+    29	const VIEW_MODE_KEY_SUFFIX = ':view-mode';
+    30	const LANE_COLLAPSE_KEY_SUFFIX = ':lane-collapse';
+    31	const STAGE_COLLAPSE_KEY_SUFFIX = ':stage-collapse';
+    32	
+    33	type ViewMode = 'kanban' | 'list';
+    34	
+    35	export interface FocusPreset {
+    36	  readonly id: string;
+    37	  readonly name: string;
+    38	  readonly createdAt: string;
+    39	  readonly visibleLanes: readonly string[];
+    40	  readonly focusedLanes: readonly string[];
+    41	  readonly viewModePerLane: Readonly<Record<string, ViewMode>>;
+    42	  readonly laneCollapseState: Readonly<Record<string, boolean>>;
+    43	  /**
+    44	   * Collapsed stages per lane (collapsed names only). Per
+    45	   * AUDIT-20260528-37 (F6): the array shape replaces the older
+    46	   * `Record<stageName, boolean>` shape which silently dropped
+    47	   * `false` flags through the snapshot/apply round-trip. Legacy
+    48	   * presets are migrated on read (see `coerceStageCollapseState`).
+    49	   */
+    50	  readonly stageCollapseState: Readonly<Record<string, readonly string[]>>;
+    51	}
+    52	
+    53	export function presetsKey(projectKey: string): string {
+    54	  return STORAGE_KEY_PREFIX + projectKey + PRESETS_KEY_SUFFIX;
+    55	}
+    56	
+    57	function focusKey(projectKey: string): string {
+    58	  return STORAGE_KEY_PREFIX + projectKey + FOCUS_KEY_SUFFIX;
+    59	}
+    60	
+    61	function visibilityKey(projectKey: string): string {
+    62	  return STORAGE_KEY_PREFIX + projectKey + VISIBILITY_KEY_SUFFIX;
+    63	}
+    64	
+    65	function viewModeKey(projectKey: string): string {
+    66	  return STORAGE_KEY_PREFIX + projectKey + VIEW_MODE_KEY_SUFFIX;
+    67	}
+    68	
+    69	function laneCollapseKey(projectKey: string): string {
+    70	  return STORAGE_KEY_PREFIX + projectKey + LANE_COLLAPSE_KEY_SUFFIX;
+    71	}
+    72	
+    73	function stageCollapseKey(projectKey: string): string {
+    74	  return STORAGE_KEY_PREFIX + projectKey + STAGE_COLLAPSE_KEY_SUFFIX;
+    75	}
+    76	
+    77	function isViewMode(value: unknown): value is ViewMode {
+    78	  return value === 'kanban' || value === 'list';
+    79	}
+    80	
+    81	function isStringArray(value: unknown): value is readonly string[] {
+    82	  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+    83	}
+    84	
+    85	function isObject(value: unknown): value is { readonly [k: string]: unknown } {
+    86	  return value !== null && typeof value === 'object' && !Array.isArray(value);
+    87	}
+    88	
+    89	function isBooleanFlagMap(value: unknown): value is {
+    90	  readonly [k: string]: boolean;
+    91	} {
+    92	  if (!isObject(value)) return false;
+    93	  for (const flag of Object.values(value)) {
+    94	    if (typeof flag !== 'boolean') return false;
+    95	  }
+    96	  return true;
+    97	}
+    98	
+    99	/**
+   100	 * Coerce a per-lane stage-collapse value into the canonical readonly-
+   101	 * string-array shape. Accepts either:
+   102	 *
+   103	 *   - the new shape: `readonly string[]` (array of collapsed stage
+   104	 *     names); returned as-is.
+   105	 *   - the legacy shape: `Record<string, boolean>` from presets saved
+   106	 *     before AUDIT-20260528-37 (F6); returns the names whose flag
+   107	 *     was `true` (uncollapsed entries are dropped — they're the same
+   108	 *     as "not present" under the new shape).
+   109	 *
+   110	 * Unrecognised shapes coerce to an empty array (no collapsed
+
+2026-05-31T07:35:54.852731Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:54.852748Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:54.853039Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:54.853045Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:54.853329Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:54.853337Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:54.853632Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:54.853639Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:54.853919Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:54.853924Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:35:54.854500Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:35:54.854505Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+exec
+/bin/zsh -lc "nl -ba packages/studio/src/pages/dashboard/project-key.ts | sed -n '1,80p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+     1	/**
+     2	 * Project-key hash used by the multi-lane swimlane dashboard's
+     3	 * client controller to namespace localStorage state per project
+     4	 * root.
+     5	 *
+     6	 * The accepted brief specifies localStorage keys of the shape
+     7	 * `deskwork:dashboard:<projectRoot-hash>:focus` (and
+     8	 * `:visibility`). Hashing the project root rather than embedding
+     9	 * the raw path keeps localStorage keys short, opaque, and free of
+    10	 * path-separator collision concerns; it also avoids leaking
+    11	 * absolute filesystem paths into the browser's storage when the
+    12	 * studio is reverse-proxied.
+    13	 *
+    14	 * The hash is sha1-12 (12 lowercase hex chars). This is NOT a
+    15	 * cryptographic identifier — it's a namespace separator. sha1 is
+    16	 * fine here; the truncation guarantees the project key stays
+    17	 * compact in the rendered HTML attribute.
+    18	 *
+    19	 * The companion client controller at
+    20	 * `plugins/deskwork-studio/public/src/dashboard/swimlane.ts` reads
+    21	 * `shell.dataset.projectKey` and falls back to `window.location.
+    22	 * pathname` when the attribute is absent. Emitting the hash here
+    23	 * means two projects sharing the same studio route (different
+    24	 * project roots, same path) get isolated localStorage namespaces.
+    25	 */
+    26	
+    27	import { createHash } from 'node:crypto';
+    28	
+    29	/**
+    30	 * Hash a project root path into a 12-char lowercase hex token.
+    31	 * Stable across processes (no salt); identical input always
+    32	 * produces identical output. Used as the namespace segment for
+    33	 * the dashboard's localStorage keys.
+    34	 */
+    35	export function projectKeyHash(projectRoot: string): string {
+    36	  return createHash('sha1').update(projectRoot).digest('hex').slice(0, 12);
+    37	}
+
+exec
+/bin/zsh -lc "nl -ba docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md | sed -n '1588,1612p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+  1588	The picked design **pivots away from the PRD's original "per-lane tab strip" framing** (which corresponds to D2 Lane Bar — now REJECTED) toward stacked horizontal swimlanes on desktop + a vertical lane-stack on mobile. The PRD body in `prd.md` still describes the tab-strip approach; that wording is to be iterated through `/deskwork:iterate` so the PRD reflects the picked design. Implementation continues against the swimlane spec captured in the brief + mockup, not against the stale PRD prose.
+  1589	
+  1590	### Task 5.1: Multi-lane swimlane dashboard + focus-chip strip + lane-visibility rail
+  1591	
+  1592	- [x] Step 5.1.1: Refactor the studio's dashboard server-render to read `listLaneConfigs(projectRoot)` and emit one **swimlane** (`<article class="swim ...">`) per visible-and-focused lane, in operator-configured order.
+  1593	- [x] Step 5.1.2: Each swimlane's body renders the lane's dashboard: columns drawn from the lane's template `linearStages` (in order) + an "Off-pipeline" section listing entries in `offPipelineStages`. No tab navigation; every focused lane is on-screen at once.
+  1594	- [x] Step 5.1.3: **Focus-chip strip** (transient filter) emits one chip per visibility-on lane plus an "All" chip; clicking a chip toggles whether that lane is rendered in the current view. State stored per-operator (localStorage); URL-deep-linkable via `?focus=<csv>`.
+  1595	- [x] Step 5.1.4: **Lane-visibility rail** (left rail on desktop, sheet on mobile) lists every lane with an eye-toggle (`●` visible / `○` persistently hidden) + drag handle. Visibility-off lanes don't appear in the focus-chip strip at all. (Mobile sheet is Task 5.1A's territory; desktop rail ships here. Drag handle renders as a non-interactive stub — drag wiring is Task 5.4.)
+  1596	- [x] Step 5.1.5: Filtered-out lane stubs: when a lane is visibility-on but focus-off, render a compact **swim-stub** button between the focused swimlanes so the operator can see what's hidden by the current focus filter; clicking the stub re-adds the lane to focus.
+  1597	
+  1598	### Task 5.1A: Per-lane collapse — lane-level + per-stage
+  1599	
+  1600	- [x] Step 5.1A.1: Lane-level collapse: chevron in each `swim-head` toggles between expanded (full pipeline body) and collapsed (swim-head + compact per-stage count strip). State stored per-lane-per-operator at `deskwork:dashboard:<projectKey>:lane-collapse` (JSON array of lane ids). The `lane-head` (mobile lane-stack) variant ships with Task 5.1B's mobile pass — only the desktop `swim-head` carries the chevron in 5.1A scope.
+  1601	- [x] Step 5.1A.2: Per-stage collapse: chevron in each `stage-head` (kanban) toggles one stage's content within an expanded lane. Collapsed columns shrink to a 42px vertical strip with the stage name rotated bottom-to-top via `writing-mode: vertical-rl` + `transform: rotate(180deg)`; remaining columns redistribute via the base `flex: 1 1 0` rule. State stored per-lane-per-stage-per-operator at `deskwork:dashboard:<projectKey>:stage-collapse` (JSON `Record<laneId, stageName[]>`). The list-view `lb-group-head` variant ships with Task 5.1B.
+  1602	- [x] Step 5.1A.3: Universal chevron convention: `▾` (U+25BE) glyph, `transform: rotate(-90deg)` when `aria-expanded="false"`, click anywhere on the head (or chevron) to toggle, focus-visible ring via `outline: 2px solid var(--er-proof-blue)`, ≥24×24 hit target per WCAG 2.2 SC 2.5.8 AA. Chevron is a real focusable `<button>` carrying `aria-expanded` per WAI-ARIA Authoring Practices for disclosure widgets; Enter activates via the native `<button>` keyboard contract; Space is wired explicitly with `preventDefault` to suppress page scroll.
+  1603	
+  1604	### Task 5.1B: Per-lane kanban ↔ list view toggle
+  1605	
+  1606	- [x] Step 5.1B.1: Segmented `▦ Kanban` / `≡ List` toggle in each swim-head / lane-head flips the body between the two views. Both views show the same entries — only spatial arrangement differs. Toggle is `<div class="view-toggle" role="radiogroup">` carrying two real `<button class="vt-cell">` cells with `role="radio"` + `aria-checked`. Both `.stage-grid` (kanban) AND `.list-body` (list) are server-rendered for every swim; CSS shows exactly one based on `.swim.view-kanban` / `.swim.view-list`.
+  1607	- [x] Step 5.1B.2: Viewport-aware defaults: desktop kanban, mobile list (gate: `window.matchMedia('(max-width: 720px)')` — same breakpoint as the existing layout-collapse at `dashboard-swimlane.css:826`). Operator's per-lane choice persists once set at `deskwork:dashboard:<projectKey>:view-mode` (`Record<laneId, 'kanban' | 'list'>`).
+  1608	- [x] Step 5.1B.3: When a lane is lane-level-collapsed, the toggle greys out (collapse precedence — there's no body to render either view of). CSS: `.swim.collapsed .view-toggle { opacity: 0.4; pointer-events: none }`. Client also stamps `aria-disabled="true"` on each cell (via MutationObserver watching the swim's class list) and click handlers early-return when the parent swim has `.collapsed`.
+  1609	- [x] Step 5.1B.4: Mobile kanban tile view is the **v0.19 single-column collapsible-stage-tile pattern** (per `DESIGN-STANDARDS.md § Collapsible stage tiles`), NOT a 2-column wrap (which would obscure the linear stage sequence) — already covered by the existing `.stage-grid { flex-direction: column }` rule inside `@media (max-width: 720px)`. List view stage groups carry the same stage-name + count + collapse-chev pattern as the kanban stage-grid heads (reusing the universal `.collapse-chev` primitive from Task 5.1A); rows are dense (`.lb-title` + `.lb-version` (slug, mirroring `.e-meta`) + `.lb-state` (empty slot per Commandment III) + `.lb-overflow` (role="button" span)). Per-stage collapse state is SHARED between kanban `.stage-col` and list-body `.lb-group` — `swimlane-collapse.ts` extended to walk both parents via the same lane:stage state.
+  1610	
+  1611	### Task 5.1C: Per-lane Compose chip (`+ new`)
+  1612	
+
+exec
+/bin/zsh -lc "rg -n \"localStorage\\.(getItem|setItem|removeItem)|window\\.localStorage\" plugins/deskwork-studio/public/src packages/studio/src | head -n 200" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:62:    const raw = window.localStorage.getItem(key);
+plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:91:    const raw = window.localStorage.getItem(key);
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:193:    const raw = window.localStorage.getItem(presetsKey(projectKey));
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:218:    window.localStorage.setItem(presetsKey(projectKey), JSON.stringify(obj));
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:235:  const raw = window.localStorage.getItem(key);
+plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:351:    window.localStorage.setItem(key, JSON.stringify(value));
+plugins/deskwork-studio/public/src/lanes/lanes-page.ts:312:    const stored = window.localStorage.getItem(key);
+plugins/deskwork-studio/public/src/lanes/lanes-page.ts:324:      window.localStorage.setItem(key, String(details.open));
+plugins/deskwork-studio/public/src/entry-review/marginalia-toggle.ts:99:      window.localStorage.setItem(MARGINALIA_HIDDEN_KEY, hidden ? '1' : '0');
+plugins/deskwork-studio/public/src/entry-review/marginalia-toggle.ts:116:    const persisted = window.localStorage.getItem(MARGINALIA_HIDDEN_KEY);
+plugins/deskwork-studio/public/src/entry-review/group-members-section.ts:41:    const raw = window.localStorage.getItem(storageKey(groupUuid));
+plugins/deskwork-studio/public/src/entry-review/group-members-section.ts:51:    window.localStorage.setItem(storageKey(groupUuid), mode);
+plugins/deskwork-studio/public/src/dashboard/swimlane.ts:85:    window.localStorage.setItem(key, JSON.stringify(Array.from(value)));
+plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:70:    const raw = window.localStorage.getItem(key);
+plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:104:    window.localStorage.setItem(key, JSON.stringify(Array.from(value)));
+plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:120:    window.localStorage.setItem(key, JSON.stringify(out));
+plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts:85:    window.localStorage.setItem(key, JSON.stringify(obj));
+plugins/deskwork-studio/public/src/dashboard/swimlane-reorder.ts:56:    window.localStorage.setItem(key, JSON.stringify(value));
+plugins/deskwork-studio/public/src/dashboard/lane-stack.ts:53:    const raw = window.localStorage.getItem(key);
+plugins/deskwork-studio/public/src/dashboard/lane-stack.ts:69:    window.localStorage.setItem(key, JSON.stringify(Array.from(value)));
+plugins/deskwork-studio/public/src/editorial-review-client.ts:435:        window.localStorage.setItem(MARGINALIA_HIDDEN_KEY, '0');
+plugins/deskwork-studio/public/src/editorial-review-client.ts:1430:      window.localStorage.setItem(MARGINALIA_HIDDEN_KEY, hidden ? '1' : '0');
+plugins/deskwork-studio/public/src/editorial-review-client.ts:1438:    if (window.localStorage.getItem(MARGINALIA_HIDDEN_KEY) === '1') {
+
+2026-05-31T07:36:03.474324Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:36:03.474358Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:36:03.474637Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:36:03.474644Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:36:03.474928Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:36:03.474937Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:36:03.475229Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:36:03.475234Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:36:03.475510Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:36:03.475518Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+2026-05-31T07:36:03.476137Z  WARN codex_core_skills::loader: ignoring interface.icon_small: icon path must not contain '..'
+2026-05-31T07:36:03.476144Z  WARN codex_core_skills::loader: ignoring interface.icon_large: icon path must not contain '..'
+codex
+No findings.
+
+The change adds a centralized `STORAGE_SCHEMA_VERSION` and moves the shared dashboard prefix to `deskwork:dashboard:v2:` in `plugins/deskwork-studio/public/src/dashboard/swimlane-storage.ts:21-34`. The affected dashboard controllers appear to build keys through that shared prefix, including focus/visibility, collapse, view-mode, lane order, lane stack, and presets. The added regression seeds the old unversioned visibility key and verifies it is ignored, which covers the production stale-key shape from AUDIT-20260530-26.
+
+Residual risk: old unversioned keys are ignored rather than removed, so browser storage can retain unused entries. That is storage hygiene rather than a restore bug unless the product explicitly requires physical cleanup on version bump.
+tokens used
+35,296
