@@ -2614,23 +2614,32 @@ GH #385 (dampener counter doesn't reset on material-diff-range expansion). Opera
 - [ ] GH #385 is closed with the rationale comment in place.
 - [ ] No additional code change required (this task is a disposition, not a fix).
 
-### Task 3: Shallow-fix process discipline — pending operator pick
+### Task 3: HIGH-finding regression-lock discipline (Option D — picked 2026-06-01)
 
-**Open thread.** Operator's diagnostic: *"If the fixes keep throwing HIGH issues, that's a failure of the fixes, not a problem of recursion depth."* This session's pattern bore that out: v1 sentinel fix didn't enumerate the migration/clone state matrix; v1 audit-barrage-lift fix didn't enumerate the run-success states. Each fix was incomplete because the agent didn't pause to walk the failure-mode matrix before coding.
+**Operator-picked discipline** (after discussion 2026-06-01). The chosen frame:
 
-Three candidate process disciplines (operator picks; implementation waits):
+- **Severity-gated**: discipline kicks in only for HIGH (or BLOCKING) findings. MEDIUM/LOW are unchanged — the audit catches them statistically per the operator's stochasticity directive.
+- **Targets commission, not omission**: *"If you miss something, the audit will catch it. If you break something, that's worse than doing nothing."* The fix-task template's "Step 0 invariant write-up + regression-lock test" specifically guards against changes that break working behavior.
+- **Light touch — "think a little harder"**: 1–2 sentences of invariant prose + one extra regression test per HIGH fix-task. Not exhaustive state-matrix enumeration (operator explicitly rejected that as overkill).
 
-- **Option A — Mandatory state-matrix write-up** before coding any discrimination fix (boot/non-boot, stale/current, healthy/unhealthy, etc.). Forces enumeration. Cost: small friction per fix. Surface: dispatch-wrapper prelude OR fix-task template Step 0.
-- **Option B — Pre-fix `/dw-lifecycle:review` pass** that critiques the *fix plan* before code lands. Same mechanism used post-implementation, one stage earlier. Cost: a second review-cycle per fix. Surface: optional flag on `/dw-lifecycle:implement` or a fix-task Step 0.
-- **Option C — Sub-agent dispatch instruction** with "enumerate the failure modes" as the first paragraph of the prompt template. Forces the agent to write out the failure modes BEFORE proposing a fix. Cost: token overhead per dispatch; one prompt change. Surface: dispatch-wrapper prelude.
+**What this catches**: any change that breaks behavior the existing code does correctly. That IS the commission failure mode.
 
-- [ ] Step 1: operator picks among A/B/C (or a fourth option).
-- [ ] Step 2: implement the picked discipline.
-- [ ] Step 3: regression test against a fixture that demonstrates the discipline catches an incomplete-enumeration fix.
-- [ ] Step 4: SKILL.md update.
+**What this skips**: enumeration of all the dimensions the agent might have missed. Accepts that some commission against implicit/untested behavior surfaces in the next audit cycle, not in Step 0.
+
+Implementation:
+
+- [ ] Step 1: extend `workplan-task-renderer.ts` to emit a "Step 0: working-code invariant" prose block when the rendered task's `severity ∈ {high, blocking}`. The Step 0 prose is operator-or-agent-filled with 1–2 sentences naming what the current code does correctly that the fix touches.
+- [ ] Step 2: extend the rendered task's Step 1 (existing failing-test step) to require TWO tests for HIGH+ findings: (a) the bug-repro test (existing), (b) a regression-lock test that pins the Step 0 invariant. Template prose names both explicitly.
+- [ ] Step 3: extend `tdd-enforcement.ts` (the library `check-fix-task-tdd` + the doctor rule compose) to detect HIGH+ severity from the task block AND require ≥2 test() blocks in the cited test file when severity is HIGH+. MEDIUM/LOW unchanged.
+- [ ] Step 4: failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/tdd-enforcement.test.ts`. A HIGH-tagged task with only 1 test → refuse. A HIGH-tagged task with 2+ tests → allow. A MEDIUM-tagged task with 1 test → allow (unchanged). RED-first per project TDD discipline.
+- [ ] Step 5: SKILL.md (implement skill) Step 6 prose: name the HIGH-severity regression-lock requirement. Reference the operator's framing about commission vs omission.
+- [ ] Step 6: commit with `Closes AUDIT-?` or `Refs: Phase 18 Task 3` depending on whether a finding is filed for this gap.
 
 **Acceptance Criteria:**
-- [ ] Operator-picked discipline is implemented + the agent's behavior demonstrably enumerates state matrices before discrimination fixes.
+- [ ] Rendered HIGH+ fix-task blocks include a Step 0 invariant write-up section.
+- [ ] Doctor rule + commit-msg gate require ≥2 test blocks for HIGH+ fix commits.
+- [ ] Regression test demonstrates a HIGH-tagged task with only 1 test is correctly refused.
+- [ ] MEDIUM/LOW behavior unchanged (sanity test that the existing single-test path still passes).
 
 ### Task 4: apply-audit-flips trailer parser — handle comma-separated Closes references
 
