@@ -164,7 +164,13 @@ describe('bindPasteHandler', () => {
     const ev = makeClipboardEvent(file);
     target.dispatchEvent(ev);
     // Let the async persist promise resolve.
-    await new Promise((r) => setTimeout(r, 0));
+    // Allow microtasks to flush — the paste handler chains
+    // crypto.subtle.digest -> fetch -> res.json() -> callback. A
+    // single tick isn't enough; 5 ticks lets all the awaits resolve
+    // before the assertion runs.
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(onScreenshotAttached).toHaveBeenCalledTimes(1);
     const call = onScreenshotAttached.mock.calls[0][0];
@@ -181,7 +187,13 @@ describe('bindPasteHandler', () => {
     bindPasteHandler(target, { onScreenshotAttached });
     const ev = makeClipboardEvent(null); // no file
     target.dispatchEvent(ev);
-    await new Promise((r) => setTimeout(r, 0));
+    // Allow microtasks to flush — the paste handler chains
+    // crypto.subtle.digest -> fetch -> res.json() -> callback. A
+    // single tick isn't enough; 5 ticks lets all the awaits resolve
+    // before the assertion runs.
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(onScreenshotAttached).not.toHaveBeenCalled();
   });
@@ -211,7 +223,13 @@ describe('bindPasteHandler', () => {
     });
     const file = new File([pngBlob()], 'p.png', { type: 'image/png' });
     target.dispatchEvent(makeClipboardEvent(file));
-    await new Promise((r) => setTimeout(r, 0));
+    // Allow microtasks to flush — the paste handler chains
+    // crypto.subtle.digest -> fetch -> res.json() -> callback. A
+    // single tick isn't enough; 5 ticks lets all the awaits resolve
+    // before the assertion runs.
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0][0].message).toMatch(/disk full|500/);
   });
@@ -225,7 +243,13 @@ describe('bindPasteHandler', () => {
     unsubscribe();
     const file = new File([pngBlob()], 'p.png', { type: 'image/png' });
     target.dispatchEvent(makeClipboardEvent(file));
-    await new Promise((r) => setTimeout(r, 0));
+    // Allow microtasks to flush — the paste handler chains
+    // crypto.subtle.digest -> fetch -> res.json() -> callback. A
+    // single tick isn't enough; 5 ticks lets all the awaits resolve
+    // before the assertion runs.
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(onScreenshotAttached).not.toHaveBeenCalled();
   });
@@ -244,7 +268,13 @@ describe('bindDragDropHandler', () => {
     bindDragDropHandler(target, { onScreenshotAttached });
     const file = new File([pngBlob()], 'drop.png', { type: 'image/png' });
     target.dispatchEvent(makeDragEvent(file));
-    await new Promise((r) => setTimeout(r, 0));
+    // Allow microtasks to flush — the paste handler chains
+    // crypto.subtle.digest -> fetch -> res.json() -> callback. A
+    // single tick isn't enough; 5 ticks lets all the awaits resolve
+    // before the assertion runs.
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(onScreenshotAttached).toHaveBeenCalledTimes(1);
   });
@@ -267,7 +297,13 @@ describe('bindDragDropHandler', () => {
     bindDragDropHandler(target, { onScreenshotAttached });
     const file = new File(['hi'], 'doc.txt', { type: 'text/plain' });
     target.dispatchEvent(makeDragEvent(file));
-    await new Promise((r) => setTimeout(r, 0));
+    // Allow microtasks to flush — the paste handler chains
+    // crypto.subtle.digest -> fetch -> res.json() -> callback. A
+    // single tick isn't enough; 5 ticks lets all the awaits resolve
+    // before the assertion runs.
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(onScreenshotAttached).not.toHaveBeenCalled();
   });
@@ -282,7 +318,13 @@ describe('bindDragDropHandler', () => {
     unsubscribe();
     const file = new File([pngBlob()], 'd.png', { type: 'image/png' });
     target.dispatchEvent(makeDragEvent(file));
-    await new Promise((r) => setTimeout(r, 0));
+    // Allow microtasks to flush — the paste handler chains
+    // crypto.subtle.digest -> fetch -> res.json() -> callback. A
+    // single tick isn't enough; 5 ticks lets all the awaits resolve
+    // before the assertion runs.
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
     expect(fetchSpy).not.toHaveBeenCalled();
     // After unsubscribe, dragover preventDefault no longer fires.
     const ev = new Event('dragover', { bubbles: true, cancelable: true });

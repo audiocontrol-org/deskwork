@@ -22,23 +22,22 @@
  * to catch any cross-cutting regression that a per-step test would
  * miss.
  *
- * Render-side support state as of Phase 8 Task 8.7 (per pre-flight
- * audit in `plugins/deskwork-studio/public/src/entry-review/`):
+ * Render-side support state as of Phase 8 Task 8.4:
  *
  *   Field                         | Schema | Render
  *   ------------------------------|--------|-----------------------
  *   replyTo                       |  YES   | YES (Task 8.2)
  *   addressed reason              |  YES   | YES (Step 8.5.3)
  *   inline diff expansion         |  YES   | YES (Task 8.6)
- *   attachments                   |  YES   | NO (Task 8.3 / 8.4 future)
+ *   attachments                   |  YES   | YES (Task 8.4 render)
  *   spatialAnchor                 |  YES   | NO (Phase 10 / 11 future)
  *
  * For fields whose render-side has shipped, the assertion form is
  * "the rendered DOM surfaces the field correctly." For fields whose
  * render-side has NOT shipped, the assertion form is "the field
  * survives into the parsed `CommentAnnotation` object so a future
- * Phase 10/11 + Task 8.3/8.4 render pass can read it without a
- * schema-shape migration."
+ * Phase 10/11 render pass can read it without a schema-shape
+ * migration."
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -267,49 +266,73 @@ describe('Phase 8 cross-cutting markdown review benefit (Task 8.7)', () => {
   );
 
   it(
-    'parsed CommentAnnotation surfaces the attachments field on a markdown ' +
-      'entry — schema integration works even though Task 8.3/8.4 has not ' +
-      'shipped the render-side',
+    'attachments render as <img> thumbnails in the marginalia strip ' +
+      '(Phase 8 Step 8.4 render-side)',
     () => {
-      // Task 8.7's pre-flight audit found that `sidebar-render.ts`
-      // does NOT currently surface `attachments` in the rendered DOM.
-      // Task 8.3 (capture) + Task 8.4 (rendering) are the future
-      // dispatches that close that gap. This test pins the SCHEMA
-      // integration: the field reaches the parsed `CommentAnnotation`
-      // object and is available for the future renderer to read.
+      // Phase 8 Step 8.4 added the render-side for `attachments[]`:
+      // each path becomes an `<img>` inside an
+      // `.er-marginalia-attachments` container appended below the
+      // comment text. The assertion form is full DOM verification —
+      // every attachment path renders as a thumbnail with the same
+      // `src` value and the lazy-loading attribute set.
       //
-      // The assertion form is shape-only — we DO NOT assert against
-      // rendered DOM because no render-side exists. If a future task
-      // adds attachment-rendering, the additional DOM assertions
-      // land in the per-task test (`packages/studio/test/entry-review/
-      // attachment-render.test.ts` or similar); this test continues
-      // to guard the schema-integration baseline.
+      // Future work (Phase 9/10/11) wraps the `<img>` in a
+      // click-to-lightbox container; that change will not touch
+      // this test's invariants because the lightbox-trigger
+      // attaches to the existing `<img>` tags rather than
+      // restructuring the strip.
       const withAttachment = comment({
         id: 'c-with-attachment',
         text: 'see the screenshot — the misalignment is on the right edge',
         attachments: [
-          'scrapbook/screenshots/comment-c-with-attachment-12345.png',
+          'docs/foo/scrapbook/screenshots/comment-c-with-attachment-A.png',
+          'docs/foo/scrapbook/screenshots/comment-c-with-attachment-B.png',
         ],
       });
 
-      // The TS type allows the field through (declared as
-      // `attachments?: string[]` on the client-side
-      // CommentAnnotation). The runtime preserves it on round-trip
-      // through `groupCommentsIntoThreads` — single-comment input
-      // emits a single-root thread whose `root` IS the input object.
       const threads = groupCommentsIntoThreads([withAttachment]);
       expect(threads).toHaveLength(1);
       expect(threads[0].root.id).toBe('c-with-attachment');
       expect(threads[0].root.attachments).toEqual([
-        'scrapbook/screenshots/comment-c-with-attachment-12345.png',
+        'docs/foo/scrapbook/screenshots/comment-c-with-attachment-A.png',
+        'docs/foo/scrapbook/screenshots/comment-c-with-attachment-B.png',
       ]);
 
-      // Render the comment — confirm no crash and the DOM contains
-      // the comment card (the field is silently carried, not
-      // surfaced, until Task 8.3/8.4 adds the render branch).
       const li = buildSidebarThread(threads[0], 'current', makeDeps());
       document.body.appendChild(li);
       expect(li.dataset.annotationId).toBe('c-with-attachment');
+
+      // Render-side: the attachment strip is appended on the root
+      // card. Two thumbnails, one per attachment, each with src
+      // matching the input verbatim and the lazy-loading attribute.
+      const strip = li.querySelector<HTMLElement>(
+        '.er-marginalia-attachments',
+      );
+      expect(strip).not.toBeNull();
+      const thumbs = strip?.querySelectorAll<HTMLImageElement>(
+        '.er-marginalia-attachment-thumb',
+      );
+      expect(thumbs?.length).toBe(2);
+      expect(thumbs?.[0]?.getAttribute('src')).toBe(
+        'docs/foo/scrapbook/screenshots/comment-c-with-attachment-A.png',
+      );
+      expect(thumbs?.[1]?.getAttribute('src')).toBe(
+        'docs/foo/scrapbook/screenshots/comment-c-with-attachment-B.png',
+      );
+      expect(thumbs?.[0]?.getAttribute('loading')).toBe('lazy');
+      expect(thumbs?.[0]?.getAttribute('alt')).toBe('attached screenshot');
+    },
+  );
+
+  it(
+    'comment with no attachments does NOT render an empty marginalia strip',
+    () => {
+      const plain = comment({ id: 'c-plain', text: 'plain comment' });
+      const threads = groupCommentsIntoThreads([plain]);
+      const li = buildSidebarThread(threads[0], 'current', makeDeps());
+      document.body.appendChild(li);
+      const strip = li.querySelector('.er-marginalia-attachments');
+      expect(strip).toBeNull();
     },
   );
 

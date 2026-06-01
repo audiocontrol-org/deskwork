@@ -276,6 +276,52 @@ function renderDiffExpansion(payload: DiffSlicePayload): HTMLElement {
   return expansion;
 }
 
+/**
+ * Phase 8 Step 8.4 — render attached screenshots as a thumbnail strip.
+ * Returns a container `<div class="er-marginalia-attachments">` with
+ * one `<img>` per attachment path, or null when the comment has no
+ * attachments (so the caller doesn't append an empty div).
+ *
+ * Paths are taken VERBATIM as the `src` attribute. Per Phase 8 the
+ * attachment paths are project-root-relative (e.g.
+ * `docs/foo/scrapbook/screenshots/<filename>.png`), which serves
+ * directly from the studio's static-file handler. The renderer does
+ * NOT URL-encode the path; the persistence layer's filename regex
+ * (`screenshot-persistence.ts`) is the security boundary against
+ * malformed filenames, AND the schema-level `z.array(z.string())`
+ * is the type-safety boundary against non-string entries.
+ *
+ * The strip is intentionally minimal — a click-to-lightbox surface
+ * lands in Phase 9/10/11 design work. The shape stays stable so the
+ * lightbox can attach to the existing `<img>` tags without changing
+ * the strip's outer structure.
+ */
+function buildAttachmentStrip(
+  attachments: readonly string[] | undefined,
+): HTMLElement | null {
+  if (!attachments || attachments.length === 0) return null;
+  const strip = document.createElement('div');
+  strip.className = 'er-marginalia-attachments';
+  for (const path of attachments) {
+    if (typeof path !== 'string' || path.length === 0) continue;
+    const img = document.createElement('img');
+    img.className = 'er-marginalia-attachment-thumb';
+    // setAttribute (instead of img.src = path) so the assertion
+    // `getAttribute('src')` returns the verbatim string the caller
+    // passed — `img.src` resolves to an absolute URL via the
+    // browser's URL resolver, which would break tests that assert
+    // the literal relative path.
+    img.setAttribute('src', path);
+    img.setAttribute('alt', 'attached screenshot');
+    img.setAttribute('loading', 'lazy');
+    strip.appendChild(img);
+  }
+  // If every entry was a falsy string the strip ends up empty;
+  // return null so the caller doesn't render an empty container.
+  if (strip.children.length === 0) return null;
+  return strip;
+}
+
 export interface BuildSidebarItemDeps extends SidebarRenderDeps {
   /** Click on the Resolve button — the controller handles the
    *  POST + sidebar-list mutation. */
@@ -344,6 +390,13 @@ export function buildSidebarItem(
   );
   if (stamp) li.appendChild(stamp);
   li.appendChild(text);
+  // Phase 8 Step 8.4 render — attached screenshots surface as a
+  // thumbnail strip below the comment text. The strip is plain
+  // `<img>` tags; a click-through to a fullsize lightbox lands in
+  // Phase 9/10/11 design work. The strip's container has
+  // `.er-marginalia-attachments` so CSS can style the row.
+  const attachmentStrip = buildAttachmentStrip(annotation.attachments);
+  if (attachmentStrip) li.appendChild(attachmentStrip);
 
   const actions = document.createElement('div');
   actions.className = 'er-marginalia-actions';
@@ -444,6 +497,8 @@ export function buildResolvedItem(
   li.appendChild(quote);
   if (stamp) li.appendChild(stamp);
   li.appendChild(text);
+  const attachmentStrip = buildAttachmentStrip(ann.attachments);
+  if (attachmentStrip) li.appendChild(attachmentStrip);
   li.appendChild(actions);
   return li;
 }
