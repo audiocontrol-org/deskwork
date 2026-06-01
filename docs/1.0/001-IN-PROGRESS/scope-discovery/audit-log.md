@@ -1971,3 +1971,27 @@ Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (run `20260601T05
 The updated `last-hook-run.json` points `runDir` at `20260601T053324695Z-scope-discovery` and carries `disposition: "fired-and-promoted"` with `findingsCount: 0` and `promotedCount: 0`. But that same run is the one whose audit-log lift adds AUDIT-52…58 (7 findings) and whose workplan hunk adds Tasks 5.86…5.92 (7 promoted fix-tasks). The recorded counts contradict the artifacts produced in the same commit, and `promotedCount: 0` is internally inconsistent with the `fired-and-promoted` disposition (a disposition that asserts promotion happened, paired with a zero promotion count).
 
 This matters because `last-hook-run.json` is the machine-readable productivity marker — any tooling or operator reading it to answer "did the last barrage find anything?" gets `0/0` while the audit-log shows 7 findings lifted and 7 tasks scoped. Either the counts are stale/uninstrumented for the manual-lift path (the commit subject "audit-log/workplan updates from latest barrage" suggests the lift was authored by hand, with the hook only stamping the marker), or the count fields are simply not populated. Fix: either have the lift path write the true `findingsCount`/`promotedCount`, or change the disposition to one that doesn't claim promotion when the counts are zero — don't let `fired-and-promoted, 0, 0` stand as a self-contradicting record.
+
+## 2026-06-01 — audit-barrage lift (20260601T054004684Z-scope-discovery)
+
+### AUDIT-20260601-61 — Task 5.93 — the fix-task for the HIGH finding AUDIT-59 is itself rendered with the plain code-defect template, reproducing the exact bug AUDIT-59 names, inside the commit that lifts AUDIT-59
+
+Finding-ID: AUDIT-20260601-61 (claude-01 + claude-03 + claude-04 + claude-05 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.93 (`fix-finding-AUDIT-20260601-59`), vs. AUDIT-20260601-59 (`Severity: high`) in `audit-log.md`
+
+AUDIT-59 (high, cross-model) is the finding whose entire thesis is: *HIGH fix-tasks are rendered without a `Severity:` line / Step 0 / Step 1b, so `extractTaskSeverity` returns `null` and the ≥2-test regression-lock gate never fires.* This same diff then adds **Task 5.93 — the fix-task for AUDIT-59 — rendered with the exact plain template the finding describes**: `Closes AUDIT-20260601-59 …. Surface: …`, then `Step 1: write failing test`, `Step 2: confirm test fails`, …, with **no `Severity: high.` line, no Step 0 working-code invariant, no Step 1b regression-lock test**, and a single-test AC (`npx vitest run <test-file-path> exits 0`).
+
+This is distinct from the already-triaged AUDIT-59/AUDIT-52 instances (which named Tasks 5.86 / 5.83 / 5.84): Task 5.93 did not exist when AUDIT-59 was written, and it is the HIGH finding's *own* fix-task. It is empirical proof the root cause is **still unfixed as of this commit** — the `promote-findings`/`apply.ts` lift path did not thread `finding.severity` into `renderFixTaskBlock`, so promoting the HIGH finding reproduced the bug on the HIGH finding's own remediation task. When an implementer picks up 5.93, `extractTaskSeverity(taskBlock)` finds no `Severity:` line → returns `null` → the `severity === 'high' || 'blocking'` guard is skipped → the ≥2-test requirement is never applied; the fix to the missing-severity-gate finding can itself ship with one test, fail-open and silent. Fix: thread `finding.severity` from the audit-log entry into the renderer so 5.93 emits `Severity: high.` + Step 0 + Step 1b before it is checked `[x]`.
+
+### AUDIT-20260601-62 — last-hook-run.json writes a fresh `fired-and-promoted` / `findingsCount: 0` / `promotedCount: 0` record for the run that lifted 2 findings and added 2 tasks
+
+Finding-ID: AUDIT-20260601-62 (claude-02 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json` (updated to run `20260601T053658225Z-scope-discovery`, tip `6b92e0ee`)
+
+The diff repoints `last-hook-run.json` at run `20260601T053658225Z` with `disposition: "fired-and-promoted"` while leaving `findingsCount: 0` and `promotedCount: 0` untouched. That same run is the one whose audit-log lift (in the same commit) adds AUDIT-59 + AUDIT-60 (2 findings) and whose workplan hunk adds Tasks 5.93 + 5.94 (2 promoted fix-tasks). So the commit that *documents* AUDIT-60 (the "0/0 fired-and-promoted is self-contradicting" finding) simultaneously *reproduces* AUDIT-60 on the new run: a disposition asserting promotion happened, paired with a zero promotion count, contradicting the artifacts produced in the same commit.
+
+This is a continuing instance, not a re-litigation of AUDIT-60's disposition — AUDIT-60 named run `…053324695Z`; this writes the identical broken shape for run `…053658225Z`. Any tooling/operator reading `last-hook-run.json` to answer "did the last barrage find anything?" gets `0/0` while the audit-log shows 2 findings lifted and 2 tasks scoped. The count fields are evidently not populated on the manual/in-loop lift path (commit subject "marker churn from in-loop barrage"). Fix: the lift path must write the true `findingsCount`/`promotedCount`, or the marker must not carry `fired-and-promoted` when the counts are zero.

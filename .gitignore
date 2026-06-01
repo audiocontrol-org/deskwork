@@ -121,3 +121,12 @@ yarn-error.log*
 .dw-lifecycle/complete-parent-closure/
 
 .dw-lifecycle/close-shipped/
+
+## Per AUDIT-20260601-claude-opus-05: runtime marker files are mutated
+## on every barrage run. Tracking them creates a recursion engine —
+## each commit triggers a barrage → marker file dirties → marker needs
+## commit → another barrage. Per Phase 17's design, the marker is
+## per-worktree runtime state, NOT source.
+.dw-lifecycle/scope-discovery/last-hook-run.json
+.dw-lifecycle/scope-discovery/hook-run-log.jsonl
+.dw-lifecycle/scope-discovery/.implement-hook-bootstrapped
