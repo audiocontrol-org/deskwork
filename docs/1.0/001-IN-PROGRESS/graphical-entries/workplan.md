@@ -1445,7 +1445,7 @@ Disposition: split fix:
 
 - [x] Step 1.1.1: Author a candidate matrix at `docs/studio-design/PROPOSED/2026-05-25-graphical-review-prior-art/candidates.md` — 17 candidates evaluated across 6 concerns (image annotation, HTML annotation, data model, screenshot capture, screenshot markup, closed-source inform-only).
 - [x] Step 1.1.2: License / last-commit / bundle weight / W3C alignment / browser-API surface / self-hosting cost / adoptable y/n captured per row; sources cited inline.
-- [ ] Step 1.1.3: Drop the matrix into the decision-doc draft as the "Survey" section. (Deferred to Task 1.6.)
+- [x] Step 1.1.3: Drop the matrix into the decision-doc draft as the "Survey" section. (Tracked via Task 1.6 — the decision document is the natural home for the Survey section, not Task 1.1. Closing 1.1.3 here as "tracked-via-1.6" rather than re-doing the work in two places.)
 
 **Surprises surfaced that change the spike picks:**
 - **tldraw disqualified** — source-available licence, requires paid commercial use or "made with tldraw" watermark; incompatible with deskwork's OSS-dependency constraint. Excalidraw is the clean MIT alternative.
