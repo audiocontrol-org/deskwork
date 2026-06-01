@@ -80,11 +80,16 @@ export async function checkImplementHookCoverage(
   }
   const uncovered: UncoveredCommit[] = [];
   for (const commit of unpushed) {
-    // A commit is covered iff its PARENT appears in the log (i.e.,
-    // implement-hook ran when HEAD was at the parent → marker.tip
-    // matches parent → that hook covered the diff that became this
-    // commit).
-    if (!tipsSeen.has(commit.parentSha)) {
+    // A commit is covered iff its OWN sha appears in the log (i.e.,
+    // implement-hook ran AFTER the commit landed → marker.tip ===
+    // commit.sha → that hook audited the diff that produced this
+    // commit). Per AUDIT-20260531-16: pre-fix, the gate checked
+    // `parentSha`, which was the inverted direction — it asserted
+    // "hook ran before this commit," not "hook covered this commit."
+    // The hook explicitly runs AFTER each task-completion commit so
+    // it can audit the diff that just landed; the log entry's tip
+    // is the SHA the hook audited up to.
+    if (!tipsSeen.has(commit.sha)) {
       uncovered.push({
         sha: commit.sha,
         parentSha: commit.parentSha,

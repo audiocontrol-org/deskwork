@@ -210,7 +210,7 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
       args.stderr.write('implement-hook: git rev-parse HEAD failed; marker not written.\n');
       return 1;
     }
-    await writeMarkerSafe({
+    const wrote = await writeMarkerSafe({
       repoRoot: repoRootResolved,
       tip: head,
       runDir: null,
@@ -220,6 +220,10 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
       slushedCount: 0,
       stderr: args.stderr,
     });
+    if (!wrote) {
+      args.stderr.write('implement-hook: marker/log persistence failed on no-new-diff path; exit 1.\n');
+      return 1;
+    }
     args.stderr.write('implement-hook: no new diff since last barrage; skip without firing.\n');
     return 0;
   }
@@ -287,7 +291,7 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
     // forward-progresses per SKILL.md "barrage was an outage, NOT a
     // finding." Write marker with disposition=barrage-outage so the
     // gate still sees the verb ran.
-    await writeMarkerSafe({
+    const wrote = await writeMarkerSafe({
       repoRoot: repoRootResolved,
       tip: head,
       runDir: runDir.length > 0 ? runDir : null,
@@ -297,6 +301,10 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
       slushedCount: 0,
       stderr: args.stderr,
     });
+    if (!wrote) {
+      args.stderr.write('implement-hook: marker/log persistence failed on outage path; exit 1.\n');
+      return 1;
+    }
     args.stderr.write(
       'implement-hook: audit-barrage all-models-failed (outage); marker written, hook complete.\n',
     );
@@ -404,7 +412,7 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
   }
 
   // Step 8: marker.
-  await writeMarkerSafe({
+  const wrote = await writeMarkerSafe({
     repoRoot: repoRootResolved,
     tip: head,
     runDir,
@@ -414,6 +422,10 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
     slushedCount,
     stderr: args.stderr,
   });
+  if (!wrote) {
+    args.stderr.write('implement-hook: marker/log persistence failed on happy path; exit 1.\n');
+    return 1;
+  }
   args.stderr.write(
     `implement-hook: complete (disposition=${disposition}, findings=${findingsCount}, promoted=${promotedCount}, slushed=${slushedCount}).\n`,
   );
@@ -431,7 +443,18 @@ interface MarkerWriteArgs {
   readonly stderr: NodeJS.WriteStream | NodeJS.WritableStream;
 }
 
-async function writeMarkerSafe(args: MarkerWriteArgs): Promise<void> {
+/**
+ * Per AUDIT-20260531-18: marker write failure or log append failure
+ * MUST surface as a non-zero outcome. A successful-looking exit-0
+ * without persisted state silently bypasses the Phase 17 teeth — the
+ * commit-msg gate refuses the next commit while the CLI reported
+ * success. Both writes are persistence the gates depend on; either
+ * failing is a hook failure, not a warning.
+ *
+ * Returns true on success; false (with stderr error) on failure.
+ * Callers MUST map false to exit code 1.
+ */
+async function writeMarkerSafe(args: MarkerWriteArgs): Promise<boolean> {
   const marker: HookRunMarker = {
     tip: args.tip,
     timestamp: new Date().toISOString(),
@@ -447,13 +470,14 @@ async function writeMarkerSafe(args: MarkerWriteArgs): Promise<void> {
   try {
     await writeHookRunMarker({ repoRoot: args.repoRoot, marker });
   } catch (err) {
-    args.stderr.write(`implement-hook: marker write failed: ${(err as Error).message}\n`);
-    return;
+    args.stderr.write(`implement-hook: marker write FAILED: ${(err as Error).message}\n`);
+    return false;
   }
   // Also append to the per-run history log used by the pre-push gate
   // (Phase 17 Task 5). The single marker tracks "latest run"; the log
   // tracks every run by tip, which is what the pre-push gate needs to
-  // walk a multi-commit range.
+  // walk a multi-commit range. Log append failure is ALSO fatal — the
+  // pre-push gate relies on it.
   try {
     await appendHookRunLogEntry(args.repoRoot, {
       tip: marker.tip,
@@ -462,8 +486,10 @@ async function writeMarkerSafe(args: MarkerWriteArgs): Promise<void> {
       runDir: marker.runDir,
     });
   } catch (err) {
-    args.stderr.write(`implement-hook: hook-run-log append failed: ${(err as Error).message}\n`);
+    args.stderr.write(`implement-hook: hook-run-log append FAILED: ${(err as Error).message}\n`);
+    return false;
   }
+  return true;
 }
 
 async function readLatestBarrageTip(repoRoot: string): Promise<string | null> {

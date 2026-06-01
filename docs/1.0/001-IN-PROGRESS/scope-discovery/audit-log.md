@@ -1079,3 +1079,51 @@ The comment states the phrases are "assembled via concat so the test file's data
 ---
 
 Summary: the new regression guard is a step in the right direction but is scoped too narrowly to close the class AUDIT-08/09/10 named (claude-02, claude-03), and — most importantly — the diff's own new fix-tasks 5.25/5.26 re-introduce the bare-`*.test.ts` token that re-trips the doctor rule AUDIT-09 was fixing (claude-01, high). I'd treat claude-01 as the blocking-adjacent item: it means the `fixed-<sha>` flips on AUDIT-08/09 ship alongside workplan tasks the project's own doctor rule will flag as violations.
+
+## 2026-05-31 — audit-barrage lift (20260601T014150238Z-scope-discovery)
+
+Fired against the Phase 17 substantive diff (775fd2a..f5981de — 4 commits: docs scope + failing test + Tasks 2-4 + Tasks 5-6). claude + gemini outputs empty (subscription/auth issues); codex emitted 4 findings. All 4 are real bugs that must be addressed before v0.31.0 ships.
+
+### AUDIT-20260531-16 — Pre-push gate checks the wrong SHA (inverted parent-vs-self direction)
+
+Finding-ID: AUDIT-20260531-16 (codex-01; cross-model=1/3)
+Status:     open
+Severity:   blocking
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-coverage.ts:78-91`
+
+The pre-push gate marks a commit as covered when the log contains the commit's `parentSha`. But the hook runs AFTER each commit and writes the current HEAD (= the just-landed commit's SHA) as `tip`. The log entry proving commit A was audited is `tip=A`, not `tip=<parent of A>`. The current implementation enforces "hook ran BEFORE this commit," the opposite of the Phase 17 contract ("hook MUST fire between every pair of task-completion commits — specifically AFTER each commit lands"). Tests at `check-implement-hook-coverage.test.ts:51-62` encode the same inverted model, so they pass while protecting the wrong behavior.
+
+Fix: require `tipsSeen.has(commit.sha)` for each unpushed commit. Update fixtures to expect log tips that match the commits themselves.
+
+### AUDIT-20260531-17 — `allow-no-prior-run` declared but never returned; opted-in fresh project deadlocks
+
+Finding-ID: AUDIT-20260531-17 (codex-02; cross-model=1/3)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts:42-83`
+
+The result union declares `allow-no-prior-run`, and the workplan explicitly requires *"first commit after `.dw-lifecycle/scope-discovery/` opt-in … gate allows,"* but `checkImplementHookRan` never returns that state. Once opted in, `marker === null` always becomes `refuse-marker-missing`. Test scenario D at `check-implement-hook-ran.test.ts:105-123` covers the not-opted-in branch, not the boot case the workplan specifies. Fresh-install deadlock: a project that just adds `.dw-lifecycle/scope-discovery/` cannot commit at all until they run `implement-hook` — but `implement-hook` may itself need a commit context to audit.
+
+Fix: when marker is missing AND the hook-run-log is empty, return `allow-no-prior-run` (boot case). Distinguish "no hook has ever run" (boot) from "marker was deleted" (refuse) via the log's emptiness.
+
+### AUDIT-20260531-18 — Marker write failures swallowed; exit-0 returned without the marker
+
+Finding-ID: AUDIT-20260531-18 (codex-03; cross-model=1/3)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` writeMarkerSafe + callers
+
+`writeMarkerSafe` catches marker + log-append failures, writes a stderr warning, returns `void`. Callers continue, returning exit 0 on success/skip/outage paths. Violates the contract that every exit-0 path writes `last-hook-run.json` AND appends `hook-run-log.jsonl`. A successful-looking run can leave no persisted state, causing the commit-msg gate to refuse the next commit (or pre-push to fail) while the CLI reported success. Worse: silent persistence failure = invisible Phase-17-teeth bypass.
+
+Fix: make marker write failure surface non-zero. Either bubble the error (return 1) or thread the failure through to the caller so exit code matches actual persistence state.
+
+### AUDIT-20260531-19 — SKILL.md claims hooks are wired but the actual wiring is missing from the diff
+
+Finding-ID: AUDIT-20260531-19 (codex-04; cross-model=1/3)
+Status:     open
+Severity:   high
+Surface:    Missing surface: project `commit-msg` / `pre-push` hook wiring
+
+The workplan and SKILL.md both state `check-implement-hook-ran` is *"wired into the project's commit-msg hook chain"* and `check-implement-hook-coverage` is *"wired into the pre-push hook."* The diff adds the CLI subcommands but no corresponding hook-script changes. Without actual hook installation, Phase 17 ships the verbs but not the mechanized enforcement — the entire teeth premise is unwired. The agent could keep skipping the hook and nothing would refuse.
+
+Fix: update `install-scope-discovery-hooks` (or sibling installer) to emit `commit-msg` and `pre-push` hook entries that invoke the two gates. Mirror the pattern `check-fix-task-tdd-discipline` uses. Tests or fixtures should prove both commands actually get called.

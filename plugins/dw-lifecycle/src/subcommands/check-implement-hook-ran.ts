@@ -28,6 +28,7 @@ import {
   readHookRunMarker,
   type HookRunMarker,
 } from '../scope-discovery/promote-findings/hook-run-marker.js';
+import { readHookRunLog } from '../scope-discovery/promote-findings/hook-run-log.js';
 import {
   checkImplementHookRan,
   type CheckImplementHookRanResult,
@@ -114,6 +115,7 @@ export interface RunArgs {
   readonly readMarker?: () => Promise<HookRunMarker | null>;
   readonly gitHeadResolver?: () => Promise<string>;
   readonly isScopeDiscoveryOptedIn?: () => Promise<boolean>;
+  readonly hasAnyPriorHookRun?: () => Promise<boolean>;
 }
 
 function summarize(result: CheckImplementHookRanResult): string {
@@ -134,11 +136,18 @@ export async function runCheckImplementHookRan(args: RunArgs): Promise<number> {
   const gitHeadResolver = args.gitHeadResolver ?? (async () => defaultGitHead(repoRootResolved));
   const isScopeDiscoveryOptedIn =
     args.isScopeDiscoveryOptedIn ?? (() => defaultIsScopeDiscoveryOptedIn(repoRootResolved));
+  const hasAnyPriorHookRun =
+    args.hasAnyPriorHookRun ??
+    (async () => {
+      const log = await readHookRunLog(repoRootResolved);
+      return log.length > 0;
+    });
   const result = await checkImplementHookRan({
     repoRoot: repoRootResolved,
     readMarker,
     gitHeadResolver,
     isScopeDiscoveryOptedIn,
+    hasAnyPriorHookRun,
   });
   args.stderr.write(`${summarize(result)}\n`);
   if (result.kind.startsWith('allow')) return 0;

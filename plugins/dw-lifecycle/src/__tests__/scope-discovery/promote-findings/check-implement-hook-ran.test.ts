@@ -44,12 +44,17 @@ function makeArgs(opts: {
   marker: MarkerFixture | null;
   head: string;
   scopeDiscoveryOptedIn?: boolean;
+  hasAnyPriorHookRun?: boolean;
 }) {
   return {
     repoRoot: '/tmp/fake-project',
     readMarker: async () => opts.marker,
     gitHeadResolver: async () => opts.head,
     isScopeDiscoveryOptedIn: async () => opts.scopeDiscoveryOptedIn ?? true,
+    // Default: assume prior runs exist (covers the typical case where
+    // a marker is being compared against HEAD). Boot-case tests pass
+    // `hasAnyPriorHookRun: false` explicitly.
+    hasAnyPriorHookRun: async () => opts.hasAnyPriorHookRun ?? true,
   };
 }
 
@@ -72,11 +77,14 @@ describe('checkImplementHookRan — Phase 17 Task 4 (commit-msg gate)', () => {
     expect(result.reason.toLowerCase()).toMatch(/hook ran|matches head/);
   });
 
-  it('B. refuses when marker is missing (no hook has ever run)', async () => {
+  it('B. refuses when marker is missing AND prior runs exist (stale-state: marker was deleted)', async () => {
+    // Per AUDIT-20260531-17: missing marker + prior runs = the marker
+    // was deleted or corrupted (not a fresh project). Refuse.
     const result = await checkImplementHookRan(
       makeArgs({
         marker: null,
         head: 'def456abc789',
+        hasAnyPriorHookRun: true,
       }),
     );
     expect(result.kind).toBe('refuse-marker-missing');
@@ -105,7 +113,24 @@ describe('checkImplementHookRan — Phase 17 Task 4 (commit-msg gate)', () => {
     expect(result.cure).toMatch(/dw-lifecycle implement-hook/);
   });
 
-  it('D. allows when scope-discovery is NOT opted-in (project hasnt enrolled)', async () => {
+  it('D1. allows boot case: opted-in but no marker AND no prior hook-run-log entries', async () => {
+    // Per AUDIT-20260531-17: a freshly-opted-in project's first commit
+    // must be allowed. Distinguishing "boot case" from "stale state"
+    // requires checking the hook-run-log for prior entries.
+    const result = await checkImplementHookRan(
+      makeArgs({
+        marker: null,
+        head: 'firstcommit',
+        scopeDiscoveryOptedIn: true,
+        hasAnyPriorHookRun: false,
+      }),
+    );
+    expect(result.kind).toBe('allow-no-prior-run');
+    if (result.kind !== 'allow-no-prior-run') return;
+    expect(result.reason.toLowerCase()).toMatch(/opt|boot|no prior/);
+  });
+
+  it('D2. allows when scope-discovery is NOT opted-in (project hasnt enrolled)', async () => {
     // Projects without `.dw-lifecycle/scope-discovery/` are not gate-
     // enrolled; the commit-msg hook is a no-op for them. Same pattern
     // as audit-barrage hook silent-skip when scope-discovery is absent
@@ -129,6 +154,8 @@ describe('checkImplementHookRan — Phase 17 Task 4 (commit-msg gate)', () => {
     // is half-broken. Both refusal modes must surface the literal verb
     // string.
     const missing = await checkImplementHookRan(
+      // hasAnyPriorHookRun defaults to true → this triggers the
+      // refuse-marker-missing branch (stale state, not boot).
       makeArgs({ marker: null, head: 'aaa' }),
     );
     const stale = await checkImplementHookRan(

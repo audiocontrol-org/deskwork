@@ -37,6 +37,16 @@ export interface CheckImplementHookRanArgs {
    * False = project not opted into scope-discovery → gate is moot.
    */
   readonly isScopeDiscoveryOptedIn: () => Promise<boolean>;
+  /**
+   * Returns true when the project has at least one hook-run-log entry
+   * (i.e., implement-hook has run at least once since opt-in). Used to
+   * distinguish "boot case" (just opted in, no hook has ever run) from
+   * "stale-state" (hook ran before but the marker was deleted).
+   * Per AUDIT-20260531-17: without this distinction, a freshly-opted-
+   * in project deadlocks — its first commit can't satisfy a missing
+   * marker, but no commit can land to trigger the first hook run.
+   */
+  readonly hasAnyPriorHookRun: () => Promise<boolean>;
 }
 
 export type CheckImplementHookRanResult =
@@ -81,12 +91,25 @@ export async function checkImplementHookRan(
   const marker = await args.readMarker();
   const head = await args.gitHeadResolver();
   if (marker === null) {
+    // Distinguish boot case (never ran) from stale-state (deleted marker).
+    // Per AUDIT-20260531-17: a freshly-opted-in project's first commit
+    // must be allowed; otherwise the project deadlocks.
+    const hasPriorRun = await args.hasAnyPriorHookRun();
+    if (!hasPriorRun) {
+      return {
+        kind: 'allow-no-prior-run',
+        reason:
+          'No marker and no prior hook-run-log entries — project just opted into scope-discovery; ' +
+          'allow first commit. The audit-barrage hook will engage on subsequent task-completion commits.',
+      };
+    }
     return {
       kind: 'refuse-marker-missing',
       head,
       cure:
-        `No hook-run marker found. Run \`${CURE_VERB}\` to fire the audit-barrage hook ` +
-        `on the parent commit (${head.slice(0, 8)}) BEFORE retrying this commit.`,
+        `Marker missing but hook-run-log has prior entries (marker was deleted or corrupted). ` +
+        `Run \`${CURE_VERB}\` to re-fire the audit-barrage hook on the parent commit ` +
+        `(${head.slice(0, 8)}) BEFORE retrying this commit.`,
     };
   }
   if (marker.tip === head) {

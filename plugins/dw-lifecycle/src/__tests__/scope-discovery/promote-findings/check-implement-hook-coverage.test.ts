@@ -51,7 +51,11 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
     expect(result.kind).toBe('allow-no-unpushed-commits');
   });
 
-  it('allows when every unpushed commit has a log entry for its parent', async () => {
+  it('allows when every unpushed commit has its OWN sha in the log (hook ran after each)', async () => {
+    // Per AUDIT-20260531-16: the hook runs AFTER each commit lands.
+    // marker.tip = the just-landed commit's SHA = "hook audited up
+    // through this commit." A commit is covered iff its own SHA
+    // appears in the log.
     const result = await checkImplementHookCoverage(
       makeArgs({
         unpushed: [
@@ -59,7 +63,7 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
           { sha: 'commit-B', parentSha: 'commit-A', subject: 'feat: B' },
           { sha: 'commit-C', parentSha: 'commit-B', subject: 'feat: C' },
         ],
-        logTips: ['baseSha', 'commit-A', 'commit-B'],
+        logTips: ['commit-A', 'commit-B', 'commit-C'],
       }),
     );
     expect(result.kind).toBe('allow-all-commits-backed');
@@ -67,7 +71,11 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
     expect(result.checkedCount).toBe(3);
   });
 
-  it('refuses when an unpushed commit has no log entry for its parent', async () => {
+  it('refuses when an unpushed commit has no log entry with its own sha', async () => {
+    // commit-B was --no-verify-bypassed: the hook never ran after
+    // commit-B landed, so the log has no `tip=commit-B` entry.
+    // commit-A and commit-C both have their own tips in the log
+    // (the operator ran the hook around B, just not for B).
     const result = await checkImplementHookCoverage(
       makeArgs({
         unpushed: [
@@ -75,13 +83,7 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
           { sha: 'commit-B', parentSha: 'commit-A', subject: 'feat: B (--no-verify bypass)' },
           { sha: 'commit-C', parentSha: 'commit-B', subject: 'feat: C' },
         ],
-        // commit-A had hook run (baseSha tip in log); commit-B did
-        // NOT (commit-A absent from log) — operator bypassed via
-        // --no-verify. commit-C's parent (commit-B) IS in the log
-        // because we logged AFTER commit-B landed, but commit-B
-        // itself is still uncovered because no log entry shows tip=
-        // commit-A.
-        logTips: ['baseSha', 'commit-B'],
+        logTips: ['commit-A', 'commit-C'],
       }),
     );
     expect(result.kind).toBe('refuse-uncovered-commits');
@@ -92,6 +94,8 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
   });
 
   it('refuses with all uncovered commits listed when multiple bypass', async () => {
+    // All three commits bypassed — log is empty; none of c1/c2/c3
+    // appear as tips, so all three are uncovered.
     const result = await checkImplementHookCoverage(
       makeArgs({
         unpushed: [
@@ -99,7 +103,7 @@ describe('checkImplementHookCoverage — Phase 17 Task 5 (pre-push gate)', () =>
           { sha: 'c2', parentSha: 'c1', subject: 'second bypass' },
           { sha: 'c3', parentSha: 'c2', subject: 'third bypass' },
         ],
-        logTips: [], // nothing ran; all three bypassed
+        logTips: [],
       }),
     );
     expect(result.kind).toBe('refuse-uncovered-commits');
