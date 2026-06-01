@@ -22,7 +22,12 @@ import {
   wrapRange,
 } from './range-utils.ts';
 import { computeMarkPencilPosition } from './pencil-position.ts';
-import { buildSidebarItem } from './sidebar-render.ts';
+import {
+  buildSidebarItem,
+  type DiffHunk,
+  type DiffSliceFetcher,
+  type DiffSlicePayload,
+} from './sidebar-render.ts';
 import {
   createCommentEditApi,
   createEditDeleteHandlers,
@@ -103,6 +108,65 @@ export function createAnnotationsController(
     `${ENTRY_API}/${encodeURIComponent(entryId)}/annotations`;
   const annotateUrl = (): string =>
     `${ENTRY_API}/${encodeURIComponent(entryId)}/annotate`;
+  // Phase 8 Step 8.6.1 — fetch the diff slice for an addressed
+  // comment. Wired into `buildSidebarItem` so the "addressed" stamp
+  // becomes click-interactive. Throws on non-200 so the toggle's
+  // error branch surfaces an inline marker instead of silently
+  // rendering an empty expansion. Validates the response shape with
+  // explicit per-field type guards (no `as` casts) — the server
+  // contract is owned by `routes/api.ts`'s diff-slice route + the
+  // `computeDiffSlice` return type, but the client doesn't trust the
+  // wire format on read.
+  const fetchDiffSlice: DiffSliceFetcher = async (
+    commentId: string,
+    revision: number,
+  ): Promise<DiffSlicePayload> => {
+    const url =
+      `${ENTRY_API}/${encodeURIComponent(entryId)}/diff-slice` +
+      `?commentId=${encodeURIComponent(commentId)}` +
+      `&revision=${encodeURIComponent(String(revision))}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const body: unknown = await res.json();
+    if (typeof body !== 'object' || body === null) {
+      throw new Error('expected JSON object response');
+    }
+    const reason = Reflect.get(body, 'reason');
+    const hunksRaw = Reflect.get(body, 'hunks');
+    const notes = Reflect.get(body, 'notes');
+    if (typeof reason !== 'string' || !Array.isArray(hunksRaw)) {
+      throw new Error('malformed diff-slice response');
+    }
+    const hunks: DiffHunk[] = [];
+    for (const raw of hunksRaw) {
+      if (typeof raw !== 'object' || raw === null) {
+        throw new Error('malformed hunk entry');
+      }
+      const oldStart = Reflect.get(raw, 'oldStart');
+      const oldLines = Reflect.get(raw, 'oldLines');
+      const newStart = Reflect.get(raw, 'newStart');
+      const newLines = Reflect.get(raw, 'newLines');
+      const lines = Reflect.get(raw, 'lines');
+      if (
+        typeof oldStart !== 'number' ||
+        typeof oldLines !== 'number' ||
+        typeof newStart !== 'number' ||
+        typeof newLines !== 'number' ||
+        !Array.isArray(lines) ||
+        !lines.every((l) => typeof l === 'string')
+      ) {
+        throw new Error('malformed hunk fields');
+      }
+      hunks.push({ oldStart, oldLines, newStart, newLines, lines });
+    }
+    return {
+      reason,
+      hunks,
+      ...(typeof notes === 'string' ? { notes } : {}),
+    };
+  };
   const editApi = createCommentEditApi(entryId, showToast);
   const editDeleteHandlers = createEditDeleteHandlers({
     api: editApi,
@@ -141,6 +205,7 @@ export function createAnnotationsController(
     const li = buildSidebarItem(annotation, status, {
       draftBody,
       addressByCommentId,
+      fetchDiffSlice,
       onResolve: (a, s) => { void resolveComment(a, s); },
       onEdit: editDeleteHandlers.onEdit,
       onDelete: editDeleteHandlers.onDelete,
@@ -390,6 +455,7 @@ export function createAnnotationsController(
       draftBody,
       addressByCommentId,
       resolvedHistory,
+      fetchDiffSlice,
       onReopen: (a, s) => { void reopenComment(a, s); },
     });
   }

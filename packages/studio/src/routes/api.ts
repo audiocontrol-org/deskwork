@@ -33,6 +33,7 @@ import {
   listEntryAnnotations,
   mintEntryAnnotation,
 } from '@deskwork/core/entry/annotations';
+import { computeDiffSlice } from '@deskwork/core/entry/diff-slice';
 import { readSidecar } from '@deskwork/core/sidecar';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import type { OverrideResolver } from '@deskwork/core/overrides';
@@ -287,6 +288,65 @@ export function createApiRouter(ctx: StudioContext): Hono {
     const entryId = c.req.param('entryId');
     const annotations = await listEntryAnnotations(ctx.projectRoot, entryId);
     return c.json({ annotations });
+  });
+
+  // GET /api/dev/editorial-review/entry/:entryId/diff-slice?commentId=<id>&revision=<n>
+  //
+  // Phase 8 Step 8.6.2 — per-comment inline diff-slicing for the
+  // "addressed" badge expansion. Returns the subset of unified-diff
+  // hunks between iteration revisions N-1 and N that intersect the
+  // comment's anchor region, paired with the disposition `reason`
+  // (Step 8.1.2). The client renders the reason as a header line and
+  // the hunks as a side-by-side mini-diff inline under the badge.
+  //
+  // Status codes:
+  //   400 — malformed entryId / commentId; missing or non-numeric
+  //         revision; revision < 1.
+  //   404 — entry not found; OR commentId does not resolve to a
+  //         comment on the entry; OR no `address` annotation with
+  //         disposition `addressed` exists for the comment + revision
+  //         pair (computeDiffSlice returns null in both cases).
+  //   200 — `{ reason, hunks: Hunk[], notes?: string }`. Empty
+  //         `hunks` + present `notes` surfaces the operator-readable
+  //         explanation (first iteration, spatial-anchor limitation,
+  //         etc.); empty `hunks` without `notes` is the "addressed
+  //         without local diff" case (Step 8.6.4 fallback).
+  app.get('/entry/:entryId/diff-slice', async (c) => {
+    const entryId = c.req.param('entryId');
+    if (!UUID_RE.test(entryId)) {
+      return c.json({ error: `malformed entryId: ${entryId}` }, 400);
+    }
+    const commentId = c.req.query('commentId') ?? '';
+    if (!UUID_RE.test(commentId)) {
+      return c.json({ error: `malformed commentId: ${commentId}` }, 400);
+    }
+    const revRaw = c.req.query('revision') ?? '';
+    const revision = Number.parseInt(revRaw, 10);
+    if (!Number.isFinite(revision) || revision < 1 || String(revision) !== revRaw) {
+      return c.json(
+        { error: `revision query parameter must be a positive integer (got ${JSON.stringify(revRaw)})` },
+        400,
+      );
+    }
+    try {
+      await readSidecar(ctx.projectRoot, entryId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = msg.startsWith('sidecar not found') ? 404 : 500;
+      return c.json({ error: `unknown entry: ${entryId}` }, status);
+    }
+    const slice = await computeDiffSlice(ctx.projectRoot, entryId, commentId, revision);
+    if (slice === null) {
+      return c.json(
+        { error: `no addressed annotation for commentId=${commentId} on revision=${revision}` },
+        404,
+      );
+    }
+    return c.json({
+      reason: slice.reason,
+      hunks: slice.hunks,
+      ...(slice.notes !== undefined ? { notes: slice.notes } : {}),
+    });
   });
 
   // Phase 35 (issue #199) — append-only edit + delete journal for

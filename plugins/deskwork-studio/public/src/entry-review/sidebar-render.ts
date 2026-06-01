@@ -14,14 +14,57 @@ import type {
   CommentAnnotation,
 } from './state.ts';
 
+/**
+ * Phase 8 Step 8.6.1 — fetcher contract for the inline diff
+ * expansion. The sidebar render helper wires the click handler on the
+ * "addressed" badge; the controller injects the actual fetch + JSON
+ * parse via this callback. Keeping the fetch out of `sidebar-render.ts`
+ * keeps that module pure-DOM (no network coupling), matches the
+ * pattern used by `onResolve` / `onEdit` / `onDelete`, and lets the
+ * jsdom tests inject a stubbed fetcher.
+ *
+ * Returns the parsed `{ reason, hunks, notes? }` payload from the
+ * studio's `/entry/:entryId/diff-slice` route. Throws on network
+ * error or non-200 response — the click handler renders an inline
+ * error marker in that case.
+ */
+export interface DiffHunk {
+  readonly oldStart: number;
+  readonly oldLines: number;
+  readonly newStart: number;
+  readonly newLines: number;
+  readonly lines: readonly string[];
+}
+export interface DiffSlicePayload {
+  readonly reason: string;
+  readonly hunks: readonly DiffHunk[];
+  readonly notes?: string;
+}
+export type DiffSliceFetcher = (
+  commentId: string,
+  revision: number,
+) => Promise<DiffSlicePayload>;
+
 export interface SidebarRenderDeps {
   draftBody: HTMLElement;
   addressByCommentId: ReadonlyMap<string, AddressAnnotation>;
+  /**
+   * Phase 8 Step 8.6.1 — when present, the "addressed" badge becomes
+   * click-interactive (cursor:pointer, role="button",
+   * aria-pressed="false"). Clicking expands an inline panel below the
+   * badge with the disposition reason as a header and the diff slice
+   * (or the Step 8.6.4 fallback when empty) as the body. Clicking
+   * again collapses. Omit to keep the legacy non-interactive
+   * behavior — tests that don't care about the diff toggle continue
+   * working unchanged.
+   */
+  fetchDiffSlice?: DiffSliceFetcher;
 }
 
 export function buildAddressStamp(
   commentId: string,
   addressByCommentId: ReadonlyMap<string, AddressAnnotation>,
+  fetchDiffSlice?: DiffSliceFetcher,
 ): HTMLElement | null {
   const addr = addressByCommentId.get(commentId);
   if (!addr) return null;
@@ -67,7 +110,150 @@ export function buildAddressStamp(
     reason.textContent = 'no reason recorded';
     stamp.appendChild(reason);
   }
+  // Phase 8 Step 8.6.1 — click-to-expand only on `addressed` stamps,
+  // and only when a fetcher is wired by the controller. The diff
+  // slice is the THING the badge addresses; surfacing it inline on
+  // the badge itself is the canonical affordance-placement pattern
+  // (`.claude/rules/affordance-placement.md` — controls live ON the
+  // component they affect, not in a toolbar). `deferred` and
+  // `wontfix` stamps stay non-interactive — there's no diff to show
+  // for those dispositions.
+  if (addr.disposition === 'addressed' && fetchDiffSlice !== undefined) {
+    attachDiffToggle(stamp, addr, fetchDiffSlice);
+  }
   return stamp;
+}
+
+/**
+ * Wires the click-to-expand affordance on an addressed-disposition
+ * stamp. The toggle inserts a `.er-marginalia-diff-expansion` element
+ * directly after the stamp inside the sidebar item; the next click
+ * collapses it. State lives on the DOM (`aria-pressed` + the
+ * adjacent expansion's presence) so the controller doesn't need to
+ * track per-stamp toggle state in script-scope variables.
+ *
+ * The fetch is lazy — the first click triggers the fetch + render;
+ * subsequent toggles re-use the rendered expansion. A pending fetch
+ * is debounced via `dataset.fetching = '1'` so rapid double-clicks
+ * don't fire duplicate network calls.
+ */
+function attachDiffToggle(
+  stamp: HTMLElement,
+  addr: AddressAnnotation,
+  fetchDiffSlice: DiffSliceFetcher,
+): void {
+  stamp.setAttribute('role', 'button');
+  stamp.setAttribute('tabindex', '0');
+  stamp.setAttribute('aria-pressed', 'false');
+  stamp.dataset.expandable = 'true';
+  stamp.style.cursor = 'pointer';
+  const onActivate = async (ev: Event): Promise<void> => {
+    ev.stopPropagation();
+    const existing = stamp.nextElementSibling;
+    const isExpansion =
+      existing instanceof HTMLElement &&
+      existing.classList.contains('er-marginalia-diff-expansion');
+    if (isExpansion) {
+      existing.remove();
+      stamp.setAttribute('aria-pressed', 'false');
+      return;
+    }
+    if (stamp.dataset.fetching === '1') return;
+    stamp.dataset.fetching = '1';
+    stamp.setAttribute('aria-pressed', 'true');
+    try {
+      const payload = await fetchDiffSlice(addr.commentId, addr.version);
+      const expansion = renderDiffExpansion(payload);
+      stamp.insertAdjacentElement('afterend', expansion);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const errEl = document.createElement('div');
+      errEl.className =
+        'er-marginalia-diff-expansion er-marginalia-diff-expansion--error';
+      errEl.textContent = `Could not load diff slice: ${errMsg}`;
+      stamp.insertAdjacentElement('afterend', errEl);
+    } finally {
+      delete stamp.dataset.fetching;
+    }
+  };
+  stamp.addEventListener('click', (ev) => {
+    void onActivate(ev);
+  });
+  // Keyboard activation — Space and Enter both fire on a role=button
+  // element; jsdom doesn't synthesize a click for these so wire them
+  // explicitly. Matches the existing er-marginalia-action button
+  // pattern (those use native <button>; this is a div-as-button by
+  // necessity since the stamp's chrome is a div).
+  stamp.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      void onActivate(ev);
+    }
+  });
+}
+
+/**
+ * Build the inline diff-expansion DOM under an "addressed" stamp.
+ * The expansion is structured as:
+ *   .er-marginalia-diff-expansion
+ *     .er-marginalia-diff-reason        (header — the disposition reason)
+ *     .er-marginalia-diff-body          (the slice — hunks or fallback)
+ *
+ * Hunks render as a side-by-side `<pre>` block: each `Hunk.lines`
+ * entry is prefixed by `' '` / `'-'` / `'+'` per unified-diff
+ * convention; the renderer wraps each line in a `<span>` carrying a
+ * `data-kind` so CSS can color the deletion/insertion sides
+ * differently. The full side-by-side layout (two columns, old | new)
+ * lands when the studio CSS picks up the per-line `data-kind` —
+ * the markup is shape-stable so CSS can evolve independently.
+ *
+ * Step 8.6.4 fallback ("addressed without local diff — see the
+ * disposition reason") is added in the next commit (separate
+ * concern, separate test).
+ */
+function renderDiffExpansion(payload: DiffSlicePayload): HTMLElement {
+  const expansion = document.createElement('div');
+  expansion.className = 'er-marginalia-diff-expansion';
+  const reasonHeader = document.createElement('div');
+  reasonHeader.className = 'er-marginalia-diff-reason';
+  reasonHeader.textContent = payload.reason || 'no reason recorded';
+  if (!payload.reason) {
+    reasonHeader.dataset.legacyMissingReason = 'true';
+  }
+  expansion.appendChild(reasonHeader);
+  const body = document.createElement('div');
+  body.className = 'er-marginalia-diff-body';
+  if (payload.notes !== undefined && payload.hunks.length === 0) {
+    const notes = document.createElement('div');
+    notes.className = 'er-marginalia-diff-notes';
+    notes.textContent = payload.notes;
+    body.appendChild(notes);
+  } else {
+    for (const hunk of payload.hunks) {
+      const block = document.createElement('pre');
+      block.className = 'er-marginalia-diff-hunk';
+      block.dataset.oldStart = String(hunk.oldStart);
+      block.dataset.newStart = String(hunk.newStart);
+      for (const line of hunk.lines) {
+        const lineEl = document.createElement('span');
+        lineEl.className = 'er-marginalia-diff-line';
+        const kind = line.startsWith('+')
+          ? 'add'
+          : line.startsWith('-')
+            ? 'del'
+            : 'ctx';
+        lineEl.dataset.kind = kind;
+        // Render the line including its leading +/-/' ' prefix so
+        // the operator's mental model lines up with the unified-diff
+        // convention they already know.
+        lineEl.textContent = line + '\n';
+        block.appendChild(lineEl);
+      }
+      body.appendChild(block);
+    }
+  }
+  expansion.appendChild(body);
+  return expansion;
 }
 
 export interface BuildSidebarItemDeps extends SidebarRenderDeps {
@@ -131,7 +317,11 @@ export function buildSidebarItem(
 
   li.appendChild(cat);
   li.appendChild(quote);
-  const stamp = buildAddressStamp(annotation.id, deps.addressByCommentId);
+  const stamp = buildAddressStamp(
+    annotation.id,
+    deps.addressByCommentId,
+    deps.fetchDiffSlice,
+  );
   if (stamp) li.appendChild(stamp);
   li.appendChild(text);
 
@@ -212,7 +402,11 @@ export function buildResolvedItem(
   const text = document.createElement('p');
   text.className = 'note';
   text.textContent = ann.text;
-  const stamp = buildAddressStamp(ann.id, deps.addressByCommentId);
+  const stamp = buildAddressStamp(
+    ann.id,
+    deps.addressByCommentId,
+    deps.fetchDiffSlice,
+  );
 
   const actions = document.createElement('div');
   actions.className = 'er-marginalia-actions';

@@ -1,4 +1,4 @@
-generated_at: 2026-06-01T05:36:51.122Z
+generated_at: 2026-06-01T06:24:48.358Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -367,7 +367,7 @@ clones:
   - id: 5c72154b2f6d
     lines: 9
     members:
-      - packages/core/src/entry/annotations.ts:397:405
+      - packages/core/src/entry/annotations.ts:442:450
       - packages/core/src/review/pipeline.ts:358:366
     disposition: pending
     reason: null
@@ -578,43 +578,57 @@ clones:
   - id: ddade15dffd2
     lines: 12
     members:
-      - packages/studio/src/routes/api.ts:259:270
-      - packages/studio/src/routes/api.ts:314:325
+      - packages/studio/src/routes/api.ts:260:271
+      - packages/studio/src/routes/api.ts:374:385
+    disposition: pending
+    reason: null
+  - id: 71cfaeb7da22
+    lines: 10
+    members:
+      - packages/studio/src/routes/api.ts:262:271
+      - packages/studio/src/routes/api.ts:329:338
     disposition: pending
     reason: null
   - id: b50718db746d
     lines: 11
     members:
-      - packages/studio/src/routes/api.ts:261:326
-      - packages/studio/src/routes/api.ts:354:364
+      - packages/studio/src/routes/api.ts:262:386
+      - packages/studio/src/routes/api.ts:414:424
     disposition: pending
     reason: null
   - id: 918b3c68f28e
     lines: 9
     members:
-      - packages/studio/src/routes/api.ts:277:285
-      - packages/studio/src/routes/api.ts:338:346
+      - packages/studio/src/routes/api.ts:278:286
+      - packages/studio/src/routes/api.ts:398:406
     disposition: pending
     reason: null
+  - id: 87dabae13c21
+    lines: 6
+    members:
+      - packages/studio/src/routes/api.ts:314:319
+      - packages/studio/src/routes/api.ts:453:458
+    disposition: ignore-with-justification
+    reason: established UUID validation pattern in this routes file; six-line clone is the entryId-validate prefix shared with put-body / patch-comment / delete-comment
   - id: a858e789a3a1
     lines: 10
     members:
-      - packages/studio/src/routes/api.ts:299:308
-      - packages/studio/src/routes/api.ts:347:356
+      - packages/studio/src/routes/api.ts:359:368
+      - packages/studio/src/routes/api.ts:407:416
     disposition: pending
     reason: null
   - id: 29e3abdb5a22
     lines: 15
     members:
-      - packages/studio/src/routes/api.ts:332:285
-      - packages/studio/src/routes/api.ts:366:380
+      - packages/studio/src/routes/api.ts:392:286
+      - packages/studio/src/routes/api.ts:426:440
     disposition: pending
     reason: null
   - id: 87cabafecb0f
     lines: 10
     members:
-      - packages/studio/src/routes/api.ts:354:270
-      - packages/studio/src/routes/api.ts:416:425
+      - packages/studio/src/routes/api.ts:414:271
+      - packages/studio/src/routes/api.ts:476:485
     disposition: pending
     reason: null
   - id: 3dac81177cbc
