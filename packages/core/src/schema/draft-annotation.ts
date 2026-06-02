@@ -111,6 +111,78 @@ const BaseFields = {
   id: z.string(),
 } as const;
 
+/**
+ * W3C Web Annotation Data Model alignment (Phase 8 Step 8.1.3).
+ *
+ * Per Phase 1's decision-doc (`docs/studio-design/ACCEPTED/2026-05-26-graphical-review-prior-art/brief.md`)
+ * the project adopts `@recogito/text-annotator` + `W3CTextFormat` for
+ * text-range pins. The W3C Web Annotation Data Model is the structural
+ * base; the deskwork-namespaced fields below are the extension.
+ *
+ * Field-by-field mapping to the W3C model:
+ *
+ *   - `CommentAnnotation` (this schema) ≡ W3C `Annotation` with
+ *     `bodyValue: <text>` plus a selector chosen by the kind of pin
+ *     being recorded (TextQuoteSelector / TextPositionSelector for
+ *     markdown character ranges; FragmentSelector or XPathSelector for
+ *     DOM-keyed pins; SvgSelector for free-form region pins).
+ *
+ *   - `range` (`RangeSchema`) ≡ W3C `TextPositionSelector` /
+ *     `TextQuoteSelector`. The recogito library emits both selectors
+ *     for the same annotation; the deskwork schema currently persists
+ *     only the position form, with the quote shape recoverable from
+ *     the underlying markdown bytes at read time.
+ *
+ *   - `text` (this schema) ≡ W3C `bodyValue` (a plain-text comment
+ *     body). The W3C model also supports a structured `Body` with its
+ *     own type / value / purpose; deskwork's v1 single-string `text`
+ *     maps to the simpler `bodyValue` shape. Future thread / disposition
+ *     fields are layered as additional bodies with their own purpose.
+ *
+ *   - `replyTo` (Step 8.1.1) ≡ W3C single-level reply via a
+ *     `motivation: 'replying'` annotation whose `target` points at
+ *     another annotation. deskwork's reply model is one level deep
+ *     (root + replies; no nested reply-to-reply); this matches the
+ *     `replying` motivation cleanly and avoids the JSON-LD graph
+ *     traversal cost of nested-reply models.
+ *
+ *   - `attachments` (Step 8.1.1) ≡ W3C `body` of type `Image`. The
+ *     deskwork schema stores attachments as a `string[]` of relative
+ *     paths under `<entryDir>/scrapbook/screenshots/` rather than the
+ *     verbose JSON-LD body shape; the path-only form is the smallest
+ *     persistent representation that the studio can resolve to an
+ *     `<img>` src + a server can resolve to a file on disk.
+ *
+ *   - `spatialAnchor` (Step 8.1.1, discriminated union over `kind`)
+ *     ≡ W3C selectors:
+ *       - `kind: 'pixel'` (with `x` + `y` numbers) ≡ W3C
+ *         `FragmentSelector` with a pixel-fragment value (or an
+ *         `SvgSelector` describing a point primitive).
+ *       - `kind: 'dom-selector'` (with `selector` CSS string) ≡ W3C
+ *         `XPathSelector` (CSS-selector form is a deskwork variant).
+ *       - `kind: 'svg-element'` (with `selector` id-or-path string)
+ *         ≡ W3C `FragmentSelector` keyed by an SVG element id (the
+ *         W3C `SvgSelector` shape would carry an inline SVG fragment;
+ *         deskwork references the element by id instead).
+ *
+ *   - `category` ≡ W3C `purpose` on a non-comment body (e.g.
+ *     `motivation: 'tagging'` with a body whose `purpose` carries
+ *     the category label). deskwork v1 inlines the category on the
+ *     comment annotation itself; W3C alignment is a render-side
+ *     translation when serializing for export.
+ *
+ *   - `anchor` ≡ W3C selector hint (an opaque string that callers
+ *     resolved to a DOM element prior to recogito adoption). New
+ *     pins are recorded via the recogito-emitted W3C selectors; the
+ *     legacy `anchor` field is retained for read compatibility.
+ *
+ * The additive Phase 8 fields (`replyTo`, `attachments`,
+ * `spatialAnchor`) are independently optional, so legacy single-
+ * comment annotations parse unchanged (Step 8.1.4 invariant).
+ *
+ * The TS source-of-truth for the runtime shape lives at
+ * `review/types.ts:CommentAnnotation`.
+ */
 const CommentAnnotation = z.object({
   ...BaseFields,
   type: z.literal('comment'),
@@ -122,6 +194,8 @@ const CommentAnnotation = z.object({
   // Phase 8 Step 8.1.1 — additive fields. Existing single-comment
   // annotations without any of these continue to parse unchanged.
   // The TS source-of-truth lives at `review/types.ts:CommentAnnotation`.
+  // W3C Web Annotation mapping for each of these fields is documented
+  // in the schema-level docstring above (Step 8.1.3).
   replyTo: z.string().optional(),
   attachments: z.array(z.string()).optional(),
   spatialAnchor: SpatialAnchorSchema.optional(),
