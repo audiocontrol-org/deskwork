@@ -142,16 +142,34 @@ export function parseCliArgs(argv: string[], opts: ParseCliArgsOptions = {}): Cl
   if (!Number.isFinite(port) || port <= 0 || port > 65535) {
     usage(`invalid port: ${port}`);
   }
-  if (noTailscaleFlagSeen) {
+  // DESKWORK_STUDIO_NO_TAILSCALE truthiness — normalized (case-insensitive,
+  // trimmed) and tolerant of the common spellings. This is the ONLY way to
+  // force loopback-only on a no-auth server (AUDIT-20260602-01/-04), so a
+  // fat-fingered value must not silently fail open onto the tailnet.
+  const rawEnv = env.DESKWORK_STUDIO_NO_TAILSCALE;
+  const normEnv = rawEnv?.toLowerCase().trim();
+  const TRUTHY = new Set(['1', 'true', 'yes', 'on']);
+  const FALSY = new Set(['', '0', 'false', 'no', 'off']);
+  const noTailscale = normEnv !== undefined && TRUTHY.has(normEnv);
+  if (normEnv !== undefined && !TRUTHY.has(normEnv) && !FALSY.has(normEnv)) {
     stderr(
-      'deskwork-studio: --no-tailscale is deprecated and now a no-op; the studio ' +
-        'auto-detects Tailscale so you can reach it from another device. For ' +
-        'non-interactive loopback-only (smokes / CI), set ' +
-        'DESKWORK_STUDIO_NO_TAILSCALE=1.\n',
+      `deskwork-studio: DESKWORK_STUDIO_NO_TAILSCALE is set to '${rawEnv}', which ` +
+        'is not a recognized truthy value (use 1/true/yes/on). Treating as unset — ' +
+        'the studio WILL auto-detect Tailscale and may be reachable on your tailnet.\n',
     );
   }
-  const noTailscaleEnv = env.DESKWORK_STUDIO_NO_TAILSCALE;
-  const noTailscale = noTailscaleEnv === '1' || noTailscaleEnv === 'true';
+  if (noTailscaleFlagSeen) {
+    // The flag is a no-op (it used to force loopback-only and stranded
+    // off-keyboard operators). Warn loudly that the protection it once gave is
+    // gone — the no-auth studio now binds to the tailnet by default.
+    stderr(
+      'deskwork-studio: --no-tailscale is deprecated and now a NO-OP. The studio ' +
+        'auto-detects Tailscale and (having no authentication) will be reachable ' +
+        'by every peer on your tailnet. If you passed --no-tailscale to keep it ' +
+        'loopback-only, that no longer works: set DESKWORK_STUDIO_NO_TAILSCALE=1 ' +
+        '(or use --host 127.0.0.1) to restore loopback-only binding.\n',
+    );
+  }
   return {
     projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve(process.cwd(), projectRoot),
     port,

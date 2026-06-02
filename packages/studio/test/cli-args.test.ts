@@ -80,6 +80,36 @@ describe('parseCliArgs', () => {
     expect(args.noTailscale).toBe(false);
   });
 
+  // AUDIT-20260602-01: the no-auth studio binds to the tailnet by default now.
+  // An adopter who used --no-tailscale specifically to keep it OFF the tailnet
+  // is silently exposed. The deprecation notice must WARN about the exposure
+  // (not just describe the env var), and name how to restore loopback-only.
+  it('--no-tailscale notice warns about tailnet exposure + names the restore path', () => {
+    const lines: string[] = [];
+    parseCliArgs(['--no-tailscale'], { env: {}, stderr: (s) => lines.push(s) });
+    const notice = lines.join('');
+    expect(notice).toMatch(/tailnet|exposed|reachable/i);
+    expect(notice).toMatch(/DESKWORK_STUDIO_NO_TAILSCALE=1/);
+  });
+
+  // AUDIT-20260602-04: env truthiness must not be case/format-narrow, since
+  // this is the only loopback-only path on a no-auth server. TRUE/True/yes/on
+  // and surrounding whitespace should all work.
+  it.each(['TRUE', 'True', 'true', 'yes', 'on', ' 1 ', '1'])(
+    'DESKWORK_STUDIO_NO_TAILSCALE=%j enables loopback-only',
+    (val) => {
+      const args = parseCliArgs([], { env: { DESKWORK_STUDIO_NO_TAILSCALE: val }, stderr: () => {} });
+      expect(args.noTailscale).toBe(true);
+    },
+  );
+
+  it('DESKWORK_STUDIO_NO_TAILSCALE set to an unrecognized value warns and does NOT silently enable', () => {
+    const lines: string[] = [];
+    const args = parseCliArgs([], { env: { DESKWORK_STUDIO_NO_TAILSCALE: 'maybe' }, stderr: (s) => lines.push(s) });
+    expect(args.noTailscale).toBe(false);
+    expect(lines.join('')).toMatch(/DESKWORK_STUDIO_NO_TAILSCALE/);
+  });
+
   it('--port and --host can combine', () => {
     const args = parseCliArgs(['--port', '8080', '--host', '0.0.0.0']);
     expect(args.port).toBe(8080);
