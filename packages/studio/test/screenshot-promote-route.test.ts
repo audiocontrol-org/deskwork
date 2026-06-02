@@ -361,6 +361,41 @@ describe('POST /api/dev/editorial-review/screenshots/orphan/:filename/promote-to
     },
   );
 
+  // AUDIT-20260602-06 — Regression-lock: collapsing the dead
+  // disjunct (`|| msg === 'screenshot filename is required'`) in the
+  // promote-route error map must not regress the live path —
+  // every screenshot-filename-* throw from
+  // assertSafeScreenshotFilename starts with the prefix the remaining
+  // disjunct matches. This test pins the malformed-filename ->
+  // 400 mapping after the disjunct collapse.
+  it(
+    'maps screenshot-filename-* validation throws to 400 (AUDIT-20260602-06 regression-lock)',
+    async () => {
+      const commentId = await seedComment(projectRoot);
+      const app = createApp({ projectRoot, config: cfg });
+      // Filename with forbidden characters — triggers a
+      // `screenshot filename contains forbidden characters` throw.
+      const { status: forbiddenStatus, body: forbiddenBody } = await postPromote(
+        app,
+        '..hop.png',
+        ENTRY_UUID,
+        commentId,
+      );
+      expect(forbiddenStatus).toBe(400);
+      expect(asObj(forbiddenBody).error).toMatch(/screenshot filename/);
+      // Filename whose extension is outside the image allowlist —
+      // triggers a `screenshot filename must match` throw.
+      const { status: extStatus, body: extBody } = await postPromote(
+        app,
+        'bad.txt',
+        ENTRY_UUID,
+        commentId,
+      );
+      expect(extStatus).toBe(400);
+      expect(asObj(extBody).error).toMatch(/screenshot filename/);
+    },
+  );
+
   // AUDIT-20260602-05 — Bug-repro: a JSON array body must be rejected
   // with 400. Pre-fix the promote route's inline body parse omitted
   // the Array.isArray check that the shared readJsonObjectBody helper

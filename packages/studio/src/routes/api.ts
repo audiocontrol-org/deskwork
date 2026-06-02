@@ -677,7 +677,12 @@ export function createApiRouter(ctx: StudioContext): Hono {
         if (msg.startsWith('malformed ')) {
           return c.json({ error: msg }, 400);
         }
-        if (msg.startsWith('screenshot filename') || msg === 'screenshot filename is required') {
+        // AUDIT-20260602-06 — the prior shape included a
+        // `|| msg === 'screenshot filename is required'` disjunct
+        // that was always subsumed by msg.startsWith('screenshot
+        // filename'). Removed. Every screenshot-filename-* throw from
+        // screenshot-persistence.ts starts with the same prefix.
+        if (msg.startsWith('screenshot filename')) {
           return c.json({ error: msg }, 400);
         }
         if (msg.startsWith('orphan screenshot not found')) {
