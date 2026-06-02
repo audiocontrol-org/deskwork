@@ -242,6 +242,13 @@ Each session gets an entry in `DEVELOPMENT-NOTES.md`:
 - [What was learned]
 ```
 
+### Quantitative reporting conventions (AUDIT-20260602-03/-04)
+
+When the journal reports counts derived from the audit-log or test-suite, the entry must distinguish the underlying signal so a future reader can't confuse a parked-but-real defect with a resolved one:
+
+- **Audit findings (AUDIT-03):** When reporting "open findings at session end," ALSO report the slush-pile count and HIGH/MEDIUM severity breakdown of slushed entries. "0 open" alone is misleading when `acknowledged-slush-pile-<date>` findings include real unfixed defects (the dampener parks them; that's a process choice, not a resolution). Suggested form: `Open findings at session end: N (M acknowledged-slush-pile carrying unfixed defects: AUDIT-X, AUDIT-Y)`. The headline number is honest only when paired with the slush-pile context.
+- **Test counts (AUDIT-04):** When reporting `N → M (K new test blocks)`, re-derive the numbers from `npx vitest` output and verify the arithmetic. If a prior commit was reverted, name the revert (`N → M, +K net: +A from <feature>, +B/−B from the reverted <other-feature> attempt`) so the math reconciles. Skip the line entirely if the arithmetic isn't reconciled — false precision erodes trust more than absence.
+
 ## Critical Don'ts
 
 - Never hardcode secrets

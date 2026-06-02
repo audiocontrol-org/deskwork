@@ -1119,36 +1119,40 @@ Acknowledges AUDIT-20260602-02. Surface: `docs/1.0/001-IN-PROGRESS/scope-discove
 
 ### Task 5.114 (fix-finding-AUDIT-20260602-03) (non-bug): AUDIT-20260602-03 — Journal "0 open findings at session end" presents `acknowled…
 
-Closes AUDIT-20260602-03. Surface: `DEVELOPMENT-NOTES.md` — "Open findings at session end: 0" and "Audit findings closed: 64 (60 bulk + 4 individual…)". Severity: medium.
+Acknowledges AUDIT-20260602-03. Surface: `DEVELOPMENT-NOTES.md` — "Open findings at session end: 0" and "Audit findings closed: 64 (60 bulk + 4 individual…)". Severity: medium.
 
 **Shape**: non-bug. This finding's surface is non-source (journal docs). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit to DEVELOPMENT-NOTES.md, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Closes AUDIT-20260602-03` in subject.
+**Disposition (Step 1):** Added a "Quantitative reporting conventions" subsection to `.claude/CLAUDE.md` § Development Journal Format that explicitly requires future journal entries to report the slush-pile count + HIGH/MEDIUM severity breakdown alongside the "open findings at session end" headline. Per the project rule "Content-management databases preserve, they don't delete" (and its audit-log-preservation analog), the historical 2026-06-02 journal entry stays as-is — rewriting past entries would defeat the historical-record function the journal exists to provide. The convention applies forward-only.
+
+- [x] Step 1: write the disposition prose (≥40 chars, substantive).
+- [x] Step 2: apply the action named in Step 1 (`.claude/CLAUDE.md` Quantitative reporting conventions section).
+- [x] Step 3: commit with `Acknowledges AUDIT-20260602-03` in subject (doc convention; not a code change verifiable by test; per AUDIT-01 convention).
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (`.claude/CLAUDE.md` edit is present).
+- [x] Audit-log Status flipped to `acknowledged-historical-forward-only-convention-2026-06-02` via the close-shipped-audit-findings step.
 
 
 ### Task 5.115 (fix-finding-AUDIT-20260602-04) (non-bug): AUDIT-20260602-04 — Journal test-count arithmetic is internally inconsistent
 
-Closes AUDIT-20260602-04. Surface: `DEVELOPMENT-NOTES.md` — "Plugin test suite: 2622 → 2626 (5 new test blocks; the +5 from AUDIT-68 attempt reverted)". Severity: low.
+Acknowledges AUDIT-20260602-04. Surface: `DEVELOPMENT-NOTES.md` — "Plugin test suite: 2622 → 2626 (5 new test blocks; the +5 from AUDIT-68 attempt reverted)". Severity: low.
 
 **Shape**: non-bug. This finding's surface is non-source (journal docs). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — re-derive the arithmetic from `npx vitest` output and edit DEVELOPMENT-NOTES.md, or acknowledge the historical inconsistency with a substantive reason.
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Closes AUDIT-20260602-04` in subject.
+**Disposition (Step 1):** Same disposition as Task 5.114 — the `.claude/CLAUDE.md` Quantitative reporting conventions section also covers test-count arithmetic: future journal entries must re-derive counts from `npx vitest` output, name reverts explicitly so the math reconciles, and skip the line entirely if the arithmetic doesn't add up (false precision erodes trust more than absence). The historical 2026-06-02 entry stays as-is per the preservation rule.
+
+- [x] Step 1: write the disposition prose (≥40 chars, substantive).
+- [x] Step 2: apply the action named in Step 1 (same `.claude/CLAUDE.md` edit as Task 5.114; covers both findings).
+- [x] Step 3: commit with `Acknowledges AUDIT-20260602-04` in subject (folded into Task 5.114's commit since the disposition is identical).
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (`.claude/CLAUDE.md` edit is present).
+- [x] Audit-log Status flipped to `acknowledged-historical-forward-only-convention-2026-06-02` via the close-shipped-audit-findings step.
 
 ### Task 5.99 (fix-finding-AUDIT-20260601-65): AUDIT-20260601-65 — Task 5.97 — the fix-task for the HIGH finding AUDIT-63 is re…
 

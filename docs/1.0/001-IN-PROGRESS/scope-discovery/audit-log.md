@@ -2290,7 +2290,7 @@ The structural problem is that an audit finding *about an audit disposition* has
 ### AUDIT-20260602-03 — Journal "0 open findings at session end" presents `acknowledged-slush-pile` as resolution
 
 Finding-ID: AUDIT-20260602-03
-Status:     open
+Status:     acknowledged-historical-forward-only-convention-2026-06-02
 Severity:   medium
 Surface:    `DEVELOPMENT-NOTES.md` — "Open findings at session end: 0" and "Audit findings closed: 64 (60 bulk + 4 individual…)"
 
@@ -2301,7 +2301,7 @@ The cost is operator-trust: a future reader of this journal sees "burndown to ze
 ### AUDIT-20260602-04 — Journal test-count arithmetic is internally inconsistent
 
 Finding-ID: AUDIT-20260602-04
-Status:     open
+Status:     acknowledged-historical-forward-only-convention-2026-06-02
 Severity:   low
 Surface:    `DEVELOPMENT-NOTES.md` — "Plugin test suite: 2622 → 2626 (5 new test blocks; the +5 from AUDIT-68 attempt reverted)"
 
@@ -2526,3 +2526,38 @@ Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings
 The new tests lock that `Acknowledges <id>` and `Defers <id>` are ignored and that `Closes <id>` still extracts alongside an `Acknowledges` sibling. But the property the whole convention rests on is *which leading verb arms a flip* — and the tests never exercise the adversarial case where `closes` appears as a **substring** of another word immediately before an AUDIT id. `parseClosesAuditTrailers`' source is not in this diff, so I can't confirm its anchoring; if the regex is `/closes\s+(AUDIT-…)/i` without a `\b` boundary, a body line like `Discloses AUDIT-20260601-50.` or `Encloses AUDIT-…` would false-match `closes AUDIT-50` and arm a spurious `fixed-<sha>` proposal. That is precisely the false-flip failure mode this convention exists to prevent, and it's untested.
 
 This is a test-coverage gap verifiable from the diff alone: the added cases cover sibling-verb discrimination but not intra-word boundary. A one-line regression case — `parseClosesAuditTrailers('… \nDiscloses AUDIT-20260601-50.')` expecting `[]` — would lock the boundary property and turn a latent parser assumption into an asserted contract. Given the convention's stated purpose is "which words trigger a flip," the boundary behavior is core to the contract the tests claim to regression-lock, not an edge case.
+
+## 2026-06-02 — audit-barrage lift (20260602T171859274Z-scope-discovery)
+
+### AUDIT-20260602-22 — Workplan Step 3 is checked `[x]` claiming an `Acknowledges AUDIT-20260602-02` commit trailer, but the actual commit subject carries only a bare `(AUDIT-20260602-02)` parenthetical
+
+Finding-ID: AUDIT-20260602-22
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.113 Step 3 vs. the audited commit subject
+
+Task 5.113's Step 3 is marked done — `[x] Step 3: commit with `Acknowledges AUDIT-20260602-02` in subject (doc-only — no code change verifiable by test; per AUDIT-01 convention).` But the only commit subject in the audited range is `docs(promote-findings): document disposition-of-disposition operator-judgment scaffolding (AUDIT-20260602-02)` — it contains the bare parenthetical `(AUDIT-20260602-02)`, not the `Acknowledges AUDIT-20260602-02` trailer the step prescribes and claims to have executed.
+
+This is the same self-confirming-claim shape the recent audit-log run flagged in AUDIT-20260602-19 (a checked-off step whose stated action its own artifact falsifies). Functionally it's benign — `parseClosesAuditTrailers` only arms a flip on a leading `Closes`, so a bare parenthetical correctly arms nothing, and AUDIT-02's status was set manually to `acknowledged-architectural-tradeoff-2026-06-02`. But the whole point of the AUDIT-01 verb convention is that `Acknowledges <id>` is the *intentional, recognized-but-ignored* signal for a no-fix acknowledgment commit; a bare parenthetical is less traceable, not more. Fix: either reword the commit to lead with `Acknowledges AUDIT-20260602-02` (matching Step 3), or change Step 3's text to describe what was actually done (bare parenthetical reference, no verb trailer) so the checked AC matches the artifact.
+
+### AUDIT-20260602-23 — The deferred `meta-disposition` structural fix is declared OUT OF SCOPE in durable SKILL.md guidance with no GitHub issue tracking it
+
+Finding-ID: AUDIT-20260602-23
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/promote-findings/SKILL.md` (new "Disposition-of-disposition findings" section, final paragraph) + `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.113 disposition prose
+
+The new SKILL.md section ends: *"The structural fix (a `meta-disposition` shape distinct from `non-bug` that auto-routes to `informational`) is out of scope for AUDIT-02…"* and the workplan Task 5.113 prose mirrors it: *"A full mechanical classifier … is OUT OF SCOPE: the heuristic risks over-firing…"*. The substantive rationale (over/under-fire risk; AUDIT-05's classifier mismatch shares the surface pattern) is genuinely good and is exactly the kind of reasoning capture mode should preserve. The gap is the *disposition of the deferral itself*: per `agent-discipline.md` § "Just for now is bullshit", a deferred-but-acknowledged item must terminate in one of four dispositions — addressed, **issue-with-link**, scoped-into-a-verified-downstream-dispatch, or recorded operator decision. This deferral ends in none of them: it lives only as prose in a SKILL.md and a workplan task, with no issue number tracking the `meta-disposition` structural fix.
+
+This is the precise failure mode the rule names — a "for now" decision (here phrased as "out of scope for AUDIT-02") baked into durable doc text that becomes conventional canon and never gets tracked or revisited, because writing the rationale *feels* like it tracked the work. The acknowledgment status (`acknowledged-architectural-tradeoff-2026-06-02`) is a valid disposition for AUDIT-02 *if* it was an operator decision, but the deferred structural follow-up it spawns needs its own tracker. Fix: file a GitHub issue capturing the `meta-disposition` shape proposal (with the over/under-fire rationale as the acceptance discussion) and cite that issue number in both the SKILL.md paragraph and the workplan prose, so "out of scope" becomes "tracked at #N" rather than rotting in prose.
+
+### AUDIT-20260602-24 — The recursion AUDIT-02 warns about is empirically still occurring within this same lift — the dampener masks it but doesn't structurally close it
+
+Finding-ID: AUDIT-20260602-24
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   informational
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260602-19/20/21, all `acknowledged-slush-pile-2026-06-02`) vs. the new SKILL.md "Disposition-of-disposition findings" section
+
+AUDIT-20260602-02's core claim is that *"creating fix-tasks to close findings-about-a-disposition is self-perpetuating."* The same diff that documents the operator-judgment scaffolding to handle this also appends AUDIT-19/20/21 — and all three are textbook disposition-of-disposition findings (AUDIT-19 critiques AUDIT-01's *disposition prose*; AUDIT-20 critiques the `Defers` *convention table*; AUDIT-21 critiques the *regression-lock tests* of the convention). They were absorbed into `acknowledged-slush-pile-2026-06-02`, which is exactly the dampener behavior the SKILL.md predicts (*"recursion-shape findings cluster on later barrage runs after the dampener has engaged"*). So the empirical claim in the new guidance is corroborated by this very run.
+
+The informational note for the operator: the scaffolding *dampens* the recursion (slush-pile + manual `informational` routing) but does not *close* it — every audit-log entry remains a new auditable surface, and the SKILL.md itself concedes the structural fix is deferred (see claude-02). This is not a bug in the diff; it's confirmation that the AUDIT-02 trade-off is live and load-bearing. Worth the operator's awareness that the slush-pile dampener is now the only thing standing between this feature and unbounded disposition-of-disposition growth, which raises the stakes on the dampener's own correctness (the Rule A/Rule B engagement logic in `/dw-lifecycle:audit-barrage`).
