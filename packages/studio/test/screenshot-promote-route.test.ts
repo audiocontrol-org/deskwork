@@ -277,6 +277,90 @@ describe('POST /api/dev/editorial-review/screenshots/orphan/:filename/promote-to
     expect(asObj(body).error).toMatch(/unknown commentId/);
   });
 
+  // AUDIT-20260602-01 — Bug-repro: the destructive file move MUST NOT
+  // happen before the commentId existence check. Unknown-commentId is a
+  // normal 404 path; if the orphan file is consumed before the 404
+  // fires, the operator's screenshot is unrecoverable on retry.
+  it(
+    'preserves the orphan file when commentId is unknown (AUDIT-20260602-01)',
+    async () => {
+      await seedOrphan(projectRoot, FILENAME);
+      const app = createApp({ projectRoot, config: cfg });
+      const missingComment = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+      const orphanPath = join(
+        projectRoot,
+        '.deskwork',
+        'screenshots-orphan',
+        FILENAME,
+      );
+      const destPath = join(
+        projectRoot,
+        'docs',
+        'foo',
+        'scrapbook',
+        'screenshots',
+        FILENAME,
+      );
+      const { status } = await postPromote(
+        app,
+        FILENAME,
+        ENTRY_UUID,
+        missingComment,
+      );
+      expect(status).toBe(404);
+      // The orphan still exists — operator can retry with the right
+      // commentId.
+      const orphanInfo = await stat(orphanPath);
+      expect(orphanInfo.size).toBe(PNG_MAGIC.length);
+      // The destination file was NOT written.
+      await expect(stat(destPath)).rejects.toThrow();
+    },
+  );
+
+  // AUDIT-20260602-01 — Regression-lock: the working-code invariant the
+  // fix preserves — when every precondition holds, the orphan IS moved
+  // to the entry-anchored path and the comment's attachments[] is
+  // updated. Pins the success-path data flow so the validation reorder
+  // can't accidentally bypass the move.
+  it(
+    'still moves the orphan to the destination on the success path (AUDIT-20260602-01 regression-lock)',
+    async () => {
+      const commentId = await seedComment(projectRoot);
+      await seedOrphan(projectRoot, FILENAME);
+      const orphanPath = join(
+        projectRoot,
+        '.deskwork',
+        'screenshots-orphan',
+        FILENAME,
+      );
+      const destPath = join(
+        projectRoot,
+        'docs',
+        'foo',
+        'scrapbook',
+        'screenshots',
+        FILENAME,
+      );
+      const app = createApp({ projectRoot, config: cfg });
+      const { status, body } = await postPromote(
+        app,
+        FILENAME,
+        ENTRY_UUID,
+        commentId,
+      );
+      expect(status).toBe(200);
+      // Orphan is gone (move semantics).
+      await expect(stat(orphanPath)).rejects.toThrow();
+      // Destination exists with the same byte count.
+      const destInfo = await stat(destPath);
+      expect(destInfo.size).toBe(PNG_MAGIC.length);
+      // attachments[] now references the moved file.
+      expect(asObj(body).attachments).toEqual([
+        `docs/foo/scrapbook/screenshots/${FILENAME}`,
+      ]);
+    },
+  );
+
   it('returns 409 when an entry-anchored file of the same name already exists', async () => {
     const commentId = await seedComment(projectRoot);
     await seedOrphan(projectRoot, FILENAME);

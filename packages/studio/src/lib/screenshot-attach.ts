@@ -192,11 +192,22 @@ export async function promoteOrphanToEntry(
   }
   const entry = await readSidecar(projectRoot, entryId);
   const destDir = entryScreenshotsDir(projectRoot, entry);
-  await mkdir(destDir, { recursive: true });
   const writtenPath = join(destDir, filename);
   if (existsSync(writtenPath)) {
     throw new Error(`screenshot already exists at ${writtenPath}`);
   }
+  // AUDIT-20260602-01 — validate the comment exists BEFORE moving the
+  // file. Unknown commentId is a 404 path the route maps explicitly;
+  // if we move the orphan first, the operator's screenshot is consumed
+  // out of the orphan dir and on retry the route now returns "orphan
+  // screenshot not found" — unrecoverable. Every 4xx-shaped precondition
+  // (sidecar lookup, commentId existence, dest collision) is checked
+  // before any destructive side-effect.
+  const comment = await findCommentByIdFolded(projectRoot, entryId, commentId);
+  if (comment === null) {
+    throw new Error(`unknown commentId ${commentId} on entry ${entryId}`);
+  }
+  await mkdir(destDir, { recursive: true });
   await moveFile(orphanPath, writtenPath);
   const rel = relative(projectRoot, writtenPath);
   const relativeWrittenPath =

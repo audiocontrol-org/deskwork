@@ -1547,6 +1547,111 @@ Disposition: closed by commit `2fb0bac9` — Status flip landed immediately afte
 - [x] Test passes: N/A.
 - [x] Audit-log Status flipped to `fixed-2fb0bac9` per disposition.
 
+
+### Task 1.12 (fix-finding-AUDIT-20260602-01): AUDIT-20260602-01 — Orphan-promote moves + deletes the file BEFORE validating th…
+
+Closes AUDIT-20260602-01. Surface: `packages/studio/src/lib/screenshot-attach.ts:promoteOrphanToEntry` (the `await moveFile(orphanPath, writtenPath)` line through the trailing `attachScreenshotToCommentServer` call, ~lines 200-235). Severity: high.
+
+- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
+- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
+- [ ] Step 5: commit with `Closes AUDIT-20260602-01` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 1.13 (fix-finding-AUDIT-20260602-02): AUDIT-20260602-02 — `attachScreenshotToCommentServer` stores `relativePath` verb…
+
+Closes AUDIT-20260602-02. Surface: `packages/studio/src/lib/screenshot-attach.ts:attachScreenshotToCommentServer` (~lines 120-150); `packages/studio/src/routes/api.ts` attach route (~lines 565-595); `plugins/deskwork-studio/public/src/entry-review/sidebar-render.ts:buildAttachmentStrip` (~lines 279-322). Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-02` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 1.14 (fix-finding-AUDIT-20260602-03): AUDIT-20260602-03 — Paste/drop always synthesizes a `.png` filename regardless o…
+
+Closes AUDIT-20260602-03. Surface: `plugins/deskwork-studio/public/src/entry-review/screenshot-paste-drop.ts:persistAsOrphan` (~the `const filename = \`${timestamp}-${hash}.png\`` line) and `IMAGE_TYPES` allowlist. Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-03` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 1.15 (fix-finding-AUDIT-20260602-04): AUDIT-20260602-04 — New-comment body parser silently drops a non-string `replyTo…
+
+Closes AUDIT-20260602-04. Surface: `packages/studio/src/routes/entry-annotation-body.ts` (the `comment` branch, the new `attachments` + `replyTo` handling, ~lines 84-120). Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-04` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 1.16 (fix-finding-AUDIT-20260602-05): AUDIT-20260602-05 — Promote route accepts a JSON array body without error, diver…
+
+Closes AUDIT-20260602-05. Surface: `packages/studio/src/routes/api.ts` promote-to-entry handler (the inline body parse, ~lines 605-625) vs `readJsonObjectBody` (~lines 145-160). Severity: low.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-05` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 1.17 (fix-finding-AUDIT-20260602-06): AUDIT-20260602-06 — Dead disjunct in the promote-route error mapping
+
+Closes AUDIT-20260602-06. Surface: `packages/studio/src/routes/api.ts` promote-to-entry catch block (~lines 645-665). Severity: low.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-06` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 1.7 (fix-finding-AUDIT-20260601-07): AUDIT-20260601-07 — spatialAnchor schema accepts semantically-invalid per-kind combinations
 
 Closes AUDIT-20260601-07 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model). Surface: `packages/core/src/schema/draft-annotation.ts:39-46` (`SpatialAnchorSchema`); docstring claims at `review/types.ts:69-72` and `draft-annotation.ts:34-37`.
