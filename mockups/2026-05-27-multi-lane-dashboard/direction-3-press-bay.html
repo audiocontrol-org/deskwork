@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Direction 3 · Press Bay — Phase 5 mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --ink-soft: #3D3530;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1.5rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .meta a { color: var(--paper); border-bottom: 1px solid rgba(245,241,232,0.4); text-decoration: none; }
+  h1.demo-title { color: var(--paper); font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 36, "wght" 500; font-size: 1.7rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 1.6rem; text-align: center; max-width: 64ch; }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; margin-top: 0.8rem; text-align: center; max-width: 410px; }
+  .desktop { width: 1280px; min-height: 880px; background: var(--paper); box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04); border-radius: 6px; overflow: hidden; position: relative; }
+  .phone { width: 410px; height: 880px; background: #050505; border-radius: 50px; padding: 12px; box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04); position: relative; }
+  .phone::before { content: ''; position: absolute; top: 22px; left: 50%; transform: translateX(-50%); width: 110px; height: 30px; background: #000; border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper); border-radius: 38px; overflow: hidden; position: relative; }
+
+  .masthead { display: flex; justify-content: space-between; align-items: baseline; padding: 1rem 1.25rem 0.5rem; border-bottom: 2px solid var(--red); }
+  .masthead .title { font-family: var(--display); font-style: italic; font-size: 1.5rem; font-variation-settings: "opsz" 36, "wght" 500; }
+  .masthead .kicker { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--faded); }
+  .masthead .star { font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem; cursor: pointer; padding: 0.2rem 0.4rem; }
+
+  /* ===== Press-bay layout (desktop): left rail + bay ===== */
+  .bay-shell { display: grid; grid-template-columns: 180px 1fr; min-height: 700px; }
+  .lane-rail {
+    background: var(--paper-2);
+    border-right: 1px solid var(--paper-3);
+    padding: 1rem 0.7rem 1.5rem;
+  }
+  .rail-head {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--faded);
+    padding: 0.4rem 0.3rem 0.5rem;
+    border-bottom: 1px dashed var(--paper-3);
+    margin-bottom: 0.5rem;
+  }
+  .rail-lane {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    min-height: 32px;
+    padding: 0.55rem 0.4rem;
+    border-bottom: 1px dashed var(--paper-3);
+    cursor: pointer; position: relative;
+  }
+  .rail-lane:hover { background: var(--paper); }
+  .rail-lane:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+  }
+  .rail-lane.focused {
+    background: var(--paper);
+    border-left: 3px solid var(--red);
+    padding-left: 0.55rem;
+  }
+  .rail-lane.hidden { color: var(--faded); }
+  .rail-lane.hidden .r-name { text-decoration: line-through; }
+  .rail-lane .r-eye {
+    font-family: var(--mono); width: 14px; text-align: center;
+    color: var(--ink-soft); font-size: 0.85rem;
+  }
+  .rail-lane.hidden .r-eye { color: var(--faded); }
+  .rail-lane .r-glyph {
+    font-family: var(--display); font-style: italic;
+    color: var(--red); font-size: 1.05rem;
+  }
+  .rail-lane.hidden .r-glyph { color: var(--faded); }
+  .rail-lane .r-name {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+  }
+  .rail-lane .r-count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.65rem; color: var(--faded);
+  }
+  .rail-views {
+    margin-top: 1.2rem; padding-top: 0.7rem;
+    border-top: 1px solid var(--paper-3);
+  }
+  .rail-views .vh {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--faded);
+    padding: 0.2rem 0.3rem 0.4rem;
+  }
+  .rail-views .v-pill {
+    display: flex; align-items: center;
+    width: 100%;
+    min-height: 28px;
+    margin: 0.2rem 0;
+    padding: 0.4rem 0.55rem;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    font-family: var(--mono); font-size: 0.7rem;
+    color: var(--ink-soft); cursor: pointer;
+    text-align: left;
+  }
+  .rail-views .v-pill.active {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .rail-views .v-pill:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+  .rail-views .v-pill.new {
+    font-style: italic; font-family: var(--display);
+    color: var(--faded); text-align: center;
+    border-style: dashed;
+  }
+
+  /* The bay itself */
+  .bay {
+    overflow: auto; padding: 0.6rem 1rem 1.6rem;
+    background:
+      repeating-linear-gradient(
+        180deg,
+        transparent 0 calc((100% - 3 * 1rem) / 3),
+        var(--paper-3) calc((100% - 3 * 1rem) / 3) calc((100% - 3 * 1rem) / 3 + 1px)
+      );
+  }
+  .bay-head {
+    padding: 0.3rem 0.2rem 0.6rem;
+    border-bottom: 1px solid var(--paper-3);
+    margin-bottom: 0.8rem;
+  }
+  .bay-head .bh-row-1 {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--faded);
+    margin-bottom: 0.5rem;
+  }
+  .bay-head .bh-meta { margin-left: auto; color: var(--ink-soft); }
+  .bay-head .bh-meta .filter-active {
+    color: var(--red); font-weight: 500;
+  }
+
+  /* === Focus chip strip — the lane filter affordance === */
+  .focus-strip {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+    padding: 0.4rem 0;
+  }
+  .focus-strip .strip-label {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--faded);
+    margin-right: 0.35rem;
+  }
+  .focus-chip {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    min-height: 28px;
+    padding: 0.36rem 0.7rem;
+    background: var(--paper-2);
+    border: 1px solid var(--paper-3);
+    border-radius: 99px;
+    font-family: var(--display); font-style: italic; font-size: 0.88rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: background 0.1s ease, border-color 0.1s ease;
+  }
+  .focus-chip:hover { background: var(--paper); border-color: var(--ink-soft); }
+  .focus-chip:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+  .focus-chip .fc-glyph {
+    font-family: var(--display); font-style: italic;
+    color: var(--ink-soft); font-size: 0.95rem;
+  }
+  .focus-chip .fc-count {
+    font-family: var(--mono); font-size: 0.6rem;
+    color: var(--faded); letter-spacing: 0.1em;
+    padding: 0.05rem 0.3rem;
+    background: var(--paper); border-radius: 99px;
+  }
+  /* Active (focused) chip: stage-colored to match the lane's swimlane edge */
+  .focus-chip.active {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .focus-chip.active .fc-glyph { color: var(--paper); }
+  .focus-chip.active .fc-count { background: rgba(245,241,232,0.18); color: var(--paper); }
+  /* "All" chip — special; resets the focus */
+  .focus-chip.all { background: var(--paper); }
+  .focus-chip.all.active {
+    background: var(--ink); color: var(--paper);
+  }
+  /* Save-current-view chip — surfaces ONLY when a partial subset is selected */
+  .focus-chip.save {
+    background: transparent; border-style: dashed;
+    color: var(--faded); font-family: var(--mono); font-style: normal;
+    font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .focus-chip.save:hover { color: var(--ink); border-color: var(--ink-soft); }
+  /* Saved-view chips: distinct from per-lane chips so the operator can tell them apart */
+  .focus-chip.saved {
+    background: var(--paper); border-style: dotted; border-color: var(--kraft);
+    color: var(--kraft);
+  }
+  .focus-chip.saved::before {
+    content: '⌘';
+    color: var(--kraft); margin-right: 0.2rem;
+    font-family: var(--display); font-style: italic;
+  }
+  .focus-chip.saved.active {
+    background: var(--kraft); color: var(--paper); border-style: solid;
+  }
+  .focus-chip.saved.active::before { color: var(--paper); }
+  .focus-strip .strip-divider {
+    width: 1px; height: 1.4rem; align-self: center;
+    background: var(--paper-3); margin: 0 0.25rem;
+  }
+  .focus-strip .strip-hint {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--faded);
+  }
+  .focus-strip .strip-hint kbd {
+    font-family: var(--mono); font-size: 0.6rem;
+    padding: 0.05rem 0.3rem;
+    border: 1px solid var(--paper-3); border-radius: 2px;
+    background: var(--paper); color: var(--ink-soft);
+    letter-spacing: 0;
+  }
+
+  /* === Swimlanes === */
+  .swim {
+    margin-bottom: 1.2rem;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-left: 4px solid var(--red);
+  }
+  .swim:nth-child(2) { border-left-color: var(--blue); }
+  .swim:nth-child(3) { border-left-color: var(--green); }
+  .swim-head {
+    padding: 0.6rem 0.85rem;
+    display: flex; align-items: baseline; gap: 0.6rem;
+    background: var(--paper-2);
+    border-bottom: 1px dashed var(--paper-3);
+  }
+  .swim-head .glyph {
+    font-family: var(--display); font-style: italic; font-size: 1.25rem;
+    color: var(--red);
+  }
+  .swim-head .name {
+    font-family: var(--display); font-style: italic; font-size: 1.15rem;
+  }
+  .swim-head .tag {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--faded);
+    padding: 0.1rem 0.4rem; border: 1px solid var(--paper-3); border-radius: 2px;
+  }
+  .swim-head .quick-meta {
+    margin-left: auto; font-family: var(--mono); font-size: 0.65rem;
+    color: var(--ink-soft); letter-spacing: 0.1em;
+  }
+  /* Per-lane overflow ⋮: 24×24 hit area, ink-soft contrast (9.93:1 vs
+     paper-2), focus-visible ring. Same shape as `.collapse-chev`. */
+  .swim-head .overflow {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 24px; min-height: 24px;
+    font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem;
+    cursor: pointer; user-select: none;
+    background: transparent; border: none; padding: 0;
+    border-radius: 2px;
+    margin-left: 0.6rem;
+    transition: color 0.12s ease, background 0.12s ease;
+  }
+  .swim-head .overflow:hover {
+    color: var(--red);
+    background: rgba(184, 54, 42, 0.08);
+  }
+  .swim-head .overflow:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+  /* ===== Universal `.collapse-chev` accessibility primitives =====
+     Standards (per DESIGN-STANDARDS § Accessibility — Contrast):
+     - WCAG 2.2 SC 2.5.8 Target Size Minimum (AA): ≥24×24 CSS px.
+     - WCAG 2.1 SC 1.4.11 Non-Text Contrast (AA): ≥3:1 vs adjacent bg.
+     - WCAG 2.1 SC 2.4.7 Focus Visible (AA): focus ring at rest.
+     Contrast: `--ink-soft` (#3D3530) on `--paper-2` (#ECE6D4) ≈ 9.93:1 ✓.
+     Hover `--red` (#B8362A) on `--paper-2` ≈ 6.55:1 ✓.
+     Focus `--blue` (#2A4B7C) ring on `--paper-2` ≈ 7.92:1 ✓.
+     Target size: 24×24 uniform on desktop and mobile. WCAG 2.1 SC 2.5.5
+     (AAA 44×44) is satisfied via the "equivalent route" exception —
+     the entire enclosing head (swim-head / stage-head / lb-group-head)
+     is itself a click target with `cursor: pointer`, sized comfortably
+     larger than 44px in every context. The chevron is a precise-tap
+     option for operators who want it; the whole-head fallback covers
+     operators who don't.
+     Visual glyph stays small (0.85rem); hit area expands via
+     min-width/min-height + flex centering. */
+  .collapse-chev {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    min-height: 24px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+    user-select: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 2px;
+    transition: transform 0.18s ease, color 0.12s ease, background 0.12s ease;
+  }
+  .collapse-chev:hover {
+    color: var(--red);
+    background: rgba(184, 54, 42, 0.08);
+  }
+  .collapse-chev:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+  /* Per-context overrides: positioning + rotation only — sizing + colour
+     come from the universal `.collapse-chev` rule above. */
+  .swim-head .collapse-chev {
+    margin-left: 0.2rem;
+  }
+  .swim-head:hover .collapse-chev { color: var(--red); }
+
+  /* ===== View toggle (kanban ↔ list) — segmented, lives in swim-head =====
+     Each cell is 24px tall minimum (WCAG 2.2 SC 2.5.8 AA target size). */
+  .view-toggle {
+    display: inline-flex; align-items: stretch;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--paper);
+    margin-left: 0.4rem;
+  }
+  .view-toggle .vt-cell {
+    min-height: 24px;
+    padding: 0 0.55rem;
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: transparent; border: none;
+    cursor: pointer;
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-soft);
+    border-right: 1px solid var(--paper-3);
+  }
+  .view-toggle .vt-cell:last-child { border-right: none; }
+  .view-toggle .vt-cell:hover { background: var(--paper-2); }
+  .view-toggle .vt-cell:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -1px;
+  }
+  .view-toggle .vt-cell .vt-icon {
+    font-family: var(--display); font-size: 0.95rem;
+    color: var(--ink-soft);
+  }
+  .view-toggle .vt-cell.active {
+    background: var(--ink); color: var(--paper);
+  }
+  .view-toggle .vt-cell.active .vt-icon { color: var(--paper); }
+  /* Collapsed lane greys out the view toggle — collapse takes precedence
+     until the operator re-expands. */
+  .swim.collapsed .view-toggle { opacity: 0.5; pointer-events: none; }
+
+  /* ===== List-view body (alternative to stage-grid) ===== */
+  .swim.list-view .stage-grid { display: none; }
+  .list-body { display: none; padding: 0; background: var(--paper); }
+  .swim.list-view .list-body { display: block; }
+  .list-body .lb-group {
+    padding: 0; margin: 0;
+    border-bottom: 1px dashed var(--paper-3);
+  }
+  .list-body .lb-group:last-child { border-bottom: none; }
+  .list-body .lb-group-head {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    padding: 0.45rem 0.85rem 0.35rem;
+    background: var(--paper-2);
+    border-bottom: 1px dashed var(--paper-3);
+    cursor: pointer; user-select: none;
+  }
+  .list-body .lb-group-head:hover { background: var(--paper-3); }
+  .list-body .lb-group-head .collapse-chev {
+    margin-left: 0.4rem;
+  }
+  .list-body .lb-group-head:hover .collapse-chev { color: var(--red); }
+  .list-body .lb-group.collapsed .lb-row { display: none; }
+  .list-body .lb-group.collapsed .lb-group-head { border-bottom: none; }
+  .list-body .lb-group.collapsed .lb-group-head .collapse-chev { transform: rotate(-90deg); }
+  .list-body .lb-group-head .lb-glyph {
+    font-family: var(--display); font-style: italic; font-size: 1.05rem;
+    color: var(--red);
+  }
+  .list-body .lb-group.empty .lb-glyph { color: var(--faded); }
+  .list-body .lb-group.locked .lb-glyph { color: var(--blue); }
+  .list-body .lb-group-head .lb-name {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+  }
+  .list-body .lb-group.empty .lb-name { color: var(--ink-soft); }
+  .list-body .lb-group-head .lb-tag {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .list-body .lb-group-head .lb-count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
+    letter-spacing: 0.1em;
+  }
+  .list-body .lb-row {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.4rem 0.85rem;
+    border-bottom: 1px solid var(--paper-3);
+    cursor: pointer;
+  }
+  .list-body .lb-row:last-child { border-bottom: none; }
+  .list-body .lb-row:hover { background: var(--paper-2); }
+  .list-body .lb-row .lb-title {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+    color: var(--ink);
+    flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .list-body .lb-row .lb-version {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.1em; color: var(--ink-soft);
+    padding: 0.08rem 0.35rem;
+    background: var(--paper-2);
+    border: 1px solid var(--paper-3); border-radius: 99px;
+    white-space: nowrap;
+  }
+  .list-body .lb-row .lb-state {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faded); white-space: nowrap;
+    min-width: 95px; text-align: right;
+  }
+  .list-body .lb-row .lb-state.iter { color: var(--red); }
+  .list-body .lb-row .lb-state.ready { color: var(--green); }
+  /* List-row overflow ⋮: bumped from --faded (3.42:1) to --ink-soft
+     (9.93:1) per the v0.20 row-affordance fix pattern (DESIGN-STANDARDS
+     § Accessibility — Contrast). 24×24 hit area + focus-visible. */
+  .list-body .lb-row .lb-overflow {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 24px; min-height: 24px;
+    font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem;
+    cursor: pointer; user-select: none;
+    background: transparent; border: none; padding: 0;
+    border-radius: 2px;
+    transition: color 0.12s ease, background 0.12s ease;
+  }
+  .list-body .lb-row .lb-overflow:hover {
+    color: var(--red);
+    background: rgba(184, 54, 42, 0.08);
+  }
+  .list-body .lb-row .lb-overflow:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+  .list-body .lb-row.empty-state {
+    color: var(--faded); cursor: default;
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    justify-content: center;
+  }
+  .list-body .lb-row.empty-state:hover { background: var(--paper); }
+
+  /* === Collapsed lane state ===
+     - stage-grid is hidden
+     - a compact per-stage strip renders inside the swim-head's bottom edge
+       so the pipeline shape stays visible (favor structure over scrolling)
+     - chevron rotates to indicate state
+     - left-edge accent bar stays so the lane's presence + color is preserved
+  */
+  .swim.collapsed { margin-bottom: 0.6rem; }
+  .swim.collapsed .stage-grid { display: none; }
+  .swim.collapsed .swim-head {
+    border-bottom: none;
+    background: var(--paper);
+  }
+  .swim.collapsed .swim-head .collapse-chev {
+    transform: rotate(-90deg);
+    color: var(--faded);
+  }
+  .swim.collapsed .swim-head:hover .collapse-chev { color: var(--red); }
+  /* Compact per-stage strip — shown only when collapsed. Visually
+     attached to the bottom of the head with a hairline. */
+  .swim.collapsed .swim-compact {
+    display: flex;
+  }
+  .swim-compact {
+    display: none;
+    align-items: stretch;
+    border-top: 1px dashed var(--paper-3);
+    background: var(--paper-2);
+  }
+  .swim-compact .sc-stage {
+    flex: 1;
+    padding: 0.4rem 0.55rem;
+    display: flex; flex-direction: column; gap: 0.15rem;
+    border-right: 1px dashed var(--paper-3);
+  }
+  .swim-compact .sc-stage:last-child { border-right: none; }
+  .swim-compact .sc-name {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .swim-compact .sc-count {
+    font-family: var(--display); font-style: italic; font-size: 1.05rem;
+    color: var(--ink-soft);
+  }
+  .swim-compact .sc-stage.empty .sc-count { color: var(--faded); }
+  .swim-compact .sc-stage.attention .sc-count { color: var(--red); }
+  .swim-compact .sc-stage.locked .sc-count { color: var(--blue); }
+
+  /* Per-swimlane stage columns. FLEX (not grid) so collapsed columns can
+     opt out of the equal-width sharing — narrow strip when collapsed,
+     expanded columns redistribute to fill the freed horizontal space. */
+  .stage-grid {
+    display: flex;
+    gap: 1px;
+    background: var(--paper-3);
+    border-top: none;
+  }
+  .stage-col {
+    flex: 1 1 0;
+    min-width: 0;
+    background: var(--paper);
+    padding: 0.5rem 0.55rem;
+    min-height: 100px;
+    display: flex; flex-direction: column; gap: 0.35rem;
+  }
+  .stage-col .stage-head {
+    display: flex; align-items: baseline; gap: 0.4rem;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.3rem; margin-bottom: 0.2rem;
+    cursor: pointer; user-select: none;
+  }
+  .stage-col .stage-head:hover { color: var(--red); }
+  /* Per-stage chevron: positioning only — accessibility primitives come
+     from the universal `.collapse-chev` rule. */
+  .stage-col .stage-head .collapse-chev {
+    margin-left: 0.2rem;
+  }
+  .stage-col .stage-head:hover .collapse-chev { color: var(--red); }
+  .stage-col .stage-glyph {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+    color: var(--red);
+  }
+  .stage-col .stage-name {
+    font-family: var(--display); font-style: italic; font-size: 0.85rem;
+  }
+  .stage-col .stage-count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
+  }
+  .stage-col.empty .stage-glyph { color: var(--faded); }
+  .stage-col.empty .stage-name { color: var(--ink-soft); }
+  .stage-col .card {
+    background: var(--paper-2);
+    padding: 0.35rem 0.45rem;
+    font-family: var(--display); font-style: italic; font-size: 0.82rem;
+    line-height: 1.25;
+    border-left: 2px solid var(--paper-3);
+    cursor: pointer;
+  }
+  .stage-col .card .e-meta {
+    display: block;
+    font-family: var(--mono); font-style: normal;
+    font-size: 0.58rem; letter-spacing: 0.1em; color: var(--faded);
+    margin-top: 0.2rem;
+    text-transform: uppercase;
+  }
+  .stage-col .empty-state {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em;
+    color: var(--faded); text-transform: uppercase;
+  }
+
+  /* Per-lane template-driven column counts handled by flex — each
+     .stage-col has flex: 1 1 0 so N columns auto-share equally,
+     regardless of N. Collapsed cols opt out via flex-basis override. */
+
+  /* Collapsed stage column: narrow vertical strip with the stage name
+     rotated, count + glyph stacked vertically. Cards hidden. Clicking
+     anywhere on the strip re-expands the column. */
+  .stage-col.collapsed {
+    flex: 0 0 42px;
+    padding: 0.5rem 0;
+    background: var(--paper-2);
+    cursor: pointer;
+  }
+  .stage-col.collapsed .stage-head {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    border-bottom: none;
+    padding: 0;
+    margin: 0;
+  }
+  .stage-col.collapsed .stage-head .stage-glyph {
+    margin: 0;
+  }
+  .stage-col.collapsed .stage-head .stage-name {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin: 0.3rem 0;
+    white-space: nowrap;
+  }
+  .stage-col.collapsed .stage-head .stage-count {
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    margin-left: 0;
+  }
+  .stage-col.collapsed .stage-head .collapse-chev {
+    transform: rotate(-90deg);
+    margin: 0;
+  }
+  .stage-col.collapsed .card,
+  .stage-col.collapsed .empty-state {
+    display: none;
+  }
+
+  /* Filtered-out lane stub: shown when a focus filter hides a lane that
+     ISN'T permanently hidden in the rail. Keeps the operator aware of
+     what they've excluded without rendering the full swimlane. */
+  .swim-stub {
+    display: flex; align-items: center; gap: 0.6rem;
+    width: 100%; margin-bottom: 1.2rem;
+    min-height: 36px;
+    padding: 0.65rem 0.85rem;
+    background: var(--paper-2);
+    border: 1px dashed var(--paper-3);
+    border-left: 4px solid var(--paper-3);
+    color: var(--ink-soft);
+    font-family: var(--display); font-style: italic; font-size: 0.92rem;
+    cursor: pointer;
+  }
+  .swim-stub:hover { background: var(--paper); border-left-color: var(--red); }
+  .swim-stub:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+  .swim-stub .ss-glyph { font-size: 1.1rem; color: var(--ink-soft); }
+  .swim-stub .ss-meta {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .swim-stub .ss-action {
+    font-family: var(--mono); font-size: 1.1rem;
+    color: var(--faded); margin-left: 0.3rem;
+    width: 22px; text-align: center;
+  }
+  .swim-stub:hover .ss-action { color: var(--red); }
+
+  /* ===== Per-lane Compose chip =====
+     Each swim-head carries its own `+ slug` chip. Clicking immediately
+     clipboard-copies `/deskwork:add <SLUG> --lane <id> --stage <first-
+     linear>` for that lane — no form, no popover, no fields. The
+     operator pastes in chat, replaces `<SLUG>` with the actual slug,
+     hits enter. The "form" is the chat editor (where they already live);
+     the studio just supplies the lane/stage prefix.
+     Per THESIS Consequence 2 — the studio doesn't mutate state; the
+     operator's slash-command invocation IS the action.
+     Just-clicked state briefly swaps to "✓ Copied — paste in chat" for
+     ~1.5s so the operator sees the action confirmed without a separate
+     toast component. */
+  .swim-compose {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    min-height: 26px;
+    padding: 0.32rem 0.75rem;
+    background: var(--red);
+    color: var(--paper);
+    border: none;
+    border-radius: 99px;
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    cursor: pointer;
+    margin-left: 0.4rem;
+    transition: background 0.18s ease, transform 0.12s ease;
+    white-space: nowrap;
+  }
+  .swim-compose:hover { background: #9c2d22; transform: translateY(-1px); }
+  .swim-compose:active { transform: translateY(0); }
+  .swim-compose:focus-visible {
+    outline: 2px solid var(--blue); outline-offset: 2px;
+  }
+  .swim-compose .sc-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 0.95rem; line-height: 1;
+  }
+  /* Copied state — flashes stamp-green for ~1.5s before reverting. */
+  .swim-compose.copied {
+    background: var(--green);
+  }
+  .swim-compose.copied:hover {
+    background: var(--green);
+    transform: none;
+  }
+  .swim-compose .sc-label-copied,
+  .swim-compose .sc-glyph-copied { display: none; }
+  .swim-compose.copied .sc-label-default,
+  .swim-compose.copied .sc-glyph-default { display: none; }
+  .swim-compose.copied .sc-label-copied,
+  .swim-compose.copied .sc-glyph-copied { display: inline; }
+
+  /* Mobile compose chip: icon-only (just `+`) to fit the narrower
+     lane-head; the "slug" text is hidden but kept in aria-label for SR.
+     Copied state still shows the longer label since that's the only
+     time it matters. */
+  .phone .swim-compose {
+    min-height: 30px; min-width: 30px;
+    padding: 0.32rem 0.5rem;
+    margin-left: 0.3rem;
+  }
+  .phone .swim-compose .sc-label-default { display: none; }
+  .phone .swim-compose.copied { padding: 0.32rem 0.7rem; }
+  .phone .swim-compose.copied .sc-label-copied {
+    display: inline; font-size: 0.55rem;
+  }
+
+  /* v9 Compose FAB + v10 Compose Card both retired in v11 — the form
+     approach was wrong; per-lane Compose chips ship the action without
+     a form. The compose-fab + compose-card CSS rules have been deleted
+     rather than left as dead code (per the project "Just for now is
+     bullshit" rule). The flow:
+       1. Operator clicks `+ slug` chip in a swim-head.
+       2. Studio clipboard-copies the partial command + flashes the chip.
+       3. Operator pastes in chat, replaces `<SLUG>` with their slug,
+          hits enter.
+     No form fields. The chat editor (where the operator already lives)
+     is the slug input. */
+
+  /* === Phone (mobile): collapses to lane-stack === */
+  .phone .focus-strip.mobile {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0.45rem 1rem;
+    background: var(--paper);
+    border-bottom: 1px solid var(--paper-3);
+    gap: 0.3rem;
+  }
+  .phone .focus-strip.mobile .focus-chip {
+    padding: 0.28rem 0.55rem;
+    font-size: 0.82rem; flex-shrink: 0;
+  }
+  .phone .focus-strip.mobile .strip-label { flex-shrink: 0; font-size: 0.55rem; }
+  .phone .lane-stack {
+    padding: 1rem 1rem 5rem; overflow-y: auto;
+    max-height: calc(100% - 180px);
+  }
+  .phone .lane-section { margin-bottom: 1.3rem; }
+  .phone .lane-head {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    border-bottom: 1px dashed var(--paper-3);
+    padding: 0.4rem 0 0.5rem; margin-bottom: 0.5rem;
+  }
+  .phone .lane-head .glyph {
+    font-family: var(--display); font-style: italic; font-size: 1.15rem;
+    color: var(--red);
+  }
+  .phone .lane-head .name {
+    font-family: var(--display); font-style: italic; font-size: 1.05rem;
+  }
+  .phone .lane-head .count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
+  }
+  .phone .lane-head .collapse-chev {
+    margin-left: 0.2rem;
+  }
+  .phone .lane-section.collapsed .stage-row { display: none; }
+  .phone .lane-section.collapsed .lane-head { margin-bottom: 0; }
+  .phone .lane-section.collapsed .lane-head .collapse-chev { transform: rotate(-90deg); display: inline-block; color: var(--faded); }
+  .phone .lane-section.collapsed .swim-compact { display: flex; }
+  .phone .lane-section .swim-compact {
+    display: none;
+    align-items: stretch;
+    background: var(--paper-2);
+    border: 1px dashed var(--paper-3);
+    border-top: none;
+  }
+  .phone .lane-section .swim-compact .sc-stage {
+    flex: 1; padding: 0.3rem 0.4rem;
+    border-right: 1px dashed var(--paper-3);
+    display: flex; flex-direction: column; gap: 0.1rem;
+  }
+  .phone .lane-section .swim-compact .sc-stage:last-child { border-right: none; }
+  .phone .lane-section .swim-compact .sc-name {
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--faded);
+  }
+  .phone .lane-section .swim-compact .sc-count {
+    font-family: var(--display); font-style: italic; font-size: 0.9rem;
+    color: var(--ink-soft);
+  }
+  .phone .lane-section .swim-compact .sc-stage.empty .sc-count { color: var(--faded); }
+  .phone .lane-section .swim-compact .sc-stage.locked .sc-count { color: var(--blue); }
+
+  /* Mobile view toggle — same 24px floor as desktop; icon-only to fit in
+     the narrower lane-head. WCAG 2.2 SC 2.5.8 AA target size. */
+  .phone .lane-head .view-toggle {
+    margin-left: 0.3rem;
+    border-color: var(--paper-3);
+  }
+  .phone .lane-head .view-toggle .vt-cell {
+    min-height: 24px;
+    padding: 0 0.5rem;
+    font-size: 0.55rem; letter-spacing: 0.1em;
+  }
+  .phone .lane-head .view-toggle .vt-cell .vt-icon { font-size: 0.85rem; }
+  /* Collapsed lane greys mobile toggle too — collapse precedence. */
+  .phone .lane-section.collapsed .view-toggle { opacity: 0.5; pointer-events: none; }
+  /* Mobile list-view body: same .list-body markup, narrower paddings. */
+  .phone .lane-section.list-view .stage-row { display: none; }
+  .phone .lane-section.list-view .list-body { display: block; }
+  .phone .lane-section .list-body {
+    display: none;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+  }
+  .phone .lane-section .list-body .lb-group { border-bottom: 1px dashed var(--paper-3); }
+  .phone .lane-section .list-body .lb-group:last-child { border-bottom: none; }
+  .phone .lane-section .list-body .lb-group-head {
+    padding: 0.35rem 0.55rem 0.3rem;
+    background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
+    display: flex; align-items: baseline; gap: 0.4rem;
+    cursor: pointer; user-select: none;
+  }
+  .phone .lane-section .list-body .lb-group-head .collapse-chev {
+    margin-left: 0.3rem;
+  }
+  .phone .lane-section .list-body .lb-group.collapsed .lb-row { display: none; }
+  .phone .lane-section .list-body .lb-group.collapsed .lb-group-head { border-bottom: none; }
+  .phone .lane-section .list-body .lb-group.collapsed .lb-group-head .collapse-chev { transform: rotate(-90deg); }
+  .phone .lane-section .list-body .lb-group-head .lb-glyph {
+    font-family: var(--display); font-style: italic; font-size: 0.9rem;
+    color: var(--red);
+  }
+  .phone .lane-section .list-body .lb-group.empty .lb-glyph { color: var(--faded); }
+  .phone .lane-section .list-body .lb-group.locked .lb-glyph { color: var(--blue); }
+  .phone .lane-section .list-body .lb-group-head .lb-name {
+    font-family: var(--display); font-style: italic; font-size: 0.82rem;
+  }
+  .phone .lane-section .list-body .lb-group-head .lb-count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.6rem; color: var(--ink-soft);
+  }
+  .phone .lane-section .list-body .lb-row {
+    display: flex; align-items: center; gap: 0.45rem;
+    padding: 0.35rem 0.55rem;
+    border-bottom: 1px solid var(--paper-3);
+  }
+  .phone .lane-section .list-body .lb-row:last-child { border-bottom: none; }
+  .phone .lane-section .list-body .lb-row .lb-title {
+    font-family: var(--display); font-style: italic; font-size: 0.8rem;
+    flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .phone .lane-section .list-body .lb-row .lb-version {
+    font-family: var(--mono); font-size: 0.55rem;
+    padding: 0.04rem 0.3rem;
+    background: var(--paper-2); border: 1px solid var(--paper-3);
+    border-radius: 99px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .phone .lane-section .list-body .lb-row .lb-state {
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--faded); white-space: nowrap;
+  }
+  .phone .lane-section .list-body .lb-row .lb-state.iter { color: var(--red); }
+  .phone .lane-section .list-body .lb-row .lb-state.ready { color: var(--green); }
+  .phone .lane-section .list-body .lb-row .lb-overflow {
+    font-family: var(--mono); font-size: 0.85rem; color: var(--faded);
+    padding: 0 0.15rem;
+  }
+  .phone .lane-section .list-body .lb-row.empty-state {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--faded); justify-content: center;
+  }
+  /* Mobile kanban view: single-column vertical stack per DESIGN-STANDARDS
+     § "Collapsible stage tiles — mobile-only navigation." Each tile is
+     a one-line strip; tapping (in production) expands the tile to reveal
+     entries inline. The single-column stack preserves the linear stage
+     sequence (top-to-bottom = pipeline order). The previously-drawn
+     2-column grid broke this — corrected here. */
+  .phone .stage-row {
+    display: flex; flex-direction: column; gap: 0.3rem;
+  }
+  .phone .m-stage-tile {
+    background: var(--paper); border: 1px solid var(--paper-3);
+    padding: 0.5rem 0.7rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .phone .m-stage-tile .stage-glyph { color: var(--red); font-family: var(--display); font-style: italic; font-size: 1rem; }
+  .phone .m-stage-tile .stage-name { font-family: var(--display); font-style: italic; font-size: 0.85rem; }
+  .phone .m-stage-tile .stage-count { margin-left: auto; font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft); }
+  .phone .m-stage-tile.empty .stage-glyph { color: var(--faded); }
+  .phone .mobile-rail-trigger {
+    display: inline-flex; align-items: center;
+    min-height: 28px;
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--ink-soft);
+    padding: 0.4rem 0.6rem; border: 1px solid var(--paper-3); background: var(--paper);
+    cursor: pointer;
+  }
+  .phone .mobile-rail-trigger:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+
+  /* Deviation note */
+  .deviation-note {
+    margin: 1rem auto 0; max-width: 720px;
+    background: rgba(245,241,232,0.06); color: var(--paper);
+    font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
+    padding: 0.9rem 1.1rem; border: 1px solid rgba(245,241,232,0.18);
+    border-left: 3px solid var(--green);
+  }
+  .deviation-note .label {
+    color: var(--green); letter-spacing: 0.18em; text-transform: uppercase;
+    font-weight: 600; font-size: 0.62rem; margin-right: 0.4rem;
+  }
+</style>
+</head>
+<body>
+  <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
+  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v11 · PER-LANE COMPOSE</span></h1>
+  <div class="demo-sub">No form. Each lane carries its own <code>+ new</code> chip. Click clipboard-copies <code>/deskwork:add &lt;SLUG&gt; --lane &lt;id&gt; --stage &lt;first&gt;</code> with lane + initial stage pre-filled; the operator pastes in chat, replaces <code>&lt;SLUG&gt;</code> with the actual slug, hits return. The "form" is the chat editor — where the operator already is.</div>
+
+  <div class="deviation-note">
+    <span class="label">Standards-compliant</span> Two granularities of collapse, each with its own chevron: <strong>lane-level</strong> (chevron in swim-head / lane-head) hides the entire lane body, leaves the swim-head + a compact per-stage count strip; <strong>stage-level</strong> (chevron in stage-head for kanban / lb-group-head for list) hides one stage's content within an expanded lane. In kanban, collapsed columns shrink to a narrow vertical strip (~42px wide) with the stage name rotated; remaining columns redistribute via flex to fill the freed space. In list, collapsed groups show just the group-head (with the entry count + tag) and hide their rows. Mockup demonstrates: Editorial swim has <strong>Published collapsed as a vertical strip</strong>; Press Releases list has <strong>Published collapsed as a head-only row</strong>; mobile Editorial list has <strong>Planned collapsed</strong>. The collapse-chev convention is universal — same `▾` glyph rotated 90° clockwise to indicate collapsed, same hover-to-red-pencil affordance, click anywhere on the head (or chevron) to toggle.<br><br>
+    Per-lane segmented toggle (<code>▦ Kanban</code> / <code>≡ List</code>) flips the body between the two views. Both views show the same entries — only the spatial arrangement differs. <strong>Defaults are viewport-aware:</strong> desktop defaults to kanban (wide viewport → multi-column real estate); mobile defaults to list (narrow viewport → vertical sequence is the natural fit, AND list view preserves the linear stage relationship more honestly than the tile-stack does). The operator can flip either default per-lane via the toggle. When collapsed, the toggle greys out (collapse precedence). The kanban tile view on mobile is the established v0.19 collapsible-stage-tile pattern — single-column vertical stack of one-line tile strips (per <code>DESIGN-STANDARDS.md § Collapsible stage tiles</code>), NOT a 2-column wrap (which would break the stage sequence visually). Mockup demonstrates four lane states at once: <strong>Editorial</strong> (kanban on desktop / list on mobile), <strong>Mockups</strong> (filtered out), <strong>QA</strong> (collapsed — view-toggle greyed), <strong>Press Releases</strong> (list on desktop / kanban-tile on mobile). The list-view stage groups carry the same stage-name + count + tag pattern as the kanban stage-grid heads; rows are dense (one-liner: title + version-pill + state + ⋮ overflow); locked stages render the group-head glyph in proof-blue.<br><br>
+
+    <strong>Compose is per-lane, no form (v11).</strong> Every swim-head (desktop) and lane-head (mobile) carries a red-pencil <code>+ new</code> chip ("new" rather than "slug" so the chip reads as the action, not the field — the operator types the slug in chat after pasting). Click does ONE thing: clipboard-copies <code>/deskwork:add &lt;SLUG&gt; --lane &lt;id&gt; --stage &lt;first-linear-stage&gt;</code> with the lane and initial stage pre-filled — the operator pastes in chat, replaces <code>&lt;SLUG&gt;</code>, hits return. No form fields. No popover. No bottom sheet. The chat editor is already the slug input; the chip just primes the rest of the command. This honors THESIS Consequence 2 (studio doesn't mutate state — the operator's slash-command IS the action) while eliminating the form-fill friction. Post-click, the chip flashes green with <strong>"✓ Copied — paste in chat"</strong> for ~2s, then reverts (Editorial's chip is shown in this state in both frames). Mobile chip is icon-only (<code>+</code>) to fit the narrower lane-head; aria-label carries the full action. The compose chip's position mirrors the lane's identity — same chip on every lane means muscle memory works regardless of which lane the operator targets, and lane-level filtering can't hide compose (it travels with the lane). The Mockups lane is filtered out via a compact stub; clicking the stub restores Mockups to focus, at which point its compose chip becomes available again. This pattern retires the v9 floating <strong>+ Compose</strong> FAB and the v10 multi-field <strong>Compose Card</strong> dialog — both required selecting the lane after opening compose; the v11 chip makes lane selection implicit (you click the chip on the lane you want).
+  </div>
+
+  <div class="frames" style="margin-top:1.4rem;">
+
+    <!-- DESKTOP -->
+    <div class="frame-wrap">
+      <div class="desktop">
+        <div class="masthead">
+          <div>
+            <div class="kicker">The Desk · multi-lane</div>
+            <div class="title">deskwork — editorial studio</div>
+          </div>
+          <div class="star">⋮</div>
+        </div>
+
+        <div class="bay-shell">
+          <!-- Left rail: lane visibility + saved views.
+               The eye-toggle ("●" = visible, "○" = persistently hidden) sets
+               VISIBILITY — whether a lane appears in the focus chip strip at
+               all. The "focused" highlight (left edge) reflects the active
+               focus filter from the chip strip; rail + chip strip are two
+               views of the same state. Drag the dotted handle to reorder. -->
+          <aside class="lane-rail">
+            <div class="rail-head">Lanes <span style="font-family: var(--mono); font-size: 0.55rem; color: var(--faded); margin-left: 0.3rem; letter-spacing: 0.1em;">4 visible</span></div>
+
+            <div class="rail-lane focused" role="button" tabindex="0" aria-pressed="true">
+              <span class="r-eye">●</span>
+              <span class="r-glyph">§</span>
+              <span class="r-name">Editorial</span>
+              <span class="r-count">12</span>
+            </div>
+            <div class="rail-lane" role="button" tabindex="0" aria-pressed="false">
+              <span class="r-eye">●</span>
+              <span class="r-glyph">◆</span>
+              <span class="r-name">Mockups</span>
+              <span class="r-count">5</span>
+            </div>
+            <div class="rail-lane focused" role="button" tabindex="0" aria-pressed="true">
+              <span class="r-eye">●</span>
+              <span class="r-glyph">⊕</span>
+              <span class="r-name">QA</span>
+              <span class="r-count">3</span>
+            </div>
+            <div class="rail-lane focused" role="button" tabindex="0" aria-pressed="true">
+              <span class="r-eye">●</span>
+              <span class="r-glyph" style="color: var(--kraft);">⌘</span>
+              <span class="r-name">Press Releases</span>
+              <span class="r-count">7</span>
+            </div>
+
+            <div class="rail-views">
+              <div class="vh">Saved Views</div>
+              <button class="v-pill">All visible (default)</button>
+              <button class="v-pill">In review</button>
+              <button class="v-pill">Active only</button>
+              <button class="v-pill new">+ Save current</button>
+            </div>
+          </aside>
+
+          <!-- The press bay itself -->
+          <main class="bay">
+            <div class="bay-head">
+              <div class="bh-row-1">
+                <span>The Press Bay</span>
+                <span class="bh-meta"><span class="filter-active">Filtered · </span>3 of 4 lanes shown · 22 entries</span>
+              </div>
+              <!--
+                Focus chip strip — the lane filter affordance.
+                Click an "All" chip = show everything.
+                Click a single lane chip = focus only that lane.
+                Cmd/Ctrl-click multiple lane chips = combine into a subset.
+                Saved-view chips (kraft-bordered with ⌘ prefix) are pre-saved
+                multi-lane compositions; clicking re-applies them.
+                "+ Save view" surfaces when a non-default subset is active so the
+                operator can pin the current selection for later.
+                The left rail's eye-toggles + saved-views section are the same
+                state surfaced two ways — they sync.
+              -->
+              <nav class="focus-strip" aria-label="Lane focus filter">
+                <span class="strip-label">Focus</span>
+                <button class="focus-chip all">
+                  <span>All</span>
+                  <span class="fc-count">4</span>
+                </button>
+                <div class="strip-divider"></div>
+                <button class="focus-chip active">
+                  <span class="fc-glyph">§</span>
+                  <span>Editorial</span>
+                  <span class="fc-count">12</span>
+                </button>
+                <button class="focus-chip">
+                  <span class="fc-glyph">◆</span>
+                  <span>Mockups</span>
+                  <span class="fc-count">5</span>
+                </button>
+                <button class="focus-chip active">
+                  <span class="fc-glyph">⊕</span>
+                  <span>QA</span>
+                  <span class="fc-count">3</span>
+                </button>
+                <button class="focus-chip active">
+                  <span class="fc-glyph" style="color: var(--kraft);">⌘</span>
+                  <span>Press Releases</span>
+                  <span class="fc-count">7</span>
+                </button>
+                <div class="strip-divider"></div>
+                <button class="focus-chip saved">In review</button>
+                <button class="focus-chip saved">Active only</button>
+                <button class="focus-chip save" title="Save current 3-lane selection as a named view">+ Save view</button>
+                <span class="strip-hint"><kbd>1</kbd><kbd>2</kbd>⋯ to focus · <kbd>0</kbd> for all</span>
+              </nav>
+            </div>
+
+            <!-- Lane 1: Editorial (6 stages) — EXPANDED · KANBAN VIEW -->
+            <article class="swim editorial">
+              <div class="swim-head">
+                <span class="glyph">§</span>
+                <span class="name">Editorial</span>
+                <span class="tag">editorial · 6 stages</span>
+                <span class="quick-meta">12 entries · 4 drafting · 1 final</span>
+                <div class="view-toggle" role="radiogroup" aria-label="View mode">
+                  <button class="vt-cell active" title="Kanban view (columnar stages with cards)"><span class="vt-icon">▦</span><span>Kanban</span></button>
+                  <button class="vt-cell" title="List view (vertical grouped by stage)"><span class="vt-icon">≡</span><span>List</span></button>
+                </div>
+                <!-- Per-lane Compose chip (v11) — shown in "copied" state to
+                     demonstrate post-click feedback. Click clipboard-copies
+                     `/deskwork:add <SLUG> --lane editorial --stage <first>` so
+                     the operator pastes in chat and fills the slug there. -->
+                <button class="swim-compose copied" type="button" aria-label="Composed — paste in chat">
+                  <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
+                  <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
+                  <span class="sc-label-default">new</span>
+                  <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
+                </button>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse this lane" title="Collapse this lane">▾</span>
+                <span class="overflow" role="button" tabindex="0" aria-label="Lane actions">⋮</span>
+              </div>
+              <!-- Each stage-head carries its own chevron — per-stage collapse.
+                   Click anywhere on the stage-head (or the chevron) to toggle.
+                   Collapsed columns shrink to a narrow vertical strip with the
+                   stage name rotated; expanded columns redistribute to fill
+                   the freed horizontal space. The Published column below
+                   demonstrates the collapsed state. -->
+              <div class="stage-grid">
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
+                  <div class="card">Mobile-first scrapbook reflow<span class="e-meta">v1 · today</span></div>
+                  <div class="card">Marginalia keyboard nav<span class="e-meta">v1 · yesterday</span></div>
+                  <div class="card">Pipeline custom rationale<span class="e-meta">v1</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
+                  <div class="card">Phase 5 retrospective<span class="e-meta">v1</span></div>
+                  <div class="card">Studio mobile-first v2<span class="e-meta">v1</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">⊹</span><span class="stage-name">Outlining</span><span class="stage-count">1</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
+                  <div class="card">Annotation model deep-dive<span class="e-meta">v1</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">✎</span><span class="stage-name">Drafting</span><span class="stage-count">4</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
+                  <div class="card">Graphical-entries PRD<span class="e-meta">v3 · iterating</span></div>
+                  <div class="card">Editor retrospective<span class="e-meta">v1</span></div>
+                  <div class="card">Templates rationale<span class="e-meta">v1</span></div>
+                  <div class="card">Phase 4 closeout<span class="e-meta">v2</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
+                  <div class="card">v0.20 row-affordance<span class="e-meta">ready</span></div>
+                </div>
+                <!-- Published: COLLAPSED — narrow vertical strip with rotated name -->
+                <div class="stage-col collapsed">
+                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Published</span><span class="stage-count">1</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand Published stage">▾</span></div>
+                  <div class="card">v0.19 mobile-first<span class="e-meta">last sprint</span></div>
+                </div>
+              </div>
+            </article>
+
+            <!-- Lane 2: Mockups — FILTERED OUT in current view (focus is Editorial + QA) -->
+            <!-- A compact stub renders so the operator can SEE which lanes are
+                 hidden by the active filter; clicking it re-adds Mockups to focus.
+                 If the operator wanted Mockups permanently hidden, they would
+                 toggle it off in the left rail instead, and no stub would render. -->
+            <button class="swim-stub" aria-label="Restore Mockups to focus">
+              <span class="ss-glyph">◆</span>
+              <span class="ss-name">Mockups</span>
+              <span class="ss-meta">hidden by focus · 5 entries · click to restore</span>
+              <span class="ss-action">+</span>
+            </button>
+
+            <!-- Lane 3: QA (4 stages) — COLLAPSED · view toggle greyed -->
+            <article class="swim qa collapsed">
+              <div class="swim-head">
+                <span class="glyph">⊕</span>
+                <span class="name">QA</span>
+                <span class="tag">qa-plan · 4 stages</span>
+                <span class="quick-meta">3 entries · collapsed</span>
+                <div class="view-toggle" role="radiogroup" aria-label="View mode">
+                  <button class="vt-cell active"><span class="vt-icon">▦</span><span>Kanban</span></button>
+                  <button class="vt-cell"><span class="vt-icon">≡</span><span>List</span></button>
+                </div>
+                <button class="swim-compose" type="button" aria-label="Compose new entry in QA lane">
+                  <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
+                  <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
+                  <span class="sc-label-default">new</span>
+                  <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
+                </button>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand this lane" title="Expand this lane">▾</span>
+                <span class="overflow" role="button" tabindex="0" aria-label="Lane actions">⋮</span>
+              </div>
+              <div class="swim-compact">
+                <div class="sc-stage">
+                  <span class="sc-name">Drafted</span>
+                  <span class="sc-count">1</span>
+                </div>
+                <div class="sc-stage locked">
+                  <span class="sc-name">Reviewed (locked)</span>
+                  <span class="sc-count">1</span>
+                </div>
+                <div class="sc-stage">
+                  <span class="sc-name">Tested</span>
+                  <span class="sc-count">1</span>
+                </div>
+                <div class="sc-stage empty">
+                  <span class="sc-name">Approved</span>
+                  <span class="sc-count">0</span>
+                </div>
+              </div>
+            </article>
+
+            <!-- Lane 4: Press Releases (5 stages) — LIST VIEW
+                 Same content the kanban would show, presented as a vertical
+                 list grouped by stage. Stage groups act as section heads;
+                 entries become single rows with title, version-pill, state
+                 indicator, and per-row overflow. Useful when a lane has
+                 lots of entries (kanban columns get tall + hard to scan),
+                 or when the operator wants to scan entries by attribute. -->
+            <article class="swim press-releases list-view" style="border-left-color: var(--kraft);">
+              <div class="swim-head">
+                <span class="glyph" style="color: var(--kraft);">⌘</span>
+                <span class="name">Press Releases</span>
+                <span class="tag">blog-post · 5 stages</span>
+                <span class="quick-meta">7 entries · 3 drafting</span>
+                <div class="view-toggle" role="radiogroup" aria-label="View mode">
+                  <button class="vt-cell"><span class="vt-icon">▦</span><span>Kanban</span></button>
+                  <button class="vt-cell active" title="Currently in list view"><span class="vt-icon">≡</span><span>List</span></button>
+                </div>
+                <button class="swim-compose" type="button" aria-label="Compose new entry in Press Releases lane">
+                  <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
+                  <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
+                  <span class="sc-label-default">new</span>
+                  <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
+                </button>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse this lane" title="Collapse this lane">▾</span>
+                <span class="overflow" role="button" tabindex="0" aria-label="Lane actions">⋮</span>
+              </div>
+              <!-- Each lb-group-head carries its own chevron — per-stage
+                   collapse, independent of per-lane collapse. Click toggles
+                   the group's row list. Published below demonstrates
+                   the collapsed state. -->
+              <div class="list-body">
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">◇</span>
+                    <span class="lb-name">Idea</span>
+                    <span class="lb-tag">2 captured</span>
+                    <span class="lb-count">2</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">v0.30 release announcement</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">today</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Q3 retrospective post</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">2 days ago</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
+                  </div>
+                </div>
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">✎</span>
+                    <span class="lb-name">Drafting</span>
+                    <span class="lb-tag">3 in progress</span>
+                    <span class="lb-count">3</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Graphical-entries feature announcement</span>
+                    <span class="lb-version">v2</span>
+                    <span class="lb-state iter">iterating</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Press-check editorial pipeline — what we learned</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">drafting</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Multi-lane support landing in v0.30</span>
+                    <span class="lb-version">v3</span>
+                    <span class="lb-state iter">iterating</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
+                  </div>
+                </div>
+                <div class="lb-group locked">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">⌕</span>
+                    <span class="lb-name">Edited</span>
+                    <span class="lb-tag">locked · ready to publish</span>
+                    <span class="lb-count">1</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Hello, Lanes — the multi-pipeline rationale</span>
+                    <span class="lb-version">v4</span>
+                    <span class="lb-state ready">final</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
+                  </div>
+                </div>
+                <!-- Published: COLLAPSED — only the head visible -->
+                <div class="lb-group collapsed">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">✓</span>
+                    <span class="lb-name">Published</span>
+                    <span class="lb-tag">live · 1 hidden</span>
+                    <span class="lb-count">1</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand Published group">▾</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">v0.29 release — Phase 4 lands</span>
+                    <span class="lb-version">v2</span>
+                    <span class="lb-state">last sprint</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
+                  </div>
+                </div>
+                <div class="lb-group empty">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">⊘</span>
+                    <span class="lb-name">Blocked</span>
+                    <span class="lb-tag">cul-de-sac</span>
+                    <span class="lb-count">0</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
+                  </div>
+                  <div class="lb-row empty-state">no blocked entries</div>
+                </div>
+              </div>
+            </article>
+          </main>
+        </div>
+      </div>
+      <div class="caption">Desktop · per-lane <code>+ new</code> chip in each swim-head. Click copies the partial slash-command (lane + stage pre-filled) so the operator can paste in chat and fill in the slug. Editorial's chip is shown post-click in the "Copied" state.</div>
+    </div>
+
+    <!-- MOBILE -->
+    <div class="frame-wrap">
+      <div class="phone">
+        <div class="screen">
+          <div class="masthead" style="margin-top:2.4rem;">
+            <div>
+              <div class="kicker">The Desk · multi-lane</div>
+              <div class="title" style="font-size:1.1rem;">editorial studio</div>
+            </div>
+            <button class="mobile-rail-trigger">Lanes ▾</button>
+          </div>
+
+          <!-- Focus strip — horizontally scrollable on mobile -->
+          <nav class="focus-strip mobile" aria-label="Lane focus filter">
+            <span class="strip-label">Focus</span>
+            <button class="focus-chip all"><span>All</span><span class="fc-count">4</span></button>
+            <button class="focus-chip active"><span class="fc-glyph">§</span><span>Editorial</span></button>
+            <button class="focus-chip"><span class="fc-glyph">◆</span><span>Mockups</span></button>
+            <button class="focus-chip active"><span class="fc-glyph">⊕</span><span>QA</span></button>
+            <button class="focus-chip active"><span class="fc-glyph" style="color: var(--kraft);">⌘</span><span>Press</span></button>
+          </nav>
+
+          <div class="lane-stack" style="padding-top: 0;">
+            <!-- Editorial: EXPANDED · LIST VIEW (mobile default).
+                 List view preserves the linear stage sequence (top-to-bottom
+                 = pipeline order) better than the tile-stack since each row
+                 is a real entry the operator can act on directly. -->
+            <section class="lane-section list-view">
+              <div class="lane-head">
+                <span class="glyph">§</span>
+                <span class="name">Editorial</span>
+                <div class="view-toggle">
+                  <button class="vt-cell"><span class="vt-icon">▦</span></button>
+                  <button class="vt-cell active"><span class="vt-icon">≡</span></button>
+                </div>
+                <span class="count">12</span>
+                <button class="swim-compose copied" type="button" aria-label="Composed — paste in chat">
+                  <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
+                  <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
+                  <span class="sc-label-default">new</span>
+                  <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
+                </button>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
+              </div>
+              <div class="list-body">
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">◇</span>
+                    <span class="lb-name">Ideas</span>
+                    <span class="lb-count">3</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Mobile-first scrapbook reflow</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">today</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Marginalia keyboard nav</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">yest</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Pipeline custom rationale</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">3d</span>
+                  </div>
+                </div>
+                <!-- Planned: COLLAPSED on mobile to demo per-stage collapse there too -->
+                <div class="lb-group collapsed">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">§</span>
+                    <span class="lb-name">Planned</span>
+                    <span class="lb-count">2</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand Planned group">▾</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Phase 5 retrospective</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">today</span>
+                  </div>
+                </div>
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">✎</span>
+                    <span class="lb-name">Drafting</span>
+                    <span class="lb-count">4</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Graphical-entries PRD</span>
+                    <span class="lb-version">v3</span>
+                    <span class="lb-state iter">iter</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Editor retrospective</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">drafting</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Mockups is filtered out; show the compact stub -->
+            <button class="swim-stub" style="width: 100%; margin-bottom: 0.8rem; padding: 0.5rem 0.7rem; font-size: 0.85rem;">
+              <span class="ss-glyph">◆</span>
+              <span style="font-family: var(--display); font-style: italic;">Mockups</span>
+              <span class="ss-meta" style="font-size: 0.55rem;">hidden · tap to restore</span>
+              <span class="ss-action">+</span>
+            </button>
+
+            <!-- QA: COLLAPSED · view toggle greyed -->
+            <section class="lane-section collapsed">
+              <div class="lane-head">
+                <span class="glyph">⊕</span>
+                <span class="name">QA</span>
+                <div class="view-toggle">
+                  <button class="vt-cell active"><span class="vt-icon">▦</span></button>
+                  <button class="vt-cell"><span class="vt-icon">≡</span></button>
+                </div>
+                <span class="count">3</span>
+                <button class="swim-compose" type="button" aria-label="Compose new entry in QA lane">
+                  <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
+                  <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
+                  <span class="sc-label-default">new</span>
+                  <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
+                </button>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
+              </div>
+              <div class="swim-compact">
+                <div class="sc-stage"><span class="sc-name">Drafted</span><span class="sc-count">1</span></div>
+                <div class="sc-stage locked"><span class="sc-name">Rev'd</span><span class="sc-count">1</span></div>
+                <div class="sc-stage"><span class="sc-name">Tested</span><span class="sc-count">1</span></div>
+                <div class="sc-stage empty"><span class="sc-name">App'd</span><span class="sc-count">0</span></div>
+              </div>
+            </section>
+
+            <!-- Press Releases: KANBAN TILE VIEW — demonstrates the
+                 NON-default option on mobile. Single-column vertical stack
+                 of stage-tile strips (per DESIGN-STANDARDS § Collapsible
+                 stage tiles), which is also linear top-to-bottom. The tap-
+                 to-expand pattern from v0.19 would render entries inline
+                 below an expanded tile. Useful when the operator wants
+                 "how many in each stage" at-a-glance without scanning
+                 entry rows. -->
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph" style="color: var(--kraft);">⌘</span>
+                <span class="name">Press</span>
+                <div class="view-toggle">
+                  <button class="vt-cell active"><span class="vt-icon">▦</span></button>
+                  <button class="vt-cell"><span class="vt-icon">≡</span></button>
+                </div>
+                <span class="count">7</span>
+                <button class="swim-compose" type="button" aria-label="Compose new entry in Press Releases lane">
+                  <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
+                  <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
+                  <span class="sc-label-default">new</span>
+                  <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
+                </button>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
+              </div>
+              <div class="stage-row">
+                <div class="m-stage-tile"><span class="stage-glyph">◇</span><span class="stage-name">Idea</span><span class="stage-count">2</span></div>
+                <div class="m-stage-tile" style="background: var(--paper-2); border-top: 2px solid var(--red);"><span class="stage-glyph" style="color: var(--red);">✎</span><span class="stage-name" style="color: var(--red);">Drafting</span><span class="stage-count">3</span></div>
+                <div class="m-stage-tile" style="border-top: 2px solid var(--blue);"><span class="stage-glyph" style="color: var(--blue);">⌕</span><span class="stage-name">Edited</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Published</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile empty"><span class="stage-glyph" style="color: var(--faded);">⊘</span><span class="stage-name" style="color: var(--ink-soft);">Blocked</span><span class="stage-count">0</span></div>
+              </div>
+            </section>
+          </div>
+
+        </div>
+      </div>
+      <div class="caption">Mobile · per-lane <code>+</code> chip in each lane-head (icon-only to fit; aria-label carries "compose"). Tap copies, chip flashes green with "Copied — paste in chat" briefly, then reverts.</div>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "featureSlug": "graphical-entries",
+  "prdPath": "/Users/orion/work/deskwork-work/graphical-entries/docs/1.0/001-IN-PROGRESS/graphical-entries/prd.md",
+  "outPath": "/Users/orion/work/deskwork-work/graphical-entries/docs/1.0/001-IN-PROGRESS/graphical-entries/scope-manifest.yaml",
+  "repoRoot": "/Users/orion/work/deskwork-work/graphical-entries",
+  "moduleRoot": "src",
+  "evidenceTrail": true,
+  "quiet": true,
+  "editorSymmetryOut": null,
+  "noAuditRead": false,
+  "noAuditFire": false,
+  "noRequireModules": false
+}

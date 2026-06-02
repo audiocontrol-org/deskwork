@@ -4,10 +4,23 @@
  * Usage:
  *   deskwork-add <project-root> [--site <slug>] [--type blog|youtube|tool]
  *                [--content-url URL] [--source manual|analytics]
+ *                [--lane <lane-id>] [--stage <stage>]
+ *                [--kind markdown|html-mockup|single-file-html|image]
  *                <title> [description]
  *
  * Writes the calendar atomically. Emits a JSON result on stdout:
  *   { "slug": "...", "stage": "Ideas", "site": "...", "calendarPath": "..." }
+ *
+ * AUDIT-20260528-39: the dashboard's per-lane compose chip generates
+ * commands of the shape
+ *
+ *   /deskwork:add <slug> --lane <laneId> --stage <firstStage>
+ *
+ * to seed entries in non-editorial lanes (visual, qa-plan, custom). The
+ * lane + stage + kind flags below close the parser-rejected gap that
+ * surfaced in the AUDIT-20260528 dashboard sweep — pasted commands now
+ * resolve the lane's pipeline template, validate the requested stage,
+ * and persist the lane / stage / artifactKind to the new entry sidecar.
  */
 
 import { readConfig } from '@deskwork/core/config';
@@ -17,9 +30,27 @@ import { resolveSite, resolveCalendarPath } from '@deskwork/core/paths';
 import { isContentType, type ContentType } from '@deskwork/core/types';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 import { createFreshEntrySidecar } from '@deskwork/core/entry/create';
+import {
+  bootstrapDefaultLaneIfMissing,
+  loadLaneConfig,
+} from '@deskwork/core/lanes';
+import { ArtifactKindSchema, type ArtifactKind } from '@deskwork/core/lanes';
+import { loadPipelineTemplate } from '@deskwork/core/pipelines';
+
+const DEFAULT_LANE_ID = 'default';
+const DEFAULT_ARTIFACT_KIND: ArtifactKind = 'markdown';
 
 export async function run(argv: string[]): Promise<void> {
-  const KNOWN_FLAGS = ['site', 'type', 'content-url', 'source', 'slug'] as const;
+  const KNOWN_FLAGS = [
+    'site',
+    'type',
+    'content-url',
+    'source',
+    'slug',
+    'lane',
+    'stage',
+    'kind',
+  ] as const;
   const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 
   const { positional, flags } = parse();
@@ -28,6 +59,8 @@ export async function run(argv: string[]): Promise<void> {
     fail(
       'Usage: deskwork-add <project-root> [--site <slug>] [--type blog|youtube|tool] ' +
         '[--content-url URL] [--source manual|analytics] [--slug <path>] ' +
+        '[--lane <lane-id>] [--stage <stage>] ' +
+        '[--kind markdown|html-mockup|single-file-html|image] ' +
         '<title> [description]',
       2,
     );
@@ -70,6 +103,15 @@ export async function run(argv: string[]): Promise<void> {
     source = flags.source;
   }
 
+  // Resolve lane + stage + kind BEFORE any disk mutation. If validation
+  // fails, the calendar.md write and sidecar write are both skipped —
+  // adopting `fail` here on bad input is the same contract as `--type` /
+  // `--source` / `--slug`.
+  const { laneId, currentStage, artifactKind } = await resolveLaneStageKind(
+    projectRoot,
+    flags,
+  );
+
   const calendar = readCalendar(calendarPath);
 
   let entry;
@@ -103,17 +145,21 @@ export async function run(argv: string[]): Promise<void> {
     slug: entry.slug,
     title: entry.title,
     ...(entry.description ? { description: entry.description } : {}),
-    currentStage: 'Ideas',
+    currentStage,
     source,
+    lane: laneId,
+    artifactKind,
   });
 
   emit({
     slug: entry.slug,
     title: entry.title,
-    stage: entry.stage,
+    stage: currentStage,
     description: entry.description,
     site,
     calendarPath,
+    lane: laneId,
+    artifactKind,
     contentType: entry.contentType,
     contentUrl: entry.contentUrl,
   });
@@ -125,4 +171,100 @@ export async function run(argv: string[]): Promise<void> {
       fail(err instanceof Error ? err.message : String(err), 2);
     }
   }
+}
+
+/**
+ * Resolve and validate `--lane`, `--stage`, `--kind` together.
+ *
+ * Defaults:
+ *   - `--lane`: `'default'` (the bootstrap-default lane bound to the
+ *     `editorial` pipeline template). Operator pastes from the
+ *     dashboard compose chip — which always supplies `--lane` — so this
+ *     default only fires for hand-typed editorial-only invocations.
+ *   - `--stage`: the resolved lane's pipeline template's first
+ *     `linearStages` entry (`'Ideas'` for editorial, `'Sketched'` for
+ *     visual, etc.).
+ *   - `--kind`: `'markdown'` (legacy `.md` artifact path; preserves
+ *     back-compat for editorial entries that scaffold idea.md).
+ *
+ * Validation:
+ *   - `--lane` must resolve via `loadLaneConfig` — a missing lane
+ *     surfaces the loader's full error (lane id + file path + advice).
+ *   - `--stage`, when supplied, must appear in the lane's template
+ *     `linearStages ∪ offPipelineStages`. The error message lists the
+ *     legal stages so the operator can correct without grepping the
+ *     template JSON.
+ *   - `--kind`, when supplied, must be one of the four ArtifactKindSchema
+ *     enum values. Anything else is rejected with the legal list.
+ */
+async function resolveLaneStageKind(
+  projectRoot: string,
+  flags: Record<string, string>,
+): Promise<{ laneId: string; currentStage: string; artifactKind: ArtifactKind }> {
+  const explicitLane = flags['lane'];
+  const laneId = explicitLane ?? DEFAULT_LANE_ID;
+
+  // Migration-window convenience: when the operator does NOT supply
+  // `--lane` and the project has no `.deskwork/lanes/default.json` yet
+  // (pre-Phase 3 install path, or an editorial-only project that hasn't
+  // run doctor's lane-migration yet), bootstrap the default lane from
+  // the legacy site config so the editorial path keeps working end-to-
+  // end. When the operator explicitly names a lane that does not exist,
+  // we surface the loader's error verbatim — the explicit name is the
+  // commitment the operator wants honored or refused, not auto-created.
+  if (explicitLane === undefined) {
+    try {
+      await bootstrapDefaultLaneIfMissing(projectRoot);
+    } catch (err) {
+      fail(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  let lane;
+  try {
+    lane = loadLaneConfig(laneId, projectRoot);
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+
+  let template;
+  try {
+    template = loadPipelineTemplate(lane.pipelineTemplate, projectRoot);
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+
+  const firstLinearStage = template.linearStages[0];
+  const requestedStage = flags['stage'];
+  let currentStage: string;
+  if (requestedStage === undefined) {
+    currentStage = firstLinearStage;
+  } else {
+    const allowed = [...template.linearStages, ...template.offPipelineStages];
+    if (!allowed.includes(requestedStage)) {
+      fail(
+        `Invalid --stage "${requestedStage}" for lane "${laneId}" `
+          + `(pipeline template "${template.id}"). `
+          + `Allowed stages: ${allowed.join(', ')}.`,
+        2,
+      );
+    }
+    currentStage = requestedStage;
+  }
+
+  let artifactKind: ArtifactKind = DEFAULT_ARTIFACT_KIND;
+  const requestedKind = flags['kind'];
+  if (requestedKind !== undefined) {
+    const parsed = ArtifactKindSchema.safeParse(requestedKind);
+    if (!parsed.success) {
+      const allowed = ArtifactKindSchema.options.join(', ');
+      fail(
+        `Invalid --kind "${requestedKind}". Must be one of: ${allowed}.`,
+        2,
+      );
+    }
+    artifactKind = parsed.data;
+  }
+
+  return { laneId, currentStage, artifactKind };
 }

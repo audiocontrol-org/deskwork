@@ -54,9 +54,12 @@ Covers the core editorial pipeline: schema, ingest, approve, doctor, calendar re
 |---|---|---|
 | [#246](https://github.com/audiocontrol-org/deskwork/issues/246) | core/approve refuses Final → Published; spec says approve is universal | Real divergence between `approve.ts` (refuses) and `DESKWORK-STATE-MACHINE.md` + approve SKILL.md (universal). Operator picks: (a) make approve universal per Commandment II; (b) keep refusal as design-intentional and update spec/skill; (c) split the verb |
 | [#266](https://github.com/audiocontrol-org/deskwork/issues/266) | Schema vocabulary: `DraftWorkflowState` still uses retired `ReviewState` union (Commandment III/VI) | Architectural; operator picks whether DraftWorkflowState is genuinely separate from entry reviewState or this is straight drift |
-| [#142](https://github.com/audiocontrol-org/deskwork/issues/142) | Pipeline stages don't fit project-internal feature docs (PRDs/specs/plans) | Capture-mode: feature uses Drafting for PRDs; UX is misleading; operator picks rename / new kind / accept-as-is |
 | [#56](https://github.com/audiocontrol-org/deskwork/issues/56) | Phase 24: Content collections (not websites) — v0.9.0 | Schema rename `sites` → `collections`; partial — `host`-becomes-optional shipped; full vocabulary migration not. Operator picks v1 ship-shape |
 | [#222](https://github.com/audiocontrol-org/deskwork/issues/222) | Architectural: single document evolves + scrapbook accumulates approved snapshots | Phase 11 Task 1 work; T1 fix-landed per audit log; operator triages whether Option B+hybrid suffices long-term |
+
+## Superseded
+
+- [#142](https://github.com/audiocontrol-org/deskwork/issues/142) (pipeline stages don't fit project-internal PRDs/specs/plans) — **closed as superseded by the graphical-entries feature (#301).** The multi-lane / pipeline-template model ships a `feature-doc` preset (`Defined → Drafting → Approved → Implemented → Complete`) so feature docs get their own lifecycle instead of editorial `Drafting`. Was previously listed under Operator triage; no longer a standalone decision.
 
 ## Already-tracked / informational
 

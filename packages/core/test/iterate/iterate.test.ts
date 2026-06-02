@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { iterateEntry } from '@/iterate/iterate';
 import { writeSidecar } from '@/sidecar/write';
 import { readSidecar } from '@/sidecar/read';
+import { sidecarPath } from '@/sidecar/paths';
 import { readJournalEvents } from '@/journal/read';
 import type { Entry } from '@/schema/entry';
 
@@ -76,22 +77,40 @@ describe('iterateEntry', () => {
     // Per DESKWORK-STATE-MACHINE.md Commandment III, iterate does NOT
     // write reviewState. Vestigial reviewState (if present from legacy
     // sidecars) is stripped on the iterate write.
-    expect(updated.reviewState).toBeUndefined();
+    expect('reviewState' in updated).toBe(false);
   });
 
   it('strips vestigial reviewState from legacy sidecars on iterate', async () => {
     const entry = await setupEntry('Drafting');
-    // Simulate a legacy sidecar carrying a reviewState field.
-    const legacySidecar = { ...entry, reviewState: 'in-review' as const };
-    await writeSidecar(projectRoot, legacySidecar);
+    // Simulate a legacy sidecar carrying a reviewState field. Per
+    // DESKWORK-STATE-MACHINE.md Commandment III the schema no longer
+    // carries `reviewState`; we use a runtime-typed record to attach
+    // the vestigial key for the fixture and pass through writeSidecar
+    // via its schema-validating round-trip (the field is dropped on
+    // parse).
+    const legacyRecord: Record<string, unknown> = { ...entry, reviewState: 'in-review' };
+    // writeSidecar's argument is `Entry`; the schema's non-strict mode
+    // drops the vestigial key on parse, so we re-parse here to obtain
+    // a strict Entry before the write. The result is an Entry-typed
+    // value with reviewState absent — exactly what the legacy sidecar
+    // would look like AFTER one read/write round-trip. To test the
+    // legacy-on-disk path, we write the raw JSON directly to disk.
+    const sidecarPathStr = join(projectRoot, '.deskwork', 'entries', `${uuid}.json`);
+    await writeFile(sidecarPathStr, JSON.stringify(legacyRecord));
     await writeFile(
       join(projectRoot, 'docs', slug, 'index.md'),
       `---\ndeskwork:\n  id: ${uuid}\n---\n\n# body\n`,
     );
 
     await iterateEntry(projectRoot, { uuid });
+    // reviewState is RETIRED (Commandment III): the read→write of iterate
+    // drops the planted legacy field. Assert both the typed read AND
+    // the raw on-disk JSON to prove the legacy field doesn't survive
+    // the round-trip.
     const updated = await readSidecar(projectRoot, uuid);
-    expect(updated.reviewState).toBeUndefined();
+    expect('reviewState' in updated).toBe(false);
+    const rawSidecar = await readFile(sidecarPath(projectRoot, uuid), 'utf8');
+    expect(rawSidecar).not.toContain('reviewState');
   });
 
   it('produces v(N+1) from existing iteration N', async () => {
@@ -131,6 +150,40 @@ describe('iterateEntry', () => {
     await writeFile(join(projectRoot, 'docs', slug, 'index.md'), '# x\n');
 
     await expect(iterateEntry(projectRoot, { uuid })).rejects.toThrow(/published.*frozen/i);
+  });
+
+  // AUDIT-20260530-16: iterate on a Final-stage editorial entry MUST
+  // throw — Final is the editorial preset's `lockedStages` entry
+  // (`packages/core/src/pipelines/editorial.json`), and per
+  // DESKWORK-STATE-MACHINE.md the iterate verb is explicitly NOT
+  // available in Final ("Final locks the content; to iterate, induct
+  // backward to Drafting first"). The spec is canonical. Pre-Phase-4
+  // `iterateEntry` (which had hardcoded refuse-only-on-Published)
+  // permitted iterate on Final; the Phase-4 template-aware refactor
+  // closed the gap correctly. This regression locks in the
+  // spec-conformant behavior so future drift (e.g. a refactor that
+  // removes the locked-stage check or relaxes editorial's
+  // `lockedStages`) fails the suite.
+  it('refuses to iterate an editorial Final entry (locked-stage gate, DESKWORK-STATE-MACHINE.md Commandment II)', async () => {
+    const entry = await setupEntry('Final');
+    entry.iterationByStage = { Ideas: 1, Planned: 1, Outlining: 1, Drafting: 5, Final: 1 };
+    entry.priorStage = 'Drafting';
+    await writeSidecar(projectRoot, entry);
+    await writeFile(
+      join(projectRoot, 'docs', slug, 'index.md'),
+      `---\ndeskwork:\n  id: ${uuid}\n---\n\n# final body — should be locked\n`,
+    );
+
+    // The error message names the locked-stage condition + the induct
+    // recovery path so the operator knows what to do next.
+    await expect(iterateEntry(projectRoot, { uuid })).rejects.toThrow(
+      /locked stage "Final".*editorial.*induct/is,
+    );
+
+    // The iteration counter MUST NOT have advanced (the refusal happens
+    // before any mutation).
+    const reloaded = await readSidecar(projectRoot, uuid);
+    expect(reloaded.iterationByStage.Final).toBe(1);
   });
 
   // T1 (#222): even at Outlining, iterate reads index.md — NOT the

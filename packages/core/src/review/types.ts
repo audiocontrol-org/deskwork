@@ -46,6 +46,53 @@ export interface DraftRange {
   end: number;
 }
 
+/**
+ * Spatial anchor for graphical-entry comments (Phase 8 Step 8.1.1).
+ *
+ * Where a textual comment's `range` + `anchor` locates the comment in
+ * the raw markdown source, a `spatialAnchor` locates the comment on
+ * the entry's primary visual surface — a mockup, an image, an SVG
+ * diagram, anything rendered as the entry's content. The three `kind`s
+ * are mutually exclusive in interpretation AND in shape — each variant
+ * declares only the fields its kind requires, and the runtime
+ * `SpatialAnchorSchema` in `schema/draft-annotation.ts` enforces the
+ * per-kind shape at parse time (AUDIT-20260601-07):
+ *
+ *   - `pixel` — `x`/`y` are pixel coordinates against the rendered
+ *     visual's intrinsic dimensions. Used for image-style entries
+ *     where DOM selectors are not meaningful. No `selector` field.
+ *   - `dom-selector` — `selector` is a CSS selector that identifies
+ *     the anchored element within the rendered HTML mockup. No
+ *     `x`/`y` fields.
+ *   - `svg-element` — `selector` is a CSS selector that resolves to
+ *     an SVG element (e.g. `g.layer-2 > rect[id="logo"]`). No `x`/`y`
+ *     fields.
+ *
+ * The TS type is a discriminated union over `kind` so consumers narrow
+ * structurally and the compiler refuses access to fields that don't
+ * belong to the narrowed variant.
+ */
+export interface SpatialAnchorPixel {
+  kind: 'pixel';
+  x: number;
+  y: number;
+}
+
+export interface SpatialAnchorDomSelector {
+  kind: 'dom-selector';
+  selector: string;
+}
+
+export interface SpatialAnchorSvgElement {
+  kind: 'svg-element';
+  selector: string;
+}
+
+export type SpatialAnchor =
+  | SpatialAnchorPixel
+  | SpatialAnchorDomSelector
+  | SpatialAnchorSvgElement;
+
 interface AnnotationBase {
   /** ISO-8601 timestamp when the annotation was recorded. */
   createdAt: string;
@@ -97,6 +144,30 @@ export interface CommentAnnotation extends AnnotationBase {
    * field. Optional for back-compat.
    */
   anchorSuffix?: string;
+  /**
+   * Phase 8 Step 8.1.1 — threading. The id of the root `comment`
+   * annotation this comment replies to. Absent when the comment is
+   * itself a root (top-level) comment. Threading is single-level:
+   * a reply's `replyTo` always points at a root comment, never at
+   * another reply.
+   */
+  replyTo?: string;
+  /**
+   * Phase 8 Step 8.1.1 — screenshot attachments. Relative paths under
+   * `<entryDir>/scrapbook/screenshots/`, each pointing at an
+   * operator-attached screenshot bound to this comment. Stored as
+   * relative paths so the entry tree is portable. Empty / absent
+   * when the comment has no attachments.
+   */
+  attachments?: string[];
+  /**
+   * Phase 8 Step 8.1.1 — spatial anchor for graphical entries. When
+   * present, the comment is anchored on the entry's primary visual
+   * (mockup, image, SVG) per the {@link SpatialAnchor} contract.
+   * Independent of `range` — a comment may carry both (a markdown
+   * range AND a spatial pin) or neither.
+   */
+  spatialAnchor?: SpatialAnchor;
 }
 
 export interface EditAnnotation extends AnnotationBase {
@@ -139,15 +210,49 @@ export interface ResolveAnnotation extends AnnotationBase {
  * Per-iteration agent disposition for a comment. Written when a new
  * version addresses (or defers) an operator comment. Latest-wins when
  * rendering the sidebar badge.
+ *
+ * Phase 8 Step 8.1.2 (Part 2) — `reason` is REQUIRED (non-empty) on every
+ * `disposition === 'addressed'` instance, per the PRD acceptance
+ * criterion ("required free-text disposition reason captured at iterate
+ * time"). `deferred` / `wontfix` continue to accept an optional reason.
+ *
+ * Modeled as a discriminated union on `disposition`. The runtime schema
+ * (`DraftAnnotationSchema` in `schema/draft-annotation.ts`) enforces the
+ * non-empty-`reason`-when-`addressed` constraint via a top-level
+ * `superRefine` (a nested discriminated union would collide with the
+ * outer `type` discriminator); the TS type achieves the same
+ * compile-time discrimination via the three-variant union below.
  */
-export interface AddressAnnotation extends AnnotationBase {
+interface AddressAnnotationAddressed extends AnnotationBase {
   type: 'address';
   commentId: string;
   /** Version the disposition was recorded against (the just-produced version). */
   version: number;
-  disposition: 'addressed' | 'deferred' | 'wontfix';
+  disposition: 'addressed';
+  /** Required non-empty free-text reason — Phase 8 Step 8.1.2 contract. */
+  reason: string;
+}
+
+interface AddressAnnotationDeferred extends AnnotationBase {
+  type: 'address';
+  commentId: string;
+  version: number;
+  disposition: 'deferred';
   reason?: string;
 }
+
+interface AddressAnnotationWontfix extends AnnotationBase {
+  type: 'address';
+  commentId: string;
+  version: number;
+  disposition: 'wontfix';
+  reason?: string;
+}
+
+export type AddressAnnotation =
+  | AddressAnnotationAddressed
+  | AddressAnnotationDeferred
+  | AddressAnnotationWontfix;
 
 /**
  * Edit a previously-recorded `comment` annotation. Append-only: the
@@ -173,6 +278,14 @@ export interface EditCommentAnnotation extends AnnotationBase {
   category?: AnnotationCategory;
   /** New anchor (selected-text quote) — replaces the prior value when present. */
   anchor?: string;
+  /**
+   * Phase 8 Step 8.4.1 — new attachment list. Replaces the prior value
+   * when present (full-replacement semantics, identical to every other
+   * field on this patch). Callers wishing to APPEND a screenshot pass
+   * `[...priorAttachments, newRelativePath]`; the writer records the
+   * full intended state so the journal event is self-describing.
+   */
+  attachments?: string[];
 }
 
 /**

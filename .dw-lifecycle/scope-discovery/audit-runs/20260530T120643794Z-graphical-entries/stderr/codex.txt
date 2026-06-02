@@ -1,0 +1,2668 @@
+Reading additional input from stdin...
+OpenAI Codex v0.133.0
+--------
+workdir: /Users/orion/work/deskwork-work/graphical-entries
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e78c7-8ba5-74c3-a2c0-ad53ba9787dd
+--------
+user
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface bugs, design issues, missed edge cases, and code-quality concerns in the work product captured in the diff below.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+graphical-entries
+
+## Feature scope (workplan / PRD summary)
+
+Phase 6 Tasks 6.5 + 6.6 of graphical-entries: doctor rule + integration test. Task 6.5 ships the lane-config-missing-template doctor rule (first-site-gated project-wide scan; prompt-plan with per-template rebind choice; delete-with-entry-binding-refusal); LaneConfigRepairEvent schema extension; 4 test scenarios. Task 6.6 ships the custom-pipeline + lane lifecycle integration test — real CLI subprocess driving pipeline create → lane create → 2-sidecar write → archive → restore → purge-refusal → byte-equivalent state-intact end-to-end. Audit focus: doctor rule correctness across all 5 templates; rebind-choice edge cases; entry-binding detection (false positives / false negatives); integration test reliability (subprocess timing; tmp dir cleanup); end-to-end coverage gaps.
+
+## Commit subjects in the audited range
+
+295b803 feat(graphical-entries): Phase 6 Task 6.6 — custom-pipeline + lane lifecycle integration test
+f341ecb feat(graphical-entries): Phase 6 Task 6.5 — doctor rule lane-config-missing-template
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+
+The `initGroupMembersSection` docblock states "Idempotent — calling twice has no visible effect." That is true for `applyMode` (it reads current state) but NOT for the three `wire*` helpers: `wireToggle`, `wireEmptyStateCta`, and `wireMemberRowCopy` each call `addEventListener` unconditionally on every invocation. There is no module-level `wired` guard analogous to the one in the sibling `row-member-tab.ts` (which correctly guards with `let wired = false`).
+
+If `initPressCheckSurface` ever runs twice (re-init after a partial DOM swap, or a future refresh path), the section accumulates duplicate listeners — clicking a member row would fire `copyOrShowFallback` twice (two clipboard writes + two toasts), and the toggle would double-write localStorage.
+
+LOW severity because the current single call site doesn't trigger it, but the docstring asserts a property the code doesn't have.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: mirror the `row-member-tab.ts` pattern with a module-level `wired = false` guard, OR bind via a `dataset` sentinel on the section element so re-init is a genuine no-op.
+
+<!-- ===========================================================
+     Audit-barrage sweep — 2026-05-30 — 4 retroactive barrages
+     ===========================================================
+     Phase 2 (pipeline templates), Phase 3 (lane data model),
+     Phase 4 (verb refactor), Phase 7 small surfaces
+     (T7.1 + T7.2.7 + T7.2.8). 30 raw findings consolidated into
+     24 unique entries (cross-model agreement merged where same
+     surface). Run dirs:
+       20260530T062828859Z (P2)
+       20260530T063131307Z (P3)
+       20260530T063443880Z (P4)
+       20260530T064014571Z (P7 small)
+     -->
+
+### AUDIT-20260530-01 — path traversal in `loadPipelineTemplate` (unsanitized id flows to filesystem path)
+
+Finding-ID: AUDIT-20260530-01 (cross-model: AUDIT-BARRAGE-claude-01-P2 + AUDIT-BARRAGE-codex-01-P2)
+Status:     fixed-7e15a61
+Severity:   high
+Surface:    `packages/core/src/pipelines/loader.ts:118-141` (`loadPipelineTemplate`), `:36-38` (`projectOverridesDir`), `packages/core/src/pipelines/types.ts:96` (`id: z.string().min(1)`)
+
+`loadPipelineTemplate(id, projectRoot)` string-interpolates the caller-supplied `id` directly into both candidate paths. The only guard is `id.length === 0`. No charset constraint — the schema validates the `id` field INSIDE a loaded file, never the REQUESTED id. An `id` of `'../../../../etc/something'` normalizes out of the intended directory and reads an arbitrary `.json` from disk.
+
+Cross-references the downstream `LANE_ID_REGEX` fix from AUDIT-30 (applied at the studio render site for the same charset gap on lane ids). The right fix is here at the canonical chokepoint, not at every consumer.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude + codex cross-model agreement). Fix: introduce `PIPELINE_ID_REGEX` mirroring `LANE_ID_REGEX` (`^[a-z0-9][a-z0-9-]*$`); enforce in `PipelineTemplateSchema.id` AND at the top of `loadPipelineTemplate` before any path construction; have `listAvailablePipelineTemplates` ignore filenames that don't match.
+
+### AUDIT-20260530-02 — `.passthrough()` on `PipelineTemplateSchema` silently accepts misspelled optional fields
+
+Finding-ID: AUDIT-20260530-02 (cross-model: AUDIT-BARRAGE-claude-02-P2)
+Status:     fixed-c569a61
+Severity:   medium
+Surface:    `packages/core/src/pipelines/types.ts:107-110` (`.passthrough()`), `:101` (`lockedStages: ...optional()`)
+
+The schema uses blanket `.passthrough()` to tolerate a single known extra key (`$rationale`). Every unknown top-level key is silently accepted, including typos of real optional fields. An operator who writes `"lockdStages": ["Review"]` (transposed) gets zero diagnostics — `lockedStages` resolves to `undefined`, the pipeline ships with no lock gate, and iterate-at-lock-stage silently permits edits.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: declare `$rationale: z.string().optional()` explicitly and drop `.passthrough()` (default strip, or `.strict()` if unknown keys should be rejected outright).
+
+### AUDIT-20260530-03 — `PLUGIN_DEFAULTS_DIR` doubles as module directory AND preset registry (stray `.json` becomes phantom template)
+
+Finding-ID: AUDIT-20260530-03 (cross-model: AUDIT-BARRAGE-claude-03-P2)
+Status:     fixed-d5303ed
+Severity:   low
+Surface:    `packages/core/src/pipelines/loader.ts:31`, `:148-159`, `:180-189`
+
+`listAvailablePipelineTemplates` enumerates every `.json` in `PLUGIN_DEFAULTS_DIR` = `dirname(import.meta.url)`. The directory serves dual roles: holds loader/types modules + acts as preset registry. Any future non-template JSON that lands in `src/pipelines/` is copied to `dist/pipelines/` and appears as a bogus template id in the operator picker.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: name the preset set explicitly (`PRESET_IDS` constant the build also drives, or a `presets.json` index).
+
+### AUDIT-20260530-04 — verify `dist/pipelines/*.json` actually ships in the `@deskwork/core` published tarball
+
+Finding-ID: AUDIT-20260530-04 (cross-model: AUDIT-BARRAGE-claude-04-P2)
+Status:     fixed-c99e6d1
+Severity:   medium
+Surface:    `packages/core/package.json:214-215` (`build`/`prepack` cp step) — `files` whitelist (not in diff; needs inspection)
+
+Build/prepack scripts `cp src/pipelines/*.json dist/pipelines/`, but the whole feature depends on those JSON files being present in the published tarball. If `package.json`'s `files` whitelist enumerates specific dist subpaths rather than shipping `dist/` wholesale, the JSON gets excluded and every `loadPipelineTemplate` call in the marketplace-installed package throws "file not found." Same shape as v0.11.0 missing-`zod`. Tests can't catch it (no test exercises the built `dist/` resolution path).
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: `npm pack --dry-run` in `packages/core/` and assert `dist/pipelines/blog-post.json` et al. appear. If absent, widen `files` whitelist and add a CI/smoke check.
+
+### AUDIT-20260530-05 — `dev` watch never re-copies preset JSON after edit (build/watch asymmetry)
+
+Finding-ID: AUDIT-20260530-05 (cross-model: AUDIT-BARRAGE-claude-05-P2)
+Status:     fixed-f0090c2
+Severity:   low
+Surface:    `packages/core/package.json:217` (`dev` script)
+
+`build`/`prepack` copy `src/pipelines/*.json` into `dist/pipelines/`, but `dev` is `npm run build && tsc -b --watch`. Initial build copies once; thereafter `tsc --watch` only recompiles `.ts`. An operator iterating on a preset during `dev` sees no dist update.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: add parallel JSON watcher OR document in the script comment that JSON edits require manual `npm run build` during dev.
+
+### AUDIT-20260530-06 — case-insensitive filesystem produces confusing id-mismatch error in `loadPipelineTemplate`
+
+Finding-ID: AUDIT-20260530-06 (cross-model: AUDIT-BARRAGE-claude-06-P2)
+Status:     fixed-b51859b
+Severity:   low
+Surface:    `packages/core/src/pipelines/loader.ts:124-138`, `:73-78`
+
+On macOS's default case-insensitive filesystem, `existsSync(...'Editorial.json')` returns true for on-disk `editorial.json`. `loadPipelineTemplate('Editorial', root)` reads the file, then trips the id-mismatch check and throws a misleading error. Behavior diverges by host OS.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: pair with AUDIT-01's charset guard so the regex rejects mixed-case ids up front.
+
+### AUDIT-20260530-07 — path traversal in `loadLaneConfig` (sister to AUDIT-01; same shape, different surface)
+
+Finding-ID: AUDIT-20260530-07 (cross-model: AUDIT-BARRAGE-claude-01-P3 + AUDIT-BARRAGE-codex-01-P3)
+Status:     fixed-9edc085
+Severity:   high
+Surface:    `packages/core/src/lanes/loader.ts:33-49` (`laneConfigPath`), `:90-115` (`loadLaneConfig`), `packages/core/src/schema/entry.ts:148` (`lane: z.string().min(1).optional()`)
+
+`loadLaneConfig(id, projectRoot)` builds the path via `join(lanesDir(projectRoot), \`${id}.json\`)`. Only guard is `id.trim().length === 0`. `EntrySchema.lane` is `z.string().min(1).optional()` — NOT regex-bound — so a malformed sidecar (`lane: "../../secrets"`) flows straight into `loadLaneConfig` and reads arbitrary JSON.
+
+AUDIT-30 already fixed this at the studio render site. The canonical chokepoint still doesn't enforce the charset.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude + codex cross-model agreement). Fix: bind `EntrySchema.lane` to `LANE_ID_REGEX` at the schema layer AND validate the loader's `id` param up-front. Same pattern as AUDIT-01's pipeline-id fix; consider a shared validator.
+
+### AUDIT-20260530-08 — `StrictLaneConfig` / `StrictPipelineTemplate` aliases are no-op; comments misdescribe Zod `.passthrough()`
+
+Finding-ID: AUDIT-20260530-08 (cross-model: AUDIT-BARRAGE-claude-02-P3)
+Status:     fixed-16917db
+Severity:   medium
+Surface:    `packages/core/src/lanes/types.ts:69-78`, `packages/core/src/pipelines/types.ts:137-161`
+
+Both aliases claim to "narrow" a `z.infer` type that `.passthrough()` "widens." In Zod v3, `.passthrough()` changes only RUNTIME parsing; it does NOT add a `[k: string]: unknown` index signature to the inferred type. So `StrictLaneConfig = Pick<LaneConfig, ...>` is structurally identical to `LaneConfig`. The alias buys zero type safety; the comment's claim about catching typos at compile time is false.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: verify against the project's actual Zod version with a type probe; if confirmed, delete the aliases and the misdescribing comments. If extra-key safety is genuinely wanted, switch the schemas to explicit `.catchall()`.
+
+### AUDIT-20260530-09 — `detectArtifactKind` classifies non-existent files as valid artifacts (inconsistent disk contract)
+
+Finding-ID: AUDIT-20260530-09 (cross-model: AUDIT-BARRAGE-claude-03-P3 + AUDIT-BARRAGE-codex-02-P3)
+Status:     fixed-2b42356
+Severity:   medium
+Surface:    `packages/core/src/lanes/detection.ts:44-77`, `packages/core/test/lanes/detection.test.ts:15-50`
+
+Module doc says "classifies an on-disk path," but only the `html-mockup` branch touches disk. `.md`/`.html`/image branches dispatch purely on `extname` with NO existence check. `detectArtifactKind('/deleted/post.md')` returns `'markdown'` for a non-existent file; a deleted html-mockup throws. Asymmetric failure modes for the same root cause. Test fixture locks this in but the contract drift between doc and code is unintentional.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude + codex cross-model agreement). Fix: probe existence once at the top and refuse non-existent paths with a clear error, then dispatch on extension; OR document detection as path-shape-only.
+
+### AUDIT-20260530-10 — `bootstrap` doc claims "no readable config → no-config" but only checks existence
+
+Finding-ID: AUDIT-20260530-10 (cross-model: AUDIT-BARRAGE-claude-04-P3)
+Status:     fixed-234ac5a
+Severity:   low
+Surface:    `packages/core/src/lanes/bootstrap.ts:74-83`
+
+Docblock states "If the project has no readable `.deskwork/config.json`, returns `{ created: false, reason: 'no-config' }`." Code only guards existsSync, then calls `readConfig` unguarded — a corrupt config throws, contradicting the "best-effort hook" contract.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: update doc to say "absent" instead of "no readable"; consider catch+rethrow with lane-bootstrap context.
+
+### AUDIT-20260530-11 — `StageStringSchema` accepts whitespace-only stage values (`min(1)` is not `trim()`)
+
+Finding-ID: AUDIT-20260530-11 (cross-model: AUDIT-BARRAGE-claude-05-P3)
+Status:     fixed-242a434
+Severity:   low
+Surface:    `packages/core/src/schema/entry.ts:108`, `packages/core/test/schema/entry.test.ts:75-101`
+
+`StageStringSchema = z.string().min(1)` parses `currentStage: '   '` successfully. Sibling validations disagree: lane ids reject whitespace via `.trim()`; stage values accept it. A whitespace stage silently fails every editorial-default helper.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: `z.string().trim().min(1)` on `StageStringSchema`; add regression test.
+
+### AUDIT-20260530-12 — `inferPriorStageFromJournal` silently skips non-editorial `from` values (semantics regression)
+
+Finding-ID: AUDIT-20260530-12 (cross-model: AUDIT-BARRAGE-claude-06-P3)
+Status:     fixed-15f7f41
+Severity:   low
+Surface:    `packages/core/src/doctor/migrate.ts:248-260`
+
+Pre-diff the loop returned `e.from` unconditionally. Now returns only `if (isEditorialStage(e.from))`; non-editorial `from` is silently skipped and the loop walks past it. For editorial-only legacy migration this is a no-op, but `StageTransitionEvent.from` is broadened to `StageStringSchema` — the moment any journal carries non-editorial `from`, the function silently produces a wrong prior-stage.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: if migration is genuinely editorial-only, assert/refuse on non-editorial `from` rather than silently skipping; if it must tolerate lane stages, return raw `from`.
+
+### AUDIT-20260530-13 — `bootstrapDefaultLaneIfMissing` can leave a lane file without its migration journal event (partial-success)
+
+Finding-ID: AUDIT-20260530-13 (cross-model: AUDIT-BARRAGE-codex-03-P3)
+Status:     fixed-908eb49
+Severity:   medium
+Surface:    `packages/core/src/lanes/bootstrap.ts:102-123`
+
+Writes `default.json` BEFORE appending the `lane-migration` journal event. If journal append fails after the write, the project is left with a lane but no migration audit record. Next invocation returns `already-exists` and never repairs the missing event.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (codex). Fix: compensating operation — if journal append fails, remove the just-created lane file; OR record enough state to retry the missing event.
+
+### AUDIT-20260530-14 — multi-lane calendar renderer silently drops entries whose `currentStage` isn't in their lane's template (re-introduces #247)
+
+Finding-ID: AUDIT-20260530-14 (cross-model: AUDIT-BARRAGE-claude-01-P4 + AUDIT-BARRAGE-codex-02-P4)
+Status:     fixed-f345069
+Severity:   high
+Surface:    `packages/core/src/calendar/render.ts:86-98`, `:179-201`; test coverage at `packages/core/test/calendar/regenerate-multilane.test.ts`
+
+#247's stated fix was "stop silently dropping entries whose stage the renderer doesn't know about." Multi-lane path reintroduces it: `bucketize` only creates buckets for `templateStageOrder(template)`; entries whose `currentStage` is not in `byStage` are never pushed. Two vectors: (a) entry bound to valid lane carrying out-of-template `currentStage` vanishes from its lane section; (b) orphan entry (lane undefined OR lane id deleted) renders through `EDITORIAL_FALLBACK`, so a deleted-visual-lane entry at `Sketched`/`Iterating` has no matching editorial-fallback bucket and disappears from "(unassigned)" too.
+
+Same shape as just-fixed AUDIT-37 composed-view drop, but on the CANONICAL calendar surface — the doctor's SSOT. Bigger blast radius. Regression tests assert only entries in known stages appear.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + codex cross-model agreement). Fix: collect any entry whose `currentStage` produced no bucket into an explicit `## (unrecognized stage)` tail per lane (or unassigned block). Add regression test seeding an entry with stage outside its lane template.
+
+### AUDIT-20260530-15 — corrupt sidecars silently skipped during lane migration (no-silent-fallback violation)
+
+Finding-ID: AUDIT-20260530-15 (cross-model: AUDIT-BARRAGE-claude-02-P4 + AUDIT-BARRAGE-codex-03-P4)
+Status:     fixed-bf2fb98
+Severity:   medium
+Surface:    `packages/core/src/doctor/lane-migration.ts:145-158`
+
+`migrateLaneMembership` walks every `*.json`; `readFile`/`JSON.parse`/`EntrySchema.safeParse` failures are all swallowed via `catch { continue }`. The sidecar is not counted in `examined`, not migrated, no diagnostic. Same root cause AUDIT-39 flagged in `entry-review/data.ts` — surfacing in a new file.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + codex cross-model agreement). Fix: distinguish ENOENT from parse/validation/IO failures; count every `.json` examined; surface skipped-corrupt sidecars in `LaneMigrationResult` (e.g. `skippedCorrupt: string[]`) OR throw with the offending path. Migration test suite has no corrupt-sidecar case.
+
+### AUDIT-20260530-16 — `iterateEntry` now refuses editorial `Final` stage (untested behavior change)
+
+Finding-ID: AUDIT-20260530-16 (cross-model: AUDIT-BARRAGE-claude-03-P4)
+Status:     fixed-fe21786
+Severity:   medium
+Surface:    `packages/core/src/iterate/iterate.ts:99-106`, `packages/core/test/iterate/iterate.test.ts:141`
+
+Resolution: outcome A (lock the new semantic). DESKWORK-STATE-MACHINE.md is explicit that iterate is NOT available in Final ("Final locks the content; to iterate, induct backward to Drafting first" — verb iterate § "When it can be invoked"; reinforced in the stage table for Final: "Content is locked — ready to publish, no further edits or iterations allowed in this stage" + Commandment I's stage-gate example). The Phase-4 `isLockedStageInTemplate` gate is the spec-conformant implementation; the pre-Phase-4 hardcoded Published-only gate was the bug. Regression test added at `packages/core/test/iterate/iterate.test.ts` :: "refuses to iterate an editorial Final entry (locked-stage gate, DESKWORK-STATE-MACHINE.md Commandment II)" asserts iterate throws naming the locked stage + pipeline + induct recovery path AND verifies the iteration counter does not advance. Existing docstring at iterate.ts:70-79 already documents the locked-stage behavior — no code or docstring change needed; the test pins the contract.
+
+Pre-Phase-4 `iterateEntry` refused only `Published`/`Blocked`/`Cancelled` — `Final` was iterable. Refactor adds `isLockedStageInTemplate`, editorial's `lockedStages = ['Final']`, so iterate-on-`Final` now throws. Semantic change to editorial workflow; operators who pinned new revisions while at `Final` must `induct` back to `Drafting` first. May be intended state-machine semantics but shipped untested + un-changelogged.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: confirm Final-refuses-iterate intent against DESKWORK-STATE-MACHINE.md; add editorial regression test asserting refusal.
+
+### AUDIT-20260530-17 — `regenerateCalendar` couples per-entry transitions to validity of unrelated lane files
+
+Finding-ID: AUDIT-20260530-17 (cross-model: AUDIT-BARRAGE-claude-04-P4)
+Status:     fixed-165e7a7
+Severity:   medium
+Surface:    `packages/core/src/calendar/render.ts:111-121` (`loadLaneContexts`)
+
+`loadLaneContexts` calls `loadLaneConfig` + `loadPipelineTemplate` per lane with no error handling. Any throw propagates out of `renderCalendar` → `regenerateCalendar`. Every verb calls `regenerateCalendar` as final step AFTER `writeSidecar` + `appendJournalEvent`. A single malformed lane file breaks all six verbs for every entry — AFTER the sidecar mutation has already landed.
+
+Pre-Phase-4 `renderCalendar` was pure over the entry list. Lane-config read multiplies blast radius from "this entry" to "the whole project, on any verb."
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: make `regenerateCalendar`'s failure non-fatal to the transition (calendar reconciled by `doctor --fix`, the documented recovery path); OR validate lane configs once up-front. At minimum the partial-state window should be tested.
+
+### AUDIT-20260530-18 — `deriveArtifactKindFromPath` writes wrong `artifactKind` for multi-file HTML mockups
+
+Finding-ID: AUDIT-20260530-18 (cross-model: AUDIT-BARRAGE-claude-05-P4)
+Status:     fixed-edb8122
+Severity:   medium
+Surface:    `packages/core/src/doctor/lane-migration.ts:deriveArtifactKindFromPath`; test acknowledgement at `packages/core/test/doctor/lane-migration.test.ts:131-138`
+
+Migration derives `artifactKind` purely from path extension: any `.html` → `'single-file-html'`. But authoritative `detectArtifactKind` probes the filesystem and would classify a directory of HTML as `html-mockup`. For a multi-file HTML mockup whose `artifactPath` ends in `index.html`, migration writes `'single-file-html'` — contradicting the authoritative classifier. Migration is idempotent so the wrong value is permanent.
+
+Visual/`mockups` lane (the headline graphical-entries use case) is exactly where multi-file HTML mockups live.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: have migration call `detectArtifactKind` (already filesystem-touching code); OR only back-fill kinds the path heuristic can classify unambiguously (`.md`, image extensions).
+
+### AUDIT-20260530-19 — `EDITORIAL_FALLBACK` duplicates `editorial.json` with manual "keep in sync" + Phase-8 deferral
+
+Finding-ID: AUDIT-20260530-19 (cross-model: AUDIT-BARRAGE-claude-06-P4)
+Status:     fixed-00fb2bc
+Severity:   low
+Surface:    `packages/core/src/calendar/render.ts:130-145`
+
+Hardcodes editorial's `linearStages` / `lockedStages` / `offPipelineStages` inline, duplicating `packages/core/src/pipelines/editorial.json`. Code documents the hazard. Defers cleanup to "Phase 8 … this constant can be deleted" with NO issue link.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: load editorial preset from the bundled package resource rather than duplicating; at minimum file the Phase-8 deletion as a GitHub issue.
+
+### AUDIT-20260530-20 — `induct` CLI still editorial-narrow (Phase 4 "verbs are universal" goal half-wired at CLI; deferral phrase in comment)
+
+Finding-ID: AUDIT-20260530-20 (cross-model: AUDIT-BARRAGE-claude-07-P4 + AUDIT-BARRAGE-codex-01-P4)
+Status:     fixed-e85bb8e
+Severity:   high
+Surface:    `packages/cli/src/commands/induct.ts:84-95,114`
+
+Core `inductEntry` is template-aware, but CLI keeps editorial-only `isLinearPipelineTarget(flags.to)` guard and hardcoded error text. A visual-lane operator running `deskwork induct icon-set --to Sketched` is rejected before the request reaches the template-aware core helper. CLI comment explicitly defers ("until a lane-aware CLI lands") with no issue link — violates "Just for now is bullshit" rule.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + codex cross-model agreement). Fix: read sidecar in CLI, resolve template, validate `--to` against `template.linearStages`; replace deferral comment with reference to tracked issue OR widen the guard now.
+
+### AUDIT-20260530-21 — `renderCalendar` docstring drift: promises `## Lane:` but emits `# Lane:` (h1)
+
+Finding-ID: AUDIT-20260530-21 (cross-model: AUDIT-BARRAGE-claude-08-P4)
+Status:     fixed-66f2854
+Severity:   low
+Surface:    `packages/core/src/calendar/render.ts:157-159` (docstring) vs `:194` and `:199` (emit)
+
+Docstring says h2 lane headers; code writes h1. Multi-lane test asserts h1 — code consistent with test, only docstring wrong. Heading level meaningful: output opens with `# Editorial Calendar` (h1), so per-lane blocks at h1 are sibling top-level rather than nested.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: decide intentionally (h1 vs h2); fix docstring; verify doctor's section-agnostic UUID scan is the only consumer.
+
+### AUDIT-20260530-22 — partial cascade failure leaves `calendar.md` persistently stale (7.2.7 single-regen regression)
+
+Finding-ID: AUDIT-20260530-22 (cross-model: AUDIT-BARRAGE-claude-01-P7small)
+Status:     fixed-8296171
+Severity:   medium
+Surface:    `packages/core/src/entry/cancel.ts` (public `cancelEntry` wrapper)
+
+The wrapper's `await regenerateCalendar(projectRoot)` runs ONLY if the walker returns normally. If the walker throws partway through a cascade (member with missing/corrupt sidecar), the group + every member processed before the failure are already `Cancelled` on disk but `calendar.md` is never regenerated. PERSISTENT divergence, not the transient window AUDIT-25 dispositioned as informational.
+
+Behavior regression vs pre-7.2.7: each invocation regenerated immediately, so mid-cascade throws left calendar consistent with completed work. The N+1→1 optimization traded for a wider, now-persistent inconsistency on the failure path. The four regenerate-count tests exercise only the happy path.
+
+Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (claude). Fix: `try { result = await cancelEntryWithoutCalendarRegen(...) } finally { await regenerateCalendar(projectRoot) }`. Add test seeding a missing/corrupt member that drives the throw and asserts calendar reconciles.
+
+### AUDIT-20260530-23 — cascade catch swallows write/journal failures as "skipped member" (can hide state corruption)
+
+Finding-ID: AUDIT-20260530-23 (cross-model: AUDIT-BARRAGE-codex-01-P7small)
+Status:     fixed-5264770
+Severity:   medium
+Surface:    `packages/core/src/entry/cancel.ts:209-279`
+
+Cascade loop wraps member lookup + template resolution + recursive walker call in ONE broad `try/catch`. Failures from the recursive transition path become a skipped member with `slug: '(unresolved)'` and `reason: 'read failed: ...'`, even when the failure was not a read failure. If journal append fails after sidecar write, the result claims the member was skipped while its sidecar is already `Cancelled` with no durable `stage-transition` event.
+
+Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (codex). Fix: narrow the recoverable catch to the specific missing-member/read case; let template/config/write/journal errors propagate. If distinct recoverable cases beyond missing-sidecar are wanted, classify them explicitly.
+
+### AUDIT-20260530-24 — indentation regression on `CancelOptions.cascade` (3-space indent slipped through)
+
+Finding-ID: AUDIT-20260530-24 (cross-model: AUDIT-BARRAGE-claude-02-P7small)
+Status:     fixed-f283f9b
+Severity:   low
+Surface:    `packages/core/src/entry/cancel.ts` — `interface CancelOptions { ... }`
+
+Pure-whitespace change with no functional purpose: `readonly cascade?: boolean;` indented with 3 spaces instead of the surrounding 2-space indentation. Signals formatting is not enforced on this file's edit path.
+
+Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (claude). Fix: restore 2-space indentation; consider format-on-commit enforcement.
+
+## Diff under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/.dw-lifecycle/scope-discovery/clones.yaml b/.dw-lifecycle/scope-discovery/clones.yaml
+index 5287367..de04a5d 100644
+--- a/.dw-lifecycle/scope-discovery/clones.yaml
++++ b/.dw-lifecycle/scope-discovery/clones.yaml
+@@ -1,4 +1,4 @@
+-generated_at: 2026-05-29T03:11:32.650Z
++generated_at: 2026-05-29T04:20:08.985Z
+ clones:
+   - id: 014b49040fe1
+     lines: 13
+@@ -244,6 +244,13 @@ clones:
+       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:96:111
+     disposition: pending
+     reason: null
++  - id: e1b16a900b51
++    lines: 18
++    members:
++      - packages/core/src/doctor/rules/lane-config-missing-template.ts:232:249
++      - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:158:174
++    disposition: keep-with-reason
++    reason: Doctor rule contract boilerplate (end of plan choices array + apply()'s plan.kind guard + payload coercion); each rule independently implements the DoctorRule interface against the same contract, so shape similarity is interface-driven not duplication; extracting a base class would violate composition-over-inheritance
+   - id: 2ccdcd76762f
+     lines: 15
+     members:
+@@ -282,8 +289,8 @@ clones:
+   - id: 189be54baaa8
+     lines: 9
+     members:
+-      - packages/core/src/doctor/runner.ts:180:188
+-      - packages/core/src/doctor/runner.ts:207:215
++      - packages/core/src/doctor/runner.ts:182:190
++      - packages/core/src/doctor/runner.ts:209:217
+     disposition: pending
+     reason: null
+   - id: 41b3f9fce647
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+index f7edeb7..381dc42 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+@@ -327,20 +327,20 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
+ 
+ ### Task 6.5: Doctor rule: orphan-pipeline-reference
+ 
+-- [ ] Step 6.5.1: Add `lane-config-missing-template` doctor rule per PRD § Doctor rules: when a lane config references a `pipelineTemplate` id that doesn't resolve, surface error with the lane file path.
+-- [ ] Step 6.5.2: Repair flow: operator picks a valid template, or removes the lane.
+-- [ ] Step 6.5.3: Unit test against a fixture with a dangling pipeline reference.
++- [x] Step 6.5.1: Add `lane-config-missing-template` doctor rule per PRD § Doctor rules: when a lane config references a `pipelineTemplate` id that doesn't resolve, surface error with the lane file path. (Rule emits one severity=error finding per dangling lane with `{ laneId, laneFilePath, unresolvedTemplateId, availableTemplates }`; project-wide scan gated to first-site to avoid duplicates on multi-site projects.)
++- [x] Step 6.5.2: Repair flow: operator picks a valid template, or removes the lane. (Prompt plan offers one `set-template-<id>` choice per resolvable preset/override + `delete-lane` last; set-template uses tmp+rename atomic write and re-validates the chosen template at apply time; delete is gated on entry bindings via `readAllSidecars` with `+N more` sample-limited refusal mirroring `purge.ts`. Both actions emit a `lane-config-repair` journal event added to `JournalEventSchema`.)
++- [x] Step 6.5.3: Unit test against a fixture with a dangling pipeline reference. (4 scenarios in `test/doctor/lane-config-missing-template.test.ts`: audit-positive, set-template-repair + journal + re-audit-clean, delete-lane + journal, delete-lane-refusal-when-entry-bound naming the bound UUID; 715/715 full suite pass.)
+ 
+ ### Task 6.6: Integration test
+ 
+-- [ ] Step 6.6.1: Tmp-fixture project; create a custom pipeline (`custom-blog` with stages "Idea → Drafting → Reviewed → Live"); create a lane bound to it; add 2 entries; archive the lane; restore; verify entries persist + state intact.
++- [x] Step 6.6.1: Tmp-fixture project; create a custom pipeline (`custom-blog` with stages "Idea → Drafting → Reviewed → Live"); create a lane bound to it; add 2 entries; archive the lane; restore; verify entries persist + state intact. (End-to-end test at `packages/cli/test/custom-pipeline-lane-integration.test.ts`; one `it()` block drives real `deskwork` CLI subprocess through pipeline create → lane create → 2-sidecar write → archive → restore → purge-refusal → state-intact-byte-compare. `pipeline update --set-locked` / `--set-off-pipeline` invoked separately since `pipeline create` doesn't accept those flags. 1/1 pass; full @deskwork/cli suite 320 → 321 pass, 0 regressions.)
+ 
+ **Acceptance Criteria:**
+ 
+-- [ ] Lane + pipeline CRUD CLI + studio surfaces work end-to-end.
+-- [ ] Soft-archive is the default; hard delete refused when references exist.
+-- [ ] Doctor surfaces orphan pipeline references with actionable repair.
+-- [ ] Studio writes nothing to sidecar state — every action clipboard-copies the equivalent CLI invocation per THESIS Consequence 2.
++- [x] Lane + pipeline CRUD CLI + studio surfaces work end-to-end. (CLI exercised end-to-end via Task 6.6's integration test; studio surfaces shipped in Tasks 6.3 + 6.4 with their own test suites.)
++- [x] Soft-archive is the default; hard delete refused when references exist. (Task 6.6 step 6 asserts `lane purge` exits non-zero + lane file persists when entries are bound, naming both bound slugs in the error.)
++- [x] Doctor surfaces orphan pipeline references with actionable repair. (Task 6.5's `lane-config-missing-template` rule + 4-scenario test suite — audit-positive, set-template repair + journal, delete-lane + journal, delete-refusal-when-bound.)
++- [x] Studio writes nothing to sidecar state — every action clipboard-copies the equivalent CLI invocation per THESIS Consequence 2. (Tasks 6.3 + 6.4 — both pages render server-side then clipboard-copy the CLI verb on save/delete; no fetch/POST surfaces.)
+ 
+ ## Phase 7: Groups — members field + CRUD + review surface + multi-lane composition  ·  [#308](https://github.com/audiocontrol-org/deskwork/issues/308)
+ 
+diff --git a/packages/cli/test/custom-pipeline-lane-integration.test.ts b/packages/cli/test/custom-pipeline-lane-integration.test.ts
+new file mode 100644
+index 0000000..800faae
+--- /dev/null
++++ b/packages/cli/test/custom-pipeline-lane-integration.test.ts
+@@ -0,0 +1,335 @@
++/**
++ * End-to-end integration test for the custom-pipeline + lane lifecycle.
++ *
++ * Phase 6 Task 6.6 (graphical-entries). Drives the real `deskwork` CLI
++ * binary via `spawnSync` against a tmp-fixture project:
++ *
++ *   1. Create a custom pipeline (`custom-blog`).
++ *   2. Mark "Reviewed" locked + "Blocked,Cancelled" off-pipeline via
++ *      mutually-exclusive `pipeline update` invocations.
++ *   3. Create a lane (`blog-lane`) bound to that pipeline.
++ *   4. Write two entry sidecars bound to the lane.
++ *   5. Archive the lane — sidecars persist untouched.
++ *   6. Restore the lane — sidecars persist untouched.
++ *   7. Hard-delete (`lane purge`) is refused while entries reference the
++ *      lane.
++ *   8. State-intact: post-cycle sidecar JSON is byte-equivalent to the
++ *      pre-cycle written bytes.
++ *
++ * No mocking — every CLI invocation is a real subprocess. The test
++ * exercises the full surface implicated by Phase 6 Task 6.6's acceptance
++ * criteria (CRUD CLI works end-to-end, soft-archive default, hard-delete
++ * refusal when referenced).
++ */
++
++import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
++import { spawnSync } from 'node:child_process';
++import { randomUUID } from 'node:crypto';
++import {
++  existsSync,
++  mkdirSync,
++  mkdtempSync,
++  readFileSync,
++  rmSync,
++  writeFileSync,
++} from 'node:fs';
++import { tmpdir } from 'node:os';
++import { dirname, join, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const testDir = dirname(fileURLToPath(import.meta.url));
++const workspaceRoot = resolve(testDir, '../../..');
++const deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork');
++
++interface RunResult {
++  readonly code: number;
++  readonly stdout: string;
++  readonly stderr: string;
++}
++
++function assertDeskworkBinPresent(): void {
++  if (!existsSync(deskworkBin)) {
++    throw new Error(
++      `deskwork binary not found at ${deskworkBin} — run npm install at the `
++      + `workspace root before running the custom-pipeline-lane integration `
++      + `test.`,
++    );
++  }
++}
++
++function makeProject(): string {
++  const project = mkdtempSync(join(tmpdir(), 'dw-cpl-int-'));
++  mkdirSync(join(project, '.deskwork', 'entries'), { recursive: true });
++  writeFileSync(
++    join(project, '.deskwork', 'config.json'),
++    JSON.stringify({
++      version: 1,
++      sites: {
++        main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' },
++      },
++      defaultSite: 'main',
++    }),
++    'utf-8',
++  );
++  writeFileSync(
++    join(project, '.deskwork', 'calendar.md'),
++    '# Editorial Calendar\n\n## Ideas\n\n*No entries.*\n',
++    'utf-8',
++  );
++  return project;
++}
++
++function destroyProject(project: string): void {
++  rmSync(project, { recursive: true, force: true });
++}
++
++function pipeline(project: string, ...args: string[]): RunResult {
++  const r = spawnSync(
++    deskworkBin,
++    ['pipeline', project, ...args],
++    { encoding: 'utf-8' },
++  );
++  return {
++    code: r.status ?? -1,
++    stdout: r.stdout ?? '',
++    stderr: r.stderr ?? '',
++  };
++}
++
++function lane(project: string, ...args: string[]): RunResult {
++  const r = spawnSync(
++    deskworkBin,
++    ['lane', project, ...args],
++    { encoding: 'utf-8' },
++  );
++  return {
++    code: r.status ?? -1,
++    stdout: r.stdout ?? '',
++    stderr: r.stderr ?? '',
++  };
++}
++
++function pipelinePath(project: string, id: string): string {
++  return join(project, '.deskwork', 'pipelines', `${id}.json`);
++}
++
++function lanePath(project: string, id: string): string {
++  return join(project, '.deskwork', 'lanes', `${id}.json`);
++}
++
++function sidecarPath(project: string, uuid: string): string {
++  return join(project, '.deskwork', 'entries', `${uuid}.json`);
++}
++
++interface SidecarSeed {
++  readonly uuid: string;
++  readonly slug: string;
++  readonly currentStage: string;
++  readonly lane: string;
++}
++
++function writeSidecarFile(project: string, seed: SidecarSeed): string {
++  const path = sidecarPath(project, seed.uuid);
++  const now = new Date().toISOString();
++  const payload = {
++    uuid: seed.uuid,
++    slug: seed.slug,
++    title: seed.slug,
++    keywords: [],
++    source: 'manual',
++    currentStage: seed.currentStage,
++    iterationByStage: {},
++    lane: seed.lane,
++    createdAt: now,
++    updatedAt: now,
++  };
++  // JSON.stringify with no indentation; the file's exact byte content is
++  // what we round-trip-compare across the archive/restore cycle.
++  writeFileSync(path, JSON.stringify(payload), 'utf-8');
++  return path;
++}
++
++beforeAll(() => { assertDeskworkBinPresent(); });
++
++describe('custom-pipeline + lane integration (Phase 6 Task 6.6)', () => {
++  let project: string;
++  beforeEach(() => { project = makeProject(); });
++  afterEach(() => { destroyProject(project); });
++
++  it('runs the full create → bind entries → archive → restore → refuse-purge cycle', () => {
++    // 1. Create custom pipeline `custom-blog`.
++    const created = pipeline(
++      project,
++      'create', 'custom-blog',
++      '--shape', 'Idea,Drafting,Reviewed,Live',
++      '--name', 'Custom Blog Pipeline',
++      '--description', 'Test pipeline for graphical-entries Task 6.6',
++    );
++    expect(created.stderr).toBe('');
++    expect(created.code).toBe(0);
++    expect(existsSync(pipelinePath(project, 'custom-blog'))).toBe(true);
++
++    const createdParsed = JSON.parse(created.stdout) as {
++      created: boolean;
++      id: string;
++      linearStages: string[];
++      lockedStages: string[];
++      offPipelineStages: string[];
++    };
++    expect(createdParsed.created).toBe(true);
++    expect(createdParsed.id).toBe('custom-blog');
++    expect(createdParsed.linearStages).toEqual(
++      ['Idea', 'Drafting', 'Reviewed', 'Live'],
++    );
++    expect(createdParsed.lockedStages).toEqual([]);
++    expect(createdParsed.offPipelineStages).toEqual([]);
++
++    // 2a. Mark "Reviewed" as a locked stage via `pipeline update --set-locked`.
++    const locked = pipeline(
++      project,
++      'update', 'custom-blog',
++      '--set-locked', 'Reviewed',
++    );
++    expect(locked.stderr).toBe('');
++    expect(locked.code).toBe(0);
++    const lockedParsed = JSON.parse(locked.stdout) as {
++      updated: boolean;
++      lockedStages: string[];
++    };
++    expect(lockedParsed.updated).toBe(true);
++    expect(lockedParsed.lockedStages).toEqual(['Reviewed']);
++
++    // 2b. Add off-pipeline stages via a second mutually-exclusive update.
++    const offPipe = pipeline(
++      project,
++      'update', 'custom-blog',
++      '--set-off-pipeline', 'Blocked,Cancelled',
++    );
++    expect(offPipe.stderr).toBe('');
++    expect(offPipe.code).toBe(0);
++    const offPipeParsed = JSON.parse(offPipe.stdout) as {
++      updated: boolean;
++      offPipelineStages: string[];
++    };
++    expect(offPipeParsed.updated).toBe(true);
++    expect(offPipeParsed.offPipelineStages).toEqual(['Blocked', 'Cancelled']);
++
++    // Verify the on-disk pipeline JSON reflects every mutation.
++    const pipelineOnDisk = JSON.parse(
++      readFileSync(pipelinePath(project, 'custom-blog'), 'utf-8'),
++    ) as Record<string, unknown>;
++    expect(pipelineOnDisk['id']).toBe('custom-blog');
++    expect(pipelineOnDisk['name']).toBe('Custom Blog Pipeline');
++    expect(pipelineOnDisk['description']).toBe(
++      'Test pipeline for graphical-entries Task 6.6',
++    );
++    expect(pipelineOnDisk['linearStages']).toEqual(
++      ['Idea', 'Drafting', 'Reviewed', 'Live'],
++    );
++    expect(pipelineOnDisk['lockedStages']).toEqual(['Reviewed']);
++    expect(pipelineOnDisk['offPipelineStages']).toEqual(['Blocked', 'Cancelled']);
++
++    // 3. Create a lane bound to the new pipeline.
++    const laneRes = lane(
++      project,
++      'create', 'blog-lane',
++      '--template', 'custom-blog',
++      '--content-dir', 'content/blog',
++      '--name', 'Blog',
++    );
++    expect(laneRes.stderr).toBe('');
++    expect(laneRes.code).toBe(0);
++    expect(existsSync(lanePath(project, 'blog-lane'))).toBe(true);
++
++    const laneOnDisk = JSON.parse(
++      readFileSync(lanePath(project, 'blog-lane'), 'utf-8'),
++    ) as Record<string, unknown>;
++    expect(laneOnDisk['id']).toBe('blog-lane');
++    expect(laneOnDisk['name']).toBe('Blog');
++    expect(laneOnDisk['pipelineTemplate']).toBe('custom-blog');
++    expect(laneOnDisk['contentDir']).toBe('content/blog');
++
++    // 4. Write two entry sidecars bound to the lane at a non-locked,
++    //    non-terminal stage of the custom pipeline.
++    const seeds: SidecarSeed[] = [
++      {
++        uuid: randomUUID(),
++        slug: 'first-post',
++        currentStage: 'Drafting',
++        lane: 'blog-lane',
++      },
++      {
++        uuid: randomUUID(),
++        slug: 'second-post',
++        currentStage: 'Drafting',
++        lane: 'blog-lane',
++      },
++    ];
++    const sidecarPreBytes = new Map<string, string>();
++    for (const seed of seeds) {
++      const path = writeSidecarFile(project, seed);
++      expect(existsSync(path)).toBe(true);
++      sidecarPreBytes.set(seed.uuid, readFileSync(path, 'utf-8'));
++    }
++
++    // 5. Archive the lane. Soft-archive: archivedAt populated; the lane
++    //    JSON stays on disk; sidecars are untouched.
++    const archived = lane(project, 'archive', 'blog-lane');
++    expect(archived.stderr).toBe('');
++    expect(archived.code).toBe(0);
++
++    const laneAfterArchive = JSON.parse(
++      readFileSync(lanePath(project, 'blog-lane'), 'utf-8'),
++    ) as Record<string, unknown>;
++    expect(typeof laneAfterArchive['archivedAt']).toBe('string');
++    expect(String(laneAfterArchive['archivedAt'])).toMatch(/^\d{4}-\d{2}-\d{2}T/);
++
++    for (const seed of seeds) {
++      expect(existsSync(sidecarPath(project, seed.uuid))).toBe(true);
++      const post = readFileSync(sidecarPath(project, seed.uuid), 'utf-8');
++      expect(post).toBe(sidecarPreBytes.get(seed.uuid));
++    }
++
++    // 6. Restore the lane. archivedAt cleared; sidecars STILL intact.
++    const restored = lane(project, 'restore', 'blog-lane');
++    expect(restored.stderr).toBe('');
++    expect(restored.code).toBe(0);
++
++    const laneAfterRestore = JSON.parse(
++      readFileSync(lanePath(project, 'blog-lane'), 'utf-8'),
++    ) as Record<string, unknown>;
++    expect(laneAfterRestore['archivedAt']).toBeUndefined();
++    expect(laneAfterRestore['id']).toBe('blog-lane');
++    expect(laneAfterRestore['pipelineTemplate']).toBe('custom-blog');
++
++    for (const seed of seeds) {
++      expect(existsSync(sidecarPath(project, seed.uuid))).toBe(true);
++    }
++
++    // 7. Hard-delete (`lane purge`) is refused while entries reference the
++    //    lane. The error message MUST name the bound entries; the lane
++    //    JSON MUST remain on disk; sidecars MUST remain untouched.
++    const purgeRefused = lane(project, 'purge', 'blog-lane');
++    expect(purgeRefused.code).not.toBe(0);
++    // Dependent-slug ordering reflects `readAllSidecars`' filesystem
++    // walk order — not stable across runs. Assert both slugs appear
++    // without committing to an order.
++    expect(purgeRefused.stderr).toMatch(/2 entries reference it/);
++    expect(purgeRefused.stderr).toContain('first-post');
++    expect(purgeRefused.stderr).toContain('second-post');
++    expect(existsSync(lanePath(project, 'blog-lane'))).toBe(true);
++
++    // 8. State-intact verification: every sidecar's bytes are unchanged
++    //    by the full archive → restore → refused-purge cycle.
++    for (const seed of seeds) {
++      const finalBytes = readFileSync(sidecarPath(project, seed.uuid), 'utf-8');
++      expect(finalBytes).toBe(sidecarPreBytes.get(seed.uuid));
++
++      const finalParsed = JSON.parse(finalBytes) as Record<string, unknown>;
++      expect(finalParsed['uuid']).toBe(seed.uuid);
++      expect(finalParsed['slug']).toBe(seed.slug);
++      expect(finalParsed['currentStage']).toBe('Drafting');
++      expect(finalParsed['lane']).toBe('blog-lane');
++    }
++  });
++});
+diff --git a/packages/core/src/doctor/rules/lane-config-missing-template.ts b/packages/core/src/doctor/rules/lane-config-missing-template.ts
+new file mode 100644
+index 0000000..c08c99f
+--- /dev/null
++++ b/packages/core/src/doctor/rules/lane-config-missing-template.ts
+@@ -0,0 +1,391 @@
++/**
++ * Rule: lane-config-missing-template.
++ *
++ * Phase 6 Task 6.5 (graphical-entries). Catches lane configs that
++ * reference a `pipelineTemplate` id that does not resolve via
++ * `loadPipelineTemplate`. The condition is exactly the failure mode
++ * `loadLaneConfig` throws for in its cross-validation step; this rule
++ * surfaces those as audit findings rather than relying on each call
++ * site to handle the throw.
++ *
++ * Repair: operator picks a valid template (rebinds the lane) OR
++ * deletes the lane file. Delete is gated by an entry-binding check —
++ * any entry whose sidecar references the lane id blocks the delete
++ * until the operator moves it elsewhere via `deskwork lane move`.
++ *
++ * Audit / multi-site semantics:
++ *
++ *   The runner invokes `audit()` once per configured site. Lane configs
++ *   are project-scoped — they live under `<projectRoot>/.deskwork/lanes/`
++ *   regardless of how many sites the project's config declares — so a
++ *   naive per-site scan would emit duplicate findings on multi-site
++ *   projects. The guard: only run when `ctx.site` is the first site in
++ *   `ctx.config.sites` (Object.keys insertion order). Single-site
++ *   projects (the overwhelming majority) trip the guard on their only
++ *   site; multi-site projects trip it on the first site listed in the
++ *   config and skip the rest. This mirrors how project-wide rules
++ *   behave when invoked from the per-site loop without a dedicated
++ *   project-scope abstraction in the runner.
++ *
++ * Sibling-relative imports per the project convention.
++ */
++
++import { readFileSync, unlinkSync, writeFileSync, renameSync } from 'node:fs';
++import { relative } from 'node:path';
++import { appendJournalEvent } from '../../journal/append.ts';
++import {
++  laneConfigPath,
++  listLaneConfigs,
++  loadLaneConfig,
++} from '../../lanes/loader.ts';
++import {
++  listAvailablePipelineTemplates,
++  loadPipelineTemplate,
++} from '../../pipelines/loader.ts';
++import { LaneConfigSchema, type LaneConfig } from '../../lanes/types.ts';
++import { readAllSidecars } from '../../sidecar/read-all.ts';
++import type {
++  DoctorContext,
++  DoctorRule,
++  Finding,
++  RepairPlan,
++  RepairResult,
++} from '../types.ts';
++
++const RULE_ID = 'lane-config-missing-template';
++
++/**
++ * Cap on the number of dependent slugs included verbatim in the
++ * delete-refusal error before falling back to `+N more`. Mirrors the
++ * `PURGE_DEPENDENTS_SAMPLE_LIMIT` constant in
++ * `lanes/operations/purge.ts` (not exported there); five keeps the
++ * error message scannable while still giving the operator concrete
++ * names to grep for.
++ */
++const DELETE_DEPENDENTS_SAMPLE_LIMIT = 5;
++
++/**
++ * Read the raw lane JSON (skipping `loadLaneConfig` to bypass the
++ * pipeline-template cross-validation that we're explicitly testing
++ * for). Returns the parsed JSON as a `LaneConfig` candidate via
++ * `LaneConfigSchema` — if even the schema rejects, we return `null`
++ * (that case is `schema-rejected`'s rule to handle, not ours).
++ */
++function readLaneJson(projectRoot: string, id: string): LaneConfig | null {
++  const path = laneConfigPath(projectRoot, id);
++  let raw: string;
++  try {
++    raw = readFileSync(path, 'utf8');
++  } catch {
++    return null;
++  }
++  let parsed: unknown;
++  try {
++    parsed = JSON.parse(raw);
++  } catch {
++    return null;
++  }
++  const result = LaneConfigSchema.safeParse(parsed);
++  if (!result.success) return null;
++  return result.data;
++}
++
++/**
++ * Try resolving the lane's `pipelineTemplate`. Returns `true` when the
++ * template resolves cleanly, `false` when the loader throws (the
++ * "missing template" case this rule catches).
++ */
++function templateResolves(templateId: string, projectRoot: string): boolean {
++  try {
++    loadPipelineTemplate(templateId, projectRoot);
++    return true;
++  } catch {
++    return false;
++  }
++}
++
++/**
++ * Atomic write helper for lane config JSON. Mirrors the
++ * `commitLaneConfig` shape in `lanes/operations/commit.ts` — tmp file
++ * + rename, with the tmp file cleaned up on rename failure. Inlined
++ * here rather than imported because `commitLaneConfig` carries the
++ * `verb` parameter and the operation-specific error wording; the
++ * doctor-rule repair path is its own caller with its own error
++ * surface.
++ */
++function atomicWriteLaneJson(
++  projectRoot: string,
++  id: string,
++  payload: LaneConfig,
++): string {
++  const path = laneConfigPath(projectRoot, id);
++  const tmpPath = `${path}.${process.pid}.tmp`;
++  const body = JSON.stringify(payload, null, 2) + '\n';
++  try {
++    writeFileSync(tmpPath, body, 'utf8');
++    renameSync(tmpPath, path);
++  } catch (err) {
++    try { unlinkSync(tmpPath); } catch { /* tmp absent — ignore */ }
++    throw err;
++  }
++  return path;
++}
++
++/**
++ * Check whether the current site is the "first" site per the config's
++ * insertion order. Used to gate the project-wide scan so multi-site
++ * projects don't emit duplicate findings (see header).
++ */
++function isFirstSite(ctx: DoctorContext): boolean {
++  const siteIds = Object.keys(ctx.config.sites);
++  if (siteIds.length === 0) return true;
++  return siteIds[0] === ctx.site;
++}
++
++const rule: DoctorRule = {
++  id: RULE_ID,
++  label: 'Lane configs whose pipelineTemplate id does not resolve',
++
++  async audit(ctx: DoctorContext): Promise<Finding[]> {
++    if (!isFirstSite(ctx)) return [];
++
++    const laneIds = listLaneConfigs(ctx.projectRoot, { includeArchived: true });
++    if (laneIds.length === 0) return [];
++
++    const availableTemplates = listAvailablePipelineTemplates(ctx.projectRoot);
++    const findings: Finding[] = [];
++
++    for (const laneId of laneIds) {
++      // Use the loader for the happy path so we catch the
++      // pipeline-resolution failure mode exactly the way every other
++      // lane-aware call site sees it. We swallow the throw and inspect
++      // the lane's raw JSON to confirm the failure is specifically the
++      // missing-template case (vs. schema rejection or a missing file,
++      // both of which are other rules' responsibility).
++      try {
++        loadLaneConfig(laneId, ctx.projectRoot);
++        continue;
++      } catch {
++        // fall through to the targeted check
++      }
++
++      const lane = readLaneJson(ctx.projectRoot, laneId);
++      if (lane === null) {
++        // schema rejection or read error — out of scope for THIS rule.
++        // `schema-rejected` covers the schema case; the read case
++        // shouldn't happen (`listLaneConfigs` just enumerated the file).
++        continue;
++      }
++      if (templateResolves(lane.pipelineTemplate, ctx.projectRoot)) {
++        // The loader threw for some reason other than a missing
++        // template (e.g. id/filename mismatch). Not this rule's
++        // concern.
++        continue;
++      }
++
++      const laneFilePath = laneConfigPath(ctx.projectRoot, laneId);
++      findings.push({
++        ruleId: RULE_ID,
++        site: ctx.site,
++        severity: 'error',
++        message:
++          `Lane "${laneId}" references pipelineTemplate "${lane.pipelineTemplate}" ` +
++          `which does not resolve (file: ${relative(ctx.projectRoot, laneFilePath)})`,
++        details: {
++          laneId,
++          laneFilePath,
++          unresolvedTemplateId: lane.pipelineTemplate,
++          availableTemplates,
++        },
++      });
++    }
++    return findings;
++  },
++
++  async plan(ctx: DoctorContext, finding: Finding): Promise<RepairPlan> {
++    const laneId = String(finding.details.laneId ?? '');
++    if (!laneId) {
++      return {
++        kind: 'report-only',
++        finding,
++        reason: 'finding missing laneId — re-run audit',
++      };
++    }
++    // Re-enumerate templates at plan time so newly-customized templates
++    // since the audit pass show up in the picker.
++    const availableTemplates = listAvailablePipelineTemplates(ctx.projectRoot);
++    const setTemplateChoices = availableTemplates.map((templateId) => ({
++      id: `set-template-${templateId}`,
++      label: `Bind lane to "${templateId}" pipeline template`,
++      payload: { action: 'set-template', laneId, templateId },
++    }));
++    return {
++      kind: 'prompt',
++      finding,
++      question:
++        `Lane "${laneId}" references an unresolved pipelineTemplate. Pick a repair:`,
++      choices: [
++        ...setTemplateChoices,
++        {
++          id: 'delete-lane',
++          label: 'Delete the lane file',
++          payload: { action: 'delete', laneId },
++        },
++      ],
++    };
++  },
++
++  async apply(ctx: DoctorContext, plan: RepairPlan): Promise<RepairResult> {
++    if (plan.kind !== 'apply') {
++      return {
++        finding: plan.finding,
++        applied: false,
++        message:
++          'plan is not directly appliable; runner should resolve prompt first',
++        skipReason: 'apply-failed',
++      };
++    }
++    const action = String(plan.payload.action ?? '');
++    const laneId = String(plan.payload.laneId ?? '');
++    if (!laneId) {
++      return {
++        finding: plan.finding,
++        applied: false,
++        message: 'apply payload missing laneId',
++        skipReason: 'apply-failed',
++      };
++    }
++
++    if (action === 'set-template') {
++      const templateId = String(plan.payload.templateId ?? '');
++      if (!templateId) {
++        return {
++          finding: plan.finding,
++          applied: false,
++          message: 'set-template payload missing templateId',
++          skipReason: 'apply-failed',
++        };
++      }
++      const lane = readLaneJson(ctx.projectRoot, laneId);
++      if (lane === null) {
++        return {
++          finding: plan.finding,
++          applied: false,
++          message: `lane "${laneId}" JSON unreadable or schema-invalid; cannot rebind`,
++          skipReason: 'apply-failed',
++        };
++      }
++      // Re-confirm the picked template resolves before writing — the
++      // operator might have picked an id that was customized away
++      // between audit and apply.
++      try {
++        loadPipelineTemplate(templateId, ctx.projectRoot);
++      } catch (err) {
++        const detail = err instanceof Error ? err.message : String(err);
++        return {
++          finding: plan.finding,
++          applied: false,
++          message: `picked template "${templateId}" does not resolve: ${detail}`,
++          skipReason: 'apply-failed',
++        };
++      }
++      const before = lane.pipelineTemplate;
++      const updated: LaneConfig = { ...lane, pipelineTemplate: templateId };
++      try {
++        atomicWriteLaneJson(ctx.projectRoot, laneId, updated);
++      } catch (err) {
++        const detail = err instanceof Error ? err.message : String(err);
++        return {
++          finding: plan.finding,
++          applied: false,
++          message: `failed to write lane JSON: ${detail}`,
++          skipReason: 'apply-failed',
++        };
++      }
++      await appendJournalEvent(ctx.projectRoot, {
++        kind: 'lane-config-repair',
++        at: new Date().toISOString(),
++        laneId,
++        ruleId: RULE_ID,
++        details: { action: 'set-template', before, after: templateId },
++      });
++      return {
++        finding: plan.finding,
++        applied: true,
++        message: `rebound lane "${laneId}" to pipelineTemplate "${templateId}"`,
++        details: { laneId, before, after: templateId },
++      };
++    }
++
++    if (action === 'delete') {
++      // Refuse if any entry references this lane — mirror the guard
++      // in `lanes/operations/purge.ts`. The operator must `lane move`
++      // every dependent first.
++      let sidecars;
++      try {
++        sidecars = await readAllSidecars(ctx.projectRoot);
++      } catch (err) {
++        const detail = err instanceof Error ? err.message : String(err);
++        return {
++          finding: plan.finding,
++          applied: false,
++          message: `failed to read sidecars for dependency check: ${detail}`,
++          skipReason: 'apply-failed',
++        };
++      }
++      const dependents = sidecars
++        .filter((entry) => entry.lane === laneId)
++        .map((entry) => entry.uuid);
++      if (dependents.length > 0) {
++        const sample = dependents.slice(0, DELETE_DEPENDENTS_SAMPLE_LIMIT);
++        const remainder = dependents.length - sample.length;
++        const suffix = remainder > 0 ? `, +${remainder} more` : '';
++        return {
++          finding: plan.finding,
++          applied: false,
++          message:
++            `Cannot delete lane "${laneId}": ${dependents.length} ` +
++            `${dependents.length === 1 ? 'entry references' : 'entries reference'} ` +
++            `it (${sample.join(', ')}${suffix}). Move each entry to another lane ` +
++            `with "deskwork lane move <slug> --to <other>" before deleting.`,
++          skipReason: 'editorial-decision',
++        };
++      }
++
++      const laneFilePath = laneConfigPath(ctx.projectRoot, laneId);
++      try {
++        unlinkSync(laneFilePath);
++      } catch (err) {
++        const detail = err instanceof Error ? err.message : String(err);
++        return {
++          finding: plan.finding,
++          applied: false,
++          message: `failed to delete lane file ${laneFilePath}: ${detail}`,
++          skipReason: 'apply-failed',
++        };
++      }
++      await appendJournalEvent(ctx.projectRoot, {
++        kind: 'lane-config-repair',
++        at: new Date().toISOString(),
++        laneId,
++        ruleId: RULE_ID,
++        details: { action: 'delete', deleted: true, laneFilePath },
++      });
++      return {
++        finding: plan.finding,
++        applied: true,
++        message: `deleted lane file ${relative(ctx.projectRoot, laneFilePath)}`,
++        details: { laneId, laneFilePath },
++      };
++    }
++
++    return {
++      finding: plan.finding,
++      applied: false,
++      message: `unknown apply action: ${action}`,
++      skipReason: 'apply-failed',
++    };
++  },
++};
++
++export default rule;
+diff --git a/packages/core/src/doctor/runner.ts b/packages/core/src/doctor/runner.ts
+index c04bf3c..de64573 100644
+--- a/packages/core/src/doctor/runner.ts
++++ b/packages/core/src/doctor/runner.ts
+@@ -23,6 +23,7 @@ import workflowStale from './rules/workflow-stale.ts';
+ import calendarUuidMissing from './rules/calendar-uuid-missing.ts';
+ import legacyTopLevelIdMigration from './rules/legacy-top-level-id-migration.ts';
+ import legacyStageArtifactPath from './rules/legacy-stage-artifact-path.ts';
++import laneConfigMissingTemplate from './rules/lane-config-missing-template.ts';
+ import { loadProjectRules, mergeRules } from './project-rules.ts';
+ import type {
+   DoctorContext,
+@@ -50,6 +51,7 @@ export const RULES: ReadonlyArray<DoctorRule> = [
+   calendarUuidMissing,
+   legacyTopLevelIdMigration,
+   legacyStageArtifactPath,
++  laneConfigMissingTemplate,
+   missingFrontmatterId,
+   orphanFrontmatterId,
+   duplicateId,
+diff --git a/packages/core/src/schema/journal-events.ts b/packages/core/src/schema/journal-events.ts
+index 27a26e1..d6634cd 100644
+--- a/packages/core/src/schema/journal-events.ts
++++ b/packages/core/src/schema/journal-events.ts
+@@ -202,6 +202,36 @@ const LaneMoveEvent = z.object({
+   }),
+ });
+ 
++/**
++ * Phase 6 Task 6.5 (graphical-entries): doctor-repair record for a lane
++ * config whose `pipelineTemplate` reference does not resolve. The
++ * `lane-config-missing-template` rule emits this event after applying
++ * either a `set-template` rebind (with `before` / `after` template ids)
++ * or a `delete` of the lane file (with `deleted: true`).
++ *
++ * The event is project-scoped (no `entryId`); `laneId` identifies the
++ * lane the repair acted on. `ruleId` records the originating doctor
++ * rule so an audit trail can be filtered by which rule wrote the entry.
++ */
++const LaneConfigRepairEvent = z.object({
++  kind: z.literal('lane-config-repair'),
++  at: z.string().datetime(),
++  laneId: z.string().min(1),
++  ruleId: z.string().min(1),
++  details: z.union([
++    z.object({
++      action: z.literal('set-template'),
++      before: z.string().min(1),
++      after: z.string().min(1),
++    }),
++    z.object({
++      action: z.literal('delete'),
++      deleted: z.literal(true),
++      laneFilePath: z.string().min(1),
++    }),
++  ]),
++});
++
+ /**
+  * Phase 6 Task 6.2 (graphical-entries): pipeline-template-lifecycle
+  * events emitted by the `/deskwork:pipeline` verb family. Each event is
+@@ -310,6 +340,7 @@ export const JournalEventSchema = z.discriminatedUnion('kind', [
+   LaneRestoreEvent,
+   LanePurgeEvent,
+   LaneMoveEvent,
++  LaneConfigRepairEvent,
+   PipelineCreateEvent,
+   PipelineUpdateEvent,
+   PipelineDeleteEvent,
+diff --git a/packages/core/test/doctor/lane-config-missing-template.test.ts b/packages/core/test/doctor/lane-config-missing-template.test.ts
+new file mode 100644
+index 0000000..61007be
+--- /dev/null
++++ b/packages/core/test/doctor/lane-config-missing-template.test.ts
+@@ -0,0 +1,284 @@
++/**
++ * Tests for the `lane-config-missing-template` doctor rule.
++ *
++ * Phase 6 Task 6.5 (graphical-entries). Four scenarios:
++ *
++ *   1. Audit: a lane config referencing a non-existent template id
++ *      produces exactly one finding with the expected details shape.
++ *   2. Repair via `set-template`: the rebind lands on disk, a journal
++ *      event is emitted, and a re-audit returns zero findings.
++ *   3. Repair via `delete-lane` (no entries bound): the lane file is
++ *      removed and a journal event is emitted.
++ *   4. Repair via `delete-lane` when entries are bound: the apply
++ *      refuses with `success: false` and names the bound entry's UUID.
++ *
++ * Fixtures live on disk under tmp directories — no filesystem mocking,
++ * per the project's testing rules.
++ */
++
++import { describe, it, expect, beforeEach, afterEach } from 'vitest';
++import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { runAudit, yesInteraction } from '@/doctor/runner';
++import laneConfigMissingTemplate from '@/doctor/rules/lane-config-missing-template';
++import { buildContentIndex } from '@/content-index';
++import { readCalendar } from '@/calendar';
++import { resolveCalendarPath } from '@/paths';
++import type { DeskworkConfig } from '@/config';
++import type { DoctorContext } from '@/doctor/types';
++
++const RULE_ID = 'lane-config-missing-template';
++
++interface Fixture {
++  root: string;
++  config: DeskworkConfig;
++}
++
++function setupFixture(): Fixture {
++  const root = mkdtempSync(join(tmpdir(), 'dw-lane-cfg-mt-'));
++  mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
++  mkdirSync(join(root, '.deskwork', 'lanes'), { recursive: true });
++  mkdirSync(join(root, 'docs'), { recursive: true });
++  // Empty calendar — every test runs against a calendar that has no
++  // rows. The rule under test doesn't consult the calendar.
++  writeFileSync(
++    join(root, '.deskwork', 'calendar.md'),
++    `# Editorial Calendar\n\n## Drafting\n\n| UUID | Slug | Title | Description | Keywords | Source | Updated |\n|------|------|------|------|------|------|------|\n`,
++    'utf8',
++  );
++  const config: DeskworkConfig = {
++    version: 1,
++    sites: {
++      main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' },
++    },
++    defaultSite: 'main',
++  };
++  return { root, config };
++}
++
++function writeLaneJson(root: string, id: string, payload: unknown): void {
++  writeFileSync(
++    join(root, '.deskwork', 'lanes', `${id}.json`),
++    JSON.stringify(payload, null, 2) + '\n',
++    'utf8',
++  );
++}
++
++function writeSidecarJson(root: string, payload: unknown): void {
++  // sidecars are stored at .deskwork/entries/<uuid>.json
++  const obj = payload as { uuid: string };
++  writeFileSync(
++    join(root, '.deskwork', 'entries', `${obj.uuid}.json`),
++    JSON.stringify(payload, null, 2),
++    'utf8',
++  );
++}
++
++function buildCtx(fixture: Fixture): DoctorContext {
++  const calendarPath = resolveCalendarPath(fixture.root, fixture.config, 'main');
++  return {
++    projectRoot: fixture.root,
++    config: fixture.config,
++    site: 'main',
++    calendar: readCalendar(calendarPath),
++    index: buildContentIndex(fixture.root, fixture.config, 'main'),
++    workflows: [],
++    interaction: yesInteraction,
++  };
++}
++
++function listJournalEvents(root: string): unknown[] {
++  const dir = join(root, '.deskwork', 'review-journal', 'history');
++  if (!existsSync(dir)) return [];
++  return readdirSync(dir)
++    .filter((n) => n.endsWith('.json'))
++    .map((n) => JSON.parse(readFileSync(join(dir, n), 'utf8')) as unknown);
++}
++
++const EXPECTED_PRESET_TEMPLATES = [
++  'blog-post',
++  'editorial',
++  'feature-doc',
++  'qa-plan',
++  'visual',
++];
++
++describe('doctor: lane-config-missing-template', () => {
++  let fixture: Fixture;
++
++  beforeEach(() => {
++    fixture = setupFixture();
++  });
++
++  afterEach(() => {
++    rmSync(fixture.root, { recursive: true, force: true });
++  });
++
++  it('emits one finding when a lane config references a non-existent template', async () => {
++    writeLaneJson(fixture.root, 'dangling', {
++      id: 'dangling',
++      name: 'Dangling Lane',
++      pipelineTemplate: 'nonsense',
++      contentDir: 'docs',
++    });
++
++    const report = await runAudit(
++      { projectRoot: fixture.root, config: fixture.config },
++      yesInteraction,
++    );
++    const findings = report.findings.filter((f) => f.ruleId === RULE_ID);
++    expect(findings).toHaveLength(1);
++    const f = findings[0];
++    expect(f.severity).toBe('error');
++    expect(f.details.laneId).toBe('dangling');
++    expect(f.details.unresolvedTemplateId).toBe('nonsense');
++    expect(f.details.laneFilePath).toBe(
++      join(fixture.root, '.deskwork', 'lanes', 'dangling.json'),
++    );
++    expect(f.details.availableTemplates).toEqual(EXPECTED_PRESET_TEMPLATES);
++  });
++
++  it('repairs via set-template: rebinds the lane and emits a journal event', async () => {
++    writeLaneJson(fixture.root, 'dangling', {
++      id: 'dangling',
++      name: 'Dangling Lane',
++      pipelineTemplate: 'nonsense',
++      contentDir: 'docs',
++    });
++
++    const ctx = buildCtx(fixture);
++    const findings = await laneConfigMissingTemplate.audit(ctx);
++    expect(findings).toHaveLength(1);
++
++    const plan = await laneConfigMissingTemplate.plan(ctx, findings[0]);
++    expect(plan.kind).toBe('prompt');
++    if (plan.kind !== 'prompt') throw new Error('plan must be prompt');
++
++    const choice = plan.choices.find((c) => c.id === 'set-template-editorial');
++    expect(choice).toBeDefined();
++    if (!choice) throw new Error('set-template-editorial choice missing');
++
++    const result = await laneConfigMissingTemplate.apply(ctx, {
++      kind: 'apply',
++      finding: findings[0],
++      summary: choice.label,
++      payload: choice.payload,
++    });
++    expect(result.applied).toBe(true);
++
++    // Lane JSON updated on disk.
++    const onDisk = JSON.parse(
++      readFileSync(join(fixture.root, '.deskwork', 'lanes', 'dangling.json'), 'utf8'),
++    ) as { pipelineTemplate: string };
++    expect(onDisk.pipelineTemplate).toBe('editorial');
++
++    // Journal event emitted.
++    const events = listJournalEvents(fixture.root);
++    const repairEvents = events.filter(
++      (e): e is { kind: string; laneId: string; details: { action: string; before: string; after: string } } =>
++        typeof e === 'object'
++        && e !== null
++        && (e as { kind?: unknown }).kind === 'lane-config-repair',
++    );
++    expect(repairEvents).toHaveLength(1);
++    expect(repairEvents[0].laneId).toBe('dangling');
++    expect(repairEvents[0].details.action).toBe('set-template');
++    expect(repairEvents[0].details.before).toBe('nonsense');
++    expect(repairEvents[0].details.after).toBe('editorial');
++
++    // Re-audit returns zero findings.
++    const reauditCtx = buildCtx(fixture);
++    const after = await laneConfigMissingTemplate.audit(reauditCtx);
++    expect(after).toHaveLength(0);
++  });
++
++  it('repairs via delete-lane (no entries bound): removes the file and emits a journal event', async () => {
++    writeLaneJson(fixture.root, 'dangling', {
++      id: 'dangling',
++      name: 'Dangling Lane',
++      pipelineTemplate: 'nonsense',
++      contentDir: 'docs',
++    });
++
++    const ctx = buildCtx(fixture);
++    const findings = await laneConfigMissingTemplate.audit(ctx);
++    expect(findings).toHaveLength(1);
++
++    const plan = await laneConfigMissingTemplate.plan(ctx, findings[0]);
++    if (plan.kind !== 'prompt') throw new Error('plan must be prompt');
++    const choice = plan.choices.find((c) => c.id === 'delete-lane');
++    if (!choice) throw new Error('delete-lane choice missing');
++
++    const laneFile = join(fixture.root, '.deskwork', 'lanes', 'dangling.json');
++    expect(existsSync(laneFile)).toBe(true);
++
++    const result = await laneConfigMissingTemplate.apply(ctx, {
++      kind: 'apply',
++      finding: findings[0],
++      summary: choice.label,
++      payload: choice.payload,
++    });
++    expect(result.applied).toBe(true);
++    expect(existsSync(laneFile)).toBe(false);
++
++    const events = listJournalEvents(fixture.root);
++    const repairEvents = events.filter(
++      (e): e is { kind: string; laneId: string; details: { action: string; deleted: true; laneFilePath: string } } =>
++        typeof e === 'object'
++        && e !== null
++        && (e as { kind?: unknown }).kind === 'lane-config-repair',
++    );
++    expect(repairEvents).toHaveLength(1);
++    expect(repairEvents[0].details.action).toBe('delete');
++    expect(repairEvents[0].details.deleted).toBe(true);
++    expect(repairEvents[0].details.laneFilePath).toBe(laneFile);
++  });
++
++  it('refuses delete-lane when an entry references the lane', async () => {
++    writeLaneJson(fixture.root, 'dangling', {
++      id: 'dangling',
++      name: 'Dangling Lane',
++      pipelineTemplate: 'nonsense',
++      contentDir: 'docs',
++    });
++    const boundUuid = '11111111-1111-4111-8111-111111111111';
++    const nowIso = new Date().toISOString();
++    writeSidecarJson(fixture.root, {
++      uuid: boundUuid,
++      slug: 'bound-entry',
++      title: 'Bound Entry',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Drafting',
++      iterationByStage: {},
++      lane: 'dangling',
++      createdAt: nowIso,
++      updatedAt: nowIso,
++    });
++
++    const ctx = buildCtx(fixture);
++    const findings = await laneConfigMissingTemplate.audit(ctx);
++    expect(findings).toHaveLength(1);
++
++    const plan = await laneConfigMissingTemplate.plan(ctx, findings[0]);
++    if (plan.kind !== 'prompt') throw new Error('plan must be prompt');
++    const choice = plan.choices.find((c) => c.id === 'delete-lane');
++    if (!choice) throw new Error('delete-lane choice missing');
++
++    const result = await laneConfigMissingTemplate.apply(ctx, {
++      kind: 'apply',
++      finding: findings[0],
++      summary: choice.label,
++      payload: choice.payload,
++    });
++    expect(result.applied).toBe(false);
++    expect(result.message).toContain(boundUuid);
++    expect(result.message).toMatch(/Cannot delete lane/);
++
++    // Lane file still on disk — refusal was effective.
++    expect(
++      existsSync(join(fixture.root, '.deskwork', 'lanes', 'dangling.json')),
++    ).toBe(true);
++  });
++});
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...). Use `blocking` only for issues that would break the feature's stated goals in obvious ways; `high` for correctness bugs adopters will hit; `medium` for design issues that compound over time; `low` for hygiene; `informational` for context you think the operator should see but isn't itself a bug.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
+
+codex
+I’m using the `feature-review` workflow because this is an audit/review request against a feature diff. I’ll keep the output to concrete findings only, anchored to the diff.
+exec
+/bin/zsh -lc "sed -n '1,220p' .agents/skills/feature-review/SKILL.md && nl -ba packages/core/src/doctor/rules/lane-config-missing-template.ts | sed -n '1,430p' && nl -ba packages/cli/test/custom-pipeline-lane-integration.test.ts | sed -n '1,380p' && nl -ba packages/core/src/schema/journal-events.ts | sed -n '190,360p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+---
+name: feature-review
+description: "Review recent feature changes for bugs, regressions, and missing tests, then report findings without fixing them."
+---
+
+# Feature Review
+
+1. Determine review scope from uncommitted, staged, and branch-vs-main changes.
+2. Read the changed files and workplan context.
+3. Review for:
+   - bugs
+   - regressions
+   - missing tests
+   - guideline violations
+4. Report findings first, ordered by severity, with file references.
+5. Do not fix issues in this step.
+     1	/**
+     2	 * Rule: lane-config-missing-template.
+     3	 *
+     4	 * Phase 6 Task 6.5 (graphical-entries). Catches lane configs that
+     5	 * reference a `pipelineTemplate` id that does not resolve via
+     6	 * `loadPipelineTemplate`. The condition is exactly the failure mode
+     7	 * `loadLaneConfig` throws for in its cross-validation step; this rule
+     8	 * surfaces those as audit findings rather than relying on each call
+     9	 * site to handle the throw.
+    10	 *
+    11	 * Repair: operator picks a valid template (rebinds the lane) OR
+    12	 * deletes the lane file. Delete is gated by an entry-binding check —
+    13	 * any entry whose sidecar references the lane id blocks the delete
+    14	 * until the operator moves it elsewhere via `deskwork lane move`.
+    15	 *
+    16	 * Audit / multi-site semantics:
+    17	 *
+    18	 *   The runner invokes `audit()` once per configured site. Lane configs
+    19	 *   are project-scoped — they live under `<projectRoot>/.deskwork/lanes/`
+    20	 *   regardless of how many sites the project's config declares — so a
+    21	 *   naive per-site scan would emit duplicate findings on multi-site
+    22	 *   projects. The guard: only run when `ctx.site` is the first site in
+    23	 *   `ctx.config.sites` (Object.keys insertion order). Single-site
+    24	 *   projects (the overwhelming majority) trip the guard on their only
+    25	 *   site; multi-site projects trip it on the first site listed in the
+    26	 *   config and skip the rest. This mirrors how project-wide rules
+    27	 *   behave when invoked from the per-site loop without a dedicated
+    28	 *   project-scope abstraction in the runner.
+    29	 *
+    30	 * Sibling-relative imports per the project convention.
+    31	 */
+    32	
+    33	import { readFileSync, unlinkSync, writeFileSync, renameSync } from 'node:fs';
+    34	import { relative } from 'node:path';
+    35	import { appendJournalEvent } from '../../journal/append.ts';
+    36	import {
+    37	  laneConfigPath,
+    38	  listLaneConfigs,
+    39	  loadLaneConfig,
+    40	} from '../../lanes/loader.ts';
+    41	import {
+    42	  listAvailablePipelineTemplates,
+    43	  loadPipelineTemplate,
+    44	} from '../../pipelines/loader.ts';
+    45	import { LaneConfigSchema, type LaneConfig } from '../../lanes/types.ts';
+    46	import { readAllSidecars } from '../../sidecar/read-all.ts';
+    47	import type {
+    48	  DoctorContext,
+    49	  DoctorRule,
+    50	  Finding,
+    51	  RepairPlan,
+    52	  RepairResult,
+    53	} from '../types.ts';
+    54	
+    55	const RULE_ID = 'lane-config-missing-template';
+    56	
+    57	/**
+    58	 * Cap on the number of dependent slugs included verbatim in the
+    59	 * delete-refusal error before falling back to `+N more`. Mirrors the
+    60	 * `PURGE_DEPENDENTS_SAMPLE_LIMIT` constant in
+    61	 * `lanes/operations/purge.ts` (not exported there); five keeps the
+    62	 * error message scannable while still giving the operator concrete
+    63	 * names to grep for.
+    64	 */
+    65	const DELETE_DEPENDENTS_SAMPLE_LIMIT = 5;
+    66	
+    67	/**
+    68	 * Read the raw lane JSON (skipping `loadLaneConfig` to bypass the
+    69	 * pipeline-template cross-validation that we're explicitly testing
+    70	 * for). Returns the parsed JSON as a `LaneConfig` candidate via
+    71	 * `LaneConfigSchema` — if even the schema rejects, we return `null`
+    72	 * (that case is `schema-rejected`'s rule to handle, not ours).
+    73	 */
+    74	function readLaneJson(projectRoot: string, id: string): LaneConfig | null {
+    75	  const path = laneConfigPath(projectRoot, id);
+    76	  let raw: string;
+    77	  try {
+    78	    raw = readFileSync(path, 'utf8');
+    79	  } catch {
+    80	    return null;
+    81	  }
+    82	  let parsed: unknown;
+    83	  try {
+    84	    parsed = JSON.parse(raw);
+    85	  } catch {
+    86	    return null;
+    87	  }
+    88	  const result = LaneConfigSchema.safeParse(parsed);
+    89	  if (!result.success) return null;
+    90	  return result.data;
+    91	}
+    92	
+    93	/**
+    94	 * Try resolving the lane's `pipelineTemplate`. Returns `true` when the
+    95	 * template resolves cleanly, `false` when the loader throws (the
+    96	 * "missing template" case this rule catches).
+    97	 */
+    98	function templateResolves(templateId: string, projectRoot: string): boolean {
+    99	  try {
+   100	    loadPipelineTemplate(templateId, projectRoot);
+   101	    return true;
+   102	  } catch {
+   103	    return false;
+   104	  }
+   105	}
+   106	
+   107	/**
+   108	 * Atomic write helper for lane config JSON. Mirrors the
+   109	 * `commitLaneConfig` shape in `lanes/operations/commit.ts` — tmp file
+   110	 * + rename, with the tmp file cleaned up on rename failure. Inlined
+   111	 * here rather than imported because `commitLaneConfig` carries the
+   112	 * `verb` parameter and the operation-specific error wording; the
+   113	 * doctor-rule repair path is its own caller with its own error
+   114	 * surface.
+   115	 */
+   116	function atomicWriteLaneJson(
+   117	  projectRoot: string,
+   118	  id: string,
+   119	  payload: LaneConfig,
+   120	): string {
+   121	  const path = laneConfigPath(projectRoot, id);
+   122	  const tmpPath = `${path}.${process.pid}.tmp`;
+   123	  const body = JSON.stringify(payload, null, 2) + '\n';
+   124	  try {
+   125	    writeFileSync(tmpPath, body, 'utf8');
+   126	    renameSync(tmpPath, path);
+   127	  } catch (err) {
+   128	    try { unlinkSync(tmpPath); } catch { /* tmp absent — ignore */ }
+   129	    throw err;
+   130	  }
+   131	  return path;
+   132	}
+   133	
+   134	/**
+   135	 * Check whether the current site is the "first" site per the config's
+   136	 * insertion order. Used to gate the project-wide scan so multi-site
+   137	 * projects don't emit duplicate findings (see header).
+   138	 */
+   139	function isFirstSite(ctx: DoctorContext): boolean {
+   140	  const siteIds = Object.keys(ctx.config.sites);
+   141	  if (siteIds.length === 0) return true;
+   142	  return siteIds[0] === ctx.site;
+   143	}
+   144	
+   145	const rule: DoctorRule = {
+   146	  id: RULE_ID,
+   147	  label: 'Lane configs whose pipelineTemplate id does not resolve',
+   148	
+   149	  async audit(ctx: DoctorContext): Promise<Finding[]> {
+   150	    if (!isFirstSite(ctx)) return [];
+   151	
+   152	    const laneIds = listLaneConfigs(ctx.projectRoot, { includeArchived: true });
+   153	    if (laneIds.length === 0) return [];
+   154	
+   155	    const availableTemplates = listAvailablePipelineTemplates(ctx.projectRoot);
+   156	    const findings: Finding[] = [];
+   157	
+   158	    for (const laneId of laneIds) {
+   159	      // Use the loader for the happy path so we catch the
+   160	      // pipeline-resolution failure mode exactly the way every other
+   161	      // lane-aware call site sees it. We swallow the throw and inspect
+   162	      // the lane's raw JSON to confirm the failure is specifically the
+   163	      // missing-template case (vs. schema rejection or a missing file,
+   164	      // both of which are other rules' responsibility).
+   165	      try {
+   166	        loadLaneConfig(laneId, ctx.projectRoot);
+   167	        continue;
+   168	      } catch {
+   169	        // fall through to the targeted check
+   170	      }
+   171	
+   172	      const lane = readLaneJson(ctx.projectRoot, laneId);
+   173	      if (lane === null) {
+   174	        // schema rejection or read error — out of scope for THIS rule.
+   175	        // `schema-rejected` covers the schema case; the read case
+   176	        // shouldn't happen (`listLaneConfigs` just enumerated the file).
+   177	        continue;
+   178	      }
+   179	      if (templateResolves(lane.pipelineTemplate, ctx.projectRoot)) {
+   180	        // The loader threw for some reason other than a missing
+   181	        // template (e.g. id/filename mismatch). Not this rule's
+   182	        // concern.
+   183	        continue;
+   184	      }
+   185	
+   186	      const laneFilePath = laneConfigPath(ctx.projectRoot, laneId);
+   187	      findings.push({
+   188	        ruleId: RULE_ID,
+   189	        site: ctx.site,
+   190	        severity: 'error',
+   191	        message:
+   192	          `Lane "${laneId}" references pipelineTemplate "${lane.pipelineTemplate}" ` +
+   193	          `which does not resolve (file: ${relative(ctx.projectRoot, laneFilePath)})`,
+   194	        details: {
+   195	          laneId,
+   196	          laneFilePath,
+   197	          unresolvedTemplateId: lane.pipelineTemplate,
+   198	          availableTemplates,
+   199	        },
+   200	      });
+   201	    }
+   202	    return findings;
+   203	  },
+   204	
+   205	  async plan(ctx: DoctorContext, finding: Finding): Promise<RepairPlan> {
+   206	    const laneId = String(finding.details.laneId ?? '');
+   207	    if (!laneId) {
+   208	      return {
+   209	        kind: 'report-only',
+   210	        finding,
+   211	        reason: 'finding missing laneId — re-run audit',
+   212	      };
+   213	    }
+   214	    // Re-enumerate templates at plan time so newly-customized templates
+   215	    // since the audit pass show up in the picker. `listAvailable…` does
+   216	    // NOT validate; it enumerates filenames so UI pickers can advertise
+   217	    // ids that exist on disk even when malformed. We filter through
+   218	    // `loadPipelineTemplate` here so the prompt only offers ids that
+   219	    // resolve cleanly — picking an unresolvable id would otherwise
+   220	    // succeed at plan time and fail late inside `apply()` (the apply-
+   221	    // time revalidation is intentionally retained for the audit→apply
+   222	    // race where a template gets clobbered between phases; see
+   223	    // AUDIT-20260529-08).
+   224	    const availableTemplates = listAvailablePipelineTemplates(ctx.projectRoot)
+   225	      .filter((templateId) => templateResolves(templateId, ctx.projectRoot));
+   226	    const setTemplateChoices = availableTemplates.map((templateId) => ({
+   227	      id: `set-template-${templateId}`,
+   228	      label: `Bind lane to "${templateId}" pipeline template`,
+   229	      payload: { action: 'set-template', laneId, templateId },
+   230	    }));
+   231	    return {
+   232	      kind: 'prompt',
+   233	      finding,
+   234	      question:
+   235	        `Lane "${laneId}" references an unresolved pipelineTemplate. Pick a repair:`,
+   236	      choices: [
+   237	        ...setTemplateChoices,
+   238	        {
+   239	          id: 'delete-lane',
+   240	          label: 'Delete the lane file',
+   241	          payload: { action: 'delete', laneId },
+   242	        },
+   243	      ],
+   244	    };
+   245	  },
+   246	
+   247	  async apply(ctx: DoctorContext, plan: RepairPlan): Promise<RepairResult> {
+   248	    if (plan.kind !== 'apply') {
+   249	      return {
+   250	        finding: plan.finding,
+   251	        applied: false,
+   252	        message:
+   253	          'plan is not directly appliable; runner should resolve prompt first',
+   254	        skipReason: 'apply-failed',
+   255	      };
+   256	    }
+   257	    const action = String(plan.payload.action ?? '');
+   258	    const laneId = String(plan.payload.laneId ?? '');
+   259	    if (!laneId) {
+   260	      return {
+   261	        finding: plan.finding,
+   262	        applied: false,
+   263	        message: 'apply payload missing laneId',
+   264	        skipReason: 'apply-failed',
+   265	      };
+   266	    }
+   267	
+   268	    if (action === 'set-template') {
+   269	      const templateId = String(plan.payload.templateId ?? '');
+   270	      if (!templateId) {
+   271	        return {
+   272	          finding: plan.finding,
+   273	          applied: false,
+   274	          message: 'set-template payload missing templateId',
+   275	          skipReason: 'apply-failed',
+   276	        };
+   277	      }
+   278	      const lane = readLaneJson(ctx.projectRoot, laneId);
+   279	      if (lane === null) {
+   280	        return {
+   281	          finding: plan.finding,
+   282	          applied: false,
+   283	          message: `lane "${laneId}" JSON unreadable or schema-invalid; cannot rebind`,
+   284	          skipReason: 'apply-failed',
+   285	        };
+   286	      }
+   287	      // Re-confirm the picked template resolves before writing — the
+   288	      // operator might have picked an id that was customized away
+   289	      // between audit and apply.
+   290	      try {
+   291	        loadPipelineTemplate(templateId, ctx.projectRoot);
+   292	      } catch (err) {
+   293	        const detail = err instanceof Error ? err.message : String(err);
+   294	        return {
+   295	          finding: plan.finding,
+   296	          applied: false,
+   297	          message: `picked template "${templateId}" does not resolve: ${detail}`,
+   298	          skipReason: 'apply-failed',
+   299	        };
+   300	      }
+   301	      const before = lane.pipelineTemplate;
+   302	      const updated: LaneConfig = { ...lane, pipelineTemplate: templateId };
+   303	      try {
+   304	        atomicWriteLaneJson(ctx.projectRoot, laneId, updated);
+   305	      } catch (err) {
+   306	        const detail = err instanceof Error ? err.message : String(err);
+   307	        return {
+   308	          finding: plan.finding,
+   309	          applied: false,
+   310	          message: `failed to write lane JSON: ${detail}`,
+   311	          skipReason: 'apply-failed',
+   312	        };
+   313	      }
+   314	      await appendJournalEvent(ctx.projectRoot, {
+   315	        kind: 'lane-config-repair',
+   316	        at: new Date().toISOString(),
+   317	        laneId,
+   318	        ruleId: RULE_ID,
+   319	        details: { action: 'set-template', before, after: templateId },
+   320	      });
+   321	      return {
+   322	        finding: plan.finding,
+   323	        applied: true,
+   324	        message: `rebound lane "${laneId}" to pipelineTemplate "${templateId}"`,
+   325	        details: { laneId, before, after: templateId },
+   326	      };
+   327	    }
+   328	
+   329	    if (action === 'delete') {
+   330	      // Refuse if any entry references this lane — mirror the guard
+   331	      // in `lanes/operations/purge.ts`. The operator must `lane move`
+   332	      // every dependent first.
+   333	      let sidecars;
+   334	      try {
+   335	        sidecars = await readAllSidecars(ctx.projectRoot);
+   336	      } catch (err) {
+   337	        const detail = err instanceof Error ? err.message : String(err);
+   338	        return {
+   339	          finding: plan.finding,
+   340	          applied: false,
+   341	          message: `failed to read sidecars for dependency check: ${detail}`,
+   342	          skipReason: 'apply-failed',
+   343	        };
+   344	      }
+   345	      const dependents = sidecars
+   346	        .filter((entry) => entry.lane === laneId)
+   347	        .map((entry) => entry.uuid);
+   348	      if (dependents.length > 0) {
+   349	        const sample = dependents.slice(0, DELETE_DEPENDENTS_SAMPLE_LIMIT);
+   350	        const remainder = dependents.length - sample.length;
+   351	        const suffix = remainder > 0 ? `, +${remainder} more` : '';
+   352	        return {
+   353	          finding: plan.finding,
+   354	          applied: false,
+   355	          message:
+   356	            `Cannot delete lane "${laneId}": ${dependents.length} ` +
+   357	            `${dependents.length === 1 ? 'entry references' : 'entries reference'} ` +
+   358	            `it (${sample.join(', ')}${suffix}). Move each entry to another lane ` +
+   359	            `with "deskwork lane move <slug> --to <other>" before deleting.`,
+   360	          skipReason: 'editorial-decision',
+   361	        };
+   362	      }
+   363	
+   364	      const laneFilePath = laneConfigPath(ctx.projectRoot, laneId);
+   365	      try {
+   366	        unlinkSync(laneFilePath);
+   367	      } catch (err) {
+   368	        const detail = err instanceof Error ? err.message : String(err);
+   369	        return {
+   370	          finding: plan.finding,
+   371	          applied: false,
+   372	          message: `failed to delete lane file ${laneFilePath}: ${detail}`,
+   373	          skipReason: 'apply-failed',
+   374	        };
+   375	      }
+   376	      await appendJournalEvent(ctx.projectRoot, {
+   377	        kind: 'lane-config-repair',
+   378	        at: new Date().toISOString(),
+   379	        laneId,
+   380	        ruleId: RULE_ID,
+   381	        details: { action: 'delete', deleted: true, laneFilePath },
+   382	      });
+   383	      return {
+   384	        finding: plan.finding,
+   385	        applied: true,
+   386	        message: `deleted lane file ${relative(ctx.projectRoot, laneFilePath)}`,
+   387	        details: { laneId, laneFilePath },
+   388	      };
+   389	    }
+   390	
+   391	    return {
+   392	      finding: plan.finding,
+   393	      applied: false,
+   394	      message: `unknown apply action: ${action}`,
+   395	      skipReason: 'apply-failed',
+   396	    };
+   397	  },
+   398	};
+   399	
+   400	export default rule;
+     1	/**
+     2	 * End-to-end integration test for the custom-pipeline + lane lifecycle.
+     3	 *
+     4	 * Phase 6 Task 6.6 (graphical-entries). Drives the real `deskwork` CLI
+     5	 * binary via `spawnSync` against a tmp-fixture project:
+     6	 *
+     7	 *   1. Create a custom pipeline (`custom-blog`).
+     8	 *   2. Mark "Reviewed" locked + "Blocked,Cancelled" off-pipeline via
+     9	 *      mutually-exclusive `pipeline update` invocations.
+    10	 *   3. Create a lane (`blog-lane`) bound to that pipeline.
+    11	 *   4. Write two entry sidecars bound to the lane.
+    12	 *   5. Archive the lane — sidecars persist untouched.
+    13	 *   6. Restore the lane — sidecars persist untouched.
+    14	 *   7. Hard-delete (`lane purge`) is refused while entries reference the
+    15	 *      lane.
+    16	 *   8. State-intact: post-cycle sidecar JSON is byte-equivalent to the
+    17	 *      pre-cycle written bytes.
+    18	 *
+    19	 * No mocking — every CLI invocation is a real subprocess. The test
+    20	 * exercises the full surface implicated by Phase 6 Task 6.6's acceptance
+    21	 * criteria (CRUD CLI works end-to-end, soft-archive default, hard-delete
+    22	 * refusal when referenced).
+    23	 */
+    24	
+    25	import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+    26	import { spawnSync } from 'node:child_process';
+    27	import { randomUUID } from 'node:crypto';
+    28	import {
+    29	  existsSync,
+    30	  mkdirSync,
+    31	  mkdtempSync,
+    32	  readFileSync,
+    33	  rmSync,
+    34	  writeFileSync,
+    35	} from 'node:fs';
+    36	import { tmpdir } from 'node:os';
+    37	import { dirname, join, resolve } from 'node:path';
+    38	import { fileURLToPath } from 'node:url';
+    39	
+    40	const testDir = dirname(fileURLToPath(import.meta.url));
+    41	const workspaceRoot = resolve(testDir, '../../..');
+    42	const deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork');
+    43	
+    44	interface RunResult {
+    45	  readonly code: number;
+    46	  readonly stdout: string;
+    47	  readonly stderr: string;
+    48	}
+    49	
+    50	function assertDeskworkBinPresent(): void {
+    51	  if (!existsSync(deskworkBin)) {
+    52	    throw new Error(
+    53	      `deskwork binary not found at ${deskworkBin} — run npm install at the `
+    54	      + `workspace root before running the custom-pipeline-lane integration `
+    55	      + `test.`,
+    56	    );
+    57	  }
+    58	}
+    59	
+    60	function makeProject(): string {
+    61	  const project = mkdtempSync(join(tmpdir(), 'dw-cpl-int-'));
+    62	  mkdirSync(join(project, '.deskwork', 'entries'), { recursive: true });
+    63	  writeFileSync(
+    64	    join(project, '.deskwork', 'config.json'),
+    65	    JSON.stringify({
+    66	      version: 1,
+    67	      sites: {
+    68	        main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' },
+    69	      },
+    70	      defaultSite: 'main',
+    71	    }),
+    72	    'utf-8',
+    73	  );
+    74	  writeFileSync(
+    75	    join(project, '.deskwork', 'calendar.md'),
+    76	    '# Editorial Calendar\n\n## Ideas\n\n*No entries.*\n',
+    77	    'utf-8',
+    78	  );
+    79	  return project;
+    80	}
+    81	
+    82	function destroyProject(project: string): void {
+    83	  rmSync(project, { recursive: true, force: true });
+    84	}
+    85	
+    86	function pipeline(project: string, ...args: string[]): RunResult {
+    87	  const r = spawnSync(
+    88	    deskworkBin,
+    89	    ['pipeline', project, ...args],
+    90	    { encoding: 'utf-8' },
+    91	  );
+    92	  return {
+    93	    code: r.status ?? -1,
+    94	    stdout: r.stdout ?? '',
+    95	    stderr: r.stderr ?? '',
+    96	  };
+    97	}
+    98	
+    99	function lane(project: string, ...args: string[]): RunResult {
+   100	  const r = spawnSync(
+   101	    deskworkBin,
+   102	    ['lane', project, ...args],
+   103	    { encoding: 'utf-8' },
+   104	  );
+   105	  return {
+   106	    code: r.status ?? -1,
+   107	    stdout: r.stdout ?? '',
+   108	    stderr: r.stderr ?? '',
+   109	  };
+   110	}
+   111	
+   112	function pipelinePath(project: string, id: string): string {
+   113	  return join(project, '.deskwork', 'pipelines', `${id}.json`);
+   114	}
+   115	
+   116	function lanePath(project: string, id: string): string {
+   117	  return join(project, '.deskwork', 'lanes', `${id}.json`);
+   118	}
+   119	
+   120	function sidecarPath(project: string, uuid: string): string {
+   121	  return join(project, '.deskwork', 'entries', `${uuid}.json`);
+   122	}
+   123	
+   124	interface SidecarSeed {
+   125	  readonly uuid: string;
+   126	  readonly slug: string;
+   127	  readonly currentStage: string;
+   128	  readonly lane: string;
+   129	}
+   130	
+   131	function writeSidecarFile(project: string, seed: SidecarSeed): string {
+   132	  const path = sidecarPath(project, seed.uuid);
+   133	  const now = new Date().toISOString();
+   134	  const payload = {
+   135	    uuid: seed.uuid,
+   136	    slug: seed.slug,
+   137	    title: seed.slug,
+   138	    keywords: [],
+   139	    source: 'manual',
+   140	    currentStage: seed.currentStage,
+   141	    iterationByStage: {},
+   142	    lane: seed.lane,
+   143	    createdAt: now,
+   144	    updatedAt: now,
+   145	  };
+   146	  // JSON.stringify with no indentation; the file's exact byte content is
+   147	  // what we round-trip-compare across the archive/restore cycle.
+   148	  writeFileSync(path, JSON.stringify(payload), 'utf-8');
+   149	  return path;
+   150	}
+   151	
+   152	beforeAll(() => { assertDeskworkBinPresent(); });
+   153	
+   154	describe('custom-pipeline + lane integration (Phase 6 Task 6.6)', () => {
+   155	  let project: string;
+   156	  beforeEach(() => { project = makeProject(); });
+   157	  afterEach(() => { destroyProject(project); });
+   158	
+   159	  it('runs the full create → bind entries → archive → restore → refuse-purge cycle', () => {
+   160	    // 1. Create custom pipeline `custom-blog`.
+   161	    const created = pipeline(
+   162	      project,
+   163	      'create', 'custom-blog',
+   164	      '--shape', 'Idea,Drafting,Reviewed,Live',
+   165	      '--name', 'Custom Blog Pipeline',
+   166	      '--description', 'Test pipeline for graphical-entries Task 6.6',
+   167	    );
+   168	    expect(created.stderr).toBe('');
+   169	    expect(created.code).toBe(0);
+   170	    expect(existsSync(pipelinePath(project, 'custom-blog'))).toBe(true);
+   171	
+   172	    const createdParsed = JSON.parse(created.stdout) as {
+   173	      created: boolean;
+   174	      id: string;
+   175	      linearStages: string[];
+   176	      lockedStages: string[];
+   177	      offPipelineStages: string[];
+   178	    };
+   179	    expect(createdParsed.created).toBe(true);
+   180	    expect(createdParsed.id).toBe('custom-blog');
+   181	    expect(createdParsed.linearStages).toEqual(
+   182	      ['Idea', 'Drafting', 'Reviewed', 'Live'],
+   183	    );
+   184	    expect(createdParsed.lockedStages).toEqual([]);
+   185	    expect(createdParsed.offPipelineStages).toEqual([]);
+   186	
+   187	    // 2a. Mark "Reviewed" as a locked stage via `pipeline update --set-locked`.
+   188	    const locked = pipeline(
+   189	      project,
+   190	      'update', 'custom-blog',
+   191	      '--set-locked', 'Reviewed',
+   192	    );
+   193	    expect(locked.stderr).toBe('');
+   194	    expect(locked.code).toBe(0);
+   195	    const lockedParsed = JSON.parse(locked.stdout) as {
+   196	      updated: boolean;
+   197	      lockedStages: string[];
+   198	    };
+   199	    expect(lockedParsed.updated).toBe(true);
+   200	    expect(lockedParsed.lockedStages).toEqual(['Reviewed']);
+   201	
+   202	    // 2b. Add off-pipeline stages via a second mutually-exclusive update.
+   203	    const offPipe = pipeline(
+   204	      project,
+   205	      'update', 'custom-blog',
+   206	      '--set-off-pipeline', 'Blocked,Cancelled',
+   207	    );
+   208	    expect(offPipe.stderr).toBe('');
+   209	    expect(offPipe.code).toBe(0);
+   210	    const offPipeParsed = JSON.parse(offPipe.stdout) as {
+   211	      updated: boolean;
+   212	      offPipelineStages: string[];
+   213	    };
+   214	    expect(offPipeParsed.updated).toBe(true);
+   215	    expect(offPipeParsed.offPipelineStages).toEqual(['Blocked', 'Cancelled']);
+   216	
+   217	    // Verify the on-disk pipeline JSON reflects every mutation.
+   218	    const pipelineOnDisk = JSON.parse(
+   219	      readFileSync(pipelinePath(project, 'custom-blog'), 'utf-8'),
+   220	    ) as Record<string, unknown>;
+   221	    expect(pipelineOnDisk['id']).toBe('custom-blog');
+   222	    expect(pipelineOnDisk['name']).toBe('Custom Blog Pipeline');
+   223	    expect(pipelineOnDisk['description']).toBe(
+   224	      'Test pipeline for graphical-entries Task 6.6',
+   225	    );
+   226	    expect(pipelineOnDisk['linearStages']).toEqual(
+   227	      ['Idea', 'Drafting', 'Reviewed', 'Live'],
+   228	    );
+   229	    expect(pipelineOnDisk['lockedStages']).toEqual(['Reviewed']);
+   230	    expect(pipelineOnDisk['offPipelineStages']).toEqual(['Blocked', 'Cancelled']);
+   231	
+   232	    // 3. Create a lane bound to the new pipeline.
+   233	    const laneRes = lane(
+   234	      project,
+   235	      'create', 'blog-lane',
+   236	      '--template', 'custom-blog',
+   237	      '--content-dir', 'content/blog',
+   238	      '--name', 'Blog',
+   239	    );
+   240	    expect(laneRes.stderr).toBe('');
+   241	    expect(laneRes.code).toBe(0);
+   242	    expect(existsSync(lanePath(project, 'blog-lane'))).toBe(true);
+   243	
+   244	    const laneOnDisk = JSON.parse(
+   245	      readFileSync(lanePath(project, 'blog-lane'), 'utf-8'),
+   246	    ) as Record<string, unknown>;
+   247	    expect(laneOnDisk['id']).toBe('blog-lane');
+   248	    expect(laneOnDisk['name']).toBe('Blog');
+   249	    expect(laneOnDisk['pipelineTemplate']).toBe('custom-blog');
+   250	    expect(laneOnDisk['contentDir']).toBe('content/blog');
+   251	
+   252	    // 4. Write two entry sidecars bound to the lane at a non-locked,
+   253	    //    non-terminal stage of the custom pipeline.
+   254	    const seeds: SidecarSeed[] = [
+   255	      {
+   256	        uuid: randomUUID(),
+   257	        slug: 'first-post',
+   258	        currentStage: 'Drafting',
+   259	        lane: 'blog-lane',
+   260	      },
+   261	      {
+   262	        uuid: randomUUID(),
+   263	        slug: 'second-post',
+   264	        currentStage: 'Drafting',
+   265	        lane: 'blog-lane',
+   266	      },
+   267	    ];
+   268	    const sidecarPreBytes = new Map<string, string>();
+   269	    for (const seed of seeds) {
+   270	      const path = writeSidecarFile(project, seed);
+   271	      expect(existsSync(path)).toBe(true);
+   272	      sidecarPreBytes.set(seed.uuid, readFileSync(path, 'utf-8'));
+   273	    }
+   274	
+   275	    // 5. Archive the lane. Soft-archive: archivedAt populated; the lane
+   276	    //    JSON stays on disk; sidecars are untouched.
+   277	    const archived = lane(project, 'archive', 'blog-lane');
+   278	    expect(archived.stderr).toBe('');
+   279	    expect(archived.code).toBe(0);
+   280	
+   281	    const laneAfterArchive = JSON.parse(
+   282	      readFileSync(lanePath(project, 'blog-lane'), 'utf-8'),
+   283	    ) as Record<string, unknown>;
+   284	    expect(typeof laneAfterArchive['archivedAt']).toBe('string');
+   285	    expect(String(laneAfterArchive['archivedAt'])).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+   286	
+   287	    for (const seed of seeds) {
+   288	      expect(existsSync(sidecarPath(project, seed.uuid))).toBe(true);
+   289	      const post = readFileSync(sidecarPath(project, seed.uuid), 'utf-8');
+   290	      expect(post).toBe(sidecarPreBytes.get(seed.uuid));
+   291	    }
+   292	
+   293	    // 6. Restore the lane. archivedAt cleared; sidecars STILL intact.
+   294	    const restored = lane(project, 'restore', 'blog-lane');
+   295	    expect(restored.stderr).toBe('');
+   296	    expect(restored.code).toBe(0);
+   297	
+   298	    const laneAfterRestore = JSON.parse(
+   299	      readFileSync(lanePath(project, 'blog-lane'), 'utf-8'),
+   300	    ) as Record<string, unknown>;
+   301	    expect(laneAfterRestore['archivedAt']).toBeUndefined();
+   302	    expect(laneAfterRestore['id']).toBe('blog-lane');
+   303	    expect(laneAfterRestore['pipelineTemplate']).toBe('custom-blog');
+   304	
+   305	    for (const seed of seeds) {
+   306	      expect(existsSync(sidecarPath(project, seed.uuid))).toBe(true);
+   307	    }
+   308	
+   309	    // 7. Hard-delete (`lane purge`) is refused while entries reference the
+   310	    //    lane. The error message MUST name the bound entries; the lane
+   311	    //    JSON MUST remain on disk; sidecars MUST remain untouched.
+   312	    const purgeRefused = lane(project, 'purge', 'blog-lane');
+   313	    expect(purgeRefused.code).not.toBe(0);
+   314	    // Dependent-slug ordering reflects `readAllSidecars`' filesystem
+   315	    // walk order — not stable across runs. Assert both slugs appear
+   316	    // without committing to an order.
+   317	    expect(purgeRefused.stderr).toMatch(/2 entries reference it/);
+   318	    expect(purgeRefused.stderr).toContain('first-post');
+   319	    expect(purgeRefused.stderr).toContain('second-post');
+   320	    expect(existsSync(lanePath(project, 'blog-lane'))).toBe(true);
+   321	
+   322	    // 8. State-intact verification: every sidecar's bytes are unchanged
+   323	    //    by the full archive → restore → refused-purge cycle.
+   324	    for (const seed of seeds) {
+   325	      const finalBytes = readFileSync(sidecarPath(project, seed.uuid), 'utf-8');
+   326	      expect(finalBytes).toBe(sidecarPreBytes.get(seed.uuid));
+   327	
+   328	      const finalParsed = JSON.parse(finalBytes) as Record<string, unknown>;
+   329	      expect(finalParsed['uuid']).toBe(seed.uuid);
+   330	      expect(finalParsed['slug']).toBe(seed.slug);
+   331	      expect(finalParsed['currentStage']).toBe('Drafting');
+   332	      expect(finalParsed['lane']).toBe('blog-lane');
+   333	    }
+   334	  });
+   335	});
+   190	  details: z.object({
+   191	    changedFields: z.array(z.string().min(1)).min(1),
+   192	    before: z.record(z.string(), z.unknown()),
+   193	    after: z.record(z.string(), z.unknown()),
+   194	  }),
+   195	});
+   196	
+   197	const LaneArchiveEvent = z.object({
+   198	  kind: z.literal('lane-archive'),
+   199	  at: z.string().datetime(),
+   200	  laneId: z.string().min(1),
+   201	});
+   202	
+   203	const LaneRestoreEvent = z.object({
+   204	  kind: z.literal('lane-restore'),
+   205	  at: z.string().datetime(),
+   206	  laneId: z.string().min(1),
+   207	});
+   208	
+   209	const LanePurgeEvent = z.object({
+   210	  kind: z.literal('lane-purge'),
+   211	  at: z.string().datetime(),
+   212	  laneId: z.string().min(1),
+   213	  details: z.object({
+   214	    purgedPath: z.string().min(1),
+   215	  }),
+   216	});
+   217	
+   218	const LaneMoveEvent = z.object({
+   219	  kind: z.literal('lane-move'),
+   220	  at: z.string().datetime(),
+   221	  entryId: z.string().uuid(),
+   222	  details: z.object({
+   223	    fromLane: z.string().min(1),
+   224	    toLane: z.string().min(1),
+   225	    fromStage: StageStringSchema,
+   226	    toStage: StageStringSchema,
+   227	    fromArtifactPath: z.string().optional(),
+   228	    toArtifactPath: z.string().optional(),
+   229	  }),
+   230	});
+   231	
+   232	/**
+   233	 * Phase 6 Task 6.5 (graphical-entries): doctor-repair record for a lane
+   234	 * config whose `pipelineTemplate` reference does not resolve. The
+   235	 * `lane-config-missing-template` rule emits this event after applying
+   236	 * either a `set-template` rebind (with `before` / `after` template ids)
+   237	 * or a `delete` of the lane file (with `deleted: true`).
+   238	 *
+   239	 * The event is project-scoped (no `entryId`); `laneId` identifies the
+   240	 * lane the repair acted on. `ruleId` records the originating doctor
+   241	 * rule so an audit trail can be filtered by which rule wrote the entry.
+   242	 */
+   243	const LaneConfigRepairEvent = z.object({
+   244	  kind: z.literal('lane-config-repair'),
+   245	  at: z.string().datetime(),
+   246	  laneId: z.string().min(1),
+   247	  ruleId: z.string().min(1),
+   248	  details: z.union([
+   249	    z.object({
+   250	      action: z.literal('set-template'),
+   251	      before: z.string().min(1),
+   252	      after: z.string().min(1),
+   253	    }),
+   254	    z.object({
+   255	      action: z.literal('delete'),
+   256	      deleted: z.literal(true),
+   257	      laneFilePath: z.string().min(1),
+   258	    }),
+   259	  ]),
+   260	});
+   261	
+   262	/**
+   263	 * Phase 6 Task 6.2 (graphical-entries): pipeline-template-lifecycle
+   264	 * events emitted by the `/deskwork:pipeline` verb family. Each event is
+   265	 * project-scoped (no `entryId`); `pipelineId` identifies the template
+   266	 * the operation acted on and `details` carries kind-specific context.
+   267	 *
+   268	 * Three kinds mirror the three mutating verbs:
+   269	 *
+   270	 *   - `pipeline-create` — a new pipeline template was written to
+   271	 *                         `<projectRoot>/.deskwork/pipelines/<id>.json`.
+   272	 *   - `pipeline-update` — an existing project-override pipeline was
+   273	 *                         mutated (stage added / renamed / removed,
+   274	 *                         lockedStages or offPipelineStages replaced).
+   275	 *                         The `operation` discriminator names which of
+   276	 *                         the five mutation flavors ran, with shape-
+   277	 *                         specific `before` / `after` fields.
+   278	 *   - `pipeline-delete` — a project-override pipeline JSON was deleted
+   279	 *                         from disk. `reassignedLanes` carries the
+   280	 *                         list of lane ids that were re-bound (empty
+   281	 *                         when no lanes referenced the template).
+   282	 *
+   283	 * Plugin presets are read-only — none of these events fire against
+   284	 * the packaged defaults; the mutating verbs refuse with a "create a
+   285	 * project override first" error before reaching the journal append.
+   286	 */
+   287	const PipelineCreateEvent = z.object({
+   288	  kind: z.literal('pipeline-create'),
+   289	  at: z.string().datetime(),
+   290	  pipelineId: z.string().min(1),
+   291	  details: z.object({
+   292	    name: z.string().min(1),
+   293	    linearStages: z.array(z.string().min(1)).min(1),
+   294	    lockedStages: z.array(z.string().min(1)),
+   295	    offPipelineStages: z.array(z.string().min(1)),
+   296	  }),
+   297	});
+   298	
+   299	const PipelineUpdateAddStage = z.object({
+   300	  operation: z.literal('add-stage'),
+   301	  stage: z.string().min(1),
+   302	  position: z.number().int().nonnegative(),
+   303	});
+   304	
+   305	const PipelineUpdateRenameStage = z.object({
+   306	  operation: z.literal('rename-stage'),
+   307	  from: z.string().min(1),
+   308	  to: z.string().min(1),
+   309	});
+   310	
+   311	const PipelineUpdateRemoveStage = z.object({
+   312	  operation: z.literal('remove-stage'),
+   313	  stage: z.string().min(1),
+   314	});
+   315	
+   316	const PipelineUpdateSetLocked = z.object({
+   317	  operation: z.literal('set-locked'),
+   318	  before: z.array(z.string().min(1)),
+   319	  after: z.array(z.string().min(1)),
+   320	});
+   321	
+   322	const PipelineUpdateSetOffPipeline = z.object({
+   323	  operation: z.literal('set-off-pipeline'),
+   324	  before: z.array(z.string().min(1)),
+   325	  after: z.array(z.string().min(1)),
+   326	});
+   327	
+   328	const PipelineUpdateEvent = z.object({
+   329	  kind: z.literal('pipeline-update'),
+   330	  at: z.string().datetime(),
+   331	  pipelineId: z.string().min(1),
+   332	  details: z.discriminatedUnion('operation', [
+   333	    PipelineUpdateAddStage,
+   334	    PipelineUpdateRenameStage,
+   335	    PipelineUpdateRemoveStage,
+   336	    PipelineUpdateSetLocked,
+   337	    PipelineUpdateSetOffPipeline,
+   338	  ]),
+   339	});
+   340	
+   341	const PipelineDeleteEvent = z.object({
+   342	  kind: z.literal('pipeline-delete'),
+   343	  at: z.string().datetime(),
+   344	  pipelineId: z.string().min(1),
+   345	  details: z.object({
+   346	    purgedPath: z.string().min(1),
+   347	    reassignedLanes: z.array(z.object({
+   348	      laneId: z.string().min(1),
+   349	      from: z.string().min(1),
+   350	      to: z.string().min(1),
+   351	    })),
+   352	  }),
+   353	});
+   354	
+   355	/**
+   356	 * Phase 7 Task 7.2 (graphical-entries): group-lifecycle events emitted
+   357	 * by the `/deskwork:group` verb family. Each event carries `entryId`
+   358	 * (the group's UUID — groups are themselves entries) and a per-kind
+   359	 * `details` payload.
+   360	 *
+
+codex
+I’ve read the changed doctor rule, journal schema, and the new CLI integration test. The strongest issues are in the repair path and in what the new integration test claims to cover versus what it actually exercises.
+exec
+/bin/zsh -lc "rg -n \"listAvailablePipelineTemplates|function listAvailablePipelineTemplates|export function listAvailablePipelineTemplates|loadPipelineTemplate\" packages/core/src/pipelines packages/core/test -g '*.ts'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+packages/core/test/pipelines/presets.test.ts:20:  loadPipelineTemplate,
+packages/core/test/pipelines/presets.test.ts:21:  listAvailablePipelineTemplates,
+packages/core/test/pipelines/presets.test.ts:83:  it('listAvailablePipelineTemplates includes all five preset ids', () => {
+packages/core/test/pipelines/presets.test.ts:84:    const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/test/pipelines/presets.test.ts:93:        const template = loadPipelineTemplate(id, projectRoot);
+packages/core/test/pipelines/presets.test.ts:101:        const template = loadPipelineTemplate(id, projectRoot);
+packages/core/test/pipelines/presets.test.ts:109:        const template = loadPipelineTemplate(id, projectRoot);
+packages/core/src/pipelines/index.ts:5: * contract; `loadPipelineTemplate` + `listAvailablePipelineTemplates`
+packages/core/src/pipelines/index.ts:15:  loadPipelineTemplate,
+packages/core/src/pipelines/index.ts:16:  listAvailablePipelineTemplates,
+packages/core/test/pipelines/strict-schema.test.ts:26:  loadPipelineTemplate,
+packages/core/test/pipelines/strict-schema.test.ts:27:  listAvailablePipelineTemplates,
+packages/core/test/pipelines/strict-schema.test.ts:98:      const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/test/pipelines/strict-schema.test.ts:101:        expect(() => loadPipelineTemplate(id, projectRoot)).not.toThrow();
+packages/core/test/pipelines/strict-schema.test.ts:126:      expect(() => loadPipelineTemplate('newsletter', projectRoot))
+packages/core/src/pipelines/loader.ts:6: *   - `loadPipelineTemplate(id, projectRoot)` resolves a template by id.
+packages/core/src/pipelines/loader.ts:12: *   - `listAvailablePipelineTemplates(projectRoot)` enumerates every id
+packages/core/src/pipelines/loader.ts:15: *     callers resolve each id through `loadPipelineTemplate` to get the
+packages/core/src/pipelines/loader.ts:87: * (`listAvailablePipelineTemplates`) and the packaging-regression test
+packages/core/src/pipelines/loader.ts:191: * plugin preset. `loadPipelineTemplate` returns the override first if
+packages/core/src/pipelines/loader.ts:265:export function loadPipelineTemplate(id: string, projectRoot: string): PipelineTemplate {
+packages/core/src/pipelines/loader.ts:268:      `loadPipelineTemplate requires a non-empty id; received ${JSON.stringify(id)}`,
+packages/core/src/pipelines/loader.ts:314: * `loadPipelineTemplate` to get the full template.
+packages/core/src/pipelines/loader.ts:329:export function listAvailablePipelineTemplates(projectRoot: string): string[] {
+packages/core/src/pipelines/loader.ts:333:  // precedence is moot until the operator calls loadPipelineTemplate.
+packages/core/test/lanes/loader.test.ts:147:    // cross-validation must resolve it via loadPipelineTemplate's
+packages/core/test/pipelines/loader.test.ts:2: * loadPipelineTemplate + listAvailablePipelineTemplates tests.
+packages/core/test/pipelines/loader.test.ts:17:  loadPipelineTemplate,
+packages/core/test/pipelines/loader.test.ts:18:  listAvailablePipelineTemplates,
+packages/core/test/pipelines/loader.test.ts:21:describe('loadPipelineTemplate', () => {
+packages/core/test/pipelines/loader.test.ts:33:    const template = loadPipelineTemplate('editorial', projectRoot);
+packages/core/test/pipelines/loader.test.ts:63:    const template = loadPipelineTemplate('editorial', projectRoot);
+packages/core/test/pipelines/loader.test.ts:85:    const template = loadPipelineTemplate('newsletter', projectRoot);
+packages/core/test/pipelines/loader.test.ts:91:    expect(() => loadPipelineTemplate('does-not-exist', projectRoot))
+packages/core/test/pipelines/loader.test.ts:96:    expect(() => loadPipelineTemplate('does-not-exist', projectRoot))
+packages/core/test/pipelines/loader.test.ts:98:    expect(() => loadPipelineTemplate('does-not-exist', projectRoot))
+packages/core/test/pipelines/loader.test.ts:106:    expect(() => loadPipelineTemplate('editorial', projectRoot))
+packages/core/test/pipelines/loader.test.ts:125:    expect(() => loadPipelineTemplate('editorial', projectRoot))
+packages/core/test/pipelines/loader.test.ts:144:    expect(() => loadPipelineTemplate('editorial', projectRoot))
+packages/core/test/pipelines/loader.test.ts:149:    expect(() => loadPipelineTemplate('', projectRoot))
+packages/core/test/pipelines/loader.test.ts:154:    expect(() => loadPipelineTemplate('   ', projectRoot))
+packages/core/test/pipelines/loader.test.ts:159:describe('listAvailablePipelineTemplates', () => {
+packages/core/test/pipelines/loader.test.ts:171:    const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/test/pipelines/loader.test.ts:180:    const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/test/pipelines/loader.test.ts:215:    const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/test/pipelines/loader.test.ts:226:    const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/test/pipelines/loader.test.ts:237:    const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/src/pipelines/operations/commit.ts:17: * `loadPipelineTemplate` reads would reject.
+packages/core/src/pipelines/operations/delete.ts:11: *     (which must itself resolve via `loadPipelineTemplate`) before
+packages/core/src/pipelines/operations/delete.ts:58:  loadPipelineTemplate,
+packages/core/src/pipelines/operations/delete.ts:169:      loadPipelineTemplate(opts.reassignLanesTo, projectRoot);
+packages/core/test/packaging/tarball-includes-presets.test.ts:11: * `loadPipelineTemplate` call in the marketplace-installed package
+packages/core/src/pipelines/operations/show.ts:6: * `loadPipelineTemplate` + `hasPipelineOverride`. Mirrors `lane show`
+packages/core/src/pipelines/operations/show.ts:15:  loadPipelineTemplate,
+packages/core/src/pipelines/operations/show.ts:29:  const template = loadPipelineTemplate(id, projectRoot);
+packages/core/test/pipelines/case-sensitivity.test.ts:3: * id-mismatch error in loadPipelineTemplate.
+packages/core/test/pipelines/case-sensitivity.test.ts:14: * loadPipelineTemplate now rejects mixed-case ids BEFORE any FS
+packages/core/test/pipelines/case-sensitivity.test.ts:18: *   1. loadPipelineTemplate('Editorial', root) throws the
+packages/core/test/pipelines/case-sensitivity.test.ts:35:import { loadPipelineTemplate } from '../../src/pipelines/loader.ts';
+packages/core/test/pipelines/case-sensitivity.test.ts:48:  it('rejects loadPipelineTemplate("Editorial", root) with the regex error, not the id-mismatch error', () => {
+packages/core/test/pipelines/case-sensitivity.test.ts:51:      loadPipelineTemplate('Editorial', projectRoot);
+packages/core/test/pipelines/case-sensitivity.test.ts:69:        loadPipelineTemplate(id, projectRoot);
+packages/core/test/pipelines/case-sensitivity.test.ts:81:    const template = loadPipelineTemplate('editorial', projectRoot);
+packages/core/test/calendar/regenerate-lane-error-tolerant.test.ts:154:        // defaults or under .deskwork/pipelines/. `loadPipelineTemplate`
+packages/core/src/pipelines/operations/list.ts:22:  listAvailablePipelineTemplates,
+packages/core/src/pipelines/operations/list.ts:23:  loadPipelineTemplate,
+packages/core/src/pipelines/operations/list.ts:39:  const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/src/pipelines/operations/list.ts:41:    const template = loadPipelineTemplate(id, projectRoot);
+packages/core/test/pipelines/preset-ids.test.ts:8: *   2. `listAvailablePipelineTemplates` (no overrides) returns exactly
+packages/core/test/pipelines/preset-ids.test.ts:26:  listAvailablePipelineTemplates,
+packages/core/test/pipelines/preset-ids.test.ts:30:describe('AUDIT-20260530-03 — listAvailablePipelineTemplates uses explicit PRESET_IDS', () => {
+packages/core/test/pipelines/preset-ids.test.ts:53:    const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/test/pipelines/preset-ids.test.ts:58:    const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/src/pipelines/operations/update.ts:67:  loadPipelineTemplate,
+packages/core/src/pipelines/operations/update.ts:99:  // call from loadPipelineTemplate.
+packages/core/src/pipelines/operations/update.ts:128:  const existing = loadPipelineTemplate(opts.id, projectRoot);
+packages/core/test/pipelines/path-traversal.test.ts:7: *   1. `loadPipelineTemplate(id, projectRoot)` MUST refuse any `id` that
+packages/core/test/pipelines/path-traversal.test.ts:20: *   3. `listAvailablePipelineTemplates` MUST skip basenames that fail
+packages/core/test/pipelines/path-traversal.test.ts:34:  loadPipelineTemplate,
+packages/core/test/pipelines/path-traversal.test.ts:35:  listAvailablePipelineTemplates,
+packages/core/test/pipelines/path-traversal.test.ts:40:describe('AUDIT-20260530-01 — loadPipelineTemplate path-traversal hardening', () => {
+packages/core/test/pipelines/path-traversal.test.ts:70:    expect(() => loadPipelineTemplate('../../gotcha', projectRoot))
+packages/core/test/pipelines/path-traversal.test.ts:75:    expect(() => loadPipelineTemplate('foo/bar', projectRoot))
+packages/core/test/pipelines/path-traversal.test.ts:80:    expect(() => loadPipelineTemplate('Editorial', projectRoot))
+packages/core/test/pipelines/path-traversal.test.ts:85:    expect(() => loadPipelineTemplate('-editorial', projectRoot))
+packages/core/test/pipelines/path-traversal.test.ts:90:    expect(() => loadPipelineTemplate('/etc/passwd', projectRoot))
+packages/core/test/pipelines/path-traversal.test.ts:95:    const template = loadPipelineTemplate('editorial', projectRoot);
+packages/core/test/pipelines/path-traversal.test.ts:139:describe('AUDIT-20260530-01 — listAvailablePipelineTemplates filters non-canonical basenames', () => {
+packages/core/test/pipelines/path-traversal.test.ts:168:    const ids = listAvailablePipelineTemplates(projectRoot);
+packages/core/test/doctor/lane-config-missing-template.test.ts:247:    // `listAvailablePipelineTemplates` will surface its basename, but
+packages/core/test/doctor/lane-config-missing-template.test.ts:248:    // `loadPipelineTemplate` rejects on the JSON parse. The plan's
+
+exec
+/bin/zsh -lc "rg -n \"function readAllSidecars|export async function readAllSidecars|readAllSidecars\" packages/core/src packages/core/test -g '*.ts'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+packages/core/test/sidecar/read-all.test.ts:5:import { readAllSidecars, sidecarPath, writeSidecar } from '@/sidecar';
+packages/core/test/sidecar/read-all.test.ts:26:describe('readAllSidecars', () => {
+packages/core/test/sidecar/read-all.test.ts:38:    const result = await readAllSidecars(projectRoot);
+packages/core/test/sidecar/read-all.test.ts:44:    const result = await readAllSidecars(projectRoot);
+packages/core/test/sidecar/read-all.test.ts:52:    const result = await readAllSidecars(projectRoot);
+packages/core/test/sidecar/read-all.test.ts:62:    const result = await readAllSidecars(projectRoot);
+packages/core/test/sidecar/read-all.test.ts:73:    await expect(readAllSidecars(projectRoot)).rejects.toThrow(/schema invalid/);
+packages/core/test/sidecar/read-all.test.ts:79:    await expect(readAllSidecars(projectRoot)).rejects.toThrow(/JSON invalid/);
+packages/core/src/pipelines/operations/update.ts:63:import { readAllSidecars } from '../../sidecar/read-all.ts';
+packages/core/src/pipelines/operations/update.ts:372:  const sidecars = await readAllSidecars(projectRoot);
+packages/core/src/lanes/operations/purge.ts:22:import { readAllSidecars } from '../../sidecar/read-all.ts';
+packages/core/src/lanes/operations/purge.ts:45:  const sidecars = await readAllSidecars(projectRoot);
+packages/core/src/sidecar/read-all.ts:18:export async function readAllSidecars(projectRoot: string): Promise<Entry[]> {
+packages/core/src/doctor/rules/lane-config-missing-template.ts:46:import { readAllSidecars } from '../../sidecar/read-all.ts';
+packages/core/src/doctor/rules/lane-config-missing-template.ts:335:        sidecars = await readAllSidecars(ctx.projectRoot);
+packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:34:import { readAllSidecars } from '../../sidecar/read-all.ts';
+packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:164:      entries = await readAllSidecars(ctx.projectRoot);
+packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:236:      entries = await readAllSidecars(ctx.projectRoot);
+packages/core/src/groups/operations/list.ts:5: * `readAllSidecars` and filters to those declared as groups (the
+packages/core/src/groups/operations/list.ts:16:import { readAllSidecars } from '../../sidecar/read-all.ts';
+packages/core/src/groups/operations/list.ts:36:  const all = await readAllSidecars(projectRoot);
+packages/core/src/groups/operations/create.ts:25:import { readAllSidecars } from '../../sidecar/read-all.ts';
+packages/core/src/groups/operations/create.ts:78:  // Slug-collision check — readAllSidecars throws on a malformed
+packages/core/src/groups/operations/create.ts:81:  const existing = await readAllSidecars(projectRoot);
+
+exec
+/bin/zsh -lc "rg -n \"lane purge|purgeLane|entries reference it|reference it\" packages -g '*.ts'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+packages/cli/src/commands/lane.ts:14: *   deskwork lane purge <id>                        — delete the JSON (refused when entries reference it)
+packages/cli/src/commands/lane.ts:34:  purgeLane,
+packages/cli/src/commands/lane.ts:287:    const result = await purgeLane(projectRoot, id);
+packages/cli/test/lane/update-archive-purge.test.ts:127:describe('deskwork lane purge', () => {
+packages/cli/test/custom-pipeline-lane-integration.test.ts:14: *   7. Hard-delete (`lane purge`) is refused while entries reference the
+packages/cli/test/custom-pipeline-lane-integration.test.ts:309:    // 7. Hard-delete (`lane purge`) is refused while entries reference the
+packages/cli/test/custom-pipeline-lane-integration.test.ts:317:    expect(purgeRefused.stderr).toMatch(/2 entries reference it/);
+packages/studio/src/pages/lanes/table.ts:73:      copy: `/deskwork:lane purge ${row.id}`,
+packages/core/src/lanes/index.ts:53:  purgeLane,
+packages/core/src/lanes/operations/index.ts:17:export { purgeLane } from './purge.ts';
+packages/core/src/lanes/operations/purge.ts:2: * lane purge — delete a lane config JSON from disk.
+packages/core/src/lanes/operations/purge.ts:37:export async function purgeLane(
+packages/core/src/lanes/operations/archive.ts:14: * use `lane purge` — which refuses when entries still reference the
+packages/studio/test/lanes/lanes-page.test.ts:197:    expect(r.html).toContain('data-copy="/deskwork:lane purge old-lane"');
+packages/studio/test/lanes/lanes-page.test.ts:199:    expect(r.html).not.toContain('data-copy="/deskwork:lane purge editorial-lane"');
+packages/studio/test/lanes/lanes-page.test.ts:237:      expect(r.html).not.toContain('data-copy="/deskwork:lane purge archived-with-entries"');
+
+codex
+### Repair can mutate lane state without recording the repair event
+
+Finding-ID: AUDIT-BARRAGE-codex-01
+Status:     open
+Severity:   medium
+Surface:    packages/core/src/doctor/rules/lane-config-missing-template.ts:303-320 and packages/core/src/doctor/rules/lane-config-missing-template.ts:364-381
+
+Both repair actions perform the filesystem mutation before appending the `lane-config-repair` journal event. In `set-template`, the lane JSON is rewritten at lines 303-304, then `appendJournalEvent` is awaited at lines 314-320 with no catch or compensation. In `delete`, the lane file is unlinked at lines 364-366, then the journal event is appended at lines 376-381.
+
+If journal append fails, the operator gets a thrown repair failure after the lane was already rebound or deleted, and there is no durable audit record for the state change. This is worse for delete because the lane file is already gone. A reasonable fix is to make these repair operations transactional enough for this repository’s filesystem model: restore the prior lane JSON if `set-template` journal append fails, and use a staged delete path or compensating restore for delete so “applied” and “journaled” cannot diverge silently.
+
+### Rebind prompt can offer templates that cannot actually be selected
+
+Finding-ID: AUDIT-BARRAGE-codex-02
+Status:     open
+Severity:   medium
+Surface:    packages/core/src/doctor/rules/lane-config-missing-template.ts:214-229 and packages/core/src/doctor/rules/lane-config-missing-template.ts:287-299
+
+The prompt choices are built directly from `listAvailablePipelineTemplates(ctx.projectRoot)` at lines 214-229. The apply path then separately revalidates the selected template with `loadPipelineTemplate` at lines 287-299 and can reject the same choice the prompt just offered.
+
+That creates a bad repair loop when a project contains a malformed or otherwise unresolvable pipeline override whose filename is still enumerable. The operator sees it as a valid rebind target, selects it, and then gets an apply failure. Since Task 6.5 specifically calls for a prompt plan with per-template rebind choices, the choices should be only templates that resolve cleanly. Filter the available ids through `loadPipelineTemplate` before constructing `set-template-*` choices, while keeping the apply-time validation for races between planning and application.
+
+### CLI subprocess integration test can hang indefinitely
+
+Finding-ID: AUDIT-BARRAGE-codex-03
+Status:     open
+Severity:   medium
+Surface:    packages/cli/test/custom-pipeline-lane-integration.test.ts:86-104
+
+The new integration test wraps the real CLI with `spawnSync` in `pipeline()` and `lane()`, but neither call sets a timeout. If the CLI blocks on unexpected I/O, a stuck child process, or a regression that waits for input, the test process can hang instead of failing with a bounded diagnostic. That also means `afterEach` cleanup at lines 156-157 may never run for the tmp project.
+
+Because this test is intentionally exercising real subprocesses, it needs a timeout per invocation and should surface `r.error`, `r.signal`, stdout, and stderr in the failure path. A small helper-level timeout is enough to keep the end-to-end coverage reliable in local and CI runs.
+tokens used
+44,545

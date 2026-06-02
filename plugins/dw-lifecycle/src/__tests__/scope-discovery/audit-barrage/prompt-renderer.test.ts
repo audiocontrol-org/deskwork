@@ -190,4 +190,45 @@ describe('renderAuditBarragePrompt — project override resolution', () => {
     // that the renderer reached for it (i.e. did not 404).
     expect(rendered).toContain('Audit-barrage');
   });
+
+  // Regression: pre-fix, when a substitution value contained literal
+  // `{{declared_var}}` text (e.g., a diff that includes the audit-
+  // barrage template itself, or a workplan summary that quotes
+  // template syntax), the post-substitution check false-rejected the
+  // render because it saw declared-var markers in the output. Two-phase
+  // substitution prevents the recursive-substitution case AND the
+  // retired post-check no longer false-rejects. The value's literal
+  // marker text survives unchanged into the output, which is the
+  // correct behavior: values are content, not templates.
+  it('value containing a literal {{declared_var}} marker passes through verbatim', async () => {
+    await seedOverride(
+      [
+        '# OVERRIDE',
+        'feature: {{feature_slug}}',
+        'plan: {{workplan_summary}}',
+        'diff: {{diff}}',
+        'audit: {{audit_log_excerpt}}',
+        'commits: {{commit_subjects}}',
+      ].join('\n'),
+    );
+    const varsWithMarkers: Readonly<Record<string, string>> = Object.freeze({
+      feature_slug: 'sample-feature',
+      workplan_summary: 'WPLAN-{{feature_slug}}',
+      diff: 'DIFF includes {{diff}} and {{feature_slug}} literally',
+      audit_log_excerpt: 'AUDIT-EXCERPT-BODY',
+      commit_subjects: 'COMMITS-BODY',
+    });
+    const rendered = await renderAuditBarragePrompt({
+      repoRoot: tmp,
+      vars: varsWithMarkers,
+    });
+    // Template markers were substituted.
+    expect(rendered).toContain('feature: sample-feature');
+    expect(rendered).toContain('plan: WPLAN-{{feature_slug}}');
+    expect(rendered).toContain('diff: DIFF includes {{diff}} and {{feature_slug}} literally');
+    // The literal `{{feature_slug}}` inside the workplan_summary and
+    // diff values survives unchanged — values are content.
+    expect(rendered).toContain('WPLAN-{{feature_slug}}');
+    expect(rendered).toContain('DIFF includes {{diff}}');
+  });
 });

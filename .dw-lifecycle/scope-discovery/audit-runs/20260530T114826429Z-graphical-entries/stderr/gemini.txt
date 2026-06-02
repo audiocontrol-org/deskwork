@@ -1,0 +1,2 @@
+Loaded cached credentials.
+Loading extension: nanobanana

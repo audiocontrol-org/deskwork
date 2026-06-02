@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { approveEntryStage } from '@/entry/approve';
 import { writeSidecar } from '@/sidecar/write';
 import { readSidecar } from '@/sidecar/read';
+import { sidecarPath } from '@/sidecar/paths';
 import { readJournalEvents } from '@/journal/read';
 import {
   addEntryAnnotation,
@@ -22,6 +23,14 @@ describe('approveEntryStage', () => {
   beforeEach(async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
     await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
+    await writeFile(
+      join(projectRoot, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: { main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' } },
+        defaultSite: 'main',
+      }),
+    );
   });
 
   afterEach(async () => {
@@ -54,16 +63,24 @@ describe('approveEntryStage', () => {
     expect(sidecar.currentStage).toBe('Planned');
   });
 
-  it('graduates Drafting → Final', async () => {
-    await setupEntry({ currentStage: 'Drafting', reviewState: 'in-review' });
+  it('graduates Drafting → Final (and drops any legacy reviewState — Commandment III)', async () => {
+    const entry = await setupEntry({ currentStage: 'Drafting' });
+    // Plant a legacy reviewState on disk (writeSidecar persists raw fields)
+    // to prove approve omits it on the write-back.
+    const legacy = { ...entry, reviewState: 'in-review' as const };
+    await writeSidecar(projectRoot, legacy);
     const result = await approveEntryStage(projectRoot, { uuid });
     expect(result.toStage).toBe('Final');
     const sidecar = await readSidecar(projectRoot, uuid);
     expect(sidecar.currentStage).toBe('Final');
     // Per DESKWORK-STATE-MACHINE.md Commandment III, reviewState is
     // RETIRED — the schema field is gone, so it's necessarily absent
-    // from any read sidecar.
-    expect(sidecar.reviewState).toBeUndefined();
+    // from any read sidecar. Assert via `in` against the typed shape
+    // AND via the raw on-disk JSON to prove approve strips the
+    // planted legacy field on write-back.
+    expect('reviewState' in sidecar).toBe(false);
+    const rawSidecar = await readFile(sidecarPath(projectRoot, uuid), 'utf8');
+    expect(rawSidecar).not.toContain('reviewState');
   });
 
   it('does NOT emit a review-state-change journal event on approve (Commandment III — reviewState is retired)', async () => {

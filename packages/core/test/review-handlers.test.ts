@@ -90,12 +90,15 @@ describe('review handlers', () => {
 
     it('accepts address disposition values and rejects others', () => {
       const w = seedWorkflow(root, cfg);
+      // Phase 8 Step 8.1.2 (Part 2) — `addressed` disposition now
+      // requires a non-empty `reason`. Test updated to supply one.
       const r1 = handleAnnotate(root, cfg, {
         type: 'address',
         workflowId: w.id,
         commentId: 'c-1',
         version: 2,
         disposition: 'addressed',
+        reason: 'addressed by adding section X at line 42',
       });
       expect(r1.status).toBe(200);
       const r2 = handleAnnotate(root, cfg, {
@@ -106,6 +109,51 @@ describe('review handlers', () => {
         disposition: 'whatever',
       });
       expect(r2.status).toBe(400);
+    });
+
+    it("rejects an `addressed` disposition without `reason` (Phase 8 Step 8.1.2 contract)", () => {
+      const w = seedWorkflow(root, cfg);
+      const r = handleAnnotate(root, cfg, {
+        type: 'address',
+        workflowId: w.id,
+        commentId: 'c-1',
+        version: 2,
+        disposition: 'addressed',
+        // no reason field
+      });
+      expect(r.status).toBe(400);
+      if (r.status === 400) {
+        expect(JSON.stringify(r.body)).toContain('reason is required');
+      }
+    });
+
+    it("rejects an `addressed` disposition with empty-string `reason` (Phase 8 Step 8.1.2 contract)", () => {
+      const w = seedWorkflow(root, cfg);
+      const r = handleAnnotate(root, cfg, {
+        type: 'address',
+        workflowId: w.id,
+        commentId: 'c-1',
+        version: 2,
+        disposition: 'addressed',
+        reason: '',
+      });
+      expect(r.status).toBe(400);
+      if (r.status === 400) {
+        expect(JSON.stringify(r.body)).toContain('reason is required');
+      }
+    });
+
+    it("accepts a `deferred` disposition without `reason` (contract scoped to `addressed`)", () => {
+      const w = seedWorkflow(root, cfg);
+      const r = handleAnnotate(root, cfg, {
+        type: 'address',
+        workflowId: w.id,
+        commentId: 'c-1',
+        version: 2,
+        disposition: 'deferred',
+        // no reason field
+      });
+      expect(r.status).toBe(200);
     });
   });
 

@@ -1,0 +1,242 @@
+/**
+ * Mobile lane-stack accordion — Phase 5 Task 5.1B mobile-variant
+ * (AUDIT-20260528-10).
+ *
+ * Renders the brief-contracted vertical lane-stack at phone widths.
+ * Per the D3 Press Bay brief (`docs/studio-design/ACCEPTED/2026-05-27
+ * -multi-lane-dashboard-d3-press-bay/brief.md:14`): "Stacked
+ * horizontal swimlanes (one per lane) in a press-bay shell on
+ * desktop; vertical lane-stack of accordion sections on mobile."
+ *
+ * Per `.claude/rules/affordance-placement.md`: every affordance
+ * (chevron, compose chip, view-toggle) lives ON the lane-head, NOT
+ * in a separate toolbar. The lane-head's flex layout positions them
+ * inline with the lane name + count.
+ *
+ * Strategy: the desktop swim-bay markup and this lane-stack markup
+ * are BOTH server-rendered. CSS gates which paints:
+ *
+ *   - Desktop (>720px): `.lane-stack { display: none }` —
+ *     the desktop bay's swimlanes paint.
+ *   - Mobile (≤720px): `.bay-body { display: none }` (the desktop
+ *     swimlanes hide); `.lane-stack { display: block }`.
+ *
+ * The 720px breakpoint mirrors `dashboard-swimlane-mobile.css`'s
+ * existing mobile gate so the layout-switch + the body-switch flip
+ * together.
+ */
+
+/* ----- Desktop default — lane-stack is hidden. ----- */
+.lane-stack {
+  display: none;
+}
+
+/* ----- Mobile gate — flip the bay body OFF and lane-stack ON. ----- */
+@media (max-width: 720px) {
+  .bay-body {
+    /* Desktop swimlane markup is server-rendered but hidden on
+     * mobile — the lane-stack below takes over the body slot.
+     * Keeping the markup in the DOM means shared client controllers
+     * (focus toggle, preset apply) still see both DOM trees. */
+    display: none;
+  }
+
+  .lane-stack {
+    display: block;
+    margin: 0.5rem 0 1.2rem;
+  }
+
+  /* Each lane-section is a single accordion card. */
+  .lane-section {
+    display: block;
+    background: var(--er-paper);
+    border: 1px solid var(--er-paper-3);
+    border-radius: 6px;
+    margin-bottom: 0.6rem;
+    overflow: hidden;
+  }
+
+  /* Focus-hidden lanes (operator removed them from focus via the
+   * desktop chip strip or the shared focus preset) hide on mobile
+   * too — symmetric across viewport classes. */
+  .lane-section.is-focus-hidden {
+    display: none;
+  }
+
+  /* ----- Lane head — accordion header carrying every affordance. ----- */
+  .lane-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.5rem;
+    padding: 0.55rem 0.7rem;
+    background: var(--er-paper-2);
+    border-bottom: 1px solid var(--er-paper-3);
+    cursor: pointer;
+    /* The head as a whole is the click target for collapsing — per
+     * the affordance contract. The chevron is the focusable handle;
+     * a click anywhere on the head dispatches the same toggle. */
+  }
+
+  .lane-head .lh-glyph {
+    font-family: var(--er-font-serif);
+    font-size: 1.1rem;
+    color: var(--er-ink);
+    flex: 0 0 auto;
+  }
+
+  .lane-head .lh-name {
+    flex: 1 1 auto;
+    font-family: var(--er-font-serif);
+    font-size: 0.92rem;
+    color: var(--er-ink);
+    /* Long lane names wrap onto a second line without pushing the
+     * affordances off-screen. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lane-head .lh-count {
+    flex: 0 0 auto;
+    font-family: var(--er-font-mono);
+    font-size: 0.65rem;
+    color: var(--er-ink-soft);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.4rem;
+    background: var(--er-paper-3);
+    border-radius: 99px;
+  }
+
+  /* Chevron — the canonical lane-head affordance. Reuses the
+   * universal `.collapse-chev` primitive (sized to ≥24×24 per WCAG
+   * 2.2 SC 2.5.8 AA in `dashboard-swimlane-collapse.css`). The
+   * `.lh-chev` class is a lane-head-scoped modifier for layout-only
+   * tweaks (no override of the primitive's size / focus ring). */
+  .lane-head .lh-chev {
+    flex: 0 0 auto;
+    /* The chevron always lives at the right edge of the head's
+     * first row; flex layout keeps it pinned. */
+    order: 10;
+  }
+
+  /* Compose chip on the lane-head — same `.swim-compose` primitive
+   * desktop uses (Task 5.1C). The lane-head-scoped `.lh-compose`
+   * class lets the mobile layout tweak position without changing
+   * the desktop chip's behavior. */
+  .lane-head .lh-compose {
+    flex: 0 0 auto;
+    min-height: 30px;
+    min-width: 30px;
+    padding: 0.2rem 0.4rem;
+    order: 8;
+  }
+
+  .lane-head .lh-compose .sc-label {
+    /* Phone: icon-only — the aria-label still carries the full
+     * action for assistive tech. */
+    display: none;
+  }
+
+  /* View-toggle on the lane-head — same `.view-toggle` primitive
+   * desktop uses (Task 5.1B). Cells shrink to fit alongside the
+   * other lane-head affordances. */
+  .lane-head .lh-view-toggle {
+    flex: 0 0 auto;
+    order: 9;
+  }
+
+  .lane-head .lh-view-toggle .vt-cell {
+    padding: 0.18rem 0.35rem;
+    font-size: 0.6rem;
+    gap: 0.18rem;
+    /* WCAG 2.2 SC 2.5.8 AA target-size minimum — each cell must be at
+     * least 24x24 CSS pixels. The shrunken padding/font-size above
+     * collapse the cell below 24x24; the explicit min-* floors restore
+     * the hit target without altering the visual chrome (the cell
+     * grows from ~19px wide to 24px wide). */
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  .lane-head .lh-view-toggle .vt-cell .vt-icon {
+    font-size: 0.72rem;
+  }
+
+  /* Hide the label text on phone so the segmented control occupies
+   * less horizontal real estate. The vt-icon glyph + the aria-label
+   * carry the meaning. */
+  .lane-head .lh-view-toggle .vt-cell .vt-label {
+    display: none;
+  }
+
+  /* ----- Lane body — list-mode stage groups + optional empty CTA. ----- */
+  .lane-body {
+    display: block;
+    padding: 0.4rem 0;
+    background: var(--er-paper);
+  }
+
+  /* The `hidden` attribute is the canonical collapsed-state signal
+   * (set by `lane-stack.ts` client controller). `hidden` doubles as
+   * a screen-reader skip — collapsed sections are skipped during
+   * AT navigation, which a CSS-only `display: none` would not
+   * communicate as crisply. */
+  .lane-body[hidden] {
+    display: none;
+  }
+
+  /* Empty-CTA inside the lane-body — sibling to the list-body
+   * stage-group cards. Mirrors the desktop `.swim-empty-cta`
+   * styling so the visual rests in the same paper-stamp idiom. */
+  .lane-section .lane-empty-cta {
+    margin: 0.5rem 0.7rem;
+  }
+
+  /* List-body inside the lane-stack — the renderer reuses
+   * `renderListBody`, so the existing `.lb-group` styles in
+   * `dashboard-swimlane-list.css` apply. The single override here
+   * narrows the horizontal padding so the group head + rows hug
+   * the lane-section's edges. */
+  .lane-section .list-body {
+    padding: 0;
+  }
+
+  .lane-section .list-body .lb-group {
+    margin: 0 0.6rem 0.4rem;
+  }
+
+  /* ----- Lane-head chevron rotation contract.
+   *
+   * The chevron primitive in `dashboard-swimlane-collapse.css` already
+   * rotates on `[aria-expanded="false"]`. The lane-head's chevron
+   * inherits that rotation — no additional CSS needed.
+   *
+   * The lane-body's `hidden` attribute is the canonical collapsed
+   * marker on the body itself; combined with the chevron's
+   * aria-expanded state, the contract is symmetric:
+   *
+   *   - Expanded: chevron `aria-expanded="true"`, body NOT `[hidden]`.
+   *   - Collapsed: chevron `aria-expanded="false"`, body `[hidden]`.
+   * ----- */
+}
+
+/* ----- Wider phones / narrow tablets — same lane-stack layout but
+ * slightly more breathing room. The mobile gate is binary at 720px;
+ * inside it we keep the stack vertical regardless of width because
+ * the brief contracts the vertical-stack shape. ----- */
+@media (max-width: 720px) and (min-width: 480px) {
+  .lane-head {
+    padding: 0.6rem 0.85rem;
+    gap: 0.4rem 0.6rem;
+  }
+
+  .lane-head .lh-name {
+    font-size: 0.96rem;
+  }
+
+  .lane-head .lh-view-toggle .vt-cell .vt-label {
+    /* Show the labels on the larger phones — there's room. */
+    display: inline;
+  }
+}

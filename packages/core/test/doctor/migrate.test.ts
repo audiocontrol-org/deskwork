@@ -279,6 +279,66 @@ describe('migrateCalendar', () => {
     } finally { await rm(projectRoot, { recursive: true, force: true }); }
   });
 
+  /**
+   * AUDIT-20260530-12 regression: pre-diff the loop returned e.from
+   * unconditionally. After Phase 3 the loop was tightened to skip
+   * non-editorial `from` values via `isEditorialStage`, but the
+   * `StageTransitionEvent.from` schema accepts any non-empty string
+   * (lane-template-driven). Silent skip meant a non-editorial `from`
+   * (e.g. a visual-pipeline `Sketched`) produced a wrong prior-stage
+   * fallback ('Drafting') without surfacing the unhandled value.
+   *
+   * The fix refuses non-editorial `from` values loudly — the
+   * migration is editorial-only by design (it walks legacy
+   * single-pipeline calendar.md), so a non-editorial `from` in the
+   * journal is a data shape the migration explicitly should not
+   * silently tolerate.
+   */
+  it('refuses migration when a stage-transition event carries a non-editorial from value (AUDIT-20260530-12)', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
+    try {
+      // Calendar.md places the entry in Cancelled (terminal off-pipeline)
+      // so the migrator branches into inferPriorStageFromJournal.
+      await mkdir(join(projectRoot, '.deskwork'), { recursive: true });
+      await writeFile(join(projectRoot, '.deskwork', 'calendar.md'),
+        `# Editorial Calendar
+
+## Cancelled
+| UUID | Slug | Title | Description | Keywords | Source |
+|------|------|------|------|------|------|
+| 55555555-5555-5555-5555-555555555555 | cancelled-entry | Cancelled Entry |  | kw | manual |
+`);
+
+      // Seed a journal stage-transition whose `from` is non-editorial.
+      // The schema's StageStringSchema accepts any non-empty string;
+      // the migration's inferPriorStageFromJournal must REFUSE rather
+      // than silently fall through to its default.
+      const journalDir = join(projectRoot, '.deskwork', 'review-journal', 'history');
+      await mkdir(journalDir, { recursive: true });
+      await writeFile(
+        join(journalDir, '2026-01-01T00-00-00-000Z-evt.json'),
+        JSON.stringify({
+          kind: 'stage-transition',
+          at: '2026-01-01T00:00:00.000Z',
+          entryId: '55555555-5555-5555-5555-555555555555',
+          from: 'Sketched',
+          to: 'Iterating',
+        }),
+      );
+
+      let captured: unknown;
+      try {
+        await migrateCalendar(projectRoot, { dryRun: false });
+      } catch (err) {
+        captured = err;
+      }
+      expect(captured).toBeInstanceOf(Error);
+      // The thrown error MUST name the offending non-editorial value
+      // so the operator can find it.
+      expect((captured as Error).message).toMatch(/Sketched|non-editorial|editorial-only/);
+    } finally { await rm(projectRoot, { recursive: true, force: true }); }
+  });
+
   it('does not write when dryRun is true', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
     try {

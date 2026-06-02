@@ -158,6 +158,9 @@ describe('entry-keyed annotation store', () => {
         commentId: 'some-comment-id',
         version: 3,
         disposition: 'addressed',
+        // Phase 8 Step 8.1.2 (Part 2) — `addressed` requires non-empty
+        // `reason`. Test updated to supply one.
+        reason: 'addressed by adding section X',
       }),
     ];
     for (const d of drafts) {

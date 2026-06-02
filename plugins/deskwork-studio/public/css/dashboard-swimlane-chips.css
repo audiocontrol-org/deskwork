@@ -1,0 +1,175 @@
+/**
+ * Multi-lane swimlane dashboard — Press Bay FOCUS-CHIP strip.
+ *
+ * The chip strip at the top of the bay (above the swimlanes). One
+ * `.focus-chip` per lane + an `.all` chip. Chips toggle a transient
+ * lane filter (the .swim and .swim-stub siblings get
+ * `.is-focus-hidden` applied).
+ *
+ * Sub-sections:
+ *   - `.focus-strip` container — flex layout + Phase 5 Task 5.3
+ *     `nowrap` + `overflow-x: auto` so many-lane configurations
+ *     scroll horizontally instead of pushing chips onto a second
+ *     row. Right-edge fade gradient (`::after`) signals overflow
+ *     per WCAG 2.1 SC 1.4.10 (Reflow).
+ *   - `.focus-chip` chip itself — base + hover + focus-visible +
+ *     `.active` + `.all` variants. Sub-elements: `.fc-glyph`,
+ *     `.fc-label`, `.fc-count`.
+ */
+
+/* ============================================================
+ *  Focus chip strip — transient lane filter.
+ *
+ *  Phase 5 Task 5.3.1 override: the strip uses `flex-wrap: nowrap`
+ *  + horizontal overflow so many-lane configurations don't push
+ *  chips onto a second row. Pre-Task-5.3 the rule was `flex-wrap:
+ *  wrap` — Task 5.3.1's revision is recorded by the combined
+ *  rule below.
+ * ============================================================ */
+
+.focus-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  scroll-behavior: smooth;
+  /* Thin scrollbar so the bay-head's vertical rhythm holds. Firefox:
+   * `scrollbar-width: thin`. WebKit/Blink: the dedicated ::webkit-
+   * scrollbar rule below. The bay's vertical scrollbar gets the same
+   * treatment from the existing `overflow: auto` on `.bay`. */
+  scrollbar-width: thin;
+}
+
+.focus-strip::-webkit-scrollbar {
+  height: 4px;
+}
+
+.focus-strip::-webkit-scrollbar-thumb {
+  background: var(--er-paper-3);
+  border-radius: 99px;
+}
+
+/* Right-edge fade gradient — only paints when there's overflow.
+ * Position: sticky on a right-anchored pseudo would be cleaner but
+ * isn't reliable across the strip's flex-item layout; the fixed-
+ * width gradient at the strip's right edge is the project's existing
+ * idiom (mirrors how `editorial-review.css` handles overflow fades
+ * on its content surfaces). Pointer-events: none so the gradient
+ * doesn't intercept chip clicks under it. */
+.focus-strip::after {
+  content: '';
+  position: sticky;
+  right: 0;
+  top: 0;
+  width: 28px;
+  height: 100%;
+  background: linear-gradient(to right, transparent, var(--er-paper) 100%);
+  pointer-events: none;
+  flex: 0 0 auto;
+  margin-left: -28px;
+}
+
+.focus-strip .strip-label {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-right: 0.35rem;
+}
+
+.focus-strip .strip-divider {
+  width: 1px;
+  height: 1.4rem;
+  align-self: center;
+  background: var(--er-paper-3);
+  margin: 0 0.25rem;
+}
+
+.focus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 28px;
+  padding: 0.36rem 0.7rem;
+  background: var(--er-paper-2);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 99px;
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.88rem;
+  color: var(--er-ink-soft);
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+  /* Phase 5 Task 5.3 — the focus-strip is `flex-wrap: nowrap;
+   * overflow-x: auto`. Chips must NOT shrink under pressure (long
+   * lane names) — the strip should scroll horizontally once the chip
+   * widths exceed the viewport. Without flex-shrink: 0 chips
+   * compress at their min-content size before the overflow scroll
+   * kicks in. Per AUDIT-20260528-23. */
+  flex-shrink: 0;
+}
+
+.focus-chip .fc-label {
+  /* Lane names can contain spaces (e.g. "Mockups & Specs"); without
+   * `white-space: nowrap` the label can break inside the chip when
+   * the strip pressure is high. The chip's `flex-shrink: 0` above
+   * already prevents the chip itself from compressing; this rule
+   * extends the contract to the label text. */
+  white-space: nowrap;
+}
+
+.focus-chip:hover {
+  background: var(--er-paper);
+  border-color: var(--er-ink-soft);
+}
+
+.focus-chip:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 2px;
+}
+
+.focus-chip .fc-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-size: 0.95rem;
+}
+
+.focus-chip .fc-count {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  color: var(--er-faded);
+  letter-spacing: 0.1em;
+  padding: 0.05rem 0.3rem;
+  background: var(--er-paper);
+  border-radius: 99px;
+}
+
+.focus-chip.active {
+  background: var(--er-ink);
+  color: var(--er-paper);
+  border-color: var(--er-ink);
+}
+
+.focus-chip.active .fc-glyph {
+  color: var(--er-paper);
+}
+
+.focus-chip.active .fc-count {
+  background: rgba(245, 241, 232, 0.18);
+  color: var(--er-paper);
+}
+
+.focus-chip.all {
+  background: var(--er-paper);
+}
+
+.focus-chip.all.active {
+  background: var(--er-ink);
+  color: var(--er-paper);
+}

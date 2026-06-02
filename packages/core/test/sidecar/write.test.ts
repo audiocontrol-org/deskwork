@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { writeSidecar, readSidecar } from '@/sidecar';
@@ -62,7 +62,12 @@ describe('writeSidecar', () => {
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T10:00:00.000Z',
     };
-    // @ts-expect-error — intentional invalid input
+    // Previously suppressed via `@ts-expect-error`: the prior schema's
+    // narrow `StageEnum` made the literal type-incompatible at compile
+    // time. Per Phase 3 (graphical-entries) currentStage is now any
+    // string, so the literal IS structurally compatible — the
+    // assertion below still catches the runtime-only `uuid` validation
+    // failure (`'not-a-uuid'` is not a valid UUID).
     await expect(writeSidecar(projectRoot, invalid)).rejects.toThrow(/schema/);
   });
 });

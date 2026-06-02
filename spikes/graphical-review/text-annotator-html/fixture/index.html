@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mockup fixture — graphical-entries review surface</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="dashboard-header">
+      <h1 id="page-title">Editorial dashboard</h1>
+      <p class="lede">Pipeline progress across all entries this sprint.</p>
+      <div class="header-actions">
+        <button id="action-new" class="btn-primary" type="button">
+          <span class="btn-icon" aria-hidden="true">+</span>
+          <span>New entry</span>
+        </button>
+        <button
+          id="action-help"
+          class="icon-button"
+          type="button"
+          aria-label="Help"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+            <text x="12" y="16" text-anchor="middle" font-size="12" fill="currentColor">?</text>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="card lane" data-lane="drafting">
+        <h2 class="lane-title">Drafting</h2>
+        <p>
+          The drafting stage is where the body of the entry takes shape. Operators
+          iterate through several revisions before approving the draft.
+        </p>
+        <ul class="entries">
+          <li class="entry">
+            <span class="entry-title">Annotation model deep-dive</span>
+            <span class="entry-meta">v3 — iterating</span>
+          </li>
+          <li class="entry">
+            <span class="entry-title">Mobile-first review UX retrospective</span>
+            <span class="entry-meta">v1 — drafting</span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="card lane" data-lane="published">
+        <h2 class="lane-title">Published</h2>
+        <p>
+          Published entries are the terminal state for the editorial pipeline.
+          They appear on the live site after a successful approval.
+        </p>
+        <figure class="thumbnail">
+          <img
+            id="thumb-hero"
+            src="data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A//www.w3.org/2000/svg%22 viewBox%3D%220 0 240 120%22%3E%3Crect width%3D%22240%22 height%3D%22120%22 fill%3D%22%23bca275%22/%3E%3Ctext x%3D%22120%22 y%3D%2266%22 text-anchor%3D%22middle%22 font-family%3D%22Georgia%22 font-size%3D%2218%22 fill%3D%22%23fff%22%3EHero thumbnail%3C/text%3E%3C/svg%3E"
+            alt="Hero thumbnail placeholder for the published lane"
+          />
+          <figcaption>Featured entry thumbnail</figcaption>
+        </figure>
+      </section>
+
+      <aside id="decorative-rule" class="decorative" aria-hidden="true"></aside>
+
+      <section class="card lane" data-lane="cancelled">
+        <h2 class="lane-title">Cancelled</h2>
+        <p>
+          Cancelled entries are preserved as historical record. They do not appear
+          on the live site but remain searchable inside the studio.
+        </p>
+      </section>
+    </main>
+
+    <footer class="dashboard-footer">
+      <p>
+        End of mockup. The annotator pins regions inside this iframe; the host
+        page surfaces the resulting W3C JSON-LD payload alongside.
+      </p>
+    </footer>
+    <script type="module" src="/src/iframe-annotator.js"></script>
+  </body>
+</html>

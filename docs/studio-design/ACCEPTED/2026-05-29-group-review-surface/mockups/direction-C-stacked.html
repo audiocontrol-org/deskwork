@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Direction C — Stacked composed-then-list (no toggle)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --er-paper:     #F5F1E8;
+    --er-paper-2:   #ECE6D4;
+    --er-paper-3:   #DFD7BF;
+    --er-ink:       #1A1614;
+    --er-ink-soft:  #3A3530;
+    --er-faded:     #8A7F70;
+    --er-red-pencil:  #B8362A;
+    --er-proof-blue:  #2A4B7C;
+    --er-stamp-green: #2E5D45;
+    --er-kraft:       #8A7250;
+    --display: "Newsreader", Georgia, serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--er-ink);
+    font-family: var(--display);
+    color: var(--er-ink);
+    min-height: 100vh;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at top, rgba(255,255,255,0.04), transparent 70%),
+      var(--er-ink);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .frame {
+    max-width: 390px;
+    margin: 32px auto;
+    background: var(--er-paper);
+    position: relative;
+    box-shadow:
+      0 24px 60px rgba(0,0,0,0.4),
+      0 8px 20px rgba(0,0,0,0.3);
+    border-radius: 4px;
+    overflow: hidden;
+    z-index: 1;
+  }
+  .frame::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: 2;
+    mix-blend-mode: multiply;
+  }
+  .surface { position: relative; z-index: 3; }
+
+  .masthead {
+    display: grid;
+    grid-template-columns: 56px 1fr 56px;
+    align-items: center;
+    height: 56px;
+    border-bottom: 1px solid var(--er-paper-3);
+    background: var(--er-paper);
+  }
+  .masthead .back {
+    color: var(--er-proof-blue);
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1.25rem;
+    text-align: center;
+    cursor: pointer;
+  }
+  .masthead .center {
+    display: flex; flex-direction: column; align-items: center;
+    line-height: 1.15;
+  }
+  .masthead .kicker {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+  }
+  .masthead .slug {
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--er-ink);
+    letter-spacing: -0.01em;
+  }
+  .masthead .menu {
+    font-family: var(--mono);
+    font-size: 1.2rem;
+    color: var(--er-ink-soft);
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .title-strip {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--er-paper-3);
+    background: var(--er-paper);
+  }
+  .title-strip .title {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.6rem;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
+    color: var(--er-ink);
+    margin: 0;
+  }
+  .title-strip .meta {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin-top: 6px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .stage-mark {
+    color: var(--er-red-pencil);
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .stage-name {
+    color: var(--er-ink-soft);
+    font-weight: 500;
+  }
+
+  /* Compact composed strip on top */
+  .composed-strip {
+    background: var(--er-paper-2);
+    border-bottom: 1px solid var(--er-paper-3);
+    padding: 14px 16px 16px;
+  }
+  .composed-strip .kicker {
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .composed-strip .kicker .name {
+    color: var(--er-red-pencil);
+    font-family: var(--display);
+    font-style: italic;
+    text-transform: none;
+    font-size: 1rem;
+    letter-spacing: -0.005em;
+  }
+  .composed-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .composed-lane {
+    background: var(--er-paper);
+    border: 1px solid var(--er-paper-3);
+    padding: 8px 10px 10px;
+    border-left-width: 3px;
+  }
+  .composed-lane.lane-feature { border-left-color: var(--er-proof-blue); }
+  .composed-lane.lane-mockups { border-left-color: var(--er-kraft); }
+  .composed-lane .lane-name {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .composed-lane.lane-feature .lane-name { color: var(--er-proof-blue); }
+  .composed-lane.lane-mockups .lane-name { color: var(--er-kraft); }
+  .stage-pip-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stage-pip {
+    display: grid;
+    grid-template-columns: 16px 1fr auto;
+    gap: 6px;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+  }
+  .stage-pip .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--er-red-pencil);
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+  .stage-pip .stage {
+    color: var(--er-ink-soft);
+    font-size: 0.625rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .stage-pip .n {
+    color: var(--er-ink);
+    font-weight: 500;
+  }
+  .stage-pip.is-zero .glyph,
+  .stage-pip.is-zero .stage,
+  .stage-pip.is-zero .n {
+    color: var(--er-faded);
+  }
+
+  /* Section head for the member list below */
+  .section-divider {
+    padding: 18px 20px 8px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .section-divider .name {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1rem;
+    color: var(--er-red-pencil);
+  }
+  .section-divider .count {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+  }
+
+  /* Member rows (flat list below the strip) */
+  .member-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 20px;
+  }
+  .member-row {
+    padding: 10px 20px 10px 18px;
+    border-bottom: 1px dashed var(--er-paper-3);
+    display: grid;
+    grid-template-columns: 1fr 24px;
+    column-gap: 12px;
+    align-items: center;
+    position: relative;
+  }
+  .member-row:last-child { border-bottom: none; }
+  .member-row::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 12px; bottom: 12px; width: 2px;
+  }
+  .member-row.lane-feature::before { background: var(--er-proof-blue); }
+  .member-row.lane-mockups::before { background: var(--er-kraft); }
+  .member-row .meta-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin-bottom: 2px;
+  }
+  .lane-tag.lane-feature { color: var(--er-proof-blue); }
+  .lane-tag.lane-mockups { color: var(--er-kraft); }
+  .stage-inline .g {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--er-red-pencil);
+    font-size: 0.8rem;
+    line-height: 1;
+    margin-right: 2px;
+  }
+  .stage-inline {
+    color: var(--er-ink-soft);
+    font-weight: 500;
+  }
+  .member-row .title {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 0.98rem;
+    color: var(--er-ink);
+    line-height: 1.2;
+  }
+  .member-row .slug {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    color: var(--er-faded);
+    margin-top: 2px;
+  }
+  .member-row .open {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--er-proof-blue);
+    text-align: center;
+    cursor: pointer;
+  }
+
+  /* Bottom bar */
+  .bar {
+    border-top: 1px solid var(--er-paper-3);
+    background: var(--er-paper);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    height: 52px;
+  }
+  .bar .cell {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border-right: 1px solid var(--er-paper-3);
+    cursor: pointer;
+  }
+  .bar .cell:last-child { border-right: none; }
+  .bar .cell .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--er-red-pencil);
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+  .bar .cell .label {
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--er-ink-soft);
+    margin-top: 3px;
+  }
+
+  .note {
+    max-width: 390px;
+    margin: 0 auto 32px;
+    padding: 16px 20px;
+    background: rgba(232, 226, 208, 0.12);
+    color: rgba(245, 241, 232, 0.7);
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    line-height: 1.7;
+    letter-spacing: 0.04em;
+    border-left: 2px solid rgba(184, 54, 42, 0.6);
+    position: relative;
+    z-index: 1;
+  }
+  .note .title {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.95rem;
+    color: rgba(245, 241, 232, 0.95);
+    margin-bottom: 8px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .note ul { margin: 6px 0 0; padding-left: 18px; }
+  .note li { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+  <div class="note">
+    <div class="title">Direction C — Stacked composed-then-list (no toggle)</div>
+    Both views always visible: compact lane × stage composition on top, flat member list below.
+    No toggle, no mode state.
+    <ul>
+      <li>"Structure over scrolling" served by the always-visible composed strip.</li>
+      <li>Trade-off: double chrome cost; composed strip uses ~120px before the list starts.</li>
+      <li>Honest when the operator's task is "scan structure THEN drill into a member" — they don't toggle, they look up then down.</li>
+      <li>Risk if member count grows large: list scrolls past the composed strip and the lane × stage info is no longer in view.</li>
+      <li>Empty-members fallback: composed strip drops; surface degrades to the artifactPath-or-empty-state shape (same fallback as Direction B).</li>
+    </ul>
+  </div>
+
+  <div class="frame">
+    <div class="surface">
+      <div class="masthead">
+        <div class="back">←</div>
+        <div class="center">
+          <div class="kicker">GROUP · MOCKUPS</div>
+          <div class="slug">v0.18-row-rebuild</div>
+        </div>
+        <div class="menu">⋮</div>
+      </div>
+
+      <div class="title-strip">
+        <h1 class="title">v0.18 row-affordance rebuild</h1>
+        <div class="meta">
+          <span class="stage-mark">✎</span>
+          <span class="stage-name">Drafting</span>
+          <span style="color: var(--er-paper-3);">·</span>
+          <span>4 members</span>
+        </div>
+      </div>
+
+      <div class="composed-strip">
+        <div class="kicker">
+          <span class="name">Composition</span>
+          <span>2 lanes · editorial + visual</span>
+        </div>
+        <div class="composed-grid">
+          <div class="composed-lane lane-feature">
+            <div class="lane-name">Feature</div>
+            <div class="stage-pip-row">
+              <div class="stage-pip is-zero">
+                <span class="glyph">⊹</span>
+                <span class="stage">Outline</span>
+                <span class="n">0</span>
+              </div>
+              <div class="stage-pip">
+                <span class="glyph">✎</span>
+                <span class="stage">Drafting</span>
+                <span class="n">2</span>
+              </div>
+              <div class="stage-pip">
+                <span class="glyph">※</span>
+                <span class="stage">Final</span>
+                <span class="n">1</span>
+              </div>
+            </div>
+          </div>
+          <div class="composed-lane lane-mockups">
+            <div class="lane-name">Mockups</div>
+            <div class="stage-pip-row">
+              <div class="stage-pip">
+                <span class="glyph">⊹</span>
+                <span class="stage">Sketched</span>
+                <span class="n">1</span>
+              </div>
+              <div class="stage-pip is-zero">
+                <span class="glyph">✎</span>
+                <span class="stage">Iterating</span>
+                <span class="n">0</span>
+              </div>
+              <div class="stage-pip is-zero">
+                <span class="glyph">✓</span>
+                <span class="stage">Approved</span>
+                <span class="n">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider">
+        <div class="name">Members</div>
+        <div class="count">4 entries</div>
+      </div>
+
+      <ul class="member-list">
+        <li class="member-row lane-feature">
+          <div>
+            <div class="meta-line">
+              <span class="lane-tag lane-feature">Feature</span>
+              <span style="color: var(--er-paper-3);">·</span>
+              <span class="stage-inline"><span class="g">✎</span>Drafting</span>
+            </div>
+            <div class="title">Row chrome cascade rewrite</div>
+            <div class="slug">row-chrome-cascade-rewrite</div>
+          </div>
+          <div class="open">↪</div>
+        </li>
+        <li class="member-row lane-feature">
+          <div>
+            <div class="meta-line">
+              <span class="lane-tag lane-feature">Feature</span>
+              <span style="color: var(--er-paper-3);">·</span>
+              <span class="stage-inline"><span class="g">✎</span>Drafting</span>
+            </div>
+            <div class="title">Stage-aware verb router</div>
+            <div class="slug">stage-aware-verb-router</div>
+          </div>
+          <div class="open">↪</div>
+        </li>
+        <li class="member-row lane-feature">
+          <div>
+            <div class="meta-line">
+              <span class="lane-tag lane-feature">Feature</span>
+              <span style="color: var(--er-paper-3);">·</span>
+              <span class="stage-inline"><span class="g">※</span>Final</span>
+            </div>
+            <div class="title">Swipe drawer dispatch contract</div>
+            <div class="slug">swipe-drawer-dispatch-contract</div>
+          </div>
+          <div class="open">↪</div>
+        </li>
+        <li class="member-row lane-mockups">
+          <div>
+            <div class="meta-line">
+              <span class="lane-tag lane-mockups">Mockups</span>
+              <span style="color: var(--er-paper-3);">·</span>
+              <span class="stage-inline"><span class="g">⊹</span>Sketched</span>
+            </div>
+            <div class="title">Row-3 swipe-only direction</div>
+            <div class="slug">row-3-swipe-only-mockup</div>
+          </div>
+          <div class="open">↪</div>
+        </li>
+      </ul>
+
+      <div class="bar">
+        <div class="cell">
+          <span class="glyph">✎</span>
+          <span class="label">Iterate</span>
+        </div>
+        <div class="cell">
+          <span class="glyph">+</span>
+          <span class="label">Add member</span>
+        </div>
+        <div class="cell">
+          <span class="glyph">✗</span>
+          <span class="label">Cancel</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

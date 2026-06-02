@@ -1,0 +1,11 @@
+{
+  "featureSlug": "graphical-entries",
+  "complaint": "Task 5.1B: per-lane kanban<->list view toggle — segmented .vt-cell radio buttons, viewport-aware defaults, dual-body server-render, .lb-group list view with .lb-row entries, mobile single-column kanban stack",
+  "manifestPath": "/Users/orion/work/deskwork-work/graphical-entries/docs/1.0/001-IN-PROGRESS/graphical-entries/scope-manifest.yaml",
+  "prdPath": "/Users/orion/work/deskwork-work/graphical-entries/docs/1.0/001-IN-PROGRESS/graphical-entries/prd.md",
+  "repoRoot": "/Users/orion/work/deskwork-work/graphical-entries",
+  "moduleRoot": "src",
+  "apply": true,
+  "evidenceTrail": true,
+  "quiet": false
+}

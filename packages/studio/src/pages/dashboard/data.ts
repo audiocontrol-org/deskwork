@@ -20,6 +20,9 @@ import { listOpen } from '@deskwork/core/review/pipeline';
 import type { DraftWorkflowItem } from '@deskwork/core/review/types';
 import type { Platform } from '@deskwork/core/types';
 import type { DeskworkConfig } from '@deskwork/core/config';
+import { isPopulatedGroupEntry } from '@deskwork/core/groups';
+import { loadLaneBuckets, type LaneBucketsResult } from './lane-data.ts';
+import { isLegacyEditorialStage } from './legacy-stage.ts';
 
 /**
  * The eight canonical stages, in display order. Linear pipeline
@@ -56,12 +59,42 @@ export interface DashboardData {
   readonly byStage: ReadonlyMap<Stage, readonly Entry[]>;
   readonly shortformWorkflows: readonly DraftWorkflowItem[];
   readonly shortformByPlatform: ReadonlyMap<Platform, readonly DraftWorkflowItem[]>;
+  /**
+   * Per-lane buckets for the multi-lane swimlane shell (Phase 5
+   * Task 5.1). `byLane` iteration order = lane order from
+   * `listLaneConfigs`. Entries are bucketed against the lane's
+   * resolved pipeline template, not the legacy eight-stage union.
+   * `byStage` above is kept as a back-compat read view for code that
+   * still iterates the legacy union (the v7 ordering test + the
+   * eight-stage section renderer for Shortform/Adjacent siblings).
+   */
+  readonly lanes: LaneBucketsResult;
+  /**
+   * Reverse-lookup index: member UUID → ordered list of parent group
+   * entries. Built once per dashboard render so per-row renderers can
+   * surface the "Member of:" pull-tab without scanning every entry per
+   * row (Phase 7 Task 7.3 — Direction 1 picked).
+   *
+   * Only populated groups (`isPopulatedGroupEntry`) contribute; entries
+   * that aren't members of any group have NO entry in this map (the
+   * row renderer treats absent + empty as the same "render no tab"
+   * signal).
+   */
+  readonly parentsByMemberUuid: ReadonlyMap<string, readonly Entry[]>;
 }
 
 function bucketize(entries: readonly Entry[]): Map<Stage, Entry[]> {
   const out = new Map<Stage, Entry[]>();
   for (const stage of DASHBOARD_STAGE_ORDER) out.set(stage, []);
   for (const e of entries) {
+    // Per AUDIT-20260528-01: `byStage` is the back-compat read view
+    // keyed by the legacy editorial `Stage` union. Entries whose
+    // `currentStage` is not a legacy editorial stage belong to a
+    // non-editorial lane template and are surfaced through the
+    // `lanes` (LaneBucketsResult) read path below. Skip them here so
+    // the legacy view stays type-clean; their per-lane bucketing in
+    // `loadLaneBuckets` is the authoritative routing.
+    if (!isLegacyEditorialStage(e.currentStage)) continue;
     const bucket = out.get(e.currentStage);
     if (bucket !== undefined) bucket.push(e);
   }
@@ -123,6 +156,35 @@ export function bucketizeShortform(
   return out;
 }
 
+/**
+ * Build the member→parents reverse-lookup index from the loaded
+ * sidecar set (Phase 7 Task 7.3 Step 7.3.3). One pass over `entries`:
+ * for every populated group, push its sidecar into the per-member
+ * accumulator. Iteration order of the resulting Map's values is the
+ * order in which parents were encountered (groups are scanned in
+ * sidecar-load order); operators don't rely on this ordering yet
+ * (no spec calls for a "primary parent" notion), so the encounter
+ * order is the canonical surface order.
+ */
+function buildParentsIndex(
+  entries: readonly Entry[],
+): ReadonlyMap<string, readonly Entry[]> {
+  const index = new Map<string, Entry[]>();
+  for (const entry of entries) {
+    if (!isPopulatedGroupEntry(entry)) continue;
+    const members = entry.members ?? [];
+    for (const memberUuid of members) {
+      const arr = index.get(memberUuid);
+      if (arr === undefined) {
+        index.set(memberUuid, [entry]);
+      } else {
+        arr.push(entry);
+      }
+    }
+  }
+  return index;
+}
+
 export async function loadDashboardData(
   projectRoot: string,
   config: DeskworkConfig,
@@ -131,5 +193,18 @@ export async function loadDashboardData(
   const byStage = bucketize(entries);
   const shortformWorkflows = loadOpenShortform(projectRoot, config);
   const shortformByPlatform = bucketizeShortform(shortformWorkflows);
-  return { entries, byStage, shortformWorkflows, shortformByPlatform };
+  // Phase 5 Task 5.1 Step 5.1.1: also bucket entries per lane.
+  // bootstrapDefaultLaneIfMissing fires inside loadLaneBuckets so
+  // legacy projects without `.deskwork/lanes/` participate in the
+  // new model without explicit operator setup.
+  const lanes = await loadLaneBuckets(projectRoot, config, entries);
+  const parentsByMemberUuid = buildParentsIndex(entries);
+  return {
+    entries,
+    byStage,
+    shortformWorkflows,
+    shortformByPlatform,
+    lanes,
+    parentsByMemberUuid,
+  };
 }

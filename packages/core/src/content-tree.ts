@@ -203,8 +203,9 @@ export function buildContentTree(
         WARNED_LEGACY_FALLBACK.add(dedupKey);
         warn(
           `[content-tree] Calendar entry "${entry.slug}" matched fs node by slug ` +
-            `(no frontmatter id binding). Run \`deskwork doctor --fix=missing-frontmatter-id\` ` +
-            `to make this binding refactor-proof.`,
+            `(no frontmatter id binding). \`deskwork ingest --apply\` binds ` +
+            `\`deskwork.id\` into the source file at ingest time, making this ` +
+            `binding refactor-proof.`,
         );
       }
       continue;

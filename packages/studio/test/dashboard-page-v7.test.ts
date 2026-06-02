@@ -143,13 +143,24 @@ describe('dashboard v7 page wiring (Step 2.2.9)', () => {
     expect(r.html).toContain('2 longform · 1 shortform');
   });
 
-  it('existing longform stage tiles carry data-stage-section-group="longform"', async () => {
+  it('bay shell renders one swimlane per visible lane (Phase 5 Task 5.1)', async () => {
+    // Per ambiguity resolution 5 (Task 5.1 dispatch): the v7 stage-tile
+    // grouping test (which counted `data-stage-section-group="longform"`
+    // occurrences across 8 stage tiles + Distribution) measured the
+    // legacy pre-bay-shell DOM. Phase 5 swaps the 8-stage-tile loop for
+    // the swimlane bay shell — there's exactly ONE longform lane on
+    // disk (the in-memory default), so the bay renders ONE `<article
+    // class="swim" data-lane-id="default">`. Distribution still renders
+    // as a top-level sibling (per ambiguity resolution 2) so the v7
+    // ordering test above still holds.
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    // Each of the 8 stage tiles + Distribution should carry the group attr.
-    const matches = r.html.match(/data-stage-section-group="longform"/g) ?? [];
-    // 8 stage tiles + 1 Distribution = 9.
-    expect(matches.length).toBeGreaterThanOrEqual(9);
+    // Phase 5 Task 5.1 spec-fidelity fix (Finding 3) added a
+    // `swim--<template-id>` modifier class on the `<article>`; the
+    // regex tolerates the additional class token while still
+    // pinning the same semantic assertion.
+    const swimMatches = r.html.match(/<article class="swim(?:\s[^"]*)?"[^>]*data-lane-id="default"/g) ?? [];
+    expect(swimMatches.length).toBe(1);
   });
 
   it('shortform tiles carry data-stage-section-group="shortform"', async () => {

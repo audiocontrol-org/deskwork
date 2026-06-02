@@ -9,6 +9,14 @@ describe('validateAll - schema', () => {
   beforeEach(async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
     await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
+    await writeFile(
+      join(projectRoot, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: { main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' } },
+        defaultSite: 'main',
+      }),
+    );
     await mkdir(join(projectRoot, 'docs'), { recursive: true });
     await writeFile(join(projectRoot, '.deskwork', 'calendar.md'), '# Editorial Calendar\n\n## Ideas\n*No entries.*\n');
   });

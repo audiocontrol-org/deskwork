@@ -21,6 +21,7 @@ The scope-discovery feature lives at [`docs/1.0/001-IN-PROGRESS/scope-discovery/
 | [#352](https://github.com/audiocontrol-org/deskwork/issues/352) | scope-discovery pre-commit gate runs on docs-only commits (canary #349 §3c) | Filter on `git diff --staged --name-only \| grep -v '^docs/'` before invoking the gate suite | ~5 LOC | none |
 | [#350](https://github.com/audiocontrol-org/deskwork/issues/350) | `validate-return`: refactor-cue substring match false-positives (canary #349 §3a) | Tighten the substring matcher to require word boundaries + return-context anchor | ~15 LOC + 3 regression cases | none |
 | [#351](https://github.com/audiocontrol-org/deskwork/issues/351) | session-start/session-end helper-subcommand availability check (canary #349 §3b) | Probe `dw-lifecycle help` once at session start; emit actionable error with install hint when subcommand is missing | ~20 LOC + smoke | none |
+| [#354](https://github.com/audiocontrol-org/deskwork/issues/354) | clone gate scans gitignored dirs — gate result depends on local untracked state | Set `"gitignore": true` in both `.jscpd.json` files (root + `.dw-lifecycle/scope-discovery/`), or pass only git-tracked files to jscpd; regression check for "gitignored sandbox present" | ~5 LOC + 1 regression | none |
 
 ## Medium effort (1-2 days)
 

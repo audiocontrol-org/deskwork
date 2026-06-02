@@ -1,0 +1,21 @@
+{
+  "name": "capture-dom-to-canvas-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phase 1 Task 1.4.2 spike — html-to-image DOM-to-PNG capture against a fidelity-stress fixture (custom fonts, flex/grid, pseudo-elements, box-shadow, inline SVG, multi-line text). Vanilla JS, not part of the workspace.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "html-to-image": "^1.11.13"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0",
+    "pngjs": "^7.0.0",
+    "vite": "^5.4.0"
+  }
+}

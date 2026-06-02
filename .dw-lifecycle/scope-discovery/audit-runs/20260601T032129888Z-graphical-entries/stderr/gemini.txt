@@ -1,0 +1,21 @@
+Loaded cached credentials.
+Loading extension: nanobanana
+Ignored 7 files:
+Git-ignored: google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/core/baseLlmClient.js:71:19, google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/routing/strategies/classifierStrategy.js:126:34, google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/routing/strategies/compositeStrategy.js:30:34, google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/routing/modelRouterService.js:44:24, google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/core/client.js:373:30, google/gemini-cli/dist/src/nonInteractiveCli.js:188:34, google/gemini-cli/dist/src/gemini.js:361:9
+Attempt 1 failed: You have exhausted your capacity on this model. Your quota will reset after 8s.. Retrying after 8348.460978000001ms...
+Attempt 3 failed: You have exhausted your capacity on this model. Your quota will reset after 7s.. Retrying after 7857.337404ms...
+Error generating JSON content via API. Full report available at: /var/folders/sk/jzwspmzn1g17x97x7s7l_dch0000gn/T/gemini-client-error-generateJson-api-2026-06-01T03-22-21-836Z.json
+[Routing] ClassifierStrategy failed: Error: Failed to generate JSON content: You have exhausted your capacity on this model. Your quota will reset after 3s.
+    at BaseLlmClient.generateJson (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/core/baseLlmClient.js:71:19)
+    at async ClassifierStrategy.route (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/routing/strategies/classifierStrategy.js:126:34)
+    at async CompositeStrategy.route (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/routing/strategies/compositeStrategy.js:30:34)
+    at async ModelRouterService.route (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/routing/modelRouterService.js:44:24)
+    at async GeminiClient.sendMessageStream (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/core/client.js:373:30)
+    at async file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/dist/src/nonInteractiveCli.js:188:34
+    at async main (file:///Users/orion/.nvm/versions/node/v22.19.0/lib/node_modules/@google/gemini-cli/dist/src/gemini.js:361:9)
+Attempt 1 failed: You have exhausted your capacity on this model.. Retrying after 10000ms...
+Attempt 2 failed: You have exhausted your capacity on this model.. Retrying after 10000ms...
+Error when talking to Gemini API Full report available at: /var/folders/sk/jzwspmzn1g17x97x7s7l_dch0000gn/T/gemini-client-error-Turn.run-sendMessageStream-2026-06-01T03-22-44-567Z.json
+[API Error: You have exhausted your capacity on this model.]
+An unexpected critical error occurred:
+[object Object]

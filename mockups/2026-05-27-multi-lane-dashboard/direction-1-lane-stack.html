@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Direction 1 · Lane Stack — Phase 5 mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --kraft-soft: #B0966E;
+    --ink: #1A1614;
+    --ink-soft: #3D3530;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1.5rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .meta a { color: var(--paper); border-bottom: 1px solid rgba(245,241,232,0.4); text-decoration: none; }
+  h1.demo-title { color: var(--paper); font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 36, "wght" 500; font-size: 1.7rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 1.6rem; text-align: center; max-width: 64ch; }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; margin-top: 0.8rem; text-align: center; max-width: 410px; }
+
+  /* Desktop frame */
+  .desktop {
+    width: 1080px; min-height: 880px; background: var(--paper);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+  /* Phone frame */
+  .phone {
+    width: 410px; height: 880px; background: #050505;
+    border-radius: 50px; padding: 12px;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before { content: ''; position: absolute; top: 22px; left: 50%; transform: translateX(-50%); width: 110px; height: 30px; background: #000; border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper); border-radius: 38px; overflow: hidden; position: relative; }
+
+  /* ===== Surface chrome ===== */
+  .masthead { display: flex; justify-content: space-between; align-items: baseline; padding: 1rem 1.25rem 0.5rem; border-bottom: 2px solid var(--red); }
+  .masthead .title { font-family: var(--display); font-style: italic; font-size: 1.5rem; font-variation-settings: "opsz" 36, "wght" 500; }
+  .masthead .kicker { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--faded); }
+  .masthead .star { font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem; cursor: pointer; padding: 0.2rem 0.4rem; }
+
+  .desktop .body { padding: 1.5rem 2rem 5rem; }
+  .phone .screen .body { padding: 1rem 1rem 5rem; height: 100%; overflow-y: auto; padding-top: 90px; }
+
+  /* ===== Section header (per-lane) ===== */
+  .lane-section { margin-bottom: 1.5rem; }
+  .lane-head {
+    display: flex; align-items: baseline; gap: 0.75rem;
+    border-bottom: 1px dashed var(--paper-3);
+    padding: 0.5rem 0 0.6rem;
+    margin-bottom: 0.7rem;
+  }
+  .lane-head .glyph {
+    font-family: var(--display); font-style: italic; font-size: 1.3rem;
+    color: var(--red); font-variation-settings: "opsz" 24, "wght" 500;
+  }
+  .lane-head .name {
+    font-family: var(--display); font-style: italic; font-size: 1.2rem;
+    font-variation-settings: "opsz" 24, "wght" 500;
+  }
+  .lane-head .template-tag {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--faded);
+    padding: 0.15rem 0.4rem;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+  .lane-head .meta-strip { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
+  .lane-head .count {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+  .lane-head .collapse-chev {
+    font-family: var(--mono); color: var(--faded); font-size: 0.8rem;
+    padding: 0.25rem 0.5rem; cursor: pointer; border: 1px solid var(--paper-3);
+    border-radius: 2px; background: var(--paper);
+  }
+
+  /* ===== Stage tiles row (desktop) ===== */
+  .stage-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .stage-tile {
+    background: var(--paper); border: 1px solid var(--paper-3);
+    padding: 0.6rem 0.7rem;
+    display: flex; align-items: center; gap: 0.5rem;
+    cursor: pointer;
+  }
+  .stage-tile .stage-glyph {
+    font-family: var(--display); font-style: italic; font-size: 1.05rem;
+    color: var(--red);
+  }
+  .stage-tile .stage-name {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+  }
+  .stage-tile .stage-count {
+    font-family: var(--mono); font-size: 0.8rem; color: var(--ink-soft);
+    margin-left: auto;
+  }
+  /* Empty stage uses explicit muted palette (per standards) */
+  .stage-tile.empty { cursor: default; }
+  .stage-tile.empty .stage-glyph { color: var(--faded); }
+  .stage-tile.empty .stage-name,
+  .stage-tile.empty .stage-count { color: var(--ink-soft); }
+  /* Active stage tile (expanded) */
+  .stage-tile.active {
+    background: var(--paper-2);
+    border-top: 2px solid var(--red);
+  }
+  .stage-tile.active .stage-glyph,
+  .stage-tile.active .stage-name { color: var(--red); }
+
+  /* ===== Expanded entries (under an active stage tile) ===== */
+  .entries-group {
+    border-left: 2px solid var(--paper-3);
+    margin: 0.4rem 0 0.6rem 0.4rem;
+    padding: 0.4rem 0.4rem 0.4rem 0.8rem;
+  }
+  .entry-row {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.45rem 0.55rem;
+    border-bottom: 1px solid var(--paper-3);
+  }
+  .entry-row:last-child { border-bottom: none; }
+  .entry-row .e-title {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+    flex: 1;
+  }
+  .entry-row .e-meta {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.12em;
+    color: var(--faded);
+  }
+  .entry-row .e-overflow {
+    font-family: var(--mono); color: var(--faded); font-size: 0.95rem;
+    cursor: pointer; padding: 0 0.4rem;
+  }
+
+  /* ===== Lane is collapsed-to-header state ===== */
+  .lane-section.collapsed .stage-row,
+  .lane-section.collapsed .entries-group { display: none; }
+  .lane-section.collapsed .lane-head { margin-bottom: 0; }
+
+  /* ===== Lane-visibility drawer (right rail on desktop) ===== */
+  .desktop { display: grid; grid-template-columns: 1fr 220px; }
+  .desktop .main {
+    padding: 0; min-width: 0;
+  }
+  .desktop .main .body { padding: 1.5rem 1.5rem 5rem; }
+  .desktop .visibility-rail {
+    background: var(--paper-2);
+    border-left: 1px solid var(--paper-3);
+    padding: 1.5rem 1rem;
+    position: sticky; top: 0;
+    align-self: stretch;
+  }
+  .vrail-head {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--faded);
+    margin-bottom: 0.8rem;
+  }
+  .vrail-item {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 0.3rem;
+    border-bottom: 1px dashed var(--paper-3);
+    cursor: pointer;
+  }
+  .vrail-item .v-eye {
+    font-family: var(--mono); font-size: 0.9rem; color: var(--ink-soft);
+    width: 16px; text-align: center;
+  }
+  .vrail-item.hidden .v-eye { color: var(--faded); }
+  .vrail-item.hidden .v-name { color: var(--faded); text-decoration: line-through; }
+  .vrail-item .v-name {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+  }
+  .vrail-item .v-count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
+  }
+  .vrail-views {
+    margin-top: 1.2rem; padding-top: 0.7rem;
+    border-top: 1px solid var(--paper-3);
+  }
+  .vrail-views .view-pill {
+    display: inline-block; margin: 0.15rem 0.2rem 0.15rem 0;
+    padding: 0.2rem 0.5rem; border-radius: 99px;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.1em;
+    color: var(--ink-soft); cursor: pointer;
+  }
+  .vrail-views .view-pill.active {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+
+  /* ===== Phone (mobile) — same structure, no rail ===== */
+  .phone .lane-head .name { font-size: 1.05rem; }
+  .phone .lane-head .meta-strip { gap: 0.4rem; }
+  .phone .stage-row { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .phone .stage-tile { padding: 0.5rem 0.6rem; }
+  .phone .stage-tile .stage-name { font-size: 0.85rem; }
+  .phone .stage-tile .stage-count { font-size: 0.7rem; }
+  .phone .entry-row { padding: 0.4rem 0.3rem; }
+  .phone .entry-row .e-title { font-size: 0.85rem; }
+  /* Mobile lane-visibility = bottom-sheet trigger in header */
+  .phone .mobile-rail-trigger {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--ink-soft);
+    padding: 0.3rem 0.5rem; border: 1px solid var(--paper-3);
+    background: var(--paper); cursor: pointer;
+  }
+  /* Compose FAB */
+  .compose-fab {
+    position: absolute; right: 1rem; bottom: 1rem;
+    padding: 0.6rem 0.9rem; background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.15em;
+    text-transform: uppercase; border: none; border-radius: 99px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18); cursor: pointer;
+  }
+
+  /* ===== Standards-deviation note ===== */
+  .deviation-note {
+    margin: 1rem auto 0; max-width: 720px;
+    background: rgba(245,241,232,0.06); color: var(--paper);
+    font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
+    padding: 0.9rem 1.1rem; border: 1px solid rgba(245,241,232,0.18);
+    border-left: 3px solid var(--green);
+  }
+  .deviation-note .label {
+    color: var(--green); letter-spacing: 0.18em; text-transform: uppercase;
+    font-weight: 600; font-size: 0.62rem; margin-right: 0.4rem;
+  }
+</style>
+</head>
+<body>
+  <div class="meta">Direction 1 · <a href="./index.html">↩ all directions</a></div>
+  <h1 class="demo-title">Lane Stack</h1>
+  <div class="demo-sub">Each lane is a section. Sections stack vertically. Honors all existing IA rules.</div>
+
+  <div class="deviation-note">
+    <span class="label">Standards-compliant</span> Existing IA extended additively: each lane becomes its own section under the Longform domain, mirroring the current Longform / Shortform / Adjacent stacked-section pattern. No top-level tab bar; no new navigation idiom. Per-lane collapsibility uses the same chevron pattern as existing stage tiles. Lane visibility is a right-rail panel on desktop (mirrors the existing sidebar-rail pattern from entry-review); on mobile it's a bottom-sheet trigger in the masthead.
+  </div>
+
+  <div class="frames" style="margin-top:1.4rem;">
+
+    <!-- DESKTOP -->
+    <div class="frame-wrap">
+      <div class="desktop">
+        <div class="main">
+          <div class="masthead">
+            <div>
+              <div class="kicker">The Desk · multi-lane</div>
+              <div class="title">deskwork — editorial studio</div>
+            </div>
+            <div class="star">⋮</div>
+          </div>
+          <div class="body">
+
+            <!-- Lane 1: Editorial -->
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph">§</span>
+                <span class="name">Editorial</span>
+                <span class="template-tag">editorial · 6 stages</span>
+                <div class="meta-strip">
+                  <span class="count">12 entries</span>
+                  <span class="collapse-chev">▾</span>
+                </div>
+              </div>
+              <div class="stage-row">
+                <div class="stage-tile"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span></div>
+                <div class="stage-tile"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span></div>
+                <div class="stage-tile"><span class="stage-glyph">⊹</span><span class="stage-name">Outlining</span><span class="stage-count">1</span></div>
+                <div class="stage-tile active"><span class="stage-glyph">✎</span><span class="stage-name">Drafting</span><span class="stage-count">4</span></div>
+                <div class="stage-tile"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span></div>
+                <div class="stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Published</span><span class="stage-count">1</span></div>
+              </div>
+              <div class="entries-group">
+                <div class="entry-row">
+                  <span class="e-title">Graphical-entries PRD — review surface</span>
+                  <span class="e-meta">v3 · iterating</span>
+                  <span class="e-overflow">⋮</span>
+                </div>
+                <div class="entry-row">
+                  <span class="e-title">Mobile-first editor retrospective</span>
+                  <span class="e-meta">v1 · drafting</span>
+                  <span class="e-overflow">⋮</span>
+                </div>
+                <div class="entry-row">
+                  <span class="e-title">Annotation model deep-dive</span>
+                  <span class="e-meta">v2 · drafting</span>
+                  <span class="e-overflow">⋮</span>
+                </div>
+                <div class="entry-row">
+                  <span class="e-title">Pipeline templates rationale</span>
+                  <span class="e-meta">v1 · drafting</span>
+                  <span class="e-overflow">⋮</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Lane 2: Mockups (collapsed-to-header demo) -->
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph">◆</span>
+                <span class="name">Mockups</span>
+                <span class="template-tag">visual · 4 stages</span>
+                <div class="meta-strip">
+                  <span class="count">5 entries</span>
+                  <span class="collapse-chev">▾</span>
+                </div>
+              </div>
+              <div class="stage-row">
+                <div class="stage-tile"><span class="stage-glyph">✏</span><span class="stage-name">Sketched</span><span class="stage-count">2</span></div>
+                <div class="stage-tile"><span class="stage-glyph">◴</span><span class="stage-name">Iterating</span><span class="stage-count">2</span></div>
+                <div class="stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">1</span></div>
+                <div class="stage-tile empty"><span class="stage-glyph">⌖</span><span class="stage-name">Shipped</span><span class="stage-count">0</span></div>
+              </div>
+            </section>
+
+            <!-- Lane 3: QA -->
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph">⊕</span>
+                <span class="name">QA</span>
+                <span class="template-tag">qa-plan · 4 stages</span>
+                <div class="meta-strip">
+                  <span class="count">3 entries</span>
+                  <span class="collapse-chev">▾</span>
+                </div>
+              </div>
+              <div class="stage-row">
+                <div class="stage-tile"><span class="stage-glyph">✎</span><span class="stage-name">Drafted</span><span class="stage-count">1</span></div>
+                <div class="stage-tile"><span class="stage-glyph">⌕</span><span class="stage-name">Reviewed</span><span class="stage-count">1</span></div>
+                <div class="stage-tile"><span class="stage-glyph">⊝</span><span class="stage-name">Tested</span><span class="stage-count">1</span></div>
+                <div class="stage-tile empty"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">0</span></div>
+              </div>
+            </section>
+
+          </div>
+          <button class="compose-fab">+ Compose</button>
+        </div>
+
+        <!-- Right rail: lane visibility -->
+        <aside class="visibility-rail">
+          <div class="vrail-head">Lanes</div>
+          <div class="vrail-item">
+            <span class="v-eye">●</span>
+            <span class="v-name">Editorial</span>
+            <span class="v-count">12</span>
+          </div>
+          <div class="vrail-item">
+            <span class="v-eye">●</span>
+            <span class="v-name">Mockups</span>
+            <span class="v-count">5</span>
+          </div>
+          <div class="vrail-item">
+            <span class="v-eye">●</span>
+            <span class="v-name">QA</span>
+            <span class="v-count">3</span>
+          </div>
+          <div class="vrail-item hidden">
+            <span class="v-eye">○</span>
+            <span class="v-name">Press Releases</span>
+            <span class="v-count">2</span>
+          </div>
+          <div class="vrail-views">
+            <div class="vrail-head">Saved views</div>
+            <span class="view-pill active">All</span>
+            <span class="view-pill">Active only</span>
+            <span class="view-pill">Editorial + QA</span>
+            <span class="view-pill">+ New view</span>
+          </div>
+        </aside>
+      </div>
+      <div class="caption">Desktop · 1080px · Lane visibility rail on right; Compose FAB stays bottom-right</div>
+    </div>
+
+    <!-- MOBILE -->
+    <div class="frame-wrap">
+      <div class="phone">
+        <div class="screen">
+          <div class="masthead" style="margin-top:2.4rem;">
+            <div>
+              <div class="kicker">The Desk · multi-lane</div>
+              <div class="title" style="font-size:1.1rem;">editorial studio</div>
+            </div>
+            <button class="mobile-rail-trigger">Lanes ▾</button>
+          </div>
+          <div class="body">
+
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph">§</span>
+                <span class="name">Editorial</span>
+                <div class="meta-strip">
+                  <span class="count">12</span>
+                  <span class="collapse-chev">▾</span>
+                </div>
+              </div>
+              <div class="stage-row">
+                <div class="stage-tile"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span></div>
+                <div class="stage-tile"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span></div>
+                <div class="stage-tile"><span class="stage-glyph">⊹</span><span class="stage-name">Outline</span><span class="stage-count">1</span></div>
+                <div class="stage-tile active"><span class="stage-glyph">✎</span><span class="stage-name">Drafting</span><span class="stage-count">4</span></div>
+                <div class="stage-tile"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span></div>
+                <div class="stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Pub'd</span><span class="stage-count">1</span></div>
+              </div>
+              <div class="entries-group">
+                <div class="entry-row">
+                  <span class="e-title">Graphical-entries PRD</span>
+                  <span class="e-meta">v3</span>
+                  <span class="e-overflow">⋮</span>
+                </div>
+                <div class="entry-row">
+                  <span class="e-title">Mobile editor retrospective</span>
+                  <span class="e-meta">v1</span>
+                  <span class="e-overflow">⋮</span>
+                </div>
+                <div class="entry-row">
+                  <span class="e-title">Annotation model deep-dive</span>
+                  <span class="e-meta">v2</span>
+                  <span class="e-overflow">⋮</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph">◆</span>
+                <span class="name">Mockups</span>
+                <div class="meta-strip">
+                  <span class="count">5</span>
+                  <span class="collapse-chev">▾</span>
+                </div>
+              </div>
+              <div class="stage-row">
+                <div class="stage-tile"><span class="stage-glyph">✏</span><span class="stage-name">Sketched</span><span class="stage-count">2</span></div>
+                <div class="stage-tile"><span class="stage-glyph">◴</span><span class="stage-name">Iterating</span><span class="stage-count">2</span></div>
+                <div class="stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">1</span></div>
+                <div class="stage-tile empty"><span class="stage-glyph">⌖</span><span class="stage-name">Shipped</span><span class="stage-count">0</span></div>
+              </div>
+            </section>
+
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph">⊕</span>
+                <span class="name">QA</span>
+                <div class="meta-strip">
+                  <span class="count">3</span>
+                  <span class="collapse-chev">▾</span>
+                </div>
+              </div>
+              <div class="stage-row">
+                <div class="stage-tile"><span class="stage-glyph">✎</span><span class="stage-name">Drafted</span><span class="stage-count">1</span></div>
+                <div class="stage-tile"><span class="stage-glyph">⌕</span><span class="stage-name">Reviewed</span><span class="stage-count">1</span></div>
+                <div class="stage-tile"><span class="stage-glyph">⊝</span><span class="stage-name">Tested</span><span class="stage-count">1</span></div>
+                <div class="stage-tile empty"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">0</span></div>
+              </div>
+            </section>
+
+          </div>
+          <button class="compose-fab">+ Compose</button>
+        </div>
+      </div>
+      <div class="caption">Mobile · iPhone 13 · Lanes button opens a bottom-sheet visibility panel</div>
+    </div>
+
+  </div>
+</body>
+</html>

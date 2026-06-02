@@ -5,7 +5,7 @@
  * to register a custom rule. The runner merges those project rules
  * with the built-in rules; basename collisions let the project rule
  * override the built-in (e.g., a project-supplied
- * `missing-frontmatter-id.ts` replaces the bundled one).
+ * `orphan-frontmatter-id.ts` replaces the bundled one).
  *
  * Override resolution by basename, not by `rule.id`: the basename is
  * what the operator types; mapping it to a rule object happens in the
@@ -92,7 +92,7 @@ function assertDoctorRule(value: unknown, source: string): DoctorRule {
  * rules.
  */
 export interface LoadedProjectRule {
-  /** Filename without extension — e.g. `missing-frontmatter-id`. */
+  /** Filename without extension — e.g. `orphan-frontmatter-id`. */
   basename: string;
   /** Absolute path of the source file. */
   path: string;

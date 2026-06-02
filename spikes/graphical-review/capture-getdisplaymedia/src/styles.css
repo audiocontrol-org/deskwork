@@ -1,0 +1,120 @@
+/* Phase 1 Task 1.4.1 — page chrome only. No library overrides. */
+
+:root {
+  --ink: #1c1c1c;
+  --paper: #f6f1e8;
+  --rule: #c8b89e;
+  --accent: #6d3a1f;
+  --pane-bg: #fffaf0;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  background: var(--paper);
+  line-height: 1.5;
+}
+
+.masthead {
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid var(--rule);
+  background: var(--pane-bg);
+}
+
+.masthead h1 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.6rem;
+  letter-spacing: 0.02em;
+}
+
+.lede {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 0.95rem;
+  color: #4a3b2c;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 2fr);
+  gap: 1.5rem;
+  padding: 1.5rem 2rem;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+.capture-pane,
+.preview-pane {
+  background: var(--pane-bg);
+  border: 1px solid var(--rule);
+  padding: 1rem;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+button {
+  font: inherit;
+  background: var(--ink);
+  color: var(--pane-bg);
+  border: 1px solid var(--ink);
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #888;
+  border-color: #888;
+  cursor: not-allowed;
+}
+
+.status {
+  font-size: 0.9rem;
+  color: var(--accent);
+  margin: 0.25rem 0;
+  min-height: 1.2em;
+}
+
+.status.error {
+  color: #7a1f1f;
+  font-weight: bold;
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: #4a3b2c;
+  margin: 0.5rem 0 0 0;
+}
+
+#preview-canvas {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  background: #2a2a2a;
+  border: 1px solid var(--rule);
+  display: block;
+}
+
+.meta {
+  font-size: 0.85rem;
+  color: #4a3b2c;
+  margin: 0.5rem 0 0 0;
+  font-family: "SF Mono", Menlo, monospace;
+}
+
+.footnotes {
+  padding: 1rem 2rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.85rem;
+  color: #4a3b2c;
+}

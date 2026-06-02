@@ -2,49 +2,81 @@ import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
 import { regenerateCalendar } from '../calendar/regenerate.ts';
-import { isLinearPipelineStage } from '../schema/entry.ts';
-import type { Entry, Stage } from '../schema/entry.ts';
+import type { Entry } from '../schema/entry.ts';
+import { resolveEntryStrictTemplate } from '../lanes/resolve.ts';
+import {
+  assertStageInTemplate,
+  isLinearPipelineStageInTemplate,
+  isOffPipelineStageInTemplate,
+} from '../pipelines/helpers.ts';
 
 interface InductOptions {
   readonly uuid: string;
   /**
-   * Linear-pipeline stage to teleport the entry into. Must be one of:
-   * Ideas, Planned, Outlining, Drafting, Final, Published. (Blocked /
-   * Cancelled are not valid induction targets — use `blockEntry` /
-   * `cancelEntry` for those.)
+   * Linear-pipeline stage to teleport the entry into. Per Phase 4
+   * (graphical-entries) the parameter is `string` rather than the
+   * editorial-narrow `Stage` union; the runtime check validates that
+   * the requested stage is in the entry's lane template's
+   * `linearStages` list and throws with the allowed-stages list on
+   * mismatch.
    */
-  readonly targetStage: Stage;
+  readonly targetStage: string;
   readonly reason?: string;
 }
 
 interface InductResult {
   readonly entryId: string;
-  readonly fromStage: Stage;
-  readonly toStage: Stage;
+  /**
+   * Per Phase 4 (graphical-entries) both stages are plain strings
+   * echoing the lane template's vocabulary.
+   */
+  readonly fromStage: string;
+  readonly toStage: string;
 }
 
 /**
  * Teleport an entry into a chosen linear-pipeline stage.
  *
- * Primary use: returning a Blocked or Cancelled entry to the pipeline.
- * Also works on linear-pipeline entries when the operator wants to
- * non-linearly skip ahead or back.
+ * Primary use: returning an off-pipeline (e.g. Blocked / Cancelled)
+ * entry to the linear pipeline. Also works on linear-pipeline entries
+ * when the operator wants to non-linearly skip ahead or back.
  *
- * Refuses targetStage = Blocked / Cancelled (use the dedicated helpers).
+ * Refuses:
+ *   - `targetStage` not in the entry's lane template's `linearStages`
+ *     (covers both unknown stages AND off-pipeline destinations like
+ *     Blocked / Cancelled — use `blockEntry` / `cancelEntry` for those).
+ *   - `targetStage === currentStage` (no-op).
+ *   - `currentStage` itself unknown to the template (configuration drift).
  */
 export async function inductEntry(
   projectRoot: string,
   opts: InductOptions,
 ): Promise<InductResult> {
-  if (!isLinearPipelineStage(opts.targetStage)) {
-    throw new Error(
-      `Cannot induct to ${opts.targetStage}: targetStage must be a linear-pipeline stage. ` +
-        `Use blockEntry / cancelEntry for off-pipeline transitions.`,
-    );
-  }
   const sidecar = await readSidecar(projectRoot, opts.uuid);
+  const template = resolveEntryStrictTemplate(sidecar, projectRoot);
   const from = sidecar.currentStage;
   const to = opts.targetStage;
+
+  // Validate the entry's current stage belongs to the template.
+  assertStageInTemplate(template, from, 'inductEntry');
+
+  // Validate the target stage is a recognized LINEAR stage. The check
+  // surfaces both "unknown stage" and "off-pipeline target" with the
+  // same error shape — both cases require operator-side correction.
+  if (!isLinearPipelineStageInTemplate(template, to)) {
+    if (isOffPipelineStageInTemplate(template, to)) {
+      throw new Error(
+        `Cannot induct to ${to}: ${to} is an off-pipeline stage of pipeline "${template.id}". ` +
+          `Use blockEntry / cancelEntry for off-pipeline transitions. ` +
+          `Allowed linear stages: ${template.linearStages.join(', ')}.`,
+      );
+    }
+    throw new Error(
+      `Cannot induct to ${to}: ${to} is not a linear stage of pipeline "${template.id}". ` +
+        `Allowed linear stages: ${template.linearStages.join(', ')}.`,
+    );
+  }
+
   if (from === to) {
     throw new Error(`Cannot induct: entry is already at ${to}.`);
   }
@@ -52,15 +84,19 @@ export async function inductEntry(
 
   // Inducting OUT of an off-pipeline stage clears priorStage.
   // Inducting between linear stages doesn't change it (priorStage only
-  // tracks the most-recent entry into Blocked/Cancelled).
-  const wasOffPipeline = from === 'Blocked' || from === 'Cancelled';
+  // tracks the most-recent entry into the off-pipeline stages).
+  const wasOffPipeline = isOffPipelineStageInTemplate(template, from);
   const { priorStage: _drop, ...rest } = sidecar;
   void _drop;
   const updated: Entry = {
     ...rest,
     currentStage: to,
     updatedAt: at,
-    ...(wasOffPipeline ? {} : sidecar.priorStage !== undefined ? { priorStage: sidecar.priorStage } : {}),
+    ...(wasOffPipeline
+      ? {}
+      : sidecar.priorStage !== undefined
+        ? { priorStage: sidecar.priorStage }
+        : {}),
   };
   await writeSidecar(projectRoot, updated);
   await appendJournalEvent(projectRoot, {

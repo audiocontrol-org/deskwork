@@ -20,12 +20,20 @@ import { html, unsafe, type RawHtml } from './html.ts';
 
 /**
  * The set of values callers can pass as the active key. The first five
- * map to a nav-item that gets `class="active"`; `'longform'` is a
- * special "no nav match" key for the longform review surface — it
- * carries an active context (we ARE inside a review) but no nav-item
- * represents that destination, so none gets highlighted. Issue 4 fixed
- * the prior behaviour where the longform review highlighted the
+ * map to a nav-item that gets `class="active"`; `'longform'`, `'lanes'`,
+ * and `'pipelines'` are "no nav match" keys for surfaces that carry an
+ * active context (we ARE inside a review / on a lane-management page /
+ * on a pipeline-registry page) but whose destination is not represented
+ * by a folio nav-item — so none gets highlighted.
+ *
+ * Issue 4 added `'longform'` after the prior behaviour highlighted the
  * shortform nav-item by prefix-matching, which was misleading.
+ * AUDIT-20260530-76 (cross-model: AUDIT-BARRAGE-codex-P6-2) added
+ * `'lanes'` and `'pipelines'` after both pages were passing `'dashboard'`
+ * — assistive tech was told the Dashboard link was the current page on
+ * `/dev/lanes` and `/dev/pipelines`, which is incorrect link semantics.
+ * Lanes and pipelines do not have dedicated folio nav-items; the
+ * correct shape is "no link is current."
  */
 export type ChromeActiveLink =
   | 'index'
@@ -33,10 +41,12 @@ export type ChromeActiveLink =
   | 'content'
   | 'shortform'
   | 'manual'
-  | 'longform';
+  | 'longform'
+  | 'lanes'
+  | 'pipelines';
 
 interface FolioLink {
-  key: Exclude<ChromeActiveLink, 'longform'>;
+  key: Exclude<ChromeActiveLink, 'longform' | 'lanes' | 'pipelines'>;
   href: string;
   label: string;
 }

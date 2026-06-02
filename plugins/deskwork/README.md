@@ -37,7 +37,7 @@ Operators can override built-in studio templates and doctor rules without forkin
 
 ```
 /deskwork:customize templates dashboard
-/deskwork:customize doctor missing-frontmatter-id
+/deskwork:customize doctor orphan-frontmatter-id
 ```
 
 See the customize skill for the full list of overridable names and the safety rules.
@@ -99,7 +99,7 @@ Examples:
 ```sh
 deskwork doctor                                  # audit-only across every site
 deskwork doctor --site main                      # audit one site
-deskwork doctor --fix=missing-frontmatter-id     # interactive backfill of ids
+deskwork doctor --fix=orphan-frontmatter-id      # resolve files whose id has no calendar match
 deskwork doctor --fix=all --yes                  # non-interactive repair (skips ambiguous prompts)
 ```
 

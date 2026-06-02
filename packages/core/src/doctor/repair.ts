@@ -1,7 +1,9 @@
 import { readdir, readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { join, dirname, relative } from 'node:path';
 import { sidecarsDir } from '../sidecar/paths.ts';
-import { EntrySchema, type Entry, type Stage } from '../schema/entry.ts';
+import { EntrySchema, type Entry } from '../schema/entry.ts';
+import { readConfig } from '../config.ts';
+import { resolveCalendarPath } from '../paths.ts';
 import { renderCalendar } from '../calendar/render.ts';
 
 export interface RepairOptions {
@@ -17,9 +19,10 @@ export interface RepairResult {
  * Stage-conventional artifact path. Mirrors `artifactPathForStage` in
  * validate.ts (kept here to avoid a cross-import; both files reach for
  * the same canonical mapping). Returns null for stages with no on-disk
- * artifact.
+ * artifact, including stages outside the editorial pipeline (Phase 3
+ * / Phase 4 — lane-aware path conventions land in lane code).
  */
-function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): string | null {
+function artifactPathForStage(projectRoot: string, slug: string, stage: string): string | null {
   switch (stage) {
     case 'Ideas':
       return join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
@@ -33,6 +36,10 @@ function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): 
       return join(projectRoot, 'docs', slug, 'index.md');
     case 'Blocked':
     case 'Cancelled':
+      return null;
+    default:
+      // Lane-specific or unrecognized stage; no editorial-default path
+      // applies. Phase 4 introduces template-driven path resolution.
       return null;
   }
 }
@@ -120,7 +127,9 @@ export async function repairAll(projectRoot: string, opts: RepairOptions): Promi
   }
 
   const md = renderCalendar(entries);
-  const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
+  // #232: honor the configured per-site calendarPath (default site) rather
+  // than the hardcoded `.deskwork/calendar.md`, consistent with regenerateCalendar.
+  const calendarPath = resolveCalendarPath(projectRoot, readConfig(projectRoot));
   await mkdir(dirname(calendarPath), { recursive: true });
   await writeFile(calendarPath, md);
   result.applied.push('calendar-regenerated');

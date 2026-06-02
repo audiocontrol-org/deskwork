@@ -25,3 +25,5 @@ export * as contentTree from './content-tree.ts';
 export * from './content-index.ts';
 export * as doctor from './doctor/index.ts';
 export * from './overrides.ts';
+export * as pipelines from './pipelines/index.ts';
+export * as lanes from './lanes/index.ts';

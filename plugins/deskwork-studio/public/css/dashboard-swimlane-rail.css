@@ -1,0 +1,240 @@
+/**
+ * Multi-lane swimlane dashboard — Press Bay RAIL.
+ *
+ * Left-rail surface that lives in the bay-shell's first column. Holds
+ * one row per lane with:
+ *   - eye-toggle button (`.r-eye-btn`) for persistent visibility.
+ *   - glyph + name + count.
+ *   - keyboard-accessible reorder buttons (`.r-move-up-btn`, `.r-move-
+ *     down-btn`) landed for AUDIT-20260528-31.
+ *   - drag handle (`.rail-drag`) used by the HTML5 DnD path.
+ *   - the AUDIT-04 eye-glyph sibling swap (`.r-eye-visible` / `.r-eye-
+ *     hidden`) driven by `data-lane-visible` on the parent row.
+ *
+ * Preset surface (the rail-head's Save / Load / Delete chrome) ships
+ * in `dashboard-swimlane-presets.css` so this file stays focused on
+ * the per-lane row primitives.
+ *
+ * Drag visual feedback (drop-target hairlines, is-dragging opacity)
+ * lives in `dashboard-swimlane-drag.css` so the rail row primitives
+ * are independent of the drag state machine.
+ */
+
+/* ============================================================
+ *  Lane rail — left sidebar with one row per lane.
+ * ============================================================ */
+
+.lane-rail {
+  background: var(--er-paper-2);
+  border-right: 1px solid var(--er-paper-3);
+  padding: 1rem 0.7rem 1.5rem;
+}
+
+.lane-rail .rail-head {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  padding: 0.4rem 0.3rem 0.5rem;
+  border-bottom: 1px dashed var(--er-paper-3);
+  margin-bottom: 0.5rem;
+}
+
+.lane-rail .rail-head-count {
+  font-family: var(--er-font-mono);
+  font-size: 0.55rem;
+  color: var(--er-faded);
+  margin-left: 0.3rem;
+  letter-spacing: 0.1em;
+  text-transform: none;
+}
+
+.rail-lane {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-height: 32px;
+  padding: 0.55rem 0.4rem;
+  border-bottom: 1px dashed var(--er-paper-3);
+  cursor: pointer;
+  position: relative;
+}
+
+.rail-lane:hover {
+  background: var(--er-paper);
+}
+
+.rail-lane:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+.rail-lane.focused {
+  background: var(--er-paper);
+  border-left: 3px solid var(--er-red-pencil);
+  padding-left: 0.55rem;
+}
+
+/* Hidden-lane rail row treatment (Phase 5 Task 5.3 review-followup):
+ * The pre-existing rule used `--er-faded` which renders at ~3.48:1
+ * contrast on `--er-paper` — below WCAG 2.1 SC 1.4.3 AA (4.5:1).
+ * Upgraded to `--er-ink-soft` (~8.92:1 on paper, AAA) so the row
+ * stays readable while still differentiating from the active lanes
+ * via `text-decoration: line-through` on the name. Per AUDIT-
+ * 20260528-22 — the redundant opacity wash that was added at the
+ * tail of this file (Task 5.3 initial commit) is replaced with this
+ * single color rule. */
+.rail-lane[data-lane-visible="false"] {
+  color: var(--er-ink-soft);
+}
+
+.rail-lane[data-lane-visible="false"] .r-name {
+  text-decoration: line-through;
+}
+
+.rail-lane .r-eye-btn {
+  font-family: var(--er-font-mono);
+  text-align: center;
+  color: var(--er-ink-soft);
+  font-size: 0.85rem;
+  /* F6 a11y: real <button> primitive instead of <span>. Strip the
+     UA chrome so the visual presentation matches the previous
+     span-based glyph cell. */
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  line-height: 1;
+  /* AUDIT-20260530-27 — WCAG 2.2 SC 2.5.8 (AA) hit-target floor.
+   * The glyph itself stays small (font-size: 0.85rem) — the hit area
+   * expands via min-width / min-height + flex centering so the visual
+   * chrome doesn't bloat. Mirrors the `.r-move-up-btn` /
+   * `.r-move-down-btn` and `.collapse-chev` patterns in the same
+   * file. The button is independently focusable (own click handler
+   * in `swimlane.ts:bindRailEyeToggles` with `stopPropagation`), so
+   * it is subject to the target-size rule on its own — not covered
+   * by the row's larger hit area. */
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rail-lane[data-lane-visible="false"] .r-eye-btn {
+  color: var(--er-faded);
+}
+
+.rail-lane .r-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-red-pencil);
+  font-size: 1.05rem;
+}
+
+.rail-lane[data-lane-visible="false"] .r-glyph {
+  color: var(--er-faded);
+}
+
+.rail-lane .r-name {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+.rail-lane .r-count {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  color: var(--er-faded);
+}
+
+.rail-lane .rail-drag {
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  color: var(--er-faded-2);
+  margin-left: 0.3rem;
+  cursor: grab;
+  user-select: none;
+}
+
+/* AUDIT-20260528-31 — keyboard-accessible reorder affordance.
+ *
+ * Two `<button>` siblings (`▲` / `▼`) per row, rendered between the
+ * entry count and the drag handle. Mouse drag remains the high-
+ * bandwidth path; these buttons are what keyboard-only operators use.
+ * Per WCAG 2.2 SC 2.5.8 (Target Size — minimum AA), the hit area is
+ * ≥24×24 CSS px; per WCAG 2.1 SC 2.4.7 (Focus Visible), the focus
+ * ring mirrors `.r-eye-btn` (same `--er-proof-blue` outline). The
+ * visible glyph stays small (0.7rem) — the hit area expands via
+ * `min-width` / `min-height` + flex centering so the visual chrome
+ * doesn't bloat. Disabled state (top row's `▲`, bottom row's `▼`)
+ * dims the glyph and switches the cursor to `not-allowed`. Buttons
+ * have `background: transparent` to integrate visually with the rail
+ * row (no boxed chrome). */
+.rail-lane .r-move-up-btn,
+.rail-lane .r-move-down-btn {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-faded-2);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  /* WCAG 2.2 SC 2.5.8 hit-target floor — ≥24×24 CSS px. */
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+  user-select: none;
+}
+
+.rail-lane .r-move-up-btn:hover:not(:disabled),
+.rail-lane .r-move-down-btn:hover:not(:disabled) {
+  color: var(--er-ink);
+}
+
+.rail-lane .r-move-up-btn:focus-visible,
+.rail-lane .r-move-down-btn:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 1px;
+}
+
+.rail-lane .r-move-up-btn:disabled,
+.rail-lane .r-move-down-btn:disabled {
+  color: var(--er-faded);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Disabled state in hidden lanes — keep the disabled affordance
+ * legible even when the row is rendered in the dimmed
+ * `--er-faded` color. */
+.rail-lane[data-lane-visible="false"] .r-move-up-btn,
+.rail-lane[data-lane-visible="false"] .r-move-down-btn {
+  color: var(--er-faded);
+}
+
+/* AUDIT-20260528-04 sub-B (with F6 a11y fix): the rail eye glyph
+   swaps between two server-rendered siblings inside `.r-eye-btn`
+   based on the parent `[data-lane-visible]` attribute. The client
+   controller updates the attribute on visibility toggles; CSS picks
+   which sibling shows. Both siblings exist in the DOM at server
+   render so no client-side text mutation is required. */
+.r-eye-btn .r-eye-visible,
+.r-eye-btn .r-eye-hidden {
+  display: none;
+}
+
+.rail-lane[data-lane-visible="true"] .r-eye-btn .r-eye-visible {
+  display: inline;
+}
+
+.rail-lane[data-lane-visible="false"] .r-eye-btn .r-eye-hidden {
+  display: inline;
+}

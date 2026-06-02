@@ -27,7 +27,12 @@ export async function readJournalEvents(projectRoot: string, opts: ReadOptions =
     const parsed = JournalEventSchema.safeParse(json);
     if (!parsed.success) continue;
     const e = parsed.data;
-    if (opts.entryId && e.entryId !== opts.entryId) continue;
+    // Not every event variant carries `entryId` (the Phase 3
+    // `lane-migration` event is project-scoped). Filter only when the
+    // field is present on the variant.
+    if (opts.entryId) {
+      if (!('entryId' in e) || e.entryId !== opts.entryId) continue;
+    }
     if (opts.stage && 'stage' in e && e.stage !== opts.stage) continue;
     if (opts.kinds && !opts.kinds.includes(e.kind)) continue;
     events.push(e);

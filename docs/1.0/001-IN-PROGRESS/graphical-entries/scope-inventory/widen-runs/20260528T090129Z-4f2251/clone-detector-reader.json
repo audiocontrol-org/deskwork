@@ -1,0 +1,1009 @@
+{
+  "agent": "clone-detector-reader",
+  "featureSlug": "graphical-entries",
+  "baselinePath": ".dw-lifecycle/scope-discovery/clones.yaml",
+  "filterApplied": "none",
+  "modulesInScope": [
+    "."
+  ],
+  "clones": [
+    {
+      "id": "014b49040fe1",
+      "members": [
+        "packages/cli/src/commands/add.ts:45:57",
+        "packages/cli/src/commands/ingest.ts:104:115"
+      ],
+      "lines": 13,
+      "disposition": "pending"
+    },
+    {
+      "id": "0fc38332b5ee",
+      "members": [
+        "packages/cli/src/commands/approve.ts:110:121",
+        "packages/cli/src/commands/block.ts:52:63",
+        "packages/cli/src/commands/induct.ts:78:67"
+      ],
+      "lines": 12,
+      "disposition": "pending"
+    },
+    {
+      "id": "09fe516bb060",
+      "members": [
+        "packages/cli/src/commands/approve.ts:121:132",
+        "packages/cli/src/commands/publish.ts:111:122"
+      ],
+      "lines": 12,
+      "disposition": "pending"
+    },
+    {
+      "id": "62a9f3c52a49",
+      "members": [
+        "packages/cli/src/commands/approve.ts:141:157",
+        "packages/cli/src/commands/approve.ts:93:80"
+      ],
+      "lines": 17,
+      "disposition": "pending"
+    },
+    {
+      "id": "fed80612d9af",
+      "members": [
+        "packages/cli/src/commands/approve.ts:259:269",
+        "packages/studio/src/pages/shortform-review.ts:62:72"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "1d80654deb70",
+      "members": [
+        "packages/cli/src/commands/approve.ts:46:60",
+        "packages/cli/src/commands/cancel.ts:26:40",
+        "packages/cli/src/commands/publish.ts:51:65"
+      ],
+      "lines": 15,
+      "disposition": "pending"
+    },
+    {
+      "id": "24450692261b",
+      "members": [
+        "packages/cli/src/commands/approve.ts:97:107",
+        "packages/cli/src/commands/induct.ts:68:78"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "389500784322",
+      "members": [
+        "packages/cli/src/commands/block.ts:17:35",
+        "packages/cli/src/commands/cancel.ts:22:65"
+      ],
+      "lines": 19,
+      "disposition": "pending"
+    },
+    {
+      "id": "5fcc7d54ef8a",
+      "members": [
+        "packages/cli/src/commands/block.ts:35:51",
+        "packages/cli/src/commands/cancel.ts:40:78"
+      ],
+      "lines": 17,
+      "disposition": "pending"
+    },
+    {
+      "id": "b3ca8b5bdedf",
+      "members": [
+        "packages/cli/src/commands/block.ts:63:79",
+        "packages/cli/src/commands/cancel.ts:67:152"
+      ],
+      "lines": 17,
+      "disposition": "pending"
+    },
+    {
+      "id": "6e51c9681a1d",
+      "members": [
+        "packages/cli/src/commands/cancel.ts:41:65",
+        "packages/cli/src/commands/induct.ts:63:87"
+      ],
+      "lines": 25,
+      "disposition": "pending"
+    },
+    {
+      "id": "7826110a84e7",
+      "members": [
+        "packages/cli/src/commands/cancel.ts:68:83",
+        "packages/cli/src/commands/induct.ts:137:152"
+      ],
+      "lines": 16,
+      "disposition": "pending"
+    },
+    {
+      "id": "4b85626d608b",
+      "members": [
+        "packages/cli/src/commands/distribute.ts:59:84",
+        "packages/cli/src/commands/shortform-start.ts:55:80"
+      ],
+      "lines": 26,
+      "disposition": "pending"
+    },
+    {
+      "id": "76c90b0fef13",
+      "members": [
+        "packages/cli/src/commands/distribute.ts:95:111",
+        "packages/cli/src/commands/shortform-start.ts:81:97"
+      ],
+      "lines": 17,
+      "disposition": "pending"
+    },
+    {
+      "id": "89f8a99f8ce2",
+      "members": [
+        "packages/cli/src/commands/induct.ts:138:150",
+        "packages/cli/src/commands/publish.ts:110:122"
+      ],
+      "lines": 13,
+      "disposition": "pending"
+    },
+    {
+      "id": "99536ef5fb66",
+      "members": [
+        "packages/cli/src/commands/induct.ts:47:62",
+        "packages/cli/src/commands/iterate.ts:74:65"
+      ],
+      "lines": 16,
+      "disposition": "pending"
+    },
+    {
+      "id": "039be133bac2",
+      "members": [
+        "packages/cli/src/commands/iterate.ts:77:89",
+        "packages/cli/src/commands/publish.ts:53:65"
+      ],
+      "lines": 13,
+      "disposition": "pending"
+    },
+    {
+      "id": "44c103564dce",
+      "members": [
+        "packages/core/src/calendar-mutations.ts:136:144",
+        "packages/core/src/calendar-mutations.ts:186:194",
+        "packages/core/src/calendar-mutations.ts:212:220"
+      ],
+      "lines": 9,
+      "disposition": "pending"
+    },
+    {
+      "id": "c6f1287504cf",
+      "members": [
+        "packages/core/src/calendar.ts:167:176",
+        "packages/core/src/calendar.ts:92:101"
+      ],
+      "lines": 10,
+      "disposition": "pending"
+    },
+    {
+      "id": "800396267262",
+      "members": [
+        "packages/core/src/content-index.ts:120:147",
+        "packages/core/src/doctor/rules/missing-frontmatter-id.ts:62:94"
+      ],
+      "lines": 28,
+      "disposition": "pending"
+    },
+    {
+      "id": "d90106a0fd59",
+      "members": [
+        "packages/core/src/doctor/repair.ts:23:45",
+        "packages/core/src/doctor/validate.ts:172:204"
+      ],
+      "lines": 23,
+      "disposition": "keep-with-reason"
+    },
+    {
+      "id": "2b7d648d9381",
+      "members": [
+        "packages/core/src/doctor/rules/calendar-uuid-missing.ts:155:168",
+        "packages/core/src/doctor/rules/missing-frontmatter-id.ts:282:295",
+        "packages/core/src/doctor/rules/orphan-frontmatter-id.ts:160:173",
+        "packages/core/src/doctor/rules/workflow-stale.ts:103:116"
+      ],
+      "lines": 14,
+      "disposition": "pending"
+    },
+    {
+      "id": "6ce82987b6bb",
+      "members": [
+        "packages/core/src/doctor/rules/duplicate-id.ts:114:128",
+        "packages/core/src/doctor/rules/missing-frontmatter-id.ts:281:116"
+      ],
+      "lines": 15,
+      "disposition": "pending"
+    },
+    {
+      "id": "2d803bd758f4",
+      "members": [
+        "packages/core/src/doctor/rules/duplicate-id.ts:34:49",
+        "packages/core/src/doctor/rules/orphan-frontmatter-id.ts:96:111"
+      ],
+      "lines": 16,
+      "disposition": "pending"
+    },
+    {
+      "id": "2ccdcd76762f",
+      "members": [
+        "packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:208:222",
+        "packages/core/src/doctor/rules/workflow-stale.ts:103:116"
+      ],
+      "lines": 15,
+      "disposition": "pending"
+    },
+    {
+      "id": "bf1260ae927f",
+      "members": [
+        "packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:97:104",
+        "packages/core/src/entry/snapshot.ts:63:80"
+      ],
+      "lines": 18,
+      "disposition": "pending"
+    },
+    {
+      "id": "18718b4e0ad7",
+      "members": [
+        "packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:218:233",
+        "packages/core/src/doctor/rules/workflow-stale.ts:103:296"
+      ],
+      "lines": 16,
+      "disposition": "pending"
+    },
+    {
+      "id": "98a17ac7f3a7",
+      "members": [
+        "packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:64:89",
+        "packages/core/src/doctor/rules/missing-frontmatter-id.ts:59:84"
+      ],
+      "lines": 26,
+      "disposition": "pending"
+    },
+    {
+      "id": "8b1f12469501",
+      "members": [
+        "packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:89:101",
+        "packages/core/src/doctor/rules/missing-frontmatter-id.ts:84:96"
+      ],
+      "lines": 13,
+      "disposition": "pending"
+    },
+    {
+      "id": "189be54baaa8",
+      "members": [
+        "packages/core/src/doctor/runner.ts:180:188",
+        "packages/core/src/doctor/runner.ts:207:215"
+      ],
+      "lines": 9,
+      "disposition": "pending"
+    },
+    {
+      "id": "41b3f9fce647",
+      "members": [
+        "packages/core/src/doctor/validate.ts:147:154",
+        "packages/core/src/doctor/validate.ts:43:50"
+      ],
+      "lines": 8,
+      "disposition": "pending"
+    },
+    {
+      "id": "5c72154b2f6d",
+      "members": [
+        "packages/core/src/entry/annotations.ts:327:335",
+        "packages/core/src/review/pipeline.ts:358:366"
+      ],
+      "lines": 9,
+      "disposition": "pending"
+    },
+    {
+      "id": "fe9d16f3c59f",
+      "members": [
+        "packages/core/src/entry/approve.ts:1:11",
+        "packages/core/src/entry/induct.ts:1:11"
+      ],
+      "lines": 11,
+      "disposition": "ignore-with-justification"
+    },
+    {
+      "id": "f176f885355a",
+      "members": [
+        "packages/core/src/entry/block.ts:1:13",
+        "packages/core/src/entry/cancel.ts:1:13"
+      ],
+      "lines": 13,
+      "disposition": "pending"
+    },
+    {
+      "id": "3e94d4b73301",
+      "members": [
+        "packages/core/src/journal/read.ts:12:22",
+        "packages/core/src/sidecar/read-all.ts:19:29"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "c20b4e4f0469",
+      "members": [
+        "packages/core/src/lanes/loader.ts:59:67",
+        "packages/core/src/pipelines/loader.ts:72:80"
+      ],
+      "lines": 9,
+      "disposition": "keep-with-reason"
+    },
+    {
+      "id": "b223f2def90d",
+      "members": [
+        "packages/core/src/lanes/loader.ts:69:75",
+        "packages/core/src/pipelines/loader.ts:82:88"
+      ],
+      "lines": 7,
+      "disposition": "keep-with-reason"
+    },
+    {
+      "id": "68e3966349bd",
+      "members": [
+        "packages/core/src/review/start-handlers.ts:145:155",
+        "packages/core/src/review/start-handlers.ts:54:65"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "1884e3dfff81",
+      "members": [
+        "packages/core/src/review/start-handlers.ts:162:168",
+        "packages/core/src/review/start-handlers.ts:65:71"
+      ],
+      "lines": 7,
+      "disposition": "pending"
+    },
+    {
+      "id": "0b03898d0cc8",
+      "members": [
+        "packages/core/src/review/start-handlers.ts:232:239",
+        "packages/core/src/review/start-handlers.ts:83:90"
+      ],
+      "lines": 8,
+      "disposition": "pending"
+    },
+    {
+      "id": "0e85f4a2e968",
+      "members": [
+        "packages/core/src/review/start-handlers.ts:241:250",
+        "packages/core/src/review/start-handlers.ts:90:99"
+      ],
+      "lines": 10,
+      "disposition": "pending"
+    },
+    {
+      "id": "b59c3f6b4e1b",
+      "members": [
+        "packages/core/src/review/workflow-paths.ts:138:150",
+        "packages/core/src/review/workflow-paths.ts:97:109"
+      ],
+      "lines": 13,
+      "disposition": "pending"
+    },
+    {
+      "id": "13e80bf116fb",
+      "members": [
+        "packages/core/src/scrapbook/crud-at-dir.ts:135:148",
+        "packages/core/src/scrapbook/crud-slug.ts:136:149"
+      ],
+      "lines": 14,
+      "disposition": "pending"
+    },
+    {
+      "id": "9b6869f81d47",
+      "members": [
+        "packages/core/src/scrapbook/crud-at-dir.ts:48:66",
+        "packages/core/src/scrapbook/crud-slug.ts:49:64"
+      ],
+      "lines": 19,
+      "disposition": "pending"
+    },
+    {
+      "id": "8cc59074b6bc",
+      "members": [
+        "packages/core/src/scrapbook/crud-at-dir.ts:73:88",
+        "packages/core/src/scrapbook/crud-slug.ts:74:86"
+      ],
+      "lines": 16,
+      "disposition": "pending"
+    },
+    {
+      "id": "e6d4559e9afb",
+      "members": [
+        "packages/core/src/scrapbook/crud-at-dir.ts:96:114",
+        "packages/core/src/scrapbook/crud-slug.ts:97:112"
+      ],
+      "lines": 19,
+      "disposition": "pending"
+    },
+    {
+      "id": "8d860c7659d4",
+      "members": [
+        "packages/core/src/scrapbook/format.ts:13:19",
+        "packages/studio/src/pages/dashboard/shortform-section.ts:105:111"
+      ],
+      "lines": 7,
+      "disposition": "pending"
+    },
+    {
+      "id": "e7ea786add0a",
+      "members": [
+        "packages/core/src/sidecar/read-all.ts:34:44",
+        "packages/core/src/sidecar/read.ts:17:27"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "9dddadfc374d",
+      "members": [
+        "packages/studio/src/pages/content-detail.ts:149:160",
+        "packages/studio/src/pages/review-scrapbook-drawer.ts:71:82"
+      ],
+      "lines": 12,
+      "disposition": "pending"
+    },
+    {
+      "id": "21b4988332de",
+      "members": [
+        "packages/studio/src/pages/content-detail.ts:277:282",
+        "packages/studio/src/pages/content.ts:347:352"
+      ],
+      "lines": 6,
+      "disposition": "pending"
+    },
+    {
+      "id": "a1cac4b2512f",
+      "members": [
+        "packages/studio/src/pages/dashboard/shortform-section.ts:100:119",
+        "packages/studio/src/pages/shortform.ts:55:69"
+      ],
+      "lines": 15,
+      "disposition": "pending"
+    },
+    {
+      "id": "feecb3d2c71e",
+      "members": [
+        "packages/studio/src/pages/dashboard/swimlane-shell.ts:67:74",
+        "plugins/deskwork-studio/public/src/dashboard/swimlane.ts:106:113"
+      ],
+      "lines": 8,
+      "disposition": "keep-with-reason"
+    },
+    {
+      "id": "6a86f85c95cd",
+      "members": [
+        "packages/studio/src/pages/entry-review/index.ts:108:121",
+        "packages/studio/src/pages/shortform-review.ts:92:105"
+      ],
+      "lines": 14,
+      "disposition": "pending"
+    },
+    {
+      "id": "ddade15dffd2",
+      "members": [
+        "packages/studio/src/routes/api.ts:259:270",
+        "packages/studio/src/routes/api.ts:314:325"
+      ],
+      "lines": 12,
+      "disposition": "pending"
+    },
+    {
+      "id": "b50718db746d",
+      "members": [
+        "packages/studio/src/routes/api.ts:261:326",
+        "packages/studio/src/routes/api.ts:354:364"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "918b3c68f28e",
+      "members": [
+        "packages/studio/src/routes/api.ts:277:285",
+        "packages/studio/src/routes/api.ts:338:346"
+      ],
+      "lines": 9,
+      "disposition": "pending"
+    },
+    {
+      "id": "a858e789a3a1",
+      "members": [
+        "packages/studio/src/routes/api.ts:299:308",
+        "packages/studio/src/routes/api.ts:347:356"
+      ],
+      "lines": 10,
+      "disposition": "pending"
+    },
+    {
+      "id": "29e3abdb5a22",
+      "members": [
+        "packages/studio/src/routes/api.ts:332:285",
+        "packages/studio/src/routes/api.ts:366:380"
+      ],
+      "lines": 15,
+      "disposition": "pending"
+    },
+    {
+      "id": "87cabafecb0f",
+      "members": [
+        "packages/studio/src/routes/api.ts:354:270",
+        "packages/studio/src/routes/api.ts:416:425"
+      ],
+      "lines": 10,
+      "disposition": "pending"
+    },
+    {
+      "id": "3dac81177cbc",
+      "members": [
+        "packages/studio/src/routes/scrapbook-mutation-envelope.ts:152:159",
+        "packages/studio/src/routes/scrapbook-mutation-envelope.ts:98:105"
+      ],
+      "lines": 8,
+      "disposition": "pending"
+    },
+    {
+      "id": "62ed761d29fe",
+      "members": [
+        "packages/studio/src/routes/scrapbook-mutations.ts:127:133",
+        "packages/studio/src/routes/scrapbook-mutations.ts:167:173"
+      ],
+      "lines": 7,
+      "disposition": "pending"
+    },
+    {
+      "id": "88f659a4ab82",
+      "members": [
+        "packages/studio/src/routes/scrapbook-mutations.ts:127:134",
+        "packages/studio/src/routes/scrapbook-mutations.ts:232:239",
+        "packages/studio/src/routes/scrapbook-mutations.ts:256:263"
+      ],
+      "lines": 8,
+      "disposition": "pending"
+    },
+    {
+      "id": "dca3cfdbfe1a",
+      "members": [
+        "packages/studio/src/routes/scrapbook-mutations.ts:134:144",
+        "packages/studio/src/routes/scrapbook-mutations.ts:263:273"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "31ee5b67f429",
+      "members": [
+        "packages/studio/src/routes/scrapbook-mutations.ts:144:152",
+        "packages/studio/src/routes/scrapbook-mutations.ts:273:281",
+        "packages/studio/src/routes/scrapbook-mutations.ts:310:318"
+      ],
+      "lines": 9,
+      "disposition": "pending"
+    },
+    {
+      "id": "127f4fb6c1ef",
+      "members": [
+        "packages/studio/src/routes/scrapbook-mutations.ts:145:152",
+        "packages/studio/src/routes/scrapbook-mutations.ts:221:228"
+      ],
+      "lines": 8,
+      "disposition": "pending"
+    },
+    {
+      "id": "d6093f110268",
+      "members": [
+        "packages/studio/src/server.ts:386:395",
+        "packages/studio/src/server.ts:395:404"
+      ],
+      "lines": 10,
+      "disposition": "pending"
+    },
+    {
+      "id": "14579dae3bdf",
+      "members": [
+        "plugins/deskwork-studio/public/src/editorial-studio-client.ts:107:119",
+        "plugins/deskwork-studio/public/src/editorial-studio-client.ts:139:158"
+      ],
+      "lines": 20,
+      "disposition": "pending"
+    },
+    {
+      "id": "8a46fe453209",
+      "members": [
+        "plugins/deskwork-studio/public/src/editorial-studio-client.ts:108:119",
+        "plugins/deskwork-studio/public/src/editorial-studio-client.ts:472:488"
+      ],
+      "lines": 17,
+      "disposition": "pending"
+    },
+    {
+      "id": "82d6dc44c67e",
+      "members": [
+        "plugins/deskwork-studio/public/src/editorial-studio-client.ts:109:119",
+        "plugins/deskwork-studio/public/src/editorial-studio-client.ts:193:203"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "f0e04e87d0e2",
+      "members": [
+        "plugins/deskwork-studio/public/src/editorial-studio-client.ts:160:166",
+        "plugins/deskwork-studio/public/src/editorial-studio-client.ts:81:87"
+      ],
+      "lines": 7,
+      "disposition": "pending"
+    },
+    {
+      "id": "7c1800068cfe",
+      "members": [
+        "plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:116:129",
+        "plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:146:159",
+        "plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:97:110"
+      ],
+      "lines": 14,
+      "disposition": "pending"
+    },
+    {
+      "id": "4e82052075a8",
+      "members": [
+        "plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:141:146",
+        "plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:92:97"
+      ],
+      "lines": 6,
+      "disposition": "pending"
+    },
+    {
+      "id": "02612a02fc99",
+      "members": [
+        "plugins/deskwork-studio/public/src/lightbox.ts:191:197",
+        "plugins/deskwork-studio/public/src/scrapbook-mutations.ts:130:136"
+      ],
+      "lines": 7,
+      "disposition": "pending"
+    },
+    {
+      "id": "2b94a9cef4a7",
+      "members": [
+        "plugins/dw-lifecycle/src/__tests__/scope-discovery/adopter-manifests.fixtures.ts:34:46",
+        "plugins/dw-lifecycle/src/__tests__/scope-discovery/editor-symmetry.fixtures.ts:26:38"
+      ],
+      "lines": 13,
+      "disposition": "pending"
+    },
+    {
+      "id": "a5072ecd4210",
+      "members": [
+        "plugins/dw-lifecycle/src/__tests__/scope-discovery/adopter-manifests.fixtures.ts:70:83",
+        "plugins/dw-lifecycle/src/__tests__/scope-discovery/editor-symmetry.fixtures.ts:61:74"
+      ],
+      "lines": 14,
+      "disposition": "pending"
+    },
+    {
+      "id": "2ec90a708a85",
+      "members": [
+        "plugins/dw-lifecycle/src/__tests__/scope-discovery/adopter-manifests.fixtures.ts:85:104",
+        "plugins/dw-lifecycle/src/__tests__/scope-discovery/editor-symmetry.fixtures.ts:76:91"
+      ],
+      "lines": 20,
+      "disposition": "pending"
+    },
+    {
+      "id": "86f6261378ca",
+      "members": [
+        "plugins/dw-lifecycle/src/__tests__/scope-discovery/util/anti-patterns-harness.ts:14:24",
+        "plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:19:33"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "1801f1b7dd0b",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/batch-dispose.ts:109:116",
+        "plugins/dw-lifecycle/src/scope-discovery/summary.ts:194:201"
+      ],
+      "lines": 8,
+      "disposition": "pending"
+    },
+    {
+      "id": "f768a3b61874",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:277:293",
+        "plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts:269:285"
+      ],
+      "lines": 17,
+      "disposition": "pending"
+    },
+    {
+      "id": "478402618ea8",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:313:318",
+        "plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:362:367"
+      ],
+      "lines": 6,
+      "disposition": "pending"
+    },
+    {
+      "id": "2093cce5bb15",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:322:336",
+        "plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:339:205"
+      ],
+      "lines": 15,
+      "disposition": "pending"
+    },
+    {
+      "id": "b7ac4eca4f52",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:53:77",
+        "plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:58:83"
+      ],
+      "lines": 25,
+      "disposition": "pending"
+    },
+    {
+      "id": "27201dd80c71",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:87:136",
+        "plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:93:142"
+      ],
+      "lines": 50,
+      "disposition": "pending"
+    },
+    {
+      "id": "80a2dc36a69c",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:100:118",
+        "plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:65:83"
+      ],
+      "lines": 19,
+      "disposition": "pending"
+    },
+    {
+      "id": "b7568545fc19",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:125:136",
+        "plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:101:115"
+      ],
+      "lines": 12,
+      "disposition": "pending"
+    },
+    {
+      "id": "ab41f04d27a1",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:377:388",
+        "plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:342:205"
+      ],
+      "lines": 12,
+      "disposition": "pending"
+    },
+    {
+      "id": "2150135e911f",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:72:89",
+        "plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:86:103"
+      ],
+      "lines": 18,
+      "disposition": "pending"
+    },
+    {
+      "id": "94f54b37e331",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:90:101",
+        "plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:116:127"
+      ],
+      "lines": 12,
+      "disposition": "pending"
+    },
+    {
+      "id": "f34c45cd009d",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-disposition-survivor.ts:348:363",
+        "plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:191:205"
+      ],
+      "lines": 16,
+      "disposition": "pending"
+    },
+    {
+      "id": "3d67e7c57a62",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:191:202",
+        "plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:339:350"
+      ],
+      "lines": 12,
+      "disposition": "pending"
+    },
+    {
+      "id": "70f04e0cb6d3",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:200:206",
+        "plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:138:148"
+      ],
+      "lines": 7,
+      "disposition": "pending"
+    },
+    {
+      "id": "d92bfb30bb82",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:247:264",
+        "plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:181:200"
+      ],
+      "lines": 18,
+      "disposition": "pending"
+    },
+    {
+      "id": "0d9958faaf8f",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:269:275",
+        "plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:234:240"
+      ],
+      "lines": 7,
+      "disposition": "pending"
+    },
+    {
+      "id": "7a91b6f37fe8",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:131:154",
+        "plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:206:229"
+      ],
+      "lines": 24,
+      "disposition": "pending"
+    },
+    {
+      "id": "13667b2519b0",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/doctor-rules/agent-prompt-mirror-drift.ts:106:115",
+        "plugins/dw-lifecycle/src/scope-discovery/doctor-rules/scope-discovery-schema-stale.ts:72:81"
+      ],
+      "lines": 10,
+      "disposition": "pending"
+    },
+    {
+      "id": "029d1d9f0044",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/doctor-rules/anti-patterns-yaml-schema-violation.ts:24:33",
+        "plugins/dw-lifecycle/src/scope-discovery/doctor-rules/clones-yaml-schema-violation.ts:35:44"
+      ],
+      "lines": 10,
+      "disposition": "pending"
+    },
+    {
+      "id": "b5fbb3493d82",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/doctor-rules/clones-yaml-refactor-incomplete.ts:146:159",
+        "plugins/dw-lifecycle/src/scope-discovery/doctor-rules/clones-yaml-schema-violation.ts:44:56"
+      ],
+      "lines": 14,
+      "disposition": "pending"
+    },
+    {
+      "id": "b55096bc507f",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:118:134",
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:150:166"
+      ],
+      "lines": 17,
+      "disposition": "pending"
+    },
+    {
+      "id": "ced608f5be46",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:132:149",
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:167:184"
+      ],
+      "lines": 18,
+      "disposition": "pending"
+    },
+    {
+      "id": "bc97e6ec2135",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:304:310",
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:235:241"
+      ],
+      "lines": 7,
+      "disposition": "pending"
+    },
+    {
+      "id": "3c6b6627d081",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:150:163",
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:147:112"
+      ],
+      "lines": 14,
+      "disposition": "pending"
+    },
+    {
+      "id": "92d75db1cad2",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:169:184",
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:160:127"
+      ],
+      "lines": 16,
+      "disposition": "pending"
+    },
+    {
+      "id": "7698568d0d6c",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:323:331",
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:343:351"
+      ],
+      "lines": 9,
+      "disposition": "pending"
+    },
+    {
+      "id": "cd6cea43f755",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:461:469",
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:257:265"
+      ],
+      "lines": 9,
+      "disposition": "pending"
+    },
+    {
+      "id": "0fbb9fcd1915",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:148:160",
+        "plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:100:112"
+      ],
+      "lines": 13,
+      "disposition": "pending"
+    },
+    {
+      "id": "9746ccb605f4",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:161:175",
+        "plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:113:127"
+      ],
+      "lines": 15,
+      "disposition": "pending"
+    },
+    {
+      "id": "8c1a1eaa3a28",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:201:209",
+        "plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:216:224"
+      ],
+      "lines": 9,
+      "disposition": "pending"
+    },
+    {
+      "id": "653e6225d350",
+      "members": [
+        "plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:349:359",
+        "plugins/dw-lifecycle/src/scope-discovery/synthesis-cli.ts:146:156"
+      ],
+      "lines": 11,
+      "disposition": "pending"
+    },
+    {
+      "id": "0a9bedfbb1cf",
+      "members": [
+        "plugins/dw-lifecycle/src/subcommands/doctor.ts:109:115",
+        "plugins/dw-lifecycle/src/subcommands/doctor.ts:94:100"
+      ],
+      "lines": 7,
+      "disposition": "pending"
+    },
+    {
+      "id": "d7a6cf2d3473",
+      "members": [
+        "plugins/dw-lifecycle/src/subcommands/install-shortcuts.ts:407:416",
+        "plugins/dw-lifecycle/src/subcommands/uninstall-shortcuts.ts:276:285"
+      ],
+      "lines": 10,
+      "disposition": "pending"
+    }
+  ]
+}

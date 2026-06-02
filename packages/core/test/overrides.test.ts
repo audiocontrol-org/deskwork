@@ -58,11 +58,11 @@ describe('createOverrideResolver', () => {
   });
 
   it('returns the absolute path to a doctor override when present', () => {
-    const path = join(root, '.deskwork', 'doctor', 'missing-frontmatter-id.ts');
+    const path = join(root, '.deskwork', 'doctor', 'orphan-frontmatter-id.ts');
     mkdirSync(join(root, '.deskwork', 'doctor'), { recursive: true });
-    writeFileSync(path, 'export default { id: "missing-frontmatter-id" }');
+    writeFileSync(path, 'export default { id: "orphan-frontmatter-id" }');
     const resolver = createOverrideResolver(root);
-    expect(resolver.doctorRule('missing-frontmatter-id')).toBe(path);
+    expect(resolver.doctorRule('orphan-frontmatter-id')).toBe(path);
   });
 
   it('keeps category lookups independent — a templates override does not satisfy doctor or prompts', () => {

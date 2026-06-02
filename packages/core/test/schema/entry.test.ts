@@ -56,8 +56,15 @@ describe('EntrySchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('parses a valid Drafting entry with reviewState', () => {
-    const valid: Entry = {
+  it('silently drops a vestigial reviewState field on read (Commandment III back-compat)', () => {
+    // Per DESKWORK-STATE-MACHINE.md Commandment III, `reviewState` is
+    // retired from the Entry type. Legacy sidecars still on disk may
+    // carry a vestigial `reviewState` key; the schema's non-strict
+    // mode drops it silently on read, and the parsed Entry has no
+    // such field. The test uses a runtime-typed literal (rather than
+    // the `Entry` type) because TypeScript's type-system correctly
+    // forbids the extra key on the inferred type.
+    const legacy: Record<string, unknown> = {
       uuid: '550e8400-e29b-41d4-a716-446655440001',
       slug: 'my-second-article',
       title: 'My Second',
@@ -65,21 +72,85 @@ describe('EntrySchema', () => {
       source: 'manual',
       currentStage: 'Drafting',
       iterationByStage: { Ideas: 3, Planned: 2, Outlining: 4, Drafting: 7 },
-      reviewState: 'in-review',
+      reviewState: 'in-review', // vestigial — schema drops this
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T11:00:00.000Z',
     };
-    expect(EntrySchema.safeParse(valid).success).toBe(true);
+    const result = EntrySchema.safeParse(legacy);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // The parsed object must NOT carry `reviewState` — Commandment III
+      // requires the field be invisible to consumers post-parse.
+      expect('reviewState' in result.data).toBe(false);
+    }
   });
 
-  it('rejects an entry with unknown stage', () => {
+  it('accepts an entry whose stage is not in the legacy editorial enum (Phase 3 graphical-entries)', () => {
+    // Per Phase 3 Task 3.2.2 the schema's `currentStage` accepts any
+    // non-empty string; runtime validation against the lane's pipeline
+    // template happens outside the schema. A stage value like
+    // `'Reviewing'` (legitimate in a custom template) must parse.
+    const customStage = {
+      uuid: '550e8400-e29b-41d4-a716-446655440002',
+      slug: 'x',
+      title: 'X',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Reviewing',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(customStage).success).toBe(true);
+  });
+
+  it('rejects an entry with an empty-string stage', () => {
     const invalid = {
       uuid: '550e8400-e29b-41d4-a716-446655440002',
       slug: 'x',
       title: 'X',
       keywords: [],
       source: 'manual',
-      currentStage: 'Reviewing',  // not a real stage
+      currentStage: '',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  /**
+   * AUDIT-20260530-11 regression: `StageStringSchema = z.string().min(1)`
+   * accepted whitespace-only stage values because `min(1)` measures
+   * string length, not trimmed length. Sibling validations like
+   * `LANE_ID_REGEX` already reject whitespace; the stage-string path
+   * accepted it. A whitespace stage silently fails every editorial-
+   * default helper that compares against canonical stage names. The
+   * fix uses `.trim().min(1)` to reject after-trim whitespace.
+   */
+  it('rejects an entry with a whitespace-only stage (AUDIT-20260530-11)', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440002',
+      slug: 'x',
+      title: 'X',
+      keywords: [],
+      source: 'manual',
+      currentStage: '   ',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects an entry with a tab/newline-only stage (AUDIT-20260530-11)', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440002',
+      slug: 'x',
+      title: 'X',
+      keywords: [],
+      source: 'manual',
+      currentStage: '\t\n ',
       iterationByStage: {},
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T10:00:00.000Z',
@@ -167,5 +238,275 @@ describe('EntrySchema', () => {
       updatedAt: '2026-04-30T10:00:00.000Z',
     };
     expect(EntrySchema.safeParse(valid).success).toBe(true);
+  });
+
+  // Phase 7 Task 7.1 — members[] schema delta. Per the workplan:
+  //   - 7.1.1: extend EntrySidecar with `members?: string[]` (array of
+  //     member entry UUIDs).
+  //   - 7.1.2: invariant — entries with non-empty `members[]` are
+  //     groups; absent or empty means a regular entry. No separate
+  //     "group" entity; same schema, same code paths.
+  //   - 7.1.3: group entries can optionally carry `artifactPath`
+  //     (content body present) or omit it (metadata-only group). Both
+  //     shapes must parse.
+
+  it('accepts an entry without a members field (regular entry; backward-compat)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440020',
+      slug: 'regular',
+      title: 'Regular Entry',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.members).toBeUndefined();
+    }
+  });
+
+  it('accepts a group entry with non-empty members[] (Step 7.1.1)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440021',
+      slug: 'visual-redesign-group',
+      title: 'Visual Redesign Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      members: [
+        '550e8400-e29b-41d4-a716-446655440100',
+        '550e8400-e29b-41d4-a716-446655440101',
+      ],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.members).toEqual([
+        '550e8400-e29b-41d4-a716-446655440100',
+        '550e8400-e29b-41d4-a716-446655440101',
+      ]);
+    }
+  });
+
+  it('accepts a group entry with empty members[] (semantically equivalent to no members)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440022',
+      slug: 'empty-group',
+      title: 'Empty Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: [],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.members).toEqual([]);
+    }
+  });
+
+  it('accepts a group entry with artifactPath (Step 7.1.3 — group has content body)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440023',
+      slug: 'manifesto-group',
+      title: 'Manifesto Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      members: ['550e8400-e29b-41d4-a716-446655440102'],
+      artifactPath: 'docs/manifesto.md',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.artifactPath).toBe('docs/manifesto.md');
+      expect(result.data.members).toEqual(['550e8400-e29b-41d4-a716-446655440102']);
+    }
+  });
+
+  it('accepts a group entry without artifactPath (Step 7.1.3 — metadata-only group)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440024',
+      slug: 'metadata-only-group',
+      title: 'Metadata-Only Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: ['550e8400-e29b-41d4-a716-446655440103'],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.artifactPath).toBeUndefined();
+      expect(result.data.members).toHaveLength(1);
+    }
+  });
+
+  it('rejects members[] entries that are not UUIDs (first element invalid)', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440025',
+      slug: 'bad-member-id',
+      title: 'Bad Member ID',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: ['not-a-uuid', '550e8400-e29b-41d4-a716-446655440104'],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects members[] entries that are not UUIDs (last element invalid)', () => {
+    // Sibling of the prior test; proves the validator walks every
+    // element rather than short-circuiting on the first. Caught as a
+    // coverage gap in the Track 3 code-quality review of e47ed3e —
+    // see audit-log AUDIT-20260529-14.
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440027',
+      slug: 'bad-last-member-id',
+      title: 'Bad Last Member ID',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: ['550e8400-e29b-41d4-a716-446655440106', 'not-a-uuid'],
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects members when it is not an array', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440026',
+      slug: 'members-wrong-type',
+      title: 'Members Wrong Type',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Ideas',
+      iterationByStage: {},
+      members: '550e8400-e29b-41d4-a716-446655440105',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  // Phase 7 Task 7.2 — archivedAt schema delta. Mirrors the lane-level
+  // archivedAt shape: optional ISO datetime that doubles as the
+  // boolean signal (presence → archived) and the audit trail.
+
+  it('accepts an entry without archivedAt (active entry; backward-compat)', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440030',
+      slug: 'active',
+      title: 'Active Entry',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.archivedAt).toBeUndefined();
+    }
+  });
+
+  it('accepts an entry with archivedAt set to an ISO datetime', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440031',
+      slug: 'archived-group',
+      title: 'Archived Group',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      members: ['550e8400-e29b-41d4-a716-446655440110'],
+      archivedAt: '2026-05-29T12:34:56.789Z',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-05-29T12:34:56.789Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.archivedAt).toBe('2026-05-29T12:34:56.789Z');
+    }
+  });
+
+  it('accepts archivedAt on a non-group entry (forward-compat across entry shapes)', () => {
+    // Per the Task 7.2 schema delta doc-comment: archivedAt is
+    // forward-compat — settable on regular entries too, not just
+    // groups. Tests the field is independent of members[].
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440032',
+      slug: 'archived-regular',
+      title: 'Archived Regular Entry',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      archivedAt: '2026-05-29T12:34:56.789Z',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-05-29T12:34:56.789Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.archivedAt).toBe('2026-05-29T12:34:56.789Z');
+      expect(result.data.members).toBeUndefined();
+    }
+  });
+
+  it('rejects archivedAt that is not a datetime string', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440033',
+      slug: 'bad-archive',
+      title: 'Bad Archive',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      archivedAt: 'yesterday',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects archivedAt when it is not a string', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440034',
+      slug: 'archive-wrong-type',
+      title: 'Archive Wrong Type',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      archivedAt: 17_000_000_000,
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
   });
 });

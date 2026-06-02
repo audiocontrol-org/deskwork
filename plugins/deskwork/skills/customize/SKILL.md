@@ -1,6 +1,6 @@
 ---
 name: customize
-description: Copy a deskwork plugin default (a studio template page renderer or a doctor rule) into the project's .deskwork/<category>/<name>.ts so the operator can edit it. The plugin loads the override automatically — no fork required. Categories are templates and doctor; prompts is reserved for future use.
+description: Copy a deskwork plugin default (a studio template page renderer, a doctor rule, or a pipeline-template preset) into the project's .deskwork/<category>/<name>.<ext> so the operator can edit it. The plugin loads the override automatically — no fork required. Categories are templates, doctor, and pipeline; prompts is reserved for future use.
 ---
 
 ## Customize — drop-in overrides for studio templates and doctor rules
@@ -11,11 +11,12 @@ This is the customization layer for studio templates and doctor rules. Operators
 
 ### Categories
 
-| Category | What it overrides | Where the default lives |
-|---|---|---|
-| `templates` | A studio page renderer (dashboard, content tree, scrapbook, review surface, manual) | `packages/studio/src/pages/<name>.ts` |
-| `doctor` | A doctor rule (audit + plan + apply) | `packages/core/src/doctor/rules/<name>.ts` |
-| `prompts` | Reserved for future use — no defaults to copy yet | n/a |
+| Category | What it overrides | Where the default lives | Project copy lands at |
+|---|---|---|---|
+| `templates` | A studio page renderer (dashboard, content tree, scrapbook, review surface, manual) | `packages/studio/src/pages/<name>.ts` | `.deskwork/templates/<name>.ts` |
+| `doctor` | A doctor rule (audit + plan + apply) | `packages/core/src/doctor/rules/<name>.ts` | `.deskwork/doctor/<name>.ts` |
+| `pipeline` | A pipeline-template preset (Phase 6 Task 6.2) | `packages/core/src/pipelines/<name>.json` | `.deskwork/pipelines/<name>.json` |
+| `prompts` | Reserved for future use — no defaults to copy yet | n/a | n/a |
 
 In scope today: dashboard, content (top-level and project drilldown), scrapbook, review, manual (help). Not yet wired: shortform desk, scrapbook viewer's secret subpage, error pages.
 
@@ -25,6 +26,7 @@ Ask the operator which category they want to customize.
 
 - `templates` — modify a studio page's rendered HTML (e.g., re-skin the dashboard, hide a section, add a banner).
 - `doctor` — modify or replace a binding-validation rule (e.g., a stricter check for a project-specific frontmatter field, or a custom report).
+- `pipeline` — clone a pipeline preset (`editorial`, `blog-post`, `feature-doc`, `qa-plan`, `visual`) into the project as a starting point for a tailored template. After the copy, edit the JSON directly or mutate via `deskwork pipeline update <name>` (see `/deskwork:pipeline`).
 - `prompts` — not available yet. If the operator asks for `prompts`, surface that the category is reserved and there's no default source to copy.
 
 ### Step 2 — pick a name
@@ -32,7 +34,8 @@ Ask the operator which category they want to customize.
 The `name` is the file basename WITHOUT the `.ts` extension. Common picks:
 
 - Templates: `dashboard`, `content`, `content-project`, `scrapbook`, `review`, `help`.
-- Doctor rules: `missing-frontmatter-id`, `orphan-frontmatter-id`, `duplicate-id`, `slug-collision`, `schema-rejected`, `workflow-stale`, `calendar-uuid-missing`, `legacy-top-level-id-migration`.
+- Doctor rules: `orphan-frontmatter-id`, `duplicate-id`, `slug-collision`, `schema-rejected`, `workflow-stale`, `calendar-uuid-missing`, `legacy-top-level-id-migration`, `legacy-stage-artifact-path`, `lane-config-missing-template`, `entry-lane-missing`, `entry-anchor-shape`, `entry-address-reason-missing`.
+- Pipeline presets: `editorial`, `blog-post`, `feature-doc`, `qa-plan`, `visual`.
 
 If the operator names something that doesn't exist as a built-in, the helper exits with an actionable error listing the available basenames. Re-prompt with one of the listed names.
 

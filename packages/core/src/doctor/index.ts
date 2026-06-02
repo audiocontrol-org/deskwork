@@ -30,3 +30,9 @@ export {
 } from './runner.ts';
 
 export { printSchemaPatchInstructions } from './schema-patch.ts';
+
+export {
+  migrateLaneMembership,
+  type LaneMigrationResult,
+  type LaneMigrationOptions,
+} from './lane-migration.ts';

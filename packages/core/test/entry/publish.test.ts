@@ -15,6 +15,14 @@ describe('publishEntry', () => {
   beforeEach(async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
     await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
+    await writeFile(
+      join(projectRoot, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: { main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' } },
+        defaultSite: 'main',
+      }),
+    );
   });
 
   afterEach(async () => {
@@ -90,7 +98,7 @@ describe('publishEntry', () => {
     await setupEntry({ currentStage: 'Published' });
     await expect(
       publishEntry(projectRoot, { uuid, requireArtifact: false }),
-    ).rejects.toThrow(/already Published/i);
+    ).rejects.toThrow(/already.*Published|terminal stage.*Published/i);
   });
 
   it('refuses Blocked / Cancelled (induct first)', async () => {

@@ -85,11 +85,19 @@ The helper appends a new revision (revision N+1) from disk and emits per-comment
 
 ```json
 {
-  "<commentId-1>": { "disposition": "addressed" },
+  "<commentId-1>": { "disposition": "addressed", "reason": "addressed by adding § X at line N" },
   "<commentId-2>": { "disposition": "deferred", "reason": "out of scope for this pass" },
   "<commentId-3>": { "disposition": "wontfix", "reason": "..." }
 }
 ```
+
+Per Phase 8 Step 8.1.2's schema tightening, the `reason` field is **required** for every `addressed` disposition. State the constraint plainly:
+
+- `addressed` — MUST carry a non-empty `reason` string. The reason is the agent's record of what the iteration did to satisfy the operator's margin note (e.g. *"addressed by adding § Migration Notes at line 142"*, *"addressed by rewriting the opening paragraph in active voice"*). The studio renders this reason next to the "addressed in v_N_" stamp so the operator can verify the disposition without re-reading the whole revision.
+- `deferred` — `reason` is OPTIONAL. Supply one when the deferral has substance (*"out of scope for this pass — filed as #NNN"*); omit it when the disposition is self-evident.
+- `wontfix` — `reason` is OPTIONAL but strongly recommended. A `wontfix` without a reason reads as dismissive; spell out why the comment is rejected so the operator can push back if the rejection is wrong.
+
+Legacy dispositions files (or omitted-`reason` shapes) where `addressed` lacks a non-empty `reason` are **REFUSED by the CLI at parse time** (exit 2) — the helper exits with a clear error naming the offending `commentId` and showing the expected shape before any journal-write runs. Existing reasonless `addressed` annotations already in the journal (pre-Step-8.1.2 data) continue to be read; the studio renders them with "no reason recorded" text near the stamp. The contract is forward-only — every NEW iteration must supply a reason.
 
 Use the Write tool to create the file before invoking the helper.
 

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>getDisplayMedia screen-capture spike</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <h1>getDisplayMedia screen-capture spike</h1>
+      <p class="lede">
+        Phase 1 Task 1.4.1 — capture a single frame from the browser's
+        Screen Capture API, render it as a PNG preview, offer download.
+        Each capture requires a fresh OS-level permission prompt.
+      </p>
+    </header>
+
+    <main class="grid">
+      <section class="capture-pane" aria-label="Screen capture controls">
+        <div class="toolbar" role="toolbar" aria-label="Capture tools">
+          <button id="capture-btn" type="button">Capture screen</button>
+          <button id="download-btn" type="button" disabled>Download PNG</button>
+          <button id="clear-btn" type="button" disabled>Clear</button>
+        </div>
+        <p class="status" id="status" aria-live="polite">No capture yet.</p>
+        <p class="hint">
+          Clicking <strong>Capture screen</strong> opens an OS-level chooser
+          (tab / window / screen). The browser captures one frame, freezes
+          the stream, and renders it below. Capability test only — no
+          uploads, no network round-trips.
+        </p>
+      </section>
+
+      <section class="preview-pane" aria-label="Captured frame preview">
+        <h2>Captured frame</h2>
+        <canvas id="preview-canvas" width="640" height="360" aria-label="Captured frame preview canvas"></canvas>
+        <p class="meta" id="capture-meta">Dimensions: not captured yet.</p>
+      </section>
+    </main>
+
+    <footer class="footnotes">
+      <p>
+        <code>navigator.mediaDevices.getDisplayMedia({ video: true })</code>
+        requires HTTPS + transient user activation. This spike runs over
+        Vite's <code>http://localhost</code> (treated as secure context).
+        See <code>src/spike.js</code> for the capture wiring.
+      </p>
+    </footer>
+
+    <script type="module" src="./src/spike.js"></script>
+  </body>
+</html>

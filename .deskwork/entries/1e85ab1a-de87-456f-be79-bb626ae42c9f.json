@@ -1,0 +1,14 @@
+{
+  "uuid": "1e85ab1a-de87-456f-be79-bb626ae42c9f",
+  "slug": "graphical-entries/prd",
+  "title": "Graphical Entries",
+  "keywords": [],
+  "source": "manual",
+  "currentStage": "Final",
+  "iterationByStage": {
+    "Drafting": 1
+  },
+  "artifactPath": "docs/1.0/001-IN-PROGRESS/graphical-entries/prd.md",
+  "createdAt": "2026-05-25T21:07:50.890Z",
+  "updatedAt": "2026-05-25T21:43:12.126Z"
+}

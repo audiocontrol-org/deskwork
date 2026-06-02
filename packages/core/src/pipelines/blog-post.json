@@ -1,0 +1,9 @@
+{
+  "$rationale": "Blog-post pipeline — a four-stage simplification of the editorial flow for adopters who don't want the explicit Outlining / Planned bookkeeping but still want a content-lock gate before publication. Idea captures the seed; Drafting is the prose pass; Edited is the post-edit lock (copy frozen, awaiting publish); Published is the terminal commit. Edited mirrors the editorial template's Final lock — the iterate verb is refused here so a late inline edit can't sneak past the final review pass. Blocked / Cancelled apply.",
+  "id": "blog-post",
+  "name": "Blog Post",
+  "description": "Simplified four-stage pipeline for blog posts (Idea → Drafting → Edited → Published). Edited locks the copy before publication.",
+  "linearStages": ["Idea", "Drafting", "Edited", "Published"],
+  "lockedStages": ["Edited"],
+  "offPipelineStages": ["Blocked", "Cancelled"]
+}

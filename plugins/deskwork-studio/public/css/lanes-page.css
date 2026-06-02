@@ -1,0 +1,513 @@
+/*
+ * lanes-page.css — `/dev/lanes` studio surface (Phase 6 Task 6.3).
+ *
+ * Vocabulary mirrors the press-check tokens from editorial-review.css
+ * (paper, ink, red-pencil, proof-blue, kraft) so the page sits in the
+ * same design family as the dashboard.
+ *
+ * Layout shape:
+ *   - .lanes-container         — main column, paper background.
+ *   - .lanes-header            — page heading + count meta + warn.
+ *   - .lanes-form              — copy-builder forms (new + edit).
+ *   - .lanes-table             — server-rendered table.
+ *   - .lanes-archived          — collapse-by-default details section.
+ *   - .lanes-btn               — universal copy-button vocabulary.
+ *
+ * Per .claude/rules/affordance-placement.md, the row-level Edit and
+ * Archive buttons live ON the row (in the rightmost actions cell),
+ * not in a page-level toolbar.
+ */
+
+.lanes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-block: 1.5rem 2rem;
+}
+
+.lanes-header {
+  margin-block-end: 0.5rem;
+}
+
+.lanes-header-warn {
+  display: inline-block;
+  margin-block-start: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--er-paper-2, #ECE6D4);
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  color: var(--er-ink-soft, #3A332E);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+}
+
+.lanes-header-warn code {
+  background: var(--er-paper-3, #DFD7BF);
+  padding: 0 0.3rem;
+  border-radius: 2px;
+}
+
+/* ---- Top-of-page errors banner + inline error rows (AUDIT-20260530-66) ---- */
+
+.lanes-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-ink, #1A1614);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+}
+
+.lanes-banner code {
+  background: var(--er-paper-3, #DFD7BF);
+  padding: 0 0.3rem;
+  border-radius: 2px;
+}
+
+.lanes-row--error {
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.lanes-error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--er-ink, #1A1614);
+}
+
+.lanes-error-kind {
+  font-weight: 600;
+  margin: 0;
+}
+
+.lanes-error-path {
+  margin: 0;
+  color: var(--er-ink-soft, #3A332E);
+}
+
+.lanes-error-message {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--er-paper, #F5F1E8);
+  padding: 0.4rem 0.6rem;
+  border-radius: 2px;
+}
+
+.lanes-error-icon {
+  color: var(--er-red-pencil, #B8362A);
+  font-weight: 700;
+}
+
+/* ---- Active / archived section heads ---- */
+
+.lanes-active-heading,
+.lanes-archived-heading {
+  font-family: var(--er-font-display, Georgia, serif);
+  font-style: italic;
+  font-size: 1.4rem;
+  color: var(--er-ink, #1A1614);
+  margin-block: 0 0.75rem;
+}
+
+.lanes-active {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lanes-archived {
+  margin-block-start: 1rem;
+}
+
+.lanes-archived-details {
+  border: 1px dashed var(--er-paper-3, #DFD7BF);
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.lanes-archived-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+  color: var(--er-ink-soft, #3A332E);
+  list-style: none;
+}
+
+.lanes-archived-summary::-webkit-details-marker {
+  display: none;
+}
+
+.lanes-archived-chevron {
+  display: inline-block;
+  transition: transform 120ms ease-in-out;
+}
+
+.lanes-archived-details[open] .lanes-archived-chevron {
+  transform: rotate(90deg);
+}
+
+.lanes-archived-count {
+  margin-inline-start: auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--er-paper-3, #DFD7BF);
+  font-size: 0.75rem;
+}
+
+.lanes-archived-body {
+  padding: 0 0.75rem 0.75rem;
+}
+
+.lanes-archived-empty {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--er-faded, #8A7F70);
+  font-size: 0.9rem;
+}
+
+/* ---- Empty state ---- */
+
+.lanes-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border: 1px dashed var(--er-paper-3, #DFD7BF);
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.lanes-empty-message {
+  margin: 0;
+  color: var(--er-ink-soft, #3A332E);
+}
+
+/* ---- Forms (new + edit) ---- */
+
+.lanes-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--er-paper-2, #ECE6D4);
+  border-left: 3px solid var(--er-proof-blue, #2A4B7C);
+}
+
+.lanes-form--edit {
+  background: var(--er-paper, #F5F1E8);
+  border-left-color: var(--er-kraft, #8A7250);
+  padding: 0.75rem 1rem;
+}
+
+.lanes-form-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.lanes-form-heading {
+  margin: 0;
+  font-family: var(--er-font-display, Georgia, serif);
+  font-style: italic;
+  font-size: 1.15rem;
+  color: var(--er-ink, #1A1614);
+}
+
+.lanes-form-desc {
+  margin: 0;
+  color: var(--er-faded, #8A7F70);
+  font-size: 0.85rem;
+}
+
+.lanes-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.lanes-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.lanes-field-label {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-ink-soft, #3A332E);
+}
+
+.lanes-field-hint {
+  font-size: 0.75rem;
+  color: var(--er-faded, #8A7F70);
+}
+
+.lanes-input,
+.lanes-select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--er-paper-3, #DFD7BF);
+  background: var(--er-paper, #F5F1E8);
+  color: var(--er-ink, #1A1614);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+  border-radius: 2px;
+  min-height: 2.25rem;
+}
+
+.lanes-input:focus,
+.lanes-select:focus {
+  outline: 2px solid var(--er-proof-blue, #2A4B7C);
+  outline-offset: 1px;
+}
+
+.lanes-form-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--er-paper, #F5F1E8);
+  border: 1px solid var(--er-paper-3, #DFD7BF);
+  border-radius: 2px;
+}
+
+.lanes-form-preview-label {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-faded, #8A7F70);
+}
+
+.lanes-form-preview-cmd {
+  display: block;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.95rem;
+  color: var(--er-ink, #1A1614);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.lanes-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ---- Buttons ---- */
+
+.lanes-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 2.25rem;
+  min-width: 2.25rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--er-paper-3, #DFD7BF);
+  background: var(--er-paper, #F5F1E8);
+  color: var(--er-ink-soft, #3A332E);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 80ms ease-in-out, color 80ms ease-in-out;
+}
+
+.lanes-btn:hover {
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.lanes-btn:focus-visible {
+  outline: 2px solid var(--er-proof-blue, #2A4B7C);
+  outline-offset: 1px;
+}
+
+.lanes-btn--primary {
+  background: var(--er-proof-blue, #2A4B7C);
+  color: var(--er-paper, #F5F1E8);
+  border-color: var(--er-proof-blue, #2A4B7C);
+}
+
+.lanes-btn--primary:hover {
+  background: var(--er-ink, #1A1614);
+  border-color: var(--er-ink, #1A1614);
+}
+
+.lanes-btn--secondary {
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.lanes-btn--archive {
+  border-color: var(--er-red-pencil, #B8362A);
+  color: var(--er-red-pencil, #B8362A);
+}
+
+.lanes-btn--archive:hover {
+  background: var(--er-red-pencil, #B8362A);
+  color: var(--er-paper, #F5F1E8);
+}
+
+.lanes-btn--restore {
+  border-color: var(--er-stamp-green, #2E5D45);
+  color: var(--er-stamp-green, #2E5D45);
+}
+
+.lanes-btn--restore:hover {
+  background: var(--er-stamp-green, #2E5D45);
+  color: var(--er-paper, #F5F1E8);
+}
+
+.lanes-btn--purge {
+  border-color: var(--er-ink, #1A1614);
+  color: var(--er-ink, #1A1614);
+  background: var(--er-paper-3, #DFD7BF);
+}
+
+.lanes-btn--purge:hover {
+  background: var(--er-ink, #1A1614);
+  color: var(--er-paper, #F5F1E8);
+}
+
+/*
+ * Visibly-disabled Purge button (archived lane with entries still
+ * bound). The disabled state makes the gate discoverable; the title
+ * attribute explains the next step ("move entries first"). Carries no
+ * click handler — the CLI gate matches this visual gate.
+ */
+.lanes-btn--purge-disabled {
+  border-color: var(--er-faded-2, #B5AC9B);
+  color: var(--er-faded, #8A7F70);
+  background: var(--er-paper-2, #ECE6D4);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.lanes-btn--purge-disabled:hover {
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-faded, #8A7F70);
+}
+
+.lanes-btn.is-copied {
+  background: var(--er-stamp-green, #2E5D45) !important;
+  color: var(--er-paper, #F5F1E8) !important;
+  border-color: var(--er-stamp-green, #2E5D45) !important;
+}
+
+/* ---- Table ---- */
+
+.lanes-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--er-paper, #F5F1E8);
+  font-size: 0.9rem;
+}
+
+.lanes-table-caption {
+  text-align: left;
+  padding: 0.5rem 0;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-faded, #8A7F70);
+}
+
+.lanes-th,
+.lanes-cell {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--er-paper-3, #DFD7BF);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.lanes-th {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-ink-soft, #3A332E);
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.lanes-cell code {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--er-ink, #1A1614);
+}
+
+.lanes-row[data-archived] .lanes-cell {
+  color: var(--er-faded, #8A7F70);
+}
+
+.lanes-cell--handle,
+.lanes-th--handle {
+  width: 2rem;
+  text-align: center;
+}
+
+.lanes-reorder-handle {
+  display: inline-block;
+  color: var(--er-faded-2, #B5AC9B);
+  cursor: help;
+  user-select: none;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+}
+
+.lanes-cell--count {
+  font-variant-numeric: tabular-nums;
+}
+
+.lanes-cell--visibility {
+  text-align: center;
+}
+
+.lanes-visibility-icon {
+  display: inline-block;
+  font-size: 1.1rem;
+  color: var(--er-stamp-green, #2E5D45);
+}
+
+.lanes-row[data-archived] .lanes-visibility-icon {
+  color: var(--er-faded, #8A7F70);
+}
+
+.lanes-cell--actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.lanes-cell--empty {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--er-faded, #8A7F70);
+  font-style: italic;
+}
+
+.lanes-row--edit-form .lanes-cell {
+  padding: 0;
+  background: var(--er-paper, #F5F1E8);
+}
+
+@media (max-width: 720px) {
+  .lanes-th--content-dir,
+  .lanes-cell--content-dir,
+  .lanes-th--template,
+  .lanes-cell--template {
+    display: none;
+  }
+}

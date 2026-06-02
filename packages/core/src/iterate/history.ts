@@ -16,12 +16,18 @@
  */
 
 import { readJournalEvents } from '../journal/read.ts';
-import type { Stage } from '../schema/entry.ts';
 
+/**
+ * Per Phase 3 (graphical-entries) the `stage` field on journal events
+ * is any non-empty string (lane-template-driven). The iteration
+ * history surface reports whatever stage value the journal recorded;
+ * Phase 4's lane-aware history filtering replaces the narrow `Stage`
+ * type with a per-lane stage union.
+ */
 export interface IterationListing {
   readonly versionNumber: number;
   readonly timestamp: string;
-  readonly stage: Stage;
+  readonly stage: string;
 }
 
 export interface IterationContent extends IterationListing {
@@ -64,7 +70,7 @@ export async function getEntryIteration(
   projectRoot: string,
   entryId: string,
   versionNumber: number,
-  stage?: Stage,
+  stage?: string,
 ): Promise<IterationContent | null> {
   const events = await readJournalEvents(projectRoot, { entryId });
   for (const event of events) {

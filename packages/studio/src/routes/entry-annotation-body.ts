@@ -82,6 +82,37 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
       }
       if (typeof text !== 'string') return err('comment.text is required');
       const category = asCategory(obj.category);
+      // Phase 8 Step 8.4.1 — a brand-new `comment` annotation may
+      // carry `attachments[]` if it was created via the
+      // capture-then-create flow (the screenshot is pre-attached at
+      // POST time, not via a follow-up edit-comment). Validate the
+      // shape identically to the edit-comment patch.
+      let attachments: string[] | undefined;
+      if (obj.attachments !== undefined) {
+        if (!Array.isArray(obj.attachments)) {
+          return err('comment.attachments must be an array of strings');
+        }
+        const arr: string[] = [];
+        for (const item of obj.attachments) {
+          if (typeof item !== 'string') {
+            return err('comment.attachments entries must be strings');
+          }
+          arr.push(item);
+        }
+        attachments = arr;
+      }
+      // AUDIT-20260602-04 — reject a malformed replyTo with 400
+      // instead of silently dropping it. The sibling `attachments`
+      // validation already enforces shape-rejection; replyTo follows
+      // the same contract so an operator's threaded reply can't be
+      // turned into a detached root comment by a client bug.
+      let replyTo: string | undefined;
+      if (obj.replyTo !== undefined) {
+        if (typeof obj.replyTo !== 'string' || obj.replyTo.length === 0) {
+          return err('comment.replyTo must be a non-empty string');
+        }
+        replyTo = obj.replyTo;
+      }
       const draft: AnnotationDraftFromBody = {
         type: 'comment',
         workflowId,
@@ -90,6 +121,8 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
         text,
         ...(category !== null ? { category } : {}),
         ...(typeof obj.anchor === 'string' ? { anchor: obj.anchor } : {}),
+        ...(attachments !== undefined ? { attachments } : {}),
+        ...(replyTo !== undefined ? { replyTo } : {}),
       };
       return { kind: 'ok', draft };
     }
@@ -140,22 +173,49 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
         return err('address.commentId is required');
       }
       if (typeof version !== 'number') return err('address.version is required');
-      if (
-        disposition !== 'addressed' &&
-        disposition !== 'deferred' &&
-        disposition !== 'wontfix'
-      ) {
-        return err("address.disposition must be 'addressed' | 'deferred' | 'wontfix'");
+      // Phase 8 Step 8.1.2 (Part 2) — `AnnotationDraftFromBody` is a
+      // discriminated union over `disposition` for the `address`
+      // variant. Each branch emits the matching variant and enforces
+      // the contract: `addressed` requires non-empty `reason`.
+      if (disposition === 'addressed') {
+        if (typeof obj.reason !== 'string' || obj.reason.length === 0) {
+          return err(
+            "address.reason is required (non-empty) when disposition === 'addressed' (Phase 8 Step 8.1.2)",
+          );
+        }
+        const draft: AnnotationDraftFromBody = {
+          type: 'address',
+          workflowId,
+          commentId,
+          version,
+          disposition: 'addressed',
+          reason: obj.reason,
+        };
+        return { kind: 'ok', draft };
       }
-      const draft: AnnotationDraftFromBody = {
-        type: 'address',
-        workflowId,
-        commentId,
-        version,
-        disposition,
-        ...(typeof obj.reason === 'string' ? { reason: obj.reason } : {}),
-      };
-      return { kind: 'ok', draft };
+      if (disposition === 'deferred') {
+        const draft: AnnotationDraftFromBody = {
+          type: 'address',
+          workflowId,
+          commentId,
+          version,
+          disposition: 'deferred',
+          ...(typeof obj.reason === 'string' ? { reason: obj.reason } : {}),
+        };
+        return { kind: 'ok', draft };
+      }
+      if (disposition === 'wontfix') {
+        const draft: AnnotationDraftFromBody = {
+          type: 'address',
+          workflowId,
+          commentId,
+          version,
+          disposition: 'wontfix',
+          ...(typeof obj.reason === 'string' ? { reason: obj.reason } : {}),
+        };
+        return { kind: 'ok', draft };
+      }
+      return err("address.disposition must be 'addressed' | 'deferred' | 'wontfix'");
     }
     case 'edit-comment': {
       const commentId = obj.commentId;
@@ -172,6 +232,9 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
         ...(fields.fields.range !== undefined ? { range: fields.fields.range } : {}),
         ...(fields.fields.category !== undefined ? { category: fields.fields.category } : {}),
         ...(fields.fields.anchor !== undefined ? { anchor: fields.fields.anchor } : {}),
+        ...(fields.fields.attachments !== undefined
+          ? { attachments: fields.fields.attachments }
+          : {}),
       };
       return { kind: 'ok', draft };
     }
@@ -203,6 +266,12 @@ export interface ParseEditFieldsResult {
   range?: { start: number; end: number };
   category?: NonNullable<CommentDraft['category']>;
   anchor?: string;
+  /**
+   * Phase 8 Step 8.4.1 — attaching a screenshot to an existing comment
+   * mutates `attachments[]` via this patch field. Full-replacement
+   * semantics match every other field on this patch.
+   */
+  attachments?: string[];
 }
 
 export type ParseEditFieldsOutcome =
@@ -253,16 +322,40 @@ export function parseEditCommentFields(body: unknown): ParseEditFieldsOutcome {
     out.anchor = obj.anchor;
   }
 
+  if (obj.attachments !== undefined) {
+    if (!Array.isArray(obj.attachments)) {
+      return {
+        kind: 'err',
+        status: 400,
+        message: 'attachments must be an array of strings',
+      };
+    }
+    const arr: string[] = [];
+    for (const item of obj.attachments) {
+      if (typeof item !== 'string') {
+        return {
+          kind: 'err',
+          status: 400,
+          message: 'attachments entries must be strings',
+        };
+      }
+      arr.push(item);
+    }
+    out.attachments = arr;
+  }
+
   if (
     out.text === undefined &&
     out.range === undefined &&
     out.category === undefined &&
-    out.anchor === undefined
+    out.anchor === undefined &&
+    out.attachments === undefined
   ) {
     return {
       kind: 'err',
       status: 400,
-      message: 'at least one of text / range / category / anchor is required',
+      message:
+        'at least one of text / range / category / anchor / attachments is required',
     };
   }
 

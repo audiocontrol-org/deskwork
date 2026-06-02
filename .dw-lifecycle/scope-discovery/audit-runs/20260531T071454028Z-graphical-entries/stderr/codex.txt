@@ -1,0 +1,1343 @@
+Reading additional input from stdin...
+OpenAI Codex v0.133.0
+--------
+workdir: /Users/orion/work/deskwork-work/graphical-entries
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e7ce2-bcae-7bd2-b31a-7a8f6562824d
+--------
+user
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface bugs, design issues, missed edge cases, and code-quality concerns in the work product captured in the diff below.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+graphical-entries
+
+## Feature scope (workplan / PRD summary)
+
+Tasks 0.71+0.72+0.73 of graphical-entries Phase 0 (audit-barrage cleanup queue), bundled because all three findings share the same test file and the 0.71/0.72 split was natural along production-code vs test-strengthening lines. Closes AUDIT-20260531-01 (medium, cross-model claude+codex): renderSwimCompact dropped bucket.unbucketed entries — same defect AUDIT-25 closed on the kanban + list surfaces, missed on the collapsed compact strip. Fix mirrors the existing swimlane-unbucketed.ts pattern with a new renderUnbucketedCompactCell export consumed by renderSwimCompact. Closes AUDIT-20260531-02 (medium): count-consistency test strengthened to actually count data-row-shell + lb-row markers against bucket.entryCount, fulfilling the test's stated reconciliation contract per the spec-compliance-probe rule. Closes AUDIT-20260531-03 (informational): clean-check log acknowledged without code change. TDD discipline: new test for 0.71 failed pre-fix, passed post-fix; strengthened assertions for 0.72 verified-falsifiable via temporary code mutation. Full studio suite (954 passed, 11 skipped) green before each commit.
+
+## Commit subjects in the audited range
+
+d6162be66d56b041ad1f8c2688d972f863a7d462 docs(graphical-entries): close AUDIT-20260531-01..03 — Tasks 0.71..0.73
+f9b588825c67fa739c7b987bd9883ecf1d9ec8b0 test(graphical-entries): strengthen count-consistency test — AUDIT-20260531-02
+5cd5294b9f2e7e8bc29d399bc05a9bd328a5ad5a fix(graphical-entries): swim-compact unbucketed cell — AUDIT-20260531-01
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+
+### AUDIT-20260530-95 — [P7T7.2 codex] Group skill documentation still describes the superseded empty-members doctor rule and stale refusal text
+
+Finding-ID: AUDIT-20260530-95 (cross-model: AUDIT-BARRAGE-codex-P7T7.2)
+Status:     open
+Severity:   low
+Surface:    `plugins/deskwork/skills/group/SKILL.md:53`, `plugins/deskwork/skills/group/SKILL.md:58-66`
+
+The skill header and workplan now define `members: []` as the canonical declared-empty group state, and the workplan renames Task 7.5.5 to `group-stale-empty-members`. But the group skill default section still says Doctor’s `group-empty-members-array` rule surfaces the “dual representation” for normalization. Its error catalog also says non-group `show` / `update` refusals use the old “entry has no members” / “non-empty members[]” wording, while the implementation now refuses on absence of the `members` field.
+
+This is documentation drift on the operator-facing skill. The fix is to align the skill with the implemented semantics: `members: []` is not a normalization target, and non-group refusal text should mention “no `members` field” rather than “no members” or “non-empty members[]”.
+
+Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (codex). Run-dir at `.dw-lifecycle/scope-discovery/audit-runs/20260530T121000611Z-graphical-entries/codex.md`.
+
+## 2026-05-31 — audit-barrage lift (20260531T061519667Z-graphical-entries)
+
+### AUDIT-20260531-01 — Collapsed compact strip (`renderSwimCompact`) still drops unbucketed entries — the same count-vs-visible defect AUDIT-25 set out to close, on a third surface the fix didn't touch
+
+Finding-ID: AUDIT-20260531-01 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     fixed-5cd5294
+Severity:   medium
+Surface:    `packages/studio/src/pages/dashboard/swimlane-card.ts:358-382` (`renderSwimCompact`), called unconditionally at `:476`
+
+The fix updates the kanban grid (`renderSwimlane` → `renderUnbucketedStageCol`, `:427`) and the list-body (`renderListBody` → `renderUnbucketedListGroup`) so `bucket.unbucketed` renders. But `renderSwimCompact` — the per-stage compact strip emitted on every swim at `:476` and revealed by CSS when the lane is `.collapsed` (docstring `:48-50`) — was not updated. It iterates **only** `template.linearStages` + `template.offPipelineStages` (`:359-362`) and sums `bucket.byStage.get(stage)` per cell (`:370`). `bucket.unbucketed` is never read.
+
+Consequence: for a lane with unbucketed entries in collapsed view, the swim-head `quick-meta` reads `${bucket.entryCount} entries` (which the docstring confirms folds unbucketed in), while the sum of the visible `.sc-count` cells is `entryCount − unbucketed.length`, and the unbucketed entries have **no** representation in the compact strip at all. This is the identical "count inflated while entries silently dropped" shape the HIGH AUDIT-20260530-25 finding named — the fix closed it on two of three surfaces and the `lane-data.ts` docstring's claim that "the swim-head count reconciles with the visible cards" is false on the collapsed compact view. The new test file does not exercise the compact strip, so the gap is unguarded. Fix: append an unbucketed compact cell in `renderSwimCompact` (e.g. when `bucket.unbucketed.length > 0`, emit a trailing `.sc-stage.is-unbucketed` cell with the `⊘` glyph and `bucket.unbucketed.length`), mirroring the two surfaces already fixed, and add a collapsed-view assertion to the test.
+
+---
+
+### AUDIT-20260531-02 — Count-consistency test asserts the count *text* and two slugs but never counts the rendered cards — it does not verify the reconciliation it claims
+
+Finding-ID: AUDIT-20260531-02
+Status:     fixed-f9b5888
+Severity:   medium
+Surface:    `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:90-138` (the `count consistency` test)
+
+The test's stated contract (header `:91-94`) is *"swim-head `${n} entries` matches the visible cards once unbucketed renders"* and the inline comment `:91-96` says the block *"must contain 3 row-shell / lb-row markers (1 template-bucketed + 2 unbucketed)."* But the assertions only check (a) the literal text `<span class="quick-meta">3 entries</span>` (`:126`), and (b) that the two unbucketed slugs and their raw stages appear (`:130-137`). Nothing counts the actual rendered `data-row-shell` / `.lb-row` elements. Per `.claude/rules/ui-verification.md` § "spec-compliance probes," this is exactly the trap where a probe verifies the mechanism it imagines rather than the contract it names: the `quick-meta` text is computed from `bucket.entryCount`, **independent** of how many cards render — so a regression where the template-bucketed `a-draft` card vanished (count still 3, only 2 cards visible) would pass this test green. The number "3" and "the cards actually present" are never compared.
+
+Fix: assert the rendered card count directly — e.g. `(stageGrid.match(/data-row-shell/g) ?? []).length === 3` (or count `.lb-row` in the list body) — so the test fails if the visible-card count diverges from the displayed entry count. That is the falsifiable form of the reconciliation claim.
+
+---
+
+### AUDIT-20260531-03 — Checks that came back clean (recorded so the operator can see what was ruled out)
+
+Finding-ID: AUDIT-20260531-03
+Status:     acknowledged-clean-check
+Severity:   informational
+Surface:    (escaping, grid layout, class reuse, overflow affordance)
+
+I checked four things that looked suspect from the diff and confirmed each is fine: (1) **Escaping** — `entry.currentStage` is a drift-controlled/unvalidated value now rendered into text and `data-*` attributes, but it flows through the project's `html` escaping tag (same path as every other row), so no XSS surface. (2) **Grid layout** — `.stage-grid` is `display:flex` with `.stage-col{flex:1 1 0}` (`dashboard-swimlane-shell.css:253-272`), so the appended unbucketed column flows naturally and needs no `stageCount` increment; the `${stageCount} stages` tag correctly excludes it. (3) **Class reuse** — the hand-rolled kanban row's `er-calendar-row`/`er-calendar-body`/`er-row-slug` classes are the dashboard's own row classes (`section.ts`, `affordances.ts`), not borrowed cross-surface. (4) **List overflow `⋮`** — the `data-lb-overflow` span is currently inert decoration (`swimlane-list-body.ts:78-85` confirms no verb wiring), so reusing it on the unbucketed row does not reintroduce the `verbsForStage`-throws hazard the kanban row deliberately avoids. Had any of these been live (unescaped stage, count-based grid template, a wired overflow dispatching verbs for the unknown stage) it would have been a high finding.
+
+
+## Diff under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+index ac2e18e..64fe9af 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+@@ -4385,7 +4385,7 @@ Surfaced by audit-barrage run `20260530T121000611Z-graphical-entries` (codex). R
+ ### AUDIT-20260531-01 — Collapsed compact strip (`renderSwimCompact`) still drops unbucketed entries — the same count-vs-visible defect AUDIT-25 set out to close, on a third surface the fix didn't touch
+ 
+ Finding-ID: AUDIT-20260531-01 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)
+-Status:     open
++Status:     fixed-5cd5294
+ Severity:   medium
+ Surface:    `packages/studio/src/pages/dashboard/swimlane-card.ts:358-382` (`renderSwimCompact`), called unconditionally at `:476`
+ 
+@@ -4398,7 +4398,7 @@ Consequence: for a lane with unbucketed entries in collapsed view, the swim-head
+ ### AUDIT-20260531-02 — Count-consistency test asserts the count *text* and two slugs but never counts the rendered cards — it does not verify the reconciliation it claims
+ 
+ Finding-ID: AUDIT-20260531-02
+-Status:     open
++Status:     fixed-f9b5888
+ Severity:   medium
+ Surface:    `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:90-138` (the `count consistency` test)
+ 
+@@ -4411,7 +4411,7 @@ Fix: assert the rendered card count directly — e.g. `(stageGrid.match(/data-ro
+ ### AUDIT-20260531-03 — Checks that came back clean (recorded so the operator can see what was ruled out)
+ 
+ Finding-ID: AUDIT-20260531-03
+-Status:     open
++Status:     acknowledged-clean-check
+ Severity:   informational
+ Surface:    (escaping, grid layout, class reuse, overflow affordance)
+ 
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+index bc308a4..f692d50 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+@@ -42,51 +42,51 @@ Closes AUDIT-20260530-25 (cross-model: AUDIT-BARRAGE-claude-P5-1). Surface: `pac
+ 
+ Closes AUDIT-20260531-01 (claude-01 + claude-03 + codex-01 + codex-02; cross-model). Surface: `packages/studio/src/pages/dashboard/swimlane-card.ts:358-382` (`renderSwimCompact`), called unconditionally at `:476`.
+ 
+-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+-- [ ] Step 3: implement the fix
+-- [ ] Step 4: confirm test passes
+-- [ ] Step 5: commit with `Closes AUDIT-20260531-01 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)` in subject
++- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
++- [x] Step 2: confirm test fails against current code (verify the bug repros)
++- [x] Step 3: implement the fix
++- [x] Step 4: confirm test passes
++- [x] Step 5: commit with `Closes AUDIT-20260531-01 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)` in subject
+ 
+ **Acceptance Criteria:**
+ 
+-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
++- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` — `renders unbucketed compact cell in swim compact strip when lane is collapsed (AUDIT-20260531-01)` (cited in Step 1)
++- [x] `npx vitest run packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` exits 0 (passes against the fix)
++- [x] Audit-log Status flipped to `fixed-5cd5294` via the close-shipped-audit-findings step
+ 
+ 
+ ### Task 0.72 (fix-finding-AUDIT-20260531-02): AUDIT-20260531-02 — Count-consistency test asserts the count *text* and two slug…
+ 
+ Closes AUDIT-20260531-02. Surface: `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:90-138` (the `count consistency` test).
+ 
+-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+-- [ ] Step 3: implement the fix
+-- [ ] Step 4: confirm test passes
+-- [ ] Step 5: commit with `Closes AUDIT-20260531-02` in subject
++- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
++- [x] Step 2: confirm test fails against current code (verify the bug repros)
++- [x] Step 3: implement the fix
++- [x] Step 4: confirm test passes
++- [x] Step 5: commit with `Closes AUDIT-20260531-02` in subject
+ 
+ **Acceptance Criteria:**
+ 
+-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
++- [x] Failing test exists at `packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` — strengthened `count consistency: swim-head ${n} entries matches the visible cards once unbucketed renders` (cited in Step 1). Verified failure-on-regression by temporarily disabling `renderUnbucketedStageCol` (mutation reverted before commit; strengthened cardCount assertion failed with `expected 1 to be 3`).
++- [x] `npx vitest run packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts` exits 0 (passes against the fix)
++- [x] Audit-log Status flipped to `fixed-f9b5888` via the close-shipped-audit-findings step
+ 
+ 
+ ### Task 0.73 (fix-finding-AUDIT-20260531-03): AUDIT-20260531-03 — Checks that came back clean (recorded so the operator can se…
+ 
+ Closes AUDIT-20260531-03. Surface: (escaping, grid layout, class reuse, overflow affordance).
+ 
+-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+-- [ ] Step 3: implement the fix
+-- [ ] Step 4: confirm test passes
+-- [ ] Step 5: commit with `Closes AUDIT-20260531-03` in subject
++- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface) — N/A (informational finding; no code change)
++- [x] Step 2: confirm test fails against current code (verify the bug repros) — N/A (informational finding; no code change)
++- [x] Step 3: implement the fix — N/A (informational finding; no code change)
++- [x] Step 4: confirm test passes — N/A (informational finding; no code change)
++- [x] Step 5: commit with `Closes AUDIT-20260531-03` in subject — closure recorded in the AUDIT-20260531-01..03 docs commit; audit-log Status set to `acknowledged-clean-check` rather than `fixed-<sha>` because the four checks (escaping, grid layout, class reuse, overflow affordance) were confirmed clean by the auditor with no code change required.
+ 
+ **Acceptance Criteria:**
+ 
+-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
++- [x] Failing test exists at `(N/A — informational finding; auditor confirmed escaping, grid layout, class reuse, overflow affordance all clean. No test required.)` (cited in Step 1)
++- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix) — N/A (informational finding; no code change, no new test)
++- [x] Audit-log Status flipped to `acknowledged-clean-check` via the close-shipped-audit-findings step (informational findings disposition rather than `fixed-<sha>`)
+ 
+ ### Task 0.2 (fix-finding-AUDIT-20260530-26 (cross-model: AUDIT-BARRAGE-claude-P5-1)): AUDIT-20260530-26 — [P5-1 claude] No clear-on-version-bump for swimlane localSto…
+ 
+diff --git a/packages/studio/src/pages/dashboard/swimlane-card.ts b/packages/studio/src/pages/dashboard/swimlane-card.ts
+index 5351771..ae6db80 100644
+--- a/packages/studio/src/pages/dashboard/swimlane-card.ts
++++ b/packages/studio/src/pages/dashboard/swimlane-card.ts
+@@ -71,7 +71,10 @@ import { renderRow } from './section.ts';
+ import { stageGlyph, GLYPH_OFF } from './swimlane-stage-glyph.ts';
+ import { laneGlyph } from './lane-glyph.ts';
+ import { renderListBody } from './swimlane-list-body.ts';
+-import { renderUnbucketedStageCol } from './swimlane-unbucketed.ts';
++import {
++  renderUnbucketedStageCol,
++  renderUnbucketedCompactCell,
++} from './swimlane-unbucketed.ts';
+ import type { LaneBucket } from './lane-data.ts';
+ import type { LaneRailRow } from './swimlane-rail.ts';
+ import type { Entry } from '@deskwork/core/schema/entry';
+@@ -377,8 +380,15 @@ function renderSwimCompact(bucket: LaneBucket): RawHtml {
+         </div>`;
+     })
+     .join('');
++  // Per AUDIT-20260531-01 — trailing unbucketed cell so the per-cell
++  // counts in the collapsed compact strip reconcile with the swim-head
++  // `quick-meta` (`${bucket.entryCount} entries`, which already folds
++  // unbucketed in). Mirrors the kanban + list-body unbucketed-tail
++  // precedents the AUDIT-20260530-25 fix landed on the two other
++  // surfaces.
++  const unbucketedRaw = renderUnbucketedCompactCell(bucket.unbucketed).__raw;
+   return unsafe(html`
+-    <div class="swim-compact" data-swim-compact>${unsafe(cellsRaw)}</div>`);
++    <div class="swim-compact" data-swim-compact>${unsafe(cellsRaw)}${unsafe(unbucketedRaw)}</div>`);
+ }
+ 
+ export function renderSwimlane(
+diff --git a/packages/studio/src/pages/dashboard/swimlane-unbucketed.ts b/packages/studio/src/pages/dashboard/swimlane-unbucketed.ts
+index fd64af9..5434598 100644
+--- a/packages/studio/src/pages/dashboard/swimlane-unbucketed.ts
++++ b/packages/studio/src/pages/dashboard/swimlane-unbucketed.ts
+@@ -107,6 +107,38 @@ export function renderUnbucketedStageCol(
+     </section>`);
+ }
+ 
++/**
++ * Compact-strip unbucketed cell (AUDIT-20260531-01). Renders a trailing
++ * `.sc-stage.is-unbucketed` cell appended to the per-swim
++ * `.swim-compact` strip (revealed by CSS when the lane is `.collapsed`).
++ * Mirrors the structure of the regular compact cells emitted by
++ * `renderSwimCompact` (`.sc-stage` > `.sc-name` + `.sc-count`) so the
++ * existing flex layout (`dashboard-swimlane-shell.css`) handles the
++ * trailing cell with no template changes.
++ *
++ * Mirrors the AUDIT-20260530-25 precedent on the two other dashboard
++ * surfaces — `renderUnbucketedStageCol` (kanban grid) and
++ * `renderUnbucketedListGroup` (list body) — which already reconcile
++ * `bucket.unbucketed` against the swim-head's `quick-meta` count.
++ * Pre-fix, the collapsed compact strip read `entryCount - unbucketed.length`
++ * while the swim-head's `${entryCount} entries` text included the
++ * unbucketed entries; this cell closes that reconciliation gap.
++ *
++ * Returns the empty string (as `RawHtml`) when there are no unbucketed
++ * entries, so callers can append unconditionally.
++ */
++export function renderUnbucketedCompactCell(
++  unbucketed: readonly Entry[],
++): RawHtml {
++  if (unbucketed.length === 0) return unsafe('');
++
++  return unsafe(html`
++    <div class="sc-stage is-unbucketed" data-sc-stage="unbucketed">
++      <span class="sc-name">${UNBUCKETED_GLYPH} ${UNBUCKETED_STAGE_LABEL}</span>
++      <span class="sc-count">${unbucketed.length}</span>
++    </div>`);
++}
++
+ /**
+  * List-surface unbucketed tail. Renders a trailing `.lb-group` group
+  * carrying `.is-unbucketed`; each entry uses the same `.lb-row` chrome
+diff --git a/packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts b/packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts
+index aefde65..906332e 100644
+--- a/packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts
++++ b/packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts
+@@ -129,14 +129,46 @@ describe('dashboard swimlane AUDIT-20260530-25 — unbucketed entries are render
+     // entryCount already folds them in).
+     expect(editorialBlock).toMatch(/<span class="quick-meta">3 entries<\/span>/);
+ 
++    // AUDIT-20260531-02 — count the actual rendered cards directly so
++    // the test fails if a regression makes the visible-card count
++    // diverge from the displayed entry count. Pre-strengthening the
++    // assertions only checked the text "3 entries" + slug substrings,
++    // never the rendered card count, so a regression where a
++    // template-bucketed card vanished (count text still "3", only 2
++    // cards visible) would have passed green. The bucket.entryCount
++    // for this fixture is 3 (1 template-bucketed `a-draft` + 2
++    // unbucketed). The kanban surface emits one `data-row-shell` per
++    // entry; the list surface emits one `lb-row` per entry — both
++    // counts must reconcile with bucket.entryCount.
++    const expectedEntryCount = 3;
++    const stageGridHtml = extractStageGridSection(editorialBlock);
++    const cardCount = (stageGridHtml.match(/data-row-shell/g) ?? []).length;
++    expect(cardCount).toBe(expectedEntryCount);
++
++    const listBodyHtml = extractListBodySection(editorialBlock);
++    // Per the AUDIT-20260531-02 finding's regex-tuning note: count
++    // `data-row-shell` attribute occurrences inside the list body
++    // rather than `\blb-row\b`. The list body emits THREE different
++    // `lb-row`-class shapes — real entry rows (`class="lb-row"`),
++    // empty-state placeholders (`class="lb-row empty-state"`, one per
++    // empty template stage), and unbucketed rows (`class="lb-row
++    // lb-row--unbucketed"`). Only the first and third represent
++    // visible entries; `renderEmptyListRow` deliberately omits
++    // `data-row-shell` so the attribute count tracks real cards.
++    // This makes the assertion symmetric with the kanban surface's
++    // `data-row-shell` count above.
++    const lbRowCount = (listBodyHtml.match(/data-row-shell/g) ?? []).length;
++    expect(lbRowCount).toBe(expectedEntryCount);
++
+     // Both unbucketed entries are visible in the rendered output
+-    // (operator-perceivable — they did not vanish).
++    // (operator-perceivable — they did not vanish). Kept as auxiliary
++    // assertions; the load-bearing reconciliation claim is the
++    // cardCount + lbRowCount comparisons above.
+     expect(editorialBlock).toContain('data-slug="mystery-one"');
+     expect(editorialBlock).toContain('data-slug="mystery-two"');
+     // The raw offending stage values are surfaced for operator diagnosis.
+-    const stageGrid = extractStageGridSection(editorialBlock);
+-    expect(stageGrid).toContain('NonExistentStage');
+-    expect(stageGrid).toContain('AnotherMissingStage');
++    expect(stageGridHtml).toContain('NonExistentStage');
++    expect(stageGridHtml).toContain('AnotherMissingStage');
+   });
+ 
+   it('happy-path regression: a swim with every entry at template-known stages emits NO unbucketed column or group', async () => {
+@@ -151,6 +183,99 @@ describe('dashboard swimlane AUDIT-20260530-25 — unbucketed entries are render
+     expect(r.html).not.toMatch(/class="lb-group[^"]*\bis-unbucketed\b/);
+   });
+ 
++  it('renders unbucketed compact cell in swim compact strip when lane is collapsed (AUDIT-20260531-01)', async () => {
++    // AUDIT-20260531-01 — `renderSwimCompact` (per-stage compact strip
++    // emitted on every swim and revealed by CSS when the lane is
++    // `.collapsed`) iterates only `template.linearStages +
++    // template.offPipelineStages` and never reads `bucket.unbucketed`.
++    // Result: the sum of visible `.sc-count` values is
++    // `entryCount − unbucketed.length` while the swim-head `quick-meta`
++    // reads `${bucket.entryCount} entries` — count inflated, entries
++    // silently dropped from the compact strip.
++    //
++    // Fix mirrors the kanban + list-body precedents (AUDIT-20260530-25):
++    // append a trailing `.sc-stage.is-unbucketed` cell carrying the
++    // `⊘` glyph + `unbucketed.length` so the per-cell counts reconcile
++    // with the swim-head's `quick-meta`.
++    await writeSidecar(
++      root,
++      makeEntry({
++        uuid: UUID_EDITORIAL_UNRECOGNIZED,
++        slug: 'compact-mystery-one',
++        title: 'Compact Mystery One',
++        currentStage: 'NonExistentStage',
++        iterationByStage: { NonExistentStage: 0 },
++        lane: 'default',
++      }),
++    );
++    await writeSidecar(
++      root,
++      makeEntry({
++        uuid: UUID_VISUAL_UNRECOGNIZED,
++        slug: 'compact-mystery-two',
++        title: 'Compact Mystery Two',
++        currentStage: 'AnotherMissingStage',
++        iterationByStage: { AnotherMissingStage: 0 },
++        lane: 'default',
++      }),
++    );
++
++    const r = await getHtml(app, '/dev/editorial-studio');
++    expect(r.status).toBe(200);
++
++    const editorialBlock = extractLaneSection(r.html, 'default');
++    expect(editorialBlock).not.toBe('');
++
++    // (a) Locate the `.swim-compact` substring (the per-stage
++    // compact strip revealed when the lane is `.collapsed`).
++    const swimCompactOpen = editorialBlock.indexOf('<div class="swim-compact"');
++    expect(swimCompactOpen).toBeGreaterThanOrEqual(0);
++    const swimCompactClose = editorialBlock.indexOf('</div>', swimCompactOpen);
++    // The compact strip contains nested `.sc-stage` divs; find the
++    // outer closing tag by scanning forward through matched opens.
++    let depth = 1;
++    let cursor = swimCompactOpen + '<div class="swim-compact"'.length;
++    while (depth > 0 && cursor < editorialBlock.length) {
++      const nextOpen = editorialBlock.indexOf('<div', cursor);
++      const nextClose = editorialBlock.indexOf('</div>', cursor);
++      if (nextClose === -1) break;
++      if (nextOpen !== -1 && nextOpen < nextClose) {
++        depth += 1;
++        cursor = nextOpen + '<div'.length;
++      } else {
++        depth -= 1;
++        cursor = nextClose + '</div>'.length;
++      }
++    }
++    const swimCompact = editorialBlock.slice(swimCompactOpen, cursor);
++    expect(swimCompact).toContain('<div class="swim-compact"');
++    void swimCompactClose;
++
++    // (b) An unbucketed cell renders inside `.swim-compact` with
++    // `data-sc-stage="unbucketed"` and the `is-unbucketed` modifier.
++    expect(swimCompact).toMatch(/class="sc-stage[^"]*\bis-unbucketed\b/);
++    expect(swimCompact).toContain('data-sc-stage="unbucketed"');
++
++    // (c) The unbucketed cell's `.sc-count` is 2 (matches
++    // `bucket.unbucketed.length` for this fixture).
++    const unbucketedCellMatch = swimCompact.match(
++      /class="sc-stage[^"]*\bis-unbucketed\b[^"]*"[\s\S]*?<span class="sc-count">(\d+)<\/span>/,
++    );
++    expect(unbucketedCellMatch).not.toBeNull();
++    expect(unbucketedCellMatch?.[1]).toBe('2');
++
++    // (d) The sum of all `.sc-count` numeric values inside
++    // `.swim-compact` reconciles with `bucket.entryCount` (3).
++    const scCountMatches = swimCompact.match(
++      /<span class="sc-count">(\d+)<\/span>/g,
++    ) ?? [];
++    const compactSum = scCountMatches.reduce((acc, raw) => {
++      const m = raw.match(/(\d+)/);
++      return m === null ? acc : acc + Number.parseInt(m[1], 10);
++    }, 0);
++    expect(compactSum).toBe(3);
++  });
++
+   it('unbucketed render is scoped per-swim: an unbucketed entry in editorial does NOT leak into the mockups swim', async () => {
+     await writeSidecar(
+       root,
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...). Use `blocking` only for issues that would break the feature's stated goals in obvious ways; `high` for correctness bugs adopters will hit; `medium` for design issues that compound over time; `low` for hygiene; `informational` for context you think the operator should see but isn't itself a bug.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
+
+codex
+I’ll audit the supplied diff against the current files so the line anchors are concrete, then I’ll report only issues that are actionable and not already covered by the prior audit log.
+exec
+/bin/zsh -lc "nl -ba packages/studio/src/pages/dashboard/swimlane-card.ts | sed -n '360,395p'" in /Users/orion/work/deskwork-work/graphical-entries
+exec
+/bin/zsh -lc "nl -ba packages/studio/src/pages/dashboard/swimlane-unbucketed.ts | sed -n '95,150p'" in /Users/orion/work/deskwork-work/graphical-entries
+exec
+/bin/zsh -lc "nl -ba packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts | sed -n '120,280p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+   360	
+   361	function renderSwimCompact(bucket: LaneBucket): RawHtml {
+   362	  const stages: string[] = [
+   363	    ...bucket.template.linearStages,
+   364	    ...bucket.template.offPipelineStages,
+   365	  ];
+   366	  // `lockedStages` is optional on a pipeline template (schema:
+   367	  // `uniqueStringArray('lockedStages', 0).optional()`). Treat
+   368	  // missing as "no stages locked" — an empty lookup set, never
+   369	  // an "every stage locked" sentinel.
+   370	  const lockedSet = new Set<string>(bucket.template.lockedStages ?? []);
+   371	  const cellsRaw = stages
+   372	    .map((stage) => {
+   373	      const count = (bucket.byStage.get(stage) ?? []).length;
+   374	      const empty = count === 0 ? ' empty' : '';
+   375	      const locked = lockedSet.has(stage) ? ' locked' : '';
+   376	      return html`
+   377	        <div class="sc-stage${unsafe(empty)}${unsafe(locked)}" data-sc-stage="${stage}">
+   378	          <span class="sc-name">${stage}</span>
+   379	          <span class="sc-count">${count}</span>
+   380	        </div>`;
+   381	    })
+   382	    .join('');
+   383	  // Per AUDIT-20260531-01 — trailing unbucketed cell so the per-cell
+   384	  // counts in the collapsed compact strip reconcile with the swim-head
+   385	  // `quick-meta` (`${bucket.entryCount} entries`, which already folds
+   386	  // unbucketed in). Mirrors the kanban + list-body unbucketed-tail
+   387	  // precedents the AUDIT-20260530-25 fix landed on the two other
+   388	  // surfaces.
+   389	  const unbucketedRaw = renderUnbucketedCompactCell(bucket.unbucketed).__raw;
+   390	  return unsafe(html`
+   391	    <div class="swim-compact" data-swim-compact>${unsafe(cellsRaw)}${unsafe(unbucketedRaw)}</div>`);
+   392	}
+   393	
+   394	export function renderSwimlane(
+   395	  bucket: LaneBucket,
+
+ succeeded in 0ms:
+    95	  return unsafe(html`
+    96	    <section class="stage-col is-unbucketed"
+    97	      id="${stageId}"
+    98	      data-stage-col="unbucketed"
+    99	      data-stage-section="unbucketed"
+   100	      data-unbucketed>
+   101	      <div class="stage-head">
+   102	        <span class="stage-glyph" aria-hidden="true">${UNBUCKETED_GLYPH}</span>
+   103	        <span class="stage-name">${UNBUCKETED_STAGE_LABEL}</span>
+   104	        <span class="stage-count">${unbucketed.length}</span>
+   105	      </div>
+   106	      ${unsafe(rowsRaw)}
+   107	    </section>`);
+   108	}
+   109	
+   110	/**
+   111	 * Compact-strip unbucketed cell (AUDIT-20260531-01). Renders a trailing
+   112	 * `.sc-stage.is-unbucketed` cell appended to the per-swim
+   113	 * `.swim-compact` strip (revealed by CSS when the lane is `.collapsed`).
+   114	 * Mirrors the structure of the regular compact cells emitted by
+   115	 * `renderSwimCompact` (`.sc-stage` > `.sc-name` + `.sc-count`) so the
+   116	 * existing flex layout (`dashboard-swimlane-shell.css`) handles the
+   117	 * trailing cell with no template changes.
+   118	 *
+   119	 * Mirrors the AUDIT-20260530-25 precedent on the two other dashboard
+   120	 * surfaces — `renderUnbucketedStageCol` (kanban grid) and
+   121	 * `renderUnbucketedListGroup` (list body) — which already reconcile
+   122	 * `bucket.unbucketed` against the swim-head's `quick-meta` count.
+   123	 * Pre-fix, the collapsed compact strip read `entryCount - unbucketed.length`
+   124	 * while the swim-head's `${entryCount} entries` text included the
+   125	 * unbucketed entries; this cell closes that reconciliation gap.
+   126	 *
+   127	 * Returns the empty string (as `RawHtml`) when there are no unbucketed
+   128	 * entries, so callers can append unconditionally.
+   129	 */
+   130	export function renderUnbucketedCompactCell(
+   131	  unbucketed: readonly Entry[],
+   132	): RawHtml {
+   133	  if (unbucketed.length === 0) return unsafe('');
+   134	
+   135	  return unsafe(html`
+   136	    <div class="sc-stage is-unbucketed" data-sc-stage="unbucketed">
+   137	      <span class="sc-name">${UNBUCKETED_GLYPH} ${UNBUCKETED_STAGE_LABEL}</span>
+   138	      <span class="sc-count">${unbucketed.length}</span>
+   139	    </div>`);
+   140	}
+   141	
+   142	/**
+   143	 * List-surface unbucketed tail. Renders a trailing `.lb-group` group
+   144	 * carrying `.is-unbucketed`; each entry uses the same `.lb-row` chrome
+   145	 * the list view emits for template-bucketed entries, with the
+   146	 * offending `currentStage` substituted into the `.lb-state` slot so
+   147	 * the row is operator-diagnosable inline.
+   148	 *
+   149	 * Returns the empty string (as `RawHtml`) when there are no unbucketed
+   150	 * entries.
+
+ succeeded in 0ms:
+   120	        lane: 'default',
+   121	      }),
+   122	    );
+   123	
+   124	    const r = await getHtml(app, '/dev/editorial-studio');
+   125	    expect(r.status).toBe(200);
+   126	
+   127	    const editorialBlock = extractLaneSection(r.html, 'default');
+   128	    // The swim-head quick-meta count includes unbucketed (lane-data
+   129	    // entryCount already folds them in).
+   130	    expect(editorialBlock).toMatch(/<span class="quick-meta">3 entries<\/span>/);
+   131	
+   132	    // AUDIT-20260531-02 — count the actual rendered cards directly so
+   133	    // the test fails if a regression makes the visible-card count
+   134	    // diverge from the displayed entry count. Pre-strengthening the
+   135	    // assertions only checked the text "3 entries" + slug substrings,
+   136	    // never the rendered card count, so a regression where a
+   137	    // template-bucketed card vanished (count text still "3", only 2
+   138	    // cards visible) would have passed green. The bucket.entryCount
+   139	    // for this fixture is 3 (1 template-bucketed `a-draft` + 2
+   140	    // unbucketed). The kanban surface emits one `data-row-shell` per
+   141	    // entry; the list surface emits one `lb-row` per entry — both
+   142	    // counts must reconcile with bucket.entryCount.
+   143	    const expectedEntryCount = 3;
+   144	    const stageGridHtml = extractStageGridSection(editorialBlock);
+   145	    const cardCount = (stageGridHtml.match(/data-row-shell/g) ?? []).length;
+   146	    expect(cardCount).toBe(expectedEntryCount);
+   147	
+   148	    const listBodyHtml = extractListBodySection(editorialBlock);
+   149	    // Per the AUDIT-20260531-02 finding's regex-tuning note: count
+   150	    // `data-row-shell` attribute occurrences inside the list body
+   151	    // rather than `\blb-row\b`. The list body emits THREE different
+   152	    // `lb-row`-class shapes — real entry rows (`class="lb-row"`),
+   153	    // empty-state placeholders (`class="lb-row empty-state"`, one per
+   154	    // empty template stage), and unbucketed rows (`class="lb-row
+   155	    // lb-row--unbucketed"`). Only the first and third represent
+   156	    // visible entries; `renderEmptyListRow` deliberately omits
+   157	    // `data-row-shell` so the attribute count tracks real cards.
+   158	    // This makes the assertion symmetric with the kanban surface's
+   159	    // `data-row-shell` count above.
+   160	    const lbRowCount = (listBodyHtml.match(/data-row-shell/g) ?? []).length;
+   161	    expect(lbRowCount).toBe(expectedEntryCount);
+   162	
+   163	    // Both unbucketed entries are visible in the rendered output
+   164	    // (operator-perceivable — they did not vanish). Kept as auxiliary
+   165	    // assertions; the load-bearing reconciliation claim is the
+   166	    // cardCount + lbRowCount comparisons above.
+   167	    expect(editorialBlock).toContain('data-slug="mystery-one"');
+   168	    expect(editorialBlock).toContain('data-slug="mystery-two"');
+   169	    // The raw offending stage values are surfaced for operator diagnosis.
+   170	    expect(stageGridHtml).toContain('NonExistentStage');
+   171	    expect(stageGridHtml).toContain('AnotherMissingStage');
+   172	  });
+   173	
+   174	  it('happy-path regression: a swim with every entry at template-known stages emits NO unbucketed column or group', async () => {
+   175	    // No additional entries — the baseline fixture seeds only
+   176	    // template-valid stages (Drafting / Sketched / Approved / Drafted).
+   177	    const r = await getHtml(app, '/dev/editorial-studio');
+   178	    expect(r.status).toBe(200);
+   179	
+   180	    // All three lanes carry no unbucketed entries → no swim should
+   181	    // render the modifier.
+   182	    expect(r.html).not.toMatch(/class="stage-col[^"]*\bis-unbucketed\b/);
+   183	    expect(r.html).not.toMatch(/class="lb-group[^"]*\bis-unbucketed\b/);
+   184	  });
+   185	
+   186	  it('renders unbucketed compact cell in swim compact strip when lane is collapsed (AUDIT-20260531-01)', async () => {
+   187	    // AUDIT-20260531-01 — `renderSwimCompact` (per-stage compact strip
+   188	    // emitted on every swim and revealed by CSS when the lane is
+   189	    // `.collapsed`) iterates only `template.linearStages +
+   190	    // template.offPipelineStages` and never reads `bucket.unbucketed`.
+   191	    // Result: the sum of visible `.sc-count` values is
+   192	    // `entryCount − unbucketed.length` while the swim-head `quick-meta`
+   193	    // reads `${bucket.entryCount} entries` — count inflated, entries
+   194	    // silently dropped from the compact strip.
+   195	    //
+   196	    // Fix mirrors the kanban + list-body precedents (AUDIT-20260530-25):
+   197	    // append a trailing `.sc-stage.is-unbucketed` cell carrying the
+   198	    // `⊘` glyph + `unbucketed.length` so the per-cell counts reconcile
+   199	    // with the swim-head's `quick-meta`.
+   200	    await writeSidecar(
+   201	      root,
+   202	      makeEntry({
+   203	        uuid: UUID_EDITORIAL_UNRECOGNIZED,
+   204	        slug: 'compact-mystery-one',
+   205	        title: 'Compact Mystery One',
+   206	        currentStage: 'NonExistentStage',
+   207	        iterationByStage: { NonExistentStage: 0 },
+   208	        lane: 'default',
+   209	      }),
+   210	    );
+   211	    await writeSidecar(
+   212	      root,
+   213	      makeEntry({
+   214	        uuid: UUID_VISUAL_UNRECOGNIZED,
+   215	        slug: 'compact-mystery-two',
+   216	        title: 'Compact Mystery Two',
+   217	        currentStage: 'AnotherMissingStage',
+   218	        iterationByStage: { AnotherMissingStage: 0 },
+   219	        lane: 'default',
+   220	      }),
+   221	    );
+   222	
+   223	    const r = await getHtml(app, '/dev/editorial-studio');
+   224	    expect(r.status).toBe(200);
+   225	
+   226	    const editorialBlock = extractLaneSection(r.html, 'default');
+   227	    expect(editorialBlock).not.toBe('');
+   228	
+   229	    // (a) Locate the `.swim-compact` substring (the per-stage
+   230	    // compact strip revealed when the lane is `.collapsed`).
+   231	    const swimCompactOpen = editorialBlock.indexOf('<div class="swim-compact"');
+   232	    expect(swimCompactOpen).toBeGreaterThanOrEqual(0);
+   233	    const swimCompactClose = editorialBlock.indexOf('</div>', swimCompactOpen);
+   234	    // The compact strip contains nested `.sc-stage` divs; find the
+   235	    // outer closing tag by scanning forward through matched opens.
+   236	    let depth = 1;
+   237	    let cursor = swimCompactOpen + '<div class="swim-compact"'.length;
+   238	    while (depth > 0 && cursor < editorialBlock.length) {
+   239	      const nextOpen = editorialBlock.indexOf('<div', cursor);
+   240	      const nextClose = editorialBlock.indexOf('</div>', cursor);
+   241	      if (nextClose === -1) break;
+   242	      if (nextOpen !== -1 && nextOpen < nextClose) {
+   243	        depth += 1;
+   244	        cursor = nextOpen + '<div'.length;
+   245	      } else {
+   246	        depth -= 1;
+   247	        cursor = nextClose + '</div>'.length;
+   248	      }
+   249	    }
+   250	    const swimCompact = editorialBlock.slice(swimCompactOpen, cursor);
+   251	    expect(swimCompact).toContain('<div class="swim-compact"');
+   252	    void swimCompactClose;
+   253	
+   254	    // (b) An unbucketed cell renders inside `.swim-compact` with
+   255	    // `data-sc-stage="unbucketed"` and the `is-unbucketed` modifier.
+   256	    expect(swimCompact).toMatch(/class="sc-stage[^"]*\bis-unbucketed\b/);
+   257	    expect(swimCompact).toContain('data-sc-stage="unbucketed"');
+   258	
+   259	    // (c) The unbucketed cell's `.sc-count` is 2 (matches
+   260	    // `bucket.unbucketed.length` for this fixture).
+   261	    const unbucketedCellMatch = swimCompact.match(
+   262	      /class="sc-stage[^"]*\bis-unbucketed\b[^"]*"[\s\S]*?<span class="sc-count">(\d+)<\/span>/,
+   263	    );
+   264	    expect(unbucketedCellMatch).not.toBeNull();
+   265	    expect(unbucketedCellMatch?.[1]).toBe('2');
+   266	
+   267	    // (d) The sum of all `.sc-count` numeric values inside
+   268	    // `.swim-compact` reconciles with `bucket.entryCount` (3).
+   269	    const scCountMatches = swimCompact.match(
+   270	      /<span class="sc-count">(\d+)<\/span>/g,
+   271	    ) ?? [];
+   272	    const compactSum = scCountMatches.reduce((acc, raw) => {
+   273	      const m = raw.match(/(\d+)/);
+   274	      return m === null ? acc : acc + Number.parseInt(m[1], 10);
+   275	    }, 0);
+   276	    expect(compactSum).toBe(3);
+   277	  });
+   278	
+   279	  it('unbucketed render is scoped per-swim: an unbucketed entry in editorial does NOT leak into the mockups swim', async () => {
+   280	    await writeSidecar(
+
+codex
+The production change is small and the test does exercise the main regression. I’m checking surrounding helpers now for whether the new compact cell conflicts with existing conventions or leaves a secondary surface unguarded.
+exec
+/bin/zsh -lc 'rg "type RawHtml|interface RawHtml|__raw|function unsafe|const unsafe" packages/studio/src -n' in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+packages/studio/src/pages/masthead-menu.ts:27:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/lib/glossary-helper.ts:2:import { unsafe, type RawHtml } from '../pages/html.ts';
+packages/studio/src/pages/help.ts:34:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/pages/pipelines.ts:41:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/components/scrapbook-item.ts:51:import { html, unsafe, type RawHtml } from '../pages/html.ts';
+packages/studio/src/pages/review-scrapbook-drawer.ts:42:import { html, unsafe, escapeHtml, type RawHtml } from './html.ts';
+packages/studio/src/pages/review-scrapbook-drawer.ts:98:  return unsafe(rows.map((r) => r.__raw).join(''));
+packages/studio/src/pages/chrome.ts:19:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/pages/shortform-review-mobile-sheet.ts:41:import { html, unsafe, escapeHtml, type RawHtml } from './html.ts';
+packages/studio/src/pages/mobile-bar.ts:30:import { html, unsafe, escapeHtml, type RawHtml } from './html.ts';
+packages/studio/src/pages/content.ts:44:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/pages/scrapbook/index.ts:75:  const cardsHtml = cards.map((c) => c.__raw).join('');
+packages/studio/src/pages/masthead.ts:39:import { html, unsafe, escapeHtml, type RawHtml } from './html.ts';
+packages/studio/src/pages/index.ts:23:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/pages/shortform.ts:19:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/pages/shortform.ts:95:  const rows = workflows.map((w) => renderRow(w, now).__raw).join('');
+packages/studio/src/pages/shortform.ts:124:      ? renderEmptyState().__raw
+packages/studio/src/pages/shortform.ts:126:          .map((p) => renderPlatformSection(p, byPlatform.get(p) ?? [], now).__raw)
+packages/studio/src/pages/lanes/edit-form.ts:22:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/html.ts:9: *   - `unsafe(...)` (object with `__raw`)   → inserted verbatim
+packages/studio/src/pages/html.ts:20:export interface RawHtml {
+packages/studio/src/pages/html.ts:21:  readonly __raw: string;
+packages/studio/src/pages/html.ts:25:export function unsafe(s: string): RawHtml {
+packages/studio/src/pages/html.ts:26:  return { __raw: s };
+packages/studio/src/pages/html.ts:34:    '__raw' in value &&
+packages/studio/src/pages/html.ts:35:    typeof (value as { __raw: unknown }).__raw === 'string'
+packages/studio/src/pages/html.ts:55:  if (isRaw(value)) return value.__raw;
+packages/studio/src/pages/content-detail.ts:26:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/pages/shortform-review.ts:49:import { escapeHtml, html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/pages/entry-review/mobile-sheet.ts:30:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/pipelines/edit-form.ts:31:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/scrapbook/render.ts:19:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/lanes/table.ts:26:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/lanes.ts:37:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/pages/lanes/archived-section.ts:16:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/entry-review/not-found.ts:17:      ${unsafe(folio.__raw)}
+packages/studio/src/pages/entry-review/outline-drawer.ts:20:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/entry-review/edit-toolbar.ts:18:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/lanes/new-form.ts:21:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/entry-review/version-strip.ts:22:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/entry-review/decision-strip.ts:27:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/pipelines/new-form.ts:20:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/entry-review/edit-panes.ts:11:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/entry-review/index.ts:42:import { html, unsafe, escapeHtml, gloss, type RawHtml } from '../html.ts';
+packages/studio/src/pages/entry-review/shortcuts.ts:13:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/pipelines/table.ts:35:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/swimlane-focus-strip.ts:13:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/swimlane-focus-strip.ts:32:  const chipsRaw = laneRows.map((r) => renderFocusChip(r).__raw).join('');
+packages/studio/src/pages/pipelines/error-banner.ts:15:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/pipelines/view-panel.ts:23:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard.ts:38:import { html, unsafe, type RawHtml } from './html.ts';
+packages/studio/src/pages/dashboard/swimlane-list-body.ts:52:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/swimlane-list-body.ts:129:    ? renderEmptyListRow(stage).__raw
+packages/studio/src/pages/dashboard/swimlane-list-body.ts:130:    : entries.map((e) => renderListRow(e, defaultSite).__raw).join('');
+packages/studio/src/pages/dashboard/swimlane-list-body.ts:173:      ).__raw,
+packages/studio/src/pages/dashboard/swimlane-list-body.ts:188:      ).__raw,
+packages/studio/src/pages/dashboard/swimlane-list-body.ts:195:    renderUnbucketedListGroup(lane.id, bucket.unbucketed).__raw,
+packages/studio/src/pages/dashboard/shortform-section.ts:37:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/shortform-section.ts:182:  const rows = workflows.map((w) => renderShortformRow(w, now).__raw).join('');
+packages/studio/src/pages/dashboard/shortform-section.ts:225:    return `${tile.__raw}${group.__raw}`;
+packages/studio/src/pages/dashboard/affordances.ts:48:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/header.ts:17:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:29:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:92:    .map((entry) => renderUnbucketedKanbanRow(entry).__raw)
+packages/studio/src/pages/dashboard/adjacent-section.ts:25:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/adjacent-section.ts:69:  const tiles = FUTURE_TILES.map((t) => renderFutureTile(t).__raw).join('');
+packages/studio/src/pages/dashboard/swimlane-rail.ts:41:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/swimlane-rail.ts:157:    .map((r, idx) => renderRailRow(r, idx === 0, idx === lastIdx).__raw)
+packages/studio/src/pages/dashboard/swimlane-rail.ts:159:  const presetSurfaceRaw = renderPresetSurface().__raw;
+packages/studio/src/pages/entry-review/marginalia.ts:26:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/entry-review/members-section.ts:48:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/entry-review/members-section.ts:142:        : entries.map((m) => renderMemberStageCard(m, bucket.template.id).__raw).join('');
+packages/studio/src/pages/entry-review/members-section.ts:219:  const laneBlocks = buckets.map((b) => renderComposedLane(b).__raw).join('');
+packages/studio/src/pages/entry-review/members-section.ts:220:  const unbucketedTail = renderUnbucketedTail(unbucketed).__raw;
+packages/studio/src/pages/entry-review/members-section.ts:325:        return renderListRow(item.entry, laneConfigsById).__raw;
+packages/studio/src/pages/entry-review/members-section.ts:328:        return renderCorruptRow(item.uuid).__raw;
+packages/studio/src/pages/entry-review/members-section.ts:333:      return renderMissingRow(item.uuid).__raw;
+packages/studio/src/pages/entry-review/members-section.ts:450:  return renderPopulatedSection(input).__raw;
+packages/studio/src/pages/dashboard/lane-stack-card.ts:53:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/lane-stack-card.ts:195:  const listBodyRaw = renderListBody(bucket, defaultSite).__raw;
+packages/studio/src/pages/dashboard/lane-stack-card.ts:197:    ? renderLaneStackEmptyCta(lane.id, lane.name).__raw
+packages/studio/src/pages/dashboard/lane-stack-card.ts:248:      return renderLaneSection(bucket, defaultSite, focusHidden).__raw;
+packages/studio/src/pages/dashboard/swimlane-card.ts:69:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/swimlane-card.ts:210:        .map((e, i) => renderRow(e, i, template, defaultSite, parentsByMemberUuid).__raw)
+packages/studio/src/pages/dashboard/swimlane-card.ts:389:  const unbucketedRaw = renderUnbucketedCompactCell(bucket.unbucketed).__raw;
+packages/studio/src/pages/dashboard/swimlane-card.ts:414:      ).__raw,
+packages/studio/src/pages/dashboard/swimlane-card.ts:431:      ).__raw,
+packages/studio/src/pages/dashboard/swimlane-card.ts:437:    renderUnbucketedStageCol(lane.id, bucket.unbucketed).__raw,
+packages/studio/src/pages/dashboard/swimlane-shell.ts:41:import { html, unsafe, type RawHtml } from '../html.ts';
+packages/studio/src/pages/dashboard/swimlane-shell.ts:193:  const railRaw = renderRail(laneRows, laneIds.length).__raw;
+packages/studio/src/pages/dashboard/swimlane-shell.ts:194:  const focusStripRaw = renderFocusStrip(laneRows, allActive).__raw;
+packages/studio/src/pages/dashboard/swimlane-shell.ts:223:        renderSwimlane(bucket, defaultSite, swimHidden, parentsByMemberUuid).__raw
+packages/studio/src/pages/dashboard/swimlane-shell.ts:224:        + renderSwimStub(row, stubHidden).__raw
+packages/studio/src/pages/dashboard/swimlane-shell.ts:267:  const laneStackRaw = renderLaneStack(lanes.byLane, focused, defaultSite).__raw;
+packages/studio/src/pages/dashboard/section.ts:9:import { html, unsafe, type RawHtml } from '../html.ts';
+
+exec
+/bin/zsh -lc 'rg "extractLaneSection|extractStageGridSection|extractListBodySection" -n packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts' in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+27:  extractLaneSection,
+28:  extractStageGridSection,
+29:  extractListBodySection,
+73:    const editorialBlock = extractLaneSection(r.html, 'default');
+77:    const stageGrid = extractStageGridSection(editorialBlock);
+90:    const listBody = extractListBodySection(editorialBlock);
+127:    const editorialBlock = extractLaneSection(r.html, 'default');
+144:    const stageGridHtml = extractStageGridSection(editorialBlock);
+148:    const listBodyHtml = extractListBodySection(editorialBlock);
+226:    const editorialBlock = extractLaneSection(r.html, 'default');
+295:    const editorialBlock = extractLaneSection(r.html, 'default');
+296:    const mockupsBlock = extractLaneSection(r.html, 'mockups');
+300:    expect(extractStageGridSection(editorialBlock)).toMatch(
+307:    expect(extractListBodySection(mockupsBlock)).not.toMatch(
+
+exec
+/bin/zsh -lc 'rg "renderUnbucketed|UNBUCKETED|unbucketed" packages/studio/src/pages/dashboard -n' in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+packages/studio/src/pages/dashboard/swimlane-list-body.ts:55:import { renderUnbucketedListGroup } from './swimlane-unbucketed.ts';
+packages/studio/src/pages/dashboard/swimlane-list-body.ts:191:    // unbucketed-tail column. Same data, same operator-diagnosable
+packages/studio/src/pages/dashboard/swimlane-list-body.ts:195:    renderUnbucketedListGroup(lane.id, bucket.unbucketed).__raw,
+packages/studio/src/pages/dashboard/swimlane-card.ts:75:  renderUnbucketedStageCol,
+packages/studio/src/pages/dashboard/swimlane-card.ts:76:  renderUnbucketedCompactCell,
+packages/studio/src/pages/dashboard/swimlane-card.ts:77:} from './swimlane-unbucketed.ts';
+packages/studio/src/pages/dashboard/swimlane-card.ts:383:  // Per AUDIT-20260531-01 — trailing unbucketed cell so the per-cell
+packages/studio/src/pages/dashboard/swimlane-card.ts:386:  // unbucketed in). Mirrors the kanban + list-body unbucketed-tail
+packages/studio/src/pages/dashboard/swimlane-card.ts:389:  const unbucketedRaw = renderUnbucketedCompactCell(bucket.unbucketed).__raw;
+packages/studio/src/pages/dashboard/swimlane-card.ts:391:    <div class="swim-compact" data-swim-compact>${unsafe(cellsRaw)}${unsafe(unbucketedRaw)}</div>`);
+packages/studio/src/pages/dashboard/swimlane-card.ts:433:    // Per AUDIT-20260530-25 — unbucketed-tail column. See
+packages/studio/src/pages/dashboard/swimlane-card.ts:434:    // `swimlane-unbucketed.ts` for the rationale; this call reconciles
+packages/studio/src/pages/dashboard/swimlane-card.ts:435:    // the swim-head count (which already folds unbucketed entries into
+packages/studio/src/pages/dashboard/swimlane-card.ts:437:    renderUnbucketedStageCol(lane.id, bucket.unbucketed).__raw,
+packages/studio/src/pages/dashboard/lane-data.ts:34: *     stage list go into an "unbucketed" array on the lane bucket and
+packages/studio/src/pages/dashboard/lane-data.ts:39: *     `bucket.unbucketed` and emit an explicit `(unrecognized stage)`
+packages/studio/src/pages/dashboard/lane-data.ts:83:  readonly unbucketed: readonly Entry[];
+packages/studio/src/pages/dashboard/lane-data.ts:84:  /** Total entry count for the lane (sum of all stage buckets + unbucketed). */
+packages/studio/src/pages/dashboard/lane-data.ts:123:  unbucketed: Entry[];
+packages/studio/src/pages/dashboard/lane-data.ts:192:      unbucketed: [],
+packages/studio/src/pages/dashboard/lane-data.ts:223:        unbucketed: [],
+packages/studio/src/pages/dashboard/lane-data.ts:235: * of `{ unbucketed-by-lane, unrouted }` for later aggregation.
+packages/studio/src/pages/dashboard/lane-data.ts:245:  unbucketedByLane: Map<string, Entry[]>;
+packages/studio/src/pages/dashboard/lane-data.ts:248:  const unbucketedByLane = new Map<string, Entry[]>();
+packages/studio/src/pages/dashboard/lane-data.ts:275:      // as unbucketed so the count is visible.
+packages/studio/src/pages/dashboard/lane-data.ts:276:      const arr = unbucketedByLane.get(laneId) ?? [];
+packages/studio/src/pages/dashboard/lane-data.ts:278:      unbucketedByLane.set(laneId, arr);
+packages/studio/src/pages/dashboard/lane-data.ts:289:  return { unbucketedByLane, unrouted };
+packages/studio/src/pages/dashboard/lane-data.ts:316:  unbucketed: readonly Entry[],
+packages/studio/src/pages/dashboard/lane-data.ts:323:    unbucketed,
+packages/studio/src/pages/dashboard/lane-data.ts:345:  const { unbucketedByLane, unrouted } = bucketIntoLanes(entries, builders);
+packages/studio/src/pages/dashboard/lane-data.ts:353:    const unbucketed = unbucketedByLane.get(id) ?? [];
+packages/studio/src/pages/dashboard/lane-data.ts:354:    let total = unbucketed.length;
+packages/studio/src/pages/dashboard/lane-data.ts:356:    finalByLane.set(id, freezeBucket(builder, unbucketed, total));
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:2: * Per-swim unbucketed-tail renderers (AUDIT-20260530-25).
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:14: * out-of-template entries into `bucket.unbucketed` AND folded them
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:16: * grid) nor `renderListBody` (list view) read from `bucket.unbucketed`.
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:21: * The kanban tail (`renderUnbucketedStageCol`) emits a trailing
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:22: * `.stage-col.is-unbucketed` column. The list-body tail
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:23: * (`renderUnbucketedListGroup`) emits a trailing `.lb-group.is-unbucketed`
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:34: * Glyph used to mark the unbucketed tail in both surfaces. Mirrors
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:35: * the `⊘` glyph the entry-review composed view's unbucketed tail
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:39:const UNBUCKETED_GLYPH = '⊘';
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:41:const UNBUCKETED_STAGE_LABEL = '(unrecognized stage)';
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:44: * Render one unbucketed entry as a self-contained kanban row. The
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:56:function renderUnbucketedKanbanRow(entry: Entry): RawHtml {
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:58:  return unsafe(html`<div class="er-row-shell er-row-shell--unbucketed" data-row-shell data-search="${search}"
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:66:          <span class="er-row-unbucketed-stage" data-unbucketed-current-stage="${entry.currentStage}">stage: ${entry.currentStage}</span>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:73: * Kanban-surface unbucketed tail. Renders a trailing `.stage-col`
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:74: * column carrying `.is-unbucketed`; each entry uses
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:75: * `renderUnbucketedKanbanRow` rather than the standard `renderRow`
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:79: * Returns the empty string (as `RawHtml`) when there are no unbucketed
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:82:export function renderUnbucketedStageCol(
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:84:  unbucketed: readonly Entry[],
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:86:  if (unbucketed.length === 0) return unsafe('');
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:89:  const stageId = `lane-${laneIdSlug}-stage-unbucketed`;
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:91:  const rowsRaw = unbucketed
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:92:    .map((entry) => renderUnbucketedKanbanRow(entry).__raw)
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:96:    <section class="stage-col is-unbucketed"
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:98:      data-stage-col="unbucketed"
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:99:      data-stage-section="unbucketed"
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:100:      data-unbucketed>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:102:        <span class="stage-glyph" aria-hidden="true">${UNBUCKETED_GLYPH}</span>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:103:        <span class="stage-name">${UNBUCKETED_STAGE_LABEL}</span>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:104:        <span class="stage-count">${unbucketed.length}</span>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:111: * Compact-strip unbucketed cell (AUDIT-20260531-01). Renders a trailing
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:112: * `.sc-stage.is-unbucketed` cell appended to the per-swim
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:120: * surfaces — `renderUnbucketedStageCol` (kanban grid) and
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:121: * `renderUnbucketedListGroup` (list body) — which already reconcile
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:122: * `bucket.unbucketed` against the swim-head's `quick-meta` count.
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:123: * Pre-fix, the collapsed compact strip read `entryCount - unbucketed.length`
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:125: * unbucketed entries; this cell closes that reconciliation gap.
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:127: * Returns the empty string (as `RawHtml`) when there are no unbucketed
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:130:export function renderUnbucketedCompactCell(
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:131:  unbucketed: readonly Entry[],
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:133:  if (unbucketed.length === 0) return unsafe('');
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:136:    <div class="sc-stage is-unbucketed" data-sc-stage="unbucketed">
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:137:      <span class="sc-name">${UNBUCKETED_GLYPH} ${UNBUCKETED_STAGE_LABEL}</span>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:138:      <span class="sc-count">${unbucketed.length}</span>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:143: * List-surface unbucketed tail. Renders a trailing `.lb-group` group
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:144: * carrying `.is-unbucketed`; each entry uses the same `.lb-row` chrome
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:149: * Returns the empty string (as `RawHtml`) when there are no unbucketed
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:152:export function renderUnbucketedListGroup(
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:154:  unbucketed: readonly Entry[],
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:156:  if (unbucketed.length === 0) return unsafe('');
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:159:  const rowsRaw = unbucketed
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:162:      return html`<a class="lb-row lb-row--unbucketed" href="${reviewLink}"
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:169:        <span class="lb-state" data-unbucketed-current-stage="${entry.currentStage}">stage: ${entry.currentStage}</span>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:177:    <div class="lb-group is-unbucketed"
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:178:      data-lb-group="unbucketed"
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:179:      data-unbucketed>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:181:        <span class="lb-glyph" aria-hidden="true">${UNBUCKETED_GLYPH}</span>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:182:        <span class="lb-name">${UNBUCKETED_STAGE_LABEL}</span>
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:183:        <span class="lb-count">${unbucketed.length}</span>
+
+exec
+/bin/zsh -lc "sed -n '1,110p' packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+/**
+ * AUDIT-20260530-25 — Dashboard `bucket.unbucketed` entries are silently
+ * dropped from the rendered swimlane while still inflating every entry-
+ * count display. This regression mirrors AUDIT-20260530-14 (canonical
+ * calendar SSOT) and AUDIT-20260529-37 (entry-review composed view),
+ * both of which were closed by emitting an explicit
+ * `(unrecognized stage)` tail section so stage-not-in-template entries
+ * remain visible.
+ *
+ * The fix path here is the dashboard analogue: render `bucket.unbucketed`
+ * as a trailing `.stage-col.is-unbucketed` column on each swim's kanban
+ * grid AND as a trailing `.lb-group.is-unbucketed` group on each swim's
+ * list-body. Each unbucketed entry's raw `currentStage` value is
+ * surfaced so the operator can diagnose the routing drift inline.
+ *
+ * Pure integration — uses real sidecars, real lane configs, real
+ * pipeline templates. No mocks. Per `.claude/rules/testing.md`,
+ * fixture project trees live on disk via `mkdtempSync`.
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { writeSidecar } from '@deskwork/core/sidecar';
+import {
+  setupDashboardFixture,
+  getHtml,
+  makeEntry,
+  extractLaneSection,
+  extractStageGridSection,
+  extractListBodySection,
+} from './__helpers/dashboard-swimlane-fixture.ts';
+import { createApp } from '../src/server.ts';
+
+const UUID_EDITORIAL_UNRECOGNIZED = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const UUID_VISUAL_UNRECOGNIZED = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+describe('dashboard swimlane AUDIT-20260530-25 — unbucketed entries are rendered (not silently dropped)', () => {
+  let root: string;
+  let app: ReturnType<typeof createApp>;
+  let cleanup: () => void;
+
+  beforeEach(async () => {
+    const fixture = await setupDashboardFixture();
+    root = fixture.root;
+    app = fixture.app;
+    cleanup = fixture.cleanup;
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders unbucketed entries (currentStage not in template) as a trailing kanban column with the raw stage shown', async () => {
+    // Seed a fifth entry in the editorial lane whose `currentStage` is
+    // not part of the editorial template (Ideas / Planned / Outlining /
+    // Drafting / Final / Published / Blocked / Cancelled). The entry
+    // MUST appear in the rendered dashboard with its offending stage
+    // visible so the operator can diagnose the routing drift.
+    await writeSidecar(
+      root,
+      makeEntry({
+        uuid: UUID_EDITORIAL_UNRECOGNIZED,
+        slug: 'mystery-stage-entry',
+        title: 'Mystery Stage Entry',
+        currentStage: 'NonExistentStage',
+        iterationByStage: { NonExistentStage: 0 },
+        lane: 'default',
+      }),
+    );
+
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+
+    const editorialBlock = extractLaneSection(r.html, 'default');
+    expect(editorialBlock).not.toBe('');
+
+    // (a) An unbucketed kanban column renders in the editorial swim.
+    const stageGrid = extractStageGridSection(editorialBlock);
+    expect(stageGrid).toMatch(/class="stage-col[^"]*\bis-unbucketed\b/);
+
+    // (b) The unbucketed entry's slug appears in the rendered HTML
+    // (operator-perceivable proof the entry did not vanish).
+    expect(editorialBlock).toContain('data-slug="mystery-stage-entry"');
+
+    // (c) The entry's raw `currentStage` value is shown so the operator
+    // can diagnose the data-integrity drift.
+    expect(stageGrid).toContain('NonExistentStage');
+
+    // (d) The list-body also surfaces an unbucketed group so the list
+    // view stays consistent with the kanban view.
+    const listBody = extractListBodySection(editorialBlock);
+    expect(listBody).toMatch(/class="lb-group[^"]*\bis-unbucketed\b/);
+    expect(listBody).toContain('data-slug="mystery-stage-entry"');
+    expect(listBody).toContain('NonExistentStage');
+  });
+
+  it('count consistency: swim-head `${n} entries` matches the visible cards once unbucketed renders', async () => {
+    // Editorial lane fixture seeds 1 entry (a-draft, Drafting). Add 2
+    // unbucketed entries → count must read 3 entries; the rendered
+    // editorial block must contain 3 row-shell / lb-row markers (1
+    // template-bucketed + 2 unbucketed).
+    await writeSidecar(
+      root,
+      makeEntry({
+        uuid: UUID_EDITORIAL_UNRECOGNIZED,
+        slug: 'mystery-one',
+        title: 'Mystery One',
+        currentStage: 'NonExistentStage',
+        iterationByStage: { NonExistentStage: 0 },
+        lane: 'default',
+      }),
+
+exec
+/bin/zsh -lc 'rg "function extractLaneSection|export function extractLaneSection|extractStageGridSection|extractListBodySection" packages/studio/test -n' in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:164:export function extractLaneSection(html: string, laneId: string): string {
+packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:190:export function extractStageGridSection(htmlSection: string): string {
+packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:205:export function extractListBodySection(htmlSection: string): string {
+packages/studio/test/dashboard-swimlane-cta-render.test.ts:40:  extractStageGridSection,
+packages/studio/test/dashboard-swimlane-cta-render.test.ts:106:    const visual = extractStageGridSection(extractLaneSection(r.html, 'mockups'));
+packages/studio/test/dashboard-swimlane-cta-render.test.ts:119:    const qa = extractStageGridSection(extractLaneSection(r.html, 'qa'));
+packages/studio/test/dashboard-swimlane-cta-render.test.ts:132:    const visual = extractStageGridSection(extractLaneSection(r.html, 'mockups'));
+packages/studio/test/dashboard-swimlane-cta-render.test.ts:242:      const cols = extractStageCols(extractStageGridSection(mockups));
+packages/studio/test/dashboard-swimlane-list-render.test.ts:21:  extractListBodySection,
+packages/studio/test/dashboard-swimlane-list-render.test.ts:124:    const editorialListBody = extractListBodySection(editorialBlock);
+packages/studio/test/dashboard-swimlane-list-render.test.ts:128:    const visualListBody = extractListBodySection(extractLaneSection(r.html, 'mockups'));
+packages/studio/test/dashboard-swimlane-list-render.test.ts:131:    const qaListBody = extractListBodySection(extractLaneSection(r.html, 'qa'));
+packages/studio/test/dashboard-swimlane-list-render.test.ts:138:    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+packages/studio/test/dashboard-swimlane-list-render.test.ts:156:    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+packages/studio/test/dashboard-swimlane-list-render.test.ts:177:    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+packages/studio/test/dashboard-swimlane-list-render.test.ts:207:    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+packages/studio/test/dashboard-swimlane-list-render.test.ts:212:    const qaListBody = extractListBodySection(extractLaneSection(r.html, 'qa'));
+packages/studio/test/dashboard-swimlane-list-render.test.ts:223:    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+packages/studio/test/dashboard-swimlane-list-render.test.ts:243:    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+packages/studio/test/dashboard-swimlane-collapse-render.test.ts:19:  extractStageGridSection,
+packages/studio/test/dashboard-swimlane-collapse-render.test.ts:79:      const grid = extractStageGridSection(extractLaneSection(r.html, laneId));
+packages/studio/test/dashboard-swimlane-collapse-render.test.ts:91:    const editorialGrid = extractStageGridSection(extractLaneSection(r.html, 'default'));
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:28:  extractStageGridSection,
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:29:  extractListBodySection,
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:77:    const stageGrid = extractStageGridSection(editorialBlock);
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:90:    const listBody = extractListBodySection(editorialBlock);
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:144:    const stageGridHtml = extractStageGridSection(editorialBlock);
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:148:    const listBodyHtml = extractListBodySection(editorialBlock);
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:300:    expect(extractStageGridSection(editorialBlock)).toMatch(
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:307:    expect(extractListBodySection(mockupsBlock)).not.toMatch(
+packages/studio/test/dashboard-lane-stack-render.test.ts:58:function extractLaneSectionMarkup(html: string, laneId: string): string {
+packages/studio/test/dashboard-swimlane-integration.test.ts:68:function extractLaneSection(html: string, laneId: string): string {
+
+exec
+/bin/zsh -lc "sed -n '1,230p' packages/studio/test/dashboard-render-helpers.ts 2>/dev/null || true" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+exec
+/bin/zsh -lc "nl -ba packages/studio/test/__helpers/dashboard-swimlane-fixture.ts | sed -n '150,220p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+   150	
+   151	  return {
+   152	    root,
+   153	    app,
+   154	    cleanup: () => rmSync(root, { recursive: true, force: true }),
+   155	  };
+   156	}
+   157	
+   158	/**
+   159	 * Extract the substring of HTML from a `<article class="swim"
+   160	 * data-lane-id="<id>"` to its closing `</article>`. Used to scope
+   161	 * per-lane assertions so a Drafting column in editorial doesn't
+   162	 * leak into mockups-lane assertions.
+   163	 */
+   164	export function extractLaneSection(html: string, laneId: string): string {
+   165	  // Matches `<article class="swim"` or `<article class="swim swim--<id>"`
+   166	  // — the template-id modifier means the regex tolerates additional
+   167	  // class tokens before the `data-lane-id` attribute.
+   168	  const openPattern = new RegExp(
+   169	    `<article class="swim(?:\\s[^"]*)?"[^>]*data-lane-id="${laneId}"`,
+   170	  );
+   171	  const openMatch = openPattern.exec(html);
+   172	  if (openMatch === null) return '';
+   173	  const startIdx = openMatch.index;
+   174	  const closeIdx = html.indexOf('</article>', startIdx);
+   175	  if (closeIdx === -1) return html.slice(startIdx);
+   176	  return html.slice(startIdx, closeIdx + '</article>'.length);
+   177	}
+   178	
+   179	export function extractStageCols(htmlSection: string): readonly string[] {
+   180	  return htmlSection.match(/data-stage-col="[^"]+"/g) ?? [];
+   181	}
+   182	
+   183	/**
+   184	 * Extract the substring of HTML between a swim's `<div class="stage-
+   185	 * grid">` opening and its closing tag. Task 5.1B added a sibling
+   186	 * `<div class="list-body">` — when callers want to assert kanban-
+   187	 * specific markup without leaking into list-body matches, slice the
+   188	 * stage-grid section first.
+   189	 */
+   190	export function extractStageGridSection(htmlSection: string): string {
+   191	  const openIdx = htmlSection.indexOf('<div class="stage-grid"');
+   192	  if (openIdx === -1) return '';
+   193	  const sentinel = '<div class="list-body"';
+   194	  const closeIdx = htmlSection.indexOf(sentinel, openIdx);
+   195	  if (closeIdx === -1) return htmlSection.slice(openIdx);
+   196	  return htmlSection.slice(openIdx, closeIdx);
+   197	}
+   198	
+   199	/**
+   200	 * Extract the substring of HTML between a swim's `<div class="list-
+   201	 * body">` opening and its closing tag (the swim's closing
+   202	 * `</article>` is the boundary). Used to scope assertions inside the
+   203	 * list-body without bleeding into the kanban stage-grid above.
+   204	 */
+   205	export function extractListBodySection(htmlSection: string): string {
+   206	  const openIdx = htmlSection.indexOf('<div class="list-body"');
+   207	  if (openIdx === -1) return '';
+   208	  const closeIdx = htmlSection.indexOf('</article>', openIdx);
+   209	  if (closeIdx === -1) return htmlSection.slice(openIdx);
+   210	  return htmlSection.slice(openIdx, closeIdx);
+   211	}
+
+exec
+/bin/zsh -lc 'wc -l packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts packages/studio/src/pages/dashboard/swimlane-unbucketed.ts packages/studio/src/pages/dashboard/swimlane-card.ts' in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+     311 packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts
+     187 packages/studio/src/pages/dashboard/swimlane-unbucketed.ts
+     507 packages/studio/src/pages/dashboard/swimlane-card.ts
+    1005 total
+
+exec
+/bin/zsh -lc 'rg "data-sc-stage|sc-stage|swim-compact" packages/studio/src packages/studio/test -n' in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:197:    // append a trailing `.sc-stage.is-unbucketed` cell carrying the
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:229:    // (a) Locate the `.swim-compact` substring (the per-stage
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:231:    const swimCompactOpen = editorialBlock.indexOf('<div class="swim-compact"');
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:234:    // The compact strip contains nested `.sc-stage` divs; find the
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:237:    let cursor = swimCompactOpen + '<div class="swim-compact"'.length;
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:251:    expect(swimCompact).toContain('<div class="swim-compact"');
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:254:    // (b) An unbucketed cell renders inside `.swim-compact` with
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:255:    // `data-sc-stage="unbucketed"` and the `is-unbucketed` modifier.
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:256:    expect(swimCompact).toMatch(/class="sc-stage[^"]*\bis-unbucketed\b/);
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:257:    expect(swimCompact).toContain('data-sc-stage="unbucketed"');
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:262:      /class="sc-stage[^"]*\bis-unbucketed\b[^"]*"[\s\S]*?<span class="sc-count">(\d+)<\/span>/,
+packages/studio/test/dashboard-swimlane-unbucketed-render.test.ts:268:    // `.swim-compact` reconciles with `bucket.entryCount` (3).
+packages/studio/src/pages/dashboard/swimlane-card.ts:9: *     focused lane (swim-head + swim-compact strip + kanban-style
+packages/studio/src/pages/dashboard/swimlane-card.ts:168:  // lines 540 / 826 (.swim-compact .sc-stage.locked .sc-count), a
+packages/studio/src/pages/dashboard/swimlane-card.ts:339: * swim body (between `.swim-head` and `.swim-compact`), not in any
+packages/studio/src/pages/dashboard/swimlane-card.ts:377:        <div class="sc-stage${unsafe(empty)}${unsafe(locked)}" data-sc-stage="${stage}">
+packages/studio/src/pages/dashboard/swimlane-card.ts:391:    <div class="swim-compact" data-swim-compact>${unsafe(cellsRaw)}${unsafe(unbucketedRaw)}</div>`);
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:112: * `.sc-stage.is-unbucketed` cell appended to the per-swim
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:113: * `.swim-compact` strip (revealed by CSS when the lane is `.collapsed`).
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:115: * `renderSwimCompact` (`.sc-stage` > `.sc-name` + `.sc-count`) so the
+packages/studio/src/pages/dashboard/swimlane-unbucketed.ts:136:    <div class="sc-stage is-unbucketed" data-sc-stage="unbucketed">
+packages/studio/test/dashboard-swimlane.test.ts:340:  it('swim-compact strip mirrors the locked-stage modifier (.sc-stage.locked)', async () => {
+packages/studio/test/dashboard-swimlane.test.ts:343:    // Editorial Final → sc-stage.locked.
+packages/studio/test/dashboard-swimlane.test.ts:346:      /class="sc-stage[^"]*\blocked\b[^"]*"[^>]*data-sc-stage="Final"/,
+packages/studio/test/dashboard-swimlane.test.ts:348:    // QA Reviewed → sc-stage.locked.
+packages/studio/test/dashboard-swimlane.test.ts:351:      /class="sc-stage[^"]*\blocked\b[^"]*"[^>]*data-sc-stage="Reviewed"/,
+packages/studio/src/pages/dashboard/swimlane-shell.ts:13: * offPipelineStages). The compact per-stage strip (`.swim-compact`)
+
+exec
+/bin/zsh -lc "nl -ba packages/studio/src/pages/dashboard/swimlane-card.ts | sed -n '394,490p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+   394	export function renderSwimlane(
+   395	  bucket: LaneBucket,
+   396	  defaultSite: string,
+   397	  focusHidden: boolean,
+   398	  parentsByMemberUuid: ReadonlyMap<string, readonly Entry[]>,
+   399	): RawHtml {
+   400	  const { lane, template } = bucket;
+   401	  const lockedSet = new Set<string>(template.lockedStages ?? []);
+   402	  const stagesRaw = [
+   403	    ...template.linearStages.map((stage) =>
+   404	      renderStageCol(
+   405	        lane.id,
+   406	        template,
+   407	        stage,
+   408	        bucket.byStage.get(stage) ?? [],
+   409	        defaultSite,
+   410	        stageGlyph(stage),
+   411	        false,
+   412	        lockedSet.has(stage),
+   413	        parentsByMemberUuid,
+   414	      ).__raw,
+   415	    ),
+   416	    ...template.offPipelineStages.map((stage) =>
+   417	      renderStageCol(
+   418	        lane.id,
+   419	        template,
+   420	        stage,
+   421	        bucket.byStage.get(stage) ?? [],
+   422	        defaultSite,
+   423	        stageGlyph(stage, GLYPH_OFF),
+   424	        true,
+   425	        // Off-pipeline stages are not part of lockedStages (the
+   426	        // template schema enforces lockedStages ⊆ linearStages),
+   427	        // so this is always false. Pass it explicitly to keep the
+   428	        // signature parallel.
+   429	        false,
+   430	        parentsByMemberUuid,
+   431	      ).__raw,
+   432	    ),
+   433	    // Per AUDIT-20260530-25 — unbucketed-tail column. See
+   434	    // `swimlane-unbucketed.ts` for the rationale; this call reconciles
+   435	    // the swim-head count (which already folds unbucketed entries into
+   436	    // `entryCount`) with the visible cards.
+   437	    renderUnbucketedStageCol(lane.id, bucket.unbucketed).__raw,
+   438	  ].join('');
+   439	
+   440	  const stageCount = template.linearStages.length + template.offPipelineStages.length;
+   441	  const tag = `${template.id} · ${stageCount} stages`;
+   442	  const meta = `${bucket.entryCount} entries`;
+   443	  // Pipeline-template schema invariant: linearStages.length ≥ 1
+   444	  // (`packages/core/src/pipelines/types.ts:99` — `uniqueStringArray
+   445	  // ('linearStages', 1)`). If a malformed template ever reaches the
+   446	  // renderer at runtime, surface the violation as an error rather
+   447	  // than silently emitting an empty `data-first-stage` attribute
+   448	  // (per the project's no-fallback rule).
+   449	  const firstLinearStage = template.linearStages[0];
+   450	  if (firstLinearStage === undefined) {
+   451	    throw new Error(
+   452	      `pipeline template "${template.id}" has empty linearStages — `
+   453	      + 'the schema enforces a minimum of 1; this is a programming '
+   454	      + 'error reaching the swimlane renderer',
+   455	    );
+   456	  }
+   457	
+   458	  // Per AUDIT-20260528-02: swimlane server-rendered alongside its
+   459	  // stub for every visibility-on lane; CSS hides one or the other
+   460	  // via `.is-focus-hidden`. Per Task 5.1B: the server-default
+   461	  // view-mode class is `view-kanban`; the client controller
+   462	  // post-DOMContentLoaded applies the per-lane localStorage override
+   463	  // OR the viewport-aware default (mobile→list). Both bodies emit at
+   464	  // server time so the controller flips one class instead of mutating
+   465	  // DOM (mirrors the dual swim+stub pattern AUDIT-02 landed).
+   466	  const focusClass = focusHidden ? ' is-focus-hidden' : '';
+   467	  return unsafe(html`
+   468	    <article class="swim swim--${template.id} view-kanban${unsafe(focusClass)}"
+   469	      data-lane-id="${lane.id}"
+   470	      data-template-id="${template.id}">
+   471	      <div class="swim-head">
+   472	        <span class="glyph" aria-hidden="true">${laneGlyph(template.id)}</span>
+   473	        <span class="name">${lane.name}</span>
+   474	        <span class="tag">${tag}</span>
+   475	        <span class="quick-meta">${meta}</span>
+   476	        ${renderViewToggle(lane.id, lane.name)}
+   477	        ${renderComposeChip(lane.id, lane.name, firstLinearStage)}
+   478	        <button class="collapse-chev" type="button"
+   479	          aria-expanded="true"
+   480	          aria-label="Collapse ${lane.name} lane"
+   481	          data-collapse-target="lane"
+   482	          data-lane-id="${lane.id}"
+   483	          data-lane-name="${lane.name}">▾</button>
+   484	      </div>
+   485	      ${bucket.entryCount === 0 ? renderEmptyLaneCta(lane.id, lane.name) : unsafe('')}
+   486	      ${renderSwimCompact(bucket)}
+   487	      <div class="stage-grid" data-stage-grid>${unsafe(stagesRaw)}</div>
+   488	      ${renderListBody(bucket, defaultSite)}
+   489	    </article>`);
+   490	}
+
+codex
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-codex-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. The production change appends the unbucketed compact cell through the same escaped `html`/`unsafe` path used by the existing dashboard renderers, and the helper returns empty markup when no unbucketed entries exist. The strengthened test now counts rendered `data-row-shell` markers on both kanban and list surfaces, and the new compact-strip test verifies the unbucketed cell plus total `.sc-count` reconciliation. I would have flagged this if the compact cell always rendered, bypassed escaping, changed the stage-count semantics, or left the stated count-vs-visible reconciliation untested.
+tokens used
+40,744

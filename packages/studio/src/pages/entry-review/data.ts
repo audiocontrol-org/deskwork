@@ -32,6 +32,17 @@ import {
   type IterationContent,
 } from '@deskwork/core/iterate/history';
 import { listEntryAnnotations } from '@deskwork/core/entry/annotations';
+import { readSidecar, sidecarPath } from '@deskwork/core/sidecar';
+import { isPopulatedGroupEntry } from '@deskwork/core/groups';
+import {
+  listLaneConfigs,
+  loadLaneConfig,
+  type LaneConfig,
+} from '@deskwork/core/lanes';
+import {
+  loadPipelineTemplate,
+  type PipelineTemplate,
+} from '@deskwork/core/pipelines';
 import type { Entry, Stage } from '@deskwork/core/schema/entry';
 
 const VALID_STAGES: ReadonlySet<Stage> = new Set<Stage>([
@@ -47,6 +58,69 @@ function parseStageParam(raw: string | null | undefined): Stage | undefined {
 }
 import type { CalendarEntry } from '@deskwork/core/types';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
+
+/**
+ * Discriminated-union row item carrying ONE position in the group's
+ * declared `members[]` order (AUDIT-20260529-40). The three kinds
+ * mirror the three resolution outcomes:
+ *
+ *   - `resolved` — the sidecar read + validated cleanly.
+ *   - `missing` — the sidecar file is absent on disk (ENOENT).
+ *   - `corrupt` — the sidecar file is present but failed to load.
+ *
+ * The renderer's list-view path walks this sequence directly so
+ * insertion order is preserved end-to-end, regardless of which
+ * resolution outcome each position carries. Pre-AUDIT-40 the
+ * renderer concatenated resolved rows first, then corrupt, then
+ * missing — re-ordering the operator's declared sequence.
+ */
+export type MemberItem =
+  | { readonly kind: 'resolved'; readonly entry: Entry }
+  | { readonly kind: 'missing'; readonly uuid: string }
+  | { readonly kind: 'corrupt'; readonly uuid: string };
+
+/**
+ * When the entry is a populated group (Phase 7 Task 7.3 + 7.4), the
+ * loader resolves each member sidecar plus the lane configs + pipeline
+ * templates the members span. Members are returned in the original
+ * `group.members[]` insertion order.
+ *
+ * Resolution outcomes are partitioned into three distinct buckets per
+ * AUDIT-20260529-39 (no silent fallbacks):
+ *
+ *   - `members` — sidecars that read + validated cleanly.
+ *   - `missingMemberUuids` — sidecar files that don't exist on disk
+ *     (ENOENT). Surfaced as a "missing" row inline so the operator
+ *     sees a referential-integrity gap rather than silent drop.
+ *   - `corruptMemberUuids` — sidecar files that exist on disk but
+ *     failed to load (malformed JSON, schema parse failure, other
+ *     I/O errors). Surfaced as a distinct "corrupt" row so the
+ *     operator can distinguish data-loss / data-corruption from a
+ *     mere missing-reference gap. Conflating the two (the
+ *     pre-AUDIT-39 behavior) violated the project's no-silent-
+ *     fallbacks discipline.
+ *
+ * `orderedMembers` carries the three-variant discriminated union
+ * per AUDIT-20260529-40 — one item per declared UUID in
+ * `group.members[]` order. The list-view renderer walks this
+ * sequence so insertion order is preserved across resolution
+ * outcomes; the composed view continues to read `members` directly
+ * because it buckets by (lane, stage) rather than rendering an
+ * ordered flat list.
+ *
+ * `laneConfigsById` iterates in operator-configured lane order (per
+ * `listLaneConfigs`) — the same order the dashboard uses — so the
+ * composed view's per-lane block ordering is consistent across
+ * surfaces.
+ */
+export interface GroupMembersBundle {
+  readonly members: readonly Entry[];
+  readonly missingMemberUuids: readonly string[];
+  readonly corruptMemberUuids: readonly string[];
+  readonly orderedMembers: readonly MemberItem[];
+  readonly laneConfigsById: ReadonlyMap<string, LaneConfig>;
+  readonly templatesById: ReadonlyMap<string, PipelineTemplate>;
+}
 
 export interface EntryReviewData {
   readonly entry: Entry;
@@ -65,6 +139,13 @@ export interface EntryReviewData {
   /** The matching CalendarEntry, when present. Drives index-bound
    *  scrapbook resolution; null falls back to slug-template paths. */
   readonly calendarEntry: CalendarEntry | null;
+  /**
+   * Resolved group member bundle. `null` when the entry is not a
+   * populated group (no `members` array OR `members.length === 0`).
+   * Phase 7 Tasks 7.3 + 7.4. Loaded only when the group has members
+   * — pay-for-what-you-use per the project's "no fallback" rule.
+   */
+  readonly groupMembers: GroupMembersBundle | null;
 }
 
 export interface LoadOptions {
@@ -115,6 +196,140 @@ function parseVersionParam(raw: string | null | undefined): number | null {
   return parsed;
 }
 
+/**
+ * Resolve each member UUID to a sidecar; collect lane configs +
+ * pipeline templates for every lane the resolved members span.
+ *
+ * Resolution failures are partitioned into TWO distinct buckets per
+ * AUDIT-20260529-39 (no silent fallbacks):
+ *
+ *   - `missing` — the sidecar file doesn't exist on disk (ENOENT).
+ *     The doctor `group-member-missing` rule (Task 7.5.2) catches
+ *     this case at the project level; the studio surfaces it inline
+ *     as a "missing" row so the operator sees the gap.
+ *   - `corrupt` — the sidecar file exists on disk but failed to
+ *     load (malformed JSON, schema parse failure, permission error,
+ *     other I/O failure). Surfaced as a distinct "corrupt" row so
+ *     data-corruption isn't laundered as a mere reference gap. The
+ *     pre-AUDIT-39 implementation conflated the two — every failure
+ *     ended up as "missing", hiding real corruption from the
+ *     operator.
+ *
+ * The distinction is made by checking sidecar-file existence BEFORE
+ * calling `readSidecar`. File present + read fails ⇒ corrupt; file
+ * absent ⇒ missing. This avoids parsing readSidecar's error-message
+ * shape (fragile cross-package coupling).
+ *
+ * Lane configs are loaded for every member's lane (deduped). The
+ * resulting Map iterates in the operator-configured lane order from
+ * `listLaneConfigs` — the same order the dashboard's swimlane uses —
+ * so per-lane composed blocks render in a stable, operator-recognizable
+ * sequence.
+ */
+async function loadGroupMembersBundle(
+  projectRoot: string,
+  group: Entry,
+): Promise<GroupMembersBundle> {
+  const uuids = group.members ?? [];
+  const members: Entry[] = [];
+  const missing: string[] = [];
+  const corrupt: string[] = [];
+  // AUDIT-20260529-40: parallel ordered sequence of {kind, ...}
+  // items so the renderer can walk declared `group.members[]` order
+  // regardless of which resolution outcome each position carries.
+  const orderedMembers: MemberItem[] = [];
+  for (const uuid of uuids) {
+    // Distinguish ENOENT-missing from read/parse failure (corrupt)
+    // by file-existence check before the read. existsSync is sync +
+    // cheap (a single stat per UUID) and avoids fragile error-message
+    // matching against readSidecar's internal failure strings.
+    const path = sidecarPath(projectRoot, uuid);
+    if (!existsSync(path)) {
+      missing.push(uuid);
+      orderedMembers.push({ kind: 'missing', uuid });
+      continue;
+    }
+    try {
+      const sidecar = await readSidecar(projectRoot, uuid);
+      members.push(sidecar);
+      orderedMembers.push({ kind: 'resolved', entry: sidecar });
+    } catch (err) {
+      // Sidecar file exists but the read / parse / schema validation
+      // failed. Surface as corrupt — NOT missing — so the operator
+      // sees the corruption inline and can investigate. Log the
+      // underlying error so it surfaces in studio logs for the
+      // operator to triage.
+      const detail = err instanceof Error ? err.message : String(err);
+      console.warn(`entry-review: corrupt member sidecar ${uuid}: ${detail}`);
+      corrupt.push(uuid);
+      orderedMembers.push({ kind: 'corrupt', uuid });
+    }
+  }
+
+  // Lane configs + templates: load only what the resolved members
+  // actually use. Iterate in operator-configured lane order.
+  //
+  // Per AUDIT-20260529-37 (failure B): `laneConfigsById.set` only
+  // fires AFTER the corresponding template successfully resolves. If
+  // we set the lane first and the template load throws, the lane
+  // ends up in `laneConfigsById` while its template is absent from
+  // `templatesById`. Downstream `bucketMembersByLane` would then
+  // pass the lane guard, bucket members under it, and silently drop
+  // the entire bucket when the template lookup returns undefined.
+  // Set-after-template-resolves keeps the two maps in lockstep so
+  // members of a broken-template lane fall into the unbucketed tail
+  // instead of vanishing.
+  const usedLaneIds = new Set<string>();
+  for (const m of members) {
+    if (m.lane !== undefined) usedLaneIds.add(m.lane);
+  }
+  const laneConfigsById = new Map<string, LaneConfig>();
+  const templatesById = new Map<string, PipelineTemplate>();
+  if (usedLaneIds.size > 0) {
+    // Lane configs may not all exist on disk (legacy / mis-set). Skip
+    // missing ones — they show up in the members section as
+    // unrouted (lane label = the raw id).
+    const allLaneIds = listLaneConfigs(projectRoot);
+    for (const laneId of allLaneIds) {
+      if (!usedLaneIds.has(laneId)) continue;
+      try {
+        const config = loadLaneConfig(laneId, projectRoot);
+        const strict: LaneConfig = {
+          id: config.id,
+          name: config.name,
+          pipelineTemplate: config.pipelineTemplate,
+          contentDir: config.contentDir,
+        };
+        // Load template FIRST; only register the lane once the
+        // template-side load succeeds. If the template load throws,
+        // the lane stays absent from `laneConfigsById` and the
+        // bucketer falls back to unbucketed-rendering for its
+        // members.
+        if (!templatesById.has(strict.pipelineTemplate)) {
+          const tpl = loadPipelineTemplate(strict.pipelineTemplate, projectRoot);
+          templatesById.set(strict.pipelineTemplate, tpl);
+        }
+        laneConfigsById.set(strict.id, strict);
+      } catch {
+        // Lane / template failed to resolve. Skip — the member row
+        // surfaces in the composed view's unbucketed tail (and in
+        // list view as unrouted) instead of crashing the render or
+        // silently vanishing.
+        continue;
+      }
+    }
+  }
+
+  return {
+    members,
+    missingMemberUuids: missing,
+    corruptMemberUuids: corrupt,
+    orderedMembers,
+    laneConfigsById,
+    templatesById,
+  };
+}
+
 export async function loadEntryReviewData(
   ctx: StudioContext,
   entryId: string,
@@ -124,6 +339,9 @@ export async function loadEntryReviewData(
   const iterations = await listEntryIterations(ctx.projectRoot, entryId);
   const annotations = await listEntryAnnotations(ctx.projectRoot, entryId);
   const { site, calendarEntry } = findEntrySite(ctx, entryId);
+  const groupMembers = isPopulatedGroupEntry(resolved.entry)
+    ? await loadGroupMembersBundle(ctx.projectRoot, resolved.entry)
+    : null;
 
   // Historical-version handling. Only swap the markdown when both the
   // version param resolves and the journal has content for it. Stage
@@ -165,5 +383,6 @@ export async function loadEntryReviewData(
     annotations,
     site,
     calendarEntry,
+    groupMembers,
   };
 }
