@@ -15,9 +15,9 @@ Reduce `.claude/rules/agent-discipline.md` from 566 lines to ~150–200 by triag
 | Phase | Description | Status |
 |---|---|---|
 | 1 | Develop the disposition plan via deskwork review | **Complete** — PRD at Final; disposition table approved (rev 2) |
-| 2 | Per-disposition implementation cycles (2a–2e) | Planned — tasks enumerated; awaiting implementation session |
+| 2 | Per-disposition implementation cycles (2a–2e) | **Complete** — agent-discipline.md 566 → 157 lines; all dispositions landed |
 
-Phase 2 implementation runs in a **separate session** opened against this worktree (per the orchestrator-vs-implementation-session boundary). Issues filed via `/dw-lifecycle:issues`.
+`agent-discipline.md` reduced **566 → 157 lines** (target 150–200). Per-disposition outcomes recorded in `audit-log.md`. Tests green (core 535 / studio 589 / cli 211). Ready for review → ship. Operator override: Phase 2 was implemented in this session rather than a separate one, at the operator's explicit direction.
 
 ## Key Links
 

@@ -280,16 +280,18 @@ Per PRD row 17: schema-write helpers refuse top-level (non-namespaced) deskwork-
 
 Each task below: rewrite the named entry in `.claude/rules/agent-discipline.md` to its minimum useful form, then commit. Group-commit is acceptable within a sub-cluster (e.g. all of 18b–e in one commit) since these are in-place shrinks with no external home.
 
-- [ ] **Task 2e.1 — Entry 7** (`## Read documentation before quoting commands`): shrink ~10 → ≤5 lines. Keep: the rule + the "source-of-truth > plausible recall, especially when it feels obvious" why. Drop: the deskwork-plugin install-command worked example.
-- [ ] **Task 2e.2 — Entry 8 hedge-half** (`## Operator owns scope decisions`, failure-mode-1): after Task 2c.5 removed the dispatch-report half, shrink the remaining operator-hedge-default-to-ASK guidance to ≤4 lines.
-- [ ] **Task 2e.3 — Entry 14** (`## Use the deskwork plugin only through the publicly-advertised distribution channel`): shrink to ≤6 lines. Keep: "no privileged shortcuts; if the public path is broken, fix+push it." Drop: the long re-read-the-docs enumerations.
-- [ ] **Task 2e.4 — Entry 16** (`## Memory-vs-rule placement: durable lessons go in this file`): shrink to ≤3 lines (meta-rule about this file). Keep the operator's emphatic anchor; drop the per-target enumeration.
-- [ ] **Task 2e.5 — Entry 18b** (`### Don't pitch /schedule check-ins on this project`): shrink to ≤3 lines.
-- [ ] **Task 2e.6 — Entry 18c** (`### No test infrastructure in CI`): shrink to ≤4 lines (keep the "local-only smokes instead" how-to).
-- [ ] **Task 2e.7 — Entry 18d** (`### Content-management databases preserve, they don't delete`): shrink to ≤5 lines (keep the operator's verbatim anchor + the "added-by-mistake" narrow exception).
-- [ ] **Task 2e.8 — Entry 18e** (`### Stay in agent-as-user dogfood mode`): shrink to ≤4 lines.
-- [ ] **Task 2e.9 — Sub-rule 19b** (marketplace-clone script names + flags are an adopter contract, inside entry 19's section): shrink to ≤2 lines — "documented script paths/flags/exit-codes are an adopter contract; don't rename/remove, alias instead." Keep it inside the (now-shrunk) entry 19 section.
-- [ ] **Group commit** (or per-task commits): `git commit -m "refactor(agent-discipline): shrink-in-place entries 7, 8-hedge, 14, 16, 18b-e, 19b (stays-cluster)"`
+- [x] **Task 2e.1 — Entry 7** shrunk in place.
+- [x] **Task 2e.2 — Entry 8 hedge-half** shrunk; dispatch half composed into implement (2c.5).
+- [x] **Task 2e.3 — Entry 14** shrunk in place.
+- [x] **Task 2e.4 — Entry 16** shrunk in place.
+- [x] **Task 2e.5 — Entry 18b** shrunk in place.
+- [x] **Task 2e.6 — Entry 18c** shrunk in place.
+- [x] **Task 2e.7 — Entry 18d** shrunk in place.
+- [x] **Task 2e.8 — Entry 18e** shrunk in place.
+- [x] **Task 2e.9 — Sub-rule 19b** shrunk to ~2 lines in place (committed with 2c.6/2c.7).
+- [x] **Group commit** landed (stays-cluster).
+
+> **All of Phase 2 (2a–2e) landed.** Per-disposition outcomes + commit shape are recorded in `audit-log.md`. Phase 2a (deletes/pointer-shrinks), 2b (TDD tool-fixes — `--no-tailscale` no-op + namespace write-guard), 2c (in-repo skill composes), 2d (deskwork-plugin composes), 2e (stays-shrunk) all complete.
 
 ---
 
@@ -297,30 +299,11 @@ Each task below: rewrite the named entry in `.claude/rules/agent-discipline.md` 
 
 After Phase 2 completes, before `/dw-lifecycle:complete`:
 
-- [ ] **Step 1: Measure agent-discipline.md size.**
-
-Run: `wc -l .claude/rules/agent-discipline.md`
-
-Expected: 150–200 lines.
-
-- [ ] **Step 2: Verify every disposition action landed.**
-
-Run: comparison of pre-feature triage table (recorded in the applied PRD) against post-feature file. For each entry the action column claimed, confirm the residue matches.
-
-- [ ] **Step 3: Run the no-bare-TBDs gate against the workplan.**
-
-Run: `dw-lifecycle check-open-findings --feature decompose-agent-discipline` (or the equivalent verb name on the installed binary).
-
-Expected: zero open findings.
-
-- [ ] **Step 4: Add audit-log entry referencing the feature** under `docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/audit-log.md`, summarizing per-disposition outcomes.
-
-- [ ] **Step 5: Commit final-verification artifacts.**
-
-```bash
-git add docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/audit-log.md
-git commit -m "docs(decompose-agent-discipline): final verification + audit-log entry"
-```
+- [x] **Step 1: Measured agent-discipline.md size** — **157 lines** (was 566; target 150–200). ✓
+- [x] **Step 2: Verified every disposition action landed** — all 24 rows; 3 deletes (2, 15, 18a) confirmed absent; entry 12 byte-untouched. Per-entry residue table in `audit-log.md`. ✓
+- [x] **Step 3: Open-findings gate** — `check-open-findings` reports zero open findings. ✓ (Also: core 535 / studio 589 / cli 211 tests green.)
+- [x] **Step 4: Added `audit-log.md`** with per-disposition outcomes.
+- [x] **Step 5: Commit final-verification artifacts.**
 
 After this commit lands, the feature is ready for `/dw-lifecycle:review` → `/dw-lifecycle:ship` → `/dw-lifecycle:complete`.
 
