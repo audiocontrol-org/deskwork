@@ -4,15 +4,9 @@ Project-scoped rules for how an agent should behave when working on deskwork. Th
 
 ## Use /frontend-design for all design tasks
 
-When the work requires a design decision — a new UI surface, a redesign of an existing surface, a placement decision for a new affordance, a visual language choice, anything that asks *"what should this look like / how should this work"* — invoke the **`/frontend-design`** skill (the `frontend-design:frontend-design` plugin skill). The skill produces opinionated mockups (typically 2–3 directions) the operator picks from before any implementation begins.
+For any design decision — a new UI surface, a redesign, an affordance-placement decision, a visual-language choice, anything asking *"what should this look like / how should this work"* — invoke **`/frontend-design`** first; it produces 2–3 mockups the operator picks from before implementation. Skip only when the design is fully determined upstream. Applies to dispatch prompts too.
 
-**Why:** the 2026-05-08 review-surface rebuild and 2026-05-09 mobile-editor rebuild both succeeded because the agent produced HTML mockups first; the operator picked a direction; implementation was a translation problem instead of an exploration problem. The 5 hours of focused implementation in those sessions could have been 15 hours of incremental patching that never converged. Conversely, when the agent jumped straight to implementation on a design question (the multiple iterations of the marginalia toggle pre-affordance-placement-rule), three commits were needed to converge on the right shape.
-
-**How to apply:**
-- Whenever the task involves *"add an affordance,"* *"design X,"* *"how should Y look,"* *"the operator can't find Z" → /frontend-design first.
-- Skip /frontend-design only when the design is fully determined upstream (a workplan task that names exact CSS / markup, an operator instruction that names "use pattern X exactly," etc.). When in doubt, run it.
-- /frontend-design produces self-contained HTML+CSS mockup files (typically 2–3 directions), an updated `mockups/index.html` with a card per direction, and waits for the operator to pick before any implementation.
-- The directive applies to in-thread agent work AND to dispatch prompts: if delegating design work to a sub-agent, instruct them to use /frontend-design.
+> Composed into the implement + setup skills (precondition step) — see `plugins/dw-lifecycle/skills/implement/SKILL.md` § Composed disciplines.
 
 ## Audit findings: scope-don't-defer + TDD enforcement
 
@@ -98,18 +92,9 @@ Before writing or speaking any install/setup command for a tool, plugin, library
 
 ## Operator owns scope decisions
 
-The operator decides what's in scope. Never pre-decide for them.
+The operator decides what's in scope; never pre-decide for them. Don't unilaterally defer your own scope — when work has a "main thing + follow-up" shape, propose the split as a *question* rather than filing a follow-up that makes a unilateral cut look handled. Hedged responses (*"probably,"* *"maybe later,"* *"we'll see"*) default to ASKING, not to "deferred." An *"out of scope"* section is valid only when the operator excluded those items in conversation.
 
-**Two failure modes that share this root cause:**
-
-1. **Don't unilaterally defer your own scope.** When work has a "main thing + follow-up" shape, propose the split as a question — *"do you want X+Y as one PR, or X now and Y later?"* — don't pre-decide. Filing a follow-up issue for work I decided to defer makes a unilateral scope call look handled. *"Out of scope"* sections in workplans are valid only when the operator has explicitly excluded those items in conversation; if I'm the one deciding something is out of scope, I'm overstepping.
-
-2. **Don't let sub-agent "out of scope" notes stand as dispositions.** When a dispatched agent's report flags an adjacent issue as *"out of scope but worth flagging,"* that is NOT a valid resting place. Either fix it in-scope right now (if it's small and related), or file a GitHub issue immediately so the operator can see it and decide. *"Noted in the dispatch report"* is not a disposition — the operator may not see the dispatch report until a downstream user trips over the bug. The pattern of reading the flag and moving on bit twice on this project (the dashboard scrapbook chip count and the dev-source boot bug #49).
-
-**How to apply:**
-- Hedged user responses (*"probably,"* *"maybe later,"* *"we'll see"*) default to ASKING what to do next, not interpreting the hedge as a deferral.
-- Distinguish: items the user actively rejected (don't revive) vs. items I unilaterally deferred (do, by surfacing them).
-- Sub-agent dispatch reports get treated as action lists, not disclosures: each *"flag for triage"* becomes either a fix-in-this-PR or a filed issue, with the link in my next response.
+> The paired failure mode — sub-agent dispatch reports' "out of scope but flagging" notes are action lists, not dispositions — is composed into `plugins/dw-lifecycle/skills/implement/SKILL.md` § Composed disciplines.
 
 ## Capture mode vs scope mode: specs capture everything we know; scoping is a later, explicit pass
 
@@ -178,42 +163,9 @@ The operator's framing, verbatim: *"I'd rather have empty revisions than miss ch
 
 ## The orchestrator session is separate from the implementation session
 
-The agent's role across the dw-lifecycle skills splits across **two distinct Claude Code sessions**, not one session with a sub-agent dispatch:
+The dw-lifecycle role splits across **two distinct Claude Code sessions**. The **orchestrator session** (main repo working tree) runs define → setup → PRD iterate/approve → issues — infrastructure prep. The **implementation session** (feature worktree, `~/work/<project>-work/<slug>/`) runs `/dw-lifecycle:implement` and does the feature's code. The orchestrator session does NOT invoke `/dw-lifecycle:implement` (the boundary is the session, not a sub-agent dispatch). Operator's framing: *"you are the orchestrator, not the implementer… implementation must be done in a different worktree which implies a different claude session."* (Operator can override this boundary explicitly.)
 
-- **Orchestrator session** — runs in the **main repo working tree** (`/Users/orion/work/deskwork`). Drives `/dw-lifecycle:define`, `/dw-lifecycle:setup`, the PRD iterate/approve loop via deskwork, `/dw-lifecycle:issues`, friction-issue filing, related CLI helpers, scaffolding the feature's PRD / workplan / README content from the design spec, moving worktrees. This is **infrastructure preparation**. The orchestrator session's terminal output is "infrastructure ready; feature worktree at `<path>`; implementation happens in a separate session."
-- **Implementation session** — runs in the **feature worktree** (`~/work/deskwork-work/<slug>/`). The operator opens a new Claude Code session pointed at the worktree directory, invokes `/dw-lifecycle:implement`, and that session does the actual feature work — new TypeScript files, new SKILL.md prose, new tests, commits, `/dw-lifecycle:review` cycles, PR delivery via `/dw-lifecycle:ship`.
-
-The orchestrator session **does NOT invoke `/dw-lifecycle:implement`**. The boundary is the session, not a sub-agent dispatch. Two-session isolation keeps the orchestrator session focused on cross-feature workflow and the implementation session focused on one feature's code without context pollution in either direction.
-
-The operator's framing, verbatim: *"you are the orchestrator, not the implementer"* — clarified with *"As the orchestrator, you define and prepare feature infrastructure. You don't implement the feature."* and tightened further: *"implementation must be done in a different worktree which implies a different claude session."*
-
-**Why:** the 2026-05-11 `command-shortcuts` setup session generated this rule. The orchestrator session correctly handled define → setup → PRD iter → issues — all infrastructure preparation in the main repo. The line that would have been crossed (and wasn't, because the operator interrupted) is running `/dw-lifecycle:implement` from the orchestrator session, even via a `feature-orchestrator` sub-agent dispatch. Two earlier drafts of this rule placed the boundary at "delegate content authoring to specialists" and then at "dispatch `feature-orchestrator` at implement-time." Both were too lax. The operator's actual boundary: implementation happens in a **separate session**, opened by the operator in the **feature worktree**, and the orchestrator session is over once the infrastructure is staged for that handoff.
-
-**Failure modes this rule names (forward-looking):**
-
-| The pattern | What it actually means |
-|---|---|
-| Orchestrator session runs `/dw-lifecycle:implement` after filing issues | Wrong session for that work; close out the orchestrator session instead |
-| Orchestrator session dispatches `feature-orchestrator` as a sub-agent to implement the feature | Still wrong session — dispatch pollutes the main session with implementation context |
-| Orchestrator session opens `packages/<pkg>/src/<file>.ts` and starts writing TypeScript | Wrong session AND wrong working tree (main, not worktree) |
-| Orchestrator session "just fixes one small thing" in the worktree's source after issues are filed | Same — the implementation session is responsible for everything inside the worktree |
-
-**How to apply (orchestrator session):**
-
-- Run `/dw-lifecycle:define`, `/dw-lifecycle:setup`, `/deskwork:ingest`, `/deskwork:approve` (PRD), `/dw-lifecycle:issues`, file friction. Author PRD/workplan/README/issue-body content in-thread as the natural deliverable of this prep work.
-- Surface the worktree path + the GitHub issue tree.
-- Close out with `/session-end` (or equivalent journal/wrap-up). Operator opens the new session against the worktree to continue.
-- Do NOT run `/dw-lifecycle:implement` in the orchestrator session.
-
-**How to apply (implementation session — separate Claude Code session):**
-
-- Opens against the feature worktree (`~/work/deskwork-work/<slug>/`), NOT the main repo.
-- Runs `/dw-lifecycle:implement` to pick up the workplan.
-- Dispatches in-session specialists (`typescript-pro`, `documentation-engineer`) for the substantive content. The implement-session can do sub-agent dispatch internally; the boundary that matters is the SESSION + worktree, not in-thread vs sub-agent.
-- Runs `/dw-lifecycle:review` after each commit; iterates on findings.
-- Ships via `/dw-lifecycle:ship` → `/dw-lifecycle:complete`.
-
-**Practical handoff:** the orchestrator session's final report names the worktree path explicitly so the operator can `cd` there and start a new Claude Code session against it. Operator's command pattern: `claude` from inside the worktree directory (loads the same plugin set; CWD is the worktree).
+> Composed into the setup + issues exit-step and the implement-skill precondition — see `plugins/dw-lifecycle/skills/{setup,issues,implement}/SKILL.md` § Composed disciplines.
 
 ## "Just for now" is bullshit — no temporary fallbacks, no IOU comments, no will-fix-later deferrals
 
