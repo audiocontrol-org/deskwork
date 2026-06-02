@@ -3426,3 +3426,111 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - **Do NOT triage:** #357 + #358 — filed earlier today against other features (writeSidecar / doctor calendarPath), not graphical-entries. Tracked elsewhere.
 - **Address TBD markers:** lines 373 + 374 are the explicit deferrals tracked above (no action needed beyond ship-before-closeout); line 391 is the pre-existing Phase 7 scope-decision for `group-recursive`.
 - **Note for release-time:** the close-shipped scanner (when it runs against the next release tag) will see `fixed-<sha>` markers for AUDIT-20260529-14, -15, -16, -17, -19, -20, -21 in audit-log.md — all should attach to commits in the `e47ed3e..HEAD` range.
+
+## 2026-06-02: Phase 0 audit burndown + Phase 8 implementation + dampener-fix dogfooding
+### Feature: graphical-entries
+### Worktree: graphical-entries
+
+**Goal:** Continue Phase 7 follow-ups, burn down the Phase 0 audit-barrage cleanup queue across the autonomous overnight loop, then implement Phase 8 (annotation extension — threads + screenshot capture + attachment workflow + iterate-reason gate + inline diff). Dogfood the new `/dwi` Phase 16+17 dampener fix (issue #383) against a long-horizon autonomous run.
+
+**Accomplished:**
+
+- **Phase 0 audit-backlog burndown — 76 task closures across the autonomous overnight session (2026-05-31).** All open audit-barrage findings from the original 2026-05-30 sweep closed across 124 commits. Tasks 0.1 through 0.76 disposed via: code fixes (substantive, e.g. AUDIT-25 dashboard silent-drop on the swim-compact strip; AUDIT-54 phantom-template via rename-sidecar enumeration; AUDIT-55 empty-string `--reassign-lanes-to` bypass; AUDIT-64 lane-move path traversal; AUDIT-79 doctor lane-repair rollback-on-journal-failure; AUDIT-93 group-mutator sidecar snapshot+restore), duplicate dispositions across cross-model claude/codex overlap (10+ duplicates), acknowledged-known-tradeoff dispositions (AUDIT-71 lazy-panel-hydration deferred to issue #N; AUDIT-72 substring-match classifier), and acknowledged-spec-confirmed (AUDIT-60 pipeline lifecycle verbs intentionally not specced). 2 GH issues filed for operator-decision-required deferrals (#382 server-side preset path; lazy-panel-hydration draft body in /tmp). Workplan reorganized 2026-05-30 to hoist audit-barrage cleanup into a dedicated Phase 0 (`270915d`).
+
+- **Phase 8 implemented — 12 substantive tasks shipped (2026-06-01).** All major Phase 8 work landed: 8.0.1 (`entry-lane-missing` doctor rule — gate for the future schema tightening at 8.0.2); 8.1.1 (CommentAnnotation extended with `replyTo` / `attachments[]` / `spatialAnchor` discriminated-union); 8.1.2 (required `reason` on `addressed` disposition via top-level `.superRefine` — nested `discriminatedUnion` on a `ZodEffects` member proved infeasible; paired with `entry-address-reason-missing` doctor rule for read-back-compat per the same pattern as 8.0.1); 8.1.3 (W3C Web Annotation Data Model mapping docstring); 8.1.4 (additive-delta verified by 8.1.1 tests); 8.2 (thread grouping helper + sidebar-grouped rendering + `#comment/<id>` permalinks); 8.3 (screenshot capture via `html-to-image` per Phase 1 decision + selection-rectangle region overlay + server persistence routes for entry-anchored + orphan paths); 8.4 (attach-to-comment workflow + cross-entry sidecar metadata via `<filename>.meta.json` + paste-handler + drag-drop handler + thumbnail rendering); 8.5 (iterate-skill required-reason gate — SKILL.md prose + CLI refusal at parse time with `MissingReasonError` typed error + studio "no reason recorded" legacy fallback); 8.6 (server-side diff-slicing via `diff` npm package + character-offset-to-line conversion + per-comment inline expansion on the addressed badge + empty-slice fallback message + new `/api/dev/editorial-review/entry/:entryId/diff-slice` route); 8.7 (cross-cutting verification — `markdown-benefits-phase-8.test.ts` 5-scenario integration exercising all Phase 8 fields); 8.8 (Phase 8 end-to-end integration test).
+
+- **Audit findings closed across both phases: 18 AUDIT-20260601-NN + 7 AUDIT-20260602-NN findings disposed.** Of the 25 audit findings surfaced during Phase 8 work: 14 fixed (including AUDIT-20260602-01 HIGH — orphan-promote was destroying files on unknown-commentId 404), 10 slushed (LOW + MED hygiene tier per the dampener-engaged Rule B path), 1 acknowledged-spec-confirmed. Notable cross-model agreement: AUDIT-20260601-07 was claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03 — 7-model agreement on spatialAnchor's missing per-kind discriminated-union shape (fixed via `z.discriminatedUnion('kind', [...])` + `.strict()` per variant).
+
+- **Operator-visible audit-coverage gap on the Phase 0 burndown — surfaced + fixed.** Original `/dwi` dampener (pre-Phase-16) made the hook SKIP entirely once dampener engaged. Over ~70 Phase 0 closures the cumulative diff was effectively unaudited because the dampener counter trapped at 2 from two early-quiet barrages on tiny diffs. Filed as issue #383; operator landed the Phase 16+17 fix (`/dwi implement-hook` single-verb composition + Layer 2 commit-msg gate + Layer 3 pre-push gate; always-fire + dampener-controls-disposition semantics). Test-fired the new hook against the 70-commit historical diff: caught 4 real findings (1 cross-model MED + 1 MED + 2 informational) that the pre-fix loop missed entirely. The catch is the structural validation of #383's fix.
+
+- **3 follow-up `/dwi`-tooling issues filed during the dogfood.** #384 (implement-hook marker counters report 0 when N findings actually landed — observed every hook fire this session); #385 (follow-up to #383: dampener counter doesn't reset on material-diff-range expansion, so an engaging streak from tiny-diff runs slushes MEDIUMs on a subsequent large-diff run — concrete repro from the retroactive Phase 0 audit); #386 (`audit-barrage spawn E2BIG` on large diffs — the cumulative-since-last-tip diff exceeds OS ARG_MAX after a long autonomous run; argv-based prompt passing fails; needs stdin or temp-file path).
+
+- **Gemini-CLI disabled at the project level via `audit-barrage-config.yaml` override.** gemini-cli was failing 94.1% of runs (16 of 17 across the Phase 0 audit cycle) on two cascading error modes: ClassifierStrategy JSON-routing retry-exhaustion + "exhausted your capacity on this model" quota errors. Project-level override at `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` now ships claude + codex only. Re-enable when gemini-cli upstream fixes JSON-mode reliability OR sustained quota.
+
+**Didn't Work:**
+
+- **Pre-Phase-16 `/dwi` dampener semantic was structurally broken for long autonomous loops.** Once the dampener engaged (counter ≥2 quiet runs), every subsequent iteration skipped the audit-barrage hook entirely. The counter could only reset via barrage runs, but the gate prevented barrages — so the dampened state was permanently trapping. 70 Phase 0 tasks landed without cross-model audit coverage. Operator's framing: *"after each turn, you did new work — why didn't you run the audit barrage on the new work?"* — exactly right. Fixed in #383 / Phase 16+17.
+
+- **Dispatched implementer agents repeatedly missed the audit-log Status flip after committing fixes.** Workplan checkboxes were ticked, the fix code shipped, but the `Status: open → fixed-<sha>` flip on the audit-log entry was forgotten by ~30% of implementer dispatches. AUDIT-20260601-07's failed flip surfaced as AUDIT-20260601-11 the next audit-barrage run. Pattern: the dispatch prompts now explicitly enumerate "tick workplan AND flip audit-log Status" as two distinct steps to land in the same docs commit.
+
+- **Stale workplan checkbox state across Phase 1-7 confused the next-task seeker.** Many Phase 1-7 step checkboxes were unchecked despite the work being shipped. The /dwi gate's "first unchecked Step 1" heuristic kept finding stale leaves (e.g. Step 1.1.3 "deferred to Task 1.6"). Operator flagged this with *"we were well past phase 1"* — required manual phase-routing several times before Phase 8 dispatches could land.
+
+- **`E2BIG` on `audit-barrage` after the first ~20 commits of an autonomous run.** Once the cumulative since-last-tip diff grows past ARG_MAX (~256KB on macOS), the spawn fails. SKILL.md outage policy lets the loop continue (`disposition=barrage-outage; marker written; hook complete`), but every iteration after the first big diff loses cross-model coverage until the operator manually rebases or splits the work. Filed #386; recommended stdin / temp-file path.
+
+- **Sub-agent claimed `dw-lifecycle implement-hook` doesn't exist while the orchestrator session had it on PATH.** The Task 8.5 dispatched agent reported the CLI subcommand "is not exposed" — but the orchestrator's own shell saw it fine. Either a subprocess PATH/env discovery issue or a misread by the agent. Not file-worthy yet; will surface if it recurs.
+
+- **`/frontend-design` Phase 9 gate stopped the autonomous burndown.** Phase 9's deliverable is operator-pickable mockup directions for the graphical review surface — design decisions must come from the operator per `.claude/rules/agent-discipline.md`. The /dwi loop ran cleanly through Phase 8 closeout, then naturally stopped at the Phase 9 boundary. Correct behavior; documenting it here so the next session knows the burndown reached an operator-gated wall, not a tooling-failure wall.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"why didn't you run the audit barrage on the new work?"* (operator) — caught the structural bug in the pre-Phase-16 dampener. I had taken the SKILL.md's skip-when-dampened semantic too literally. Operator's pointed observation revealed that the dampener's "quiet on real bugs" claim is only valid for the diff range the engaging barrages covered; once new work lands in different subsystems, the dampened state goes stale. Resulted in #383 + the Phase 16+17 fix.
+
+- **[PROCESS]** *"we were well past phase 1"* (operator) — caught the next-task seeker's fixation on stale workplan checkboxes. The /dwi gate's first-unchecked-step heuristic doesn't distinguish "step in progress" from "step shipped but never ticked." Workplan-tick hygiene became a recurring tax across the session.
+
+- **[PROCESS]** *"can we disable gemini?"* (operator) — caught that I was running the barrage with 3 models when only 2 were viable. 16 of 17 runs had gemini failing; signal-to-noise ratio of the run-dir was poor. Project-level override at `audit-barrage-config.yaml` landed in one commit.
+
+- **[PROCESS]** *"file the issues"* (operator) — multiple times across the session. The autonomous burndown surfaced 4 distinct tooling concerns (#380 / #383 / #384 / #385 / #386); each filing was operator-prompted rather than autonomous. Worth folding into the dispatch discipline: when the loop catches a tooling-side defect (vs feature-side), the structured path is "log to handoff summary + file when operator next interacts" rather than "file immediately."
+
+- **[COMPLEXITY]** Dispatched implementer agents repeatedly added "scope expansions" justified by parallel-domain symmetry (e.g. extracting `withJournalRollback` shared helper, lifting `readJsonObjectBody` shared helper, the `project-scope-gate.ts` shared helper across two doctor rules). All defensible — the clone-detection gate prompted each one. Pattern is healthy as long as the implementer commits the helper in the same commit as its first consumer and notes the second consumer's adoption inline.
+
+**Quantitative:**
+
+- Commits this session range (`ead674b..HEAD`): **180+ commits** spanning two distinct burndown arcs (Phase 0 audit cleanup 2026-05-31 = 124 commits; Phase 8 implementation 2026-06-01 + 2026-06-02 = 56+ commits).
+- Sub-agent dispatches: **~30+** (mix of typescript-pro implementer dispatches + 1 documentation-engineer that misread the workflow + 1 cancel-bundle case).
+- GH issues filed this session: **5** (#380 slush-remaining severity filter; #382 server-side preset path Phase 6 enhancement; #384 marker counter discrepancy; #385 dampener-counter-on-stale-diff; #386 audit-barrage E2BIG). #383 (self-perpetuation) was filed mid-session and FIXED by operator before session-end.
+- Audit findings disposed: ~95 total (Phase 0 cleanup ~70 + Phase 8 derivatives ~25). Fixed-with-code: ~50; duplicate dispositions: ~15; acknowledged-spec-confirmed / known-tradeoff: ~10; slushed: ~20.
+- Test deltas (session-spanning): core ~880 → 987 (+107); cli ~414 → 429 (+15); studio ~973 → 1255 (+282). Workspace-wide: ~2267 → 2671 (+404).
+- New doctor rules added: 3 (`entry-lane-missing`, `entry-anchor-shape`, `entry-address-reason-missing`).
+- New SKILL.md verbs touched: `/deskwork:iterate` (Step 8.5.1 required-reason prose).
+- New schema fields landed: `CommentAnnotation.replyTo` / `.attachments` / `.spatialAnchor` (discriminated union); `EditCommentAnnotation.attachments` patch; `AddressAnnotation.reason` (now required when `disposition === 'addressed'`).
+- Plugin deps added: `diff` (jsdiff for the inline-diff expansion); `html-to-image` (capture). Both per Phase 1 decision-doc.
+- Hook fires: 12+; clean: 4-5; E2BIG outages: 6+; cumulative coverage: ~50% of session iterations had real audit coverage (the dampener-engaged + E2BIG combination ate the rest).
+
+**Insights:**
+
+- **The new `/dwi` Phase 16+17 fix structurally validates issue #383.** The retroactive barrage on the 70-commit historical diff caught 4 real findings (AUDIT-20260601-01 through -04) that the pre-fix loop never saw. AUDIT-20260601-01 specifically was a 2-model cross-model finding (claude + codex agreement) on a defect in code shipped by the autonomous burndown — exactly the kind of finding the dampener's earlier semantic was suppressing. The Phase 16+17 fix landed cleanly + the first real-world test caught real bugs. That's the strongest signal possible for the new shape.
+
+- **Cross-model agreement IS what makes the audit-barrage load-bearing.** AUDIT-20260601-07's 7-model agreement (claude-01..04 + codex-01..03 all flagged spatialAnchor's missing discriminated-union) is the kind of finding that no single model would have caught with confidence. The N-model independent-discovery pattern is the audit-barrage's whole reason for existing, and it works. The gemini-disable doesn't break this — 2-model agreement (claude + codex) is still meaningfully stronger than single-model.
+
+- **The dampener's design hole has TWO failure modes — one structurally fixed (#383), one remaining (#385).** The Phase 16+17 fix closed the always-skip hole. But the dampener counter still doesn't reset when the diff range materially changes; an engaging streak from tiny-diff runs can still slush MEDIUMs on a subsequent large-diff run. Concrete repro happened this session: 2 swim-compact-strip barrages engaged the dampener, then a 70-commit cross-subsystem audit slushed 2 MED findings (AUDIT-20260601-01 + -02) because the dampener counter said "quiet." Filed as #385 with 4 fix-shape options for operator decision.
+
+- **The audit-barrage helps MORE on rapid implementation cycles than on slow ones.** When I dispatched substantive tasks (Task 8.4 6-commit dispatch; Task 8.6 4-commit dispatch), the hook found real defects every fire that had clean execution. When the diff piled up across multiple un-audited iterations, E2BIG broke the hook and coverage went to zero. The lesson: barrage frequency matters, and dampener-reset semantics should be tuned to keep the per-fire diff bounded. The Phase 16+17 fix's "fire-every-iteration" is the right shape; #386's argv-size fix is the natural completion.
+
+- **The operator-driven scope-correction signal IS the autonomous-loop's safety net.** Three times this session, the operator caught a structural mistake I was about to compound: (1) the dampener-skip semantic, (2) the stale workplan checkboxes, (3) the gemini failure rate. Each was a "you've been doing X without noticing Y" observation that no amount of internal verification would have surfaced — they required the operator's outside-view. The 2-3 minute investment per turn paid back hours of mis-routed dispatch work.
+
+- **`html-to-image` + `diff` (jsdiff) were the right Phase 1 picks.** Both integrated cleanly. `html-to-image` had jsdom test friction (the canvas-backed capture needs a real browser to fully exercise), but the helper API was clean. `diff`'s `structuredPatch` with `context: 0` gave precise hunk boundaries for the comment-anchor intersection logic in 8.6.2.
+
+- **The Phase 0 burndown's biggest cost wasn't the per-task code work — it was the workplan-tick + audit-log Status-flip bureaucracy.** ~25% of session turns were spent on dispatch prompt construction + workplan ticking + Status flipping rather than substantive feature work. Operator's earlier framing of "audit findings are guardrails, not exceptions" is correct, but the mechanical work of recording disposition is itself a process tax that the SKILL.md could mechanize further (auto-tick workplan + auto-flip audit-log when a commit's body matches `^Closes AUDIT-NNNNN`).
+### Hygiene observations
+
+- commit 9790e5e530d3 — `follow-up` in subject: test(graphical-entries): update CLI cascade test for narrowed catch (AUDIT-23 follow-up)
+- workplan /Users/orion/work/deskwork-work/graphical-entries/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1990 — markers: defer — - [ ] Step 7.2.9: extend cancel-cascade test coverage — add recursive-cascade regression test (3-level group nesting) AND per-member `priorStage` assertions to close test-coverage gaps surfaced by Ste
+- workplan /Users/orion/work/deskwork-work/graphical-entries/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1998 — markers: defer — - [ ] Step 7.3.5: wire member-of pull-tab on the **mobile lane-stack** + the **desktop list-mode-body** so the pull-tab affordance reaches the same viewport classes the rest of the dashboard reaches. 
+- issue #1 referenced this session: deskwork plugin: editorial lifecycle + standalone studio (Astro severance)
+- issue #2 referenced this session: Phase 13: hierarchical content + scrapbook secret + writer's notebook viewport
+- issue #3 referenced this session: feat(build): self-contained bundles — closes the install gap (no npm publish required)
+- issue #4 [CLOSED] referenced this session: Marketplace plugin install ships no runnable CLI: `deskwork install` exits 127
+- issue #5 referenced this session: Phase 14: versioning, release process, and build correctness (v0.1.0)
+- issue #6 referenced this session: fix(install): ship runnable bundles inside plugin tree (closes #4)
+- issue #7 [CLOSED] referenced this session: Skill prompt at `skills/install` shows wrong arg count for `deskwork install`
+- issue #8 [CLOSED] referenced this session: Make `<project-root>` default to `process.cwd()` in `deskwork install`
+- issue #9 referenced this session: fix(ci): skip workspaces without a test script
+- issue #10 [CLOSED] referenced this session: Add `--host` flag to deskwork-studio for LAN / Tailscale / VPN dev access
+- issue #148 [CLOSED] referenced this session: BUG: studio stage-transition endpoints don't regenerate calendar.md; doctor --check misses the drift
+- issue #247 [CLOSED] referenced this session: BUG: deskwork ingest regen drops Final/Cancelled entries, reverts calendar.md to pre-redesign stage list
+- issue #299 [OPEN] referenced this session: Studio review surface: no affordance to find where/how marginalia comments were addressed in the new revision
+- issue #306 [OPEN] referenced this session: Phase 5: Studio render — per-lane tabs + template stage columns + combined overview + lane-visibility panel + multi-lane composed views
+- issue #360 [OPEN] referenced this session: perf(graphical-entries): group cancel --cascade runs regenerateCalendar N+1 times
+- issue #363 [OPEN] referenced this session: test(graphical-entries): cancel-cascade test gaps — recursive-cascade + per-member priorStage assertions
+- issue #371 [OPEN] referenced this session: feat(graphical-entries): wire member-of pull-tab on mobile lane-stack + desktop list-mode-body (Track 2 HIGH from b642cd6)
+- issue #372 [OPEN] referenced this session: feat(graphical-entries): composed view should surface unrouted-members indicator (Track 3 LOW from b642cd6)
+- issue #382 [OPEN] referenced this session: graphical-entries: server-side preset path (.deskwork/personal/<operator-id>/focus-presets.json) — Phase 6 enhancement
+- issue #383 [CLOSED] referenced this session: dw-lifecycle:implement dampener gate is self-perpetuating in long autonomous loops — new work goes unaudited
+
+### Next session recommendation (hygiene)
+
+- Resume: Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+- Triage: #299 (Studio review surface: no affordance to find where/how marginalia comments were addressed in the new revision); #306 (Phase 5: Studio render — per-lane tabs + template stage columns + combined overview + lane-visibility panel + multi-lane composed views); #360 (perf(graphical-entries): group cancel --cascade runs regenerateCalendar N+1 times); #363 (test(graphical-entries): cancel-cascade test gaps — recursive-cascade + per-member priorStage assertions); #371 (feat(graphical-entries): wire member-of pull-tab on mobile lane-stack + desktop list-mode-body (Track 2 HIGH from b642cd6)); #372 (feat(graphical-entries): composed view should surface unrouted-members indicator (Track 3 LOW from b642cd6)); #382 (graphical-entries: server-side preset path (.deskwork/personal/<operator-id>/focus-presets.json) — Phase 6 enhancement)
+- Address TBD markers: line 1990: markers: defer — - [ ] Step 7.2.9: extend cancel-cascade test coverage — add recursive-cascade regression test (3-level group nesting) AND per-member `priorStage` assertions to close test-coverage gaps surfaced by Ste; line 1998: markers: defer — - [ ] Step 7.3.5: wire member-of pull-tab on the **mobile lane-stack** + the **desktop list-mode-body** so the pull-tab affordance reaches the same viewport classes the rest of the dashboard reaches. 
+- Dismantle stale worktrees: (no stale worktrees flagged)
+
