@@ -1,8 +1,8 @@
 {
-  "tip": "f44bafe336c0360b8976062e034ee07e55d84d41",
-  "timestamp": "2026-06-02T15:49:35.866Z",
-  "runDir": "/Users/orion/work/deskwork-work/graphical-entries/.dw-lifecycle/scope-discovery/audit-runs/20260602T154457484Z-graphical-entries",
-  "disposition": "fired-and-slushed",
+  "tip": "be395cfe0f5bd759f862ea2184c0fe2c94f8eb8f",
+  "timestamp": "2026-06-02T20:52:44.363Z",
+  "runDir": null,
+  "disposition": "barrage-outage",
   "findingsCount": 0,
   "promotedCount": 0,
   "slushedCount": 0
