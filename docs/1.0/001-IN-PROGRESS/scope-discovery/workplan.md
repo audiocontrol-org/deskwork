@@ -1023,6 +1023,74 @@ Closes AUDIT-20260601-83. Surface: Task 5.102 AC placeholder restoration post-re
 - [x] Disposition prose ≥40 chars substantive content.
 - [x] Audit-log Status flipped to `acknowledged-addressed-by-AUDIT-68-disposition-2026-06-01`.
 
+
+### Task 5.112 (fix-finding-AUDIT-20260602-01) (non-bug): AUDIT-20260602-01 — `Closes AUDIT-<id>` trailers on acknowledgment/deferral comm…
+
+Closes AUDIT-20260602-01. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.102 (`Closes AUDIT-20260601-68.` + Step 3 "commit closes AUDIT-68 via this commit"), Tasks 5.112/5.113/5.114 (`Closes AUDIT-20260601-81/82/83`), Phase 20 Task 1 Step 6.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Closes AUDIT-20260602-01` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 5.113 (fix-finding-AUDIT-20260602-02) (non-bug): AUDIT-20260602-02 — Acknowledgment-task recursion: creating fix-tasks to "close"…
+
+Closes AUDIT-20260602-02. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 5.112 / 5.113 / 5.114 (new `(non-bug)` acknowledgment tasks).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Closes AUDIT-20260602-02` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 5.114 (fix-finding-AUDIT-20260602-03): AUDIT-20260602-03 — Journal "0 open findings at session end" presents `acknowled…
+
+Closes AUDIT-20260602-03. Surface: `DEVELOPMENT-NOTES.md` — "Open findings at session end: 0" and "Audit findings closed: 64 (60 bulk + 4 individual…)". Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-03` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.115 (fix-finding-AUDIT-20260602-04): AUDIT-20260602-04 — Journal test-count arithmetic is internally inconsistent
+
+Closes AUDIT-20260602-04. Surface: `DEVELOPMENT-NOTES.md` — "Plugin test suite: 2622 → 2626 (5 new test blocks; the +5 from AUDIT-68 attempt reverted)". Severity: low.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-04` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.99 (fix-finding-AUDIT-20260601-65): AUDIT-20260601-65 — Task 5.97 — the fix-task for the HIGH finding AUDIT-63 is re…
 
 Closes AUDIT-20260601-65 (claude-01 + claude-03 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 5.97 (`fix-finding-AUDIT-20260601-63`), added in the `@@ -738,6 +738,40 @@` hunk, vs. AUDIT-20260601-63 (`Severity: high`) in `audit-log.md`.

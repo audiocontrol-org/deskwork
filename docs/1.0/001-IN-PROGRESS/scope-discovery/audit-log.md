@@ -2262,3 +2262,47 @@ The revert restores Task 5.102's AC to `- [ ] Failing test exists at `(to be fil
 ---
 
 **Summary for triage:** The renderer revert itself returns to a known-good prior code state (no logic bug introduced *within* `inferFindingShape`). The risk is entirely in the **tracking-surface reconciliation** — the revert touched code + tests + workplan but not the audit-log Status or the closure trailer, and recorded no rationale. claude-01 is the load-bearing finding (false `fixed` proposal from `apply-audit-flips`); claude-02 is the design-memory gap that will cause re-implementation; claude-03 is the hygiene regression that confirms the task wasn't cleanly dispositioned.
+
+## 2026-06-02 — audit-barrage lift (20260602T154850525Z-scope-discovery)
+
+### AUDIT-20260602-01 — `Closes AUDIT-<id>` trailers on acknowledgment/deferral commits arm `apply-audit-flips` with false `fixed-<sha>` proposals
+
+Finding-ID: AUDIT-20260602-01
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.102 (`Closes AUDIT-20260601-68.` + Step 3 "commit closes AUDIT-68 via this commit"), Tasks 5.112/5.113/5.114 (`Closes AUDIT-20260601-81/82/83`), Phase 20 Task 1 Step 6
+
+Four of the workplan tasks in this diff are *non-bug acknowledgment/deferral* dispositions, yet each instructs the commit to carry a `Closes AUDIT-<id>` trailer: Task 5.102 ("commit closes AUDIT-68 via this commit"), and Tasks 5.112/5.113/5.114 (`Closes AUDIT-20260601-81/82/83`). Per `agent-discipline.md`, `apply-audit-flips` parses `Closes AUDIT-<id>` subjects/trailers and proposes `open → fixed-<sha>`. The flip parser has **no way to distinguish a `Closes` trailer on a docs-only acknowledgment commit from a `Closes` trailer on a real fix** — to the parser, every `Closes AUDIT-68` is a fix candidate. AUDIT-81 already named this for the reverted commit `7f53c2d4`; this diff *re-commits the same misuse* on a second commit (the acknowledgment), so AUDIT-68 now has **two** live false-positive close-trailers in history.
+
+The only thing currently suppressing a false flip is that AUDIT-68's Status is `acknowledged-latent-deferred-…` (not `open`), and `applyStatusFlips` defaults to `current === 'open'` (per Task 5.112's own disposition prose). But this diff also scopes **Phase 20 Task 1 Step 6**, which explicitly plans to *re-open* AUDIT-68 with another `Closes AUDIT-20260601-68`. The moment AUDIT-68 is re-opened, `apply-audit-flips` over any range spanning `7f53c2d4` or this acknowledgment commit will find `Status: open` + multiple `Closes` trailers and propose `fixed-<sha>` pointing at a commit that did **not** implement the fix. The defense in Task 5.112 ("Status is no longer open") is true only for the current snapshot and is contradicted by this same diff's own forward plan. A sounder convention: acknowledgment/deferral dispositions should NOT use `Closes AUDIT-<id>` (reserve that trailer for actual fixes); use a distinct marker (`Acknowledges AUDIT-<id>` / `Defers AUDIT-<id>`) the flip parser ignores.
+
+### AUDIT-20260602-02 — Acknowledgment-task recursion: creating fix-tasks to "close" findings-about-a-disposition is self-perpetuating
+
+Finding-ID: AUDIT-20260602-02
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 5.112 / 5.113 / 5.114 (new `(non-bug)` acknowledgment tasks)
+
+AUDIT-81/82/83 are findings *about the AUDIT-68 revert disposition* (closure-trailer reconciliation, missing rationale, restored AC placeholder). This diff resolves them by spawning three new `(non-bug)` workplan tasks (5.112/5.113/5.114) whose entire content is prose asserting "addressed by AUDIT-68 disposition," each marked `[x]` complete and each carrying its own `Closes AUDIT-<id>` trailer in the very same commit. That commit is itself a new diff that the audit-barrage hook will fire against — and a barrage run on *this* commit can surface AUDIT-8x findings about Tasks 5.112-5.114 (e.g. "these tasks close findings via prose with no verifiable contract," or claude-01 above), which would spawn yet more acknowledgment tasks. This is precisely the recursion engine the session spent 60+ findings trying to escape, re-expressed at the disposition layer instead of the classifier layer.
+
+The structural problem is that an audit finding *about an audit disposition* has no terminal state under the current "every open finding becomes a TDD-first or non-bug task" discipline — each disposition is a new auditable surface. The diff doesn't introduce a logic bug, but it demonstrates a process that doesn't converge by construction. A reasonable fix: dispositions-of-dispositions (findings whose Surface is the audit-log/workplan tracking itself, not product code) should be excluded from the promote-findings auto-scope path, or collapsed into the originating finding's entry rather than getting their own `Closes`-bearing tasks.
+
+### AUDIT-20260602-03 — Journal "0 open findings at session end" presents `acknowledged-slush-pile` as resolution
+
+Finding-ID: AUDIT-20260602-03
+Status:     open
+Severity:   medium
+Surface:    `DEVELOPMENT-NOTES.md` — "Open findings at session end: 0" and "Audit findings closed: 64 (60 bulk + 4 individual…)"
+
+The journal's headline metric asserts "Open findings at session end: 0" and frames the session as a clean burndown to zero. But the recent audit-log excerpt shows AUDIT-79 and AUDIT-80 at `Status: acknowledged-slush-pile-2026-06-01`, and AUDIT-80 is a *genuine, unfixed* defect: the AUDIT-76/77 HIGH-finding regression-lock test runs all its assertions inside an unguarded `if (newAuditLog !== undefined)` and "can pass without exercising its invariant." "0 open findings" is literally true only because `acknowledged-slush-pile` is not the string `open` — a parking status, not a resolution. This is exactly the inventory-vs-discovery failure mode `agent-discipline.md` names: reading "0 open" as "no bugs."
+
+The cost is operator-trust: a future reader of this journal sees "burndown to zero, 0 open" and reasonably concludes the regression-lock that underwrites a HIGH finding is sound, when a slush-piled finding says it's vacuous. I'm not re-litigating the slush-pile disposition (made in a prior commit); I'm flagging that *this diff's journal narrative* should distinguish resolved findings from parked-but-real ones — e.g. "0 `open`; N `acknowledged-slush-pile` carrying unfixed defects (AUDIT-80 vacuous regression-lock)." Reporting the slush-pile count alongside the zero is the honest metric.
+
+### AUDIT-20260602-04 — Journal test-count arithmetic is internally inconsistent
+
+Finding-ID: AUDIT-20260602-04
+Status:     open
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md` — "Plugin test suite: 2622 → 2626 (5 new test blocks; the +5 from AUDIT-68 attempt reverted)"
+
+The Quantitative line states `2622 → 2626`, a delta of **+4**, but parenthetically claims "**5** new test blocks." If the AUDIT-68 attempt's +5 was reverted (net 0 from that work), the net new blocks come from AUDIT-76/77; either way "5 new test blocks" with an end count of 2626 is off by one (5 net new from 2622 would be 2627). The numbers don't reconcile. This is a false-precision hygiene defect in a historical record — minor on its own, but the project rules explicitly call out fabricated/unverified metrics, and a reader can't tell whether 2626 is wrong, "5" is wrong, or a block count was double-counted. Fix: re-derive from `npx vitest` output and state the actual delta (e.g. "2622 → 2626, +4 net: +N from AUDIT-76/77, +5/−5 from the reverted AUDIT-68 attempt").
