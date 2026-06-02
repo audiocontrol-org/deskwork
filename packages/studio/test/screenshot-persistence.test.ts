@@ -71,8 +71,34 @@ describe('assertSafeScreenshotFilename', () => {
     );
   });
 
-  it('rejects a filename without the .png extension', () => {
-    expect(() => assertSafeScreenshotFilename('foo.jpg')).toThrow(/filename/);
+  it('accepts the four image extensions (png/jpg/jpeg/gif/webp) — AUDIT-20260602-03', () => {
+    // The IMAGE_TYPES allowlist on the paste/drop client side
+    // permits all four image MIMEs; the server filename regex
+    // honours the same set so the MIME-derived extension lands on
+    // disk as the bytes themselves.
+    expect(() =>
+      assertSafeScreenshotFilename('2026-06-02T00-00-00-000Z-deadbeef.png'),
+    ).not.toThrow();
+    expect(() =>
+      assertSafeScreenshotFilename('2026-06-02T00-00-00-000Z-deadbeef.jpg'),
+    ).not.toThrow();
+    expect(() =>
+      assertSafeScreenshotFilename('2026-06-02T00-00-00-000Z-deadbeef.jpeg'),
+    ).not.toThrow();
+    expect(() =>
+      assertSafeScreenshotFilename('2026-06-02T00-00-00-000Z-deadbeef.gif'),
+    ).not.toThrow();
+    expect(() =>
+      assertSafeScreenshotFilename('2026-06-02T00-00-00-000Z-deadbeef.webp'),
+    ).not.toThrow();
+  });
+
+  it('rejects a filename with an extension outside the image allowlist', () => {
+    // .txt / .pdf / .svg are NOT permitted — IMAGE_TYPES caps the
+    // accepted shapes at png/jpeg/gif/webp.
+    expect(() => assertSafeScreenshotFilename('foo.txt')).toThrow(/filename/);
+    expect(() => assertSafeScreenshotFilename('foo.pdf')).toThrow(/filename/);
+    expect(() => assertSafeScreenshotFilename('foo.svg')).toThrow(/filename/);
   });
 
   it('rejects the empty string', () => {

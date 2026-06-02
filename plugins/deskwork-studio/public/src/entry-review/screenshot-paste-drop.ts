@@ -43,6 +43,31 @@ import {
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
+/**
+ * AUDIT-20260602-03 — derive a filename extension from the blob's
+ * MIME type. The IMAGE_TYPES allowlist enumerates the accepted
+ * shapes; this table is the parallel "what does the server-side
+ * filename regex see" mapping. Defaults to `.png` for image/png so
+ * the legacy filename shape is preserved.
+ */
+const EXTENSION_BY_MIME: Readonly<Record<string, string>> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+};
+
+function extensionForBlob(blob: Blob): string {
+  const ext = EXTENSION_BY_MIME[blob.type];
+  if (ext === undefined) {
+    // The IMAGE_TYPES allowlist is the gate; extractImage* refuse
+    // unrecognised MIMEs before this function runs. Throwing here is
+    // a defense-in-depth assertion in case the gate is bypassed.
+    throw new Error(`unsupported image MIME type: ${JSON.stringify(blob.type)}`);
+  }
+  return ext;
+}
+
 export interface AttachmentEvent {
   /** Relative path the orphan-screenshot endpoint persisted to. */
   readonly relativeWrittenPath: string;
@@ -161,7 +186,11 @@ export async function persistAsOrphan(
 ): Promise<AttachmentEvent> {
   const timestamp = filesystemSafeIsoTimestamp(now());
   const hash = await shortHashOfBlob(blob);
-  const filename = `${timestamp}-${hash}.png`;
+  // AUDIT-20260602-03 — extension derived from MIME, not hard-coded
+  // .png. The server-side filename regex permits the four image
+  // extensions to keep the IMAGE_TYPES allowlist honest.
+  const ext = extensionForBlob(blob);
+  const filename = `${timestamp}-${hash}.${ext}`;
   const result = await postOrphanScreenshot(blob, filename);
   return { relativeWrittenPath: result.relativeWrittenPath, filename };
 }

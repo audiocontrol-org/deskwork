@@ -45,21 +45,27 @@ import { resolveIndexPath } from './entry-resolver.ts';
 
 /**
  * Tight filename regex. Permits:
- *   - UUID-prefixed entry-anchored form (`<uuid>-<timestamp>.png`).
- *   - Orphan timestamp+hash form (`<timestamp>-<hash>.png`).
+ *   - UUID-prefixed entry-anchored form (`<uuid>-<timestamp>.<ext>`).
+ *   - Orphan timestamp+hash form (`<timestamp>-<hash>.<ext>`).
+ *
+ * AUDIT-20260602-03 — the extension is one of png / jpg / jpeg / gif
+ * / webp so the IMAGE_TYPES allowlist on the paste/drop client side
+ * is honoured end-to-end. The server's static-file handler maps the
+ * extension to Content-Type, so the on-disk extension matching the
+ * bytes is load-bearing for correct rendering.
  *
  * Rejects:
  *   - Path separators (`/`, `\`).
  *   - Parent-dir hops (`..`).
  *   - Leading dot.
- *   - Non-png extension.
+ *   - Any extension outside the allowlist.
  *   - Empty strings.
  *
  * The two valid forms share a regex shape: 1+ non-separator chars
- * ending in `.png`, with at least one hyphen separating the prefix
+ * ending in `.<ext>`, with at least one hyphen separating the prefix
  * from the timestamp / hash.
  */
-const FILENAME_RE = /^[A-Za-z0-9][A-Za-z0-9-]+\.png$/;
+const FILENAME_RE = /^[A-Za-z0-9][A-Za-z0-9-]+\.(png|jpg|jpeg|gif|webp)$/;
 
 export interface PersistResult {
   /** Absolute path the bytes were written to. */

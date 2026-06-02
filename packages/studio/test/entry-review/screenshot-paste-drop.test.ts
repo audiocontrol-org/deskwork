@@ -179,6 +179,82 @@ describe('bindPasteHandler', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  // AUDIT-20260602-03 — Bug-repro: pasting a JPEG must synthesize a
+  // filename ending in .jpg, not .png. Pre-fix the handler hard-coded
+  // .png regardless of MIME type, producing a lying extension and a
+  // mismatch between Content-Type and actual bytes.
+  it(
+    'derives the .jpg extension from an image/jpeg blob (AUDIT-20260602-03)',
+    async () => {
+      mockOrphanSuccess();
+      const target = document.createElement('textarea');
+      document.body.appendChild(target);
+      const onScreenshotAttached = vi.fn();
+      bindPasteHandler(target, {
+        onScreenshotAttached,
+        now: () => new Date('2026-06-01T00:00:00.000Z'),
+      });
+      const file = new File([new Uint8Array([0xff, 0xd8, 0xff])], 'paste.jpg', {
+        type: 'image/jpeg',
+      });
+      target.dispatchEvent(makeClipboardEvent(file));
+      for (let i = 0; i < 5; i += 1) {
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      expect(onScreenshotAttached).toHaveBeenCalledTimes(1);
+      const call = onScreenshotAttached.mock.calls[0][0];
+      expect(call.filename).toMatch(/\.jpg$/);
+    },
+  );
+
+  it(
+    'derives the .gif extension from an image/gif blob (AUDIT-20260602-03)',
+    async () => {
+      mockOrphanSuccess();
+      const target = document.createElement('textarea');
+      document.body.appendChild(target);
+      const onScreenshotAttached = vi.fn();
+      bindPasteHandler(target, {
+        onScreenshotAttached,
+        now: () => new Date('2026-06-01T00:00:00.000Z'),
+      });
+      const file = new File([new Uint8Array([0x47, 0x49, 0x46])], 'paste.gif', {
+        type: 'image/gif',
+      });
+      target.dispatchEvent(makeClipboardEvent(file));
+      for (let i = 0; i < 5; i += 1) {
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      expect(onScreenshotAttached).toHaveBeenCalledTimes(1);
+      const call = onScreenshotAttached.mock.calls[0][0];
+      expect(call.filename).toMatch(/\.gif$/);
+    },
+  );
+
+  it(
+    'derives the .webp extension from an image/webp blob (AUDIT-20260602-03)',
+    async () => {
+      mockOrphanSuccess();
+      const target = document.createElement('textarea');
+      document.body.appendChild(target);
+      const onScreenshotAttached = vi.fn();
+      bindPasteHandler(target, {
+        onScreenshotAttached,
+        now: () => new Date('2026-06-01T00:00:00.000Z'),
+      });
+      const file = new File([new Uint8Array([0x52, 0x49, 0x46, 0x46])], 'p.webp', {
+        type: 'image/webp',
+      });
+      target.dispatchEvent(makeClipboardEvent(file));
+      for (let i = 0; i < 5; i += 1) {
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      expect(onScreenshotAttached).toHaveBeenCalledTimes(1);
+      const call = onScreenshotAttached.mock.calls[0][0];
+      expect(call.filename).toMatch(/\.webp$/);
+    },
+  );
+
   it('does not call onScreenshotAttached for a plain-text paste', async () => {
     const fetchSpy = mockOrphanSuccess();
     const target = document.createElement('textarea');
