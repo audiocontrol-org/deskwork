@@ -409,15 +409,6 @@ Any frontmatter, config, or other metadata deskwork embeds into operator-owned f
 
 ## Project workflow conventions
 
-### Stay on `feature/deskwork-plugin` for ongoing work
-
-The deskwork project uses a single long-lived working branch: `feature/deskwork-plugin`. Do NOT spin up additional `feature/<topic>` branches without an explicit ask.
-
-**How to apply:**
-- After each PR merges to `main`, sync `feature/deskwork-plugin` (rebase or fast-forward) so it tracks tip-of-main, then continue working there.
-- New phases / enhancements / bug fixes: use `/feature-extend` to add to the existing workplan rather than creating a new branch.
-- Reserve "new feature branch" for genuinely large standalone features the operator explicitly identifies as needing their own track. When in doubt, ask first.
-
 ### Don't pitch `/schedule` check-ins on this project
 
 Do NOT end replies with offers to `/schedule` a background follow-up agent (e.g. *"want me to /schedule an agent in 2 weeks to..."*). The system prompt's proactive end-of-turn prompt suggests this; the operator has explicitly overridden it for this project.
