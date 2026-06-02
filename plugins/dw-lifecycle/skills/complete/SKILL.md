@@ -51,6 +51,18 @@ gh issue close <number> --comment "Completed in feature/<slug>; see <feature-dir
 8. Commit the doc-tree move, ROADMAP update, and (if the override fired) the journal-override entry.
 9. Report: new docs path, issues closed (including the phase-parent closures from step 4), commit hash, override reason (if any).
 
+## Composed disciplines
+
+Composed from `.claude/rules/agent-discipline.md` (feature `decompose-agent-discipline`); the rules file now points here. These govern the install-verification + issue-disposition that bracket feature completion.
+
+### Packaging is UX — never paper over install bugs
+
+When evaluating a feature on a real install (marketplace install, released artifact), treat the install state as ground truth. Do NOT copy missing files into the cache, inject scripts, or reconstruct the *"intended"* surface to make the evaluation pass — that evaluates a surface no adopter actually sees. Catalog every install-level defect (missing bundles, 404s, console errors, dead UI) as a **top-priority blocker**. The fix path is: file a packaging issue, fix the public path (edit source, commit, push, re-release if needed), then re-evaluate. Operator's framing: *"Packaging IS UX."*
+
+### Issue closure requires verification in a formally-installed release
+
+No issue closes until its fix is verified in a **formally-installed release** — applies to operator-, customer-, AND agent-filed issues alike. A commit, a passing local test, a green workspace suite — none are "fixed"; each is a status update. Closing-on-commit masks packaging defects, wrong-environment success, and address-the-wrong-problem. After a commit: post the hash + what changed; the issue **stays open**. After release: post the version; **still open** until a real install + walk-through proves the symptoms gone. The closing transition is the **operator's** (or issue author's) call — the agent posts evidence, never closes. `/dw-lifecycle:close-shipped` mechanizes the post-release labeling (pending-verification, does NOT close).
+
 ## Error handling
 
 - **Bare TBDs found, no override.** complete-gate exits 2; doc move + ROADMAP + gh close steps DO NOT run. Operator promotes the deferrals via `/dw-lifecycle:promote-deferrals` and re-runs.

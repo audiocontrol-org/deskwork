@@ -251,3 +251,19 @@ Defaults at `DEFAULT_LOOP_CONFIG` in `orchestrator-loop/loop-config.ts`. Operato
 - **`dw-lifecycle validate-return` exit 1.** The sub-agent's response was rejected by the dispatch grammar (missing block / forbidden phrase / skipped-audit signal / refactor-precondition violation). Re-dispatch with the same augmented prompt + a correction note that quotes the violation surfaced in the JSON. After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
 - **Orchestrator loop — judge dispatch fails.** `dw-lifecycle orchestrator-turn` exits non-zero when the in-band judge's wrapper call rejects. Surface the violation to the operator; the next turn re-runs the judge with the same input (recovery is operator-decided per the wrong-decision-recovery primitives at `recovery/`).
 - **Orchestrator loop — wrong-decision detected but reversal proposal needs operator review.** The reversal proposal lands in `TurnReport.reversalProposals`. Auto-apply when `controllerDecision.intensity` AND the recovery library's trust-calibration both support it; otherwise enqueue an escalation via `escalation/escalation-queue.ts#enqueueEscalation`. Escalations surface in the next turn's `escalationVisibility`.
+
+## Composed disciplines
+
+These were composed from `.claude/rules/agent-discipline.md` (feature `decompose-agent-discipline`); the rules file now points here.
+
+### Design tasks go through /frontend-design first (precondition)
+
+Before picking up any task involving a **design decision** — a new UI surface, a redesign, an affordance-placement decision, a visual-language choice, anything that asks *"what should this look like / how should this work"* — invoke **`/frontend-design`** first. It produces 2–3 opinionated mockups the operator picks from, turning implementation into a translation problem instead of an exploration problem. Skip it only when the design is fully determined upstream (the task names exact CSS/markup, or the operator named "use pattern X exactly"). When in doubt, run it. Applies to dispatch prompts too: instruct design-task sub-agents to use `/frontend-design`.
+
+### Sub-agent dispatch reports are action lists, not disclosures
+
+When a dispatched sub-agent's report flags an adjacent issue as *"out of scope but worth flagging,"* that is NOT a valid resting place. Treat every such flag as an action: fix it in-scope now (if small and related), or file a GitHub issue immediately so the operator can decide. *"Noted in the dispatch report"* is not a disposition — the operator may not read the report until a downstream user trips over the bug. Report which flags you fixed vs. filed (with the issue link) in your task summary.
+
+### This skill runs in the implementation session, not the orchestrator session
+
+`/dw-lifecycle:implement` runs in a **feature-worktree session** opened against `~/work/<project>-work/<slug>/`, distinct from the orchestrator session that ran define → setup → PRD-iterate/approve → issues in the main repo. The two-session split keeps orchestration context out of implementation context. The operator's framing: *"you are the orchestrator, not the implementer."* If you're in the orchestrator session about to run implement, hand off — open a fresh session against the worktree. (Operator override of this boundary is the operator's explicit call.)

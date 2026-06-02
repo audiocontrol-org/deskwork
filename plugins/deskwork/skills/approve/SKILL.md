@@ -49,3 +49,9 @@ Per `DESKWORK-STATE-MACHINE.md` Commandment II + IX, approve is the universal fo
 - **Currently Blocked/Cancelled.** Refuse: "entry is <stage>; use /deskwork:induct to bring it back first."
 - **Currently Published.** Refuse: "Published is terminal — to revise, induct backward to a non-terminal stage first; the existing published version stays as-is."
 - **Conflicting prior snapshot.** Refuse with the snapshot path. The fix path is operator resolution (they likely hand-edited a prior snapshot). Decide which copy to keep, leave it under `scrapbook/<priorStage>.md`, then re-run approve.
+
+## Composed discipline: empty revisions beat missed changes
+
+Composed from `.claude/rules/agent-discipline.md` (feature `decompose-agent-discipline`); the rules file now points here.
+
+When the operator invokes approve (or any capture/snapshot operation), **run it as asked** — don't pre-decide that it would be a no-op and skip it. The snapshot is append-only and disk-cheap; an empty/redundant capture is bounded noise, while a missed change is unbounded (disk state diverges from your assumption and every later operation compounds the error). Operator's framing: *"I'd rather have empty revisions than miss changes."*
