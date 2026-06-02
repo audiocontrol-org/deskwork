@@ -1089,7 +1089,7 @@ Closes AUDIT-20260602-01. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 - [x] Step 1: write the disposition prose (≥40 chars, substantive).
 - [x] Step 2: apply the action named in Step 1 (regression tests + template + SKILL.md + Phase 20 Task 1 Step 6 edit).
-- [ ] Step 3: commit with `Closes AUDIT-20260602-01` in subject (the disposition IS a code change verifiable by test — the regression-lock tests in `auto-flip-from-commit.test.ts` — so `Closes` is the correct trailer here, not `Acknowledges`).
+- [x] Step 3: commit with `Closes AUDIT-20260602-01` in subject (the disposition IS a code change verifiable by test — the regression-lock tests in `auto-flip-from-commit.test.ts` — so `Closes` is the correct trailer here, not `Acknowledges`).
 
 **Acceptance Criteria:**
 
