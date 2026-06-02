@@ -47,6 +47,23 @@ export interface CheckImplementHookRanArgs {
    * marker, but no commit can land to trigger the first hook run.
    */
   readonly hasAnyPriorHookRun: () => Promise<boolean>;
+  /**
+   * Phase 22 Task 3 (#399 Friction 1): returns true iff `tip` is an
+   * ancestor of HEAD (the parent commit at gate-time). Used to distinguish
+   * "marker stale on the same history line" (refuse — operator skipped
+   * the hook between two commits) from "marker on a divergent history
+   * line" (allow as boot case — the operator did `git reset --hard
+   * origin/main`, marker came back tracked from main's tree, and points
+   * at a commit no longer reachable from HEAD).
+   *
+   * Without this distinction, sync-from-main breaks every commit-msg
+   * gate until manual marker hand-edit; with it, the gate self-recovers
+   * because the diverged marker is recognized as "from another timeline."
+   *
+   * Default impl runs `git merge-base --is-ancestor <tip> HEAD` and maps
+   * exit-0 → true, exit-anything-else → false.
+   */
+  readonly isAncestorOfHead: (tip: string) => Promise<boolean>;
 }
 
 export type CheckImplementHookRanResult =
@@ -61,6 +78,12 @@ export type CheckImplementHookRanResult =
   | {
       readonly kind: 'allow-marker-matches-head';
       readonly markerTip: string;
+      readonly reason: string;
+    }
+  | {
+      readonly kind: 'allow-marker-diverged-history';
+      readonly markerTip: string;
+      readonly head: string;
       readonly reason: string;
     }
   | {
@@ -117,6 +140,29 @@ export async function checkImplementHookRan(
       kind: 'allow-marker-matches-head',
       markerTip: marker.tip,
       reason: `Audit-barrage hook ran since the parent commit (tip ${marker.tip.slice(0, 8)} matches HEAD).`,
+    };
+  }
+  // Phase 22 Task 3 (#399 Friction 1): marker.tip !== HEAD has two
+  // sub-cases. If marker.tip IS an ancestor of HEAD, the marker is
+  // genuinely stale on the same history line — the operator landed a
+  // commit between hook runs. If marker.tip is NOT an ancestor of HEAD,
+  // history diverged via reset/rebase/sync; the marker came from
+  // another timeline (the live repro: `git reset --hard origin/main`
+  // brings back a tracked marker pointing at a commit no longer
+  // reachable from the post-reset HEAD). Treat the diverged case as
+  // boot — the operator's intent is clearly "start fresh from this tip,"
+  // and any prior-hook-run record is moot.
+  const onSameHistory = await args.isAncestorOfHead(marker.tip);
+  if (!onSameHistory) {
+    return {
+      kind: 'allow-marker-diverged-history',
+      markerTip: marker.tip,
+      head,
+      reason:
+        `Marker tip ${marker.tip.slice(0, 8)} is not an ancestor of HEAD ${head.slice(0, 8)} — ` +
+        `history diverged (likely via \`git reset --hard\` / rebase / sync). ` +
+        `Treating as boot case per Phase 22 Task 3 (#399 Friction 1); ` +
+        `the next implement-hook run will re-baseline the marker.`,
     };
   }
   return {

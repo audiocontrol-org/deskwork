@@ -107,6 +107,24 @@ function defaultGitHead(repoRoot: string): string {
   }
 }
 
+// Phase 22 Task 3 (#399 Friction 1): `git merge-base --is-ancestor`
+// returns exit-0 when `tip` is an ancestor of HEAD, exit-1 when not,
+// and exit > 1 on real errors. Map exit-0 → true; anything else → false.
+// On exec error (no git, no .git/, bad ref), treat as "not an ancestor"
+// — the safe default falls through to the existing refuse-marker-stale
+// path rather than silently allowing.
+function defaultIsAncestorOfHead(repoRoot: string, tip: string): boolean {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', tip, 'HEAD'], {
+      cwd: repoRoot,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface RunArgs {
   readonly opts: CheckImplementHookRanCliOptions;
   readonly projectRoot: string;
@@ -116,6 +134,7 @@ export interface RunArgs {
   readonly gitHeadResolver?: () => Promise<string>;
   readonly isScopeDiscoveryOptedIn?: () => Promise<boolean>;
   readonly hasAnyPriorHookRun?: () => Promise<boolean>;
+  readonly isAncestorOfHead?: (tip: string) => Promise<boolean>;
 }
 
 function summarize(result: CheckImplementHookRanResult): string {
@@ -123,6 +142,7 @@ function summarize(result: CheckImplementHookRanResult): string {
     case 'allow-not-opted-in':
     case 'allow-no-prior-run':
     case 'allow-marker-matches-head':
+    case 'allow-marker-diverged-history':
       return `check-implement-hook-ran: ${result.reason}`;
     case 'refuse-marker-missing':
     case 'refuse-marker-stale':
@@ -142,12 +162,15 @@ export async function runCheckImplementHookRan(args: RunArgs): Promise<number> {
       const log = await readHookRunLog(repoRootResolved);
       return log.length > 0;
     });
+  const isAncestorOfHead =
+    args.isAncestorOfHead ?? (async (tip: string) => defaultIsAncestorOfHead(repoRootResolved, tip));
   const result = await checkImplementHookRan({
     repoRoot: repoRootResolved,
     readMarker,
     gitHeadResolver,
     isScopeDiscoveryOptedIn,
     hasAnyPriorHookRun,
+    isAncestorOfHead,
   });
   args.stderr.write(`${summarize(result)}\n`);
   if (result.kind.startsWith('allow')) return 0;

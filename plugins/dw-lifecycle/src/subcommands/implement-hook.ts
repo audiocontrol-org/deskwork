@@ -186,6 +186,20 @@ function gitDiffWorktree(repoRoot: string): string {
   }
 }
 
+// Phase 22 Task 3 (#399 Friction 1): mirror of the helper in
+// check-implement-hook-ran.ts. exit-0 = ancestor; anything else = not.
+function isAncestorOfHead(repoRoot: string, tip: string): boolean {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', tip, 'HEAD'], {
+      cwd: repoRoot,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 interface DwlVerbInvocation {
   readonly stdout: string;
   readonly stderr: string;
@@ -274,7 +288,25 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
     args.stderr.write('implement-hook: git rev-parse HEAD failed; aborting.\n');
     return 1;
   }
-  const lastBarrageTip = await readLatestBarrageTip(repoRootResolved);
+  const rawBarrageTip = await readLatestBarrageTip(repoRootResolved);
+  // Phase 22 Task 3 (#399 Friction 1): when the marker came back via
+  // `git reset --hard origin/main` from a tracked main-side blob, its
+  // tip points at a commit no longer reachable from HEAD. Walking
+  // `lastBarrageTip..HEAD` would yield main's shipped history, not the
+  // operator's new work. Detect divergence by checking ancestry and
+  // fall through to the HEAD~10 fallback when the marker is from
+  // another timeline.
+  const lastBarrageTip =
+    rawBarrageTip !== null && isAncestorOfHead(repoRootResolved, rawBarrageTip)
+      ? rawBarrageTip
+      : null;
+  if (rawBarrageTip !== null && lastBarrageTip === null) {
+    args.stderr.write(
+      `implement-hook: barrage tip ${rawBarrageTip.slice(0, 8)} is not an ancestor of HEAD ` +
+        `${head.slice(0, 8)} (history diverged via reset/rebase/sync). ` +
+        `Falling back to HEAD~10 baseline per Phase 22 Task 3 (#399 Friction 1).\n`,
+    );
+  }
   const range = lastBarrageTip !== null ? `${lastBarrageTip}..${head}` : `HEAD~10..${head}`;
   // Phase 22 Task 2 (#399 Friction 2): the commit-range diff can be
   // empty in the immediate post-`git reset --hard origin/main` state

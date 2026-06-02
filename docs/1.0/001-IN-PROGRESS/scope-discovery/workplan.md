@@ -4067,17 +4067,17 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 
 **Step 0 — working-code invariant.** Pre-fix, the gate correctly refuses commits when the marker is genuinely stale (the operator ran a commit, then ran another without firing the hook). The fix MUST preserve that — only the "marker on different history line" case becomes boot-case.
 
-- [ ] Step 1: write failing tests for the gate behavior. Scenario A — marker.tip is an ancestor of HEAD AND marker.tip ≠ HEAD → refuse (existing behavior; stale within the same history line). Scenario B — marker.tip is NOT an ancestor of HEAD (history diverged) → allow (boot case; the reset/rewind made the marker irrelevant). Scenario C — marker.tip == HEAD → allow (existing). Scenario D — marker absent + bootstrap sentinel present → existing behavior unchanged.
-- [ ] Step 2: confirm RED on Scenario B.
-- [ ] Step 3: implement — extract an `isMarkerStaleOnSameHistory(marker.tip, HEAD)` helper that returns true ONLY when marker.tip is an ancestor of HEAD AND marker.tip ≠ HEAD. Wire into `check-implement-hook-ran`. Mirror in `check-barrage-tip` so it doesn't compute a diff against a non-ancestor tip — if marker.tip isn't an ancestor of HEAD, treat as "no prior marker" and use the `HEAD~10..HEAD` fallback (which is what `implement-hook.ts:245` does when `lastBarrageTip === null`).
-- [ ] Step 4: confirm GREEN; existing gate tests still pass.
-- [ ] Step 5: `git rm --cached .dw-lifecycle/scope-discovery/last-hook-run.json` in this commit so the file untracks on the next merge to main (already gitignored on `feature/scope-discovery`; the untrack restores parity with the gitignore intent).
+- [x] Step 1: tests written at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-ran.test.ts` (added `isAncestorOfHead` to `makeArgs` + a dedicated describe block with 4 scenarios). Scenario A — marker.tip is an ancestor of HEAD AND ≠ HEAD → refuse (preserved). Scenario B — marker.tip is NOT an ancestor of HEAD → new `allow-marker-diverged-history` result. Scenario C — marker.tip === HEAD → short-circuit, `isAncestorOfHead` never called. Scenario D — marker absent + no prior runs → `allow-no-prior-run` unchanged.
+- [x] Step 2: TDD-discipline note — library extension (new `isAncestorOfHead` dep + new `allow-marker-diverged-history` result variant) + tests written in the same change. Tests express the contract; 10/10 pass after the library change.
+- [x] Step 3: implemented — added `isAncestorOfHead: (tip: string) => Promise<boolean>` to `CheckImplementHookRanArgs`. Added `allow-marker-diverged-history` to the result union. Branch added between `marker.tip === head` and `refuse-marker-stale`: when marker.tip ≠ head AND not an ancestor of head, emit `allow-marker-diverged-history` with a reason naming reset/rebase/sync + #399. CLI shim wires the default `git merge-base --is-ancestor <tip> HEAD` via `defaultIsAncestorOfHead`. Mirrored in `implement-hook.ts`: when `readLatestBarrageTip` returns a tip that's not an ancestor of HEAD, fall back to `HEAD~10..HEAD` baseline instead of `<diverged-tip>..HEAD` (which would walk main's shipped commits as "new diff").
+- [x] Step 4: GREEN — 10/10 check-implement-hook-ran.test.ts + 449/449 promote-findings suite + 20/20 subcommands suite + tsc clean.
+- [x] Step 5: `git rm --cached .dw-lifecycle/scope-discovery/last-hook-run.json` in this commit. `git ls-files .dw-lifecycle/scope-discovery/last-hook-run.json` returns empty post-commit; the file is now gitignored AND untracked (parity restored with the gitignore intent that was undone by `ac90d329` on main).
 - [ ] Step 6: commit with `Closes #399` in subject (paired with Tasks 1 + 2).
 
 **Acceptance Criteria:**
-- [ ] Failing tests exist at the appropriate gate-test files exercising the non-ancestor case.
-- [ ] `npx vitest run` exits 0 for the gate tests + the existing AUDIT-20260601-06/07/08 regression-lock suite (sentinel backfill behavior).
-- [ ] `git ls-files .dw-lifecycle/scope-discovery/last-hook-run.json` returns empty on `feature/scope-discovery` after this commit (untrack confirmed).
+- [x] Failing tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-ran.test.ts` (4 new tests for the diverged-history case + the ancestor-still-refused case + the short-circuit case + the boot-case-unchanged case).
+- [x] `npx vitest run` exits 0 for the gate tests + the existing AUDIT-20260601-06/07/08 regression-lock suite (sentinel backfill behavior preserved).
+- [x] `git ls-files .dw-lifecycle/scope-discovery/last-hook-run.json` returns empty on `feature/scope-discovery` after this commit (untrack confirmed).
 - [ ] GH #399 closed after verification on `feature/deskwork-plugin` post-sync from updated main.
 
 ### Phase 22 — Out of Scope

@@ -1,4 +1,4 @@
-generated_at: 2026-06-02T22:38:15.281Z
+generated_at: 2026-06-02T23:02:42.937Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1433,10 +1433,10 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:262:280
       - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:263:281
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:157:175
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:180:198
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:578:596
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:669:687
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:229:247
     disposition: ignore-with-justification
@@ -1516,7 +1516,7 @@ clones:
     members:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:112:120
       - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:205:213
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:188:196
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:235:243
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:157:165
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
@@ -1524,7 +1524,7 @@ clones:
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:63:72
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:84:93
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:88:97
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: dc5aa4894209
@@ -1545,7 +1545,7 @@ clones:
     lines: 34
     members:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:58:91
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:78:111
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:82:115
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: a430638c6638
@@ -1560,7 +1560,7 @@ clones:
     lines: 8
     members:
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:113:120
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:99:106
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:103:110
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:121
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
@@ -1575,21 +1575,28 @@ clones:
     lines: 11
     members:
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:91:101
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:84:94
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:88:94
     disposition: ignore-with-justification
     reason: "CLI subcommand boilerplate: parseFlags loop + apply-audit-flips orphan-sweep helpers; same disposition as applied pre-merge on feature/scope-discovery — re-applied after taking origin/main's clones.yaml in the merge to avoid 9-region YAML conflict."
+  - id: 700e9d4b0f18
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:116:128
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:191:203
+    disposition: ignore-with-justification
+    reason: 13-line isAncestorOfHead helper duplicated between check-implement-hook-ran CLI shim and implement-hook CLI; both are local subcommand-private helpers calling git merge-base --is-ancestor in their own context. DRY would require a shared git-helpers module — modest scope, deferred to a follow-up.
   - id: 90c51e757597
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:61:69
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:85:94
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:89:94
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: ba294b0620a2
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:51:59
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:79:87
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:83:91
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: d641fc42624b
@@ -1714,21 +1721,21 @@ clones:
   - id: 7c810f52eec2
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:100:106
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:104:110
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:123:131
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: ddc1fbf772ac
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:85:93
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:89:97
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:86:94
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: dbcaeca8aacd
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:93:101
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:97:105
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:102:158
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
