@@ -337,3 +337,72 @@ pending annotations" exit 0; populated entry 2dbe2326 via `--all` → 8
 annotations with per-comment `[disposition] id {category} (version, range)`;
 `--json` empty shape; unknown uuid → `sidecar not found` non-zero). Clone-check:
 pre-commit gate ran on each commit, 0 NEW (additive new files).
+
+## 2026-06-02 — audit-barrage lift (20260602T221554321Z-deskwork-plugin)
+
+### AUDIT-20260602-01 — Audit-barrage rendered an empty diff — the range `origin/main...HEAD` is empty because the work is uncommitted
+
+Finding-ID: AUDIT-20260602-01
+Status:     acknowledged-#399
+Severity:   high
+Surface:    audit-barrage harness (diff-range selection) + repo state (HEAD `0317191d` == `origin/main`)
+
+The "## Diff under audit" section of this prompt is **empty** — no code was substituted in. I verified why: branch `feature/deskwork-plugin` HEAD is `0317191d`, *identical* to `origin/main` (v0.34.0). The Phase 39 work exists only as **staged, uncommitted** files (`git diff --cached` shows spec +109, workplan +24). The barrage computed its range as `origin/main...HEAD`, which is empty when HEAD == main, so it rendered no diff — and the "Commit subjects in the audited range" list is just all of main's history, another symptom of the same wrong range computation.
+
+This matters because any sibling CLI model that emits code-level "findings" against this prompt is **fabricating** — there is no code to anchor to. The operator is paying N models to audit nothing. A reasonable fix: the harness should diff the *working tree + index* (`git diff origin/main` without `...`, or `git diff --cached` + unstaged) when HEAD has no novel commits, and **refuse to fire** (or warn loudly) when the resolved diff is empty rather than rendering a blank section that invites confabulation.
+
+---
+
+### AUDIT-20260602-02 — Phase 39 artifacts are uncommitted; Task 39.0 is marked `[x]` DONE but overstates the committed state
+
+Finding-ID: AUDIT-20260602-02
+Status:     fixed-2026-06-02 (resolved by committing the staged 39.0 work; the `[x]` is correct once this commit lands. Secondary claim re backup is incorrect — `backup/pre-phase39-resync-928224ce` DOES carry the spec via `2abfffa1`, so the design was always recoverable.)
+Severity:   medium
+Surface:    docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md (Task 39.0, the `[x]` line)
+
+Task 39.0's body claims: *"Dropped all 9 branch commits … and re-applied only the spec file + this Phase 39 section onto main. Verified net diff vs `origin/main` = exactly `{spec (+109), workplan Phase 39 (+24)}`."* But `git diff origin/main...HEAD` is **empty** — the branch's committed history carries nothing beyond main. That "net diff" is only true for the **working tree / index**, not committed history. The spec and the Phase 39 workplan section exist **solely as staged uncommitted changes**.
+
+The reversibility note compounds the risk: the backup branch `backup/pre-phase39-resync-928224ce` preserves the *pre-reset* state (the old `928224ce` docs commits), which do **not** contain this new spec. So the only copy of the Phase 39 design + workplan is the uncommitted index — a `git reset`, `git checkout`, or stash mishap loses it with no commit and no backup-branch fallback. A force-push now (the task says force-push is "deferred to operator") would push nothing new. Either commit the docs before declaring 39.0 done, or reword the `[x]` to state the artifacts are staged-pending-commit. Marking it DONE while the work lives only in the index is exactly the overstatement the project's verification-before-completion discipline guards against.
+
+---
+
+### AUDIT-20260602-03 — Migration backfill reuses the `artifactPathForStage` heuristic — the very root cause of #394 — to stamp *authoritative* paths
+
+Finding-ID: AUDIT-20260602-03
+Status:     fixed-2026-06-02 (collision-detection folded into spec §Migration step 2 + workplan 39b acceptance: ambiguous resolution refuses-and-reports, no silent stamp)
+Severity:   high
+Surface:    spec §"Migration" step 2 + workplan Task 39b ("backfill each entry's `artifactPath` from the current resolved location (LAST use of the `artifactPathForStage` heuristic)")
+
+The spec correctly diagnoses the disease: *"location used as an identifying/resolution key"* causes the #394 multi-site false-positives because the doctor guesses which site's `contentDir` an entry lives in by searching all of them. But the migration's step 2 backfills `artifactPath` by running **that same slug+stage heuristic** (`artifactPathForStage`) to derive "the current resolved location," then stamps the result as **authoritative and required forever**.
+
+For the exact scenario the feature exists to fix — a slug that collides across two sites on different filesystems (`AUDIT-20260602-03`: *"slug-collision-across-sites resolves to the wrong file"*) — the backfiller will resolve to the *wrong* file and bake that wrong path in permanently as the new source of truth. The migration would launder a known-ambiguous guess into trusted data, making the bug *harder* to detect afterward (no more "search" to flag the ambiguity; just a confidently-wrong stored path). Task 39b's TDD note says "multi-site + multi-filesystem fixture; idempotent re-run" but does not call for a **collision-detection / refuse-and-require-disambiguation** path. The migration must detect when the heuristic resolves ambiguously (multiple candidate files, or a slug present under >1 site) and **stop / prompt** rather than silently stamp one — otherwise the cutover writes the #394 bug into permanent state. This belongs in the spec's Migration section and in 39b's acceptance criteria explicitly.
+
+---
+
+### AUDIT-20260602-04 — `scaffoldDefaults: Record<artifactKind, string>` forces *every* artifactKind present — contradicts "optional convenience default per kind"
+
+Finding-ID: AUDIT-20260602-04
+Status:     fixed-2026-06-02 (spec + workplan 39a corrected to `Partial<Record<artifactKind, string>>`; partial-map accept case added to 39a AC)
+Severity:   medium
+Surface:    spec §"The Model → Lane" (`scaffoldDefaults?: Record<artifactKind, string>`) + workplan Task 39a
+
+The spec types the field as `Record<artifactKind, string>`. In TypeScript, `Record<K, V>` over a union key type `K` requires **all** members of the union to be present — so a lane that only defines a default for `post` but not `plan`/`workspan`/etc. would be a type error, and the corresponding Zod schema (`z.object({ post: ..., plan: ..., workplan: ... })`) would reject partial maps. That directly contradicts the prose two lines down: *"scaffoldDefaults is the only location info a lane carries … a convenience default"* and the example where a lane maps only some kinds. As written, 39a would implement a schema that forces every adopter to specify a directory for every artifact kind their pipeline never uses.
+
+The intended shape is partial: `scaffoldDefaults?: Partial<Record<artifactKind, string>>` (and a Zod `z.record(artifactKindSchema, z.string())` or `.partial()`'d object). This is a small but load-bearing correction — 39a's "lane-schema tests for the new optional fields + `.strict()` rejection" should pin that a lane defining *one* kind validates, and only *unknown* keys are rejected. Fix the spec's type literal so the implementer doesn't faithfully encode the wrong contract.
+
+---
+
+### AUDIT-20260602-05 — Stale deferral pointer: #223/#234/#357 were deferred to #301 (graphical-entries), which has now MERGED without resolving them — Phase 39 silently inherits the cluster
+
+Finding-ID: AUDIT-20260602-05
+Status:     fixed-2026-06-02 (spec §9 reconciled: #223/#234/#357 ownership moved from merged-but-unresolved #301 to Phase 39 §Calendar/39c). FOLLOW-UP (needs operator approval — external-write gate denied the agent): re-point the three GH issues #223/#234/#357 at Phase 39 with a comment (the durable spec record exists; the issue comments would close the "operator checks #301, finds it merged, assumes resolved" trap).
+Severity:   medium
+Surface:    workplan Phase 38 cluster line (`#223 + #234 + #357` "deferred to `feature/graphical-entries` (#301)") vs Phase 39 spec §"Calendar" + commit `386df7dd` (Merge PR #398 from feature/graphical-entries)
+
+The Phase 38 workplan defers the calendar-surface cluster (#223 regen flip-flop, #234 divergence, #357 read-side validator) to `feature/graphical-entries`/#301, on the rationale that "lanes generalizes the … surface question." But graphical-entries **already merged** into main (commit `386df7dd`, shipped in v0.34.0) — and per Phase 39's own spec it shipped `lane.contentDir` (location-as-key *repeated*) and did **not** resolve the calendar cluster. Phase 39 §"Calendar" now picks up that exact work (retire per-site `calendarPath`, collapse to a single `.deskwork/calendar.md`, de-parameterize `resolveCalendarPath` + the `calendar-sidecar` rule).
+
+So the ownership of #223/#234/#357 has silently moved from the merged-but-didn't-fix #301 to the not-yet-implemented Phase 39, with no update to either the Phase 38 deferral line or (presumably) the GitHub issues that still point at #301. Per the project's closure discipline ("a deferral without an issue/workplan record that someone reads is debt that compounds"), the workplan should reconcile this: either re-point those three issues at Phase 39 (39c) explicitly, or note in the Phase 38 line that #301 merged without resolving them and Phase 39 now owns them. Otherwise an operator reading the burndown sees "deferred to #301," checks #301, finds it shipped, and reasonably assumes the cluster is resolved when it is not. Same applies to #394: spec §9 correctly says it "remains a known limitation until this retirement lands" — confirm the #394 issue is updated to reflect that its in-flight fix (`5fbddf15`) was **dropped** and re-scoped to Phase 39, not silently abandoned.
+
+---
+
+**Summary for triage:** The single most important signal is **-01** — this barrage had no code to audit; the work is two staged docs files. Of the doc-level findings, **-03** (migration backfills via the broken heuristic) and **-04** (`Record` vs `Partial<Record>`) are the two I'd fix in the spec *before* 39a/39b start, since the implementer will otherwise faithfully encode both. **-02** and **-05** are tracking-integrity issues (uncommitted "done" work; stale deferral pointer) that cost trust later but don't block design.
