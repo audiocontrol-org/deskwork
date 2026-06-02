@@ -3637,3 +3637,57 @@ GH #386 from the graphical-entries team: `audit-barrage` spawn-time failures wit
 - **Single-CLI design** — explicitly out of scope per the issue body.
 - **Flipping plugin-default config to `{{prompt-stdin}}`** — requires live verification per CLI (claude / codex / gemini) before changing the default. Operators who hit E2BIG can opt in via the project-side override; the default stays `{{prompt}}` to preserve the working-code invariant.
 - **Option B (temp-file via shell wrapper)** — explicitly NOT picked due to shell-injection risk.
+
+## Phase 20: AUDIT-68 follow-up + audit-barrage review-surface consolidation
+
+Two issues filed externally (2026-06-02) that close out latent work from this session's burndown loop. Both touch scope-discovery's review surface; both are tagged here so future sessions don't lose track of the commitment.
+
+### Task 1: Operator-supplied fix-shape on promote-findings proposals ([#392](https://github.com/audiocontrol-org/deskwork/issues/392) / AUDIT-20260601-68 follow-up)
+
+GH #392 surfaces the inverse of AUDIT-68: a finding whose surface IS source (`.ts`) but whose fix is comment-only / docs / pointer-rename → `inferFindingShape` returns `code-defect` and the rendered task demands a phantom `vitest` test. AUDIT-68 surfaced the symmetric direction (surface is non-source, fix is in code).
+
+Both cases share the same root cause: shape inference from surface alone is unsound. Per AUDIT-68's revert disposition (commit f1219cd6), the abandoned approach was body-keyword detection (`SOURCE_FILE_IN_BODY_RE`) — that path conflicted with the AUDIT-76/77 informational-exclusion logic. Two acceptable future-work paths remain:
+
+- **(a) Intent-language detection.** Match phrases like "the fix is in", "implement in", "change `<path>`" near a code citation. Heuristic but bounded.
+- **(c) Operator-supplied shape on the proposal.** `promote-findings` propose mode already has a proposal-file roundtrip; the operator could set `findingShape: 'non-bug' | 'code-defect'` per item before `--apply`. The `--auto` path would still infer (defaulting to `code-defect`), but operator-supplied shape would override.
+
+**Severity: medium** (HIGH-severity recursion is closed; this is a refinement of an already-mitigated path).
+
+**Step 0 — working-code invariant.** Pre-fix, surface-only inference works correctly for surfaces that are unambiguously source (`.ts:line` → code-defect) or unambiguously docs (`workplan.md` → non-bug). The fix MUST preserve those cases; the change adds an override layer above the current inference, not a replacement.
+
+- [ ] Step 1: pick approach (a) vs (c) — propose to operator before implementing.
+- [ ] Step 2: failing tests — code-defect surface + comment-only-fix body should yield non-bug shape; non-bug surface + code-fix body should yield code-defect shape; existing surface-only cases unchanged.
+- [ ] Step 3: confirm RED.
+- [ ] Step 4: implement.
+- [ ] Step 5: confirm GREEN; full plugin suite + tsc clean.
+- [ ] Step 6: commit with `Closes #392` (and `Closes AUDIT-20260601-68` if AUDIT-68 is re-opened to track the proper fix).
+
+**Acceptance Criteria:**
+- [ ] Approach picked by operator + rationale documented in commit body.
+- [ ] ≥2 test blocks per HIGH-severity Option D discipline (even though severity is medium, the historical recursion-engine motivation justifies the regression-lock).
+- [ ] GH #392 closed after verification in a release.
+
+### Task 2: Retire `/dw-lifecycle:review` + `/dw-lifecycle:audit` ([#387](https://github.com/audiocontrol-org/deskwork/issues/387))
+
+GH #387 captures an architectural decision: the audit-barrage hook (Phase 16/17) has subsumed the three-track review protocol. The operator's verbatim framing: *"the review skill is no longer hooked into the iterate cycle — superseded by the audit barrage hook. Review is no longer operationally enforced, so we shouldn't put anything in there. In fact, we should consider retiring review and audit in favor of audit barrage."*
+
+This is multi-skill architectural work that touches scope-discovery's review surface (audit-barrage is one of three audit surfaces per `agent-discipline.md`; retiring review reduces it to two: in-band self-audit + audit-barrage). The scope-discovery feature owns the audit-log lifecycle that review/audit currently drives; that ownership transfers fully to audit-barrage's lift step.
+
+**Severity: medium** (no current operational impact; review skill is dead-but-listed).
+
+- [ ] Step 1: surface inventory (per #387 body) — confirm every caller of `/dw-lifecycle:review`, `/dw-lifecycle:audit`, and their CLI surfaces.
+- [ ] Step 2: confirm audit-barrage's lift step owns the full audit-log lifecycle (creation + status flips + closure triad) — if not, identify the gap.
+- [ ] Step 3: decide whether to delete the two skills outright, alias them to audit-barrage, or split (review → delete; audit → audit-barrage alias).
+- [ ] Step 4: remove the skills + rehome every cross-reference (including `agent-discipline.md` "three audit surfaces" framing).
+- [ ] Step 5: commit with `Closes #387` in subject.
+
+**Acceptance Criteria:**
+- [ ] Zero dangling references to `/dw-lifecycle:review` or `/dw-lifecycle:audit` in skills, CLAUDE.md, agent-discipline.md, or other docs.
+- [ ] `agent-discipline.md` "three audit surfaces" framing updated to two surfaces (or whatever the final count is).
+- [ ] GH #387 closed after verification.
+
+### Phase 20 — Out of Scope
+
+- **`/dw-lifecycle:review` / `/dw-lifecycle:audit` callers in OTHER plugins** — if any. Scope-discovery only owns its own callers; downstream plugins (deskwork, deskwork-studio) coordinate their own retirements.
+- **`code-reviewer` sub-agent retirement** — Task 2's `agent-discipline.md` cleanup may surface this as a follow-up; the agent itself stays as long as it has callers outside scope-discovery.
+- **Migration of historical audit-log entries** — entries written by `/dw-lifecycle:review` stay as historical record; the lifecycle ownership transfer is forward-only.
