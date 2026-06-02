@@ -108,7 +108,7 @@ Two hygiene notes. (1) The shrunk entry-10 pointer reads "Composed into the desk
 ### AUDIT-20260602-06 — Pointer narrowing contradicts the audit-log's own composition record (close-shipped dropped)
 
 Finding-ID: AUDIT-20260602-06
-Status:     acknowledged-slush-pile-2026-06-02
+Status:     fixed-d9bb4452 (was dampener-slushed; fixed anyway — real finding on a fix commit)
 Severity:   medium
 Surface:    .claude/rules/agent-discipline.md (packaging-is-UX pointer + issue-closure pointer) vs. docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/audit-log.md rows 13 & 19
 
@@ -124,7 +124,7 @@ This is exactly the cross-document drift the feature is built to prevent, and it
 ### AUDIT-20260602-07 — AUDIT-03 regression test exercises `updateFrontmatter`, not the migration round-trip it claims to lock
 
 Finding-ID: AUDIT-20260602-07
-Status:     acknowledged-slush-pile-2026-06-02
+Status:     fixed-d9bb4452 (was dampener-slushed; fixed anyway — real finding on the AUDIT-03 fix)
 Severity:   low
 Surface:    packages/core/test/frontmatter.test.ts:348-367 (new "migration path" test)
 
