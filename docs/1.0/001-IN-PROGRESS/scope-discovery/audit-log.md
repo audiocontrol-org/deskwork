@@ -2824,7 +2824,7 @@ I checked and found clean: the short-circuit semantics (tip===HEAD returns `allo
 ### AUDIT-20260602-45 — Fail-closed helper is fail-closed for the gate but fail-OPEN for `implement-hook` — the consolidation reintroduces the Friction-1 bug on the git-error path
 
 Finding-ID: AUDIT-20260602-45
-Status:     open
+Status:     fixed-7cdf1896accb2e183a4c2fa83fc3701d6c1fbf3e
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:60-67` (error → `return true`) consumed at `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:289-291` AND `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts` (the `allow-marker-diverged-history` branch)
 
@@ -2840,7 +2840,7 @@ Evidence it was an oversight, not a deliberate trade-off: the fix's own workplan
 ### AUDIT-20260602-46 — Shared-helper doc comment documents only the gate's interpretation of `true`/`false` — relocating, not fixing, the "comment lies about semantics" defect AUDIT-41 named
 
 Finding-ID: AUDIT-20260602-46
-Status:     open
+Status:     fixed-7cdf1896accb2e183a4c2fa83fc3701d6c1fbf3e
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:1-49` (file-level doc comment)
 
@@ -2851,3 +2851,58 @@ A maintainer reading "`false` → allow / boot case; refuse on unknown is the sa
 ---
 
 What I checked and found clean: the new `allow-marker-diverged-history` result variant threading and the `result.kind.startsWith('allow')` exit-code mapping (unchanged, correct); the gate's short-circuit (`marker.tip === HEAD` returns before any ancestry call); the real-git test fixture build (`makeRepoWithDivergence` genuinely produces A→B→C / A→D divergence and the exit-0/exit-1/exit-128 cases map to the asserted booleans); the clone-group `700e9d4b0f18` drop from the baseline (matches the consolidation); and the DI-seam async wrapper in `check-implement-hook-ran.ts:151-163` (sound — sync helper wrapped in an async arrow). My two findings are one defect viewed two ways: the consolidated helper's single error policy is correct for the gate and a regression for `implement-hook` (-01), and the doc comment documents only the gate's polarity so the regression reads as intentional safety (-02). Both trace to the same root cause — a boolean helper serving two callers whose safe-on-error directions are opposite — and both are resolved by returning a tri-state result.
+
+## 2026-06-02 — audit-barrage lift (20260602T232824373Z-scope-discovery)
+
+### AUDIT-20260602-47 — Tri-state→caller mappings are untested — the exact integration point AUDIT-45's bug lived at has no test
+
+Finding-ID: AUDIT-20260602-47
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:155-164` (the `result !== 'not-ancestor'` collapse) AND `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:295-301` (the `ancestry === 'ancestor'` trust gate) — neither exercised by the only test touched in this diff, `git-ancestry.test.ts`.
+
+The whole point of the tri-state refactor (per the file-level doc, `git-ancestry.ts:13-18`) is to "force each caller to make the safety choice explicit at the call site." But the diff tests only `checkAncestry` in isolation — every assertion in `git-ancestry.test.ts` calls the helper directly and checks `'ancestor'`/`'not-ancestor'`/`'unknown'`. The two *mappings* the refactor exists to get right are both untested: (a) the gate shim's `result !== 'not-ancestor'` collapse (`'unknown'`→`true`→refuse), and (b) implement-hook's `ancestry === 'ancestor' ? rawBarrageTip : null` (`'unknown'`/`'not-ancestor'`→`HEAD~10` fallback). AUDIT-45's own evidence paragraph stated "no test asserts what `implement-hook` does on the error path" — the fix changed implement-hook's logic to a new condition and *still* added no test for it.
+
+This is the same blind-spot shape AUDIT-43 named ("the suite is green while the production default behind the DI seam is unexercised") and the project memory warns about ("TDD spec tests have systematic blind spots"). The gate's DI seam (`args.isAncestorOfHead`) is still a `Promise<boolean>`, so `check-implement-hook-ran.test.ts` injects a boolean stub and never runs the collapse arrow. A reasonable fix: add a test that drives `runImplementHook` with `rawBarrageTip` set and `checkAncestry` returning `'unknown'`/`'not-ancestor'`, asserting the audited range is `HEAD~10..HEAD` (not `<tip>..HEAD`); and a test that drives the gate shim's default arrow across all three tri-state values. The code reads correctly today, but the high-severity bug being fixed was precisely a call-site disposition error, and nothing locks the call-site dispositions.
+
+### AUDIT-20260602-48 — Duplicate Task number `5.121` in the workplan — collides with the existing AUDIT-44 task
+
+Finding-ID: AUDIT-20260602-48
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new `### Task 5.121 (fix-finding-AUDIT-20260602-45)` (added near line 2340) vs. pre-existing `### Task 5.121 (fix-finding-AUDIT-20260602-44) (non-bug)` (line ~2433).
+
+The batch already contained 5.118 (AUDIT-41), 5.119 (AUDIT-42), 5.120 (AUDIT-43), 5.121 (AUDIT-44). The diff inserts two new tasks numbered `5.121` (AUDIT-45) and `5.122` (AUDIT-46) at the top of the section — but `5.121` is already in use for AUDIT-44. The result is two distinct `Task 5.121` headings in the same workplan file: one for AUDIT-45, one for AUDIT-44.
+
+Task numbers are used as identifiers across this project's tracking surfaces (commit subjects reference `fix-finding-AUDIT-…`, gates parse task shapes). A collision means any reference to "Task 5.121" is ambiguous and a numbering-driven walk could check off or skip the wrong task. The new tasks should be renumbered to the next free integers (5.122/5.123, with the pre-existing 5.122 — if any — re-checked) so each task ID is unique. Cheap to fix now, compounding if it ships.
+
+### AUDIT-20260602-49 — Workplan RED-gate claims for 5.121/5.122 don't demonstrate the bug under fix — recurrence of AUDIT-44's shape
+
+Finding-ID: AUDIT-20260602-49
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.121 Step 1/Step 2 (the "RED observed on the test side … boolean-shape tests failed verbatim against the new return type — that's the RED gate") and Task 5.122 Step 2 ("RED was observable as a consequence — the boolean-era doc couldn't have referred to 'the tri-state result' … The doc rewrite is a type-change consequence").
+
+These are not genuine RED→GREEN observations of the defect being fixed. AUDIT-45's bug is implement-hook *trusting a diverged tip on a git error*. A real RED would be a test that exercises that path, watched failing before the fix. Instead, 5.121 Step 1 calls "the old `.toBe(true)` assertions break when I change the return type" a RED gate — that's a refactor breaking its own pre-existing assertions, which proves nothing about whether the fail-open is caught (and per Finding-01, the implement-hook error path has no test at all). 5.122 Step 2 is worse: it labels a *doc-comment rewrite* "RED observable" because a boolean-era comment "couldn't refer to the tri-state result" — a documentation edit has no RED/GREEN state.
+
+This is the exact pattern AUDIT-44 flagged (RED gate rewritten into a self-justifying note asserting compliance rather than demonstrating it), now recurring in two fresh tasks. Per `.claude/rules/agent-discipline.md`, an accepted TDD compression is an explicit operator decision recorded against the finding — not a self-issued "RED was observable as a consequence" annotation. The correct disposition is either (a) add a call-site test that genuinely goes red against the pre-fix logic (which Finding-01 also requires), or (b) record the compression as an operator-accepted deviation referencing AUDIT-45/46.
+
+### AUDIT-20260602-50 — Gate shim discards the `unknown` distinction the refactor created — refuse diagnostic misreports git-error as same-history stale
+
+Finding-ID: AUDIT-20260602-50
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:160-163` (`return result !== 'not-ancestor'`) → the gate library's `refuse-marker-stale` branch.
+
+The tri-state's stated benefit (`git-ancestry.ts:16-18`) is making the consequence "visible at the call site." The gate shim immediately collapses `'unknown'` and `'ancestor'` back into a single `true`, so the gate library cannot tell "marker is a real ancestor → genuinely stale" from "git couldn't resolve the tip." Both produce `refuse-marker-stale`, whose reason asserts same-history staleness ("marker.tip=X but HEAD=Y"). In the precise Friction-1 scenario this whole line of work targets — a marker tip GC'd/absent after `reset --hard`, i.e. `'unknown'` — the operator gets a diagnostically wrong "stale marker" message instead of "could not verify the marker tip against HEAD."
+
+The safe *direction* (refuse) is preserved, so this is not a correctness bug — only a misleading diagnostic at the exact moment an operator is debugging the divergence the feature was built to handle. A fix would thread the tri-state into the gate (e.g. an `allow`/`refuse-stale`/`refuse-unverifiable` discriminant) so the refusal message names the real cause. Worth noting because it partially defeats the refactor's own rationale.
+
+### AUDIT-20260602-51 — `IsAncestorOfHeadOptions` interface name is stale after the `isAncestorOfHead` → `checkAncestry` rename
+
+Finding-ID: AUDIT-20260602-51
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:52` — `export interface IsAncestorOfHeadOptions`.
+
+The function was renamed `isAncestorOfHead` → `checkAncestry` and the return type changed to `AncestryResult`, but its options interface is still `IsAncestorOfHeadOptions`. The name now references a function that no longer exists and a boolean question (`is ancestor`) the helper no longer answers as a yes/no. Per the project guideline "names that don't reveal intent," rename to `CheckAncestryOptions` (or `AncestryOptions`) so the type vocabulary tracks the function it parameterizes. Pure hygiene, but it's the kind of residual drift that makes the next reader hunt for a function that isn't there.

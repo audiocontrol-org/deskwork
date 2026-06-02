@@ -2355,7 +2355,7 @@ Closes AUDIT-20260602-45. Surface: `plugins/dw-lifecycle/src/scope-discovery/uti
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exercising the tri-state semantic
 - [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is 8 (≥2 per Option D discipline)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exits 0
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.122 (fix-finding-AUDIT-20260602-46): AUDIT-20260602-46 — Shared-helper doc comment documents only the gate's interpre…
@@ -2372,7 +2372,7 @@ Closes AUDIT-20260602-46. Surface: `plugins/dw-lifecycle/src/scope-discovery/uti
 
 - [x] The file-level doc comment names both consumers + their `unknown`-state dispositions
 - [x] `npx vitest run` exits 0 (the doc change rides on AUDIT-45's test suite)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 5.118 (fix-finding-AUDIT-20260602-41): AUDIT-20260602-41 — `defaultIsAncestorOfHead` comment claims a fail-closed safet…
 
