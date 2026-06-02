@@ -1095,24 +1095,26 @@ Closes AUDIT-20260602-01. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 - [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [x] The named action has landed in this branch (regression tests + template + SKILL.md edits are present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
 ### Task 5.113 (fix-finding-AUDIT-20260602-02) (non-bug): AUDIT-20260602-02 — Acknowledgment-task recursion: creating fix-tasks to "close"…
 
-Closes AUDIT-20260602-02. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 5.112 / 5.113 / 5.114 (new `(non-bug)` acknowledgment tasks).
+Acknowledges AUDIT-20260602-02. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 5.112 / 5.113 / 5.114 (new `(non-bug)` acknowledgment tasks).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Closes AUDIT-20260602-02` in subject.
+**Disposition (Step 1):** Acknowledge as an accepted-trade-off of the current closure-triad architecture, documented via operator-judgment scaffolding in `plugins/dw-lifecycle/skills/promote-findings/SKILL.md` (new "Disposition-of-disposition findings (AUDIT-20260602-02)" section). The dampener already absorbs most recursion-shape findings (Rule A / Rule B engaging on consecutive 0-HIGH+ runs slushes them to `acknowledged-slush-pile-<date>` — empirically AUDIT-08..14 in this branch's history). For the gap where the dampener has NOT engaged (first runs, after a real-bug interrupt), operators reviewing the propose-mode manifest should mark disposition-of-disposition findings as `informational` rather than `promote-to-workplan` — `promote-findings` auto-flips informational to `acknowledged-informational-<date>` and they stop blocking the gate. A full mechanical classifier (a third shape `meta-disposition` that auto-routes to informational) is OUT OF SCOPE: the heuristic risks over-firing because real bugs (e.g. AUDIT-05's classifier mismatch) share the same surface-and-citation pattern as recursion-shape findings; operator judgment is the safer routing for now.
+
+- [x] Step 1: write the disposition prose (≥40 chars, substantive).
+- [x] Step 2: apply the action named in Step 1 (SKILL.md "Disposition-of-disposition findings" section added).
+- [x] Step 3: commit with `Acknowledges AUDIT-20260602-02` in subject (doc-only — no code change verifiable by test; per AUDIT-01 convention).
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (SKILL.md edit is present).
+- [x] Audit-log Status flipped to `acknowledged-architectural-tradeoff-2026-06-02` (operator-judgment routing chosen over mechanical heuristic with under/over-fire risk).
 
 
 ### Task 5.114 (fix-finding-AUDIT-20260602-03) (non-bug): AUDIT-20260602-03 — Journal "0 open findings at session end" presents `acknowled…

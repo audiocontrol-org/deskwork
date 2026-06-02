@@ -122,6 +122,16 @@ Three verbs distinguish the disposition's intent for `apply-audit-flips`:
 
 Regression-locked at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-flip-from-commit.test.ts` (per the AUDIT-20260602-01 regression-lock tests added with the convention).
 
+## Disposition-of-disposition findings (AUDIT-20260602-02)
+
+A finding whose Surface points at `audit-log.md` / `workplan.md` and whose body cites another `AUDIT-<id>` is a **disposition-of-disposition**: the model reviewed an earlier audit-log entry's resolution (the disposition prose, the acknowledgement task, the scoped fix-task) and produced a new finding about that resolution. Every audit-log entry then becomes a new auditable surface; auto-promoting these findings as their own fix-tasks recreates the recursion the closure-triad was built to escape.
+
+**The dampener (per `/dw-lifecycle:audit-barrage`) absorbs most of these.** Rule A (one clean 0-HIGH+0-MEDIUM run) and Rule B (two consecutive 0-HIGH+ runs) shift incoming findings into `acknowledged-slush-pile-<date>` rather than scoping them. Empirically, recursion-shape findings cluster on later barrage runs after the dampener has engaged, so they get slushed and don't drive new tasks.
+
+**When the dampener is NOT engaged (first runs, after a real-bug interrupt), operators reviewing the proposal manifest should mark disposition-of-disposition findings as `informational` rather than `promote-to-workplan`.** The classifier signal: Surface points at audit-log/workplan AND the finding body names another `AUDIT-<id>` whose Status is `acknowledged-*` (already-dispositioned). Mark as `informational` with a rationale naming the originating finding — `promote-findings` auto-flips them to `acknowledged-informational-<date>` and they stop blocking the gate.
+
+This is operator-judgment scaffolding (not full mechanization) because the heuristic risks over-firing — a legitimate bug finding (e.g. AUDIT-05's classifier mismatch) also has workplan.md surface + cited AUDIT-ids but IS a real bug. The structural fix (a `meta-disposition` shape distinct from `non-bug` that auto-routes to `informational`) is out of scope for AUDIT-02; the operator-judgment path closes the immediate recursion concern without the under/over-fire risk a mechanical heuristic would introduce.
+
 ## Cross-references
 
 - **Discipline rule** — [`.claude/rules/agent-discipline.md`](../../../../.claude/rules/agent-discipline.md) § "Just for now is bullshit". The mechanical enforcement of *"agents relentlessly rationalize deferral as scope discipline when it's scope erosion."*

@@ -2268,7 +2268,7 @@ The revert restores Task 5.102's AC to `- [ ] Failing test exists at `(to be fil
 ### AUDIT-20260602-01 — `Closes AUDIT-<id>` trailers on acknowledgment/deferral commits arm `apply-audit-flips` with false `fixed-<sha>` proposals
 
 Finding-ID: AUDIT-20260602-01
-Status:     open
+Status:     fixed-65f724941778b1940a7a90448c224188c97d98c6
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 5.102 (`Closes AUDIT-20260601-68.` + Step 3 "commit closes AUDIT-68 via this commit"), Tasks 5.112/5.113/5.114 (`Closes AUDIT-20260601-81/82/83`), Phase 20 Task 1 Step 6
 
@@ -2279,7 +2279,7 @@ The only thing currently suppressing a false flip is that AUDIT-68's Status is `
 ### AUDIT-20260602-02 — Acknowledgment-task recursion: creating fix-tasks to "close" findings-about-a-disposition is self-perpetuating
 
 Finding-ID: AUDIT-20260602-02
-Status:     open
+Status:     acknowledged-architectural-tradeoff-2026-06-02
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 5.112 / 5.113 / 5.114 (new `(non-bug)` acknowledgment tasks)
 
@@ -2441,3 +2441,88 @@ Two minor mechanical notes on the same lines: (1) line 84's `\.claude\/rules\//`
 ---
 
 I walked the diff's only executable change (the two new `inferFindingShape` regex clauses at renderer.ts:84-85 plus their two tests) and confirmed both match their intended AUDIT-07 surfaces and don't over-match. The workplan Task 5.118 reshape to `non-bug` is faithful — its disposition prose accurately describes the code edit, and the claimed regression tests exist. The agent-discipline.md:19 edit correctly drops the "third" framing. The one substantive gap is that SKILL.md's edit asserts it achieves internal consistency while leaving lines 8 and 18 still naming `/dw-lifecycle:review` as a live closure/trigger mechanism — the same inconsistency shape, in the same file, that the edit's own note claims to resolve (claude-01). I'd prioritize claude-01.
+
+## 2026-06-02 — audit-barrage lift (20260602T170913446Z-scope-discovery)
+
+### AUDIT-20260602-15 — check-implement-hook-coverage's hardcoded `origin/main` default fails *open* when the ref doesn't resolve — silently defeating the gate on any repo whose default branch isn't `main`
+
+Finding-ID: AUDIT-20260602-15
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:147` (default) + `:194-196` (catch) + `:250-251` (call site); `.husky/pre-push` (hardcoded default)
+
+`resolveUpstreamBaseRef` falls back to the literal `'origin/main'` (line 147), and `runCheckImplementHookCoverage` feeds `buildRange(tipRef, 'origin/main')` → `git log <tip>..HEAD ^origin/main` (lines 250-251). The new wrinkle: this command now requires **both** `tipRef` *and* `origin/main` to be valid revisions. If `origin/main` does not resolve, `git log` exits non-zero, `resolveCommits` catches it and `return []` (line 195), and `checkImplementHookCoverage` then reports `allow-no-unpushed-commits` → exit 0. The gate passes every push *and* prints a reassuring "no unpushed commits" summary that is factually false (line 258 + `summarize`). Pre-Phase-21 the command depended only on `tipRef`; this diff adds a second hard ref dependency whose absence fails open rather than closed.
+
+This matters because `dw-lifecycle` is a *distributed* plugin and `install-scope-discovery-hooks` wires this pre-push gate into adopter repos. Any adopter whose default branch is `master`/`trunk`/`develop` (i.e. no `origin/main`) gets the discipline gate silently disabled — the exact "fallbacks are bug factories" failure mode the project guidelines forbid. The Phase 21 "Out of Scope" note dismisses *auto-detection* of the base, which is fine, but it never addresses the *failure mode* when the hardcoded default is wrong: the result should be a loud config error (exit 2), not a silent allow. A reasonable fix: before building the range, `git rev-parse --verify --quiet "${upstreamBaseRef}^{commit}"`; if it doesn't resolve, either emit an actionable exit-2 error ("upstream base `origin/main` not found; pass --upstream-base-ref or DW_UPSTREAM_BASE_REF") or fall back to the no-exclusion range *with a warning* — never silently treat "git errored" as "zero commits to check."
+
+---
+
+### AUDIT-20260602-16 — `.husky/pre-push` uses `${DW_UPSTREAM_BASE_REF:-origin/main}`, making the documented empty-string env opt-out impossible
+
+Finding-ID: AUDIT-20260602-16
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `.husky/pre-push` (the `--upstream-base-ref "${DW_UPSTREAM_BASE_REF:-origin/main}"` line + its comment) vs. `check-implement-hook-coverage.ts:144-147`
+
+The hook's own comment says *"Pass an empty string to opt out entirely (pre-Phase-21 behavior)"*, and `buildRange` does honor `""` as the opt-out (line 159). But the hook substitutes via `${DW_UPSTREAM_BASE_REF:-origin/main}` — the `:-` form treats **empty and unset identically**, so `DW_UPSTREAM_BASE_REF="" git push` expands to `--upstream-base-ref origin/main`, not `--upstream-base-ref ""`. The env-var opt-out the comment advertises is therefore unreachable through the hook; an operator following the documented instruction silently keeps the exclusion on. To make empty pass through you need the colon-less form `${DW_UPSTREAM_BASE_REF-origin/main}`.
+
+This is a documentation-vs-behavior drift on a security/discipline surface. Either (a) change the hook to `${DW_UPSTREAM_BASE_REF-origin/main}` so an explicitly-empty env var reaches the CLI as the opt-out, or (b) fix the comment to state that opt-out requires editing the hook to pass `--upstream-base-ref ""` directly, and that the env var only *overrides* (cannot disable). As written the two paths disagree, which is exactly the kind of trap that erodes trust in the gate.
+
+---
+
+### AUDIT-20260602-17 — The negative-case test was downgraded from the workplan's real-git integration test to a pure-string unit test — the Step-0 working-code invariant has no automated coverage
+
+Finding-ID: AUDIT-20260602-17
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/subcommands/check-implement-hook-coverage-cli.test.ts` (whole file) vs. `check-implement-hook-coverage.ts:175-197` (`resolveCommits`)
+
+Phase 21's Step 0 declares a "working-code invariant": the fix MUST preserve refusal of feature-authored commits that lack a marker. The original workplan Step 5 specified a real-git fixture proving that invariant under the *default* `origin/main` base. The implemented tests instead exercise only the two pure helpers — `resolveUpstreamBaseRef` (flag/env/default precedence) and `buildRange` (string assembly) — and the "negative case" was reworded to `buildRange(tip, '')` returning the old range. The test file's own comment concedes *"Real-git integration is left to manual smoke."* So nothing automated verifies that `git log <tip>..HEAD ^origin/main` actually *retains* a feature commit not present on main, nor that the `resolveCommits` catch (lines 194-196) doesn't swallow the very signal the gate depends on (see claude-01).
+
+The result is a TDD blind spot of the kind this project has been burned by before: the helpers are green while the integration the feature actually changes (the two-ref `git log` invocation + its error handling) is untested. A focused integration test against a tmp git repo — one inherited-from-main commit (excluded), one feature commit without a marker (still refused), and one case where the base ref is bogus (asserting the gate does *not* silently allow) — would lock in both the merge-from-main fix and the Step-0 invariant, and would catch the fail-open in claude-01.
+
+---
+
+### AUDIT-20260602-18 — `buildRange` returns a space-joined string only to be re-split by `resolveCommits` — primitives that should compose as `string[]` instead round-trip through a brittle string format
+
+Finding-ID: AUDIT-20260602-18
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:158-161` (`buildRange`) + `:180` (`range.split(/\s+/)`)
+
+`buildRange` assembles a single string (`"<tip>..HEAD ^<base>"`), which `resolveCommits` immediately tears back apart with `range.split(/\s+/).filter(...)` to feed `execFileSync` arg-by-arg (line 180). The string round-trip exists purely so the helper is unit-testable as a string (the JSDoc says *"Avoid coupling the test to git semantics"*), but it couples the test to a string format instead and introduces a fragile parse step on the hot path. The cleaner shape is `buildRange(tip, base): readonly string[]` returning `base.length === 0 ? [`${tip}..HEAD`] : [`${tip}..HEAD`, `^${base}`]`, spread directly into the `git log` args — same testability (assert the array), no re-split, no whitespace-splitting assumption. Not a live bug today (git refnames can't contain whitespace, so the split is safe), but it's the "build a string just to parse it" smell and a needless coupling between the two helpers. Worth folding into the same fix that addresses claude-01/claude-03 rather than on its own.
+
+## 2026-06-02 — audit-barrage lift (20260602T171455823Z-scope-discovery)
+
+### AUDIT-20260602-19 — Disposition prose claims it "removed" the speculative `Closes AUDIT-20260601-68` trailer, but the diff retains the token in conditional guidance
+
+Finding-ID: AUDIT-20260602-19
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.116 disposition prose, item (d)) vs. the Phase 20 Task 1 Step 6 diff (`workplan.md:3788`)
+
+The Step-1 disposition prose for AUDIT-20260602-01 asserts: *"(d) updated Phase 20 Task 1 Step 6 to **remove** the speculative `Closes AUDIT-20260601-68` trailer (Phase 20 hasn't shipped a fix yet — the trailer would arm a false flip…)."* But the actual Phase 20 Task 1 Step 6 hunk does **not** remove the token — it rewords it into conditional guidance that still contains the literal string: the before-text `(and `Closes AUDIT-20260601-68` if AUDIT-68 is re-opened…)` becomes `…use `Closes AUDIT-20260601-68` ONLY if Phase 20 Task 1 actually re-opens AUDIT-68 AND ships the fix in the same commit. Otherwise omit the AUDIT trailer…`. The `Closes AUDIT-20260601-68` token survives verbatim.
+
+This is the self-confirming-claim shape the project's verification rules target: the disposition describes an action ("remove the trailer") that its own diff falsifies (the trailer was *conditionalized*, not removed). The distinction matters because the disposition's stated rationale — that a bare `Closes` token would "arm a false flip" — applies to whether the token appears in a *commit message*, and the edit only ever lived in workplan prose, so "remove" was never the right verb for what happened. A precise fix: change the prose to *"reworded Phase 20 Task 1 Step 6 so the `Closes AUDIT-20260601-68` trailer is conditional on an actual re-open + same-commit fix, naming `Acknowledges` as the non-fix alternative,"* which matches the diff. As written, an operator auditing the disposition against the diff finds the claim and the change disagree.
+
+### AUDIT-20260602-20 — First-class `Defers` trailer + bare-deferral test fixture is in tension with promote-findings' "agent cannot pick deferral" invariant
+
+Finding-ID: AUDIT-20260602-20
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/promote-findings/SKILL.md` (new "Commit-trailer convention" table, `Defers` row) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-flip-from-commit.test.ts` (the `Defers` test fixture)
+
+The promote-findings skill's own one-line description is *"default disposition is scope-into-workplan with TDD-first task shape; **the agent cannot pick deferral**; substantive-reason validator gates the acknowledged path."* The new SKILL.md convention introduces `Defers AUDIT-<id>` as a sanctioned, first-class trailer — *"Deferral to a follow-up issue with substantive rationale (NOT 'for now'; that's banned)."* This sits uneasily next to the invariant: if the agent cannot pick deferral as a disposition, when is a `Defers` trailer ever legitimately authored, and by whom? The convention doesn't say it requires an explicit operator decision (per agent-discipline § "Just for now is bullshit," every concern must end in addressed / issue-with-link / scoped / **operator-decision** — never a self-issued deferral). Adding `Defers` to the verb canon without that guardrail reads as quietly re-opening the deferral path the rest of the feature was built to close.
+
+The test fixture sharpens the concern: the `Defers` regression test commits `docs(workplan): defer AUDIT-82 to follow-up` / `Defers AUDIT-20260601-82.` — a bare "defer to follow-up" with **no issue link and no substantive rationale**, i.e. exactly the shape agent-discipline bans. As a parser fixture it only needs to exercise the regex, but it doubles as the documented exemplar of how a `Defers` commit looks, and the exemplar models the banned pattern. A reasonable fix: in the `Defers` row, require a GitHub issue link in the trailer or body (mirror the "Just for now is bullshit" four-disposition rule), and change the test fixture to include an issue reference so the exemplar isn't a bare deferral.
+
+### AUDIT-20260602-21 — Regression-lock tests for the trailer convention omit the word-boundary false-positive case (`Discloses` / `Encloses` / `Forecloses`)
+
+Finding-ID: AUDIT-20260602-21
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-flip-from-commit.test.ts` (the three new AUDIT-20260602-01 cases)
+
+The new tests lock that `Acknowledges <id>` and `Defers <id>` are ignored and that `Closes <id>` still extracts alongside an `Acknowledges` sibling. But the property the whole convention rests on is *which leading verb arms a flip* — and the tests never exercise the adversarial case where `closes` appears as a **substring** of another word immediately before an AUDIT id. `parseClosesAuditTrailers`' source is not in this diff, so I can't confirm its anchoring; if the regex is `/closes\s+(AUDIT-…)/i` without a `\b` boundary, a body line like `Discloses AUDIT-20260601-50.` or `Encloses AUDIT-…` would false-match `closes AUDIT-50` and arm a spurious `fixed-<sha>` proposal. That is precisely the false-flip failure mode this convention exists to prevent, and it's untested.
+
+This is a test-coverage gap verifiable from the diff alone: the added cases cover sibling-verb discrimination but not intra-word boundary. A one-line regression case — `parseClosesAuditTrailers('… \nDiscloses AUDIT-20260601-50.')` expecting `[]` — would lock the boundary property and turn a latent parser assumption into an asserted contract. Given the convention's stated purpose is "which words trigger a flip," the boundary behavior is core to the contract the tests claim to regression-lock, not an edge case.
