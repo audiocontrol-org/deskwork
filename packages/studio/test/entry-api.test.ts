@@ -173,6 +173,121 @@ describe('POST /api/dev/editorial-review/entry/:entryId/annotate', () => {
     );
     expect(status).toBe(400);
   });
+
+  // AUDIT-20260602-04 — Bug-repro: a non-string replyTo on a new
+  // comment is a malformed shape and MUST be rejected with 400 (same
+  // contract as the sibling `attachments` validation). Pre-fix the
+  // parser silently dropped non-string replyTo, creating a root
+  // comment instead of the intended reply — operator's threaded reply
+  // appears detached with no error to explain why.
+  it(
+    'returns 400 when comment.replyTo is a non-string value (AUDIT-20260602-04)',
+    async () => {
+      await writeSidecar(projectRoot, entry('Drafting'));
+      const app = createApp({ projectRoot, config: cfg });
+      const { status, body } = await postJson(
+        app,
+        `/api/dev/editorial-review/entry/${ENTRY_UUID}/annotate`,
+        {
+          type: 'comment',
+          workflowId: ENTRY_UUID,
+          version: 1,
+          range: { start: 0, end: 4 },
+          text: 'reply',
+          replyTo: 42,
+        },
+      );
+      expect(status).toBe(400);
+      const obj = asObj(body);
+      expect(typeof obj.error).toBe('string');
+      expect((obj.error as string).toLowerCase()).toMatch(/replyto/);
+    },
+  );
+
+  it(
+    'returns 400 when comment.replyTo is an object (AUDIT-20260602-04)',
+    async () => {
+      await writeSidecar(projectRoot, entry('Drafting'));
+      const app = createApp({ projectRoot, config: cfg });
+      const { status } = await postJson(
+        app,
+        `/api/dev/editorial-review/entry/${ENTRY_UUID}/annotate`,
+        {
+          type: 'comment',
+          workflowId: ENTRY_UUID,
+          version: 1,
+          range: { start: 0, end: 4 },
+          text: 'reply',
+          replyTo: { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+        },
+      );
+      expect(status).toBe(400);
+    },
+  );
+
+  it(
+    'returns 400 when comment.replyTo is an empty string (AUDIT-20260602-04)',
+    async () => {
+      await writeSidecar(projectRoot, entry('Drafting'));
+      const app = createApp({ projectRoot, config: cfg });
+      const { status } = await postJson(
+        app,
+        `/api/dev/editorial-review/entry/${ENTRY_UUID}/annotate`,
+        {
+          type: 'comment',
+          workflowId: ENTRY_UUID,
+          version: 1,
+          range: { start: 0, end: 4 },
+          text: 'reply',
+          replyTo: '',
+        },
+      );
+      expect(status).toBe(400);
+    },
+  );
+
+  it(
+    'accepts an omitted replyTo (existing root-comment contract holds)',
+    async () => {
+      await writeSidecar(projectRoot, entry('Drafting'));
+      const app = createApp({ projectRoot, config: cfg });
+      const { status } = await postJson(
+        app,
+        `/api/dev/editorial-review/entry/${ENTRY_UUID}/annotate`,
+        {
+          type: 'comment',
+          workflowId: ENTRY_UUID,
+          version: 1,
+          range: { start: 0, end: 4 },
+          text: 'root',
+        },
+      );
+      expect(status).toBe(200);
+    },
+  );
+
+  it(
+    'accepts a string replyTo (existing reply contract holds)',
+    async () => {
+      await writeSidecar(projectRoot, entry('Drafting'));
+      const app = createApp({ projectRoot, config: cfg });
+      const { status, body } = await postJson(
+        app,
+        `/api/dev/editorial-review/entry/${ENTRY_UUID}/annotate`,
+        {
+          type: 'comment',
+          workflowId: ENTRY_UUID,
+          version: 1,
+          range: { start: 0, end: 4 },
+          text: 'reply',
+          replyTo: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        },
+      );
+      expect(status).toBe(200);
+      const ann = asObj(asObj(body).annotation);
+      expect(ann.replyTo).toBe('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+    },
+  );
 });
 
 describe('GET /api/dev/editorial-review/entry/:entryId/annotations', () => {

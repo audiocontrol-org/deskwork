@@ -1,0 +1,12 @@
+{
+  "kind": "lane-migration",
+  "at": "2026-05-29T08:40:02.895Z",
+  "migration": "default-lane-from-legacy-site",
+  "source": "sites.deskwork-internal",
+  "target": "lanes.default",
+  "details": {
+    "legacySiteId": "deskwork-internal",
+    "contentDir": "docs",
+    "pipelineTemplate": "editorial"
+  }
+}

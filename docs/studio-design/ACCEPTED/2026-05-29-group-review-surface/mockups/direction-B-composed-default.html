@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Direction B — Composed multi-lane default with list toggle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --er-paper:     #F5F1E8;
+    --er-paper-2:   #ECE6D4;
+    --er-paper-3:   #DFD7BF;
+    --er-ink:       #1A1614;
+    --er-ink-soft:  #3A3530;
+    --er-faded:     #8A7F70;
+    --er-red-pencil:  #B8362A;
+    --er-proof-blue:  #2A4B7C;
+    --er-stamp-green: #2E5D45;
+    --er-kraft:       #8A7250;
+    --display: "Newsreader", Georgia, serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--er-ink);
+    font-family: var(--display);
+    color: var(--er-ink);
+    min-height: 100vh;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at top, rgba(255,255,255,0.04), transparent 70%),
+      var(--er-ink);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .stack {
+    max-width: 390px;
+    margin: 32px auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    position: relative;
+    z-index: 1;
+  }
+  .frame {
+    background: var(--er-paper);
+    position: relative;
+    box-shadow:
+      0 24px 60px rgba(0,0,0,0.4),
+      0 8px 20px rgba(0,0,0,0.3);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .frame::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: 2;
+    mix-blend-mode: multiply;
+  }
+  .surface { position: relative; z-index: 3; }
+
+  /* Masthead */
+  .masthead {
+    display: grid;
+    grid-template-columns: 56px 1fr 56px;
+    align-items: center;
+    height: 56px;
+    border-bottom: 1px solid var(--er-paper-3);
+    background: var(--er-paper);
+  }
+  .masthead .back {
+    color: var(--er-proof-blue);
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1.25rem;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  .masthead .center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.15;
+  }
+  .masthead .kicker {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+  }
+  .masthead .slug {
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--er-ink);
+    letter-spacing: -0.01em;
+  }
+  .masthead .menu {
+    font-family: var(--mono);
+    font-size: 1.2rem;
+    color: var(--er-ink-soft);
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  /* Title strip */
+  .title-strip {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--er-paper-3);
+    background: var(--er-paper);
+  }
+  .title-strip .title {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.6rem;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
+    color: var(--er-ink);
+    margin: 0;
+  }
+  .title-strip .meta {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin-top: 6px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .stage-mark {
+    color: var(--er-red-pencil);
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .stage-name {
+    color: var(--er-ink-soft);
+    font-weight: 500;
+  }
+
+  /* Section head with toggle chevron */
+  .section-head {
+    padding: 18px 20px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--er-paper);
+  }
+  .section-head .name {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.05rem;
+    color: var(--er-red-pencil);
+    letter-spacing: -0.005em;
+  }
+  .section-head .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-ink-soft);
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 8px;
+    border: 1px solid var(--er-paper-3);
+    border-radius: 2px;
+    background: var(--er-paper-2);
+  }
+  .section-head .toggle.is-active {
+    background: var(--er-paper);
+    color: var(--er-proof-blue);
+    border-color: var(--er-proof-blue);
+  }
+  .toggle .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  /* Composed multi-lane swimlane view */
+  .composed {
+    padding: 4px 12px 18px;
+    background: var(--er-paper);
+  }
+  .swim {
+    border: 1px solid var(--er-paper-3);
+    margin-bottom: 12px;
+    background: var(--er-paper);
+  }
+  .swim-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--er-paper-2);
+    border-bottom: 1px solid var(--er-paper-3);
+  }
+  .swim-head .name {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .swim-head .count {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.14em;
+    color: var(--er-faded);
+  }
+  .swim.lane-feature .swim-head { border-left: 3px solid var(--er-proof-blue); }
+  .swim.lane-feature .swim-head .name { color: var(--er-proof-blue); }
+  .swim.lane-mockups .swim-head { border-left: 3px solid var(--er-kraft); }
+  .swim.lane-mockups .swim-head .name { color: var(--er-kraft); }
+
+  /* Stages within a lane (list-mode-default for mobile narrow viewport) */
+  .swim-stages {
+    display: flex;
+    flex-direction: column;
+  }
+  .swim-stage {
+    border-bottom: 1px dashed var(--er-paper-3);
+    padding: 8px 12px 10px;
+  }
+  .swim-stage:last-child { border-bottom: none; }
+  .swim-stage.is-empty { opacity: 1; background: var(--er-paper); }
+  .swim-stage .stage-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .swim-stage .stage-head .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--er-red-pencil);
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+  .swim-stage .stage-head .name {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--er-ink-soft);
+    font-weight: 500;
+  }
+  .swim-stage .stage-head .count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    color: var(--er-faded);
+  }
+  .swim-stage.is-empty .stage-head .glyph,
+  .swim-stage.is-empty .stage-head .name,
+  .swim-stage.is-empty .stage-head .count {
+    color: var(--er-faded);
+  }
+  .swim-stage .stage-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .stage-card {
+    padding: 8px 10px;
+    background: var(--er-paper-2);
+    border-left: 2px solid var(--er-faded);
+    border-radius: 1px;
+    display: grid;
+    grid-template-columns: 1fr 20px;
+    gap: 8px;
+    align-items: center;
+  }
+  .stage-card.lane-feature { border-left-color: var(--er-proof-blue); }
+  .stage-card.lane-mockups { border-left-color: var(--er-kraft); }
+  .stage-card .title {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 0.95rem;
+    line-height: 1.2;
+    color: var(--er-ink);
+    letter-spacing: -0.005em;
+  }
+  .stage-card .slug {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    color: var(--er-faded);
+    margin-top: 2px;
+  }
+  .stage-card .open {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--er-proof-blue);
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  .stage-body .empty {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    color: var(--er-faded);
+    letter-spacing: 0.12em;
+    font-style: italic;
+  }
+
+  /* Bottom bar */
+  .bar {
+    border-top: 1px solid var(--er-paper-3);
+    background: var(--er-paper);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    height: 52px;
+  }
+  .bar .cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--er-paper-3);
+    cursor: pointer;
+    user-select: none;
+  }
+  .bar .cell:last-child { border-right: none; }
+  .bar .cell .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--er-red-pencil);
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+  .bar .cell .label {
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--er-ink-soft);
+    margin-top: 3px;
+  }
+
+  /* Empty-state fallback (right-side panel) */
+  .empty-state {
+    padding: 60px 24px;
+    text-align: center;
+  }
+  .empty-state .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--er-faded);
+    font-size: 2.5rem;
+    line-height: 1;
+    margin-bottom: 18px;
+  }
+  .empty-state .head {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1.15rem;
+    color: var(--er-ink-soft);
+    margin-bottom: 8px;
+  }
+  .empty-state .desc {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--er-faded);
+    line-height: 1.6;
+    letter-spacing: 0.04em;
+    margin-bottom: 24px;
+    text-transform: lowercase;
+  }
+  .empty-state .cta {
+    display: inline-block;
+    padding: 10px 16px;
+    background: var(--er-red-pencil);
+    color: var(--er-paper);
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .empty-state .cta .plus { margin-right: 6px; font-weight: 600; }
+
+  /* Annotation strip */
+  .note {
+    max-width: 390px;
+    margin: 0 auto;
+    padding: 16px 20px;
+    background: rgba(232, 226, 208, 0.12);
+    color: rgba(245, 241, 232, 0.7);
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    line-height: 1.7;
+    letter-spacing: 0.04em;
+    border-left: 2px solid rgba(184, 54, 42, 0.6);
+    position: relative;
+    z-index: 1;
+  }
+  .note .title {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.95rem;
+    color: rgba(245, 241, 232, 0.95);
+    margin-bottom: 8px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .note ul { margin: 6px 0 0; padding-left: 18px; }
+  .note li { margin-bottom: 3px; }
+  .label-strip {
+    max-width: 390px;
+    margin: 0 auto;
+    padding: 0 4px;
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(245, 241, 232, 0.45);
+    position: relative;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+  <div class="stack">
+    <div class="note">
+      <div class="title">Direction B — Composed multi-lane default with list toggle</div>
+      Default group review surface = miniature multi-lane swimlane view scoped to the group's members.
+      Section-head toggle flips to flat list (Direction A's shape) for operators who prefer linear scan.
+      <ul>
+        <li>Reuses Phase 5's swimlane primitive directly (`docs/studio-design/ACCEPTED/2026-05-27-multi-lane-dashboard-d3-press-bay/`).</li>
+        <li>Empty stages render as `is-empty` per the dashboard convention — pipeline shape stays visible.</li>
+        <li>Toggle state is per-group (sticky in localStorage keyed by entry UUID).</li>
+        <li>Empty-members fallback: the Members section drops; surface shows the group's artifactPath content OR a centered empty-state CTA when there's nothing to render.</li>
+        <li>Two frames below: <strong>top</strong> = populated group (4 members across 2 lanes). <strong>bottom</strong> = empty-state fallback (members:[], no artifactPath).</li>
+      </ul>
+    </div>
+
+    <div class="label-strip">populated group — 4 members</div>
+    <div class="frame">
+      <div class="surface">
+        <div class="masthead">
+          <div class="back">←</div>
+          <div class="center">
+            <div class="kicker">GROUP · MOCKUPS</div>
+            <div class="slug">v0.18-row-rebuild</div>
+          </div>
+          <div class="menu">⋮</div>
+        </div>
+
+        <div class="title-strip">
+          <h1 class="title">v0.18 row-affordance rebuild</h1>
+          <div class="meta">
+            <span class="stage-mark">✎</span>
+            <span class="stage-name">Drafting</span>
+            <span style="color: var(--er-paper-3);">·</span>
+            <span>4 members</span>
+          </div>
+        </div>
+
+        <div class="section-head">
+          <div class="name">Members</div>
+          <div class="toggle is-active" title="Composed view active; tap to switch">
+            <span class="glyph">⊞</span>
+            <span>Composed</span>
+          </div>
+        </div>
+
+        <div class="composed">
+          <div class="swim lane-feature">
+            <div class="swim-head">
+              <span class="name">Feature</span>
+              <span class="count">3 · editorial</span>
+            </div>
+            <div class="swim-stages">
+              <div class="swim-stage is-empty">
+                <div class="stage-head">
+                  <span class="glyph">⊹</span>
+                  <span class="name">Outlining</span>
+                  <span class="count">0</span>
+                </div>
+              </div>
+              <div class="swim-stage">
+                <div class="stage-head">
+                  <span class="glyph">✎</span>
+                  <span class="name">Drafting</span>
+                  <span class="count">2</span>
+                </div>
+                <div class="stage-body">
+                  <div class="stage-card lane-feature">
+                    <div>
+                      <div class="title">Row chrome cascade rewrite</div>
+                      <div class="slug">row-chrome-cascade-rewrite</div>
+                    </div>
+                    <div class="open">↪</div>
+                  </div>
+                  <div class="stage-card lane-feature">
+                    <div>
+                      <div class="title">Stage-aware verb router</div>
+                      <div class="slug">stage-aware-verb-router</div>
+                    </div>
+                    <div class="open">↪</div>
+                  </div>
+                </div>
+              </div>
+              <div class="swim-stage">
+                <div class="stage-head">
+                  <span class="glyph">※</span>
+                  <span class="name">Final</span>
+                  <span class="count">1</span>
+                </div>
+                <div class="stage-body">
+                  <div class="stage-card lane-feature">
+                    <div>
+                      <div class="title">Swipe drawer dispatch contract</div>
+                      <div class="slug">swipe-drawer-dispatch-contract</div>
+                    </div>
+                    <div class="open">↪</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="swim lane-mockups">
+            <div class="swim-head">
+              <span class="name">Mockups</span>
+              <span class="count">1 · visual</span>
+            </div>
+            <div class="swim-stages">
+              <div class="swim-stage">
+                <div class="stage-head">
+                  <span class="glyph">⊹</span>
+                  <span class="name">Outlining</span>
+                  <span class="count">1</span>
+                </div>
+                <div class="stage-body">
+                  <div class="stage-card lane-mockups">
+                    <div>
+                      <div class="title">Row-3 swipe-only direction</div>
+                      <div class="slug">row-3-swipe-only-mockup</div>
+                    </div>
+                    <div class="open">↪</div>
+                  </div>
+                </div>
+              </div>
+              <div class="swim-stage is-empty">
+                <div class="stage-head">
+                  <span class="glyph">✎</span>
+                  <span class="name">Drafting</span>
+                  <span class="count">0</span>
+                </div>
+              </div>
+              <div class="swim-stage is-empty">
+                <div class="stage-head">
+                  <span class="glyph">✓</span>
+                  <span class="name">Approved</span>
+                  <span class="count">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bar">
+          <div class="cell">
+            <span class="glyph">✎</span>
+            <span class="label">Iterate</span>
+          </div>
+          <div class="cell">
+            <span class="glyph">+</span>
+            <span class="label">Add member</span>
+          </div>
+          <div class="cell">
+            <span class="glyph">✗</span>
+            <span class="label">Cancel</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="label-strip">empty-members fallback — members:[], no artifactPath</div>
+    <div class="frame">
+      <div class="surface">
+        <div class="masthead">
+          <div class="back">←</div>
+          <div class="center">
+            <div class="kicker">GROUP · MOCKUPS</div>
+            <div class="slug">v0.19-dashboard-rebuild</div>
+          </div>
+          <div class="menu">⋮</div>
+        </div>
+
+        <div class="title-strip">
+          <h1 class="title">v0.19 dashboard rebuild</h1>
+          <div class="meta">
+            <span class="stage-mark">◇</span>
+            <span class="stage-name">Ideas</span>
+            <span style="color: var(--er-paper-3);">·</span>
+            <span>0 members</span>
+          </div>
+        </div>
+
+        <div class="empty-state">
+          <div class="glyph">⊟</div>
+          <div class="head">No members yet</div>
+          <div class="desc">
+            this group is metadata-only.<br>
+            populate it with `/deskwork:group add-member`.
+          </div>
+          <div class="cta"><span class="plus">+</span>Add member</div>
+        </div>
+
+        <div class="bar">
+          <div class="cell">
+            <span class="glyph">✎</span>
+            <span class="label">Iterate</span>
+          </div>
+          <div class="cell">
+            <span class="glyph">+</span>
+            <span class="label">Add member</span>
+          </div>
+          <div class="cell">
+            <span class="glyph">✗</span>
+            <span class="label">Cancel</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

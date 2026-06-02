@@ -1,0 +1,35 @@
+{
+  "agent": "ast-grep-matrix",
+  "featureSlug": "graphical-entries",
+  "patterns": [
+    {
+      "id": "as-type-cast",
+      "description": "`as <TypeName>` cast (banned per CLAUDE.md \"never bypass typing\")",
+      "regex": "\\bas\\s+(?!const\\b|unknown\\b)[A-Z][A-Za-z0-9_]*",
+      "hits": [],
+      "provenance": "registered-pattern"
+    },
+    {
+      "id": "any-annotation",
+      "description": "`: any` type annotation (banned per CLAUDE.md)",
+      "regex": ":\\s*any\\b(?![A-Za-z0-9_])",
+      "hits": [],
+      "provenance": "registered-pattern"
+    },
+    {
+      "id": "ts-ignore-pragma",
+      "description": "`@ts-ignore` or `@ts-expect-error` (banned per CLAUDE.md)",
+      "regex": "@ts-(?:ignore|expect-error)\\b",
+      "hits": [],
+      "provenance": "registered-pattern"
+    },
+    {
+      "id": "magic-number",
+      "description": "Inline numeric literal >= 10 not bound to a const/named identifier (heuristic — synthesis layer + operator curate)",
+      "regex": "(?<![A-Za-z0-9_.=])\\d{2,}\\b",
+      "hits": [],
+      "provenance": "registered-pattern"
+    }
+  ],
+  "discoveredCandidates": []
+}

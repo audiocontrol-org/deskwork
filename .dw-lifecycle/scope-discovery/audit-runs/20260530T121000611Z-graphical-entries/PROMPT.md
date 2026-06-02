@@ -1,0 +1,4856 @@
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface bugs, design issues, missed edge cases, and code-quality concerns in the work product captured in the diff below.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+graphical-entries
+
+## Feature scope (workplan / PRD summary)
+
+Phase 7 Task 7.2 of graphical-entries: /deskwork:group skill family + CLI + archivedAt schema delta. Ships /deskwork:group SKILL.md (subcommand table + per-verb steps + error catalog + safety rules); CLI dispatcher at packages/cli/src/commands/group.ts (~356 LOC, mirrors lane.ts shape); core module under packages/core/src/groups/ with per-operation files (list/show/create/update/add-member/remove-member/archive/restore); 6 new group-* journal-event kinds (audit-trail completeness for mutating verbs, mirrors lane-* event family); archivedAt: z.string().datetime().optional() schema delta on EntrySchema; cancel --cascade boolean flag with best-effort cascade semantics (cascadedMembers / skippedMembers audit arrays). Tests: core +32, cli +73. Review-action commit 50b0ebf shipped after the original 15dd424 — fixed the HIGH AUDIT-15 empty-members invisibility bug (isGroupEntry redefined to Array.isArray(entry.members) so create+list round-trip works) + 2 LOW polish + scoped 2 MEDIUM (#359/#360) into workplan + GH issues. 9c714ed added the workplan back-links for the deferrals per discipline rule. Audit focus: CLI argument parsing edge cases (--at index out-of-range, non-integer); refusal semantics across verbs; isGroupEntry / isPopulatedGroupEntry predicate correctness; group lifecycle independence from members; cascade semantics edge cases (already-cancelled members, terminal-stage members, missing-member UUIDs); archivedAt round-trip; XSS / injection via group/member fields; CLI exit-code conventions.
+
+## Commit subjects in the audited range
+
+9c714ed docs(graphical-entries): scope Task 7.2 deferrals (#359, #360) into workplan per discipline rule
+eb5d660 docs(graphical-entries): backfill AUDIT-20260529-15..21 Status sha (50b0ebf)
+50b0ebf fix(graphical-entries): Task 7.2 review actions — AUDIT-15..21 (group empty-members + docblock + tests)
+15dd424 feat(graphical-entries): Phase 7 Task 7.2 — /deskwork:group skill family + CLI + archivedAt schema delta
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+
+The `initGroupMembersSection` docblock states "Idempotent — calling twice has no visible effect." That is true for `applyMode` (it reads current state) but NOT for the three `wire*` helpers: `wireToggle`, `wireEmptyStateCta`, and `wireMemberRowCopy` each call `addEventListener` unconditionally on every invocation. There is no module-level `wired` guard analogous to the one in the sibling `row-member-tab.ts` (which correctly guards with `let wired = false`).
+
+If `initPressCheckSurface` ever runs twice (re-init after a partial DOM swap, or a future refresh path), the section accumulates duplicate listeners — clicking a member row would fire `copyOrShowFallback` twice (two clipboard writes + two toasts), and the toggle would double-write localStorage.
+
+LOW severity because the current single call site doesn't trigger it, but the docstring asserts a property the code doesn't have.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: mirror the `row-member-tab.ts` pattern with a module-level `wired = false` guard, OR bind via a `dataset` sentinel on the section element so re-init is a genuine no-op.
+
+<!-- ===========================================================
+     Audit-barrage sweep — 2026-05-30 — 4 retroactive barrages
+     ===========================================================
+     Phase 2 (pipeline templates), Phase 3 (lane data model),
+     Phase 4 (verb refactor), Phase 7 small surfaces
+     (T7.1 + T7.2.7 + T7.2.8). 30 raw findings consolidated into
+     24 unique entries (cross-model agreement merged where same
+     surface). Run dirs:
+       20260530T062828859Z (P2)
+       20260530T063131307Z (P3)
+       20260530T063443880Z (P4)
+       20260530T064014571Z (P7 small)
+     -->
+
+### AUDIT-20260530-01 — path traversal in `loadPipelineTemplate` (unsanitized id flows to filesystem path)
+
+Finding-ID: AUDIT-20260530-01 (cross-model: AUDIT-BARRAGE-claude-01-P2 + AUDIT-BARRAGE-codex-01-P2)
+Status:     fixed-7e15a61
+Severity:   high
+Surface:    `packages/core/src/pipelines/loader.ts:118-141` (`loadPipelineTemplate`), `:36-38` (`projectOverridesDir`), `packages/core/src/pipelines/types.ts:96` (`id: z.string().min(1)`)
+
+`loadPipelineTemplate(id, projectRoot)` string-interpolates the caller-supplied `id` directly into both candidate paths. The only guard is `id.length === 0`. No charset constraint — the schema validates the `id` field INSIDE a loaded file, never the REQUESTED id. An `id` of `'../../../../etc/something'` normalizes out of the intended directory and reads an arbitrary `.json` from disk.
+
+Cross-references the downstream `LANE_ID_REGEX` fix from AUDIT-30 (applied at the studio render site for the same charset gap on lane ids). The right fix is here at the canonical chokepoint, not at every consumer.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude + codex cross-model agreement). Fix: introduce `PIPELINE_ID_REGEX` mirroring `LANE_ID_REGEX` (`^[a-z0-9][a-z0-9-]*$`); enforce in `PipelineTemplateSchema.id` AND at the top of `loadPipelineTemplate` before any path construction; have `listAvailablePipelineTemplates` ignore filenames that don't match.
+
+### AUDIT-20260530-02 — `.passthrough()` on `PipelineTemplateSchema` silently accepts misspelled optional fields
+
+Finding-ID: AUDIT-20260530-02 (cross-model: AUDIT-BARRAGE-claude-02-P2)
+Status:     fixed-c569a61
+Severity:   medium
+Surface:    `packages/core/src/pipelines/types.ts:107-110` (`.passthrough()`), `:101` (`lockedStages: ...optional()`)
+
+The schema uses blanket `.passthrough()` to tolerate a single known extra key (`$rationale`). Every unknown top-level key is silently accepted, including typos of real optional fields. An operator who writes `"lockdStages": ["Review"]` (transposed) gets zero diagnostics — `lockedStages` resolves to `undefined`, the pipeline ships with no lock gate, and iterate-at-lock-stage silently permits edits.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: declare `$rationale: z.string().optional()` explicitly and drop `.passthrough()` (default strip, or `.strict()` if unknown keys should be rejected outright).
+
+### AUDIT-20260530-03 — `PLUGIN_DEFAULTS_DIR` doubles as module directory AND preset registry (stray `.json` becomes phantom template)
+
+Finding-ID: AUDIT-20260530-03 (cross-model: AUDIT-BARRAGE-claude-03-P2)
+Status:     fixed-d5303ed
+Severity:   low
+Surface:    `packages/core/src/pipelines/loader.ts:31`, `:148-159`, `:180-189`
+
+`listAvailablePipelineTemplates` enumerates every `.json` in `PLUGIN_DEFAULTS_DIR` = `dirname(import.meta.url)`. The directory serves dual roles: holds loader/types modules + acts as preset registry. Any future non-template JSON that lands in `src/pipelines/` is copied to `dist/pipelines/` and appears as a bogus template id in the operator picker.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: name the preset set explicitly (`PRESET_IDS` constant the build also drives, or a `presets.json` index).
+
+### AUDIT-20260530-04 — verify `dist/pipelines/*.json` actually ships in the `@deskwork/core` published tarball
+
+Finding-ID: AUDIT-20260530-04 (cross-model: AUDIT-BARRAGE-claude-04-P2)
+Status:     fixed-c99e6d1
+Severity:   medium
+Surface:    `packages/core/package.json:214-215` (`build`/`prepack` cp step) — `files` whitelist (not in diff; needs inspection)
+
+Build/prepack scripts `cp src/pipelines/*.json dist/pipelines/`, but the whole feature depends on those JSON files being present in the published tarball. If `package.json`'s `files` whitelist enumerates specific dist subpaths rather than shipping `dist/` wholesale, the JSON gets excluded and every `loadPipelineTemplate` call in the marketplace-installed package throws "file not found." Same shape as v0.11.0 missing-`zod`. Tests can't catch it (no test exercises the built `dist/` resolution path).
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: `npm pack --dry-run` in `packages/core/` and assert `dist/pipelines/blog-post.json` et al. appear. If absent, widen `files` whitelist and add a CI/smoke check.
+
+### AUDIT-20260530-05 — `dev` watch never re-copies preset JSON after edit (build/watch asymmetry)
+
+Finding-ID: AUDIT-20260530-05 (cross-model: AUDIT-BARRAGE-claude-05-P2)
+Status:     fixed-f0090c2
+Severity:   low
+Surface:    `packages/core/package.json:217` (`dev` script)
+
+`build`/`prepack` copy `src/pipelines/*.json` into `dist/pipelines/`, but `dev` is `npm run build && tsc -b --watch`. Initial build copies once; thereafter `tsc --watch` only recompiles `.ts`. An operator iterating on a preset during `dev` sees no dist update.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: add parallel JSON watcher OR document in the script comment that JSON edits require manual `npm run build` during dev.
+
+### AUDIT-20260530-06 — case-insensitive filesystem produces confusing id-mismatch error in `loadPipelineTemplate`
+
+Finding-ID: AUDIT-20260530-06 (cross-model: AUDIT-BARRAGE-claude-06-P2)
+Status:     fixed-b51859b
+Severity:   low
+Surface:    `packages/core/src/pipelines/loader.ts:124-138`, `:73-78`
+
+On macOS's default case-insensitive filesystem, `existsSync(...'Editorial.json')` returns true for on-disk `editorial.json`. `loadPipelineTemplate('Editorial', root)` reads the file, then trips the id-mismatch check and throws a misleading error. Behavior diverges by host OS.
+
+Surfaced by audit-barrage run `20260530T062828859Z-graphical-entries` (claude). Fix: pair with AUDIT-01's charset guard so the regex rejects mixed-case ids up front.
+
+### AUDIT-20260530-07 — path traversal in `loadLaneConfig` (sister to AUDIT-01; same shape, different surface)
+
+Finding-ID: AUDIT-20260530-07 (cross-model: AUDIT-BARRAGE-claude-01-P3 + AUDIT-BARRAGE-codex-01-P3)
+Status:     fixed-9edc085
+Severity:   high
+Surface:    `packages/core/src/lanes/loader.ts:33-49` (`laneConfigPath`), `:90-115` (`loadLaneConfig`), `packages/core/src/schema/entry.ts:148` (`lane: z.string().min(1).optional()`)
+
+`loadLaneConfig(id, projectRoot)` builds the path via `join(lanesDir(projectRoot), \`${id}.json\`)`. Only guard is `id.trim().length === 0`. `EntrySchema.lane` is `z.string().min(1).optional()` — NOT regex-bound — so a malformed sidecar (`lane: "../../secrets"`) flows straight into `loadLaneConfig` and reads arbitrary JSON.
+
+AUDIT-30 already fixed this at the studio render site. The canonical chokepoint still doesn't enforce the charset.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude + codex cross-model agreement). Fix: bind `EntrySchema.lane` to `LANE_ID_REGEX` at the schema layer AND validate the loader's `id` param up-front. Same pattern as AUDIT-01's pipeline-id fix; consider a shared validator.
+
+### AUDIT-20260530-08 — `StrictLaneConfig` / `StrictPipelineTemplate` aliases are no-op; comments misdescribe Zod `.passthrough()`
+
+Finding-ID: AUDIT-20260530-08 (cross-model: AUDIT-BARRAGE-claude-02-P3)
+Status:     fixed-16917db
+Severity:   medium
+Surface:    `packages/core/src/lanes/types.ts:69-78`, `packages/core/src/pipelines/types.ts:137-161`
+
+Both aliases claim to "narrow" a `z.infer` type that `.passthrough()` "widens." In Zod v3, `.passthrough()` changes only RUNTIME parsing; it does NOT add a `[k: string]: unknown` index signature to the inferred type. So `StrictLaneConfig = Pick<LaneConfig, ...>` is structurally identical to `LaneConfig`. The alias buys zero type safety; the comment's claim about catching typos at compile time is false.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: verify against the project's actual Zod version with a type probe; if confirmed, delete the aliases and the misdescribing comments. If extra-key safety is genuinely wanted, switch the schemas to explicit `.catchall()`.
+
+### AUDIT-20260530-09 — `detectArtifactKind` classifies non-existent files as valid artifacts (inconsistent disk contract)
+
+Finding-ID: AUDIT-20260530-09 (cross-model: AUDIT-BARRAGE-claude-03-P3 + AUDIT-BARRAGE-codex-02-P3)
+Status:     fixed-2b42356
+Severity:   medium
+Surface:    `packages/core/src/lanes/detection.ts:44-77`, `packages/core/test/lanes/detection.test.ts:15-50`
+
+Module doc says "classifies an on-disk path," but only the `html-mockup` branch touches disk. `.md`/`.html`/image branches dispatch purely on `extname` with NO existence check. `detectArtifactKind('/deleted/post.md')` returns `'markdown'` for a non-existent file; a deleted html-mockup throws. Asymmetric failure modes for the same root cause. Test fixture locks this in but the contract drift between doc and code is unintentional.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude + codex cross-model agreement). Fix: probe existence once at the top and refuse non-existent paths with a clear error, then dispatch on extension; OR document detection as path-shape-only.
+
+### AUDIT-20260530-10 — `bootstrap` doc claims "no readable config → no-config" but only checks existence
+
+Finding-ID: AUDIT-20260530-10 (cross-model: AUDIT-BARRAGE-claude-04-P3)
+Status:     fixed-234ac5a
+Severity:   low
+Surface:    `packages/core/src/lanes/bootstrap.ts:74-83`
+
+Docblock states "If the project has no readable `.deskwork/config.json`, returns `{ created: false, reason: 'no-config' }`." Code only guards existsSync, then calls `readConfig` unguarded — a corrupt config throws, contradicting the "best-effort hook" contract.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: update doc to say "absent" instead of "no readable"; consider catch+rethrow with lane-bootstrap context.
+
+### AUDIT-20260530-11 — `StageStringSchema` accepts whitespace-only stage values (`min(1)` is not `trim()`)
+
+Finding-ID: AUDIT-20260530-11 (cross-model: AUDIT-BARRAGE-claude-05-P3)
+Status:     fixed-242a434
+Severity:   low
+Surface:    `packages/core/src/schema/entry.ts:108`, `packages/core/test/schema/entry.test.ts:75-101`
+
+`StageStringSchema = z.string().min(1)` parses `currentStage: '   '` successfully. Sibling validations disagree: lane ids reject whitespace via `.trim()`; stage values accept it. A whitespace stage silently fails every editorial-default helper.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: `z.string().trim().min(1)` on `StageStringSchema`; add regression test.
+
+### AUDIT-20260530-12 — `inferPriorStageFromJournal` silently skips non-editorial `from` values (semantics regression)
+
+Finding-ID: AUDIT-20260530-12 (cross-model: AUDIT-BARRAGE-claude-06-P3)
+Status:     fixed-15f7f41
+Severity:   low
+Surface:    `packages/core/src/doctor/migrate.ts:248-260`
+
+Pre-diff the loop returned `e.from` unconditionally. Now returns only `if (isEditorialStage(e.from))`; non-editorial `from` is silently skipped and the loop walks past it. For editorial-only legacy migration this is a no-op, but `StageTransitionEvent.from` is broadened to `StageStringSchema` — the moment any journal carries non-editorial `from`, the function silently produces a wrong prior-stage.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (claude). Fix: if migration is genuinely editorial-only, assert/refuse on non-editorial `from` rather than silently skipping; if it must tolerate lane stages, return raw `from`.
+
+### AUDIT-20260530-13 — `bootstrapDefaultLaneIfMissing` can leave a lane file without its migration journal event (partial-success)
+
+Finding-ID: AUDIT-20260530-13 (cross-model: AUDIT-BARRAGE-codex-03-P3)
+Status:     fixed-908eb49
+Severity:   medium
+Surface:    `packages/core/src/lanes/bootstrap.ts:102-123`
+
+Writes `default.json` BEFORE appending the `lane-migration` journal event. If journal append fails after the write, the project is left with a lane but no migration audit record. Next invocation returns `already-exists` and never repairs the missing event.
+
+Surfaced by audit-barrage run `20260530T063131307Z-graphical-entries` (codex). Fix: compensating operation — if journal append fails, remove the just-created lane file; OR record enough state to retry the missing event.
+
+### AUDIT-20260530-14 — multi-lane calendar renderer silently drops entries whose `currentStage` isn't in their lane's template (re-introduces #247)
+
+Finding-ID: AUDIT-20260530-14 (cross-model: AUDIT-BARRAGE-claude-01-P4 + AUDIT-BARRAGE-codex-02-P4)
+Status:     fixed-f345069
+Severity:   high
+Surface:    `packages/core/src/calendar/render.ts:86-98`, `:179-201`; test coverage at `packages/core/test/calendar/regenerate-multilane.test.ts`
+
+#247's stated fix was "stop silently dropping entries whose stage the renderer doesn't know about." Multi-lane path reintroduces it: `bucketize` only creates buckets for `templateStageOrder(template)`; entries whose `currentStage` is not in `byStage` are never pushed. Two vectors: (a) entry bound to valid lane carrying out-of-template `currentStage` vanishes from its lane section; (b) orphan entry (lane undefined OR lane id deleted) renders through `EDITORIAL_FALLBACK`, so a deleted-visual-lane entry at `Sketched`/`Iterating` has no matching editorial-fallback bucket and disappears from "(unassigned)" too.
+
+Same shape as just-fixed AUDIT-37 composed-view drop, but on the CANONICAL calendar surface — the doctor's SSOT. Bigger blast radius. Regression tests assert only entries in known stages appear.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + codex cross-model agreement). Fix: collect any entry whose `currentStage` produced no bucket into an explicit `## (unrecognized stage)` tail per lane (or unassigned block). Add regression test seeding an entry with stage outside its lane template.
+
+### AUDIT-20260530-15 — corrupt sidecars silently skipped during lane migration (no-silent-fallback violation)
+
+Finding-ID: AUDIT-20260530-15 (cross-model: AUDIT-BARRAGE-claude-02-P4 + AUDIT-BARRAGE-codex-03-P4)
+Status:     fixed-bf2fb98
+Severity:   medium
+Surface:    `packages/core/src/doctor/lane-migration.ts:145-158`
+
+`migrateLaneMembership` walks every `*.json`; `readFile`/`JSON.parse`/`EntrySchema.safeParse` failures are all swallowed via `catch { continue }`. The sidecar is not counted in `examined`, not migrated, no diagnostic. Same root cause AUDIT-39 flagged in `entry-review/data.ts` — surfacing in a new file.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + codex cross-model agreement). Fix: distinguish ENOENT from parse/validation/IO failures; count every `.json` examined; surface skipped-corrupt sidecars in `LaneMigrationResult` (e.g. `skippedCorrupt: string[]`) OR throw with the offending path. Migration test suite has no corrupt-sidecar case.
+
+### AUDIT-20260530-16 — `iterateEntry` now refuses editorial `Final` stage (untested behavior change)
+
+Finding-ID: AUDIT-20260530-16 (cross-model: AUDIT-BARRAGE-claude-03-P4)
+Status:     fixed-fe21786
+Severity:   medium
+Surface:    `packages/core/src/iterate/iterate.ts:99-106`, `packages/core/test/iterate/iterate.test.ts:141`
+
+Resolution: outcome A (lock the new semantic). DESKWORK-STATE-MACHINE.md is explicit that iterate is NOT available in Final ("Final locks the content; to iterate, induct backward to Drafting first" — verb iterate § "When it can be invoked"; reinforced in the stage table for Final: "Content is locked — ready to publish, no further edits or iterations allowed in this stage" + Commandment I's stage-gate example). The Phase-4 `isLockedStageInTemplate` gate is the spec-conformant implementation; the pre-Phase-4 hardcoded Published-only gate was the bug. Regression test added at `packages/core/test/iterate/iterate.test.ts` :: "refuses to iterate an editorial Final entry (locked-stage gate, DESKWORK-STATE-MACHINE.md Commandment II)" asserts iterate throws naming the locked stage + pipeline + induct recovery path AND verifies the iteration counter does not advance. Existing docstring at iterate.ts:70-79 already documents the locked-stage behavior — no code or docstring change needed; the test pins the contract.
+
+Pre-Phase-4 `iterateEntry` refused only `Published`/`Blocked`/`Cancelled` — `Final` was iterable. Refactor adds `isLockedStageInTemplate`, editorial's `lockedStages = ['Final']`, so iterate-on-`Final` now throws. Semantic change to editorial workflow; operators who pinned new revisions while at `Final` must `induct` back to `Drafting` first. May be intended state-machine semantics but shipped untested + un-changelogged.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: confirm Final-refuses-iterate intent against DESKWORK-STATE-MACHINE.md; add editorial regression test asserting refusal.
+
+### AUDIT-20260530-17 — `regenerateCalendar` couples per-entry transitions to validity of unrelated lane files
+
+Finding-ID: AUDIT-20260530-17 (cross-model: AUDIT-BARRAGE-claude-04-P4)
+Status:     fixed-165e7a7
+Severity:   medium
+Surface:    `packages/core/src/calendar/render.ts:111-121` (`loadLaneContexts`)
+
+`loadLaneContexts` calls `loadLaneConfig` + `loadPipelineTemplate` per lane with no error handling. Any throw propagates out of `renderCalendar` → `regenerateCalendar`. Every verb calls `regenerateCalendar` as final step AFTER `writeSidecar` + `appendJournalEvent`. A single malformed lane file breaks all six verbs for every entry — AFTER the sidecar mutation has already landed.
+
+Pre-Phase-4 `renderCalendar` was pure over the entry list. Lane-config read multiplies blast radius from "this entry" to "the whole project, on any verb."
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: make `regenerateCalendar`'s failure non-fatal to the transition (calendar reconciled by `doctor --fix`, the documented recovery path); OR validate lane configs once up-front. At minimum the partial-state window should be tested.
+
+### AUDIT-20260530-18 — `deriveArtifactKindFromPath` writes wrong `artifactKind` for multi-file HTML mockups
+
+Finding-ID: AUDIT-20260530-18 (cross-model: AUDIT-BARRAGE-claude-05-P4)
+Status:     fixed-edb8122
+Severity:   medium
+Surface:    `packages/core/src/doctor/lane-migration.ts:deriveArtifactKindFromPath`; test acknowledgement at `packages/core/test/doctor/lane-migration.test.ts:131-138`
+
+Migration derives `artifactKind` purely from path extension: any `.html` → `'single-file-html'`. But authoritative `detectArtifactKind` probes the filesystem and would classify a directory of HTML as `html-mockup`. For a multi-file HTML mockup whose `artifactPath` ends in `index.html`, migration writes `'single-file-html'` — contradicting the authoritative classifier. Migration is idempotent so the wrong value is permanent.
+
+Visual/`mockups` lane (the headline graphical-entries use case) is exactly where multi-file HTML mockups live.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: have migration call `detectArtifactKind` (already filesystem-touching code); OR only back-fill kinds the path heuristic can classify unambiguously (`.md`, image extensions).
+
+### AUDIT-20260530-19 — `EDITORIAL_FALLBACK` duplicates `editorial.json` with manual "keep in sync" + Phase-8 deferral
+
+Finding-ID: AUDIT-20260530-19 (cross-model: AUDIT-BARRAGE-claude-06-P4)
+Status:     fixed-00fb2bc
+Severity:   low
+Surface:    `packages/core/src/calendar/render.ts:130-145`
+
+Hardcodes editorial's `linearStages` / `lockedStages` / `offPipelineStages` inline, duplicating `packages/core/src/pipelines/editorial.json`. Code documents the hazard. Defers cleanup to "Phase 8 … this constant can be deleted" with NO issue link.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: load editorial preset from the bundled package resource rather than duplicating; at minimum file the Phase-8 deletion as a GitHub issue.
+
+### AUDIT-20260530-20 — `induct` CLI still editorial-narrow (Phase 4 "verbs are universal" goal half-wired at CLI; deferral phrase in comment)
+
+Finding-ID: AUDIT-20260530-20 (cross-model: AUDIT-BARRAGE-claude-07-P4 + AUDIT-BARRAGE-codex-01-P4)
+Status:     fixed-e85bb8e
+Severity:   high
+Surface:    `packages/cli/src/commands/induct.ts:84-95,114`
+
+Core `inductEntry` is template-aware, but CLI keeps editorial-only `isLinearPipelineTarget(flags.to)` guard and hardcoded error text. A visual-lane operator running `deskwork induct icon-set --to Sketched` is rejected before the request reaches the template-aware core helper. CLI comment explicitly defers ("until a lane-aware CLI lands") with no issue link — violates "Just for now is bullshit" rule.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude + codex cross-model agreement). Fix: read sidecar in CLI, resolve template, validate `--to` against `template.linearStages`; replace deferral comment with reference to tracked issue OR widen the guard now.
+
+### AUDIT-20260530-21 — `renderCalendar` docstring drift: promises `## Lane:` but emits `# Lane:` (h1)
+
+Finding-ID: AUDIT-20260530-21 (cross-model: AUDIT-BARRAGE-claude-08-P4)
+Status:     fixed-66f2854
+Severity:   low
+Surface:    `packages/core/src/calendar/render.ts:157-159` (docstring) vs `:194` and `:199` (emit)
+
+Docstring says h2 lane headers; code writes h1. Multi-lane test asserts h1 — code consistent with test, only docstring wrong. Heading level meaningful: output opens with `# Editorial Calendar` (h1), so per-lane blocks at h1 are sibling top-level rather than nested.
+
+Surfaced by audit-barrage run `20260530T063443880Z-graphical-entries` (claude). Fix: decide intentionally (h1 vs h2); fix docstring; verify doctor's section-agnostic UUID scan is the only consumer.
+
+### AUDIT-20260530-22 — partial cascade failure leaves `calendar.md` persistently stale (7.2.7 single-regen regression)
+
+Finding-ID: AUDIT-20260530-22 (cross-model: AUDIT-BARRAGE-claude-01-P7small)
+Status:     fixed-8296171
+Severity:   medium
+Surface:    `packages/core/src/entry/cancel.ts` (public `cancelEntry` wrapper)
+
+The wrapper's `await regenerateCalendar(projectRoot)` runs ONLY if the walker returns normally. If the walker throws partway through a cascade (member with missing/corrupt sidecar), the group + every member processed before the failure are already `Cancelled` on disk but `calendar.md` is never regenerated. PERSISTENT divergence, not the transient window AUDIT-25 dispositioned as informational.
+
+Behavior regression vs pre-7.2.7: each invocation regenerated immediately, so mid-cascade throws left calendar consistent with completed work. The N+1→1 optimization traded for a wider, now-persistent inconsistency on the failure path. The four regenerate-count tests exercise only the happy path.
+
+Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (claude). Fix: `try { result = await cancelEntryWithoutCalendarRegen(...) } finally { await regenerateCalendar(projectRoot) }`. Add test seeding a missing/corrupt member that drives the throw and asserts calendar reconciles.
+
+### AUDIT-20260530-23 — cascade catch swallows write/journal failures as "skipped member" (can hide state corruption)
+
+Finding-ID: AUDIT-20260530-23 (cross-model: AUDIT-BARRAGE-codex-01-P7small)
+Status:     fixed-5264770
+Severity:   medium
+Surface:    `packages/core/src/entry/cancel.ts:209-279`
+
+Cascade loop wraps member lookup + template resolution + recursive walker call in ONE broad `try/catch`. Failures from the recursive transition path become a skipped member with `slug: '(unresolved)'` and `reason: 'read failed: ...'`, even when the failure was not a read failure. If journal append fails after sidecar write, the result claims the member was skipped while its sidecar is already `Cancelled` with no durable `stage-transition` event.
+
+Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (codex). Fix: narrow the recoverable catch to the specific missing-member/read case; let template/config/write/journal errors propagate. If distinct recoverable cases beyond missing-sidecar are wanted, classify them explicitly.
+
+### AUDIT-20260530-24 — indentation regression on `CancelOptions.cascade` (3-space indent slipped through)
+
+Finding-ID: AUDIT-20260530-24 (cross-model: AUDIT-BARRAGE-claude-02-P7small)
+Status:     fixed-f283f9b
+Severity:   low
+Surface:    `packages/core/src/entry/cancel.ts` — `interface CancelOptions { ... }`
+
+Pure-whitespace change with no functional purpose: `readonly cascade?: boolean;` indented with 3 spaces instead of the surrounding 2-space indentation. Signals formatting is not enforced on this file's edit path.
+
+Surfaced by audit-barrage run `20260530T064014571Z-graphical-entries` (claude). Fix: restore 2-space indentation; consider format-on-commit enforcement.
+
+## Diff under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/.dw-lifecycle/scope-discovery/clones.yaml b/.dw-lifecycle/scope-discovery/clones.yaml
+index 098aa1b..cc20521 100644
+--- a/.dw-lifecycle/scope-discovery/clones.yaml
++++ b/.dw-lifecycle/scope-discovery/clones.yaml
+@@ -1,4 +1,4 @@
+-generated_at: 2026-05-29T08:21:06.570Z
++generated_at: 2026-05-29T09:54:21.273Z
+ clones:
+   - id: 014b49040fe1
+     lines: 13
+@@ -7,14 +7,13 @@ clones:
+       - packages/cli/src/commands/ingest.ts:104:115
+     disposition: pending
+     reason: null
+-  - id: 0fc38332b5ee
++  - id: "13e871048927"
+     lines: 12
+     members:
+       - packages/cli/src/commands/approve.ts:110:121
+-      - packages/cli/src/commands/block.ts:52:63
+-      - packages/cli/src/commands/induct.ts:78:67
+-    disposition: pending
+-    reason: null
++      - packages/cli/src/commands/induct.ts:78:63
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+   - id: 09fe516bb060
+     lines: 12
+     members:
+@@ -36,14 +35,14 @@ clones:
+       - packages/studio/src/pages/shortform-review.ts:62:72
+     disposition: pending
+     reason: null
+-  - id: 1d80654deb70
++  - id: 497f5bbe1afa
+     lines: 15
+     members:
+       - packages/cli/src/commands/approve.ts:46:60
+-      - packages/cli/src/commands/cancel.ts:26:40
++      - packages/cli/src/commands/block.ts:21:35
+       - packages/cli/src/commands/publish.ts:51:65
+-    disposition: pending
+-    reason: null
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+   - id: 24450692261b
+     lines: 11
+     members:
+@@ -51,41 +50,48 @@ clones:
+       - packages/cli/src/commands/induct.ts:68:78
+     disposition: pending
+     reason: null
+-  - id: "389500784322"
+-    lines: 19
++  - id: 341413173fdd
++    lines: 16
+     members:
+-      - packages/cli/src/commands/block.ts:17:35
+-      - packages/cli/src/commands/cancel.ts:22:65
+-    disposition: pending
+-    reason: null
+-  - id: 5fcc7d54ef8a
+-    lines: 17
++      - packages/cli/src/commands/block.ts:36:51
++      - packages/cli/src/commands/induct.ts:63:78
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: 51d6e4ed7584
++    lines: 10
+     members:
+-      - packages/cli/src/commands/block.ts:35:51
+-      - packages/cli/src/commands/cancel.ts:40:78
+-    disposition: pending
+-    reason: null
+-  - id: b3ca8b5bdedf
+-    lines: 17
++      - packages/cli/src/commands/block.ts:52:61
++      - packages/cli/src/commands/induct.ts:78:87
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: ead1a31d31bc
++    lines: 16
+     members:
+-      - packages/cli/src/commands/block.ts:63:79
+-      - packages/cli/src/commands/cancel.ts:67:152
+-    disposition: pending
+-    reason: null
+-  - id: 6e51c9681a1d
++      - packages/cli/src/commands/block.ts:64:79
++      - packages/cli/src/commands/induct.ts:137:152
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: b7462277a662
++    lines: 10
++    members:
++      - packages/cli/src/commands/cancel.ts:39:48
++      - packages/cli/src/commands/pipeline.ts:96:104
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: 07da3b378bef
+     lines: 25
+     members:
+-      - packages/cli/src/commands/cancel.ts:41:65
++      - packages/cli/src/commands/cancel.ts:51:75
+       - packages/cli/src/commands/induct.ts:63:87
+-    disposition: pending
+-    reason: null
+-  - id: 7826110a84e7
+-    lines: 16
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: ed4e65efa7f3
++    lines: 14
+     members:
+-      - packages/cli/src/commands/cancel.ts:68:83
+-      - packages/cli/src/commands/induct.ts:137:152
+-    disposition: pending
+-    reason: null
++      - packages/cli/src/commands/cancel.ts:81:94
++      - packages/cli/src/commands/publish.ts:110:151
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+   - id: 4b85626d608b
+     lines: 26
+     members:
+@@ -100,6 +106,27 @@ clones:
+       - packages/cli/src/commands/shortform-start.ts:81:97
+     disposition: pending
+     reason: null
++  - id: 3fd0df7350a4
++    lines: 12
++    members:
++      - packages/cli/src/commands/group.ts:151:162
++      - packages/cli/src/commands/lane.ts:141:150
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: 043c7ab6b5e8
++    lines: 14
++    members:
++      - packages/cli/src/commands/group.ts:221:234
++      - packages/cli/src/commands/lane.ts:215:228
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: 303a01d3ddec
++    lines: 39
++    members:
++      - packages/cli/src/commands/group.ts:75:113
++      - packages/cli/src/commands/pipeline.ts:84:106
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+   - id: 89f8a99f8ce2
+     lines: 13
+     members:
+@@ -156,6 +183,29 @@ clones:
+       - packages/cli/src/commands/pipeline.ts:312:323
+     disposition: keep-with-reason
+     reason: "Phase 6 Task 6.2: in-file similarity between handleCreate (parse --shape, emit created result) and handleDelete (parse --reassign-lanes-to, emit deleted result). Both follow the verb-handler shape (parse → invoke core → emit) but operate on different argument structures and different result envelopes; collapsing into a generic verb handler would obscure per-verb argument validation."
++  - id: e5936d3c2a28
++    lines: 11
++    members:
++      - packages/cli/test/group/helpers.ts:123:133
++      - packages/cli/test/lane/helpers.ts:84:94
++      - packages/cli/test/pipeline/helpers.ts:78:88
++      - packages/cli/test/pipeline/helpers.ts:91:101
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: 145311a2b165
++    lines: 13
++    members:
++      - packages/cli/test/group/helpers.ts:21:33
++      - packages/cli/test/pipeline/helpers.ts:16:33
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: dec3f51b1463
++    lines: 18
++    members:
++      - packages/cli/test/group/helpers.ts:56:73
++      - packages/cli/test/pipeline/helpers.ts:51:68
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+   - id: d93c17540f3a
+     lines: 29
+     members:
+@@ -177,14 +227,6 @@ clones:
+       - packages/cli/test/pipeline/helpers.ts:50:75
+     disposition: keep-with-reason
+     reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
+-  - id: b99074143b08
+-    lines: 11
+-    members:
+-      - packages/cli/test/lane/helpers.ts:84:94
+-      - packages/cli/test/pipeline/helpers.ts:78:88
+-      - packages/cli/test/pipeline/helpers.ts:91:101
+-    disposition: keep-with-reason
+-    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
+   - id: b182ab3fd6d1
+     lines: 27
+     members:
+@@ -321,6 +363,20 @@ clones:
+       - packages/core/src/entry/cancel.ts:1:13
+     disposition: pending
+     reason: null
++  - id: e56c638702cc
++    lines: 13
++    members:
++      - packages/core/src/groups/operations/add-member.ts:124:136
++      - packages/core/src/groups/operations/remove-member.ts:68:80
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: d31f449b3e8c
++    lines: 9
++    members:
++      - packages/core/src/groups/operations/archive.ts:48:56
++      - packages/core/src/groups/operations/archive.ts:84:92
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+   - id: 3e94d4b73301
+     lines: 11
+     members:
+@@ -391,6 +447,20 @@ clones:
+       - packages/core/src/review/workflow-paths.ts:97:109
+     disposition: pending
+     reason: null
++  - id: e3dffdccdd78
++    lines: 9
++    members:
++      - packages/core/src/schema/journal-events.ts:162:170
++      - packages/core/src/schema/journal-events.ts:367:375
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
++  - id: d93b64cd1eae
++    lines: 7
++    members:
++      - packages/core/src/schema/journal-events.ts:376:382
++      - packages/core/src/schema/journal-events.ts:388:394
++    disposition: keep-with-reason
++    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
+   - id: 13e80bf116fb
+     lines: 14
+     members:
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+index 1fbc424..c618235 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+@@ -2289,3 +2289,192 @@ Resolution: a sibling test added at
+ members[] entries that are not UUIDs (last element invalid)" —
+ mirrors the existing first-element test with the order swapped.
+ Lands in the same commit as this audit-log entry.
++
++## 2026-05-29 (session 2) audit: Phase 7 Task 7.2 — /deskwork:group skill family
++
++Audit scope: one commit, `15dd424`. Risk classification: high (new
++core module + CLI dispatcher + schema delta + journal-events
++expansion + cross-skill `--cascade` flag; 3725 insertions across 33
++files).
++
++Track 1 verification (controller, this session):
++
++- `npm --workspace @deskwork/core test`: 755/755 pass (723 → 755,
++  +32 schema + group-operations integration tests).
++- `npm --workspace @deskwork/cli test`: 400/400 pass (327 → 400,
++  +73 per-verb suites + cancel-cascade).
++- `npm --workspace @deskwork/studio test`: 933/933 pass, unchanged.
++- Workspace builds for `@deskwork/core`, `@deskwork/cli`,
++  `@deskwork/studio`: exit 0.
++- `dw-lifecycle check-clones --refresh-baseline`: 18 NEW clone
++  groups, all dispositioned `keep-with-reason` (parallel-domain
++  symmetry across lane/pipeline/group dispatchers + the universal
++  stage-transition verb boilerplate).
++
++Track 2 spec-compliance: parallel `code-reviewer` agent against the
++workplan + PRD. All six workplan sub-steps (7.2.1 through 7.2.6)
++literally satisfied. The implementer's two scope additions (the
++`restore` subcommand and 6 group-* journal-event kinds) defensible
++per project convention (sister-to-archive symmetry + audit-trail
++completeness). No Phase 7.3 / 7.4 / 7.5 / 7.6 / 7.7 / 7.8 scope
++pulled forward. Two informational nits (PRD-sketch field-order vs.
++impl, `show.ts:71` catch{} narrowing) — no-action.
++
++Track 3 code-quality: parallel `code-reviewer` agent against the
++diff. Multiple substantive findings — recorded below.
++
++### AUDIT-20260529-15 — `members: []` is invisible to `group list` / `group show` / `group update` (HIGH)
++
++Finding-ID: AUDIT-20260529-15
++Status:     fixed-50b0ebf
++Severity:   high
++Surface:    `packages/core/src/groups/types.ts:20-22`, `packages/core/src/groups/operations/list.ts:35`, `packages/core/src/groups/operations/show.ts:48`, `packages/core/src/groups/operations/update.ts:48`, `packages/core/src/groups/operations/create.ts:119`
++
++`group create` writes `members: []` deliberately as the "intent
++marker" for a newly-declared group (see `create.ts` doc-comment,
++pre-fix lines 12-22). But `isGroupEntry` defined the predicate as
++"`Array.isArray(members) && members.length > 0`", so `list.ts`
++filtered the new group out, and `show.ts` + `update.ts` refused on
++empty-members entries.
++
++Reproduction (pre-fix):
++
++  $ deskwork group create my-group --lane default
++  {"created":true,"slug":"my-group","members":[]}
++  $ deskwork group list
++  {"groups":[]}
++  $ deskwork group show my-group
++  Cannot show group "my-group": entry has no members.
++
++The operator's just-created group was invisible to every read-side
++verb until they ran `add-member`. Per the CLI's contract that
++`create` makes a group, this was a UX regression.
++
++Resolution: `isGroupEntry` redefined to `Array.isArray(entry.members)`
++— `members: []` IS a group (declared-empty marker); `members:
++undefined` denotes a regular entry. Added sibling predicate
++`isPopulatedGroupEntry` for the "group AND has members" semantic
++(used downstream by the multi-lane composed view in Task 7.4 + the
++informational `group-all-members-cancelled` doctor rule in Task
++7.5.3 — both should skip empty groups). Updated show.ts + update.ts
++refusal messages to refer to "entry is not a group (no `members`
++field)" instead of "entry has no members".
++
++This finding SUPERSEDES AUDIT-20260529-13's framing at the CLI/
++predicate layer; the schema-layer permissiveness (both shapes parse)
++stands.
++
++### AUDIT-20260529-16 — Task 7.5.5 reframed from `group-empty-members-array` to `group-stale-empty-members` (medium)
++
++Finding-ID: AUDIT-20260529-16
++Status:     fixed-50b0ebf
++Severity:   medium
++Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:390`
++
++The previously-scheduled doctor rule
++`group-empty-members-array` (Task 7.5.5) was framed around the
++assumption that `members: []` and `members: undefined` were
++"semantically equivalent" non-group shapes that needed normalizing.
++AUDIT-20260529-15's resolution invalidates that assumption — the
++two shapes now denote different entities (declared-empty group vs.
++regular entry). Task 7.5.5 reframed to `group-stale-empty-members`:
++surface declared-empty groups whose age exceeds a threshold AND
++have no `group-add-member` journal events. Operator decides whether
++to cancel / archive / populate.
++
++### AUDIT-20260529-17 — journal-events docblock claimed non-existent `cascadeFrom` linkage (medium; cascadeFrom feature tracked at #359)
++
++Finding-ID: AUDIT-20260529-17
++Status:     fixed-50b0ebf
++Severity:   medium
++Surface:    `packages/core/src/schema/journal-events.ts:347-351`
++
++The docblock above the group-* event kinds claimed that group
++cancel `--cascade` "emits one `stage-transition` event per affected
++entry... the cascade surfaces in the per-entry event's
++`metadata.cascadeFrom` field carrying the originating group's
++entry id." `cancel.ts:138-145, :193-197` never sets
++`metadata.cascadeFrom`. The doc-code drift made the audit-trail
++claim load-bearing for downstream consumers who would have searched
++for the field that doesn't exist.
++
++Resolution: docblock rewritten to match the actual behavior — the
++cascade does NOT record per-event linkage today; the audit trail is
++reachable only via the cancel-time stdout JSON result's
++`cascadedMembers[]` / `skippedMembers[]` arrays. SKILL.md was
++already correct (line 44 explicitly states this). The
++`cascadeFrom`-on-event feature is captured in the follow-up issue
++filed alongside this audit entry.
++
++### AUDIT-20260529-18 — `regenerateCalendar` runs N+1 times per cascade (medium, deferred)
++
++Finding-ID: AUDIT-20260529-18
++Status:     acknowledged-2026-05-29-issue-#360
++Severity:   medium
++Surface:    `packages/core/src/entry/cancel.ts:225`
++
++`cancelEntry` runs `regenerateCalendar(projectRoot)` once per
++invocation. The cascade path (`cancel.ts:193`) recursively invokes
++`cancelEntry` for every cascaded member, so a group with N members
++triggers N+1 full sidecar re-reads + calendar.md writes. Quadratic
++disk I/O on large groups; the inner regenerations don't compound to
++incorrect state (the journal is the source of truth and each cancel
++finalizes its own write before the regenerate reads), but the work
++is wasted.
++
++Disposition: medium. The fix is a structural refactor (split
++`cancelEntry` into a private walker + a public wrapper that
++regenerates once at the cascade boundary) that's bigger than this
++review-action commit. Filed as a follow-up GitHub issue against the
++graphical-entries milestone; the issue body has the recommended
++refactor shape.
++
++### AUDIT-20260529-19 — create→list round-trip test gap (medium)
++
++Finding-ID: AUDIT-20260529-19
++Status:     fixed-50b0ebf
++Severity:   medium
++Surface:    `packages/cli/test/group/create.test.ts`, `packages/cli/test/group/list.test.ts`
++
++The original Task 7.2 test suite covered `group create` + `group
++list` in isolation but had no end-to-end round-trip that drove
++both verbs against the same fixture. The HIGH-1 bug
++(AUDIT-20260529-15) was exactly the kind of integration mismatch
++this gap was blind to.
++
++Resolution: new test
++`packages/cli/test/group/create.test.ts:create -> list round-trip`
++that runs `group create round-trip-group --lane default` then
++`group list` and asserts the new slug appears with `memberCount:
++0`. Plus existing tests updated to assert the new (post-fix)
++empty-group semantics across list / show / update.
++
++### AUDIT-20260529-20 — journal-events docblock count off-by-one (low)
++
++Finding-ID: AUDIT-20260529-20
++Status:     fixed-50b0ebf
++Severity:   low
++Surface:    `packages/core/src/schema/journal-events.ts:334`
++
++Docblock prose said "seven kinds" then enumerated six (and six are
++defined). Off-by-one prose error.
++
++Resolution: prose updated from "seven" to "six". One-character fix.
++
++### AUDIT-20260529-21 — group SKILL.md `update` description didn't mention empty-members refusal semantics (low)
++
++Finding-ID: AUDIT-20260529-21
++Status:     fixed-50b0ebf
++Severity:   low
++Surface:    `plugins/deskwork/skills/group/SKILL.md:47`
++
++The `update` verb description didn't surface that update refuses
++against entries without the `members` field. AUDIT-20260529-15's
++resolution changed the refusal predicate (from "empty members" to
++"missing members field"); the SKILL.md needed to match.
++
++Resolution: SKILL.md `update` description updated to read "Works
++against both populated and declared-empty groups; refuses against
++entries without the `members` field at all (regular entries)." The
++header was also expanded to document the empty-vs-absent semantic
++distinction.
+diff --git a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+index b498281..eef2a91 100644
+--- a/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
++++ b/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+@@ -354,12 +354,24 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
+ 
+ ### Task 7.2: `/deskwork:group` skill family
+ 
+-- [ ] Step 7.2.1: Author SKILL.md at `plugins/deskwork/skills/group/SKILL.md` covering: `list`, `show <slug>`, `create <slug> --lane <lane-id> [--artifact-path <path>]`, `update <slug> [--title <text>]`, `add-member <group-slug> <member-slug>`, `remove-member <group-slug> <member-slug>`, `archive <slug>`. Cancel uses the universal `/deskwork:cancel`.
+-- [ ] Step 7.2.2: CLI implementation at `packages/cli/src/commands/group.ts`.
+-- [ ] Step 7.2.3: Member ordering: members are an ordered array; `add-member` appends by default; `--at <index>` inserts; studio drag-to-reorder updates the array.
+-- [ ] Step 7.2.4: Multi-group membership supported: an entry can be a member of multiple groups simultaneously.
+-- [ ] Step 7.2.5: Cross-lane membership: members may span lanes; no lane-binding constraint on `add-member`.
+-- [ ] Step 7.2.6: Cancel propagation: cancelling a group does NOT propagate to members by default (universal-verb rule); `--cascade` is supported opt-in per PRD § Group lifecycle edge cases.
++- [x] Step 7.2.1: Author SKILL.md at `plugins/deskwork/skills/group/SKILL.md` covering: `list`, `show <slug>`, `create <slug> --lane <lane-id> [--artifact-path <path>]`, `update <slug> [--title <text>]`, `add-member <group-slug> <member-slug>`, `remove-member <group-slug> <member-slug>`, `archive <slug>`. Cancel uses the universal `/deskwork:cancel`. — shipped at `plugins/deskwork/skills/group/SKILL.md` with subcommand table, per-verb steps, defaults, error-handling catalog (one entry per refusal mode), safety rules. Universal-verb stance for cancel made explicit; the `cancel` SKILL.md was updated in parallel to document the new `--cascade` flag.
++- [x] Step 7.2.2: CLI implementation at `packages/cli/src/commands/group.ts`. — thin dispatcher (356 lines) over `@deskwork/core/groups` operations. Mirrors the lane.ts shape: `KNOWN_FLAGS` / `BOOLEAN_FLAGS` / `VERB_USAGE` / `genericUsage` / `verbUsage`. Registered in `packages/cli/src/cli.ts` immediately after `lane`. Core module landed under `packages/core/src/groups/` with per-operation files (list / show / create / update / add-member / remove-member / archive); journal-event kinds (`group-create`, `group-update`, `group-add-member`, `group-remove-member`, `group-archive`, `group-restore`) added to `JournalEventSchema`.
++- [x] Step 7.2.3: Member ordering: members are an ordered array; `add-member` appends by default; `--at <index>` inserts; studio drag-to-reorder updates the array. — `addGroupMember` defaults to append (insert at `members.length`); `--at <i>` inserts at `0 <= i <= members.length` with out-of-range and non-integer refusals. Insertion preserves slice-around-the-index ordering; covered by the per-verb test ("preserves ordering across multiple appends" + "inserts at --at"). Studio drag-to-reorder is Task 7.6's concern; the CLI primitive it sits on is shipped here.
++- [x] Step 7.2.4: Multi-group membership supported: an entry can be a member of multiple groups simultaneously. — `addGroupMember` does NOT check prior membership in other groups; same UUID can be in `members[]` of any number of groups. Removal from one group preserves the entry in the others. Covered by `add-member.test.ts` ("supports multi-group membership (Step 7.2.4)") + `remove-member.test.ts` ("removing from one group preserves membership in another (Step 7.2.4)").
++- [x] Step 7.2.5: Cross-lane membership: members may span lanes; no lane-binding constraint on `add-member`. — `addGroupMember` does NOT compare `member.lane` to `group.lane`; the verb accepts members from any lane. Covered by `add-member.test.ts` ("supports cross-lane membership (Step 7.2.5) — member in another lane") + `show.test.ts` ("enriches members in different lanes").
++- [x] Step 7.2.6: Cancel propagation: cancelling a group does NOT propagate to members by default (universal-verb rule); `--cascade` is supported opt-in per PRD § Group lifecycle edge cases. — `--cascade` boolean flag added to `packages/cli/src/commands/cancel.ts`; core-side cascade walks `members[]` and recursively cancels each (skipping members already off-pipeline or at the terminal stage rather than refusing); cascade result surfaces `cascadedMembers[]` + `skippedMembers[]` so the operator audits the walk. Documented in both the group + cancel SKILL.md files. Covered by `packages/cli/test/cancel-cascade.test.ts` (7 scenarios: default-no-propagation, cascade-cancels-all, skip-already-off-pipeline, skip-terminal, skip-missing-member-with-read-failed, no-op-on-non-group, journal events per entry).
++
++Schema delta: `archivedAt?: string` added to `EntrySchema` (`packages/core/src/schema/entry.ts`) — forward-compat field used by `group archive` (Task 7.2.1) AND settable on regular entries via the same Entry-writer path (mirrors the `LaneConfig.archivedAt` pattern shipped in Task 6.1). 5 new schema tests at `packages/core/test/schema/entry.test.ts` cover absent / present / on-non-group / rejected-malformed-datetime / rejected-non-string.
++
++**Test count deltas (Task 7.2):**
++- `@deskwork/core`: 723 → 755 (+32) — schema delta (+5), groups operations integration suite (+27).
++- `@deskwork/cli`: 327 → 400 (+73) — per-verb suites (list/show/create/update/add-member/remove-member/archive+restore) + cancel-cascade.test.ts.
++- `@deskwork/studio`: 933 (unchanged — no studio surface changes in this task; Tasks 7.3 / 7.4 / 7.6 own that).
++
++**Task 7.2 review-action follow-ups (must land before Phase 7 closeout per `.claude/rules/agent-discipline.md` "Just for now is bullshit"):**
++
++- [ ] Step 7.2.7: cascade `regenerateCalendar` N+1 perf fix — split `cancelEntry` into a private walker + public wrapper so the calendar regenerate fires once at the cascade boundary instead of N+1 times. Tracked by [#360](https://github.com/audiocontrol-org/deskwork/issues/360) (AUDIT-20260529-18 deferral from Task 7.2 code-quality review of `15dd424`). Affects `packages/core/src/entry/cancel.ts:225`; existing cascade tests pass behaviorally but a regenerate-count assertion is the missing coverage. Defer-rationale: a structural refactor of `cancelEntry` is bigger than the Task 7.2 review-action commit could absorb without confusing the audit narrative.
++- [ ] Step 7.2.8: record `cascadeFrom` on stage-transition events emitted by cascade — extend `StageTransitionEvent` (`packages/core/src/schema/journal-events.ts`) with optional `metadata.cascadeFrom`; populate it in `cancel.ts`'s cascade walk; restore the journal-events docblock paragraph claiming the linkage. Tracked by [#359](https://github.com/audiocontrol-org/deskwork/issues/359) (AUDIT-20260529-17 follow-up from Task 7.2 code-quality review of `15dd424`). Audit-trail enhancement — without it, cascade journal events are indistinguishable from single-entry cancels post-scrollback. Defer-rationale: scope-creep above what the original Task 7.2 spec required; appropriately filed for operator scope decision.
+ 
+ ### Task 7.3: Group review surface — Members section
+ 
+@@ -380,7 +392,7 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
+ - [ ] Step 7.5.2: `group-member-missing` rule: a member UUID doesn't resolve. Repair: prompts to remove the dangling reference.
+ - [ ] Step 7.5.3: `group-all-members-cancelled` informational rule: every member is in `Cancelled`; surface for operator review (cancel the group, remove cancelled members, or leave as-is).
+ - [ ] Step 7.5.4: Doctor builds a UUID → lane index once per run for efficient member-lookup-across-lanes per PRD § Risks mitigation.
+-- [ ] Step 7.5.5: `group-empty-members-array` informational rule. The schema permits both `members: undefined` and `members: []` for non-group entries (Task 7.1 deliberately left this dual representation; both shapes parse). Doctor surfaces every sidecar where `members === []` and offers a write-time normalization to remove the empty array, so downstream length-vs-presence checks converge on one canonical shape on disk. Surfaced as `informational`, not `error` — operator chooses whether to normalize. (Closes audit-log AUDIT-20260529-13; see Track 3 code-quality review of `e47ed3e`.)
++- [ ] Step 7.5.5: `group-stale-empty-members` informational rule. The Task 7.2 code-quality review action (AUDIT-20260529-16) superseded the original dual-representation framing of this step: `members: []` IS the canonical declared-empty group state (`group create` writes it; `isGroupEntry` honors it), and `members: undefined` is the canonical regular-entry shape. The schema continues to permit both shapes (Task 7.1 / AUDIT-20260529-13 stands at the schema layer), but the CLI now distinguishes them as different entities. This rule instead surfaces declared-empty groups that have been empty for longer than a configurable threshold AND have NO `group-add-member` journal events — groups created in error or abandoned mid-setup. Surfaced as `informational` (operator decides whether to cancel, archive, or populate them).
+ 
+ ### Task 7.6: Studio group-management page
+ 
+diff --git a/packages/cli/src/cli.ts b/packages/cli/src/cli.ts
+index d8fb709..923b57b 100755
+--- a/packages/cli/src/cli.ts
++++ b/packages/cli/src/cli.ts
+@@ -26,6 +26,7 @@ const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promi
+   customize: () => import('./commands/customize.ts'),
+   distribute: () => import('./commands/distribute.ts'),
+   doctor: () => import('./commands/doctor.ts'),
++  group: () => import('./commands/group.ts'),
+   induct: () => import('./commands/induct.ts'),
+   ingest: () => import('./commands/ingest.ts'),
+   install: () => import('./commands/install.ts'),
+@@ -100,6 +101,8 @@ function printUsage(): void {
+   out.write('Maintenance:\n');
+   out.write('  doctor          audit / repair calendar + sidecar + frontmatter\n');
+   out.write('  customize       copy a plugin default into .deskwork/<category>/<name>.ts\n');
++  out.write('  group           CRUD on group entries (list, show, create, update,\n');
++  out.write('                  add-member, remove-member, archive, restore)\n');
+   out.write('  lane            CRUD on lane configs (list, show, create, update,\n');
+   out.write('                  archive, restore, purge, move)\n');
+   out.write('  pipeline        CRUD on pipeline templates (list, show, create,\n');
+diff --git a/packages/cli/src/commands/cancel.ts b/packages/cli/src/commands/cancel.ts
+index c9afbcb..f084344 100644
+--- a/packages/cli/src/commands/cancel.ts
++++ b/packages/cli/src/commands/cancel.ts
+@@ -12,8 +12,17 @@
+  * signals "paused, expected to resume"; `cancel` signals "abandoned,
+  * resumption is rare".
+  *
++ * Phase 7 Task 7.2 Step 7.2.6 (graphical-entries): `--cascade` opts
++ * the operator into member-cascade behaviour for group entries (entries
++ * whose `members[]` is non-empty per Task 7.1.2). Default behaviour
++ * (no flag): the group's own stage flips to Cancelled; members are
++ * untouched. With `--cascade`: every member is also cancelled
++ * (members already off-pipeline are skipped, not refused). The flag
++ * is a no-op on non-group entries.
++ *
+  * Usage:
+- *   deskwork cancel <project-root> [--site <slug>] <slug-or-uuid> [--reason "<text>"]
++ *   deskwork cancel <project-root> [--site <slug>] <slug-or-uuid>
++ *                                   [--reason "<text>"] [--cascade]
+  */
+ 
+ import { readConfig } from '@deskwork/core/config';
+@@ -24,21 +33,22 @@ import { resolveEntryUuid } from '@deskwork/core/sidecar';
+ import type { DeskworkConfig } from '@deskwork/core/config';
+ 
+ const KNOWN_FLAGS = ['site', 'reason'] as const;
++const BOOLEAN_FLAGS = ['cascade'] as const;
+ 
+ export async function run(argv: string[]): Promise<void> {
+   let parsed;
+   try {
+-    parsed = parseArgs(argv, KNOWN_FLAGS);
++    parsed = parseArgs(argv, KNOWN_FLAGS, BOOLEAN_FLAGS);
+   } catch (err) {
+     fail(err instanceof Error ? err.message : String(err), 2);
+   }
+ 
+-  const { positional, flags } = parsed;
++  const { positional, flags, booleans } = parsed;
+ 
+   if (positional.length < 2) {
+     fail(
+       'Usage: deskwork cancel <project-root> [--site <slug>] ' +
+-        '<slug-or-uuid> [--reason "<text>"]',
++        '<slug-or-uuid> [--reason "<text>"] [--cascade]',
+       2,
+     );
+   }
+@@ -62,11 +72,13 @@ export async function run(argv: string[]): Promise<void> {
+     fail(err instanceof Error ? err.message : String(err));
+   }
+ 
++  const cascade = booleans.has('cascade');
+   let result;
+   try {
+     result = await cancelEntry(projectRoot, {
+       uuid,
+       ...(flags.reason !== undefined && { reason: flags.reason }),
++      ...(cascade && { cascade: true }),
+     });
+   } catch (err) {
+     fail(err instanceof Error ? err.message : String(err));
+@@ -79,5 +91,10 @@ export async function run(argv: string[]): Promise<void> {
+     fromStage: result.fromStage,
+     toStage: result.toStage,
+     ...(flags.reason !== undefined && { reason: flags.reason }),
++    ...(cascade && {
++      cascade: true,
++      cascadedMembers: result.cascadedMembers ?? [],
++      skippedMembers: result.skippedMembers ?? [],
++    }),
+   });
+ }
+diff --git a/packages/cli/src/commands/group.ts b/packages/cli/src/commands/group.ts
+new file mode 100644
+index 0000000..953b7b1
+--- /dev/null
++++ b/packages/cli/src/commands/group.ts
+@@ -0,0 +1,356 @@
++/**
++ * deskwork-group — CRUD operations on group entries (entries whose
++ * `members[]` is non-empty per Task 7.1.2).
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Thin dispatcher over
++ * `@deskwork/core/groups` operations:
++ *
++ *   deskwork group list                              — enumerate active groups
++ *   deskwork group list --include-archived           — include archived groups
++ *   deskwork group show <slug-or-uuid>               — show a group + its members
++ *   deskwork group create <slug> --lane <lane-id> [--artifact-path <path>]
++ *                                                    — write a new group entry
++ *   deskwork group update <slug-or-uuid> [--title <text>]
++ *                                                    — mutate group metadata
++ *   deskwork group add-member <group> <member> [--at <i>]
++ *                                                    — append (or insert at i)
++ *   deskwork group remove-member <group> <member>    — remove the member
++ *   deskwork group archive <slug-or-uuid>            — set archivedAt
++ *   deskwork group restore <slug-or-uuid>            — clear archivedAt
++ *
++ * Cancel is the universal `/deskwork:cancel` verb — group cancel does
++ * NOT live here. The `--cascade` flag on `/deskwork:cancel` is what
++ * gives operators the opt-in cascade per Step 7.2.6. See
++ * `packages/cli/src/commands/cancel.ts`.
++ *
++ * Each handler maps the parsed argv onto the matching core operation
++ * and emits a structured JSON result on stdout. Errors are routed
++ * through `fail` (stderr + non-zero exit).
++ */
++
++import {
++  absolutize,
++  emit,
++  fail,
++  parseArgs,
++  type ParsedArgs,
++} from '@deskwork/core/cli-args';
++import {
++  addGroupMember,
++  archiveGroup,
++  createGroup,
++  listGroups,
++  removeGroupMember,
++  restoreGroup,
++  showGroup,
++  updateGroup,
++} from '@deskwork/core/groups';
++
++const KNOWN_FLAGS = ['lane', 'artifact-path', 'title', 'at'] as const;
++const BOOLEAN_FLAGS = ['include-archived'] as const;
++
++const VERB_USAGE: Readonly<Record<string, string>> = {
++  list: 'deskwork group <project-root> list [--include-archived]',
++  show: 'deskwork group <project-root> show <slug-or-uuid>',
++  create:
++    'deskwork group <project-root> create <slug> --lane <lane-id> '
++    + '[--artifact-path <path>] [--title <text>]',
++  update:
++    'deskwork group <project-root> update <slug-or-uuid> [--title <text>]',
++  'add-member':
++    'deskwork group <project-root> add-member <group-slug-or-uuid> '
++    + '<member-slug-or-uuid> [--at <index>]',
++  'remove-member':
++    'deskwork group <project-root> remove-member <group-slug-or-uuid> '
++    + '<member-slug-or-uuid>',
++  archive: 'deskwork group <project-root> archive <slug-or-uuid>',
++  restore: 'deskwork group <project-root> restore <slug-or-uuid>',
++};
++
++function genericUsage(): never {
++  fail(
++    'Usage: deskwork group <project-root> <verb> [args...]\n'
++      + '  verbs: list | show | create | update | add-member | '
++      + 'remove-member | archive | restore\n'
++      + '  see `deskwork group <project-root> <verb>` for per-verb help',
++    2,
++  );
++}
++
++function verbUsage(verb: string): never {
++  const u = VERB_USAGE[verb];
++  if (u === undefined) genericUsage();
++  fail(`Usage: ${u}`, 2);
++}
++
++export async function run(argv: string[]): Promise<void> {
++  let parsed: ParsedArgs;
++  try {
++    parsed = parseArgs(argv, KNOWN_FLAGS, BOOLEAN_FLAGS);
++  } catch (err) {
++    fail(err instanceof Error ? err.message : String(err), 2);
++  }
++
++  const { positional, flags, booleans } = parsed;
++  if (positional.length < 2) genericUsage();
++
++  const [rootArg, verb, ...rest] = positional;
++  const projectRoot = absolutize(rootArg);
++
++  switch (verb) {
++    case 'list':
++      await handleList(projectRoot, booleans.has('include-archived'));
++      return;
++    case 'show':
++      await handleShow(projectRoot, rest);
++      return;
++    case 'create':
++      await handleCreate(projectRoot, rest, flags);
++      return;
++    case 'update':
++      await handleUpdate(projectRoot, rest, flags);
++      return;
++    case 'add-member':
++      await handleAddMember(projectRoot, rest, flags);
++      return;
++    case 'remove-member':
++      await handleRemoveMember(projectRoot, rest);
++      return;
++    case 'archive':
++      await handleArchive(projectRoot, rest);
++      return;
++    case 'restore':
++      await handleRestore(projectRoot, rest);
++      return;
++    default:
++      fail(
++        `Unknown group verb: ${verb}\n`
++          + '  verbs: list | show | create | update | add-member | '
++          + 'remove-member | archive | restore',
++        2,
++      );
++  }
++}
++
++async function handleList(
++  projectRoot: string,
++  includeArchived: boolean,
++): Promise<void> {
++  try {
++    const groups = await listGroups(projectRoot, { includeArchived });
++    emit({
++      groups: groups.map((g) => ({
++        uuid: g.entry.uuid,
++        slug: g.entry.slug,
++        title: g.entry.title,
++        ...(g.entry.lane !== undefined && { lane: g.entry.lane }),
++        currentStage: g.entry.currentStage,
++        memberCount: g.memberCount,
++        archived: g.archived,
++        ...(g.entry.archivedAt !== undefined && {
++          archivedAt: g.entry.archivedAt,
++        }),
++      })),
++    });
++  } catch (err) {
++    fail(err instanceof Error ? err.message : String(err));
++  }
++}
++
++async function handleShow(
++  projectRoot: string,
++  rest: string[],
++): Promise<void> {
++  if (rest.length < 1) verbUsage('show');
++  const [slug] = rest;
++  try {
++    const result = await showGroup(projectRoot, slug);
++    emit({
++      uuid: result.entry.uuid,
++      slug: result.entry.slug,
++      title: result.entry.title,
++      ...(result.entry.lane !== undefined && { lane: result.entry.lane }),
++      currentStage: result.entry.currentStage,
++      ...(result.entry.artifactPath !== undefined && {
++        artifactPath: result.entry.artifactPath,
++      }),
++      archived: result.archived,
++      ...(result.entry.archivedAt !== undefined && {
++        archivedAt: result.entry.archivedAt,
++      }),
++      members: result.members,
++      memberCount: result.members.length,
++    });
++  } catch (err) {
++    fail(err instanceof Error ? err.message : String(err));
++  }
++}
++
++async function handleCreate(
++  projectRoot: string,
++  rest: string[],
++  flags: Record<string, string>,
++): Promise<void> {
++  if (rest.length < 1) verbUsage('create');
++  const [slug] = rest;
++  if (flags['lane'] === undefined) {
++    fail('Missing required flag --lane <lane-id>', 2);
++  }
++  const lane = flags['lane'];
++  const title = flags['title'] ?? slug;
++
++  try {
++    const result = await createGroup(projectRoot, {
++      slug,
++      title,
++      lane,
++      ...(flags['artifact-path'] !== undefined && {
++        artifactPath: flags['artifact-path'],
++      }),
++    });
++    emit({
++      created: true,
++      uuid: result.entry.uuid,
++      slug: result.entry.slug,
++      title: result.entry.title,
++      lane: result.entry.lane,
++      currentStage: result.entry.currentStage,
++      ...(result.entry.artifactPath !== undefined && {
++        artifactPath: result.entry.artifactPath,
++      }),
++      members: result.entry.members ?? [],
++    });
++  } catch (err) {
++    fail(err instanceof Error ? err.message : String(err));
++  }
++}
++
++async function handleUpdate(
++  projectRoot: string,
++  rest: string[],
++  flags: Record<string, string>,
++): Promise<void> {
++  if (rest.length < 1) verbUsage('update');
++  const [slug] = rest;
++
++  try {
++    const result = await updateGroup(projectRoot, {
++      slugOrUuid: slug,
++      ...(flags['title'] !== undefined && { title: flags['title'] }),
++    });
++    emit({
++      updated: true,
++      uuid: result.entry.uuid,
++      slug: result.entry.slug,
++      title: result.entry.title,
++      changedFields: result.changedFields,
++    });
++  } catch (err) {
++    fail(err instanceof Error ? err.message : String(err));
++  }
++}
++
++async function handleAddMember(
++  projectRoot: string,
++  rest: string[],
++  flags: Record<string, string>,
++): Promise<void> {
++  if (rest.length < 2) verbUsage('add-member');
++  const [groupSlug, memberSlug] = rest;
++
++  // Parse --at into a number with a clear error message on invalid
++  // input — `parseArgs` only validates value-vs-missing, not numeric
++  // shape.
++  let at: number | undefined;
++  if (flags['at'] !== undefined) {
++    at = Number.parseInt(flags['at'], 10);
++    if (!Number.isInteger(at) || at < 0 || `${at}` !== flags['at']) {
++      fail(
++        `Invalid --at value ${JSON.stringify(flags['at'])}: must be a `
++          + 'non-negative integer (0-based insertion index).',
++        2,
++      );
++    }
++  }
++
++  try {
++    const result = await addGroupMember(projectRoot, {
++      groupSlugOrUuid: groupSlug,
++      memberSlugOrUuid: memberSlug,
++      ...(at !== undefined && { at }),
++    });
++    emit({
++      added: true,
++      groupId: result.entry.uuid,
++      groupSlug: result.entry.slug,
++      memberId: result.memberId,
++      memberSlug: result.memberSlug,
++      index: result.index,
++      members: result.members,
++    });
++  } catch (err) {
++    fail(err instanceof Error ? err.message : String(err));
++  }
++}
++
++async function handleRemoveMember(
++  projectRoot: string,
++  rest: string[],
++): Promise<void> {
++  if (rest.length < 2) verbUsage('remove-member');
++  const [groupSlug, memberSlug] = rest;
++
++  try {
++    const result = await removeGroupMember(projectRoot, {
++      groupSlugOrUuid: groupSlug,
++      memberSlugOrUuid: memberSlug,
++    });
++    emit({
++      removed: true,
++      groupId: result.entry.uuid,
++      groupSlug: result.entry.slug,
++      memberId: result.memberId,
++      memberSlug: result.memberSlug,
++      members: result.members,
++    });
++  } catch (err) {
++    fail(err instanceof Error ? err.message : String(err));
++  }
++}
++
++async function handleArchive(
++  projectRoot: string,
++  rest: string[],
++): Promise<void> {
++  if (rest.length < 1) verbUsage('archive');
++  const [slug] = rest;
++  try {
++    const result = await archiveGroup(projectRoot, slug);
++    emit({
++      archived: true,
++      uuid: result.entry.uuid,
++      slug: result.entry.slug,
++      archivedAt: result.entry.archivedAt,
++    });
++  } catch (err) {
++    fail(err instanceof Error ? err.message : String(err));
++  }
++}
++
++async function handleRestore(
++  projectRoot: string,
++  rest: string[],
++): Promise<void> {
++  if (rest.length < 1) verbUsage('restore');
++  const [slug] = rest;
++  try {
++    const result = await restoreGroup(projectRoot, slug);
++    emit({
++      restored: true,
++      uuid: result.entry.uuid,
++      slug: result.entry.slug,
++    });
++  } catch (err) {
++    fail(err instanceof Error ? err.message : String(err));
++  }
++}
+diff --git a/packages/cli/test/cancel-cascade.test.ts b/packages/cli/test/cancel-cascade.test.ts
+new file mode 100644
+index 0000000..24f76ac
+--- /dev/null
++++ b/packages/cli/test/cancel-cascade.test.ts
+@@ -0,0 +1,281 @@
++/**
++ * deskwork CLI `cancel --cascade` — group cancel propagation.
++ *
++ * Phase 7 Task 7.2 Step 7.2.6 (graphical-entries). Per the
++ * universal-verb-no-cascade rule (DESKWORK-STATE-MACHINE.md
++ * Commandment II + PRD § Group lifecycle), cancel on a group does
++ * NOT propagate to members by default. The `--cascade` flag is the
++ * operator's opt-in signal.
++ *
++ * Verifies:
++ *   - default cancel on a group leaves members untouched.
++ *   - `--cascade` cancels the group AND every member.
++ *   - members already off-pipeline are SKIPPED (not refused).
++ *   - non-group entries ignore `--cascade` (no-op).
++ *   - missing-member UUIDs surface as skipped reads rather than aborting.
++ */
++
++import { describe, it, expect, beforeEach, afterEach } from 'vitest';
++import { spawnSync } from 'node:child_process';
++import {
++  mkdirSync,
++  mkdtempSync,
++  readFileSync,
++  readdirSync,
++  rmSync,
++  writeFileSync,
++} from 'node:fs';
++import { tmpdir } from 'node:os';
++import { dirname, join, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const testDir = dirname(fileURLToPath(import.meta.url));
++const workspaceRoot = resolve(testDir, '../../..');
++const deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork');
++
++let project: string;
++
++beforeEach(() => {
++  project = mkdtempSync(join(tmpdir(), 'dw-cancel-cascade-'));
++  mkdirSync(join(project, '.deskwork', 'entries'), { recursive: true });
++  mkdirSync(join(project, '.deskwork', 'lanes'), { recursive: true });
++  writeFileSync(
++    join(project, '.deskwork', 'config.json'),
++    JSON.stringify({
++      version: 1,
++      sites: {
++        main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' },
++      },
++      defaultSite: 'main',
++    }),
++    'utf-8',
++  );
++  writeFileSync(
++    join(project, '.deskwork', 'calendar.md'),
++    '# Editorial Calendar\n\n## Ideas\n\n*No entries.*\n',
++    'utf-8',
++  );
++  writeFileSync(
++    join(project, '.deskwork', 'lanes', 'default.json'),
++    JSON.stringify({
++      id: 'default',
++      name: 'Default',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    }),
++    'utf-8',
++  );
++});
++
++afterEach(() => { rmSync(project, { recursive: true, force: true }); });
++
++interface SidecarOpts {
++  readonly members?: readonly string[];
++  readonly currentStage?: string;
++}
++
++function writeSidecar(
++  uuid: string,
++  slug: string,
++  opts: SidecarOpts = {},
++): void {
++  writeFileSync(
++    join(project, '.deskwork', 'entries', `${uuid}.json`),
++    JSON.stringify({
++      uuid,
++      slug,
++      title: slug,
++      keywords: [],
++      source: 'manual',
++      currentStage: opts.currentStage ?? 'Drafting',
++      iterationByStage: {},
++      lane: 'default',
++      ...(opts.members !== undefined && { members: opts.members }),
++      createdAt: new Date().toISOString(),
++      updatedAt: new Date().toISOString(),
++    }),
++    'utf-8',
++  );
++}
++
++function readSidecar(uuid: string): Record<string, unknown> {
++  return JSON.parse(
++    readFileSync(join(project, '.deskwork', 'entries', `${uuid}.json`), 'utf-8'),
++  );
++}
++
++interface RunResult {
++  readonly code: number;
++  readonly stdout: string;
++  readonly stderr: string;
++}
++
++function cancel(slug: string, ...extra: string[]): RunResult {
++  const r = spawnSync(
++    deskworkBin,
++    ['cancel', project, slug, ...extra],
++    { encoding: 'utf-8' },
++  );
++  return {
++    code: r.status ?? -1,
++    stdout: r.stdout ?? '',
++    stderr: r.stderr ?? '',
++  };
++}
++
++describe('deskwork cancel --cascade', () => {
++  const groupUuid = '550e8400-e29b-41d4-a716-446655440701';
++  const memberA = '550e8400-e29b-41d4-a716-446655440702';
++  const memberB = '550e8400-e29b-41d4-a716-446655440703';
++
++  it('default behaviour: cancel on a group does NOT propagate to members', () => {
++    writeSidecar(memberA, 'm-a', { currentStage: 'Drafting' });
++    writeSidecar(memberB, 'm-b', { currentStage: 'Outlining' });
++    writeSidecar(groupUuid, 'my-group', {
++      members: [memberA, memberB],
++      currentStage: 'Drafting',
++    });
++
++    const res = cancel('my-group');
++    expect(res.code).toBe(0);
++
++    // Group cancelled
++    expect(readSidecar(groupUuid)['currentStage']).toBe('Cancelled');
++    // Members UNTOUCHED
++    expect(readSidecar(memberA)['currentStage']).toBe('Drafting');
++    expect(readSidecar(memberB)['currentStage']).toBe('Outlining');
++  });
++
++  it('--cascade: cancels the group AND every member', () => {
++    writeSidecar(memberA, 'm-a', { currentStage: 'Drafting' });
++    writeSidecar(memberB, 'm-b', { currentStage: 'Outlining' });
++    writeSidecar(groupUuid, 'my-group', {
++      members: [memberA, memberB],
++      currentStage: 'Drafting',
++    });
++
++    const res = cancel('my-group', '--cascade');
++    expect(res.stderr).toBe('');
++    expect(res.code).toBe(0);
++
++    expect(readSidecar(groupUuid)['currentStage']).toBe('Cancelled');
++    expect(readSidecar(memberA)['currentStage']).toBe('Cancelled');
++    expect(readSidecar(memberB)['currentStage']).toBe('Cancelled');
++
++    const parsed = JSON.parse(res.stdout) as {
++      cascade: boolean;
++      cascadedMembers: Array<{ slug: string }>;
++      skippedMembers: unknown[];
++    };
++    expect(parsed.cascade).toBe(true);
++    expect(parsed.cascadedMembers.map((m) => m.slug).sort()).toEqual(['m-a', 'm-b']);
++    expect(parsed.skippedMembers).toHaveLength(0);
++  });
++
++  it('--cascade: skips members already off-pipeline (Cancelled / Blocked)', () => {
++    writeSidecar(memberA, 'm-a', { currentStage: 'Cancelled' });
++    writeSidecar(memberB, 'm-b', { currentStage: 'Drafting' });
++    writeSidecar(groupUuid, 'my-group', {
++      members: [memberA, memberB],
++      currentStage: 'Drafting',
++    });
++
++    const res = cancel('my-group', '--cascade');
++    expect(res.code).toBe(0);
++
++    const parsed = JSON.parse(res.stdout) as {
++      cascadedMembers: Array<{ slug: string }>;
++      skippedMembers: Array<{ slug: string; reason: string }>;
++    };
++    expect(parsed.cascadedMembers.map((m) => m.slug)).toEqual(['m-b']);
++    expect(parsed.skippedMembers).toHaveLength(1);
++    expect(parsed.skippedMembers[0].slug).toBe('m-a');
++    expect(parsed.skippedMembers[0].reason).toMatch(/already off-pipeline/);
++  });
++
++  it('--cascade: skips members at the terminal stage (Published)', () => {
++    writeSidecar(memberA, 'm-a-pub', { currentStage: 'Published' });
++    writeSidecar(memberB, 'm-b-draft', { currentStage: 'Drafting' });
++    writeSidecar(groupUuid, 'my-group', {
++      members: [memberA, memberB],
++      currentStage: 'Drafting',
++    });
++
++    const res = cancel('my-group', '--cascade');
++    expect(res.code).toBe(0);
++
++    const parsed = JSON.parse(res.stdout) as {
++      skippedMembers: Array<{ slug: string; reason: string }>;
++    };
++    const pubSkip = parsed.skippedMembers.find((m) => m.slug === 'm-a-pub');
++    expect(pubSkip).toBeDefined();
++    expect(pubSkip?.reason).toMatch(/terminal/);
++    // The Published member's stage is preserved
++    expect(readSidecar(memberA)['currentStage']).toBe('Published');
++  });
++
++  it('--cascade: missing member UUID surfaces as a skipped read', () => {
++    const missing = '550e8400-e29b-41d4-a716-446655440799';
++    writeSidecar(memberA, 'm-a-present', { currentStage: 'Drafting' });
++    writeSidecar(groupUuid, 'dangling-group', {
++      members: [memberA, missing],
++      currentStage: 'Drafting',
++    });
++
++    const res = cancel('dangling-group', '--cascade');
++    expect(res.code).toBe(0);
++
++    const parsed = JSON.parse(res.stdout) as {
++      cascadedMembers: Array<{ slug: string }>;
++      skippedMembers: Array<{ slug: string; reason: string }>;
++    };
++    expect(parsed.cascadedMembers.map((m) => m.slug)).toEqual(['m-a-present']);
++    expect(parsed.skippedMembers).toHaveLength(1);
++    expect(parsed.skippedMembers[0].reason).toMatch(/read failed/);
++  });
++
++  it('--cascade is a no-op on non-group entries (no members[])', () => {
++    writeSidecar('550e8400-e29b-41d4-a716-446655440801', 'plain', {
++      currentStage: 'Drafting',
++    });
++    const res = cancel('plain', '--cascade');
++    expect(res.code).toBe(0);
++
++    const parsed = JSON.parse(res.stdout) as {
++      cascade: boolean;
++      cascadedMembers: unknown[];
++      skippedMembers: unknown[];
++    };
++    expect(parsed.cascade).toBe(true);
++    expect(parsed.cascadedMembers).toEqual([]);
++    expect(parsed.skippedMembers).toEqual([]);
++  });
++
++  it('--cascade emits stage-transition events for every member', () => {
++    writeSidecar(memberA, 'evt-a', { currentStage: 'Drafting' });
++    writeSidecar(memberB, 'evt-b', { currentStage: 'Outlining' });
++    writeSidecar(groupUuid, 'evt-group', {
++      members: [memberA, memberB],
++      currentStage: 'Drafting',
++    });
++
++    cancel('evt-group', '--cascade');
++
++    const dir = join(project, '.deskwork', 'review-journal', 'history');
++    const events = readdirSync(dir).map((name) =>
++      JSON.parse(readFileSync(join(dir, name), 'utf-8')) as {
++        kind: string;
++        to?: string;
++        entryId?: string;
++      },
++    );
++    const transitions = events.filter((e) => e.kind === 'stage-transition');
++    // Three transitions: one per entry (group + two members)
++    expect(transitions).toHaveLength(3);
++    const cancelled = transitions
++      .filter((e) => e.to === 'Cancelled')
++      .map((e) => e.entryId)
++      .sort();
++    expect(cancelled).toEqual([groupUuid, memberA, memberB].sort());
++  });
++});
+diff --git a/packages/cli/test/group/add-member.test.ts b/packages/cli/test/group/add-member.test.ts
+new file mode 100644
+index 0000000..ed661c4
+--- /dev/null
++++ b/packages/cli/test/group/add-member.test.ts
+@@ -0,0 +1,236 @@
++/**
++ * deskwork CLI `group add-member` verb.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Verifies append/insert
++ * semantics, multi-group + cross-lane membership, duplicate
++ * refusal, self-membership refusal, and out-of-range index
++ * refusal.
++ */
++
++import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
++import {
++  addLane,
++  assertDeskworkBinPresent,
++  destroyProject,
++  group,
++  listJournalEvents,
++  makeProject,
++  readSidecar,
++  writeSidecar,
++} from './helpers.ts';
++
++beforeAll(() => { assertDeskworkBinPresent(); });
++
++let project: string;
++beforeEach(() => { project = makeProject(); });
++afterEach(() => { destroyProject(project); });
++
++describe('deskwork group add-member', () => {
++  function fixture(): {
++    groupUuid: string;
++    memberA: string;
++    memberB: string;
++    memberC: string;
++  } {
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440401';
++    const memberA = '550e8400-e29b-41d4-a716-446655440411';
++    const memberB = '550e8400-e29b-41d4-a716-446655440412';
++    const memberC = '550e8400-e29b-41d4-a716-446655440413';
++    writeSidecar(project, memberA, 'member-a');
++    writeSidecar(project, memberB, 'member-b');
++    writeSidecar(project, memberC, 'member-c');
++    writeSidecar(project, groupUuid, 'g', { members: [] });
++    return { groupUuid, memberA, memberB, memberC };
++  }
++
++  it('appends a member by default', () => {
++    const { groupUuid, memberA } = fixture();
++    const res = group(project, 'add-member', 'g', 'member-a');
++    expect(res.stderr).toBe('');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      added: boolean;
++      memberId: string;
++      memberSlug: string;
++      index: number;
++      members: string[];
++    };
++    expect(parsed.added).toBe(true);
++    expect(parsed.memberId).toBe(memberA);
++    expect(parsed.memberSlug).toBe('member-a');
++    expect(parsed.index).toBe(0);
++    expect(parsed.members).toEqual([memberA]);
++    expect((readSidecar(project, groupUuid)['members'] as unknown[]))
++      .toEqual([memberA]);
++  });
++
++  it('preserves ordering across multiple appends', () => {
++    const { memberA, memberB, memberC } = fixture();
++    group(project, 'add-member', 'g', 'member-a');
++    group(project, 'add-member', 'g', 'member-b');
++    group(project, 'add-member', 'g', 'member-c');
++    const show = group(project, 'show', 'g');
++    const parsed = JSON.parse(show.stdout) as {
++      members: Array<{ uuid: string }>;
++    };
++    expect(parsed.members.map((m) => m.uuid)).toEqual([memberA, memberB, memberC]);
++  });
++
++  it('inserts at --at <index>', () => {
++    const { memberA, memberB, memberC } = fixture();
++    group(project, 'add-member', 'g', 'member-a');
++    group(project, 'add-member', 'g', 'member-c');
++    const res = group(
++      project,
++      'add-member', 'g', 'member-b',
++      '--at', '1',
++    );
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      index: number;
++      members: string[];
++    };
++    expect(parsed.index).toBe(1);
++    expect(parsed.members).toEqual([memberA, memberB, memberC]);
++  });
++
++  it('accepts --at <members.length> as the explicit append position', () => {
++    const { memberA, memberB } = fixture();
++    group(project, 'add-member', 'g', 'member-a');
++    const res = group(
++      project,
++      'add-member', 'g', 'member-b',
++      '--at', '1',
++    );
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { members: string[] };
++    expect(parsed.members).toEqual([memberA, memberB]);
++  });
++
++  it('emits a group-add-member journal event with the index', () => {
++    fixture();
++    group(project, 'add-member', 'g', 'member-a');
++    const events = listJournalEvents(project);
++    const added = events.filter((e) => e['kind'] === 'group-add-member');
++    expect(added).toHaveLength(1);
++    const details = added[0]['details'] as Record<string, unknown>;
++    expect(details['memberSlug']).toBe('member-a');
++    expect(details['index']).toBe(0);
++  });
++
++  it('refuses --at <out-of-range>', () => {
++    fixture();
++    const res = group(
++      project,
++      'add-member', 'g', 'member-a',
++      '--at', '5',
++    );
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/--at 5 is out of range/);
++  });
++
++  it('refuses --at <negative>', () => {
++    fixture();
++    const res = group(
++      project,
++      'add-member', 'g', 'member-a',
++      '--at', '-1',
++    );
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Invalid --at value/);
++  });
++
++  it('refuses --at <not-an-integer>', () => {
++    fixture();
++    const res = group(
++      project,
++      'add-member', 'g', 'member-a',
++      '--at', '1.5',
++    );
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Invalid --at value/);
++  });
++
++  it('refuses duplicates within the same group', () => {
++    fixture();
++    const first = group(project, 'add-member', 'g', 'member-a');
++    expect(first.code).toBe(0);
++    const second = group(project, 'add-member', 'g', 'member-a');
++    expect(second.code).not.toBe(0);
++    expect(second.stderr).toMatch(/already in this group/);
++  });
++
++  it('refuses self-membership', () => {
++    const { groupUuid } = fixture();
++    const res = group(project, 'add-member', 'g', groupUuid);
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/refused self-membership/);
++  });
++
++  it('refuses against a non-group entry (no members field)', () => {
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440451', 'regular');
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440452', 'target');
++    const res = group(project, 'add-member', 'regular', 'target');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/entry has no `members` field/);
++  });
++
++  it('refuses when the member does not resolve', () => {
++    fixture();
++    const res = group(project, 'add-member', 'g', 'no-such-slug');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/'no-such-slug' not found/);
++  });
++
++  // Step 7.2.4 — multi-group membership. An entry can be a member of
++  // multiple groups simultaneously; the verb does NOT check for prior
++  // membership in another group.
++  it('supports multi-group membership (Step 7.2.4)', () => {
++    const memberShared = '550e8400-e29b-41d4-a716-446655440461';
++    const groupOne = '550e8400-e29b-41d4-a716-446655440462';
++    const groupTwo = '550e8400-e29b-41d4-a716-446655440463';
++    writeSidecar(project, memberShared, 'shared-member');
++    writeSidecar(project, groupOne, 'group-one', { members: [] });
++    writeSidecar(project, groupTwo, 'group-two', { members: [] });
++
++    const r1 = group(project, 'add-member', 'group-one', 'shared-member');
++    expect(r1.code).toBe(0);
++    const r2 = group(project, 'add-member', 'group-two', 'shared-member');
++    expect(r2.code).toBe(0);
++
++    // Both groups now carry the same member UUID.
++    expect((readSidecar(project, groupOne)['members'] as unknown[]))
++      .toEqual([memberShared]);
++    expect((readSidecar(project, groupTwo)['members'] as unknown[]))
++      .toEqual([memberShared]);
++  });
++
++  // Step 7.2.5 — cross-lane membership. The verb does NOT check that
++  // the member's `lane` matches the group's `lane`.
++  it('supports cross-lane membership (Step 7.2.5) — member in another lane', () => {
++    addLane(project, 'mockups');
++    const memberDefault = '550e8400-e29b-41d4-a716-446655440471';
++    const memberMockups = '550e8400-e29b-41d4-a716-446655440472';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440473';
++    writeSidecar(project, memberDefault, 'm-default', { lane: 'default' });
++    writeSidecar(project, memberMockups, 'm-mockups', { lane: 'mockups' });
++    writeSidecar(project, groupUuid, 'cross-group', {
++      lane: 'default',
++      members: [],
++    });
++
++    const r1 = group(project, 'add-member', 'cross-group', 'm-default');
++    expect(r1.code).toBe(0);
++    const r2 = group(project, 'add-member', 'cross-group', 'm-mockups');
++    expect(r2.code).toBe(0);
++
++    const onDisk = readSidecar(project, groupUuid)['members'] as unknown[];
++    expect(onDisk).toEqual([memberDefault, memberMockups]);
++  });
++
++  it('refuses when positionals are missing', () => {
++    const res = group(project, 'add-member', 'only-one');
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Usage: deskwork group/);
++  });
++});
+diff --git a/packages/cli/test/group/archive.test.ts b/packages/cli/test/group/archive.test.ts
+new file mode 100644
+index 0000000..e2faa66
+--- /dev/null
++++ b/packages/cli/test/group/archive.test.ts
+@@ -0,0 +1,132 @@
++/**
++ * deskwork CLI `group archive` + `group restore` verbs.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Verifies the soft-archive
++ * shape (`archivedAt` set / cleared), the already-archived /
++ * not-archived refusals, and the not-a-group refusal.
++ */
++
++import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
++import {
++  assertDeskworkBinPresent,
++  destroyProject,
++  group,
++  listJournalEvents,
++  makeProject,
++  readSidecar,
++  writeSidecar,
++} from './helpers.ts';
++
++beforeAll(() => { assertDeskworkBinPresent(); });
++
++let project: string;
++beforeEach(() => { project = makeProject(); });
++afterEach(() => { destroyProject(project); });
++
++describe('deskwork group archive', () => {
++  function fixture(): { groupUuid: string } {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440601';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440602';
++    writeSidecar(project, memberUuid, 'a-member');
++    writeSidecar(project, groupUuid, 'arch-target', { members: [memberUuid] });
++    return { groupUuid };
++  }
++
++  it('sets archivedAt on archive', () => {
++    const { groupUuid } = fixture();
++    const res = group(project, 'archive', 'arch-target');
++    expect(res.stderr).toBe('');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      archived: boolean;
++      archivedAt: string;
++    };
++    expect(parsed.archived).toBe(true);
++    expect(parsed.archivedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
++    const onDisk = readSidecar(project, groupUuid)['archivedAt'];
++    expect(typeof onDisk).toBe('string');
++  });
++
++  it('emits a group-archive journal event', () => {
++    fixture();
++    group(project, 'archive', 'arch-target');
++    const events = listJournalEvents(project);
++    const archives = events.filter((e) => e['kind'] === 'group-archive');
++    expect(archives).toHaveLength(1);
++    expect((archives[0]['details'] as Record<string, unknown>)['archivedAt'])
++      .toMatch(/^\d{4}-\d{2}-\d{2}T/);
++  });
++
++  it('refuses already-archived groups', () => {
++    fixture();
++    const first = group(project, 'archive', 'arch-target');
++    expect(first.code).toBe(0);
++    const second = group(project, 'archive', 'arch-target');
++    expect(second.code).not.toBe(0);
++    expect(second.stderr).toMatch(/already archived/);
++  });
++
++  it('refuses against a non-group entry', () => {
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440611', 'regular');
++    const res = group(project, 'archive', 'regular');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/entry has no `members` field/);
++  });
++
++  it('refuses when the slug positional is missing', () => {
++    const res = group(project, 'archive');
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Usage: deskwork group/);
++  });
++});
++
++describe('deskwork group restore', () => {
++  function fixture(): { groupUuid: string } {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440621';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440622';
++    writeSidecar(project, memberUuid, 'a-member-2');
++    writeSidecar(project, groupUuid, 'rest-target', {
++      members: [memberUuid],
++      archivedAt: '2026-05-28T10:00:00.000Z',
++    });
++    return { groupUuid };
++  }
++
++  it('clears archivedAt on restore', () => {
++    const { groupUuid } = fixture();
++    const res = group(project, 'restore', 'rest-target');
++    expect(res.stderr).toBe('');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { restored: boolean; slug: string };
++    expect(parsed.restored).toBe(true);
++    expect(parsed.slug).toBe('rest-target');
++    expect(readSidecar(project, groupUuid)['archivedAt']).toBeUndefined();
++  });
++
++  it('emits a group-restore journal event', () => {
++    fixture();
++    group(project, 'restore', 'rest-target');
++    const events = listJournalEvents(project);
++    const restores = events.filter((e) => e['kind'] === 'group-restore');
++    expect(restores).toHaveLength(1);
++  });
++
++  it('refuses non-archived groups', () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440631';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440632';
++    writeSidecar(project, memberUuid, 'm-restore');
++    writeSidecar(project, groupUuid, 'active-group', { members: [memberUuid] });
++    const res = group(project, 'restore', 'active-group');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/not archived/);
++  });
++
++  it('refuses against a non-group entry', () => {
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440641', 'plain', {
++      archivedAt: '2026-05-28T10:00:00.000Z',
++    });
++    const res = group(project, 'restore', 'plain');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/entry has no `members` field/);
++  });
++});
+diff --git a/packages/cli/test/group/create.test.ts b/packages/cli/test/group/create.test.ts
+new file mode 100644
+index 0000000..e418ebd
+--- /dev/null
++++ b/packages/cli/test/group/create.test.ts
+@@ -0,0 +1,162 @@
++/**
++ * deskwork CLI `group create` verb.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Verifies the new-group
++ * sidecar shape (members: [] intent-marker, lane binding, default
++ * stage), slug-collision refusal, archived-lane refusal, and
++ * missing-flag refusals.
++ */
++
++import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
++import {
++  addLane,
++  assertDeskworkBinPresent,
++  destroyProject,
++  group,
++  listJournalEvents,
++  listSidecarUuids,
++  makeProject,
++  readSidecar,
++  writeSidecar,
++} from './helpers.ts';
++
++beforeAll(() => { assertDeskworkBinPresent(); });
++
++let project: string;
++beforeEach(() => { project = makeProject(); });
++afterEach(() => { destroyProject(project); });
++
++describe('deskwork group create', () => {
++  it('writes a new group sidecar with members: []', () => {
++    const before = listSidecarUuids(project);
++    const res = group(project, 'create', 'my-new-group', '--lane', 'default');
++    expect(res.stderr).toBe('');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      created: boolean;
++      slug: string;
++      lane: string;
++      currentStage: string;
++      members: string[];
++    };
++    expect(parsed.created).toBe(true);
++    expect(parsed.slug).toBe('my-new-group');
++    expect(parsed.lane).toBe('default');
++    expect(parsed.currentStage).toBe('Ideas'); // editorial preset's first linearStage
++    expect(parsed.members).toEqual([]);
++
++    const after = listSidecarUuids(project);
++    expect(after.length).toBe(before.length + 1);
++
++    // Find the new sidecar and verify the on-disk shape.
++    const newUuids = after.filter((u) => !before.includes(u));
++    expect(newUuids).toHaveLength(1);
++    const sidecar = readSidecar(project, newUuids[0]);
++    expect(sidecar['slug']).toBe('my-new-group');
++    expect(sidecar['members']).toEqual([]);
++    expect(sidecar['lane']).toBe('default');
++  });
++
++  it('defaults --title to the slug when omitted', () => {
++    const res = group(project, 'create', 'untitled-group', '--lane', 'default');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { title: string };
++    expect(parsed.title).toBe('untitled-group');
++  });
++
++  it('uses --title when supplied', () => {
++    const res = group(
++      project,
++      'create', 'titled-group',
++      '--lane', 'default',
++      '--title', 'A Nice Title',
++    );
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { title: string };
++    expect(parsed.title).toBe('A Nice Title');
++  });
++
++  it('binds --artifact-path on the new entry', () => {
++    const res = group(
++      project,
++      'create', 'with-artifact',
++      '--lane', 'default',
++      '--artifact-path', 'docs/with-artifact.md',
++    );
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { artifactPath?: string };
++    expect(parsed.artifactPath).toBe('docs/with-artifact.md');
++  });
++
++  it('emits a group-create journal event', () => {
++    group(project, 'create', 'event-group', '--lane', 'default');
++    const events = listJournalEvents(project);
++    const created = events.filter((e) => e['kind'] === 'group-create');
++    expect(created).toHaveLength(1);
++    expect((created[0]['details'] as Record<string, unknown>)['slug'])
++      .toBe('event-group');
++  });
++
++  it('refuses when the slug already exists', () => {
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440201', 'collide');
++    const res = group(project, 'create', 'collide', '--lane', 'default');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/slug collision/);
++  });
++
++  it('refuses when --lane is missing', () => {
++    const res = group(project, 'create', 'no-lane');
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Missing required flag --lane/);
++  });
++
++  it('refuses when the lane does not exist', () => {
++    const res = group(
++      project,
++      'create', 'phantom-lane-group',
++      '--lane', 'no-such-lane',
++    );
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/Lane config "no-such-lane" not found/);
++  });
++
++  it('refuses when the lane is archived', () => {
++    addLane(project, 'archived-lane', {
++      contentDir: 'docs-archived',
++      archivedAt: '2026-05-28T10:00:00.000Z',
++    });
++    const res = group(
++      project,
++      'create', 'into-archived',
++      '--lane', 'archived-lane',
++    );
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/archived lane "archived-lane"/);
++  });
++
++  it('refuses when the slug positional is missing', () => {
++    const res = group(project, 'create', '--lane', 'default');
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Usage: deskwork group/);
++  });
++
++  it('create -> list round-trip: the new group appears in list output immediately', () => {
++    // Regression test for the empty-members discoverability bug
++    // surfaced by the Task 7.2 code-quality review (HIGH-1).
++    // Pre-fix: `group create` wrote `members: []` but `group list`
++    // filtered on length>0, so the new group was invisible. Post-fix:
++    // `isGroupEntry` checks `members`-field-present, so the new group
++    // surfaces in `list` with `memberCount: 0`. Closes review finding
++    // MED-4 (test gap that would have caught HIGH-1 on its own).
++    const createRes = group(project, 'create', 'round-trip-group', '--lane', 'default');
++    expect(createRes.code).toBe(0);
++    const listRes = group(project, 'list');
++    expect(listRes.code).toBe(0);
++    const parsed = JSON.parse(listRes.stdout) as {
++      groups: Array<{ slug: string; memberCount: number }>;
++    };
++    const found = parsed.groups.find((g) => g.slug === 'round-trip-group');
++    expect(found).toBeDefined();
++    expect(found?.memberCount).toBe(0);
++  });
++});
+diff --git a/packages/cli/test/group/helpers.ts b/packages/cli/test/group/helpers.ts
+new file mode 100644
+index 0000000..371a501
+--- /dev/null
++++ b/packages/cli/test/group/helpers.ts
+@@ -0,0 +1,219 @@
++/**
++ * Shared test helpers for the `deskwork group` CLI tests.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Co-located with the per-verb
++ * test files under `test/group/`. The tmp-fixture project + lane JSON
++ * writer + sidecar writer + subprocess runner are factored here so
++ * each per-verb test file stays focused on one verb's behavior.
++ *
++ * The fixture intentionally creates a real lane config + the
++ * editorial pipeline preset (resolves via the @deskwork/core
++ * pipelines loader) so the group operations exercise the full
++ * lane-template path. No mocks.
++ */
++
++import { spawnSync } from 'node:child_process';
++import {
++  existsSync,
++  mkdirSync,
++  mkdtempSync,
++  readFileSync,
++  readdirSync,
++  rmSync,
++  writeFileSync,
++} from 'node:fs';
++import { tmpdir } from 'node:os';
++import { dirname, join, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const testDir = dirname(fileURLToPath(import.meta.url));
++const workspaceRoot = resolve(testDir, '../../../..');
++export const deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork');
++
++export function assertDeskworkBinPresent(): void {
++  if (!existsSync(deskworkBin)) {
++    throw new Error(
++      `deskwork binary not found at ${deskworkBin} — run npm install at the `
++        + `workspace root before running group tests.`,
++    );
++  }
++}
++
++export interface RunResult {
++  readonly code: number;
++  readonly stdout: string;
++  readonly stderr: string;
++}
++
++/**
++ * Tmp project root with a `default` lane bound to the editorial
++ * preset. The default lane's contentDir is `docs/`; suitable for
++ * tests that don't need a second lane.
++ */
++export function makeProject(): string {
++  const project = mkdtempSync(join(tmpdir(), 'dw-group-'));
++  mkdirSync(join(project, '.deskwork', 'entries'), { recursive: true });
++  mkdirSync(join(project, '.deskwork', 'lanes'), { recursive: true });
++  writeFileSync(
++    join(project, '.deskwork', 'config.json'),
++    JSON.stringify({
++      version: 1,
++      sites: {
++        main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' },
++      },
++      defaultSite: 'main',
++    }),
++    'utf-8',
++  );
++  writeFileSync(
++    join(project, '.deskwork', 'calendar.md'),
++    '# Editorial Calendar\n\n## Ideas\n\n*No entries.*\n',
++    'utf-8',
++  );
++  writeFileSync(
++    join(project, '.deskwork', 'lanes', 'default.json'),
++    JSON.stringify({
++      id: 'default',
++      name: 'Default',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    }),
++    'utf-8',
++  );
++  return project;
++}
++
++export function destroyProject(project: string): void {
++  rmSync(project, { recursive: true, force: true });
++}
++
++/**
++ * Write a second lane with a custom name. Useful for cross-lane
++ * membership tests. Defaults to the editorial preset; pass a
++ * `pipelineTemplate` override for tests that need a different
++ * stage vocabulary. Pass `archivedAt` to write a lane marked as
++ * archived.
++ */
++export function addLane(
++  project: string,
++  id: string,
++  opts: {
++    name?: string;
++    pipelineTemplate?: string;
++    contentDir?: string;
++    archivedAt?: string;
++  } = {},
++): void {
++  writeFileSync(
++    join(project, '.deskwork', 'lanes', `${id}.json`),
++    JSON.stringify({
++      id,
++      name: opts.name ?? id,
++      pipelineTemplate: opts.pipelineTemplate ?? 'editorial',
++      contentDir: opts.contentDir ?? `docs-${id}`,
++      ...(opts.archivedAt !== undefined && { archivedAt: opts.archivedAt }),
++    }),
++    'utf-8',
++  );
++}
++
++export function group(project: string, ...args: string[]): RunResult {
++  const r = spawnSync(
++    deskworkBin,
++    ['group', project, ...args],
++    { encoding: 'utf-8' },
++  );
++  return {
++    code: r.status ?? -1,
++    stdout: r.stdout ?? '',
++    stderr: r.stderr ?? '',
++  };
++}
++
++export function cancel(project: string, ...args: string[]): RunResult {
++  const r = spawnSync(
++    deskworkBin,
++    ['cancel', project, ...args],
++    { encoding: 'utf-8' },
++  );
++  return {
++    code: r.status ?? -1,
++    stdout: r.stdout ?? '',
++    stderr: r.stderr ?? '',
++  };
++}
++
++export interface SidecarShape {
++  readonly uuid: string;
++  readonly slug: string;
++  readonly title?: string;
++  readonly currentStage?: string;
++  readonly lane?: string;
++  readonly members?: readonly string[];
++  readonly artifactPath?: string;
++  readonly archivedAt?: string;
++}
++
++/**
++ * Write a sidecar with sensible defaults. The default `currentStage`
++ * is `Ideas` so the entry sits on the linear pipeline (cancel will
++ * accept it without further setup).
++ */
++export function writeSidecar(
++  project: string,
++  uuid: string,
++  slug: string,
++  opts: Omit<SidecarShape, 'uuid' | 'slug'> = {},
++): void {
++  writeFileSync(
++    join(project, '.deskwork', 'entries', `${uuid}.json`),
++    JSON.stringify({
++      uuid,
++      slug,
++      title: opts.title ?? slug,
++      keywords: [],
++      source: 'manual',
++      currentStage: opts.currentStage ?? 'Ideas',
++      iterationByStage: {},
++      lane: opts.lane ?? 'default',
++      ...(opts.members !== undefined && { members: opts.members }),
++      ...(opts.artifactPath !== undefined && { artifactPath: opts.artifactPath }),
++      ...(opts.archivedAt !== undefined && { archivedAt: opts.archivedAt }),
++      createdAt: new Date().toISOString(),
++      updatedAt: new Date().toISOString(),
++    }),
++    'utf-8',
++  );
++}
++
++export function readSidecar(
++  project: string,
++  uuid: string,
++): Record<string, unknown> {
++  return JSON.parse(
++    readFileSync(join(project, '.deskwork', 'entries', `${uuid}.json`), 'utf-8'),
++  );
++}
++
++export function listJournalEvents(
++  project: string,
++): Array<Record<string, unknown>> {
++  const dir = join(project, '.deskwork', 'review-journal', 'history');
++  if (!existsSync(dir)) return [];
++  return readdirSync(dir).map((name) =>
++    JSON.parse(readFileSync(join(dir, name), 'utf-8')),
++  );
++}
++
++/**
++ * Convenience: enumerate the sidecar UUIDs in the project. Useful
++ * for `create` tests that need to find the freshly-written sidecar
++ * without knowing the generated UUID up front.
++ */
++export function listSidecarUuids(project: string): string[] {
++  const dir = join(project, '.deskwork', 'entries');
++  if (!existsSync(dir)) return [];
++  return readdirSync(dir)
++    .filter((f) => f.endsWith('.json'))
++    .map((f) => f.slice(0, -'.json'.length));
++}
+diff --git a/packages/cli/test/group/list.test.ts b/packages/cli/test/group/list.test.ts
+new file mode 100644
+index 0000000..3dfdf60
+--- /dev/null
++++ b/packages/cli/test/group/list.test.ts
+@@ -0,0 +1,155 @@
++/**
++ * deskwork CLI `group list` verb.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Verifies the "non-empty
++ * members[] => group" filter, the archived-default exclusion, and
++ * the `--include-archived` opt-in.
++ */
++
++import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
++import {
++  assertDeskworkBinPresent,
++  destroyProject,
++  group,
++  makeProject,
++  writeSidecar,
++} from './helpers.ts';
++
++beforeAll(() => { assertDeskworkBinPresent(); });
++
++let project: string;
++beforeEach(() => { project = makeProject(); });
++afterEach(() => { destroyProject(project); });
++
++describe('deskwork group list', () => {
++  it('emits an empty array when no groups exist', () => {
++    const res = group(project, 'list');
++    expect(res.stderr).toBe('');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { groups: unknown[] };
++    expect(parsed.groups).toEqual([]);
++  });
++
++  it('skips entries without a members field', () => {
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440001', 'regular');
++    const res = group(project, 'list');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { groups: unknown[] };
++    expect(parsed.groups).toEqual([]);
++  });
++
++  it('includes empty-members groups (members: [] is the declared-empty marker, not a regular entry)', () => {
++    // Per the Task 7.2 review action superseding AUDIT-20260529-13:
++    // an entry with `members: []` IS a group (just not populated yet)
++    // — `group create` writes this shape so the dashboard surfaces
++    // the new group immediately. `members: undefined` denotes a
++    // regular entry, which IS correctly filtered out by `list`.
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440002', 'empty-group', {
++      members: [],
++    });
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440003', 'regular-entry');
++    const res = group(project, 'list');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      groups: Array<{ slug: string; memberCount: number }>;
++    };
++    expect(parsed.groups).toHaveLength(1);
++    expect(parsed.groups[0]).toMatchObject({ slug: 'empty-group', memberCount: 0 });
++  });
++
++  it('emits groups whose members[] is non-empty', () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440010';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440011';
++    writeSidecar(project, memberUuid, 'member-1');
++    writeSidecar(project, groupUuid, 'my-group', {
++      title: 'My Group',
++      members: [memberUuid],
++    });
++    const res = group(project, 'list');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      groups: Array<{ slug: string; title: string; memberCount: number; archived: boolean }>;
++    };
++    expect(parsed.groups).toHaveLength(1);
++    expect(parsed.groups[0]).toMatchObject({
++      slug: 'my-group',
++      title: 'My Group',
++      memberCount: 1,
++      archived: false,
++    });
++  });
++
++  it('sorts groups alphabetically by slug', () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440020';
++    writeSidecar(project, memberUuid, 'member-x');
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440021', 'zebra', {
++      members: [memberUuid],
++    });
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440022', 'apple', {
++      members: [memberUuid],
++    });
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440023', 'mango', {
++      members: [memberUuid],
++    });
++
++    const res = group(project, 'list');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { groups: Array<{ slug: string }> };
++    expect(parsed.groups.map((g) => g.slug)).toEqual(['apple', 'mango', 'zebra']);
++  });
++
++  it('excludes archived groups by default', () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440030';
++    writeSidecar(project, memberUuid, 'member-a');
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440031', 'active-group', {
++      members: [memberUuid],
++    });
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440032', 'archived-group', {
++      members: [memberUuid],
++      archivedAt: '2026-05-28T10:00:00.000Z',
++    });
++    const res = group(project, 'list');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { groups: Array<{ slug: string }> };
++    expect(parsed.groups.map((g) => g.slug)).toEqual(['active-group']);
++  });
++
++  it('includes archived groups when --include-archived is passed', () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440040';
++    writeSidecar(project, memberUuid, 'member-b');
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440041', 'active-group-2', {
++      members: [memberUuid],
++    });
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440042', 'archived-group-2', {
++      members: [memberUuid],
++      archivedAt: '2026-05-28T10:00:00.000Z',
++    });
++    const res = group(project, 'list', '--include-archived');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      groups: Array<{ slug: string; archived: boolean; archivedAt?: string }>;
++    };
++    expect(parsed.groups.map((g) => g.slug)).toEqual([
++      'active-group-2',
++      'archived-group-2',
++    ]);
++    const archived = parsed.groups.find((g) => g.slug === 'archived-group-2');
++    expect(archived).toBeDefined();
++    expect(archived?.archived).toBe(true);
++    expect(archived?.archivedAt).toBe('2026-05-28T10:00:00.000Z');
++  });
++});
++
++describe('deskwork group (generic)', () => {
++  it('prints usage when no verb is supplied', () => {
++    const res = group(project);
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Usage: deskwork group/);
++  });
++
++  it('prints an unknown-verb error', () => {
++    const res = group(project, 'wat');
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Unknown group verb: wat/);
++  });
++});
+diff --git a/packages/cli/test/group/remove-member.test.ts b/packages/cli/test/group/remove-member.test.ts
+new file mode 100644
+index 0000000..5c48a96
+--- /dev/null
++++ b/packages/cli/test/group/remove-member.test.ts
+@@ -0,0 +1,123 @@
++/**
++ * deskwork CLI `group remove-member` verb.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Verifies removal, the
++ * not-present refusal, and that removing a multi-group member from
++ * one group does NOT affect membership in another group.
++ */
++
++import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
++import {
++  assertDeskworkBinPresent,
++  destroyProject,
++  group,
++  listJournalEvents,
++  makeProject,
++  readSidecar,
++  writeSidecar,
++} from './helpers.ts';
++
++beforeAll(() => { assertDeskworkBinPresent(); });
++
++let project: string;
++beforeEach(() => { project = makeProject(); });
++afterEach(() => { destroyProject(project); });
++
++describe('deskwork group remove-member', () => {
++  it('removes a present member', () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440501';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440502';
++    writeSidecar(project, memberUuid, 'mem');
++    writeSidecar(project, groupUuid, 'g', { members: [memberUuid] });
++
++    const res = group(project, 'remove-member', 'g', 'mem');
++    expect(res.stderr).toBe('');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      removed: boolean;
++      memberSlug: string;
++      members: string[];
++    };
++    expect(parsed.removed).toBe(true);
++    expect(parsed.memberSlug).toBe('mem');
++    expect(parsed.members).toEqual([]);
++    expect((readSidecar(project, groupUuid)['members'] as unknown[])).toEqual([]);
++  });
++
++  it('preserves ordering of remaining members', () => {
++    const m1 = '550e8400-e29b-41d4-a716-446655440511';
++    const m2 = '550e8400-e29b-41d4-a716-446655440512';
++    const m3 = '550e8400-e29b-41d4-a716-446655440513';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440514';
++    writeSidecar(project, m1, 'm-1');
++    writeSidecar(project, m2, 'm-2');
++    writeSidecar(project, m3, 'm-3');
++    writeSidecar(project, groupUuid, 'g', { members: [m1, m2, m3] });
++
++    const res = group(project, 'remove-member', 'g', 'm-2');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { members: string[] };
++    expect(parsed.members).toEqual([m1, m3]);
++  });
++
++  it('emits a group-remove-member journal event', () => {
++    const m1 = '550e8400-e29b-41d4-a716-446655440521';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440522';
++    writeSidecar(project, m1, 'm-event');
++    writeSidecar(project, groupUuid, 'g', { members: [m1] });
++
++    group(project, 'remove-member', 'g', 'm-event');
++    const events = listJournalEvents(project);
++    const removed = events.filter((e) => e['kind'] === 'group-remove-member');
++    expect(removed).toHaveLength(1);
++    const details = removed[0]['details'] as Record<string, unknown>;
++    expect(details['memberSlug']).toBe('m-event');
++    expect(details['membersAfter']).toEqual([]);
++  });
++
++  it('refuses when the member is not present', () => {
++    const m1 = '550e8400-e29b-41d4-a716-446655440531';
++    const m2 = '550e8400-e29b-41d4-a716-446655440532';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440533';
++    writeSidecar(project, m1, 'in-group');
++    writeSidecar(project, m2, 'not-in-group');
++    writeSidecar(project, groupUuid, 'g', { members: [m1] });
++
++    const res = group(project, 'remove-member', 'g', 'not-in-group');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/not in this group/);
++  });
++
++  it('refuses against a non-group entry', () => {
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440541', 'a');
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440542', 'b');
++    const res = group(project, 'remove-member', 'a', 'b');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/entry has no `members` field/);
++  });
++
++  // Multi-group membership: removing from one group MUST NOT affect
++  // the same UUID's membership in another group.
++  it('removing from one group preserves membership in another (Step 7.2.4)', () => {
++    const memberShared = '550e8400-e29b-41d4-a716-446655440551';
++    const gOne = '550e8400-e29b-41d4-a716-446655440552';
++    const gTwo = '550e8400-e29b-41d4-a716-446655440553';
++    writeSidecar(project, memberShared, 'shared');
++    writeSidecar(project, gOne, 'g-one', { members: [memberShared] });
++    writeSidecar(project, gTwo, 'g-two', { members: [memberShared] });
++
++    const res = group(project, 'remove-member', 'g-one', 'shared');
++    expect(res.code).toBe(0);
++
++    expect((readSidecar(project, gOne)['members'] as unknown[])).toEqual([]);
++    // g-two STILL contains the member — independence preserved.
++    expect((readSidecar(project, gTwo)['members'] as unknown[]))
++      .toEqual([memberShared]);
++  });
++
++  it('refuses when positionals are missing', () => {
++    const res = group(project, 'remove-member', 'only-one');
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Usage: deskwork group/);
++  });
++});
+diff --git a/packages/cli/test/group/show.test.ts b/packages/cli/test/group/show.test.ts
+new file mode 100644
+index 0000000..37b4b44
+--- /dev/null
++++ b/packages/cli/test/group/show.test.ts
+@@ -0,0 +1,178 @@
++/**
++ * deskwork CLI `group show` verb.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Verifies per-member
++ * enrichment (slug / lane / currentStage), missing-member
++ * surfacing, and the not-a-group refusal.
++ */
++
++import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
++import {
++  addLane,
++  assertDeskworkBinPresent,
++  destroyProject,
++  group,
++  makeProject,
++  writeSidecar,
++} from './helpers.ts';
++
++beforeAll(() => { assertDeskworkBinPresent(); });
++
++let project: string;
++beforeEach(() => { project = makeProject(); });
++afterEach(() => { destroyProject(project); });
++
++describe('deskwork group show', () => {
++  it('emits the group + enriched members', () => {
++    const m1 = '550e8400-e29b-41d4-a716-446655440101';
++    const m2 = '550e8400-e29b-41d4-a716-446655440102';
++    const g = '550e8400-e29b-41d4-a716-446655440103';
++    writeSidecar(project, m1, 'member-one', { currentStage: 'Drafting' });
++    writeSidecar(project, m2, 'member-two', { currentStage: 'Outlining' });
++    writeSidecar(project, g, 'my-group', {
++      title: 'My Group',
++      members: [m1, m2],
++    });
++
++    const res = group(project, 'show', 'my-group');
++    expect(res.stderr).toBe('');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      slug: string;
++      title: string;
++      memberCount: number;
++      members: Array<{
++        uuid: string;
++        slug?: string;
++        currentStage?: string;
++        missing: boolean;
++      }>;
++    };
++    expect(parsed.slug).toBe('my-group');
++    expect(parsed.title).toBe('My Group');
++    expect(parsed.memberCount).toBe(2);
++    expect(parsed.members).toHaveLength(2);
++    expect(parsed.members[0]).toMatchObject({
++      uuid: m1,
++      slug: 'member-one',
++      currentStage: 'Drafting',
++      missing: false,
++    });
++    expect(parsed.members[1]).toMatchObject({
++      uuid: m2,
++      slug: 'member-two',
++      currentStage: 'Outlining',
++      missing: false,
++    });
++  });
++
++  it('resolves a UUID positional', () => {
++    const m1 = '550e8400-e29b-41d4-a716-446655440111';
++    const g = '550e8400-e29b-41d4-a716-446655440112';
++    writeSidecar(project, m1, 'member-3');
++    writeSidecar(project, g, 'g-uuid', { members: [m1] });
++    const res = group(project, 'show', g);
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { uuid: string; slug: string };
++    expect(parsed.uuid).toBe(g);
++    expect(parsed.slug).toBe('g-uuid');
++  });
++
++  it('emits archived state on archived groups', () => {
++    const m1 = '550e8400-e29b-41d4-a716-446655440121';
++    const g = '550e8400-e29b-41d4-a716-446655440122';
++    writeSidecar(project, m1, 'member-a');
++    writeSidecar(project, g, 'archived-group', {
++      members: [m1],
++      archivedAt: '2026-05-28T10:00:00.000Z',
++    });
++    const res = group(project, 'show', 'archived-group');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      archived: boolean;
++      archivedAt?: string;
++    };
++    expect(parsed.archived).toBe(true);
++    expect(parsed.archivedAt).toBe('2026-05-28T10:00:00.000Z');
++  });
++
++  it('reports missing members with missing: true', () => {
++    const m1 = '550e8400-e29b-41d4-a716-446655440131';
++    const missing = '550e8400-e29b-41d4-a716-446655440199';
++    const g = '550e8400-e29b-41d4-a716-446655440132';
++    writeSidecar(project, m1, 'present-member');
++    // missing UUID intentionally NOT written to disk
++    writeSidecar(project, g, 'dangling-group', { members: [m1, missing] });
++
++    const res = group(project, 'show', 'dangling-group');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      members: Array<{ uuid: string; missing: boolean; slug?: string }>;
++    };
++    expect(parsed.members).toHaveLength(2);
++    expect(parsed.members[0]).toMatchObject({ uuid: m1, missing: false, slug: 'present-member' });
++    expect(parsed.members[1]).toMatchObject({ uuid: missing, missing: true });
++    expect(parsed.members[1].slug).toBeUndefined();
++  });
++
++  it('enriches members in different lanes (cross-lane membership)', () => {
++    addLane(project, 'mockups');
++    const m1 = '550e8400-e29b-41d4-a716-446655440141';
++    const m2 = '550e8400-e29b-41d4-a716-446655440142';
++    const g = '550e8400-e29b-41d4-a716-446655440143';
++    writeSidecar(project, m1, 'm-default-lane', { lane: 'default' });
++    writeSidecar(project, m2, 'm-mockups-lane', { lane: 'mockups' });
++    writeSidecar(project, g, 'cross-lane-group', {
++      lane: 'default',
++      members: [m1, m2],
++    });
++
++    const res = group(project, 'show', 'cross-lane-group');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      members: Array<{ slug?: string; lane?: string }>;
++    };
++    expect(parsed.members).toHaveLength(2);
++    expect(parsed.members[0]).toMatchObject({ slug: 'm-default-lane', lane: 'default' });
++    expect(parsed.members[1]).toMatchObject({ slug: 'm-mockups-lane', lane: 'mockups' });
++  });
++
++  it('refuses against a non-group entry (no members field at all)', () => {
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440151', 'regular');
++    const res = group(project, 'show', 'regular');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/entry is not a group/);
++  });
++
++  it('shows an empty group (members: [], no UUIDs yet) with members: []', () => {
++    // Per the Task 7.2 review action superseding AUDIT-20260529-13:
++    // `members: []` IS a valid group state (declared, awaiting
++    // population). `show` returns the entry plus an empty members
++    // list rather than refusing.
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440152', 'empty-shell', {
++      members: [],
++    });
++    const res = group(project, 'show', 'empty-shell');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      slug: string;
++      members: unknown[];
++      memberCount: number;
++    };
++    expect(parsed.slug).toBe('empty-shell');
++    expect(parsed.members).toEqual([]);
++    expect(parsed.memberCount).toBe(0);
++  });
++
++  it('refuses when the slug positional is missing', () => {
++    const res = group(project, 'show');
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Usage: deskwork group/);
++  });
++
++  it('refuses when the slug does not resolve', () => {
++    const res = group(project, 'show', 'no-such-slug');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/'no-such-slug' not found/);
++  });
++});
+diff --git a/packages/cli/test/group/update.test.ts b/packages/cli/test/group/update.test.ts
+new file mode 100644
+index 0000000..d7451b1
+--- /dev/null
++++ b/packages/cli/test/group/update.test.ts
+@@ -0,0 +1,118 @@
++/**
++ * deskwork CLI `group update` verb.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Verifies the --title patch
++ * + the require-at-least-one-patch refusal + the not-a-group
++ * refusal.
++ */
++
++import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
++import {
++  assertDeskworkBinPresent,
++  destroyProject,
++  group,
++  listJournalEvents,
++  makeProject,
++  readSidecar,
++  writeSidecar,
++} from './helpers.ts';
++
++beforeAll(() => { assertDeskworkBinPresent(); });
++
++let project: string;
++beforeEach(() => { project = makeProject(); });
++afterEach(() => { destroyProject(project); });
++
++describe('deskwork group update', () => {
++  function makeGroup(): { groupUuid: string; memberUuid: string } {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440301';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440302';
++    writeSidecar(project, memberUuid, 'a-member');
++    writeSidecar(project, groupUuid, 'updatable-group', {
++      title: 'Old Title',
++      members: [memberUuid],
++    });
++    return { groupUuid, memberUuid };
++  }
++
++  it('mutates --title in place', () => {
++    const { groupUuid } = makeGroup();
++    const res = group(project, 'update', 'updatable-group', '--title', 'New Title');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as {
++      title: string;
++      changedFields: string[];
++    };
++    expect(parsed.title).toBe('New Title');
++    expect(parsed.changedFields).toEqual(['title']);
++
++    const sidecar = readSidecar(project, groupUuid);
++    expect(sidecar['title']).toBe('New Title');
++  });
++
++  it('emits a group-update journal event', () => {
++    makeGroup();
++    group(project, 'update', 'updatable-group', '--title', 'Newer');
++    const events = listJournalEvents(project);
++    const updates = events.filter((e) => e['kind'] === 'group-update');
++    expect(updates).toHaveLength(1);
++    const details = updates[0]['details'] as Record<string, unknown>;
++    expect(details['changedFields']).toEqual(['title']);
++    expect((details['before'] as Record<string, unknown>)['title']).toBe('Old Title');
++    expect((details['after'] as Record<string, unknown>)['title']).toBe('Newer');
++  });
++
++  it('refuses when no patch flags are supplied', () => {
++    makeGroup();
++    const res = group(project, 'update', 'updatable-group');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/no patch fields supplied/);
++  });
++
++  it('refuses --title with an empty string', () => {
++    makeGroup();
++    const res = group(project, 'update', 'updatable-group', '--title', '');
++    // Empty string IS a value as far as parseArgs is concerned (the
++    // missing-value check only fires when the next argv is undefined
++    // or starts with --). The empty-string refusal lands at the
++    // operation layer instead.
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/--title must be a non-empty string/);
++  });
++
++  it('refuses --title with whitespace-only string', () => {
++    makeGroup();
++    const res = group(project, 'update', 'updatable-group', '--title', '   ');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/--title must be a non-empty string/);
++  });
++
++  it('refuses against a non-group entry (no members field at all)', () => {
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440310', 'plain');
++    const res = group(project, 'update', 'plain', '--title', 'oops');
++    expect(res.code).not.toBe(0);
++    expect(res.stderr).toMatch(/entry is not a group/);
++  });
++
++  it('updates an empty group (members: [], no UUIDs yet)', () => {
++    // Per the Task 7.2 review action superseding AUDIT-20260529-13:
++    // `members: []` IS a valid group state. `update --title` works
++    // against a declared-empty group, same as against a populated
++    // one.
++    writeSidecar(project, '550e8400-e29b-41d4-a716-446655440311', 'empty-shell', {
++      title: 'Old Title',
++      members: [],
++    });
++    const res = group(project, 'update', 'empty-shell', '--title', 'New Title');
++    expect(res.code).toBe(0);
++    const parsed = JSON.parse(res.stdout) as { title: string; changedFields: string[] };
++    expect(parsed.title).toBe('New Title');
++    expect(parsed.changedFields).toContain('title');
++  });
++
++  it('refuses when the slug positional is missing', () => {
++    const res = group(project, 'update', '--title', 'x');
++    expect(res.code).toBe(2);
++    expect(res.stderr).toMatch(/Usage: deskwork group/);
++  });
++});
+diff --git a/packages/core/package.json b/packages/core/package.json
+index 40edaec..c3365e9 100644
+--- a/packages/core/package.json
++++ b/packages/core/package.json
+@@ -137,6 +137,10 @@
+       "types": "./dist/journal.d.ts",
+       "default": "./dist/journal.js"
+     },
++    "./groups": {
++      "types": "./dist/groups/index.d.ts",
++      "default": "./dist/groups/index.js"
++    },
+     "./lanes": {
+       "types": "./dist/lanes/index.d.ts",
+       "default": "./dist/lanes/index.js"
+diff --git a/packages/core/src/entry/cancel.ts b/packages/core/src/entry/cancel.ts
+index 89d99d7..ab20b1a 100644
+--- a/packages/core/src/entry/cancel.ts
++++ b/packages/core/src/entry/cancel.ts
+@@ -13,6 +13,36 @@ import {
+ interface CancelOptions {
+   readonly uuid: string;
+   readonly reason?: string;
++  /**
++   * Phase 7 Task 7.2 Step 7.2.6 (graphical-entries). When `true`,
++   * cancel cascades to every entry in `members[]` (recursively if any
++   * member is itself a group, though doctor's `group-recursive` rule
++   * disallows that shape per v1). The cascade is a best-effort
++   * walk — members already off-pipeline (Cancelled / Blocked / etc.)
++   * are SKIPPED rather than refused, so cascading on a partially-
++   * cancelled group still cancels the remainder.
++   *
++   * Default behaviour (no `cascade`): the group's OWN stage flips to
++   * Cancelled; members are untouched. Per the universal-verb-no-
++   * cascade rule (DESKWORK-STATE-MACHINE.md Commandment II + PRD §
++   * Group lifecycle edge cases), cancel is opt-in.
++   *
++   * Non-group entries (no `members[]` array, or empty) ignore this
++   * flag — there's nothing to cascade into.
++   */
++  readonly cascade?: boolean;
++}
++
++interface CancelledMember {
++  readonly entryId: string;
++  readonly slug: string;
++  readonly fromStage: string;
++}
++
++interface SkippedMember {
++  readonly entryId: string;
++  readonly slug: string;
++  readonly reason: string;
+ }
+ 
+ interface CancelResult {
+@@ -26,6 +56,17 @@ interface CancelResult {
+    */
+   readonly fromStage: string;
+   readonly toStage: string;
++  /**
++   * Members the cascade actually transitioned to Cancelled. Empty
++   * when `cascade !== true` or when the entry has no members.
++   */
++  readonly cascadedMembers?: readonly CancelledMember[];
++  /**
++   * Members the cascade SKIPPED (already off-pipeline, or terminal
++   * stage). Surfaced so the CLI / operator can audit what was passed
++   * over. Empty when `cascade !== true`.
++   */
++  readonly skippedMembers?: readonly SkippedMember[];
+ }
+ 
+ /**
+@@ -102,7 +143,92 @@ export async function cancelEntry(
+     to: CANCEL_STAGE,
+     ...(opts.reason !== undefined && { reason: opts.reason }),
+   });
++
++  // Member cascade (Phase 7 Task 7.2 Step 7.2.6). Only fires when
++  // the caller explicitly opted in via `cascade: true`. Per the
++  // universal-verb-no-cascade rule (Commandment II + PRD § Group
++  // lifecycle), cancel does NOT propagate to members by default.
++  // When the flag IS set, we walk `members[]` and call back into
++  // `cancelEntry` recursively for each — recursive groups would
++  // cascade transitively, though doctor's `group-recursive` rule
++  // (Task 7.5.1) refuses that shape; the cascade here is the
++  // operator-visible behaviour the flag promises.
++  const cascadedMembers: CancelledMember[] = [];
++  const skippedMembers: SkippedMember[] = [];
++  if (
++    opts.cascade === true
++    && Array.isArray(sidecar.members)
++    && sidecar.members.length > 0
++  ) {
++    for (const memberUuid of sidecar.members) {
++      try {
++        const memberSidecar = await readSidecar(projectRoot, memberUuid);
++        const memberTemplate = resolveEntryStrictTemplate(
++          memberSidecar,
++          projectRoot,
++        );
++        const memberTerminal = terminalLinearStage(memberTemplate);
++        // Members already off-pipeline (or at terminal) are skipped
++        // — refusing would abort the cascade mid-walk, leaving the
++        // group partially cancelled which is exactly the failure
++        // mode the cascade exists to avoid.
++        if (memberSidecar.currentStage === memberTerminal) {
++          skippedMembers.push({
++            entryId: memberUuid,
++            slug: memberSidecar.slug,
++            reason: `at terminal stage "${memberTerminal}"`,
++          });
++          continue;
++        }
++        if (
++          isOffPipelineStageInTemplate(memberTemplate, memberSidecar.currentStage)
++        ) {
++          skippedMembers.push({
++            entryId: memberUuid,
++            slug: memberSidecar.slug,
++            reason: `already off-pipeline (${memberSidecar.currentStage})`,
++          });
++          continue;
++        }
++        const memberResult = await cancelEntry(projectRoot, {
++          uuid: memberUuid,
++          cascade: true,
++          ...(opts.reason !== undefined && { reason: opts.reason }),
++        });
++        cascadedMembers.push({
++          entryId: memberUuid,
++          slug: memberSidecar.slug,
++          fromStage: memberResult.fromStage,
++        });
++        // Nested cascades from the recursive call appear in
++        // `memberResult.cascadedMembers` — flatten them into the
++        // top-level list so the caller sees one cascade summary
++        // rather than a nested tree.
++        if (memberResult.cascadedMembers !== undefined) {
++          cascadedMembers.push(...memberResult.cascadedMembers);
++        }
++        if (memberResult.skippedMembers !== undefined) {
++          skippedMembers.push(...memberResult.skippedMembers);
++        }
++      } catch (err) {
++        const detail = err instanceof Error ? err.message : String(err);
++        skippedMembers.push({
++          entryId: memberUuid,
++          slug: '(unresolved)',
++          reason: `read failed: ${detail}`,
++        });
++      }
++    }
++  }
++
+   // #148: keep calendar.md in sync after every transition.
+   await regenerateCalendar(projectRoot);
+-  return { entryId: sidecar.uuid, fromStage: from, toStage: CANCEL_STAGE };
++  const result: CancelResult = {
++    entryId: sidecar.uuid,
++    fromStage: from,
++    toStage: CANCEL_STAGE,
++    ...(opts.cascade === true && { cascadedMembers }),
++    ...(opts.cascade === true && { skippedMembers }),
++  };
++  return result;
+ }
+diff --git a/packages/core/src/groups/index.ts b/packages/core/src/groups/index.ts
+new file mode 100644
+index 0000000..11c3894
+--- /dev/null
++++ b/packages/core/src/groups/index.ts
+@@ -0,0 +1,38 @@
++/**
++ * Groups — barrel export.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Per Task 7.1.2, a "group" is
++ * an entry whose `members[]` is non-empty — there is no separate
++ * Group type or schema. The group operations module + predicates
++ * here are the canonical entry point for code that needs to
++ * distinguish group entries from regular entries (the studio
++ * dashboard, doctor's group-* rules, the per-verb CLI handlers).
++ */
++
++export { isArchivedEntry, isGroupEntry } from './types.ts';
++
++// Phase 7 Task 7.2 — group CRUD operations consumed by the CLI
++// `group` verb. Each named export is the per-verb core function.
++export {
++  createGroup,
++  updateGroup,
++  showGroup,
++  listGroups,
++  addGroupMember,
++  removeGroupMember,
++  archiveGroup,
++  restoreGroup,
++  type CreateGroupOptions,
++  type CreateGroupResult,
++  type UpdateGroupOptions,
++  type UpdateGroupResult,
++  type ShowGroupResult,
++  type MemberSummary,
++  type ListGroupsOptions,
++  type ListedGroup,
++  type AddGroupMemberOptions,
++  type AddGroupMemberResult,
++  type RemoveGroupMemberOptions,
++  type RemoveGroupMemberResult,
++  type ArchiveGroupResult,
++} from './operations/index.ts';
+diff --git a/packages/core/src/groups/operations/add-member.ts b/packages/core/src/groups/operations/add-member.ts
+new file mode 100644
+index 0000000..6e301e2
+--- /dev/null
++++ b/packages/core/src/groups/operations/add-member.ts
+@@ -0,0 +1,154 @@
++/**
++ * group add-member — append (or insert at index) a member UUID onto a
++ * group's `members[]` array.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Per Step 7.2.3, members are
++ * an ordered array — `add-member` defaults to APPEND; `--at <index>`
++ * inserts at a 0-based position. Per Step 7.2.4, multi-group
++ * membership is supported — the same entry UUID can appear in
++ * multiple groups' `members[]` simultaneously. Per Step 7.2.5,
++ * cross-lane membership is supported — the verb does NOT enforce
++ * that the member lives in the same lane as the group.
++ *
++ * Refusals:
++ *   - The target entry is not a group (does NOT have a non-empty
++ *     `members[]`). The verb is group-specific.
++ *
++ *     Exception: a group created by `group create` carries
++ *     `members: []` (the intent-marker per Task 7.5.5); `add-member`
++ *     accepts that shape as "still a group" — the typeof check below
++ *     looks for `Array.isArray(entry.members)` rather than
++ *     `isGroupEntry`.
++ *
++ *   - The member UUID is already present in `members[]` (no
++ *     duplicates within a single group — though the same UUID can be
++ *     in multiple groups). Refuses with a clear error.
++ *   - The member slug doesn't resolve to a sidecar.
++ *   - `--at <index>` is out of range (`i < 0` or `i > members.length`).
++ *   - Self-membership: the group's own UUID being added as its own
++ *     member is refused — that would create a 1-element cycle which
++ *     doctor's `group-recursive` rule (Task 7.5.1) would flag anyway.
++ *     Refusing at write time gives a faster failure mode.
++ *
++ * Does NOT enforce recursion across multiple groups (a group whose
++ * member is itself a group). That check belongs to doctor's
++ * `group-recursive` rule (Task 7.5.1) per the workplan — the CLI
++ * deliberately does NOT enforce recursion per the task scope.
++ *
++ * Emits a `group-add-member` journal event on success.
++ */
++
++import { appendJournalEvent } from '../../journal/append.ts';
++import { readSidecar } from '../../sidecar/read.ts';
++import { resolveEntryUuid } from '../../sidecar/lookup.ts';
++import { writeSidecar } from '../../sidecar/write.ts';
++import type { Entry } from '../../schema/entry.ts';
++
++export interface AddGroupMemberOptions {
++  readonly groupSlugOrUuid: string;
++  readonly memberSlugOrUuid: string;
++  /**
++   * 0-based insertion index. When omitted, the member UUID is
++   * appended (insertion at `members.length`). Must satisfy
++   * `0 <= at <= members.length` — `at === members.length` is the
++   * append case and is equivalent to omitting the flag.
++   */
++  readonly at?: number;
++}
++
++export interface AddGroupMemberResult {
++  readonly entry: Entry;
++  readonly memberId: string;
++  readonly memberSlug: string;
++  readonly index: number;
++  readonly members: readonly string[];
++}
++
++export async function addGroupMember(
++  projectRoot: string,
++  opts: AddGroupMemberOptions,
++): Promise<AddGroupMemberResult> {
++  const groupUuid = await resolveEntryUuid(projectRoot, opts.groupSlugOrUuid);
++  const group = await readSidecar(projectRoot, groupUuid);
++
++  if (!Array.isArray(group.members)) {
++    throw new Error(
++      `Cannot add member to "${opts.groupSlugOrUuid}": entry has no `
++      + `\`members\` field. Per the Task 7.1.2 invariant, only group `
++      + `entries carry a \`members[]\` array. Create the group first via `
++      + `"deskwork group create <slug> --lane <lane>".`,
++    );
++  }
++
++  const memberUuid = await resolveEntryUuid(projectRoot, opts.memberSlugOrUuid);
++  if (memberUuid === groupUuid) {
++    throw new Error(
++      `Cannot add member to "${opts.groupSlugOrUuid}": refused self-membership. `
++      + `A group cannot contain itself as a member (1-element cycle).`,
++    );
++  }
++
++  // Read the member's sidecar so we can include its slug in the
++  // journal-event details (and to ensure the UUID actually points at
++  // a sidecar — `resolveEntryUuid` only validates the UUID shape
++  // when given a UUID, not slug, so a stale UUID would otherwise
++  // sneak through).
++  const member = await readSidecar(projectRoot, memberUuid);
++
++  const currentMembers = group.members;
++  if (currentMembers.includes(memberUuid)) {
++    throw new Error(
++      `Cannot add member to "${opts.groupSlugOrUuid}": member `
++      + `"${member.slug}" (UUID ${memberUuid}) is already in this group. `
++      + `Duplicates within a single group are refused; the same entry `
++      + `CAN be a member of multiple groups simultaneously (Step 7.2.4).`,
++    );
++  }
++
++  const insertIndex = opts.at ?? currentMembers.length;
++  if (
++    !Number.isInteger(insertIndex)
++    || insertIndex < 0
++    || insertIndex > currentMembers.length
++  ) {
++    throw new Error(
++      `Cannot add member to "${opts.groupSlugOrUuid}": --at ${insertIndex} `
++      + `is out of range. Valid range: 0..${currentMembers.length} (inclusive; `
++      + `${currentMembers.length} is the append position).`,
++    );
++  }
++
++  const nextMembers = [
++    ...currentMembers.slice(0, insertIndex),
++    memberUuid,
++    ...currentMembers.slice(insertIndex),
++  ];
++
++  const at = new Date().toISOString();
++  const updated: Entry = {
++    ...group,
++    members: nextMembers,
++    updatedAt: at,
++  };
++  await writeSidecar(projectRoot, updated);
++
++  await appendJournalEvent(projectRoot, {
++    kind: 'group-add-member',
++    at,
++    entryId: groupUuid,
++    details: {
++      memberId: memberUuid,
++      memberSlug: member.slug,
++      index: insertIndex,
++      membersAfter: nextMembers,
++    },
++  });
++
++  return {
++    entry: updated,
++    memberId: memberUuid,
++    memberSlug: member.slug,
++    index: insertIndex,
++    members: nextMembers,
++  };
++}
+diff --git a/packages/core/src/groups/operations/archive.ts b/packages/core/src/groups/operations/archive.ts
+new file mode 100644
+index 0000000..52d3993
+--- /dev/null
++++ b/packages/core/src/groups/operations/archive.ts
+@@ -0,0 +1,120 @@
++/**
++ * group archive / group restore — flip the `archivedAt` field on a
++ * group entry.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Soft-archive shape mirrors
++ * `lane archive` (Task 6.1): the `archivedAt` field carries an ISO
++ * datetime that doubles as the boolean signal and the audit trail.
++ * Archive sets the field; restore clears it.
++ *
++ * Archive does NOT cancel the group or its members. Per the
++ * universal-verb model (DESKWORK-STATE-MACHINE.md Commandment II) and
++ * PRD line 323 ("Soft-archive preserves history, hides from active
++ * dashboards"), an archived entry stays in the pipeline at its
++ * current stage — verbs continue to work; only listing surfaces hide
++ * the entry by default.
++ *
++ * Member archive cascade is NOT implied — archiving a group archives
++ * the group entry only. Members may be archived independently
++ * (calling `group archive` against each member individually). Cancel
++ * cascade (`--cascade`) is a separate concern owned by the universal
++ * `/deskwork:cancel` verb (Step 7.2.6).
++ *
++ * Refusals:
++ *   - The target entry is not a group (does NOT carry a non-empty
++ *     `members[]`). The verb is group-specific.
++ *
++ *     Per Task 7.5.5, a `members: []` entry is the "group with no
++ *     members yet" intent-marker; archive accepts that shape as still-
++ *     a-group (the typeof check is `Array.isArray(entry.members)`,
++ *     not `isGroupEntry`).
++ *
++ *   - Archive when already archived; restore when not archived. Both
++ *     surface the current state in the error so the operator knows
++ *     why the verb refused.
++ */
++
++import { appendJournalEvent } from '../../journal/append.ts';
++import { readSidecar } from '../../sidecar/read.ts';
++import { resolveEntryUuid } from '../../sidecar/lookup.ts';
++import { writeSidecar } from '../../sidecar/write.ts';
++import type { Entry } from '../../schema/entry.ts';
++import { isArchivedEntry } from '../types.ts';
++
++export interface ArchiveGroupResult {
++  readonly entry: Entry;
++}
++
++export async function archiveGroup(
++  projectRoot: string,
++  slugOrUuid: string,
++): Promise<ArchiveGroupResult> {
++  const uuid = await resolveEntryUuid(projectRoot, slugOrUuid);
++  const existing = await readSidecar(projectRoot, uuid);
++  if (!Array.isArray(existing.members)) {
++    throw new Error(
++      `Cannot archive group "${slugOrUuid}": entry has no \`members\` field. `
++      + `Per the Task 7.1.2 invariant, only group entries carry a `
++      + `\`members[]\` array.`,
++    );
++  }
++  if (isArchivedEntry(existing)) {
++    throw new Error(
++      `Cannot archive group "${slugOrUuid}": already archived `
++      + `(archivedAt=${existing.archivedAt}).`,
++    );
++  }
++
++  const at = new Date().toISOString();
++  const updated: Entry = {
++    ...existing,
++    archivedAt: at,
++    updatedAt: at,
++  };
++  await writeSidecar(projectRoot, updated);
++  await appendJournalEvent(projectRoot, {
++    kind: 'group-archive',
++    at,
++    entryId: uuid,
++    details: { archivedAt: at },
++  });
++  return { entry: updated };
++}
++
++export async function restoreGroup(
++  projectRoot: string,
++  slugOrUuid: string,
++): Promise<ArchiveGroupResult> {
++  const uuid = await resolveEntryUuid(projectRoot, slugOrUuid);
++  const existing = await readSidecar(projectRoot, uuid);
++  if (!Array.isArray(existing.members)) {
++    throw new Error(
++      `Cannot restore group "${slugOrUuid}": entry has no \`members\` field. `
++      + `Per the Task 7.1.2 invariant, only group entries carry a `
++      + `\`members[]\` array.`,
++    );
++  }
++  if (!isArchivedEntry(existing)) {
++    throw new Error(
++      `Cannot restore group "${slugOrUuid}": not archived (no archivedAt field).`,
++    );
++  }
++
++  // Strip archivedAt; keep every other field. `archivedAt` is
++  // schema-optional, so the destructured `rest` is structurally
++  // assignable to Entry without an explicit cast.
++  const at = new Date().toISOString();
++  const { archivedAt: _drop, ...rest } = existing;
++  void _drop;
++  const updated: Entry = {
++    ...rest,
++    updatedAt: at,
++  };
++  await writeSidecar(projectRoot, updated);
++  await appendJournalEvent(projectRoot, {
++    kind: 'group-restore',
++    at,
++    entryId: uuid,
++  });
++  return { entry: updated };
++}
+diff --git a/packages/core/src/groups/operations/create.ts b/packages/core/src/groups/operations/create.ts
+new file mode 100644
+index 0000000..e56f52f
+--- /dev/null
++++ b/packages/core/src/groups/operations/create.ts
+@@ -0,0 +1,125 @@
++/**
++ * group create — write a new group entry sidecar.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). A group is an entry whose
++ * `members` field is PRESENT (see `isGroupEntry`). At create time the
++ * array is initialized empty (`members: []`); the operator populates
++ * it via subsequent `add-member` calls. The `members`-present shape
++ * is the group-declaration marker — `members: undefined` denotes a
++ * regular (non-group) entry.
++ *
++ * Refuses when:
++ *   - the lane id doesn't resolve (`loadLaneConfig` throws).
++ *   - the lane is archived (creating into an archived lane is the
++ *     same anti-pattern lane-move rejects).
++ *   - a slug collision exists (a sidecar with the same slug is
++ *     already on disk).
++ *
++ * Emits a `group-create` journal event on success.
++ */
++
++import { randomUUID } from 'node:crypto';
++import { appendJournalEvent } from '../../journal/append.ts';
++import { loadLaneConfig } from '../../lanes/loader.ts';
++import { loadPipelineTemplate } from '../../pipelines/loader.ts';
++import { readAllSidecars } from '../../sidecar/read-all.ts';
++import { writeSidecar } from '../../sidecar/write.ts';
++import type { Entry } from '../../schema/entry.ts';
++
++export interface CreateGroupOptions {
++  readonly slug: string;
++  readonly title: string;
++  readonly lane: string;
++  readonly artifactPath?: string;
++  /** Test seam — defaults to `randomUUID()` when omitted. */
++  readonly uuid?: string;
++  /** Test seam — defaults to `new Date()` when omitted. */
++  readonly now?: Date;
++}
++
++export interface CreateGroupResult {
++  readonly entry: Entry;
++}
++
++export async function createGroup(
++  projectRoot: string,
++  opts: CreateGroupOptions,
++): Promise<CreateGroupResult> {
++  if (opts.slug.trim().length === 0) {
++    throw new Error('Cannot create group: slug must be a non-empty string.');
++  }
++  if (opts.title.trim().length === 0) {
++    throw new Error('Cannot create group: title must be a non-empty string.');
++  }
++
++  // Lane existence + archive check up front.
++  const lane = loadLaneConfig(opts.lane, projectRoot);
++  if (typeof lane.archivedAt === 'string' && lane.archivedAt.length > 0) {
++    throw new Error(
++      `Cannot create group "${opts.slug}" in archived lane "${opts.lane}". `
++      + `Restore the lane first via "deskwork lane restore ${opts.lane}".`,
++    );
++  }
++
++  // The group's `currentStage` defaults to the lane's first
++  // linearStage — same default the `move` verb uses. A group with no
++  // linearStages declared in its template can't have a starting
++  // stage; surface that as an explicit configuration error.
++  const template = loadPipelineTemplate(lane.pipelineTemplate, projectRoot);
++  const startStage = template.linearStages[0];
++  if (startStage === undefined) {
++    throw new Error(
++      `Cannot create group "${opts.slug}" in lane "${opts.lane}": `
++      + `pipeline template "${template.id}" has no linearStages defined. `
++      + `Repair the template before creating a group.`,
++    );
++  }
++
++  // Slug-collision check — readAllSidecars throws on a malformed
++  // sidecar, which is the right behaviour (don't quietly create a
++  // group into a project with corrupt sidecars).
++  const existing = await readAllSidecars(projectRoot);
++  const collision = existing.find((e) => e.slug === opts.slug);
++  if (collision !== undefined) {
++    throw new Error(
++      `Cannot create group "${opts.slug}": slug collision with `
++      + `entry ${collision.uuid} (currentStage="${collision.currentStage}"). `
++      + `Pick a different slug.`,
++    );
++  }
++
++  const uuid = opts.uuid ?? randomUUID();
++  const at = (opts.now ?? new Date()).toISOString();
++  const entry: Entry = {
++    uuid,
++    slug: opts.slug,
++    title: opts.title,
++    keywords: [],
++    source: 'group-create',
++    currentStage: startStage,
++    iterationByStage: {},
++    lane: opts.lane,
++    // The empty array is the group-declaration marker — `members`
++    // PRESENT (even if empty) means "this entry is a group, just
++    // not populated yet"; `members` ABSENT means "regular entry."
++    // See `isGroupEntry` for the predicate semantic.
++    members: [],
++    ...(opts.artifactPath !== undefined && { artifactPath: opts.artifactPath }),
++    createdAt: at,
++    updatedAt: at,
++  };
++
++  await writeSidecar(projectRoot, entry);
++  await appendJournalEvent(projectRoot, {
++    kind: 'group-create',
++    at,
++    entryId: uuid,
++    details: {
++      slug: opts.slug,
++      lane: opts.lane,
++      ...(opts.artifactPath !== undefined && { artifactPath: opts.artifactPath }),
++    },
++  });
++
++  return { entry };
++}
+diff --git a/packages/core/src/groups/operations/index.ts b/packages/core/src/groups/operations/index.ts
+new file mode 100644
+index 0000000..a459e7e
+--- /dev/null
++++ b/packages/core/src/groups/operations/index.ts
+@@ -0,0 +1,31 @@
++/**
++ * Group operations — barrel export.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). The CLI `group` verb is a
++ * thin dispatcher over these core functions: each verb has a
++ * matching named export here. All operations are async (journal
++ * append + sidecar write are async); side-effects are the entry
++ * sidecar write and the journal-event append.
++ */
++
++export { createGroup } from './create.ts';
++export { updateGroup } from './update.ts';
++export { showGroup } from './show.ts';
++export { listGroups } from './list.ts';
++export { addGroupMember } from './add-member.ts';
++export { removeGroupMember } from './remove-member.ts';
++export { archiveGroup, restoreGroup } from './archive.ts';
++
++export type { CreateGroupOptions, CreateGroupResult } from './create.ts';
++export type { UpdateGroupOptions, UpdateGroupResult } from './update.ts';
++export type { ShowGroupResult, MemberSummary } from './show.ts';
++export type { ListGroupsOptions, ListedGroup } from './list.ts';
++export type {
++  AddGroupMemberOptions,
++  AddGroupMemberResult,
++} from './add-member.ts';
++export type {
++  RemoveGroupMemberOptions,
++  RemoveGroupMemberResult,
++} from './remove-member.ts';
++export type { ArchiveGroupResult } from './archive.ts';
+diff --git a/packages/core/src/groups/operations/list.ts b/packages/core/src/groups/operations/list.ts
+new file mode 100644
+index 0000000..760ac8c
+--- /dev/null
++++ b/packages/core/src/groups/operations/list.ts
+@@ -0,0 +1,52 @@
++/**
++ * group list — enumerate every group entry in the project.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Walks every sidecar via
++ * `readAllSidecars` and filters to those declared as groups (the
++ * `members` field is present, regardless of population — `members:
++ * []` IS a valid empty group, per `isGroupEntry`'s semantic). Active
++ * by default; `includeArchived` includes entries carrying an
++ * `archivedAt` marker.
++ *
++ * Sort order is alphabetical by slug, matching the lane-list
++ * convention. The CLI's group list / studio surfaces can re-sort
++ * downstream if needed.
++ */
++
++import { readAllSidecars } from '../../sidecar/read-all.ts';
++import type { Entry } from '../../schema/entry.ts';
++import { isArchivedEntry, isGroupEntry } from '../types.ts';
++
++export interface ListGroupsOptions {
++  /** Include archived groups (`archivedAt` set). Defaults to `false`. */
++  readonly includeArchived?: boolean;
++}
++
++export interface ListedGroup {
++  readonly entry: Entry;
++  readonly archived: boolean;
++  readonly memberCount: number;
++}
++
++export async function listGroups(
++  projectRoot: string,
++  opts: ListGroupsOptions = {},
++): Promise<ListedGroup[]> {
++  const includeArchived = opts.includeArchived ?? false;
++  const all = await readAllSidecars(projectRoot);
++  const groups = all.filter(isGroupEntry);
++  const filtered = includeArchived
++    ? groups
++    : groups.filter((entry) => !isArchivedEntry(entry));
++  return filtered
++    .map((entry): ListedGroup => ({
++      entry,
++      archived: isArchivedEntry(entry),
++      // `members` is guaranteed to be an array (possibly empty) by
++      // `isGroupEntry`. `members.length` is safe; for a newly-created
++      // empty group the count is 0 and the dashboard renders the
++      // "no members yet" affordance.
++      memberCount: entry.members?.length ?? 0,
++    }))
++    .sort((a, b) => a.entry.slug.localeCompare(b.entry.slug));
++}
+diff --git a/packages/core/src/groups/operations/remove-member.ts b/packages/core/src/groups/operations/remove-member.ts
+new file mode 100644
+index 0000000..83ffa03
+--- /dev/null
++++ b/packages/core/src/groups/operations/remove-member.ts
+@@ -0,0 +1,96 @@
++/**
++ * group remove-member — remove a member UUID from a group's `members[]`.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Per CLI-discipline standard:
++ * refuses when the member is not present (silent no-op would hide
++ * operator typos). The removed member's other-group memberships are
++ * untouched — multi-group membership is supported (Step 7.2.4) and
++ * removing from one group doesn't affect the others.
++ *
++ * Refusals:
++ *   - The target entry is not a group (does NOT carry a `members[]`
++ *     array). The verb is group-specific.
++ *   - The member slug doesn't resolve to a sidecar.
++ *   - The member UUID is not present in the group's `members[]`.
++ *
++ * Emits a `group-remove-member` journal event on success.
++ */
++
++import { appendJournalEvent } from '../../journal/append.ts';
++import { readSidecar } from '../../sidecar/read.ts';
++import { resolveEntryUuid } from '../../sidecar/lookup.ts';
++import { writeSidecar } from '../../sidecar/write.ts';
++import type { Entry } from '../../schema/entry.ts';
++
++export interface RemoveGroupMemberOptions {
++  readonly groupSlugOrUuid: string;
++  readonly memberSlugOrUuid: string;
++}
++
++export interface RemoveGroupMemberResult {
++  readonly entry: Entry;
++  readonly memberId: string;
++  readonly memberSlug: string;
++  readonly members: readonly string[];
++}
++
++export async function removeGroupMember(
++  projectRoot: string,
++  opts: RemoveGroupMemberOptions,
++): Promise<RemoveGroupMemberResult> {
++  const groupUuid = await resolveEntryUuid(projectRoot, opts.groupSlugOrUuid);
++  const group = await readSidecar(projectRoot, groupUuid);
++
++  if (!Array.isArray(group.members)) {
++    throw new Error(
++      `Cannot remove member from "${opts.groupSlugOrUuid}": entry has no `
++      + `\`members\` field. Per the Task 7.1.2 invariant, only group `
++      + `entries carry a \`members[]\` array.`,
++    );
++  }
++
++  const memberUuid = await resolveEntryUuid(projectRoot, opts.memberSlugOrUuid);
++  const member = await readSidecar(projectRoot, memberUuid);
++
++  const currentMembers = group.members;
++  const index = currentMembers.indexOf(memberUuid);
++  if (index === -1) {
++    throw new Error(
++      `Cannot remove member from "${opts.groupSlugOrUuid}": member `
++      + `"${member.slug}" (UUID ${memberUuid}) is not in this group's `
++      + `\`members[]\`. Current members: `
++      + `${currentMembers.length === 0 ? '(none)' : currentMembers.join(', ')}.`,
++    );
++  }
++
++  const nextMembers = [
++    ...currentMembers.slice(0, index),
++    ...currentMembers.slice(index + 1),
++  ];
++
++  const at = new Date().toISOString();
++  const updated: Entry = {
++    ...group,
++    members: nextMembers,
++    updatedAt: at,
++  };
++  await writeSidecar(projectRoot, updated);
++
++  await appendJournalEvent(projectRoot, {
++    kind: 'group-remove-member',
++    at,
++    entryId: groupUuid,
++    details: {
++      memberId: memberUuid,
++      memberSlug: member.slug,
++      membersAfter: nextMembers,
++    },
++  });
++
++  return {
++    entry: updated,
++    memberId: memberUuid,
++    memberSlug: member.slug,
++    members: nextMembers,
++  };
++}
+diff --git a/packages/core/src/groups/operations/show.ts b/packages/core/src/groups/operations/show.ts
+new file mode 100644
+index 0000000..2b1c217
+--- /dev/null
++++ b/packages/core/src/groups/operations/show.ts
+@@ -0,0 +1,79 @@
++/**
++ * group show — return a group entry plus per-member lookups.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Resolves a slug or UUID to a
++ * group entry, and enriches each member UUID with its own sidecar's
++ * slug + title + lane + currentStage so the CLI / studio surfaces can
++ * render the member row without making N more sidecar reads.
++ *
++ * Missing-member behaviour: when a member UUID does not resolve to a
++ * sidecar, the per-member entry is returned with `missing: true` and
++ * the slug / title / lane / currentStage fields absent. Doctor's
++ * `group-member-missing` rule (Task 7.5.2) surfaces these for repair;
++ * `group show` reports them verbatim so the operator sees the
++ * dangling reference rather than the resolve-time error.
++ *
++ * Refuses when the resolved entry is not itself a group (no
++ * `members` field on the sidecar) — the verb is group-specific; for
++ * non-group entries, use the universal entry read paths. An empty
++ * group (`members: []`, no UUIDs yet) IS a group and shows with an
++ * empty member list.
++ */
++
++import { readSidecar } from '../../sidecar/read.ts';
++import { resolveEntryUuid } from '../../sidecar/lookup.ts';
++import type { Entry } from '../../schema/entry.ts';
++import { isArchivedEntry, isGroupEntry } from '../types.ts';
++
++export interface MemberSummary {
++  readonly uuid: string;
++  readonly missing: boolean;
++  readonly slug?: string;
++  readonly title?: string;
++  readonly lane?: string;
++  readonly currentStage?: string;
++  readonly archived?: boolean;
++}
++
++export interface ShowGroupResult {
++  readonly entry: Entry;
++  readonly archived: boolean;
++  readonly members: MemberSummary[];
++}
++
++export async function showGroup(
++  projectRoot: string,
++  slugOrUuid: string,
++): Promise<ShowGroupResult> {
++  const uuid = await resolveEntryUuid(projectRoot, slugOrUuid);
++  const entry = await readSidecar(projectRoot, uuid);
++  if (!isGroupEntry(entry)) {
++    throw new Error(
++      `Cannot show group "${slugOrUuid}": entry is not a group `
++      + `(no \`members\` field on the sidecar). Group-only verbs require `
++      + `the \`members\` field to be present; regular entries should be `
++      + `read via the universal entry paths.`,
++    );
++  }
++
++  const memberUuids = entry.members ?? [];
++  const members: MemberSummary[] = [];
++  for (const memberUuid of memberUuids) {
++    try {
++      const member = await readSidecar(projectRoot, memberUuid);
++      members.push({
++        uuid: memberUuid,
++        missing: false,
++        slug: member.slug,
++        title: member.title,
++        ...(member.lane !== undefined && { lane: member.lane }),
++        currentStage: member.currentStage,
++        archived: isArchivedEntry(member),
++      });
++    } catch {
++      members.push({ uuid: memberUuid, missing: true });
++    }
++  }
++
++  return { entry, archived: isArchivedEntry(entry), members };
++}
+diff --git a/packages/core/src/groups/operations/update.ts b/packages/core/src/groups/operations/update.ts
+new file mode 100644
+index 0000000..c51aa39
+--- /dev/null
++++ b/packages/core/src/groups/operations/update.ts
+@@ -0,0 +1,99 @@
++/**
++ * group update — mutate a subset of fields on an existing group entry.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Accepts an optional `title`
++ * patch (the only field operators routinely re-name on a group). The
++ * group's identity-bearing fields (`uuid`, `slug`, `lane`) are NOT
++ * mutable through this verb — slug rename is the existing
++ * `rename-slug` flow; lane move is `lane move`; uuid is immutable.
++ *
++ * The `members[]` field is intentionally NOT mutable through `update`
++ * either — `add-member` / `remove-member` own those edits so the
++ * `group-add-member` / `group-remove-member` journal events fire
++ * with the right per-member context. A bulk `members:` patch would
++ * lose that signal.
++ *
++ * Refusal:
++ *   - When no patch fields are supplied, the operation is a no-op and
++ *     throws. The verb requires explicit intent.
++ *   - When the target entry is not itself a group (per
++ *     `isGroupEntry`), refuses — `group update` is group-specific.
++ *
++ * Emits a `group-update` journal event on success.
++ */
++
++import { appendJournalEvent } from '../../journal/append.ts';
++import { readSidecar } from '../../sidecar/read.ts';
++import { resolveEntryUuid } from '../../sidecar/lookup.ts';
++import { writeSidecar } from '../../sidecar/write.ts';
++import type { Entry } from '../../schema/entry.ts';
++import { isGroupEntry } from '../types.ts';
++
++export interface UpdateGroupOptions {
++  readonly slugOrUuid: string;
++  readonly title?: string;
++}
++
++export interface UpdateGroupResult {
++  readonly entry: Entry;
++  readonly changedFields: readonly string[];
++}
++
++export async function updateGroup(
++  projectRoot: string,
++  opts: UpdateGroupOptions,
++): Promise<UpdateGroupResult> {
++  const uuid = await resolveEntryUuid(projectRoot, opts.slugOrUuid);
++  const existing = await readSidecar(projectRoot, uuid);
++  if (!isGroupEntry(existing)) {
++    throw new Error(
++      `Cannot update group "${opts.slugOrUuid}": entry is not a group `
++      + `(no \`members\` field on the sidecar). Group-only verbs require `
++      + `the \`members\` field to be present; regular entries should be `
++      + `mutated via the universal entry verbs.`,
++    );
++  }
++
++  const patches: Record<string, string> = {};
++  if (opts.title !== undefined) {
++    if (opts.title.trim().length === 0) {
++      throw new Error(
++        `Cannot update group "${opts.slugOrUuid}": --title must be a `
++        + `non-empty string.`,
++      );
++    }
++    patches['title'] = opts.title;
++  }
++
++  const changedFields = Object.keys(patches);
++  if (changedFields.length === 0) {
++    throw new Error(
++      `Cannot update group "${opts.slugOrUuid}": no patch fields supplied. `
++      + `Pass --title <text>.`,
++    );
++  }
++
++  const at = new Date().toISOString();
++  const before: Record<string, unknown> = {};
++  const after: Record<string, unknown> = {};
++  for (const field of changedFields) {
++    before[field] = Reflect.get(existing, field);
++    after[field] = patches[field];
++  }
++
++  const updated: Entry = {
++    ...existing,
++    ...patches,
++    updatedAt: at,
++  };
++
++  await writeSidecar(projectRoot, updated);
++  await appendJournalEvent(projectRoot, {
++    kind: 'group-update',
++    at,
++    entryId: uuid,
++    details: { changedFields, before, after },
++  });
++
++  return { entry: updated, changedFields };
++}
+diff --git a/packages/core/src/groups/types.ts b/packages/core/src/groups/types.ts
+new file mode 100644
+index 0000000..218a33d
+--- /dev/null
++++ b/packages/core/src/groups/types.ts
+@@ -0,0 +1,57 @@
++/**
++ * Groups — shared type surface.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). A "group" is an entry whose
++ * `members[]` is non-empty (per Task 7.1.2 invariant — there is no
++ * separate Group entity; same schema, same code paths, plus the
++ * `members` field). These types name the option / result shapes for
++ * the per-verb operations under `./operations/`.
++ */
++
++import type { Entry } from '../schema/entry.ts';
++
++/**
++ * Predicate used across the groups module: an Entry is a group when
++ * the `members` field is PRESENT (regardless of whether it carries
++ * any UUIDs yet). `members: []` is the canonical "group declared,
++ * awaiting members" state — `/deskwork:group create` writes this
++ * shape so the dashboard / studio can render the newly-created
++ * group immediately, before any `add-member` runs.
++ *
++ * An ABSENT `members` field denotes a regular (non-group) entry.
++ *
++ * The Task 7.1.2 schema invariant phrased this as "non-empty members
++ * = group"; the CLI's group-create semantic in Task 7.2 demanded the
++ * tighter shape ("members-field-present = group") so a brand-new
++ * group is visible in `group list` immediately. See review-action
++ * commit superseding AUDIT-20260529-13 for the resolution narrative.
++ *
++ * Use `isPopulatedGroupEntry` when the semantic you need is "group
++ * AND has at least one member" — e.g. the multi-lane composed view
++ * (Task 7.4) can't render member-row composition for a 0-member
++ * group, and doctor's `group-all-members-cancelled` rule (Task
++ * 7.5.3) should skip 0-member groups rather than firing an
++ * informational on every newly-created one.
++ */
++export function isGroupEntry(entry: Entry): boolean {
++  return Array.isArray(entry.members);
++}
++
++/**
++ * Tighter predicate for "group with at least one member" — see
++ * `isGroupEntry`'s doc-comment for the use cases that need this
++ * semantic rather than the looser declared-group check.
++ */
++export function isPopulatedGroupEntry(entry: Entry): boolean {
++  return Array.isArray(entry.members) && entry.members.length > 0;
++}
++
++/**
++ * Whether a group entry carries an `archivedAt` marker (Task 7.2). The
++ * predicate is intentionally string-shape-aware: an empty string
++ * resolves to false so legacy sidecars carrying `archivedAt: ""` are
++ * treated as not-archived (mirrors the lane-archive convention).
++ */
++export function isArchivedEntry(entry: Entry): boolean {
++  return typeof entry.archivedAt === 'string' && entry.archivedAt.length > 0;
++}
+diff --git a/packages/core/src/schema/entry.ts b/packages/core/src/schema/entry.ts
+index 1272c47..bed0c7a 100644
+--- a/packages/core/src/schema/entry.ts
++++ b/packages/core/src/schema/entry.ts
+@@ -208,6 +208,26 @@ export const EntrySchema = z.object({
+   // the `/deskwork:group` CLI's concern (Tasks 7.2.3 / 7.2.4).
+   members: z.array(z.string().uuid()).optional(),
+ 
++  // Soft-archive marker (Phase 7 Task 7.2). When present, the entry
++  // is considered "archived" — listings hide it by default, dashboard
++  // / studio renderers skip it, but the sidecar JSON stays on disk
++  // along with any artifact / scrapbook / journal history. Restore
++  // strips the field. The value is an ISO datetime carrying the
++  // moment the archive verb ran; the truthiness of the field is the
++  // boolean signal, the datetime is the audit trail.
++  //
++  // Set by `/deskwork:group archive <slug>` (Task 7.2.1); also
++  // settable on regular (non-group) entries via the same Entry-writer
++  // path — the field is forward-compat across entry shapes, matching
++  // the lane-archive pattern shipped in Task 6.1 (`LaneConfig.archivedAt`).
++  // Per PRD line 323: "Soft-archive is the default for lanes and
++  // groups (preserves history, hides from active dashboards)." The
++  // universal `induct` / `iterate` / `approve` / `cancel` verbs
++  // continue to operate on an archived entry — archive does NOT
++  // remove the entry from the pipeline, it hides it from active
++  // surfaces only.
++  archivedAt: z.string().datetime().optional(),
++
+   // Distribution (deferred — shortform model)
+   shortformWorkflows: z.record(z.string(), z.string()).optional(),
+ 
+diff --git a/packages/core/src/schema/journal-events.ts b/packages/core/src/schema/journal-events.ts
+index d6634cd..e134654 100644
+--- a/packages/core/src/schema/journal-events.ts
++++ b/packages/core/src/schema/journal-events.ts
+@@ -325,6 +325,95 @@ const PipelineDeleteEvent = z.object({
+   }),
+ });
+ 
++/**
++ * Phase 7 Task 7.2 (graphical-entries): group-lifecycle events emitted
++ * by the `/deskwork:group` verb family. Each event carries `entryId`
++ * (the group's UUID — groups are themselves entries) and a per-kind
++ * `details` payload.
++ *
++ * The six kinds mirror the six mutating verbs that operate on
++ * groups specifically (cancel uses the universal `stage-transition`
++ * event — `/deskwork:cancel` is a universal verb, see DESKWORK-STATE-
++ * MACHINE.md Commandment II):
++ *
++ *   - `group-create`        — a new group entry was created.
++ *   - `group-update`        — group metadata (title) was mutated.
++ *   - `group-add-member`    — a member UUID was appended (or inserted
++ *                             at an explicit index) to `members[]`.
++ *   - `group-remove-member` — a member UUID was removed from `members[]`.
++ *   - `group-archive`       — `archivedAt` was set on the group entry.
++ *   - `group-restore`       — `archivedAt` was cleared.
++ *
++ * Group `cancel` propagation (`--cascade`) emits one
++ * `stage-transition` event per affected entry (including the group
++ * itself) per the universal-cancel verb's event shape. The cascade
++ * does NOT record per-member `cascadeFrom` linkage today — the
++ * audit trail of which cancels were part of a cascade is currently
++ * only reachable via the cancel-time stdout JSON result's
++ * `cascadedMembers[]` / `skippedMembers[]` arrays. See the cancel
++ * SKILL.md for the rationale and a tracking pointer for the
++ * cascadeFrom-on-event enhancement.
++ */
++const GroupCreateEvent = z.object({
++  kind: z.literal('group-create'),
++  at: z.string().datetime(),
++  entryId: z.string().uuid(),
++  details: z.object({
++    slug: z.string().min(1),
++    lane: z.string().min(1),
++    artifactPath: z.string().optional(),
++  }),
++});
++
++const GroupUpdateEvent = z.object({
++  kind: z.literal('group-update'),
++  at: z.string().datetime(),
++  entryId: z.string().uuid(),
++  details: z.object({
++    changedFields: z.array(z.string().min(1)).min(1),
++    before: z.record(z.string(), z.unknown()),
++    after: z.record(z.string(), z.unknown()),
++  }),
++});
++
++const GroupAddMemberEvent = z.object({
++  kind: z.literal('group-add-member'),
++  at: z.string().datetime(),
++  entryId: z.string().uuid(),
++  details: z.object({
++    memberId: z.string().uuid(),
++    memberSlug: z.string().min(1),
++    index: z.number().int().nonnegative(),
++    membersAfter: z.array(z.string().uuid()),
++  }),
++});
++
++const GroupRemoveMemberEvent = z.object({
++  kind: z.literal('group-remove-member'),
++  at: z.string().datetime(),
++  entryId: z.string().uuid(),
++  details: z.object({
++    memberId: z.string().uuid(),
++    memberSlug: z.string().min(1),
++    membersAfter: z.array(z.string().uuid()),
++  }),
++});
++
++const GroupArchiveEvent = z.object({
++  kind: z.literal('group-archive'),
++  at: z.string().datetime(),
++  entryId: z.string().uuid(),
++  details: z.object({
++    archivedAt: z.string().datetime(),
++  }),
++});
++
++const GroupRestoreEvent = z.object({
++  kind: z.literal('group-restore'),
++  at: z.string().datetime(),
++  entryId: z.string().uuid(),
++});
++
+ export const JournalEventSchema = z.discriminatedUnion('kind', [
+   EntryCreatedEvent,
+   EntryIngestedEvent,
+@@ -344,6 +433,12 @@ export const JournalEventSchema = z.discriminatedUnion('kind', [
+   PipelineCreateEvent,
+   PipelineUpdateEvent,
+   PipelineDeleteEvent,
++  GroupCreateEvent,
++  GroupUpdateEvent,
++  GroupAddMemberEvent,
++  GroupRemoveMemberEvent,
++  GroupArchiveEvent,
++  GroupRestoreEvent,
+ ]);
+ 
+ export type JournalEvent = z.infer<typeof JournalEventSchema>;
+diff --git a/packages/core/test/groups/operations.test.ts b/packages/core/test/groups/operations.test.ts
+new file mode 100644
+index 0000000..11a5644
+--- /dev/null
++++ b/packages/core/test/groups/operations.test.ts
+@@ -0,0 +1,395 @@
++/**
++ * Core-layer integration tests for the group operations module.
++ *
++ * Phase 7 Task 7.2 (graphical-entries). Each test uses a fresh tmp
++ * project root (mkdtempSync) with a real lane config + editorial
++ * pipeline preset; the operations exercise the full sidecar +
++ * journal write path. No mocks.
++ *
++ * Mirrors `packages/core/test/lanes/loader.test.ts` in fixture
++ * shape; the CLI-side tests at `packages/cli/test/group/` cover
++ * the spawnSync end-to-end path.
++ */
++
++import { describe, it, expect, beforeEach, afterEach } from 'vitest';
++import {
++  mkdirSync,
++  mkdtempSync,
++  rmSync,
++  writeFileSync,
++} from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import {
++  addGroupMember,
++  archiveGroup,
++  createGroup,
++  isArchivedEntry,
++  isGroupEntry,
++  listGroups,
++  removeGroupMember,
++  restoreGroup,
++  showGroup,
++  updateGroup,
++} from '@/groups';
++import { writeSidecar } from '@/sidecar/write.ts';
++import type { Entry } from '@/schema/entry.ts';
++
++let projectRoot: string;
++
++beforeEach(() => {
++  projectRoot = mkdtempSync(join(tmpdir(), 'dw-groups-core-'));
++  mkdirSync(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
++  mkdirSync(join(projectRoot, '.deskwork', 'lanes'), { recursive: true });
++  writeFileSync(
++    join(projectRoot, '.deskwork', 'config.json'),
++    JSON.stringify({
++      version: 1,
++      sites: {
++        main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' },
++      },
++      defaultSite: 'main',
++    }),
++    'utf-8',
++  );
++  writeFileSync(
++    join(projectRoot, '.deskwork', 'calendar.md'),
++    '# Editorial Calendar\n\n## Ideas\n\n*No entries.*\n',
++    'utf-8',
++  );
++  writeFileSync(
++    join(projectRoot, '.deskwork', 'lanes', 'default.json'),
++    JSON.stringify({
++      id: 'default',
++      name: 'Default',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    }),
++    'utf-8',
++  );
++});
++
++afterEach(() => {
++  rmSync(projectRoot, { recursive: true, force: true });
++});
++
++function makeEntry(uuid: string, slug: string, overrides: Partial<Entry> = {}): Entry {
++  return {
++    uuid,
++    slug,
++    title: slug,
++    keywords: [],
++    source: 'manual',
++    currentStage: 'Ideas',
++    iterationByStage: {},
++    lane: 'default',
++    createdAt: '2026-04-30T10:00:00.000Z',
++    updatedAt: '2026-04-30T10:00:00.000Z',
++    ...overrides,
++  };
++}
++
++describe('isGroupEntry / isArchivedEntry predicates', () => {
++  it('isGroupEntry returns true when members is PRESENT (including empty), per the Task 7.2 review action superseding AUDIT-20260529-13', () => {
++    const m = '550e8400-e29b-41d4-a716-446655440f01';
++    expect(isGroupEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f02', 'regular'))).toBe(false);
++    // members: [] IS a group (declared-empty marker; group-create
++    // writes this shape so the new group is visible in list/show
++    // before the first add-member call).
++    expect(isGroupEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f03', 'empty', { members: [] }))).toBe(true);
++    expect(isGroupEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f04', 'g', { members: [m] }))).toBe(true);
++  });
++
++  it('isArchivedEntry returns true only for non-empty archivedAt strings', () => {
++    expect(isArchivedEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f10', 'a'))).toBe(false);
++    expect(isArchivedEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f11', 'a', { archivedAt: '' as unknown as string }))).toBe(false);
++    expect(isArchivedEntry(makeEntry('550e8400-e29b-41d4-a716-446655440f12', 'a', { archivedAt: '2026-05-28T10:00:00.000Z' }))).toBe(true);
++  });
++});
++
++describe('createGroup', () => {
++  it('writes a new group entry with members: []', async () => {
++    const result = await createGroup(projectRoot, {
++      slug: 'new-group',
++      title: 'New Group',
++      lane: 'default',
++    });
++    expect(result.entry.slug).toBe('new-group');
++    expect(result.entry.title).toBe('New Group');
++    expect(result.entry.lane).toBe('default');
++    expect(result.entry.members).toEqual([]);
++    expect(result.entry.currentStage).toBe('Ideas');
++  });
++
++  it('refuses when the slug collides with an existing entry', async () => {
++    await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f20', 'taken'));
++    await expect(createGroup(projectRoot, {
++      slug: 'taken',
++      title: 'Taken',
++      lane: 'default',
++    })).rejects.toThrow(/slug collision/);
++  });
++
++  it('refuses an empty slug', async () => {
++    await expect(createGroup(projectRoot, {
++      slug: '',
++      title: 'x',
++      lane: 'default',
++    })).rejects.toThrow(/slug must be a non-empty string/);
++  });
++
++  it('refuses an empty title', async () => {
++    await expect(createGroup(projectRoot, {
++      slug: 'x',
++      title: '   ',
++      lane: 'default',
++    })).rejects.toThrow(/title must be a non-empty string/);
++  });
++
++  it('refuses an unknown lane', async () => {
++    await expect(createGroup(projectRoot, {
++      slug: 'x',
++      title: 'X',
++      lane: 'no-such-lane',
++    })).rejects.toThrow(/Lane config "no-such-lane" not found/);
++  });
++
++  it('binds artifactPath when supplied', async () => {
++    const result = await createGroup(projectRoot, {
++      slug: 'with-art',
++      title: 'With Artifact',
++      lane: 'default',
++      artifactPath: 'docs/with-art.md',
++    });
++    expect(result.entry.artifactPath).toBe('docs/with-art.md');
++  });
++});
++
++describe('listGroups + showGroup', () => {
++  it('listGroups returns empty when no entries exist', async () => {
++    const groups = await listGroups(projectRoot);
++    expect(groups).toEqual([]);
++  });
++
++  it('listGroups filters to entries with the members field PRESENT (including empty-array groups)', async () => {
++    // Per the Task 7.2 review action superseding AUDIT-20260529-13:
++    // `members: []` IS a group (declared-empty); only entries
++    // without the `members` field (regular entries) are filtered out.
++    const m = '550e8400-e29b-41d4-a716-446655440f30';
++    await writeSidecar(projectRoot, makeEntry(m, 'mem'));
++    await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f31', 'regular'));
++    await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f32', 'empty-shell', { members: [] }));
++    await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f33', 'real-group', { members: [m] }));
++
++    const groups = await listGroups(projectRoot);
++    expect(groups.map((g) => g.entry.slug).sort()).toEqual(['empty-shell', 'real-group']);
++    const empty = groups.find((g) => g.entry.slug === 'empty-shell');
++    expect(empty?.memberCount).toBe(0);
++    const real = groups.find((g) => g.entry.slug === 'real-group');
++    expect(real?.memberCount).toBe(1);
++  });
++
++  it('listGroups respects includeArchived', async () => {
++    const m = '550e8400-e29b-41d4-a716-446655440f40';
++    await writeSidecar(projectRoot, makeEntry(m, 'mem-2'));
++    await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f41', 'active', { members: [m] }));
++    await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f42', 'old', {
++      members: [m],
++      archivedAt: '2026-05-28T10:00:00.000Z',
++    }));
++
++    const active = await listGroups(projectRoot);
++    expect(active.map((g) => g.entry.slug)).toEqual(['active']);
++
++    const all = await listGroups(projectRoot, { includeArchived: true });
++    expect(all.map((g) => g.entry.slug)).toEqual(['active', 'old']);
++  });
++
++  it('showGroup enriches each member with slug + lane + currentStage', async () => {
++    const m1 = '550e8400-e29b-41d4-a716-446655440f50';
++    const m2 = '550e8400-e29b-41d4-a716-446655440f51';
++    await writeSidecar(projectRoot, makeEntry(m1, 'm1', { currentStage: 'Drafting' }));
++    await writeSidecar(projectRoot, makeEntry(m2, 'm2', { currentStage: 'Outlining' }));
++    await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f52', 'g', { members: [m1, m2] }));
++
++    const result = await showGroup(projectRoot, 'g');
++    expect(result.members).toHaveLength(2);
++    expect(result.members[0]).toMatchObject({
++      uuid: m1,
++      slug: 'm1',
++      currentStage: 'Drafting',
++      missing: false,
++    });
++  });
++
++  it('showGroup surfaces missing members with missing: true', async () => {
++    const present = '550e8400-e29b-41d4-a716-446655440f60';
++    const absent = '550e8400-e29b-41d4-a716-446655440f99';
++    await writeSidecar(projectRoot, makeEntry(present, 'present'));
++    await writeSidecar(projectRoot, makeEntry('550e8400-e29b-41d4-a716-446655440f61', 'g', { members: [present, absent] }));
++
++    const result = await showGroup(projectRoot, 'g');
++    expect(result.members[1]).toMatchObject({ uuid: absent, missing: true });
++    expect(result.members[1].slug).toBeUndefined();
++  });
++});
++
++describe('addGroupMember + removeGroupMember', () => {
++  async function makeGroupWith(memberUuids: string[]): Promise<string> {
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440f70';
++    await writeSidecar(projectRoot, makeEntry(groupUuid, 'g', { members: memberUuids }));
++    return groupUuid;
++  }
++
++  it('appends a member by default', async () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440f71';
++    await writeSidecar(projectRoot, makeEntry(memberUuid, 'm'));
++    await makeGroupWith([]);
++
++    const result = await addGroupMember(projectRoot, {
++      groupSlugOrUuid: 'g',
++      memberSlugOrUuid: 'm',
++    });
++    expect(result.index).toBe(0);
++    expect(result.members).toEqual([memberUuid]);
++  });
++
++  it('inserts at --at <index>', async () => {
++    const m1 = '550e8400-e29b-41d4-a716-446655440f72';
++    const m2 = '550e8400-e29b-41d4-a716-446655440f73';
++    const m3 = '550e8400-e29b-41d4-a716-446655440f74';
++    await writeSidecar(projectRoot, makeEntry(m1, 'm1'));
++    await writeSidecar(projectRoot, makeEntry(m2, 'm2'));
++    await writeSidecar(projectRoot, makeEntry(m3, 'm3'));
++    await makeGroupWith([m1, m3]);
++
++    const result = await addGroupMember(projectRoot, {
++      groupSlugOrUuid: 'g',
++      memberSlugOrUuid: 'm2',
++      at: 1,
++    });
++    expect(result.members).toEqual([m1, m2, m3]);
++  });
++
++  it('refuses duplicates within a single group', async () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440f80';
++    await writeSidecar(projectRoot, makeEntry(memberUuid, 'm-dup'));
++    await makeGroupWith([memberUuid]);
++
++    await expect(addGroupMember(projectRoot, {
++      groupSlugOrUuid: 'g',
++      memberSlugOrUuid: 'm-dup',
++    })).rejects.toThrow(/already in this group/);
++  });
++
++  it('refuses self-membership', async () => {
++    const groupUuid = await makeGroupWith([]);
++    await expect(addGroupMember(projectRoot, {
++      groupSlugOrUuid: 'g',
++      memberSlugOrUuid: groupUuid,
++    })).rejects.toThrow(/refused self-membership/);
++  });
++
++  it('refuses out-of-range --at', async () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440f90';
++    await writeSidecar(projectRoot, makeEntry(memberUuid, 'm-oor'));
++    await makeGroupWith([]);
++    await expect(addGroupMember(projectRoot, {
++      groupSlugOrUuid: 'g',
++      memberSlugOrUuid: 'm-oor',
++      at: 5,
++    })).rejects.toThrow(/out of range/);
++  });
++
++  it('removeGroupMember removes the member', async () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440fa0';
++    await writeSidecar(projectRoot, makeEntry(memberUuid, 'm-remove'));
++    await makeGroupWith([memberUuid]);
++
++    const result = await removeGroupMember(projectRoot, {
++      groupSlugOrUuid: 'g',
++      memberSlugOrUuid: 'm-remove',
++    });
++    expect(result.members).toEqual([]);
++  });
++
++  it('removeGroupMember refuses when the member is not present', async () => {
++    const memberA = '550e8400-e29b-41d4-a716-446655440fb0';
++    const memberB = '550e8400-e29b-41d4-a716-446655440fb1';
++    await writeSidecar(projectRoot, makeEntry(memberA, 'in-grp'));
++    await writeSidecar(projectRoot, makeEntry(memberB, 'not-in-grp'));
++    await makeGroupWith([memberA]);
++
++    await expect(removeGroupMember(projectRoot, {
++      groupSlugOrUuid: 'g',
++      memberSlugOrUuid: 'not-in-grp',
++    })).rejects.toThrow(/not in this group/);
++  });
++});
++
++describe('updateGroup', () => {
++  it('mutates title', async () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440fc0';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440fc1';
++    await writeSidecar(projectRoot, makeEntry(memberUuid, 'm-u'));
++    await writeSidecar(projectRoot, makeEntry(groupUuid, 'g-u', {
++      title: 'Old',
++      members: [memberUuid],
++    }));
++
++    const result = await updateGroup(projectRoot, {
++      slugOrUuid: 'g-u',
++      title: 'New',
++    });
++    expect(result.entry.title).toBe('New');
++    expect(result.changedFields).toEqual(['title']);
++  });
++
++  it('refuses when no patch fields are supplied', async () => {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440fc2';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440fc3';
++    await writeSidecar(projectRoot, makeEntry(memberUuid, 'm-u2'));
++    await writeSidecar(projectRoot, makeEntry(groupUuid, 'g-u2', { members: [memberUuid] }));
++
++    await expect(updateGroup(projectRoot, { slugOrUuid: 'g-u2' }))
++      .rejects.toThrow(/no patch fields supplied/);
++  });
++});
++
++describe('archiveGroup + restoreGroup', () => {
++  async function makeGroupForArchive(archived = false): Promise<string> {
++    const memberUuid = '550e8400-e29b-41d4-a716-446655440fd0';
++    const groupUuid = '550e8400-e29b-41d4-a716-446655440fd1';
++    await writeSidecar(projectRoot, makeEntry(memberUuid, 'm-arc'));
++    await writeSidecar(projectRoot, makeEntry(groupUuid, 'g-arc', {
++      members: [memberUuid],
++      ...(archived && { archivedAt: '2026-05-28T10:00:00.000Z' }),
++    }));
++    return groupUuid;
++  }
++
++  it('archiveGroup sets archivedAt', async () => {
++    await makeGroupForArchive();
++    const result = await archiveGroup(projectRoot, 'g-arc');
++    expect(typeof result.entry.archivedAt).toBe('string');
++    expect(result.entry.archivedAt?.length ?? 0).toBeGreaterThan(0);
++  });
++
++  it('archiveGroup refuses an already-archived group', async () => {
++    await makeGroupForArchive(true);
++    await expect(archiveGroup(projectRoot, 'g-arc'))
++      .rejects.toThrow(/already archived/);
++  });
++
++  it('restoreGroup clears archivedAt', async () => {
++    await makeGroupForArchive(true);
++    const result = await restoreGroup(projectRoot, 'g-arc');
++    expect(result.entry.archivedAt).toBeUndefined();
++  });
++
++  it('restoreGroup refuses a non-archived group', async () => {
++    await makeGroupForArchive();
++    await expect(restoreGroup(projectRoot, 'g-arc'))
++      .rejects.toThrow(/not archived/);
++  });
++});
+diff --git a/packages/core/test/schema/entry.test.ts b/packages/core/test/schema/entry.test.ts
+index ec838e5..7ca38dd 100644
+--- a/packages/core/test/schema/entry.test.ts
++++ b/packages/core/test/schema/entry.test.ts
+@@ -370,4 +370,104 @@ describe('EntrySchema', () => {
+     };
+     expect(EntrySchema.safeParse(invalid).success).toBe(false);
+   });
++
++  // Phase 7 Task 7.2 — archivedAt schema delta. Mirrors the lane-level
++  // archivedAt shape: optional ISO datetime that doubles as the
++  // boolean signal (presence → archived) and the audit trail.
++
++  it('accepts an entry without archivedAt (active entry; backward-compat)', () => {
++    const valid: Entry = {
++      uuid: '550e8400-e29b-41d4-a716-446655440030',
++      slug: 'active',
++      title: 'Active Entry',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Drafting',
++      iterationByStage: {},
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    const result = EntrySchema.safeParse(valid);
++    expect(result.success).toBe(true);
++    if (result.success) {
++      expect(result.data.archivedAt).toBeUndefined();
++    }
++  });
++
++  it('accepts an entry with archivedAt set to an ISO datetime', () => {
++    const valid: Entry = {
++      uuid: '550e8400-e29b-41d4-a716-446655440031',
++      slug: 'archived-group',
++      title: 'Archived Group',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Drafting',
++      iterationByStage: {},
++      members: ['550e8400-e29b-41d4-a716-446655440110'],
++      archivedAt: '2026-05-29T12:34:56.789Z',
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-05-29T12:34:56.789Z',
++    };
++    const result = EntrySchema.safeParse(valid);
++    expect(result.success).toBe(true);
++    if (result.success) {
++      expect(result.data.archivedAt).toBe('2026-05-29T12:34:56.789Z');
++    }
++  });
++
++  it('accepts archivedAt on a non-group entry (forward-compat across entry shapes)', () => {
++    // Per the Task 7.2 schema delta doc-comment: archivedAt is
++    // forward-compat — settable on regular entries too, not just
++    // groups. Tests the field is independent of members[].
++    const valid: Entry = {
++      uuid: '550e8400-e29b-41d4-a716-446655440032',
++      slug: 'archived-regular',
++      title: 'Archived Regular Entry',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Drafting',
++      iterationByStage: {},
++      archivedAt: '2026-05-29T12:34:56.789Z',
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-05-29T12:34:56.789Z',
++    };
++    const result = EntrySchema.safeParse(valid);
++    expect(result.success).toBe(true);
++    if (result.success) {
++      expect(result.data.archivedAt).toBe('2026-05-29T12:34:56.789Z');
++      expect(result.data.members).toBeUndefined();
++    }
++  });
++
++  it('rejects archivedAt that is not a datetime string', () => {
++    const invalid = {
++      uuid: '550e8400-e29b-41d4-a716-446655440033',
++      slug: 'bad-archive',
++      title: 'Bad Archive',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Drafting',
++      iterationByStage: {},
++      archivedAt: 'yesterday',
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    expect(EntrySchema.safeParse(invalid).success).toBe(false);
++  });
++
++  it('rejects archivedAt when it is not a string', () => {
++    const invalid = {
++      uuid: '550e8400-e29b-41d4-a716-446655440034',
++      slug: 'archive-wrong-type',
++      title: 'Archive Wrong Type',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Drafting',
++      iterationByStage: {},
++      archivedAt: 17_000_000_000,
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    expect(EntrySchema.safeParse(invalid).success).toBe(false);
++  });
+ });
+diff --git a/plugins/deskwork/skills/cancel/SKILL.md b/plugins/deskwork/skills/cancel/SKILL.md
+index e31133c..5faf155 100644
+--- a/plugins/deskwork/skills/cancel/SKILL.md
++++ b/plugins/deskwork/skills/cancel/SKILL.md
+@@ -1,6 +1,6 @@
+ ---
+ name: cancel
+-description: Move an entry to Cancelled (intent: abandoned; resumable but rare)
++description: "Move an entry to Cancelled (intent: abandoned; resumable but rare). Universal verb — operates on every entry shape, including group entries. Use --cascade on a group to propagate the cancellation to its members."
+ ---
+ 
+ ## Cancel
+@@ -12,20 +12,34 @@ Mark an entry as Cancelled — formally abandoned. Like Blocked but signals inte
+ ```
+ /deskwork:cancel <slug>
+ /deskwork:cancel <slug> --reason "<reason>"
++/deskwork:cancel <slug> --cascade                 — group: also cancel every member
++/deskwork:cancel <slug> --reason "<reason>" --cascade
+ ```
+ 
+ ### Steps
+ 
+ 1. Resolve `<slug>` → entry uuid via `.deskwork/entries/`.
+-2. Run `deskwork cancel <uuid> [--reason "<reason>"]` (the underlying CLI helper). Cancel is now an atomic operation that:
++2. Run `deskwork cancel <uuid> [--reason "<reason>"] [--cascade]` (the underlying CLI helper). Cancel is now an atomic operation that:
+    - Validates currentStage is a linear-pipeline stage (not Published / Blocked / Cancelled).
+    - Updates the sidecar (`currentStage` → `Cancelled`; `priorStage` set to the previous stage so a later `/deskwork:induct` can restore the entry if the operator reverses the cancellation).
+    - Appends a `stage-transition` journal event (with `reason` when supplied).
++   - When `--cascade` is passed AND the entry's `members[]` is non-empty: walks each member and cancels it too (members already off-pipeline are SKIPPED rather than refused, so a partially-cancelled group still cancels cleanly).
+    - Regenerates `calendar.md`.
+ 3. Run `deskwork doctor` to validate.
+ 
++### Defaults
++
++- **No `--cascade` (default behaviour).** Per the universal-verb-no-cascade rule (DESKWORK-STATE-MACHINE.md Commandment II), cancel does NOT propagate to members. On a group entry the group's own stage flips to Cancelled and the members are untouched. This matches the Approve behaviour — approve on a group does NOT propagate either.
++- **`--cascade` is a no-op on non-group entries** (entries without a `members[]` array, or with an empty array). The flag's signal is "if this entry has members, cancel them too"; safe to pass against any entry.
++
+ ### Error handling
+ 
+ - **Already Cancelled.** CLI refuses with `Cannot cancel: entry is already Cancelled.`
+ - **Currently Blocked.** CLI refuses with `Cannot cancel: entry is already Blocked.` Suggest running `/deskwork:induct` first to return the entry to its prior pipeline stage, then `/deskwork:cancel`.
+ - **Currently Published.** CLI refuses with `Cannot cancel: Published is terminal.`
++- **`--cascade` against a member that's already Cancelled / Blocked / terminal.** The cascade does NOT abort; the member is SKIPPED and surfaces in the result's `skippedMembers[]` so the operator can audit what was passed over. Members that fail to resolve (dangling member UUID per doctor's `group-member-missing`) are also reported as skipped with a `read failed:` reason.
++
++### Safety rules
++
++- **Cancel is irreversible-by-default but recoverable via `/deskwork:induct`.** Cancel records `priorStage` on the sidecar so a later `induct` can return the entry to its previous linear stage. The cascade does NOT record per-member `cascadeFrom` linkage today; restoring a cascade requires re-inducting each member individually.
++- **`--cascade` does not enforce recursion checks.** A group whose member is itself a group is rejected by doctor's `group-recursive` rule (Phase 7 Task 7.5.1) at audit time; the CLI deliberately does NOT enforce recursion at cancel time. If a recursive group somehow exists on disk, the cascade walks transitively — every nested group + every nested member is cancelled.
+diff --git a/plugins/deskwork/skills/group/SKILL.md b/plugins/deskwork/skills/group/SKILL.md
+new file mode 100644
+index 0000000..e600245
+--- /dev/null
++++ b/plugins/deskwork/skills/group/SKILL.md
+@@ -0,0 +1,90 @@
++---
++name: group
++description: "CRUD on group entries — list, show, create, update, add-member, remove-member, archive, restore. A group is an entry with the `members` field PRESENT (an empty array marks a group declared and awaiting its first add-member; absent means regular entry). Multi-group membership and cross-lane membership are both supported. Cancel uses the universal /deskwork:cancel verb (with --cascade for member propagation)."
++---
++
++## Group — manage group entries
++
++A **group** is an entry whose `members` field is PRESENT on the sidecar. An empty `members: []` is the canonical "group declared, awaiting members" state — `group create` writes that shape so the new group is visible to `group list` / `group show` immediately, before the first `add-member` runs. An entry without a `members` field is a regular (non-group) entry; group-only verbs (`show`, `update`, `add-member`, `remove-member`, `archive`, `restore`) refuse against it. Per Phase 7 Task 7.1.2 there is no separate Group entity — same schema, same code paths, plus the `members` field. Group entries live alongside regular entries under `.deskwork/entries/<uuid>.json`; the dashboard, doctor, and review surfaces all treat them as entries with the extra members affordance.
++
++The `group` verb is a CRUD family for the group-specific lifecycle (creation, member edits, archive). Stage transitions on the group itself (approve / iterate / publish / block) use the same universal verbs as regular entries. Cancel uses the universal `/deskwork:cancel`; its `--cascade` flag is the opt-in member-cancel propagation per Step 7.2.6.
++
++### Subcommands
++
++| Verb | Purpose |
++|---|---|
++| `list` | enumerate groups (active by default; pass `--include-archived` for the full set) |
++| `show <slug>` | print a group's metadata + members (with per-member slug / lane / stage) |
++| `create <slug>` | write a new group entry into a lane |
++| `update <slug>` | mutate the group's `title` |
++| `add-member <group> <member>` | append (or insert at `--at <index>`) a member UUID |
++| `remove-member <group> <member>` | remove the member from the group's `members[]` |
++| `archive <slug>` | soft-archive a group (sets `archivedAt`; preserves history) |
++| `restore <slug>` | clear `archivedAt` |
++
++### Input
++
++```
++/deskwork:group list [--include-archived]
++/deskwork:group show <slug-or-uuid>
++/deskwork:group create <slug> --lane <lane-id> [--artifact-path <path>] [--title <text>]
++/deskwork:group update <slug-or-uuid> [--title <text>]
++/deskwork:group add-member <group-slug-or-uuid> <member-slug-or-uuid> [--at <index>]
++/deskwork:group remove-member <group-slug-or-uuid> <member-slug-or-uuid>
++/deskwork:group archive <slug-or-uuid>
++/deskwork:group restore <slug-or-uuid>
++/deskwork:cancel <slug>                          — cancel just the group (universal verb)
++/deskwork:cancel <slug> --cascade                — cancel the group AND every member
++```
++
++### Steps
++
++1. Resolve the operator-supplied slug or UUID via `resolveEntryUuid`.
++2. Run the matching subcommand via `deskwork group <verb> [args...]`:
++   - **`list`** walks every sidecar via `readAllSidecars` and filters to entries with the `members` field PRESENT (including empty-array declared groups — see the header for the empty-vs-absent semantic). Active groups only by default; `--include-archived` appends groups carrying a non-empty `archivedAt`. Each row emits uuid / slug / title / lane / currentStage / memberCount / archived / archivedAt; newly-created groups appear with `memberCount: 0`.
++   - **`show <slug>`** loads the group entry plus each member's sidecar, enriching every member row with the member's own slug / title / lane / currentStage / archived state. Members whose UUID does not resolve are reported with `missing: true` rather than aborting — doctor's `group-member-missing` rule (Task 7.5.2) handles the repair.
++   - **`create <slug> --lane <lane-id>`** writes a new group sidecar at `.deskwork/entries/<uuid>.json` with `members: []` (the empty-array form is the operator-intent marker per Task 7.5.5 — "this is a group awaiting members"). Defaults `--title <text>` to the slug when omitted; `--artifact-path <path>` is optional and binds an editable content body (e.g. `manifesto.md`) the group can iterate on. The group's `currentStage` initializes to the lane template's first `linearStages` entry. Refuses when the lane id doesn't resolve, when the lane is archived, when the slug collides with an existing entry, or when the template has no `linearStages` defined.
++   - **`update <slug>`** mutates the group's `title` in place. At least one patch flag is required (the only mutable field today is `--title`). Works against both populated and declared-empty groups; refuses against entries without the `members` field at all (regular entries). Slug rename uses the existing rename-slug flow; lane move uses `/deskwork:lane move`; uuid is immutable; `members[]` is owned by `add-member` / `remove-member`.
++   - **`add-member <group-slug> <member-slug> [--at <index>]`** resolves the member slug to its UUID, then appends (default) or inserts at the 0-based `--at <index>` (`0 <= index <= members.length` — `members.length` is the append position). The same entry UUID CAN be in multiple groups simultaneously (Step 7.2.4 multi-group membership). Members may span lanes (Step 7.2.5 cross-lane membership) — the verb does NOT check that the member's `lane` matches the group's `lane`. Refuses on self-membership (the group's own UUID), duplicate-within-group, missing member, or out-of-range index.
++   - **`remove-member <group-slug> <member-slug>`** removes the member UUID from the group's `members[]`. Refuses if the member is not present (silent no-op would hide operator typos per CLI-discipline). Removing from one group does NOT affect the same entry's membership in any other group.
++   - **`archive <slug>`** sets `archivedAt` on the group entry to the current ISO datetime. The group disappears from default `group list` output and is skipped by the dashboard / studio renderers. The group's `currentStage` is untouched — archive is a listing-affordance soft-hide, not a stage transition. Members are NOT archived.
++   - **`restore <slug>`** removes `archivedAt`. The group reappears in `list` output and is rendered again.
++3. Run `deskwork doctor` to validate (catches recursive groups, dangling member UUIDs, and groups with all-cancelled members — see Task 7.5 rules).
++
++### Defaults
++
++- `group list` excludes archived groups by default. Pass `--include-archived` for the full set.
++- `group create --title <text>` defaults to the slug when omitted.
++- `group create` initializes `members: []` (NOT `members: undefined`) — the empty array carries the operator-intent signal that distinguishes "intentionally a group, awaiting members" from "regular entry that happens to have no members." Doctor's `group-empty-members-array` informational rule (Task 7.5.5) surfaces this dual representation for operators who want to normalize.
++- `group add-member` appends to `members[]` when `--at` is omitted (insertion at `members.length`).
++- `group cancel` uses the universal `/deskwork:cancel` verb. Pass `--cascade` to propagate the cancellation to every member; default behaviour cancels only the group.
++
++### Error handling
++
++- **`list` / `show` on a project with no sidecars.** `list` emits `{ groups: [] }`; `show <slug>` refuses with the slug-not-found error from `resolveEntryUuid`.
++- **`show <slug>` against a non-group entry.** Refused with `Cannot show group "<slug>": entry has no members. Per the Task 7.1.2 invariant, only entries with a non-empty members[] are groups.` Pointer: use the universal entry read paths for non-group entries.
++- **`create <slug>` with an unknown lane.** Refused with the loader's underlying `Lane config "<id>" not found at <path>` error. Pointer: list existing lanes with `deskwork lane list`.
++- **`create <slug>` into an archived lane.** Refused with `Cannot create group "<slug>" in archived lane "<id>". Restore the lane first via "deskwork lane restore <id>".`
++- **`create <slug>` with a colliding slug.** Refused with `Cannot create group "<slug>": slug collision with entry <uuid> (currentStage="..."). Pick a different slug.`
++- **`create <slug>` against a template with no linearStages.** Refused with the configuration-error message naming the template id; repair the template before creating a group.
++- **`update <slug>` with no patch flags.** Refused with `Cannot update group "<slug>": no patch fields supplied. Pass --title <text>.`
++- **`update <slug>` against a non-group entry.** Refused with the same "entry has no members" shape as `show` — the verb is group-specific.
++- **`add-member <group> <member>` with the member already in the group.** Refused with `member "<slug>" (UUID <uuid>) is already in this group. Duplicates within a single group are refused; the same entry CAN be a member of multiple groups simultaneously (Step 7.2.4).`
++- **`add-member <group> <group>` (self-membership).** Refused with `refused self-membership. A group cannot contain itself as a member (1-element cycle).`
++- **`add-member <group> <member> --at <i>` with `i` out of range.** Refused with `--at <i> is out of range. Valid range: 0..<members.length> (inclusive; <members.length> is the append position).`
++- **`add-member <group> <member> --at <not-an-integer>`.** Refused with `Invalid --at value "<value>": must be a non-negative integer (0-based insertion index).`
++- **`add-member` against a non-group entry.** Refused with `Cannot add member to "<slug>": entry has no \`members\` field.` Pointer: `deskwork group create <slug> --lane <lane>` first.
++- **`remove-member <group> <member>` with the member not present.** Refused with `member "<slug>" (UUID <uuid>) is not in this group's members[]. Current members: <list>.`
++- **`archive <slug>` against a non-group entry.** Refused with the "entry has no members" shape.
++- **`archive <slug>` against a group already archived.** Refused with `already archived (archivedAt=<timestamp>).`
++- **`restore <slug>` against a group not archived.** Refused with `not archived (no archivedAt field).`
++
++### Safety rules
++
++- **The `members[]` field is the only schema delta for groups.** Phase 7 Task 7.1 shipped the schema; this task adds the CRUD verbs that operate on it. Nothing in `group <verb>` requires a new field — `currentStage`, `lane`, `artifactPath`, `archivedAt`, etc. are all pre-existing Entry fields.
++- **Cancel propagation is opt-in via `--cascade` on `/deskwork:cancel`.** Per DESKWORK-STATE-MACHINE.md Commandment II + the universal-verb rule, cancel on a group does NOT propagate by default. The `--cascade` flag is the operator's opt-in signal; the cascade walks `members[]` and cancels each (skipping members already off-pipeline). Approve does NOT have a `--cascade` equivalent — group approve always operates on the group only.
++- **Multi-group membership is supported.** The same entry UUID can appear in multiple groups' `members[]` arrays simultaneously. Removing the member from one group does NOT affect its membership in any other group. The studio surfaces (Task 7.3) render a "Member of: <group-1>, <group-2>" badge listing every parent.
++- **Cross-lane membership is supported.** A group in lane A can contain members in lane A, lane B, the default lane — any combination. The `add-member` verb does NOT enforce a same-lane check. Studio's Phase 5 multi-lane composed-view (Task 7.4) renders members in their own lane's columns.
++- **Recursive groups are out of scope for v1.** A group whose member is itself a group is rejected by doctor's `group-recursive` rule (Phase 7 Task 7.5.1) at audit time. The CLI deliberately does NOT enforce recursion at write time per the task scope — the doctor rule is the authoritative check.
++- **Archive is the preferred disposition for retired groups**, not cancel. Per the project's content-management-databases-preserve rule, archive hides the group from active surfaces while preserving its history (sidecar, journal, member array). Cancel records terminal abandonment intent; archive records visibility intent. They compose — an archived group can also be cancelled, and vice versa.
++- **A group with no editable artifact is "metadata-only."** When `artifactPath` is absent, `/deskwork:iterate` refuses with the metadata-only message (per Task 7.7.2). To iterate on a group, create it with `--artifact-path <path>` so the group has a content body to address comments on.
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...). Use `blocking` only for issues that would break the feature's stated goals in obvious ways; `high` for correctness bugs adopters will hit; `medium` for design issues that compound over time; `low` for hygiene; `informational` for context you think the operator should see but isn't itself a bug.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.

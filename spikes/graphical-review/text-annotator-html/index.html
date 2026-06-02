@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@recogito/text-annotator HTML-annotation spike</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <h1>@recogito/text-annotator HTML annotation spike</h1>
+      <p class="lede">
+        Phase 1 Task 1.3 — pin a comment to a DOM region inside a rendered
+        HTML mockup. Text-range pins flow through
+        <code>@recogito/text-annotator</code>'s W3C TextQuote/TextPosition
+        selectors; non-text regions flow through a thin hand-rolled
+        DOM-selector layer that emits a CssSelector with TextQuote +
+        FragmentSelector (pixel-offset) fallbacks.
+      </p>
+    </header>
+
+    <main class="grid">
+      <section class="canvas-pane" aria-label="HTML mockup annotation canvas">
+        <div class="toolbar" role="toolbar" aria-label="Annotation tools">
+          <button id="tool-text" type="button" aria-pressed="true">
+            Text-range (drag to select)
+          </button>
+          <button id="tool-dom" type="button" aria-pressed="false">
+            DOM region (click any element)
+          </button>
+          <button id="tool-clear" type="button">Clear all</button>
+        </div>
+        <iframe
+          id="fixture-iframe"
+          title="HTML mockup fixture"
+          src="./fixture/index.html"
+        ></iframe>
+        <p class="hint">
+          <strong>Text-range</strong>: select text inside the iframe; the library
+          emits a TextQuoteSelector + TextPositionSelector. <strong>DOM region</strong>:
+          click any element (including non-text icons / images / decorative divs);
+          the spike's thin layer emits a CssSelector + TextQuote fallback (if any
+          text content is present) + FragmentSelector pixel offsets.
+        </p>
+        <p class="hint">
+          <em>Note:</em> the text-annotator instance for the iframe is created
+          inside the iframe's own document context (script injection) because
+          <code>@recogito/text-annotator</code> attaches its selection listeners
+          to <code>document</code>, not to the container's
+          <code>ownerDocument</code>. See findings doc § "Anchor model — measured."
+        </p>
+      </section>
+
+      <aside class="payload-pane" aria-label="W3C Web Annotation JSON-LD payload">
+        <div class="payload-head">
+          <h2>W3C JSON-LD payload</h2>
+          <button id="download" type="button">Download annotations.json</button>
+        </div>
+        <p class="payload-meta" id="payload-meta">No annotations yet.</p>
+        <pre id="payload" aria-live="polite">[]</pre>
+      </aside>
+    </main>
+
+    <footer class="footnotes">
+      <p>
+        Text-range pins flow through <code>createTextAnnotator(iframeDoc.body)</code>
+        with <code>W3CTextFormat</code> as the adapter. DOM-region pins flow
+        through a thin hand-rolled layer in <code>src/dom-anchor.js</code> (size
+        in the findings doc — under 250 LOC) because
+        <code>@recogito/text-annotator</code> is a text-range annotator and
+        cannot natively pin to icon buttons / images / empty decorative divs.
+      </p>
+    </footer>
+
+    <script type="module" src="./src/spike.js"></script>
+  </body>
+</html>

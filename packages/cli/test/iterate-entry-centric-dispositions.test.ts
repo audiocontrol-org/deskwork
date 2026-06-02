@@ -178,8 +178,15 @@ describe('deskwork iterate — entry-centric dispositions (#198)', () => {
       '# v1 outline\n\nFirst draft body, tightened intro.\n',
     );
 
+    // Phase 8 Step 8.1.2 (Part 2) — `addressed` disposition requires a
+    // non-empty `reason`. The dispositions file supplies one explicitly;
+    // Step 8.5.2 will add a CLI-parse-time gate that surfaces a clearer
+    // error for missing-reason files.
     const dispPath = writeDispositions({
-      [COMMENT_ID]: { disposition: 'addressed' },
+      [COMMENT_ID]: {
+        disposition: 'addressed',
+        reason: 'addressed by adding tightened intro paragraph',
+      },
     });
 
     const res = run([
@@ -270,8 +277,17 @@ describe('deskwork iterate — entry-centric dispositions (#198)', () => {
       '# v1 outline\n\nUpdated body.\n',
     );
 
+    // Phase 8 Step 8.5.2 — the orphan-commentId path is gated by the
+    // disposition's shape (NOT addressed) so the parse-time
+    // reason-required check doesn't fire. The orphan is then silently
+    // skipped at runtime; the iteration still appends a new version
+    // but emits no address annotations. Use 'deferred' here so the
+    // parse-time gate passes and the orphan-skip path is what's
+    // exercised. See the dedicated Step 8.5.2 test
+    // (disposition-reason-required.test.ts) for the
+    // addressed-without-reason failure shape.
     const dispPath = writeDispositions({
-      'orphan-comment-id-xyz': { disposition: 'addressed' },
+      'orphan-comment-id-xyz': { disposition: 'deferred' },
     });
 
     const res = run([
@@ -381,7 +397,20 @@ describe('deskwork iterate — --auto-dispositions (#226)', () => {
   const C1 = 'c2260001-0000-4000-8000-000000000001';
   const C2 = 'c2260002-0000-4000-8000-000000000002';
 
-  it('applies addressed to every unresolved comment', () => {
+  it('--auto-dispositions=addressed is refused at parse time (Step 8.5.2)', () => {
+    // Phase 8 Step 8.5.2 — `--auto-dispositions=addressed` is refused
+    // BEFORE any project state is touched. The flag has no per-comment
+    // reason input, so it cannot satisfy the Step 8.1.2 contract
+    // (`addressed` requires non-empty `reason`). The CLI-parse-time
+    // gate surfaces the contract violation with a friendly error shape
+    // that explains the refusal AND points to the dispositions-file
+    // alternative. Replaces the prior write-time contract throw, which
+    // was reachable only after the iteration's project setup had run.
+    //
+    // Sibling tests `applies deferred when that value is requested`
+    // (below) and `rejects an invalid value with exit 2` (below) still
+    // exercise the flag's deferred / wontfix branches where the
+    // contract does NOT apply.
     writeSidecar({ uuid: UUID, slug: 'auto-addressed', currentStage: 'Outlining' });
     writeStageArtifact('auto-addressed', 'Outlining', '# v1\n\nbody.\n');
     seedEntryComment(UUID, C1, 'first comment');
@@ -395,21 +424,11 @@ describe('deskwork iterate — --auto-dispositions (#226)', () => {
       '--auto-dispositions=addressed',
       'auto-addressed',
     ]);
-    expect(res.stderr).toBe('');
-    expect(res.code).toBe(0);
-
-    const out = JSON.parse(res.stdout) as { addressedComments: string[] };
-    expect(out.addressedComments.sort()).toEqual([C1, C2].sort());
-
-    // Confirm two address-typed annotations landed in the journal.
-    const events = readJournalEvents();
-    const addresses = events.filter(
-      (e) => e.kind === 'entry-annotation' && e.annotation?.type === 'address',
-    );
-    expect(addresses).toHaveLength(2);
-    expect(
-      addresses.every((e) => e.annotation?.disposition === 'addressed'),
-    ).toBe(true);
+    expect(res.code).toBe(2);
+    expect(res.stderr).toMatch(/--auto-dispositions=addressed is refused/);
+    // The error points to the dispositions-file alternative shape.
+    expect(res.stderr).toMatch(/"disposition":\s*"addressed"/);
+    expect(res.stderr).toMatch(/"reason":/);
   });
 
   it('applies deferred when that value is requested', () => {
@@ -474,12 +493,17 @@ describe('deskwork iterate — --auto-dispositions (#226)', () => {
     writeSidecar({ uuid: UUID, slug: 'auto-none', currentStage: 'Outlining' });
     writeStageArtifact('auto-none', 'Outlining', '# v1\n');
 
+    // Phase 8 Step 8.5.2 — `--auto-dispositions=addressed` is refused
+    // unconditionally (the flag has no per-comment reason input).
+    // Exercise the empty-comments branch via `deferred` instead; the
+    // deferred path is unchanged and remains valid for bulk
+    // operations.
     const res = run([
       'iterate',
       project,
       '--kind',
       'longform',
-      '--auto-dispositions=addressed',
+      '--auto-dispositions=deferred',
       'auto-none',
     ]);
     expect(res.code).toBe(0);

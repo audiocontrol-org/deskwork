@@ -123,19 +123,67 @@ export function handleAnnotate(
         return err(400, 'address.commentId is required');
       }
       if (typeof d.version !== 'number') return err(400, 'address.version is required');
-      if (d.disposition !== 'addressed' && d.disposition !== 'deferred' && d.disposition !== 'wontfix') {
-        return err(400, "address.disposition must be 'addressed' | 'deferred' | 'wontfix'");
+      // Phase 8 Step 8.1.2 (Part 2) — `reason` is REQUIRED when
+      // `disposition === 'addressed'`. The write-side schema
+      // (`JournalEventSchema.safeParse` → `DraftAnnotationSchema`'s
+      // top-level `.superRefine`) would also reject the call, but
+      // surfacing the contract here gives the HTTP caller a 400 with a
+      // specific message instead of a downstream schema-rejected throw.
+      if (d.disposition === 'addressed') {
+        if (typeof d.reason !== 'string' || d.reason.length === 0) {
+          return err(
+            400,
+            "address.reason is required (non-empty) when disposition === 'addressed' (Phase 8 Step 8.1.2)",
+          );
+        }
+        const draftAddressed: Omit<
+          Extract<DraftAnnotation, { type: 'address'; disposition: 'addressed' }>,
+          'id' | 'createdAt'
+        > = {
+          type: 'address',
+          workflowId: draft.workflowId,
+          commentId: d.commentId,
+          version: d.version,
+          disposition: 'addressed',
+          reason: d.reason,
+        };
+        const annotation = mintAnnotation(draftAddressed);
+        appendAnnotation(projectRoot, config, annotation);
+        return ok({ annotation });
       }
-      const annotation = mintAnnotation({
-        type: 'address',
-        workflowId: draft.workflowId,
-        commentId: d.commentId,
-        version: d.version,
-        disposition: d.disposition,
-        ...(typeof d.reason === 'string' ? { reason: d.reason } : {}),
-      });
-      appendAnnotation(projectRoot, config, annotation);
-      return ok({ annotation });
+      if (d.disposition === 'deferred') {
+        const draftDeferred: Omit<
+          Extract<DraftAnnotation, { type: 'address'; disposition: 'deferred' }>,
+          'id' | 'createdAt'
+        > = {
+          type: 'address',
+          workflowId: draft.workflowId,
+          commentId: d.commentId,
+          version: d.version,
+          disposition: 'deferred',
+          ...(typeof d.reason === 'string' ? { reason: d.reason } : {}),
+        };
+        const annotation = mintAnnotation(draftDeferred);
+        appendAnnotation(projectRoot, config, annotation);
+        return ok({ annotation });
+      }
+      if (d.disposition === 'wontfix') {
+        const draftWontfix: Omit<
+          Extract<DraftAnnotation, { type: 'address'; disposition: 'wontfix' }>,
+          'id' | 'createdAt'
+        > = {
+          type: 'address',
+          workflowId: draft.workflowId,
+          commentId: d.commentId,
+          version: d.version,
+          disposition: 'wontfix',
+          ...(typeof d.reason === 'string' ? { reason: d.reason } : {}),
+        };
+        const annotation = mintAnnotation(draftWontfix);
+        appendAnnotation(projectRoot, config, annotation);
+        return ok({ annotation });
+      }
+      return err(400, "address.disposition must be 'addressed' | 'deferred' | 'wontfix'");
     }
     default:
       return err(400, `unknown annotation type: ${String(draft.type)}`);

@@ -1,0 +1,19 @@
+{
+  "$rationale": "Editorial pipeline — the legacy single-pipeline workflow for blog posts, essays, and long-form writing. Stages exactly match the pre-feature `Stage` enum so a pre-graphical-entries project with no operator-authored config maps cleanly into this template (the auto-migration in Phase 4 attaches every existing entry to id=editorial without renaming stages). Ideas captures a raw note; Planned commits to writing it; Outlining is the structural pass; Drafting is the prose pass; Final is the pre-publication review lock (iterate refused, content immutable, awaiting publish verb); Published is the terminal stage with public commit + version assigned. Blocked / Cancelled are the off-pipeline cul-de-sacs. The `stageEmptyHints` block (added under AUDIT-20260530-39) carries the per-stage empty-state copy the studio dashboard surfaces when a column has no entries — these strings used to live hardcoded inside the studio renderer; moving them here makes the editorial pipeline's vocabulary travel with the pipeline definition so a future stage rename propagates without a studio-side patch.",
+  "id": "editorial",
+  "name": "Editorial",
+  "description": "Long-form writing pipeline (blog posts, essays, manuscripts). Mirrors the pre-graphical-entries single-pipeline lifecycle.",
+  "linearStages": ["Ideas", "Planned", "Outlining", "Drafting", "Final", "Published"],
+  "lockedStages": ["Final"],
+  "offPipelineStages": ["Blocked", "Cancelled"],
+  "stageEmptyHints": {
+    "Ideas": "No open ideas. Run /deskwork:add to capture one.",
+    "Planned": "Nothing planned. /deskwork:approve <slug> to graduate an idea.",
+    "Outlining": "Nothing in outlining.",
+    "Drafting": "No posts in drafting.",
+    "Final": "Nothing in final review.",
+    "Published": "No published posts yet.",
+    "Blocked": "Nothing blocked.",
+    "Cancelled": "No cancelled entries."
+  }
+}

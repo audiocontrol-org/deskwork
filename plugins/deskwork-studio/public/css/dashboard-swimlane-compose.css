@@ -1,0 +1,167 @@
+/**
+ * Multi-lane swimlane dashboard — Press Bay COMPOSE chip + empty-lane CTA.
+ *
+ * Task 5.1C — Per-lane Compose chip (`+ new`).
+ *
+ *  Mirrors the .view-toggle aesthetic — same rounded-2px border,
+ *  same monospace family, same focus-ring + collapse-precedence
+ *  contract. Lives ON the lane it composes for, between the view-
+ *  toggle and the lane-collapse chevron (mockup direction-3-press
+ *  -bay.html swim-head order: glyph · name · tag · quick-meta ·
+ *  view-toggle · compose · collapse-chev).
+ *
+ *  The `.copied` flash state uses --er-stamp-green (the project's
+ *  approved-green token; see dashboard-row-affordances.css:95 +
+ *  editorial-studio.css:103) for the brief 2s flash after a
+ *  successful clipboard write.
+ *
+ * Task 5.2 — Empty-lane CTA (.swim-empty-cta).
+ *
+ *  Surfaced only on lanes whose `bucket.entryCount === 0` — the
+ *  prominent "create your first entry" affordance an operator sees
+ *  the first time they open a freshly-configured lane. Sibling to
+ *  the per-lane Compose chip but larger and with a different
+ *  clipboard payload (no <SLUG>, no --stage).
+ *
+ *  Per `affordance-placement.md`, the CTA lives ON the empty lane's
+ *  swim body (not in any toolbar). Mirrors the .er-outline-tab
+ *  precedent of attaching affordances ON the component they affect.
+ */
+
+/* ============================================================
+ *  Task 5.1C — Compose chip (`+ new`).
+ * ============================================================ */
+
+.swim-compose {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  margin-left: 0.4rem;
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-ink-soft);
+  cursor: pointer;
+  min-height: 26px;
+}
+
+.swim-compose:hover {
+  background: var(--er-paper-2);
+}
+
+.swim-compose:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+.swim-compose .sc-icon {
+  font-size: 0.85rem;
+}
+
+/* Flash state — fired on successful clipboard write; reverts after
+ * ~2000ms via the controller. Uses the project's approved-green
+ * token (var(--er-stamp-green); see dashboard-row-affordances.
+ * css:95 — `.er-row-action-approve { background: var(--er-stamp-
+ * green); }`) so the green semantic is shared with the verb chips. */
+.swim-compose.copied {
+  background: var(--er-stamp-green);
+  color: var(--er-paper);
+  border-color: var(--er-stamp-green);
+}
+
+/* Collapse precedence — mirrors `.swim.collapsed .view-toggle` (in
+ * dashboard-swimlane-list.css); the chip greys out + becomes
+ * non-interactive when the parent lane is collapsed. */
+.swim.collapsed .swim-compose {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ============================================================
+ *  Task 5.2 — Empty-lane CTA (.swim-empty-cta).
+ * ============================================================ */
+
+.swim-empty-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  border-top: 1px dashed var(--er-paper-3);
+  border-bottom: 1px dashed var(--er-paper-3);
+  font-family: var(--er-font-mono);
+  background: var(--er-paper);
+  text-align: center;
+}
+
+.swim-empty-cta .sec-msg {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--er-ink-soft);
+  letter-spacing: 0.02em;
+}
+
+.swim-empty-cta .sec-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 36px;
+  padding: 0.5rem 1rem;
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  font-family: var(--er-font-mono);
+  font-size: 0.8rem;
+  color: var(--er-ink);
+  cursor: pointer;
+}
+
+.swim-empty-cta .sec-cta:hover {
+  background: var(--er-paper-2);
+}
+
+.swim-empty-cta .sec-cta:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+.swim-empty-cta .sec-cta .sec-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Flash state — fired on successful clipboard write; reverts after
+ * ~2000ms via the controller. Uses the project's approved-green
+ * token (mirroring `.swim-compose.copied` above). */
+.swim-empty-cta .sec-cta.copied {
+  background: var(--er-stamp-green);
+  color: var(--er-paper);
+  border-color: var(--er-stamp-green);
+}
+
+.swim-empty-cta .sec-hint {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--er-ink-soft);
+  letter-spacing: 0.01em;
+}
+
+.swim-empty-cta .sec-hint code {
+  background: var(--er-paper-2);
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-ink);
+}
+
+/* Collapse precedence — when the parent lane is collapsed, the
+ * empty-lane CTA greys out + becomes non-interactive (mirrors
+ * `.swim.collapsed .swim-compose` above). */
+.swim.collapsed .swim-empty-cta .sec-cta {
+  opacity: 0.4;
+  pointer-events: none;
+}

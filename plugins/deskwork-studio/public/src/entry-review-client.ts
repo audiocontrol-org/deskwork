@@ -27,6 +27,7 @@ import { initStripCollapse } from './entry-review/strip-collapse.ts';
 import { initMobileSheetBar } from './entry-review/mobile-sheet-bar.ts';
 import { initScrapbookDrawerToggle } from './entry-review/scrapbook-drawer.ts';
 import { initShortcuts } from './entry-review/shortcuts.ts';
+import { initGroupMembersSection } from './entry-review/group-members-section.ts';
 import { copyOrShowFallback } from './clipboard.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
@@ -260,6 +261,7 @@ function initPressCheckSurface(): void {
   initScrapbookLightbox(document);
   initStickyOffset();
   initStripCollapse();
+  initGroupMembersSection();
   // (mobileSheetBar already initialized above so the annotations controller
   // can hook its openSheet for the composer flow.)
 

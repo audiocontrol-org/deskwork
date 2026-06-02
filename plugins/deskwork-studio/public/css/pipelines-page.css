@@ -1,0 +1,487 @@
+/*
+ * pipelines-page.css — `/dev/pipelines` studio surface (Phase 6 Task 6.4).
+ *
+ * Vocabulary mirrors the press-check tokens from editorial-review.css
+ * (paper, ink, red-pencil, proof-blue, kraft, stamp-green) so the page
+ * sits in the same design family as the lanes page and the dashboard.
+ *
+ * Layout shape:
+ *   - .pipelines-container       — main column, paper background.
+ *   - .pipelines-header          — page heading + count meta + warn.
+ *   - .pipelines-banner          — top-of-page errors banner.
+ *   - .pipelines-form            — copy-builder forms (new + edit ops).
+ *   - .pipelines-table           — server-rendered template table.
+ *   - .pipelines-view-panel      — stage-flow visualization (read).
+ *   - .pipelines-edit-panel      — 5-operation accordion (mutation).
+ *   - .pipelines-btn             — universal copy-button vocabulary.
+ *
+ * Per .claude/rules/affordance-placement.md, per-row View / Edit /
+ * Delete affordances live ON the row (in the rightmost actions cell).
+ */
+
+.pipelines-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-block: 1.5rem 2rem;
+}
+
+.pipelines-header {
+  margin-block-end: 0.5rem;
+}
+
+.pipelines-header-warn {
+  display: inline-block;
+  margin-block-start: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--er-paper-2, #ECE6D4);
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  color: var(--er-ink-soft, #3A332E);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+}
+
+.pipelines-section-heading {
+  font-family: var(--er-font-display, Georgia, serif);
+  font-style: italic;
+  font-size: 1.4rem;
+  color: var(--er-ink, #1A1614);
+  margin-block: 0 0.75rem;
+}
+
+/* ---- Top-of-page errors banner ---- */
+
+.pipelines-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-ink, #1A1614);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+}
+
+.pipelines-banner code {
+  background: var(--er-paper-3, #DFD7BF);
+  padding: 0 0.3rem;
+  border-radius: 2px;
+}
+
+/* ---- Forms (new + edit op bodies) ---- */
+
+.pipelines-form,
+.pipelines-edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--er-paper-2, #ECE6D4);
+  border-left: 3px solid var(--er-proof-blue, #2A4B7C);
+}
+
+.pipelines-edit-panel {
+  background: var(--er-paper, #F5F1E8);
+  border-left-color: var(--er-kraft, #8A7250);
+  padding: 0.75rem 1rem;
+}
+
+.pipelines-form-head,
+.pipelines-edit-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pipelines-form-heading,
+.pipelines-edit-heading {
+  margin: 0;
+  font-family: var(--er-font-display, Georgia, serif);
+  font-style: italic;
+  font-size: 1.15rem;
+  color: var(--er-ink, #1A1614);
+}
+
+.pipelines-form-desc,
+.pipelines-edit-desc {
+  margin: 0;
+  color: var(--er-faded, #8A7F70);
+  font-size: 0.85rem;
+}
+
+.pipelines-edit-notice {
+  padding: 0.5rem 0.75rem;
+  background: var(--er-paper-3, #DFD7BF);
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  color: var(--er-ink-soft, #3A332E);
+  font-size: 0.85rem;
+}
+
+.pipelines-edit-notice strong {
+  display: block;
+  margin-block-end: 0.25rem;
+}
+
+.pipelines-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.pipelines-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pipelines-field-label {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-ink-soft, #3A332E);
+}
+
+.pipelines-field-hint {
+  font-size: 0.75rem;
+  color: var(--er-faded, #8A7F70);
+}
+
+.pipelines-input,
+.pipelines-select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--er-paper-3, #DFD7BF);
+  background: var(--er-paper, #F5F1E8);
+  color: var(--er-ink, #1A1614);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+  border-radius: 2px;
+  min-height: 2.25rem;
+}
+
+.pipelines-input:focus,
+.pipelines-select:focus {
+  outline: 2px solid var(--er-proof-blue, #2A4B7C);
+  outline-offset: 1px;
+}
+
+.pipelines-checkbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding-block: 0.25rem;
+}
+
+.pipelines-checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--er-ink, #1A1614);
+}
+
+.pipelines-form-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--er-paper, #F5F1E8);
+  border: 1px solid var(--er-paper-3, #DFD7BF);
+  border-radius: 2px;
+}
+
+.pipelines-form-preview-label {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-faded, #8A7F70);
+}
+
+.pipelines-form-preview-cmd {
+  display: block;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.95rem;
+  color: var(--er-ink, #1A1614);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.pipelines-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/*
+ * Inline notice rendered next to a Copy button when the form is in an
+ * invalid state (empty required field, or set-locked/set-off-pipeline
+ * with no selections — both of which the CLI's `splitStageList`
+ * refuses). Lives in the actions container so the operator's eye lands
+ * on it immediately after the disabled button.
+ */
+.pipelines-copy-notice {
+  margin: 0;
+  flex-basis: 100%;
+  padding: 0.35rem 0.6rem;
+  background: var(--er-paper, #F5F1E8);
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+  color: var(--er-ink-soft, #3A332E);
+  font-size: 0.8rem;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+}
+
+/*
+ * Disabled state for the primary Copy command button. Visually distinct
+ * from the hover state so the operator can't mistake "button looks
+ * pressed" for "click already happened."
+ */
+.pipelines-btn--primary[disabled],
+.pipelines-btn--primary[aria-disabled="true"] {
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-faded, #8A7F70);
+  border-color: var(--er-faded-2, #B5AC9B);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.pipelines-btn--primary[disabled]:hover,
+.pipelines-btn--primary[aria-disabled="true"]:hover {
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-faded, #8A7F70);
+  border-color: var(--er-faded-2, #B5AC9B);
+}
+
+/* ---- Edit panel: 5-op accordion ---- */
+
+.pipelines-edit-ops {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pipelines-edit-op {
+  border: 1px solid var(--er-paper-3, #DFD7BF);
+  background: var(--er-paper, #F5F1E8);
+  border-radius: 2px;
+}
+
+.pipelines-edit-op-summary {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--er-ink-soft, #3A332E);
+  list-style: revert;
+}
+
+.pipelines-edit-op[open] > .pipelines-edit-op-summary {
+  border-bottom: 1px dashed var(--er-paper-3, #DFD7BF);
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.pipelines-edit-op-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+/* ---- Buttons ---- */
+
+.pipelines-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 2.25rem;
+  min-width: 2.25rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--er-paper-3, #DFD7BF);
+  background: var(--er-paper, #F5F1E8);
+  color: var(--er-ink-soft, #3A332E);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 80ms ease-in-out, color 80ms ease-in-out;
+}
+
+.pipelines-btn:hover {
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.pipelines-btn:focus-visible {
+  outline: 2px solid var(--er-proof-blue, #2A4B7C);
+  outline-offset: 1px;
+}
+
+.pipelines-btn--primary {
+  background: var(--er-proof-blue, #2A4B7C);
+  color: var(--er-paper, #F5F1E8);
+  border-color: var(--er-proof-blue, #2A4B7C);
+}
+
+.pipelines-btn--primary:hover {
+  background: var(--er-ink, #1A1614);
+  border-color: var(--er-ink, #1A1614);
+}
+
+.pipelines-btn--secondary {
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.pipelines-btn--view,
+.pipelines-btn--edit {
+  border-color: var(--er-kraft, #8A7250);
+  color: var(--er-kraft, #8A7250);
+}
+
+.pipelines-btn--view:hover,
+.pipelines-btn--edit:hover {
+  background: var(--er-kraft, #8A7250);
+  color: var(--er-paper, #F5F1E8);
+}
+
+.pipelines-btn--delete {
+  border-color: var(--er-red-pencil, #B8362A);
+  color: var(--er-red-pencil, #B8362A);
+}
+
+.pipelines-btn--delete:hover {
+  background: var(--er-red-pencil, #B8362A);
+  color: var(--er-paper, #F5F1E8);
+}
+
+.pipelines-btn--delete-disabled {
+  border-color: var(--er-faded-2, #B5AC9B);
+  color: var(--er-faded, #8A7F70);
+  background: var(--er-paper-2, #ECE6D4);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.pipelines-delete-blocked {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.pipelines-delete-deps {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--er-ink-soft, #5C4F40);
+  max-width: 36ch;
+}
+
+.pipelines-delete-deps code {
+  font-size: 0.78rem;
+  background: var(--er-paper-2, #ECE6D4);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.pipelines-btn--delete-disabled:hover {
+  background: var(--er-paper-2, #ECE6D4);
+  color: var(--er-faded, #8A7F70);
+}
+
+.pipelines-btn.is-copied {
+  background: var(--er-stamp-green, #2E5D45) !important;
+  color: var(--er-paper, #F5F1E8) !important;
+  border-color: var(--er-stamp-green, #2E5D45) !important;
+}
+
+/* ---- Table ---- */
+
+.pipelines-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--er-paper, #F5F1E8);
+  font-size: 0.9rem;
+}
+
+.pipelines-table-caption {
+  text-align: left;
+  padding: 0.5rem 0;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-faded, #8A7F70);
+}
+
+.pipelines-th,
+.pipelines-cell {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--er-paper-3, #DFD7BF);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.pipelines-th {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-ink-soft, #3A332E);
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.pipelines-cell code {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--er-ink, #1A1614);
+}
+
+.pipelines-cell--linear-count,
+.pipelines-cell--locked-count,
+.pipelines-cell--off-count,
+.pipelines-cell--lanes-count {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.pipelines-cell--actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.pipelines-cell--empty {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--er-faded, #8A7F70);
+  font-style: italic;
+}
+
+.pipelines-row--view-panel .pipelines-cell,
+.pipelines-row--edit-panel .pipelines-cell {
+  padding: 0;
+  background: var(--er-paper, #F5F1E8);
+}
+
+/*
+ * Source chips (`.pipelines-source--preset` / `--override` / `--error`)
+ * and error rows live in `pipelines-stage-flow.css` alongside the
+ * stage-flow vocabulary. Both stylesheets are listed by the page
+ * renderer; the split is a code-size hygiene boundary, not a runtime
+ * one.
+ */
+
+@media (max-width: 720px) {
+  .pipelines-th--linear-count,
+  .pipelines-cell--linear-count,
+  .pipelines-th--locked-count,
+  .pipelines-cell--locked-count,
+  .pipelines-th--off-count,
+  .pipelines-cell--off-count {
+    display: none;
+  }
+}

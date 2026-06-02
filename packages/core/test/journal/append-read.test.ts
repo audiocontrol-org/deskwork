@@ -46,7 +46,8 @@ describe('journal append + read', () => {
     await appendJournalEvent(projectRoot, e2);
     const events = await readJournalEvents(projectRoot, { entryId: e1.entryId });
     expect(events).toHaveLength(1);
-    expect(events[0].entryId).toBe(e1.entryId);
+    const found = events[0];
+    expect('entryId' in found ? found.entryId : null).toBe(e1.entryId);
   });
 
   it('returns events in chronological order', async () => {
@@ -57,7 +58,9 @@ describe('journal append + read', () => {
       { kind: 'iteration', at: ts(3), entryId: '550e8400-e29b-41d4-a716-446655440000', stage: 'Drafting', version: 3, markdown: 'v3' },
     ];
     for (const e of events) await appendJournalEvent(projectRoot, e);
-    const read = await readJournalEvents(projectRoot, { entryId: events[0].entryId });
+    const seed = events[0];
+    const seedEntryId = 'entryId' in seed ? seed.entryId : '';
+    const read = await readJournalEvents(projectRoot, { entryId: seedEntryId });
     expect(read.map(e => 'version' in e ? e.version : null)).toEqual([1, 2, 3]);
   });
 });

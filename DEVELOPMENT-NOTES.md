@@ -3094,6 +3094,70 @@ Phase 4 (dogfood) is manual validation work the user should drive: install the p
 - **TDD reflexively turns library-recall fabrication into a 10-second feedback loop.** Without the tests, the wrong fix could have shipped to v0.22.2 and been caught only by a post-release iOS check. With the tests, the wrong fix surfaced as 7 failures in <5 seconds.
 - **The studio's cache-validity story is structurally weak.** mtime-based freshness on entrypoint-only inputs cannot survive transitive-import changes. Worth fixing for adopters even if no fixer is currently touching it.
 
+## 2026-05-25: graphical-entries — PRD finalize → ingest → iterate → approve → workplan + issues + scope-discovery hooks + Phase 1 Task 1.1
+### Feature: graphical-entries
+### Worktree: graphical-entries
+
+**Goal:** Finalize the graphical-entries PRD from the 522-line design spec; bring it through deskwork's review cycle to Final; elaborate the workplan; file GitHub issues; install scope-discovery hooks per the dogfood handoff; begin Phase 1 (prior-art research).
+
+**Accomplished:**
+
+- **PRD finalized end-to-end** — restructured from `/dw-lifecycle:setup` template into the full design (lanes / templates / groups / graphical entries / chrome-free review surface / annotation extensions / migration / doctor / CRUD / 12-phase implementation breakdown). Commit `7bdf026`.
+- **PRD ingested into deskwork.** Entry UUID `1e85ab1a-de87-456f-be79-bb626ae42c9f`, slug `graphical-entries/prd`, Drafting stage. New sidecar + ingest journal event.
+- **PRD iterated through 3 operator marginalia comments** (revision 1 of review history): screenshot markup moved in-scope as Phase 12; schema-migration risk removed (operator: "not a real risk; state is in git"); new "Secondary deliverable: scope-discovery v1 dogfood" section added. All three dispositions `addressed` with disposition annotations.
+- **Disposition-trace affordance (#299) bundled pre-approve per "don't defer" rule** — new acceptance criterion + Phase 8 task scope + annotation-model schema extension (`reason: string` field + diff-slice rendering).
+- **PRD approved Drafting → Final.** Sidecar + calendar regen + 4 approve-side journal events (stage transition + comment archives). Commit `1e31f06`.
+- **Issues #299 + #300 filed against deskwork itself** during the review cycle:
+  - **#299** (enhancement) — studio review surface lacks affordance for navigating from "addressed" badge to diff region in the new revision. Recommended fix A (per-comment inline diff expansion) + C (required disposition reason).
+  - **#300** (bug) — doctor's `orphan-frontmatter-id` rule reports false positives for every Final/Cancelled entry; reader-side counterpart to #247. Recommended fix B (UUID-set lookup).
+- **Workplan elaborated from 1 phase to 13 phases** (12 implementation + closing milestone), 77 tasks, 249 steps, acceptance criteria on every phase. Phase 4 scoped to close #247 + #300 as side effects. Commits `2a17d8d` (Phase 4 only) + `09e0764` (full elaboration of remaining 11).
+- **13 GitHub issues filed via `/dw-lifecycle:issues`**: parent #301 + per-phase #302–#313. Workplan headings + README Status table + Key Links manually back-filled (skill only back-fills frontmatter). Commit `d69a75c`.
+- **Scope-discovery hooks armed in this worktree** — `npm install` bootstrapped husky's `.husky/_` dispatcher; pre-commit hook fires for real now. All 5 gates pass cleanly on every commit (detect-clones, anti-patterns, adopters, disposition-survivor, editor-symmetry). 4 in-session commits exercised the gates. Commit `ee56c32`.
+- **Phase 1 Task 1.1 delivered** — 17-candidate OSS prior-art matrix at `docs/studio-design/PROPOSED/2026-05-25-graphical-review-prior-art/candidates.md`. Sourced via subagent with WebFetch + WebSearch. Per-concern top-2 shortlists feed Tasks 1.2 / 1.3 / 1.4 spike phases. Commit `da7d70f`.
+- **3 TF entries logged in `tooling-feedback.md`** capturing scope-discovery dogfood friction:
+  - TF-001 · GATE · high — `install-scope-discovery-hooks` reports success but hooks silently skipped when husky's `.husky/_` dispatcher isn't bootstrapped.
+  - TF-002 · GATE · medium — `hooks-installed.json` accumulates entries across worktrees because it's committed to the tree.
+  - TF-003 · MISC · medium — `/dw-lifecycle:issues` partial back-fill (only frontmatter); workplan phase headings + README Status table + Key Links require manual updates.
+- **Branch pushed to origin** with upstream tracking — `feature/graphical-entries` lives at https://github.com/audiocontrol-org/deskwork/tree/feature/graphical-entries.
+
+**Didn't Work:**
+
+- **Pre-commit hooks silently skipped on first 3 commits of the session** (`7bdf026`, `1e31f06`, `2a17d8d`). The managed `.husky/pre-commit` was inherited from the scope-discovery worktree's canary install, but `npm install` had never run here, so husky's `.husky/_` dispatcher didn't exist and git silently skipped hook execution. Filed as TF-001 high-severity.
+- **Stale PATH after `/plugin marketplace update`** — `which dw-lifecycle` returned the v0.22.2 cache binary after the update brought 0.23.0 on disk. Operator-clarified as a missing-step (`/reload-plugins` is required post-update; not a deskwork bug). My initial framing as "follow-up gap to #131" was wrong.
+- **Markdown-wrapped URL caused 404** — I sent `**http://...:47323/...c9f**` (URL inside bold syntax); operator copied the asterisks; the studio 404'd on the resulting path. Self-inflicted; the user-memory `feedback_plain_urls_only` covers link syntax but I extended-by-analogy to bold and broke it. Apologized, gave clean URL.
+- **Pre-decided scope twice during PRD iteration** — once putting "screenshot drawing / markup UI" in Out-of-Scope (operator: should be in scope, just at the end); once leaving "Schema migration on adopter projects" as a Risk (operator: not a real risk; state is in git). Both reverted after operator pushback.
+- **`dw-lifecycle install-scope-discovery-hooks` via PATH failed** with "Unknown subcommand" because PATH had v0.22.2 cached binary. Resolved by invoking v0.23.0 binary directly via the cache path.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"do it now, don't defer"* — operator applied the rule to bundle #299 (disposition trace) into v1 acceptance criteria immediately rather than deferring to a follow-up. Same rule applied to screenshot markup (moved from Out-of-Scope to Phase 12) during the same iterate cycle.
+- **[PROCESS]** *"operator owns scope decisions"* — twice in one PRD iteration (markup deferral; risk dismissal). I pre-decided each. Reverted both. The capture-mode rule from `.claude/rules/agent-discipline.md` covers this; I still violated it twice in one cycle.
+- **[UX]** Bold-wrapped URL → 404. Extended the plain-URLs rule across all markdown wrappers (not just link syntax): bare URLs only.
+- **[PROCESS]** `/reload-plugins` is a required post-`/plugin marketplace update` step. Documented operator behavior, not a deskwork bug — my mistake to frame it as a follow-up to #131.
+- **[PROCESS]** "Capture friction over scope" applied to scope-discovery dogfood: 3 TF entries landed in-session as friction surfaced, not batched at feature-end.
+
+**Quantitative:**
+
+- Messages: ~70 user messages across the session
+- Commits on `feature/graphical-entries` this session: **7** (`7bdf026`, `1e31f06`, `2a17d8d`, `ee56c32`, `09e0764`, `d69a75c`, `da7d70f`)
+- Files changed across all commits: ~9 (prd, workplan, README, tooling-feedback, candidates matrix, calendar, sidecar, 11 journal files, hooks-installed manifest, package-lock)
+- GitHub issues filed: **15** new (#299, #300 against deskwork; #301 parent + #302–#313 phases for graphical-entries)
+- TF entries logged: **3** (TF-001 high, TF-002 medium, TF-003 medium)
+- Pre-commit gate executions: **4** (gates fired on commits after `npm install` bootstrapped husky)
+- Phase 1 progress: **1/6 tasks complete** (Task 1.1 OSS candidate matrix)
+- Decisions surfaced by Phase 1 research that change spike picks: **4** (tldraw disqualified, html2canvas dead, recogito-js archived, Hypothes.is heavyweight)
+- Workplan size: 13 phases / 77 tasks / 249 steps (was 1 phase / 1 task / 2 steps at session start)
+
+**Insights:**
+
+- **The PRD-iterate cycle in deskwork is genuinely valuable.** Three operator marginalia comments produced material spec changes that would have stayed baked-in assumptions otherwise: scope-discovery dogfood elevated to first-class deliverable; non-risk removed from Risks; screenshot markup moved from deferred to v1. The dogfood comment in particular was the kind of "the spec doesn't say it but the dogfood-handoff documents it" gap that only operator marginalia catches.
+- **"Don't defer" fires twice in one PRD cycle** — screenshot markup (Out-of-Scope → Phase 12) AND #299 disposition trace (would-be-follow-up → v1 acceptance criteria + Phase 8 scope). Pattern: when the agent identifies something as "captured but deferred to a follow-up," that's almost always the wrong call. Both deferrals would have shipped as user-visible gaps if the operator hadn't pushed.
+- **Phase 1 research saved real spike work.** Four candidate-changing findings (tldraw licence, html2canvas dead, recogito-js archived, Hypothes.is heavyweight) — every one of which would have surfaced as a failed spike if the matrix didn't go first. The workplan's "spike-then-decide" ordering is correctly ordered; doing the survey before integration is the right discipline.
+- **Sub-agent dispatch for bulk research is the right tool.** 17 candidates × 7 columns of researched-and-sourced facts = a clean delegation target. The agent's WebFetch + WebSearch in parallel landed the matrix in one shot with all sources cited. Doing this in-thread would have been ~30 sequential tool calls.
+- **Scope-discovery hooks silently skipping is the gnarliest dogfood failure mode** — 3 commits landed with the operator believing gates were firing. Without bash-testing `.husky/pre-commit` directly, the failure mode is invisible. The Medium fix (install detects missing `.husky/_` and runs `npm install` itself) is the right shape; the Light fix (warning at install) would still leave operators on the hook to notice.
+- **`/dw-lifecycle:issues` does ~40% of the back-fill it could do.** Frontmatter parentIssue lands; the prose-rendered surfaces (workplan headings + README Status table + Key Links) stay in their `/dw-lifecycle:setup` template state. The skill name implies "wires up issue tracking" but the operator does the visible wiring manually. Medium fix in TF-003.
+- **Multi-day session in one Claude context.** Started with the orchestrator-vs-implementer rule strict-reading suggesting a fresh session for implementation. Operator chose continuity. The session boundary blurred but the work landed cleanly — 7 commits, 15 issues, 3 TF entries, Phase 1 Task 1.1 deliverable, all pushed. Trade-off: long context vs setup-cost-per-session. For one-feature focused arcs, continuity wins.
+
 ## 2026-05-28: hygiene Phases 1–9 shipped — six new /dw-lifecycle skills + lifecycle integration + dogfood
 
 ### Feature: hygiene
@@ -3164,6 +3228,373 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - **Triage [#335](https://github.com/audiocontrol-org/deskwork/issues/335)** (gh-runtime extraction) — cheaper to extract now than after a 5th consumer arrives.
 - **Run `/dw-lifecycle:complete hygiene`** to move docs to `003-COMPLETE/` and close the parent + remaining phase issues. Note: `complete-gate`'s scanner is the same one #339 fixed. Either wait for v0.26.1 install OR pass `--skip-tbd-gate --reason "<substantive>"` pointing at the #339 root cause.
 - **Watch for the next batched-proposal dogfood opportunity** — the `studio-mobile-first` workplan has 15 TBDs per the baseline; promoting those is the next natural Phase-3 cycle once v0.26.1 is installed.
+
+## 2026-05-28: Phase 5 Tasks 5.1 / 5.1A / 5.1B shipped via the new scope-discovery trussing (TF-004/005/006/007 closed in dw-lifecycle v0.24.1-2; TF-008/009 logged)
+### Feature: graphical-entries
+### Worktree: graphical-entries
+
+**Goal:** drive Phase 5 implementation against the operator-approved D3 "Press Bay" v11 swimlane dashboard design, using the new dw-lifecycle scope-discovery trussing (wrap-prompt / validate-return / orchestrator-turn / scope-widen) as the dispatch protocol. Pilot the trussing end-to-end; surface friction; close trussing gaps the operator's team patches inflight; ship code that passes spec-compliance + audit + code-quality reviews.
+
+**Accomplished:**
+
+- **Phase 5 Task 5.1 — multi-lane swimlane dashboard shell + focus-chip strip + lane-visibility rail + swim-stub (D3 Press Bay v11).** Six commits (`b09bfa5` → `accc5d7`): initial implementation, spec-fidelity fixes from spec-review (5 findings), audit-log findings (AUDIT-01/02/04/05), code-quality fixes (F1-F7), gitignore + widen-run housekeeping. Tests 586 → 619 (+33). Build went TS2345-failing → exit 0. Three review cycles ran via the new trussing.
+- **Phase 5 Task 5.1A — per-lane collapse, lane-level + per-stage.** Two commits (`26e1915` + `9879da4`): chevron emission at swim-head + stage-head positions, new client controller `swimlane-collapse.ts`, CSS for kanban collapsed-strip (42px vertical) + writing-mode rotation, localStorage persistence per-lane + per-(lane,stage). Tests 619 → 635 (+16). Spec-review ✅ zero findings; code-quality ✅ with three non-blocking ⚠️ observations.
+- **Phase 5 Task 5.1B — per-lane kanban↔list view toggle.** Four commits (`2c260fe` + `0d0307b` + `24834c0` + `6aa35b0`): segmented ▦/≡ toggle in swim-head, dual-body server-render (.stage-grid + .list-body always emitted, CSS shows one), viewport-aware defaults via matchMedia(max-width:720px), per-operator localStorage override, collapse-precedence via MutationObserver, list-body with .lb-group + .lb-row + locked-stage proof-blue, mobile single-column kanban (not 2-column wrap), M2 DRY-consolidation (STORAGE_KEY_PREFIX + resolveProjectKey collapsed into shared swimlane-storage.ts across all 3 client controllers). Tests 635 → 661 (+26).
+- **Scope-discovery trussing fully closed.** TF-004 (bin shim self-install + repair-install dep-probe) + TF-005 (wrap-prompt / validate-return CLI subcommands) + TF-006 (scope-inventory minItems schema relax) + TF-007 (orchestrator-turn CLI subcommand) all closed in dw-lifecycle v0.24.1-2 via the operator's team. Every Phase 5 dispatch from Task 5.1 onward routed through the closed trussing (hand-inlined GRAMMAR_INSTRUCTION workaround retired forward after v0.24.2 landed).
+- **PRD updated to reflect D3 swimlane design** (`8032dfe`) — replaced the original "per-lane tab strip + Combined overview + multi-lane composed views" framing with the swimlane shell + two split state axes + per-lane collapse + view toggle + per-lane compose chip + saveable focus presets bullets. Reflects the design pick after iteration through `/frontend-design` to v11.
+- **Design archive filed** (`68afc72`) — ACCEPTED brief for D3 Press Bay v11 + REJECTED briefs for D1 Lane Stack and D2 Lane Bar; DESIGN-STANDARDS change-log entry for 2026-05-27. Cross-referenced from the brief: implementation notes section flagging forward-looking spec consequences (state persistence model, chip behavior contract, mobile chip icon-only shape, view-toggle precedence under collapse, Mockups-stub visibility-vs-focus semantics).
+
+**Didn't Work:**
+
+- **Three wrapper-format rejections from validate-return.** Surfaced TF-008 (the Searched line strictly requires the literal noun "matches" — agent wrote "2 source-emitter call sites"; Excluded entries strictly require `path:LINE` even for whole-file exclusions) and TF-009 (the forbidden-deferral-phrase list false-positives on project vocabulary nouns — the word "stub" in "renderSwimStub is the focus-off stub button" was flagged even though `.swim-stub` is the project's canonical class name). All three preserved the substantive work intact; rejections were on the meta-deliverable layer.
+- **AUDIT-01 build failure was originally categorized as deferred to Task 5.2.** The implementer + spec-reviewer both treated the pre-existing TS2345 errors as honest deferral. The post-task orchestrator-turn surfaced them as BLOCKING — exactly the kind of judgment-call the audit-judge cycle is designed to catch. Fix-iteration #2 narrowed the type at 5 call sites via a new `isLegacyEditorialStage` predicate; build went exit 0. Lesson: "scoped-to-Task-N" deferrals deserve audit scrutiny.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"Capture friction over scope"* applied again — every wrapper rejection got a TF entry in the moment, not batched. TF-008 grew an addendum during the same session as its second sibling rejection landed.
+- **[PROCESS]** *"Just for now is bullshit"* fired during Task 5.1 quality-review — F1 caught a "for now" deferral comment in CSS; F3 caught two forbidden `as Entry[]` casts. Both repaired in `2c9e93d`. The audit-judge layer is the third check that bites when spec + initial review let things through.
+- **[FABRICATION/PROCESS]** Initial path typo in Task 5.1A implementer brief (`deskwork-web/graphical-entries` instead of `deskwork-work/graphical-entries`) — caught and corrected within the same brief, but a reminder that orchestrator briefs need their own audit pass before dispatch.
+
+**Quantitative:**
+
+- Sessions: 1 continuous (multi-day continuation per `agent-discipline.md` orchestrator-vs-implementation-session rule deliberately bent for sub-task continuity)
+- Substantive commits on `feature/graphical-entries` this session: **17** (3 Phase 5 task starts × 5-8 sub-agent dispatches each → multiple per-task fix iterations; plus doc commits)
+- Tests: 586 → 661 passing (+75 net; 11 skipped unchanged)
+- Build: started failing TS2345 (from Phase 3 schema widening) → exits 0 throughout subsequent commits
+- TF entries logged: **2 new** (TF-008, TF-009) — both wrapper-format friction
+- TF entries closed: **4** (TF-004/005/006/007) via dw-lifecycle v0.24.1-2 patches the operator's team shipped in-session
+- AUDIT-log findings landed: **5** (AUDIT-01 through -05); **5 closed** (`fixed-<sha>`); **0 open**
+- Sub-agent dispatches: **~14** total across the three sub-tasks (code-explorer + implementer + spec-reviewer + code-quality-reviewer × 3 sub-tasks, plus 4 fix iterations)
+- Wrapper rejections: **3** (all TF-008/009 friction; substantive work intact in each)
+- Orchestrator-turn invocations: **~10** (pre + post each task, plus mid-task checks)
+- Scope-widen invocations: **3** (one per sub-task; all returned 0 additions because the unmatched-shape clustering pass is STUB per #318)
+
+**Insights:**
+
+- **The audit-judge layer catches what spec + implementation review let through.** AUDIT-20260528-01 (build failure on TS2345) was categorized as "scoped to Task 5.2" by both the implementer AND the spec-reviewer. The auditor classified it BLOCKING. Without the orchestrator-turn surfacing it, Task 5.1 would have shipped a broken build with the operator believing it was OK because two review cycles agreed it was deferred work. The Phase 11 trussing earned its keep here.
+- **The trussing's fix-class is small and tightly-scoped.** Five trussing TF entries (TF-004 through TF-008, TF-009) all sit in the same surface — operator-orchestrator engagement with the scope-discovery library. The fixes are equally narrow: bin shim probe loop, CLI subcommand additions, schema constraint relax, GRAMMAR_INSTRUCTION documentation. Iteratively shippable.
+- **`wrap-prompt` + `validate-return` is the right shape.** Even with the format-strictness rejections (TF-008/009), the round-trip flow works cleanly: write prompt → augment via wrap-prompt → dispatch agent → capture return → validate-return → if reject, address; if accept, integrate. The friction is on format details, not on the workflow shape.
+- **Three-cycle review per task pays off when audit catches what spec doesn't.** Task 5.1 went through 3 fix iterations (5 spec findings → 4 audit findings → 7 quality findings). Each iteration shrank the surface; the third left zero open issues. Without the audit-judge step, the build failure would have shipped.
+- **DRY consolidation surfaces during multi-task work.** Task 5.1B's M2 (STORAGE_KEY_PREFIX + resolveProjectKey duplicated across two client controllers) was caused by Task 5.1A introducing the swimlane-collapse controller; Task 5.1B duplicated the storage helper instead of importing. The consolidation (3-source → 1-source via new `swimlane-storage.ts`) actually folded in a THIRD copy that pre-existed in `swimlane.ts` from Task 5.1. Multi-task duplication is real and the quality reviewer catches it.
+- **The clustering pass STUB (#318) means scope-widen runs always emit 0 additions.** That's expected for greenfield Phase 5; the scope-manifest baseline establishes itself as the dashboard surface accumulates. When #318 ships, the manifest will fill in retroactively. The widen-run evidence stays committed regardless.
+- **Operator-orchestrator boundary: deliberate bend.** The implementation session ran in the feature worktree (`graphical-entries`), continuous over multi-day context. Operator-vs-implementation-session rule deliberately bent for sub-task continuity within Phase 5. Trade-off: long context vs setup cost per session. With 75 tests added and 5 audit findings caught + closed, the continuity served the work.
+
+## 2026-05-28 / 29: Phase 6 Tasks 6.1 → 6.4 (CRUD CLI + studio surfaces) shipped under SDD review with stale-branch incident mid-stream
+
+### Feature: graphical-entries
+### Worktree: graphical-entries
+
+**Goal:** drive Phase 6 implementation against the v0.25.0 dw-lifecycle trussing (wrap-prompt / validate-return / orchestrator-turn / scope-widen) per the `/dw-lifecycle:implement` SDD discipline. Each task: code-explorer → architect-decision → implementer dispatch → spec-review → quality-review → operator-triaged followups → docs.
+
+**Accomplished:**
+
+- **Phase 5 hygiene closeout shipped** (`77a6da9`). Workplan acceptance criteria for Phase 5 checked; README status row refreshed to **Done** with per-task summary + audit-log totals (39 findings across 9 tasks, 0 blocking, +215 net tests). Evidence comment posted to [#306](https://github.com/audiocontrol-org/deskwork/issues/306) — closure waits on release-verification gate per the agent-discipline rule.
+- **Phase 6 Task 6.1 — `/deskwork:lane` skill family shipped** (`5941c00` + `c2be222` + `7c6429e`). SKILL.md + 8 verbs (list / show / create / update / archive / restore / purge / move) + 45 tests + 6 new journal-event kinds. Spec-review SPEC-COMPLIANT-WITH-OBS; quality-review APPROVED-WITH-OBS, 6 followups applied: lane id charset + path-traversal validation (security), atomic write helper (data safety), move rollback when writeSidecar fails (data safety), handleMove pattern consistency, magic-5 → PURGE_DEPENDENTS_SAMPLE_LIMIT, defensive bin-existsSync check. 706 → 708 core, +45 CLI lane.
+- **Phase 6 Task 6.2 — `/deskwork:pipeline` skill family shipped** (`ae0549d` + `0a9ca59` + `e66ad25`). 5 verbs (list / show / create / update / delete) + customize-wrapper extension (`customize pipeline <id>`) + rename-migration sidecar at `.deskwork/pipelines/migrations/<id>.json` + 64 tests + 3 new journal-event kinds. Quality-review came back **REJECTED** — 3 BLOCKING findings caught at review time: (1) `pipeline list` permanently breaks after any `--rename-stage` (renames sidecar in same dir as templates → loader Zod-fails), (2) `deletePipeline` lacked `assertSafePipelineId` (path-traversal regression of Task 6.1 hardening), (3) orphan rename sidecar on delete compounded #1 into unrecoverable state. All 3 BLOCKING + 6 NON-BLOCKING applied in `0a9ca59`; 2 declined-with-reasoning documented in module headers (rename-sidecar race, journal-event non-atomicity — matches lanes precedent).
+- **Phase 6 Task 6.3 — Studio lane-management page shipped** (`0f9fc65` + `92267b2` + `6a404d5`). Server-rendered page at `/dev/lanes/` with active + archived sections, copy-builder client controller (THESIS Cons. 2 — clipboard-only, no server mutation), 30 tests. Quality-review APPROVED-WITH-OBS; 7 polish followups applied: Edit-form blank-clear symmetry, slash-command quoteValue helper, single-open accordion, reorder-handle visual-mismatch fix (passive icon vs `cursor: grab` on inert element — directly cites `.claude/rules/affordance-placement.md`), archived-section localStorage persistence, purge-button discoverability gap, empty-state CTA focus-first-field.
+- **Phase 6 Task 6.4 — Studio pipeline-editor page shipped** (`2cdde80` + `af1e91a` + `3dddc53` + `e29e87d` + `b2bcdc0` + `7c7148c`). Server-render with 5-operation update accordion + view-panel stage-flow visualization + Phase 2 follow-up error-row rendering for malformed templates (parse / Zod / id-mismatch / missing — not silently filtered). Quality-review surfaced 1 CRITICAL + 4 WARNING + 5 INFO: (a) the CRITICAL was `--set-locked ""` emitting CLI-rejected empty list when operator unchecked all boxes, with the test codifying the broken output; fixed + tests updated. Side-pass codebase-audit added 7 more entries (AUDIT-20260529-01..07), 6 verified real on re-check + addressed in `b2bcdc0`: visible dependent-lane ids on disabled Delete (was tooltip-only), plugin-preset Edit Copy gating (CLI refuses preset mutation, studio now refuses to ship the paste), client-side value validation (kebab-case id, integer position, blank-CSV check), inaccurate Clear-locks message rewritten, stale CLI assertion-text reconciled (closes 2 pre-existing failing tests carried since Task 6.1).
+- **`#347` filed mid-flight** describing the stale-branch-re-derivation failure mode (see Course Corrections below). The issue's recommended `git restore` + `rm` cleanup plan executed inline.
+
+**Didn't Work:**
+
+- **Stale-branch silent re-derivation of v0.24.0 dw-lifecycle work.** Between Task 6.4's feat and quality-review followup, an earlier agent in this same session unknowingly re-created the dw-lifecycle `detect-clones → check-clones` rename + the entire `deprecation-scan` feature (deprecation-scan.ts:432, deprecation-report.ts:188, schema file, harness, test) byte-identical to commit `4da4660` already on main v0.24.0. The `feature/graphical-entries` branch base is `e053e85` from 2026-05-25 — pre-v0.24.0; main has shipped v0.24.0 → v0.25.0 since. The agent had no signal that the file already exists on main with different content; reading the working tree showed it missing, so it wrote what it thought should be there. Surfaced when the Task 6.4 quality-review-followup commit attempt failed pre-commit hook because the dw-lifecycle CLI itself was broken (the half-done rename left `clone-detector.ts` exporting `detectClones` while the new `subcommands/check-clones.ts` shim imported the not-yet-renamed `checkClones`). Operator filed [#347](https://github.com/audiocontrol-org/deskwork/issues/347) documenting the failure mode + a per-file cleanup recipe. Cleanup applied: `git restore` modified files, `rm` untracked duplicates, then proceeded with the followup commit.
+- **`session-end-hygiene` CLI subcommand isn't installed in v0.25.0.** Same as `session-start-recommendation` at session-start. Operator reloaded the dw-lifecycle plugin mid-skill-execution and the subcommand became available — root cause was plugin cache, not actual missing surface.
+- **Initial Task 6.4 followup commit blocked by the dw-lifecycle worktree pollution.** The implementer agent correctly identified the BLOCKED state and refused to bypass the pre-commit hook — exact correct disposition per the project's "Never bypass pre-commit hooks" rule. Cost ~10 minutes investigating before the operator's #347 link gave the canonical resolution.
+- **Initial Task 6.4 followup audit-log Edit failed silently.** The Edit tool fired after I'd switched files; the commit shipped without my newly-drafted closing summary because git had already staged the pre-existing audit-log mod. Caught immediately by the next commit's diff inspection; recovered via `e29e87d`.
+
+**Course Corrections:**
+
+- **[PROCESS — load-bearing]** *"this github issue explains what's happening and suggests a fix"* — operator surfaced [#347](https://github.com/audiocontrol-org/deskwork/issues/347) when I was speculating about which-stash-leaked-where. The issue's content was already authoritative: byte-identical v0.24.0 duplicate, branch base far behind main, agent re-derived because no feedback signal. The fix recipe in the issue body was the precise per-file `git restore` + `rm` plan I'd been hedging around. Lesson: when the operator surfaces an issue link, READ IT before continuing diagnostics — the work was already done.
+- **[PROCESS]** *"verify all outstanding audit items and fix the ones that are real"* — after I'd filed the 7 side-pass audit entries (`3dddc53`) my closing summary characterized them as items separate from my SDD review cycle. The operator's response made the implicit second pass explicit: verify each item against current code state, fix the ones that are real defects, don't just append narrative. The verification surfaced AUDIT-01 closed by the prior followup (`af1e91a`), AUDIT-05 calling out a message that MY OWN Fix 1 had written ("lane configs" wrong on both counts), AUDIT-06 closing 2 pre-existing CLI test failures that had carried since Task 6.1. The 6 verify-and-fix items shipped in `b2bcdc0`.
+- **[PROCESS]** *"are you still there?"* — operator's check-in midway through the Task 6.4 BLOCKED investigation. I was waiting on their decision about the stash-vs-finish-dw-lifecycle path without saying so explicitly. Should have stated the wait clearly the first time and asked the question crisply rather than offering three options without indicating I was idle.
+- **[PROCESS]** *"what worktree are you currently in?"* — after my initial blocker analysis named "the operator's other session" without verifying. `git worktree list` shows the dedicated `~/work/deskwork-work/scope-discovery` worktree exists; the leak likely came from there via a stash pop in this directory. Should have run `git worktree list` BEFORE speculating about where the changes originated.
+- **[FABRICATION]** *"what was the in-flight work about?"* — first-pass answer listed files without explaining the *what-for*. Operator's question was the conceptual one (vocabulary cleanup + deprecation drain feature), not the file inventory. Second pass got it right but the operator had to ask twice.
+
+**Quantitative:**
+
+- Sessions: 1 continuous (multi-day continuation per `agent-discipline.md` orchestrator-vs-implementation-session rule deliberately bent for sub-task continuity within Phase 6)
+- Commits on `feature/graphical-entries` this session: **17** (including the Phase 5 closeout opener)
+  - Phase 5 closeout: `77a6da9` (1)
+  - Task 6.1: `5941c00`, `c2be222`, `7c6429e` (3)
+  - Task 6.2: `ae0549d`, `0a9ca59`, `e66ad25` (3)
+  - Task 6.3: `0f9fc65`, `92267b2`, `6a404d5` (3)
+  - Task 6.4: `2cdde80`, `af1e91a`, `3dddc53`, `e29e87d`, `b2bcdc0`, `7c7148c` (6)
+  - Stale-branch cleanup: rolled into `af1e91a` via the #347 `git restore` recipe — no separate commit
+- Tests: core 706 → 711 (+5); CLI 318 → 320 (+2, closing the 2 pre-existing failures); studio 801 → 893 (+92). Build exit 0 throughout.
+- AUDIT-log entries landed: **28 new** (AUDIT-40 through -68 from SDD cycles + AUDIT-20260529-01..07 from side-pass audit); **23 closed** (`fixed-<sha>`); **5 open** (3 audit-trail observations from Task 6.1/6.2, 1 LaneMigrationEvent schema-shape pre-existing inconsistency, 1 reserved observation); **0 blocking remain**
+- Clone dispositions added: **14** new `keep-with-reason` entries (1 in Task 6.1 followup, 12 in Task 6.2 ae0549d for pipeline↔lane symmetry, 1 in Task 6.3, 1 in Task 6.4 followup replacing the prior entry). All parallel-domain symmetry; no extracted helpers (the lifecycle differences between lanes and pipelines justify independent surfaces).
+- Sub-agent dispatches: **~16** (code-explorer × 1 at Phase 6 start + 4 implementer + 4 spec-reviewer + 4 quality-reviewer + 3 followup-implementer)
+- Wrapper rejections: **1 false-positive** (validate-return rejected an implementer return because the included path `.dw-lifecycle/scope-discovery/clones.yaml` triggered the refactor-cue substring match; rewriting the path under Excluded passed validation).
+- Reviewer verdicts on substantive work: Task 6.1 quality APPROVED-WITH-OBS; Task 6.2 quality REJECTED → 3 BLOCKING fixed; Task 6.3 quality APPROVED-WITH-OBS; Task 6.4 quality APPROVED-WITH-OBS (CRITICAL caught); Task 6.4 side-pass added 7 entries.
+
+**Insights:**
+
+- **Quality-review pushback validated its keep at Task 6.2.** The 3 BLOCKING findings (pipeline list breaks after rename / path-traversal in deletePipeline / orphan sidecar on delete) were real production-quality bugs the spec-review didn't catch. The reviewer's REJECTED verdict forced their fix BEFORE the audit-log permanently recorded them as deferred. Same pattern at Task 6.4's CRITICAL `--set-locked ""` finding: the reviewer caught the bug AND noted the test codifies it as expected — exactly the spec-test-confirms-implementation feedback loop the dispatch grammar is designed to surface.
+- **Stale-branch-re-derivation is a class of failure mode the SDD discipline doesn't catch.** The implementer agent dispatched in this session correctly wrote code that passed every gate (tests + builds + dispatch grammar + clone dispositions + style checks). The work was structurally correct. The defect was that it duplicated already-shipped code on main — no signal in the working tree, no signal in the dispatch grammar, no signal in the review cycle. The operator caught it via the pre-commit hook crash + cross-checked against main's commits. Issue #347 captures the pattern + 3 candidate mitigations (session-start drift check, pre-write file-existence check, branch-staleness gate). This will recur until one of them ships.
+- **The codebase-auditor's side-pass complemented the SDD cycle.** Spec-review + quality-review caught code-and-flow defects. The side-pass auditor caught surface concerns (tooltip-only disclosure, inaccurate guidance text, validation gaps) that the SDD reviewers had marked acceptable. Both layers had value: the SDD reviewer is fast, structured, and catches mechanism bugs; the side-pass auditor reads through the operator's eyes and catches affordance / discoverability / accuracy issues. The combo is more thorough than either alone.
+- **`quoteValue` carrying across both lanes-page and pipelines-page was the right shared call.** When I extracted `copy-builder.ts` at Task 6.4 + `quoteValue` at the b2bcdc0 followup, both consumers stayed thin. The lanes-page and pipelines-page lifecycles continue to diverge (different verbs, different gates), but the slash-command quoting concern is the same. Counter-example: I did NOT extract a generic "validate-then-build-then-quote" pipeline because the per-form validity logic genuinely differs (id vs name vs CSV-of-stages). The right factor was the smallest shareable primitive, not the apparent symmetry.
+- **`/dw-lifecycle:implement`'s continuous-execution discipline is load-bearing.** Across 4 tasks × 3+ commits each, stopping for operator check-ins at Task boundaries would have stretched this session 2-3×. The discipline of "drive through the workplan unless BLOCKED" + commit-narrative-on-each-feature-step gives the operator a reviewable paper trail without requiring synchronous engagement. The operator's #347 surface (during Task 6.4) interrupted only when actually needed.
+
+### Hygiene observations
+
+- workplan `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:379` — markers: out-of-scope — `Step 7.5.1: \`group-recursive\` rule: a group has a member whose \`members\` array is non-empty → refuse (recursive groups out of scope per v1)`. (Pre-existing; explicit scope-decision per Phase 7 design.)
+- issue [#347](https://github.com/audiocontrol-org/deskwork/issues/347) [OPEN] filed this session: Process bug: stale-branch sessions silently re-implement shipped work (graphical-entries instance). Tracks the failure mode this session surfaced; 3 candidate mitigations listed.
+- issue [#343](https://github.com/audiocontrol-org/deskwork/issues/343) [CLOSED] filed this session: Phase 10: npm Trusted Publisher CI workflow (hygiene extend).
+- issue [#342](https://github.com/audiocontrol-org/deskwork/issues/342) [CLOSED] filed this session: complete-parent-closure: propose verb broken — gh api URL unsubstituted + --repo flag rejected (#336 verification gap).
+- issue [#340](https://github.com/audiocontrol-org/deskwork/issues/340) [CLOSED] filed this session: session-end-hygiene: 'issues filed this session' is calendar-date scoped; recommendation lists closed issues; multi-marker lines duplicate samples (hygiene Phase 9 dogfood).
+- issue [#339](https://github.com/audiocontrol-org/deskwork/issues/339) [CLOSED] filed this session: promote-deferrals + complete-gate: scanner false-positives on '[x]'-checked lines + descriptive prose (hygiene Phase 9 dogfood).
+
+### Next session recommendation (hygiene)
+
+- **Resume:** Phase 6 Task 6.5 (Doctor rule: `lane-config-missing-template`) — small task, 3 steps. Then Task 6.6 (integration test against multi-lane fixture w/ custom pipeline). Then Phase 6 closing.
+- **Branch-base staleness (per #347):** before continuing, consider `git rebase origin/main` to bring v0.24.0 → v0.25.0 in. The current branch base is `e053e85` from 2026-05-25 (pre-v0.24.0). The graphical-entries Phase 6 work is fully self-contained — the rebase should land cleanly. If skipped, another stale-branch-re-derivation incident is more likely.
+- **Triage:** [#347](https://github.com/audiocontrol-org/deskwork/issues/347) — the operator may want to pick one of the 3 candidate mitigations to scope as an immediate scope-discovery feature (or push the rebase recommendation to a `/dw-lifecycle:session-start` warning).
+- **Address TBD markers:** line 379 of workplan is the only marker found; it's an explicit scope-decision rather than a deferral and likely needs no action.
+
+## 2026-05-29: Phase 6 Tasks 6.5/6.6 + closeout + audit-log sweep (12 fixes + 9 observations closed + AUDIT-10 dual-viewport verification)
+
+### Feature: graphical-entries
+### Worktree: graphical-entries
+
+**Goal:** finish Phase 6 (Tasks 6.5/6.6 + acceptance criteria + README closeout); then, per operator's "if it's broken, it's not done" directive, walk every open audit-log entry to a terminal status — fixing real defects, closing observations that don't meet the broken bar.
+
+**Accomplished:**
+
+- **89-commit rebase onto `origin/main`.** 6 conflicts resolved: hooks-installed.json deleted per main; package-lock.json fast-forwarded; 2 DEV-NOTES journal-appends merged chronologically; 3 clones.yaml `generated_at` collisions taken at the newer timestamp. `git rerere` enabled mid-rebase but didn't help (each conflict had a different timestamp pair).
+- **Bug-scoping inventory** (operator: "scope each bug fix explicitly into the workplan"): confirmed all graphical-entries-scoped bugs (#247, #299, #300) are already named in workplan tasks with auto-close commit markers. Three of the six remaining issues touching the slug (#347 stale-branch, #297 scope-discovery test flake, #349 dogfood feedback) belong in other features. **Net: no workplan edits needed.**
+- **`c4019ef` chore: sync package-lock.json to v0.26.5 post-rebase** — fixed pre-existing main-side drift (lockfile said 0.24.2 while package.json said 0.26.5).
+- **Phase 6 Task 6.5 — doctor rule `lane-config-missing-template` shipped** (`f341ecb`). 391-line rule + 4 test scenarios + `LaneConfigRepairEvent` schema extension + runner registration. First-site-gated project-wide scan; prompt-plan with set-template-per-resolvable-template + delete-lane; entry-binding pre-flight refusal on delete.
+- **Phase 6 Task 6.6 — custom-pipeline + lane lifecycle integration test shipped** (`295b803`). End-to-end CLI subprocess scenario: pipeline create → lane create → 2-sidecar write → archive → restore → purge refusal → byte-equivalent state-intact verification.
+- **Phase 6 closeout** (`1e78a5e`). All Phase 6 acceptance criteria checked off in workplan; README status row updated In progress → Done.
+- **Audit-log sweep — 21 open entries closed.** Operator's "fix everything" directive triggered a full walk. Triaged 12 actionable bugs (need real code fixes) + 9 observations (already self-disposed, trajectory notes, defensible defaults). Dispatched in 4 waves:
+  - **Wave 1** (2 parallel agents): AUDIT-06 (rail-row keydown skips interactive descendants) `653bc2b`; AUDIT-07 (stage DOM ids via `stageNameToFilesystemToken`) `a281ea7`; AUDIT-08 (list-row overflow span decorative) `e309f00`; AUDIT-09 (All chip idempotent) `9eff7af`; AUDIT-25 (drop unused exports) `73c8359`; AUDIT-20260529-08 (doctor filter through `loadPipelineTemplate` at plan time) `a031183`.
+  - **Wave 2** (2 parallel agents): AUDIT-38 (preset view-mode reads effective DOM state) `a5ba0b8`; AUDIT-37 (F2 copy-deep-link button + F4/F5 doc-comments + F6 type narrowing with read-time migration) `3ed2532`; AUDIT-31 (per-row keyboard move-up/down buttons; new `swimlane-reorder.ts` factor) `3aeea2e`.
+  - **Wave 3** (2 parallel agents): AUDIT-14 file-cap splits — 1834-line CSS → 9 per-section files; 1444-line `dashboard-swimlane.test.ts` + 6 other over-cap test files → 23 sibling test files + 4 shared fixtures. Studio test count preserved end-to-end (12 commits `2cfebad..3c5228a`). AUDIT-39 high (`/deskwork:add` accepts `--lane`+`--stage`+`--kind` across SKILL.md + CLI + core + integration test) `a9214b7`.
+  - **Wave 4** (1 agent): AUDIT-10 mobile lane-stack accordion variant per the D3 Press Bay brief `e228e26`. New `lane-stack-card.ts` server-renderer + `lane-stack.ts` client controller + `dashboard-lane-stack.css`; desktop swim and mobile lane-stack both emitted server-side, CSS at 720px breakpoint gates which renders; compose chip + view-toggle reuse existing data-attr-bound controllers transparently.
+  - **Wave 5** (in-thread audit-log edits): 9 observations closed — 4 wontfix-observation (polyfill edge case, test infra heuristic, disclosure-widget convention, pre-existing schema variation); 2 wontfix-trajectory (files under cap); 1 closed-as-documented (inline doc-comment IS the disposition); 1 addressed-by-3aeea2e (file already split during a separate fix); 1 wontfix-observation for the AUDIT-39 informational duplicate.
+- **AUDIT-10 dual-viewport verification** per `.claude/rules/ui-verification.md`. Booted `node_modules/.bin/deskwork-studio` against this worktree; Playwright probe at 1920×1080 + 390×844. Every brief-contracted aspect verified: matchMedia gate flips correctly, lane-stack ↔ bay-body visibility inversion, `.lane-section > .lane-head + .lane-body` structure matches, accordion `aria-expanded` + `[hidden]` toggle, list-default rendering on mobile, compose-chip clipboard write `/deskwork:add <SLUG> --lane default --stage Ideas`.
+- **AUDIT-20260529-10 surfaced + fixed in the same pass** (`e4529ab`). The mobile lane-head's view-toggle cells measured 18×24 / 19×24 — under WCAG 2.2 SC 2.5.8 AA's 24×24 hit-target minimum. CSS `min-width: 24px; min-height: 24px;` floor added to the shrunken-cell rule; container grew 39×26 → 50×26; cells 24×24 each. Sha backfill in `59dbfb5`.
+- **AUDIT-20260529-11 observation** records the end-to-end dual-viewport verification ran; the verification gap noted in `e228e26`'s body is closed.
+
+**Didn't Work:**
+
+- **`.git-commit-msg.tmp` race — twice.** First, the presets-cluster agent (Wave 2) left its commit-message text in the file; my next commit used that text. Second, the file-split agent (Wave 3) did the same. In both cases the Write tool's "file modified since read" error fired but `git commit -F` still consumed the (stale) file. Recovered via `git reset --soft HEAD~1` + Write-fresh + recommit. Lesson: write to `.git-commit-msg.tmp` immediately before `git commit -F`, with no other tool calls between Write and Bash. Or use `mktemp` per agent.
+- **AUDIT-39 agent flagged `customize-skill.test.ts` as pre-existing failure attributed to the concurrent AUDIT-14 file-split agent.** It was a transient state during the file-split agent's mid-stream work; once AUDIT-14 settled, the test passed cleanly (12/12). Not a real defect.
+- **Hygiene helper's "issues filed this session" filter is calendar-date scoped, not session-range scoped.** It picked up #349-356 from the prior session (filed earlier today) as "filed this session." Manually excluded in the journal entry's hygiene block.
+- **Sub-agent reported "browser-driven viewport probe not possible in this sandbox" for AUDIT-10.** Accepted the gap initially; operator pushed back ("do the audit-10 verification"). Playwright probe from MY sandbox worked fine — sub-agent sandbox limit was real but I had the tools to close it. Lesson: when a sub-agent flags a verification gap, check if I can close it myself before accepting the gap as a residual.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"commit the audit log, then we have to fix everything. If it's broken, it's not done"* — operator's framing when I surfaced the uncommitted "Phase 6 closeout audit" block + asked whether to /dw-lifecycle:review. The "fix everything" was the right move: the audit-log's 21 open entries had been carrying forward across sessions as informal debt. Closing each one to a terminal status (fixed-`<sha>` or wontfix-observation) gave the audit-log a clean baseline.
+- **[PROCESS]** *"do the audit-10 verification"* — operator's response to my "browser-driven verification is the remaining manual step" close-out. Closing that step caught a real defect (WCAG hit-target violation). Verification IS the missing complement to jsdom tests for responsive UI; don't leave it as a manual follow-up when I have the tools to run it now.
+- **[PROCESS]** *"actually, rebase, then scope each bug fix explicitly into the workplan"* — operator amended the plan mid-flight after my initial "rebase, then resume Task 6.5" framing. The bug-scoping pass revealed that the workplan was already correct — most of the 15 open issues touching this slug were phase-tracking parents, not unscoped bugs.
+
+**Quantitative:**
+
+- Commits this session: ~35 substantive (plus 89 from rebase replay). Span `e9f7cb6..59dbfb5`.
+- Sub-agent dispatches: 7 typescript-pro implementers (Wave 1A swimlane cluster, Wave 1B doctor filter, Wave 2 presets cluster, Wave 2 drag a11y, Wave 3 file-split, Wave 3 add-lane support, Wave 4 mobile lane-stack).
+- Wrapper rejections: 0 (no validate-return failures).
+- Test deltas: core 715 → 716 (+1, AUDIT-20260529-08); CLI 320 → 327 (+7, AUDIT-39's +6 + Task 6.6's +1); studio 893 → 933 (+40 across Wave 1/2/4 + AUDIT-10's lane-stack tests).
+- Build state: exit 0 workspace-wide throughout.
+- Audit-log entries: 21 open → 0; +2 new (`AUDIT-20260529-10` fixed, `AUDIT-20260529-11` observation).
+- Conflicts during rebase: 6 (1 modify/delete, 1 lockfile, 2 journal-append, 2 clones.yaml timestamp).
+- New clone-group dispositions: 1 (the lane-config-missing-template apply boilerplate matching orphan-frontmatter-id; kept as parallel-domain symmetry).
+- Files split for the cap (AUDIT-14): 1 CSS (1834 → 9 files) + 6 test files (1444 + 741 + 603 + 589 + 536 + 511).
+
+**Insights:**
+
+- **"Fix everything" was tractable once enumerated.** Twenty-one open audit-log entries sounded daunting until I broke them into actionable-vs-observation buckets. The 12 real fixes parallelized cleanly across 4 waves of typescript-pro dispatches; the 9 observations took 10 minutes of audit-log edits.
+- **Wave 4's verification caught a defect the unit tests couldn't.** The mobile lane-stack's view-toggle hit-target violation only manifested at the 390px viewport; jsdom doesn't render layout, so the unit tests couldn't see it. Playwright + `getBoundingClientRect` measurements are the right shape for responsive UI verification — `.claude/rules/ui-verification.md`'s dual-viewport protocol is load-bearing.
+- **The dispatch grammar + wrapper machinery scaled to 7 parallel agents without a single rejection.** Each agent's prompt was tight + included the audit finding body verbatim + the project conventions. The grammar gotchas (Searched-count noun whitelist, Excluded line numbers, deferral-phrase substring matches) bit zero times this session — the prompts now bake in the gotchas list explicitly.
+- **The audit-log AS the durable cross-pass channel.** Wave 1 fixes referenced AUDIT-NN; Wave 4 verification referenced the SAME audit-log entries' Status fields; the `fixed-<sha>` markers tie every commit to its underlying finding. Future close-shipped scanner runs will resolve these end-to-end. The audit-log's open-count metric (currently 0) is the clean baseline for the next release cycle.
+- **The `.git-commit-msg.tmp` race is a class of bug.** Two parallel agents using the same temp file means whoever Wrote last wins. Either mktemp per agent, OR every commit Writes the message file immediately before `git commit -F` with no intervening tool calls. The post-commit message-amend recovery via `git reset --soft HEAD~1` is safe (project rules permit it; it's not destructive) but adds two commits of churn per race. Worth a rule in `.claude/rules/file-handling.md` if it recurs.
+
+### Hygiene observations
+
+- commit 59865839834a — `follow-up` in subject: fix(graphical-entries): Phase 5 Task 5.1C a11y follow-up + audit-log + TF-011/012 *(pre-session-rebase commit; carried forward)*
+- commit 9086894fd720 — `TBD` in subject: fix(dw-lifecycle): workplan-TBD scanner — closes #339 false positives *(pre-session-rebase commit)*
+- commit 62d3965d3936 — `TBD, wontfix` in subject: feat(dw-lifecycle): promote-deferrals — workplan-TBD promotion + inline-wontfix (hygiene Phase 3) *(pre-session-rebase commit)*
+- workplan `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:379` — markers: out-of-scope — `Step 7.5.1: \`group-recursive\` rule: a group has a member whose \`members\` array is non-empty → refuse (recursive groups out of scope per v1)`. (Pre-existing; explicit Phase 7 scope-decision.)
+- Issues filed this session: **none** (the helper picked up #349-356, but those were filed in the prior 2026-05-29 session before this one started — calendar-date filter rather than session-range filter).
+- AUDIT-20260529-10 + AUDIT-20260529-11 added to audit-log this session; both already at terminal status. Audit-log open-count remains **0**.
+- Uncommitted state on disk at session-end: `.deskwork/lanes/default.json` (Phase 3 auto-bootstrap migration result created by the studio boot during AUDIT-10 verification) + one `.deskwork/review-journal/history/<ts>-<uuid>.json` snapshot. Both are real project state, not session debris; left dirty for the operator to dispose explicitly.
+
+### Next session recommendation (hygiene)
+
+- **Resume: Phase 7** — Groups (members[] field + CRUD + review surface + multi-lane composition). Parent issue [#308](https://github.com/audiocontrol-org/deskwork/issues/308). First task is 7.1: schema delta — `members[]` on entry. Workplan begins at `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:345`.
+- **Triage at next start:** decide whether to commit the uncommitted `.deskwork/lanes/default.json` migration result + the review-journal history file. The lane bootstrap is one-time canonical project state; the review-journal snapshot is per-render and likely belongs in `.gitignore` if it isn't already.
+- **Do NOT triage:** #349-356 — those issues belong to other features (scope-discovery + dw-lifecycle hygiene), tracked there.
+- **Address TBD markers:** line 379 of workplan is the only marker found; it's an explicit Phase 7 scope-decision rather than a deferral and needs no action.
+- **Note for release-time:** the close-shipped scanner (when it runs against the next release tag) will see 12 `fixed-<sha>` markers in audit-log.md from this session — all should attach to commits in the `e9f7cb6..HEAD` range.
+
+## 2026-05-29 (session 2): Phase 7 Tasks 7.1 + 7.2 shipped — groups members[] schema + /deskwork:group skill family
+### Feature: graphical-entries
+### Worktree: graphical-entries
+
+**Goal:** continue Phase 7 (Groups). Land Task 7.1 (schema delta) + Task 7.2 (CRUD skill family), each with a full Track 2 + Track 3 review cycle per the project's per-commit review rule.
+
+**Accomplished:**
+
+- **Prior-session triage prelude** (`0eb7f86`). Committed two carried-forward artifacts the prior session left dirty: `.deskwork/lanes/default.json` (Phase 3 auto-bootstrap migration result, canonical project state) + `.deskwork/review-journal/history/2026-05-29T08-40-02-895Z-…json` (lane-migration journal event from AUDIT-10 verification). Both belong in source control alongside the existing tracked entries.
+- **Task 7.1 — `EntrySidecar.members[]` schema delta** (`e47ed3e`). Added `members: z.array(z.string().uuid()).optional()` to `EntrySchema` with inline doc-comment capturing the Task 7.1.2 invariant ("no separate Group entity; same schema, same code paths") + the Task 7.1.3 metadata-only-group semantic. 7 TDD-driven schema tests cover regular / group / empty-members / with-artifactPath / metadata-only / non-UUID rejection / non-array rejection. Red phase 6/7 failing → green phase 7/7 passing → 723/723 core suite. Schema delta is purely additive; cli + studio test counts unchanged.
+- **Task 7.1 review cycle** (`05b6091` + `a9243ea` backfill). Parallel Track 2 + Track 3 `code-reviewer` dispatches via `wrap-prompt` / `validate-return`. Both returned informational-only (3 findings, 0 blocking / high / medium). Disposition: 1 push-back (AUDIT-12 — doc-comment phase-number rot mitigated by behavior anchors), 1 deferred (AUDIT-13 — schema-layer empty-array dual representation → pointed to Task 7.5.5 doctor rule), 1 applied immediately (AUDIT-14 — last-element-invalid sibling test, +1 schema test). Audit-log open count stayed at 0.
+- **Task 7.2 — `/deskwork:group` skill family + CLI + `archivedAt` schema delta** (`15dd424`). End-to-end implementation in a single typescript-pro dispatch: SKILL.md (90 lines, full subcommand table + per-verb steps + error catalog + safety rules), CLI dispatcher at `packages/cli/src/commands/group.ts` (356 lines, mirrors `lane.ts` shape), core module under `packages/core/src/groups/` with per-operation files (list / show / create / update / add-member / remove-member / archive). Implementer added two defensible scope expansions: `restore` subcommand (sister to archive — same pattern as lane has) and 6 new group-* journal-event kinds (audit-trail completeness for mutating verbs, mirrors the existing lane-* event family). `archivedAt: z.string().datetime().optional()` schema delta + cancel `--cascade` boolean flag with best-effort cascade semantics (`cascadedMembers[]` / `skippedMembers[]` audit arrays). 18 NEW clone groups all dispositioned `keep-with-reason` (parallel-domain symmetry across the verb families). Tests: core 723 → 755 (+32), cli 327 → 400 (+73), studio 933 unchanged; all builds exit 0. Workplan check-offs done with per-step narrative.
+- **Task 7.2 review cycle** (`50b0ebf` + `eb5d660` backfill + `9c714ed` workplan-scoping). Track 3 caught a real **HIGH** finding (AUDIT-15): `group create` writes `members: []` deliberately as the declared-empty marker, but `isGroupEntry` required `length > 0` to be a group — so `create my-group --lane default && group list` returned `{"groups":[]}`. The just-created group was invisible to every read-side verb. Resolution: `isGroupEntry` redefined to `Array.isArray(entry.members)`; sibling predicate `isPopulatedGroupEntry` added for the tighter semantic (used by Task 7.4's composed view + Task 7.5.3's all-members-cancelled rule). Show / update refusal messages updated. Tests rewritten to assert the new semantic; missing `create → list` round-trip added. Task 7.5.5 reframed from `group-empty-members-array` to `group-stale-empty-members` (AUDIT-16). Two MEDIUM findings deferred to follow-up issues: [#360](https://github.com/audiocontrol-org/deskwork/issues/360) — regenerateCalendar N+1 on cascade (perf); [#359](https://github.com/audiocontrol-org/deskwork/issues/359) — cascadeFrom event linkage on stage-transition events (feature). Two LOW findings applied (docblock count, SKILL.md update prose). After operator pushback at session end, the two deferred fixes were also scoped into the workplan as Steps 7.2.7 / 7.2.8 (`9c714ed`) per the agent-discipline rule's two-track recording requirement.
+
+**Didn't Work:**
+
+- **Implementer agent didn't commit.** The Task 7.2 typescript-pro dispatch reported full completion but left every file uncommitted. The controller (me) had to verify the work + author the commit message + handle the clone-detector pre-commit failure. Acceptable cost given the 22-minute dispatch landed clean implementation; future dispatch prompts should be explicit that "land the work as a commit" includes running `git add` + `git commit`.
+- **`session-end-hygiene` Resume recommendation is stale.** Helper picked "Step 1.1.3: Drop the matrix into the decision-doc draft" — a Phase 1 leaf, not the actual next-task (Task 7.3). The helper's first-unchecked-task heuristic finds the leaf under the FIRST phase containing any unchecked task rather than the operator's current working phase. Manually corrected in the recommendation block below.
+- **Hygiene helper's "issues filed this session" is calendar-date scoped, not session-range scoped.** It picked up #357 + #358 from the prior session (filed earlier today) as "filed this session." The genuinely-this-session issues are #359 + #360 only.
+- **`.git-commit-msg.tmp` not affected by the session 1 race observed last session.** Single Bash + single Write per commit kept this stable. No regressions.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"did you scope the fixes into the workplan?"* — operator caught that I'd filed #359 + #360 as GH issues but skipped the workplan back-link required by `.claude/rules/agent-discipline.md`'s two-track recording rule. The rule is explicit: "Any fix that is NOT made immediately MUST have BOTH (a) a scoped task in the relevant workplan with the issue link, AND (b) a GitHub issue with the deferral rationale." Half-recorded deferrals leave the next session's hygiene helper blind to the in-progress work. Fixed in `9c714ed` by adding Steps 7.2.7 + 7.2.8 to the workplan with the issue back-links + audit-log cross-references.
+
+**Quantitative:**
+
+- Commits this session: 8 substantive on `feature/graphical-entries` (`0eb7f86..9c714ed`).
+- Sub-agent dispatches: 5 (1 typescript-pro implementer for Task 7.2; 2 code-reviewer pairs — Track 2 + Track 3 — for Tasks 7.1 and 7.2).
+- Wrapper rejections: 0 (`validate-return` passed all 5 dispatched responses on first try).
+- Test deltas: core 716 → 755 (+39); cli 327 → 402 (+75); studio 933 (unchanged).
+- Build state: exit 0 workspace-wide throughout.
+- Audit-log entries: +10 (AUDIT-20260529-12 through -21); 7 fixed in-session, 1 informational, 2 acknowledged-deferred-to-issues.
+- Clone-groups: 18 NEW dispositioned `keep-with-reason` (parallel-domain symmetry across verb families); baseline clean.
+- Orchestrator-turn invocations: 3 (pre-7.1, post-7.1/pre-7.2, post-7.2); all clean (0 wrong-decisions, 0 escalations).
+- Issues filed this session: 2 (#359 + #360 from Task 7.2 review actions).
+
+**Insights:**
+
+- **The HIGH bug AUDIT-15 caught what TDD couldn't.** The Task 7.2 typescript-pro dispatch wrote 73 new CLI tests + 32 new core tests; all passed. The bug was an internal predicate disagreement (`create` wrote `members: []` as intent marker; `isGroupEntry` filtered it out) that no test in either file exercised — because no test combined `create` + `list` against the same fixture. The reviewer's MED-4 finding ("test gap that would have caught HIGH-1") is the structural lesson: end-to-end round-trip tests are higher-value than per-verb isolation tests for catching cross-verb contract drift.
+- **The dispatch grammar wrapper paid off across all 5 dispatches.** Zero `validate-return` rejections; every reviewer + the implementer hit the Searched/Included/Excluded shape correctly on first try. The grammar's value isn't just rejecting bad returns — it forces the dispatched agent to enumerate the scope of their audit, which surfaces the structural completeness gaps (the `Excluded:` block explicitly names what the agent ruled out, making cross-domain blind spots visible).
+- **Two-track recording is load-bearing in the discipline rule, not aspirational.** I filed both deferral issues correctly but skipped the workplan side — the operator caught it in one turn because the workplan is where they look for "what's still pending in Phase 7." A GH issue alone is invisible to anyone walking the feature's tracking doc. The rule's redundancy IS the feature: both surfaces must agree before a deferral is fully recorded.
+- **The implementer's scope expansions (`restore` verb + 6 group-* journal-events) were both reasonable.** Neither was in the workplan literally; both were defensible by parallel-domain symmetry with the lane CRUD shape. Track 2 (spec compliance) explicitly endorsed both. The takeaway: when an implementer extends scope to maintain architectural symmetry, that's not scope creep — it's symmetry preservation. Distinct from the kind of scope drift where the implementer adds unrelated features.
+- **The N+1 perf finding (AUDIT-18 / #360) is the kind of finding that ONLY surfaces in code review, not in tests.** All cascade tests pass behaviorally — the wasted work is invisible to assertion-based testing. Performance assertions (regenerate-counter test seam) would have caught it; they don't exist today, which is itself worth noting for future test-design.
+
+### Hygiene observations
+
+- workplan `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:373` — markers: defer — Step 7.2.7 (cascade regenerateCalendar N+1 perf fix, tracked at [#360](https://github.com/audiocontrol-org/deskwork/issues/360); explicit deferral with both workplan + issue per the discipline rule).
+- workplan `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:374` — markers: defer — Step 7.2.8 (cascadeFrom event linkage, tracked at [#359](https://github.com/audiocontrol-org/deskwork/issues/359); explicit deferral with both workplan + issue per the discipline rule).
+- workplan `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:391` — markers: out-of-scope — Step 7.5.1 (`group-recursive` rule explicit v1 scope-decision; pre-existing, no action needed).
+- Issues filed this session (excluding the helper's calendar-date-vs-session-range false positives): **#359** + **#360** only. The helper also picked up #357 + #358 but those were filed earlier today before this session started.
+- Audit-log: open-count remains 0 after this session. +10 entries (AUDIT-20260529-12 through -21); 7 fixed-`<sha>`, 1 informational, 2 acknowledged-issue-link.
+
+### Next session recommendation (hygiene)
+
+- **Resume: Phase 7 Task 7.3** — Group review surface (Members section). Workplan begins at `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:371`. Per `.claude/rules/agent-discipline.md` § "Use /frontend-design for all design tasks", Task 7.3's first move is `/frontend-design` to produce 2-3 mockup directions for: per-member row layout (slug + title + lane badge + stage + clipboard-link), the "Member of: <group>" badge on member entry rows, and multi-parent badge handling. Operator picks before implementation begins.
+- **Out-of-scope-but-related:** Tasks 7.4 (multi-lane composed view), 7.6 (studio group-management page), and Task 7.3 share studio surface concerns + the dual-viewport verification protocol (per `.claude/rules/ui-verification.md`). Consider whether 7.3 + 7.4 should share a single `/frontend-design` pass (both render group + member data in different layouts).
+- **Triage at next start:** decide whether Steps 7.2.7 (#360 perf) + 7.2.8 (#359 cascadeFrom) ship inside Phase 7 (would block closeout) or as separate post-Phase-7 commits. Default per the discipline rule: ship before Phase 7 closeout so the Phase 7 `complete` gate has clean TBD-free workplan.
+- **Do NOT triage:** #357 + #358 — filed earlier today against other features (writeSidecar / doctor calendarPath), not graphical-entries. Tracked elsewhere.
+- **Address TBD markers:** lines 373 + 374 are the explicit deferrals tracked above (no action needed beyond ship-before-closeout); line 391 is the pre-existing Phase 7 scope-decision for `group-recursive`.
+- **Note for release-time:** the close-shipped scanner (when it runs against the next release tag) will see `fixed-<sha>` markers for AUDIT-20260529-14, -15, -16, -17, -19, -20, -21 in audit-log.md — all should attach to commits in the `e47ed3e..HEAD` range.
+
+## 2026-06-02: Phase 0 audit burndown + Phase 8 implementation + dampener-fix dogfooding
+### Feature: graphical-entries
+### Worktree: graphical-entries
+
+**Goal:** Continue Phase 7 follow-ups, burn down the Phase 0 audit-barrage cleanup queue across the autonomous overnight loop, then implement Phase 8 (annotation extension — threads + screenshot capture + attachment workflow + iterate-reason gate + inline diff). Dogfood the new `/dwi` Phase 16+17 dampener fix (issue #383) against a long-horizon autonomous run.
+
+**Accomplished:**
+
+- **Phase 0 audit-backlog burndown — 76 task closures across the autonomous overnight session (2026-05-31).** All open audit-barrage findings from the original 2026-05-30 sweep closed across 124 commits. Tasks 0.1 through 0.76 disposed via: code fixes (substantive, e.g. AUDIT-25 dashboard silent-drop on the swim-compact strip; AUDIT-54 phantom-template via rename-sidecar enumeration; AUDIT-55 empty-string `--reassign-lanes-to` bypass; AUDIT-64 lane-move path traversal; AUDIT-79 doctor lane-repair rollback-on-journal-failure; AUDIT-93 group-mutator sidecar snapshot+restore), duplicate dispositions across cross-model claude/codex overlap (10+ duplicates), acknowledged-known-tradeoff dispositions (AUDIT-71 lazy-panel-hydration deferred to issue #N; AUDIT-72 substring-match classifier), and acknowledged-spec-confirmed (AUDIT-60 pipeline lifecycle verbs intentionally not specced). 2 GH issues filed for operator-decision-required deferrals (#382 server-side preset path; lazy-panel-hydration draft body in /tmp). Workplan reorganized 2026-05-30 to hoist audit-barrage cleanup into a dedicated Phase 0 (`270915d`).
+
+- **Phase 8 implemented — 12 substantive tasks shipped (2026-06-01).** All major Phase 8 work landed: 8.0.1 (`entry-lane-missing` doctor rule — gate for the future schema tightening at 8.0.2); 8.1.1 (CommentAnnotation extended with `replyTo` / `attachments[]` / `spatialAnchor` discriminated-union); 8.1.2 (required `reason` on `addressed` disposition via top-level `.superRefine` — nested `discriminatedUnion` on a `ZodEffects` member proved infeasible; paired with `entry-address-reason-missing` doctor rule for read-back-compat per the same pattern as 8.0.1); 8.1.3 (W3C Web Annotation Data Model mapping docstring); 8.1.4 (additive-delta verified by 8.1.1 tests); 8.2 (thread grouping helper + sidebar-grouped rendering + `#comment/<id>` permalinks); 8.3 (screenshot capture via `html-to-image` per Phase 1 decision + selection-rectangle region overlay + server persistence routes for entry-anchored + orphan paths); 8.4 (attach-to-comment workflow + cross-entry sidecar metadata via `<filename>.meta.json` + paste-handler + drag-drop handler + thumbnail rendering); 8.5 (iterate-skill required-reason gate — SKILL.md prose + CLI refusal at parse time with `MissingReasonError` typed error + studio "no reason recorded" legacy fallback); 8.6 (server-side diff-slicing via `diff` npm package + character-offset-to-line conversion + per-comment inline expansion on the addressed badge + empty-slice fallback message + new `/api/dev/editorial-review/entry/:entryId/diff-slice` route); 8.7 (cross-cutting verification — `markdown-benefits-phase-8.test.ts` 5-scenario integration exercising all Phase 8 fields); 8.8 (Phase 8 end-to-end integration test).
+
+- **Audit findings closed across both phases: 18 AUDIT-20260601-NN + 7 AUDIT-20260602-NN findings disposed.** Of the 25 audit findings surfaced during Phase 8 work: 14 fixed (including AUDIT-20260602-01 HIGH — orphan-promote was destroying files on unknown-commentId 404), 10 slushed (LOW + MED hygiene tier per the dampener-engaged Rule B path), 1 acknowledged-spec-confirmed. Notable cross-model agreement: AUDIT-20260601-07 was claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03 — 7-model agreement on spatialAnchor's missing per-kind discriminated-union shape (fixed via `z.discriminatedUnion('kind', [...])` + `.strict()` per variant).
+
+- **Operator-visible audit-coverage gap on the Phase 0 burndown — surfaced + fixed.** Original `/dwi` dampener (pre-Phase-16) made the hook SKIP entirely once dampener engaged. Over ~70 Phase 0 closures the cumulative diff was effectively unaudited because the dampener counter trapped at 2 from two early-quiet barrages on tiny diffs. Filed as issue #383; operator landed the Phase 16+17 fix (`/dwi implement-hook` single-verb composition + Layer 2 commit-msg gate + Layer 3 pre-push gate; always-fire + dampener-controls-disposition semantics). Test-fired the new hook against the 70-commit historical diff: caught 4 real findings (1 cross-model MED + 1 MED + 2 informational) that the pre-fix loop missed entirely. The catch is the structural validation of #383's fix.
+
+- **3 follow-up `/dwi`-tooling issues filed during the dogfood.** #384 (implement-hook marker counters report 0 when N findings actually landed — observed every hook fire this session); #385 (follow-up to #383: dampener counter doesn't reset on material-diff-range expansion, so an engaging streak from tiny-diff runs slushes MEDIUMs on a subsequent large-diff run — concrete repro from the retroactive Phase 0 audit); #386 (`audit-barrage spawn E2BIG` on large diffs — the cumulative-since-last-tip diff exceeds OS ARG_MAX after a long autonomous run; argv-based prompt passing fails; needs stdin or temp-file path).
+
+- **Gemini-CLI disabled at the project level via `audit-barrage-config.yaml` override.** gemini-cli was failing 94.1% of runs (16 of 17 across the Phase 0 audit cycle) on two cascading error modes: ClassifierStrategy JSON-routing retry-exhaustion + "exhausted your capacity on this model" quota errors. Project-level override at `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` now ships claude + codex only. Re-enable when gemini-cli upstream fixes JSON-mode reliability OR sustained quota.
+
+**Didn't Work:**
+
+- **Pre-Phase-16 `/dwi` dampener semantic was structurally broken for long autonomous loops.** Once the dampener engaged (counter ≥2 quiet runs), every subsequent iteration skipped the audit-barrage hook entirely. The counter could only reset via barrage runs, but the gate prevented barrages — so the dampened state was permanently trapping. 70 Phase 0 tasks landed without cross-model audit coverage. Operator's framing: *"after each turn, you did new work — why didn't you run the audit barrage on the new work?"* — exactly right. Fixed in #383 / Phase 16+17.
+
+- **Dispatched implementer agents repeatedly missed the audit-log Status flip after committing fixes.** Workplan checkboxes were ticked, the fix code shipped, but the `Status: open → fixed-<sha>` flip on the audit-log entry was forgotten by ~30% of implementer dispatches. AUDIT-20260601-07's failed flip surfaced as AUDIT-20260601-11 the next audit-barrage run. Pattern: the dispatch prompts now explicitly enumerate "tick workplan AND flip audit-log Status" as two distinct steps to land in the same docs commit.
+
+- **Stale workplan checkbox state across Phase 1-7 confused the next-task seeker.** Many Phase 1-7 step checkboxes were unchecked despite the work being shipped. The /dwi gate's "first unchecked Step 1" heuristic kept finding stale leaves (e.g. Step 1.1.3 "deferred to Task 1.6"). Operator flagged this with *"we were well past phase 1"* — required manual phase-routing several times before Phase 8 dispatches could land.
+
+- **`E2BIG` on `audit-barrage` after the first ~20 commits of an autonomous run.** Once the cumulative since-last-tip diff grows past ARG_MAX (~256KB on macOS), the spawn fails. SKILL.md outage policy lets the loop continue (`disposition=barrage-outage; marker written; hook complete`), but every iteration after the first big diff loses cross-model coverage until the operator manually rebases or splits the work. Filed #386; recommended stdin / temp-file path.
+
+- **Sub-agent claimed `dw-lifecycle implement-hook` doesn't exist while the orchestrator session had it on PATH.** The Task 8.5 dispatched agent reported the CLI subcommand "is not exposed" — but the orchestrator's own shell saw it fine. Either a subprocess PATH/env discovery issue or a misread by the agent. Not file-worthy yet; will surface if it recurs.
+
+- **`/frontend-design` Phase 9 gate stopped the autonomous burndown.** Phase 9's deliverable is operator-pickable mockup directions for the graphical review surface — design decisions must come from the operator per `.claude/rules/agent-discipline.md`. The /dwi loop ran cleanly through Phase 8 closeout, then naturally stopped at the Phase 9 boundary. Correct behavior; documenting it here so the next session knows the burndown reached an operator-gated wall, not a tooling-failure wall.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"why didn't you run the audit barrage on the new work?"* (operator) — caught the structural bug in the pre-Phase-16 dampener. I had taken the SKILL.md's skip-when-dampened semantic too literally. Operator's pointed observation revealed that the dampener's "quiet on real bugs" claim is only valid for the diff range the engaging barrages covered; once new work lands in different subsystems, the dampened state goes stale. Resulted in #383 + the Phase 16+17 fix.
+
+- **[PROCESS]** *"we were well past phase 1"* (operator) — caught the next-task seeker's fixation on stale workplan checkboxes. The /dwi gate's first-unchecked-step heuristic doesn't distinguish "step in progress" from "step shipped but never ticked." Workplan-tick hygiene became a recurring tax across the session.
+
+- **[PROCESS]** *"can we disable gemini?"* (operator) — caught that I was running the barrage with 3 models when only 2 were viable. 16 of 17 runs had gemini failing; signal-to-noise ratio of the run-dir was poor. Project-level override at `audit-barrage-config.yaml` landed in one commit.
+
+- **[PROCESS]** *"file the issues"* (operator) — multiple times across the session. The autonomous burndown surfaced 4 distinct tooling concerns (#380 / #383 / #384 / #385 / #386); each filing was operator-prompted rather than autonomous. Worth folding into the dispatch discipline: when the loop catches a tooling-side defect (vs feature-side), the structured path is "log to handoff summary + file when operator next interacts" rather than "file immediately."
+
+- **[COMPLEXITY]** Dispatched implementer agents repeatedly added "scope expansions" justified by parallel-domain symmetry (e.g. extracting `withJournalRollback` shared helper, lifting `readJsonObjectBody` shared helper, the `project-scope-gate.ts` shared helper across two doctor rules). All defensible — the clone-detection gate prompted each one. Pattern is healthy as long as the implementer commits the helper in the same commit as its first consumer and notes the second consumer's adoption inline.
+
+**Quantitative:**
+
+- Commits this session range (`ead674b..HEAD`): **180+ commits** spanning two distinct burndown arcs (Phase 0 audit cleanup 2026-05-31 = 124 commits; Phase 8 implementation 2026-06-01 + 2026-06-02 = 56+ commits).
+- Sub-agent dispatches: **~30+** (mix of typescript-pro implementer dispatches + 1 documentation-engineer that misread the workflow + 1 cancel-bundle case).
+- GH issues filed this session: **5** (#380 slush-remaining severity filter; #382 server-side preset path Phase 6 enhancement; #384 marker counter discrepancy; #385 dampener-counter-on-stale-diff; #386 audit-barrage E2BIG). #383 (self-perpetuation) was filed mid-session and FIXED by operator before session-end.
+- Audit findings disposed: ~95 total (Phase 0 cleanup ~70 + Phase 8 derivatives ~25). Fixed-with-code: ~50; duplicate dispositions: ~15; acknowledged-spec-confirmed / known-tradeoff: ~10; slushed: ~20.
+- Test deltas (session-spanning): core ~880 → 987 (+107); cli ~414 → 429 (+15); studio ~973 → 1255 (+282). Workspace-wide: ~2267 → 2671 (+404).
+- New doctor rules added: 3 (`entry-lane-missing`, `entry-anchor-shape`, `entry-address-reason-missing`).
+- New SKILL.md verbs touched: `/deskwork:iterate` (Step 8.5.1 required-reason prose).
+- New schema fields landed: `CommentAnnotation.replyTo` / `.attachments` / `.spatialAnchor` (discriminated union); `EditCommentAnnotation.attachments` patch; `AddressAnnotation.reason` (now required when `disposition === 'addressed'`).
+- Plugin deps added: `diff` (jsdiff for the inline-diff expansion); `html-to-image` (capture). Both per Phase 1 decision-doc.
+- Hook fires: 12+; clean: 4-5; E2BIG outages: 6+; cumulative coverage: ~50% of session iterations had real audit coverage (the dampener-engaged + E2BIG combination ate the rest).
+
+**Insights:**
+
+- **The new `/dwi` Phase 16+17 fix structurally validates issue #383.** The retroactive barrage on the 70-commit historical diff caught 4 real findings (AUDIT-20260601-01 through -04) that the pre-fix loop never saw. AUDIT-20260601-01 specifically was a 2-model cross-model finding (claude + codex agreement) on a defect in code shipped by the autonomous burndown — exactly the kind of finding the dampener's earlier semantic was suppressing. The Phase 16+17 fix landed cleanly + the first real-world test caught real bugs. That's the strongest signal possible for the new shape.
+
+- **Cross-model agreement IS what makes the audit-barrage load-bearing.** AUDIT-20260601-07's 7-model agreement (claude-01..04 + codex-01..03 all flagged spatialAnchor's missing discriminated-union) is the kind of finding that no single model would have caught with confidence. The N-model independent-discovery pattern is the audit-barrage's whole reason for existing, and it works. The gemini-disable doesn't break this — 2-model agreement (claude + codex) is still meaningfully stronger than single-model.
+
+- **The dampener's design hole has TWO failure modes — one structurally fixed (#383), one remaining (#385).** The Phase 16+17 fix closed the always-skip hole. But the dampener counter still doesn't reset when the diff range materially changes; an engaging streak from tiny-diff runs can still slush MEDIUMs on a subsequent large-diff run. Concrete repro happened this session: 2 swim-compact-strip barrages engaged the dampener, then a 70-commit cross-subsystem audit slushed 2 MED findings (AUDIT-20260601-01 + -02) because the dampener counter said "quiet." Filed as #385 with 4 fix-shape options for operator decision.
+
+- **The audit-barrage helps MORE on rapid implementation cycles than on slow ones.** When I dispatched substantive tasks (Task 8.4 6-commit dispatch; Task 8.6 4-commit dispatch), the hook found real defects every fire that had clean execution. When the diff piled up across multiple un-audited iterations, E2BIG broke the hook and coverage went to zero. The lesson: barrage frequency matters, and dampener-reset semantics should be tuned to keep the per-fire diff bounded. The Phase 16+17 fix's "fire-every-iteration" is the right shape; #386's argv-size fix is the natural completion.
+
+- **The operator-driven scope-correction signal IS the autonomous-loop's safety net.** Three times this session, the operator caught a structural mistake I was about to compound: (1) the dampener-skip semantic, (2) the stale workplan checkboxes, (3) the gemini failure rate. Each was a "you've been doing X without noticing Y" observation that no amount of internal verification would have surfaced — they required the operator's outside-view. The 2-3 minute investment per turn paid back hours of mis-routed dispatch work.
+
+- **`html-to-image` + `diff` (jsdiff) were the right Phase 1 picks.** Both integrated cleanly. `html-to-image` had jsdom test friction (the canvas-backed capture needs a real browser to fully exercise), but the helper API was clean. `diff`'s `structuredPatch` with `context: 0` gave precise hunk boundaries for the comment-anchor intersection logic in 8.6.2.
+
+- **The Phase 0 burndown's biggest cost wasn't the per-task code work — it was the workplan-tick + audit-log Status-flip bureaucracy.** ~25% of session turns were spent on dispatch prompt construction + workplan ticking + Status flipping rather than substantive feature work. Operator's earlier framing of "audit findings are guardrails, not exceptions" is correct, but the mechanical work of recording disposition is itself a process tax that the SKILL.md could mechanize further (auto-tick workplan + auto-flip audit-log when a commit's body matches `^Closes AUDIT-NNNNN`).
+### Hygiene observations
+
+- commit 9790e5e530d3 — `follow-up` in subject: test(graphical-entries): update CLI cascade test for narrowed catch (AUDIT-23 follow-up)
+- workplan /Users/orion/work/deskwork-work/graphical-entries/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1990 — markers: defer — - [ ] Step 7.2.9: extend cancel-cascade test coverage — add recursive-cascade regression test (3-level group nesting) AND per-member `priorStage` assertions to close test-coverage gaps surfaced by Ste
+- workplan /Users/orion/work/deskwork-work/graphical-entries/docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:1998 — markers: defer — - [ ] Step 7.3.5: wire member-of pull-tab on the **mobile lane-stack** + the **desktop list-mode-body** so the pull-tab affordance reaches the same viewport classes the rest of the dashboard reaches. 
+- issue #1 referenced this session: deskwork plugin: editorial lifecycle + standalone studio (Astro severance)
+- issue #2 referenced this session: Phase 13: hierarchical content + scrapbook secret + writer's notebook viewport
+- issue #3 referenced this session: feat(build): self-contained bundles — closes the install gap (no npm publish required)
+- issue #4 [CLOSED] referenced this session: Marketplace plugin install ships no runnable CLI: `deskwork install` exits 127
+- issue #5 referenced this session: Phase 14: versioning, release process, and build correctness (v0.1.0)
+- issue #6 referenced this session: fix(install): ship runnable bundles inside plugin tree (closes #4)
+- issue #7 [CLOSED] referenced this session: Skill prompt at `skills/install` shows wrong arg count for `deskwork install`
+- issue #8 [CLOSED] referenced this session: Make `<project-root>` default to `process.cwd()` in `deskwork install`
+- issue #9 referenced this session: fix(ci): skip workspaces without a test script
+- issue #10 [CLOSED] referenced this session: Add `--host` flag to deskwork-studio for LAN / Tailscale / VPN dev access
+- issue #148 [CLOSED] referenced this session: BUG: studio stage-transition endpoints don't regenerate calendar.md; doctor --check misses the drift
+- issue #247 [CLOSED] referenced this session: BUG: deskwork ingest regen drops Final/Cancelled entries, reverts calendar.md to pre-redesign stage list
+- issue #299 [OPEN] referenced this session: Studio review surface: no affordance to find where/how marginalia comments were addressed in the new revision
+- issue #306 [OPEN] referenced this session: Phase 5: Studio render — per-lane tabs + template stage columns + combined overview + lane-visibility panel + multi-lane composed views
+- issue #360 [OPEN] referenced this session: perf(graphical-entries): group cancel --cascade runs regenerateCalendar N+1 times
+- issue #363 [OPEN] referenced this session: test(graphical-entries): cancel-cascade test gaps — recursive-cascade + per-member priorStage assertions
+- issue #371 [OPEN] referenced this session: feat(graphical-entries): wire member-of pull-tab on mobile lane-stack + desktop list-mode-body (Track 2 HIGH from b642cd6)
+- issue #372 [OPEN] referenced this session: feat(graphical-entries): composed view should surface unrouted-members indicator (Track 3 LOW from b642cd6)
+- issue #382 [OPEN] referenced this session: graphical-entries: server-side preset path (.deskwork/personal/<operator-id>/focus-presets.json) — Phase 6 enhancement
+- issue #383 [CLOSED] referenced this session: dw-lifecycle:implement dampener gate is self-perpetuating in long autonomous loops — new work goes unaudited
+
+### Next session recommendation (hygiene)
+
+- Resume: Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+- Triage: #299 (Studio review surface: no affordance to find where/how marginalia comments were addressed in the new revision); #306 (Phase 5: Studio render — per-lane tabs + template stage columns + combined overview + lane-visibility panel + multi-lane composed views); #360 (perf(graphical-entries): group cancel --cascade runs regenerateCalendar N+1 times); #363 (test(graphical-entries): cancel-cascade test gaps — recursive-cascade + per-member priorStage assertions); #371 (feat(graphical-entries): wire member-of pull-tab on mobile lane-stack + desktop list-mode-body (Track 2 HIGH from b642cd6)); #372 (feat(graphical-entries): composed view should surface unrouted-members indicator (Track 3 LOW from b642cd6)); #382 (graphical-entries: server-side preset path (.deskwork/personal/<operator-id>/focus-presets.json) — Phase 6 enhancement)
+- Address TBD markers: line 1990: markers: defer — - [ ] Step 7.2.9: extend cancel-cascade test coverage — add recursive-cascade regression test (3-level group nesting) AND per-member `priorStage` assertions to close test-coverage gaps surfaced by Ste; line 1998: markers: defer — - [ ] Step 7.3.5: wire member-of pull-tab on the **mobile lane-stack** + the **desktop list-mode-body** so the pull-tab affordance reaches the same viewport classes the rest of the dashboard reaches. 
+- Dismantle stale worktrees: (no stale worktrees flagged)
 
 ## 2026-05-29: Merge sync + #142 closure + Phase 38 bootstrap + 38·0 blast-radius gate
 

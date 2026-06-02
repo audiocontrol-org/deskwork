@@ -9,7 +9,10 @@
  * button whose click is forwarded to the controller's `onReopen`.
  */
 
-import { buildResolvedItem } from './sidebar-render.ts';
+import {
+  buildResolvedItem,
+  type DiffSliceFetcher,
+} from './sidebar-render.ts';
 import type {
   AddressAnnotation,
   AnnotationStatus,
@@ -37,6 +40,12 @@ export interface RenderResolvedFooterDeps {
    *  to the annotate endpoint + the sidebar mutation; this module just
    *  wires the click. */
   onReopen: (annotation: CommentAnnotation, status: AnnotationStatus) => void;
+  /** Phase 8 Step 8.6.1 — fetcher forwarded through to the addressed-
+   *  badge expansion. When present, addressed stamps inside the
+   *  resolved-comments footer become click-interactive (same behavior
+   *  as the live sidebar's stamps). Omit to keep the legacy
+   *  non-interactive stamp behavior. */
+  fetchDiffSlice?: DiffSliceFetcher;
 }
 
 /**
@@ -44,7 +53,7 @@ export interface RenderResolvedFooterDeps {
  * call repeatedly. Removes the footer entirely when history is empty.
  */
 export function renderResolvedFooter(deps: RenderResolvedFooterDeps): void {
-  const { sidebar, draftBody, addressByCommentId, resolvedHistory, onReopen } = deps;
+  const { sidebar, draftBody, addressByCommentId, resolvedHistory, onReopen, fetchDiffSlice } = deps;
   let footer = sidebar.querySelector<HTMLElement>('[data-resolved-footer]');
   if (resolvedHistory.length === 0) {
     if (footer) footer.remove();
@@ -81,6 +90,7 @@ export function renderResolvedFooter(deps: RenderResolvedFooterDeps): void {
     list.appendChild(buildResolvedItem(ann, status, {
       draftBody,
       addressByCommentId,
+      ...(fetchDiffSlice !== undefined ? { fetchDiffSlice } : {}),
       onReopen,
     }));
   }

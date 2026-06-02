@@ -1,44 +1,76 @@
 /**
- * Single-stage section renderer.
+ * Row + Distribution-placeholder renderers for the dashboard.
  *
- * Each of the eight stage sections (plus the Distribution placeholder)
- * renders with a section heading (stage name + entry count) and either
- * a list of rows or an empty-state placeholder. Each row carries the
- * entry's slug, title, updated-at timestamp, and stage-gated verb
- * buttons. Per DESKWORK-STATE-MACHINE.md Commandment III, rows do NOT
- * surface iteration counts or reviewState — those were retired in
- * v0.19 along with the legacy reviewState concept.
- *
- * On mobile, each section is fronted by a collapsible tile (see
- * `renderStageTile`); on desktop the tiles are display:none and the
- * `<h2 class="er-section-head">` heading carries the stage name.
+ * Per DESKWORK-STATE-MACHINE.md Commandment III, rows do NOT surface
+ * iteration counts or reviewState — those were retired in v0.19 along
+ * with the legacy reviewState concept.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
-import type { Entry, Stage } from '@deskwork/core/schema/entry';
-import { renderRowActions, renderRowDrawer, renderRowMenu } from './affordances.ts';
+import type { Entry } from '@deskwork/core/schema/entry';
+import type { PipelineTemplate } from '@deskwork/core/pipelines';
+import {
+  classifyStage,
+  renderRowActions,
+  renderRowDrawer,
+  renderRowMenu,
+  verbsForStage,
+} from './affordances.ts';
 
-const STAGE_ORNAMENTS: Record<Stage, string> = {
-  Ideas: '◇',
-  Planned: '§',
-  Outlining: '⊹',
-  Drafting: '✎',
-  Final: '※',
-  Published: '✓',
-  Blocked: '⊘',
-  Cancelled: '✗',
-};
+/**
+ * Render the "Member of: N groups" pull-tab on the row's LEFT edge
+ * (Phase 7 Task 7.3 — Direction 1: pull-tab on row edge). Returns ''
+ * when the entry isn't a member of any populated group.
+ *
+ * Per `.claude/rules/affordance-placement.md`: the tab lives ON the
+ * row it affects, mirroring the `.er-marginalia-tab` /
+ * `.er-outline-tab` precedent. Vertical orientation (writing-mode
+ * vertical-rl) + edge-anchored placement + kraft accent.
+ *
+ * Tap → row enters `.is-expanded`; the inline popover below the row
+ * surfaces every parent group as a clipboard-copy link.
+ */
+function renderMemberTab(parents: readonly Entry[]): RawHtml {
+  if (parents.length === 0) return unsafe('');
+  return unsafe(html`
+    <button class="er-row-member-tab" type="button"
+      data-row-member-tab
+      data-parent-count="${parents.length}"
+      aria-expanded="false"
+      aria-label="Member of ${parents.length} ${parents.length === 1 ? 'group' : 'groups'}; tap to list parents">
+      <span class="er-row-member-tab-label" aria-hidden="true">Member</span>
+      <span class="er-row-member-tab-count" aria-hidden="true">${parents.length}</span>
+    </button>`);
+}
 
-const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
-  Ideas: 'No open ideas. Run /deskwork:add to capture one.',
-  Planned: 'Nothing planned. /deskwork:approve <slug> to graduate an idea.',
-  Outlining: 'Nothing in outlining.',
-  Drafting: 'No posts in drafting.',
-  Final: 'Nothing in final review.',
-  Published: 'No published posts yet.',
-  Blocked: 'Nothing blocked.',
-  Cancelled: 'No cancelled entries.',
-};
+function renderMemberPopover(parents: readonly Entry[]): RawHtml {
+  if (parents.length === 0) return unsafe('');
+  const linksRaw = parents
+    .map((parent) => {
+      const href = `/dev/editorial-review/entry/${parent.uuid}`;
+      const backLink = `Member of [${parent.title}](${href})`;
+      return html`
+        <a class="er-row-member-link"
+          href="${href}"
+          target="_blank"
+          rel="noopener"
+          data-parent-uuid="${parent.uuid}"
+          data-back-link="${backLink}">
+          <span class="er-row-member-link-name">${parent.title}</span>
+          <span class="er-row-member-link-slug">${parent.slug}</span>
+          <span class="er-row-member-link-open" aria-hidden="true">↪</span>
+        </a>`;
+    })
+    .join('');
+  const headLabel = parents.length === 1
+    ? 'Member of 1 group'
+    : `Member of ${parents.length} groups`;
+  return unsafe(html`
+    <div class="er-row-member-popover" data-row-member-popover hidden>
+      <div class="er-row-member-popover-head">${headLabel}</div>
+      ${unsafe(linksRaw)}
+    </div>`);
+}
 
 /**
  * Render one entry as a single dashboard row. Carries inline:
@@ -53,7 +85,13 @@ const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
  * revisions only via the View History surface and revert flows.
  * reviewState badges are likewise retired (Commandment III).
  */
-export function renderRow(entry: Entry, index: number, defaultSite: string): RawHtml {
+export function renderRow(
+  entry: Entry,
+  index: number,
+  template: PipelineTemplate,
+  defaultSite: string,
+  parentsByMemberUuid: ReadonlyMap<string, readonly Entry[]> = new Map(),
+): RawHtml {
   const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
   const search = [entry.slug, entry.title, entry.keywords.join(' ')].join(' ').toLowerCase();
   // Hierarchical entries (slugs containing `/`) get a visual indent
@@ -82,11 +120,29 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
   // probe code targets `.er-calendar-row` so the legacy class stays
   // on `.er-row-fg`, but the canonical attribute carriers are on the
   // shell. Test selectors should prefer `[data-row-shell]`.
+  // Phase 7 Task 7.3 Direction 1 — Member-of pull-tab on the row's
+  // LEFT edge when the entry is a member of one or more populated
+  // groups. The tab + popover are siblings of `.er-row-fg`; CSS
+  // anchors the tab at the row's left edge and reveals the popover
+  // when the row carries `.is-member-expanded`.
+  const parents = parentsByMemberUuid.get(entry.uuid) ?? [];
+  const memberClass = parents.length > 0 ? ' has-member-tab' : '';
+  // Per Task 0.12 (AUDIT-20260530-36): hoist the per-row stage
+  // classification + verb-set construction to ONCE per row. Pre-fix
+  // shape called `classifyStage` ~4× and `verbsForStage` 3× per row
+  // (each sub-renderer re-derived its own set; `renderMenu` then
+  // classified a SECOND time on the same stage+template). The
+  // computed `category` + `verbs` are now threaded into the three
+  // sub-renderers, eliminating both the wasted allocation AND the
+  // duplicate-source-of-truth shape.
+  const category = classifyStage(entry.currentStage, template);
+  const verbs = verbsForStage(entry.currentStage, template, entry, defaultSite);
   return unsafe(html`
-    <div class="er-row-shell" data-row-shell data-search="${search}"${depthAttrs}
+    <div class="er-row-shell${unsafe(memberClass)}" data-row-shell data-search="${search}"${depthAttrs}
       data-stage="${entry.currentStage}"
       data-uuid="${entry.uuid}" data-slug="${entry.slug}">
-      ${renderRowDrawer(entry, defaultSite)}
+      ${renderMemberTab(parents)}
+      ${renderRowDrawer(verbs)}
       <div class="er-row-fg er-calendar-row">
         <span class="er-row-num">№ ${String(index + 1).padStart(2, '0')}</span>
         <div class="er-calendar-body">
@@ -97,106 +153,10 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
             datetime="${entry.updatedAt}" title="${entry.updatedAt}">${formatDate(entry.updatedAt)}</time>
         </div>
         <span class="er-calendar-status" aria-hidden="true"></span>
-        ${renderRowActions(entry, defaultSite)}
+        ${renderRowActions(verbs)}
       </div>
-      ${renderRowMenu(entry, defaultSite)}
-    </div>`);
-}
-
-/**
- * Render the stage tile (mobile-only collapsible head). Hidden on desktop
- * via dashboard-mobile.css; the existing `<h2 class="er-section-head">`
- * carries the head on desktop and is hidden at <=600px so the tile takes
- * over.
- *
- * Empty stages render the same tile shape but with `is-empty` styling and
- * `disabled` so taps are no-ops (operator can still SEE the empty stage
- * in the pipeline shape — they just can't drill in to nothing).
- *
- * Review-state sub-counts (e.g. "5 · 3 in review") were removed in v0.19
- * per operator: review state isn't user-facing data and is slated for
- * backend removal; the tile shows total entry count only.
- */
-function renderStageTile(stage: Stage, count: number): RawHtml {
-  const isEmpty = count === 0;
-  const classes = isEmpty ? 'er-stage-tile is-empty' : 'er-stage-tile';
-  const disabledAttr = isEmpty ? ' disabled' : '';
-  // v7 architecture (Step 2.2.9): `data-stage-section-group="longform"`
-  // partitions single-expand state so the longform pipeline and the
-  // shortform-by-platform section operate independently. The client
-  // controller in `dashboard/stage-tiles.ts` reads this attribute to
-  // collapse only siblings in the same group when a tile is opened.
-  return unsafe(html`
-    <button class="${classes}" type="button"
-      data-stage-tile="${stage}"
-      data-stage-section-group="longform"
-      aria-expanded="false"
-      aria-controls="stage-${stage.toLowerCase()}"${unsafe(disabledAttr)}>
-      <span class="er-stage-tile-glyph" aria-hidden="true">${STAGE_ORNAMENTS[stage]}</span>
-      <span class="er-stage-tile-name">${stage}</span>
-      <span class="er-stage-tile-count"><span class="num">${count}</span></span>
-      <span class="er-stage-tile-chev" aria-hidden="true">›</span>
-    </button>`);
-}
-
-/**
- * Render one full stage section: heading + ornaments + count + rows.
- *
- * The output is wrapped in a `.er-stage-block` div that pairs a mobile-
- * only stage tile (the collapsible head) with the existing section. On
- * desktop, the tile is `display: none` and the section's `<h2>` head
- * carries the heading as before. On mobile, the section's head is hidden
- * and the tile is shown; tapping the tile toggles a `data-collapsed`
- * attribute on the section that hides/shows its rows. Single-expand
- * (tapping one tile collapses the others) is handled by
- * `dashboard/stage-tiles.ts`.
- *
- * Empty stages still render their tile (so the pipeline shape is visible
- * at-rest on phone) but the empty section body itself is hidden on mobile.
- *
- * Empty stages on desktop render compact (just the heading, no placeholder
- * body) — keeps the operator's sense of pipeline shape without padding
- * the dashboard with multi-line empty placeholders for low-volume
- * calendars (#112). The hover title still surfaces the stage's
- * "what to run next" hint when the operator points at the heading.
- */
-export function renderStageSection(
-  stage: Stage,
-  entries: readonly Entry[],
-  defaultSite: string,
-): RawHtml {
-  const tile = renderStageTile(stage, entries.length);
-
-  if (entries.length === 0) {
-    return unsafe(html`
-      <div class="er-stage-block" data-stage-block="${stage}">
-        ${tile}
-        <section class="er-section er-section--empty"
-          id="stage-${stage.toLowerCase()}" data-stage-section="${stage}"
-          data-empty-stage="${stage}">
-          <h2 class="er-section-head er-section-head--empty"
-            title="${STAGE_EMPTY_MESSAGES[stage]}">
-            <span>${stage}</span>
-            <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
-            <span class="count">№ 00</span>
-          </h2>
-        </section>
-      </div>`);
-  }
-
-  const body = unsafe(entries.map((e, i) => renderRow(e, i, defaultSite).__raw).join(''));
-
-  return unsafe(html`
-    <div class="er-stage-block" data-stage-block="${stage}">
-      ${tile}
-      <section class="er-section" id="stage-${stage.toLowerCase()}" data-stage-section="${stage}">
-        <h2 class="er-section-head">
-          <span>${stage}</span>
-          <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
-          <span class="count">№ ${entries.length}</span>
-        </h2>
-        ${body}
-      </section>
+      ${renderRowMenu(verbs, category)}
+      ${renderMemberPopover(parents)}
     </div>`);
 }
 

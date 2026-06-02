@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-25T21:25:29.431Z",
+  "entryId": "1e85ab1a-de87-456f-be79-bb626ae42c9f",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "1e85ab1a-de87-456f-be79-bb626ae42c9f",
+    "version": 1,
+    "range": {
+      "start": 1085,
+      "end": 1296
+    },
+    "text": "We need to add a mention of dogfooding the deskwork scope discovery protocol tooling in this feature implementation plan. It should be explicitly scoped into this feature documentation so we don’t forget it",
+    "category": "other",
+    "anchor": "The two problems are entangled: graphical entries need their own pipeline shape (no \"Outlining\"; \"Shipped\" as terminal, not \"Published\"), and the project-wide single-pipeline assumption is what blocks them.\nSolu",
+    "id": "7e86dcb0-3ca2-4aca-9f9d-5203c6e10ba0",
+    "createdAt": "2026-05-25T21:25:29.431Z"
+  }
+}

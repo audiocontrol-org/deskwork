@@ -1,0 +1,2482 @@
+Reading additional input from stdin...
+OpenAI Codex v0.133.0
+--------
+workdir: /Users/orion/work/deskwork-work/graphical-entries
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e7794-a743-7dd2-b15d-7e4146f3cee5
+--------
+user
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface bugs, design issues, missed edge cases, and code-quality concerns in the work product captured in the diff below.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+graphical-entries
+
+## Feature scope (workplan / PRD summary)
+
+Phase 3 of graphical-entries: Lane data model + config loader + entry schema delta. Introduces LaneConfig type + Zod schema (id, name, pipelineTemplate, contentDir); loadLaneConfig(id, projectRoot) reads .deskwork/lanes/<id>.json with refusal on missing files (no fallback per project rule); listLaneConfigs(projectRoot) walks the directory. Cross-validation: lane's pipelineTemplate must resolve via the Phase 2 template loader. Extends EntrySidecar with lane: string (required after migration) + artifactKind: 'markdown' | 'html-mockup' | 'single-file-html' | 'image' (required after migration). bootstrapDefaultLaneIfMissing migrates legacy single-site projects (default lane bound to editorial template). detectArtifactKind classifies on-disk artifacts. Schema-broadening cascade through journal events + downstream readers. Audit focus: schema invariants, loader refusals, migration correctness, type-safety, edge cases in artifact detection.
+
+## Commit subjects in the audited range
+
+8fa6477 feat(graphical-entries): Phase 3 — Lane data model + entry schema delta
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+takes a `LaneBucket` shape that's bound to the dashboard's lane
+machinery + focus state, which doesn't apply to the scoped
+group-member-set view). Instead, `members-section.ts` rebuilds the
+swim CHROME — `.er-members-swim` (header), `.er-members-stage`
+(per-stage row), `.er-members-card` (per-member card) — using the
+same press-check tokens and the same `stageGlyph()` lookup so the
+visual signature matches Phase 5 without coupling the entry-review
+surface to dashboard internals. The compositor walks the same
+`template.linearStages` + `template.offPipelineStages` sequence the
+dashboard swim does, so empty stages render with the same
+`is-empty` modifier the dashboard convention names.
+
+**Pull-tab affordance class** — `.er-row-member-tab` mirrors the
+`.er-outline-tab` / `.er-marginalia-tab` shape per the
+`.claude/rules/affordance-placement.md` § "Reference patterns in
+this codebase" mandate. Vertical text via `writing-mode:
+vertical-rl`, left-edge anchored, kraft accent color so it reads
+distinct from stage (red-pencil) or action (proof-blue). The
+expanded state inverts the colors (kraft fill, paper text) — same
+inversion pattern the marginalia-tab uses on activation.
+
+**Structural decisions made along the way**
+
+1. `members` query param on the entry-review route — added to
+   `EntryReviewQuery` and routed through `server.ts`'s
+   `c.req.query('members')`. Default = composed per the picked
+   direction; client controller flips + persists per-group via
+   localStorage.
+2. Missing-member rows — render as `.er-member-row--missing`
+   instead of silently dropping. The doctor `group-member-missing`
+   rule (Task 7.5.2) is the loud signal; the surface mirrors the
+   same finding inline so operators see the broken reference
+   without leaving the page.
+3. Lane-stack (mobile) NOT wired with the pull-tab in this commit —
+   the mobile lane-stack uses the list-body chrome, not the kanban
+   `.er-row-shell`, so a sibling rendering pass against the list-body
+   chrome is required. Track 2's spec-compliance review flagged this
+   as HIGH because the picked Direction 1 mockup is mobile-first.
+   Tracked as Step 7.3.5 in the workplan + GitHub issue #371; the
+   feature is NOT closeout-ready until that step lands. Per the
+   project's discipline rule, deferrals get both workplan + issue
+   recording — see Track 2 review actions for the resolution path.
+4. `loadLaneConfig` failures during member loading swallow rather
+   than crash — a member with a stale lane id surfaces in the
+   composed view as "unrouted" (rendered with the raw lane id) and
+   in the list view's per-row meta. The list-mode test does NOT
+   exercise this branch; the empty-members fallback test exercises
+   the no-lane-resolution path indirectly through the bare-id
+   default lane setup.
+5. The composed view's `data-template-id` attribute drives the
+   lane-accent color via CSS — no per-lane `class="lane-<id>"`
+   coupling for non-default templates. This avoids the "we forgot
+   to teach the CSS about lane X" failure mode the dashboard hit
+   in pre-Task-5.2 days.
+
+Workplan deltas + closing — Task 7.3.1, 7.3.2, 7.3.3, 7.3.4 ticked;
+Task 7.4.1, 7.4.2, 7.4.3 ticked. Phase 7's remaining tasks (7.5
+doctor rules + 7.6 studio group-management page + 7.7 iterate
+semantics on groups + 7.8 integration tests) are explicitly out of
+scope for this dispatch and remain open. Phase 7 parent issue (#306)
+stays open until those tasks land. No GitHub `Closes` keyword on
+the commit.
+
+`Status` backfilled to `fixed-b642cd6` in the immediately-following
+docs commit per the established two-commit pattern. (Note: the
+backfill commit `3d670f5` originally wrote a markdown table format
+that did NOT match the canonical `Status: fixed-<sha>` grep contract
+— that's been corrected at the AUDIT-29 header above as part of the
+Track 2 review actions; see AUDIT-30 below.)
+
+### AUDIT-20260529-30 — review-action: cancelled `unsafe(laneClass)` HTML-injection risk in renderListRow
+
+Finding-ID: AUDIT-20260529-30
+Status:     fixed-cc45787
+Severity:   medium
+Surface:    `packages/studio/src/pages/entry-review/members-section.ts:217-228`
+
+`renderListRow` wrapped the lane-class composition in `unsafe(...)`,
+bypassing the html-template's escaping. `member.lane` is Zod-typed as
+`z.string().min(1)` (`packages/core/src/schema/entry.ts:172`) — NOT
+regex-bound to the canonical lane-id charset. A malformed sidecar
+with `lane: 'x" onclick="alert(1)'` would have broken out of the
+class attribute when rendered.
+
+Resolution: import `LANE_ID_REGEX` from `@deskwork/core/lanes` and
+validate the lane id before composing the class. If it fails the
+regex, fall back to `lane-unrouted` (same shape the loader uses for
+genuinely-missing lane configs). The `unsafe(...)` wrapper is now
+safe because the input is regex-validated against the canonical
+charset.
+
+Track 3 finding #1 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-31 — review-action: pull-tab width 22px failed WCAG 2.5.8 (24x24 minimum)
+
+Finding-ID: AUDIT-20260529-31
+Status:     fixed-cc45787
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:250`
+
+`.er-row-member-tab` was 22px wide. WCAG 2.2 SC 2.5.8 (Target Size
+Minimum, AA) requires 24x24 CSS pixels. The horizontal axis failed
+by 2px. The spacing exception did not apply because the row
+foreground is the immediate right neighbor at 4px clearance, well
+under 24px.
+
+Resolution: widened the tab from 22px to 24px; adjusted
+`.er-row-shell.has-member-tab .er-row-fg`'s `padding-left` from 26px
+to 28px to preserve the row's content layout. Both axes now meet
+the WCAG floor.
+
+Track 3 finding #2 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-32 — review-action: kraft-on-paper-2 text contrast 3.58:1 failed WCAG 1.4.3 AA
+
+Finding-ID: AUDIT-20260529-32
+Status:     fixed-cc45787
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:275-304`
+
+`.er-row-member-tab-label` and `.er-row-member-tab-count` text used
+`var(--er-kraft)` (#8A7250) on `var(--er-paper-2)` (#ECE6D4),
+computed contrast ratio approx 3.58:1. The label is 0.5625rem (~9px)
+small text. WCAG 2.1 SC 1.4.3 AA requires 4.5:1 for small text; the
+text failed by ~0.92.
+
+Resolution: changed the resting-state label color to
+`var(--er-ink-soft)` (#3A3530) on `var(--er-paper-2)` = 9.79:1; the
+count badge text to `var(--er-ink)` (#1A1614) on `var(--er-paper)` =
+14.91:1. Increased label font-size from 0.5625rem to 0.625rem
+(~10px) and weight from 600 to 700. The kraft accent is preserved
+through the count badge's border + the expanded-state background
+flip, so the affordance still reads as a kraft "belonging-to"
+affordance overall. Expanded-state contrast (paper on kraft, ~3.84:1)
+left as-is because the expanded state is transient and the primary
+information delivered is in the popover content, not the tab label
+which the operator only sees while engaging the tap.
+
+Track 3 finding #3 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-33 — review-action: AUDIT-29 used non-canonical Status format (broke queue-check grep)
+
+Finding-ID: AUDIT-20260529-33
+Status:     fixed-cc45787
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:2728-2732`
+
+The AUDIT-29 entry as originally written (b642cd6) used a markdown
+table format `| fixed (b642cd6) |` for the Status field. Every
+prior audit entry follows the canonical `Status:     fixed-<sha>`
+field-format documented in the file's header and grep-anchored by
+the canonical queue check `grep -nE "^Status:[[:space:]]+fixed-"`.
+The non-canonical entry would NOT have surfaced in the standard
+triage queue.
+
+Resolution: rewrote the AUDIT-29 header block to use the canonical
+`Finding-ID / Status / Severity / Surface` field-format. The
+queue-check grep contract is preserved.
+
+Track 2 finding #2 from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-34 — review-action-deferred: mobile lane-stack missing pull-tab (Track 2 HIGH; deferred to #371)
+
+Finding-ID: AUDIT-20260529-34
+Status:     acknowledged-2026-05-29-issue-#371
+Severity:   high
+Surface:    `packages/studio/src/pages/dashboard/swimlane-shell.ts:258-271`, `packages/studio/src/pages/dashboard/lane-stack-card.ts`, `packages/studio/src/pages/dashboard/swimlane-list-body.ts`
+
+Track 2's spec-compliance review of b642cd6 flagged HIGH: the
+implementation wires the kraft pull-tab into the desktop kanban
+swim path only. The mobile lane-stack rendering (the primary
+viewport per the brief's "mobile-first" stance and the picked
+Direction 1 mockup) does NOT render the affordance. A mobile
+operator cannot discover that an entry belongs to a group.
+
+The implementer's audit-log narrative framed this as a "future
+operator need" — exactly the "Just for now is bullshit" pattern
+the discipline rule names. Resolution: filed
+[#371](https://github.com/audiocontrol-org/deskwork/issues/371)
+with the deferral rationale + scoped Step 7.3.5 into the workplan
+per the discipline rule's two-track recording requirement. The
+audit-log narrative for AUDIT-29 has been amended to surface the
+deferral path.
+
+Phase 7 closeout is BLOCKED on Step 7.3.5 landing (mobile lane-stack
++ desktop list-mode-body pull-tab parity). Track 2 finding #1 + #5
+from the per-commit review of b642cd6 + 3d670f5.
+
+### AUDIT-20260529-35 — review-action-deferred: composed view silently drops unrouted members (Track 3 #4; deferred)
+
+Finding-ID: AUDIT-20260529-35
+Status:     acknowledged-2026-05-29-issue-#372
+Severity:   low
+Surface:    `packages/studio/src/pages/entry-review/members-section.ts:99-119`
+
+`bucketMembersByLane` skips members whose `lane === undefined` AND
+members whose `lane` is not in `laneConfigsById`. In list view they
+still render (with `lane-unrouted` styling); in composed view they
+vanish with no visible count discrepancy on the toggle. The operator
+cannot tell composed view shows fewer entries unless they cross-check
+totals. Tracked at
+[#372](https://github.com/audiocontrol-org/deskwork/issues/372)
+with the recommended unrouted-indicator design.
+
+### AUDIT-20260529-36 — popover renders visible at rest on every member row (cascade order defeats `hidden`)
+
+Finding-ID: AUDIT-20260529-36 (cross-model: AUDIT-BARRAGE-claude-01)
+Status:     fixed-ffce4ba
+Severity:   high
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:347-354`, `packages/studio/src/pages/dashboard/section.ts:50` (`renderMemberPopover`)
+
+`renderMemberPopover` emits `<div class="er-row-member-popover" data-row-member-popover hidden>`, and the client controller toggles visibility via `popover.hidden = !expanded` (`row-member-tab.ts` `setRowExpanded`). The intended design is collapsed-at-rest, expanded-on-tap. But the CSS rule `.er-row-member-popover { display: block; ... }` (same specificity 0,1,0 as `[hidden] { display: none }`, declared later by origin) WINS. The `hidden` attribute is inert; every member row's popover paints at all times.
+
+The integration test (`dashboard-member-row-badge.test.ts`) only asserts `toContain('er-row-member-popover')` against the rendered HTML string — it never checks computed visibility. The test suite is green while the surface is functionally broken.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: drive visibility from the row-shell state class (e.g. `.er-row-shell:not(.is-member-expanded) .er-row-member-popover { display: none }` + `.er-row-shell.is-member-expanded .er-row-member-popover { display: block }`), AND extend the test to assert computed visibility via DOM (not string-contains) before declaring fixed. Per `.claude/rules/ui-verification.md`, the fix needs a live Playwright check before closing.
+
+### AUDIT-20260529-37 — composed view has silent-drop vectors beyond AUDIT-35 (stage-not-in-template + partial-load lane configs)
+
+Finding-ID: AUDIT-20260529-37 (cross-model: AUDIT-BARRAGE-claude-02)
+Status:     fixed-fafc0e2
+Severity:   medium
+Surface:    `packages/studio/src/pages/entry-review/members-section.ts:99-150` (`bucketMembersByLane`), `packages/studio/src/pages/entry-review/data.ts:188-210` (`loadGroupMembersBundle`)
+
+AUDIT-35 acknowledged composed view silently drops members with `lane === undefined` or a lane absent from `laneConfigsById`. Two additional silent-drop vectors are NOT covered:
+
+1. In `bucketMembersByLane`, a member is bucketed under `stageMap.get(member.currentStage)`, but the emitted `byStage` only walks `template.linearStages + template.offPipelineStages`. Any member whose `currentStage` is not in its lane's template (a legacy stage, or a custom-template omission) is pushed into `stageMap` but never read back — it vanishes from composed view AND from `memberCount`, so the swim-head count is wrong with no "missing" indicator. The same member renders fine in list view, producing an invisible composed↔list discrepancy distinct from AUDIT-35.
+
+2. In `loadGroupMembersBundle`, the load order is `laneConfigsById.set(strict.id, strict)` BEFORE `loadPipelineTemplate(...)`. If the template load throws, the `catch { continue }` fires — but the lane config is already in `laneConfigsById` while its template is absent from `templatesById`. Back in `bucketMembersByLane`, members of that lane pass the `laneConfigsById.has(member.lane)` guard, get bucketed, then hit `const template = templatesById.get(...); if (template === undefined) continue;` — dropping EVERY member of that lane from composed view, silently, and invisible in list view.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: (a) only `laneConfigsById.set` after the template successfully resolves (move the set inside the try, below the template load); (b) in `bucketMembersByLane`, emit an "unbucketed members" tail (mirroring list view's unrouted styling) so stage/template mismatches surface rather than disappear.
+
+### AUDIT-20260529-38 — member card + list-row lane-accent CSS keys on `data-template-id` attribute the markup never emits
+
+Finding-ID: AUDIT-20260529-38 (cross-model: AUDIT-BARRAGE-claude-03)
+Status:     fixed-5234182
+Severity:   medium
+Surface:    `plugins/deskwork-studio/public/css/entry-review-members.css:262-265,318-321`, `packages/studio/src/pages/entry-review/members-section.ts:152-167` (`renderMemberStageCard`), `:200-235` (`renderListRow`)
+
+AUDIT-29 structural-decision #5 claimed: "The composed view's `data-template-id` attribute drives the lane-accent color via CSS — no per-lane `class="lane-<id>"` coupling for non-default templates. This avoids the 'we forgot to teach the CSS about lane X' failure mode."
+
+The claim holds only for the swim HEAD (`.er-members-swim` carries `data-template-id`, and CSS at entry-review-members.css:218-241 keys on it). It is FALSE for the cards and list rows. `renderMemberStageCard` emits `<a class="er-members-card lane-${member.lane ?? 'default'}">` with NO `data-template-id`, and `renderListRow` emits `<li class="er-member-row lane-<id>">` likewise with no `data-template-id`. Yet the CSS includes `.er-members-card[data-template-id="editorial"]` (line 263) and `.er-member-row[data-template-id="editorial"]` (line 319) — dead selectors that NEVER match.
+
+Functional consequence: a lane using the `editorial` template but whose id is NOT the literal `default` (e.g. an `essays` or `articles` lane) gets a proof-blue swim head but FADED cards and list rows, because the only card/row accent rules that fire are the hardcoded `.lane-default` / `.lane-mockups` literals. The accent is inconsistent within a single swim block, and the exact "forgot to teach CSS about lane X" failure mode #5 said it avoided is reintroduced one level down.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: emit `data-template-id="${bucket.template.id}"` on the card `<a>` and the list `<li>` (the data is already in scope via the bucket/template), so the template-keyed accent rules actually drive the color; the literal `.lane-<id>` rules can be retired.
+
+### AUDIT-20260529-39 — corrupt member sidecars misreported as missing (silent fallback violation)
+
+Finding-ID: AUDIT-20260529-39 (cross-model: AUDIT-BARRAGE-codex-01)
+Status:     fixed-d7f1ea7
+Severity:   medium
+Surface:    `packages/studio/src/pages/entry-review/data.ts:176-183` (`loadGroupMembersBundle`)
+
+`loadGroupMembersBundle` catches every `readSidecar` failure and records the UUID as missing. That conflates a genuinely absent sidecar with schema parse failures, permission errors, malformed JSON, or other storage bugs. The result is an inline "missing" row instead of an explicit render/load failure, which violates the project's "no silent fallbacks" discipline (`.claude/CLAUDE.md` § "Error Handling") and can hide data corruption from the operator.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (codex). Fix path: distinguish not-found errors from other `readSidecar` failures. Only absent sidecars should enter `missingMemberUuids`; validation, parse, and I/O failures should propagate with an actionable message (either throwing or surfacing as a distinct "corrupt" row class so the operator can distinguish the two states).
+
+### AUDIT-20260529-40 — missing-member rows lose declared insertion order (list-mode contract violation)
+
+Finding-ID: AUDIT-20260529-40 (cross-model: AUDIT-BARRAGE-codex-02)
+Status:     fixed-b01eb21
+Severity:   medium
+Surface:    `packages/studio/src/pages/entry-review/data.ts:176-183`, `packages/studio/src/pages/entry-review/members-section.ts:263-271` (`renderListBody`)
+
+The loader splits resolved members and missing UUIDs into separate arrays; `renderListBody` renders all resolved rows BEFORE all missing rows. A group declared as `[missing-a, real-b, missing-c]` displays as `[real-b, missing-a, missing-c]`, even though the brief's acceptance criterion says list mode preserves `group.members[]` insertion order.
+
+This matters because the group membership list is operator-authored ordering — the operator's expectation is that members render in the order they added them, regardless of resolution state.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (codex). Fix path: introduce an ordered member-item structure that carries either `{kind: "resolved", entry}` or `{kind: "missing", uuid}` per original UUID position; `renderListBody` walks that sequence directly so insertion order is preserved end-to-end.
+
+### AUDIT-20260529-41 — popover left margin (22px) misaligned with WCAG-widened tab (24px) — off-by-2px drift
+
+Finding-ID: AUDIT-20260529-41 (cross-model: AUDIT-BARRAGE-claude-04)
+Status:     fixed-2274781
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/css/dashboard-row-affordances.css:349` (`.er-row-member-popover { margin: 0 0 0 22px }`) vs `:250` (`.er-row-member-tab { width: 24px }`) and `:320` (`.has-member-tab .er-row-fg { padding-left: 28px }`)
+
+AUDIT-31 widened `.er-row-member-tab` from 22px to 24px and bumped `.er-row-shell.has-member-tab .er-row-fg` padding-left from 26px to 28px to keep the foreground clear of the tab. The popover's left offset was NOT updated in lockstep: `.er-row-member-popover` still has `margin: 0 0 0 22px`. The popover now starts 2px inside the 24px tab column rather than flush with the row foreground, producing a small but visible left-edge misalignment.
+
+The cross-rule drift the WCAG-fix commit introduced by touching the tab width without sweeping the dependent offsets. The 22/24/28 magic numbers should be derived from a single `--er-member-tab-width` token to prevent this class of regression.
+
+Note: somewhat MOOT until AUDIT-20260529-36 is fixed, since the popover currently renders unconditionally — the misalignment is hidden behind the always-visible popover bug.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: align popover left margin with the tab column (24px) or the foreground inset (28px), and extract `--er-member-tab-width` as a token.
+
+### AUDIT-20260529-42 — `initGroupMembersSection` wire helpers re-attach listeners on every call (docstring lies)
+
+Finding-ID: AUDIT-20260529-42 (cross-model: AUDIT-BARRAGE-claude-05)
+Status:     fixed-90be5c3
+Severity:   low
+Surface:    `plugins/deskwork-studio/public/src/entry-review/group-members-section.ts:104-150` (`initGroupMembersSection`, `wireToggle`, `wireEmptyStateCta`, `wireMemberRowCopy`)
+
+The `initGroupMembersSection` docblock states "Idempotent — calling twice has no visible effect." That is true for `applyMode` (it reads current state) but NOT for the three `wire*` helpers: `wireToggle`, `wireEmptyStateCta`, and `wireMemberRowCopy` each call `addEventListener` unconditionally on every invocation. There is no module-level `wired` guard analogous to the one in the sibling `row-member-tab.ts` (which correctly guards with `let wired = false`).
+
+If `initPressCheckSurface` ever runs twice (re-init after a partial DOM swap, or a future refresh path), the section accumulates duplicate listeners — clicking a member row would fire `copyOrShowFallback` twice (two clipboard writes + two toasts), and the toggle would double-write localStorage.
+
+LOW severity because the current single call site doesn't trigger it, but the docstring asserts a property the code doesn't have.
+
+Surfaced by audit-barrage run `20260530T035850827Z-graphical-entries` (claude). Fix path: mirror the `row-member-tab.ts` pattern with a module-level `wired = false` guard, OR bind via a `dataset` sentinel on the section element so re-init is a genuine no-op.
+
+## Diff under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/.dw-lifecycle/scope-discovery/clones.yaml b/.dw-lifecycle/scope-discovery/clones.yaml
+index a278136..7fd8ec9 100644
+--- a/.dw-lifecycle/scope-discovery/clones.yaml
++++ b/.dw-lifecycle/scope-discovery/clones.yaml
+@@ -143,13 +143,13 @@ clones:
+       - packages/core/src/doctor/rules/missing-frontmatter-id.ts:62:94
+     disposition: pending
+     reason: null
+-  - id: aba391647f70
+-    lines: 19
++  - id: d90106a0fd59
++    lines: 23
+     members:
+-      - packages/core/src/doctor/repair.ts:22:40
+-      - packages/core/src/doctor/validate.ts:170:198
+-    disposition: pending
+-    reason: null
++      - packages/core/src/doctor/repair.ts:23:45
++      - packages/core/src/doctor/validate.ts:173:205
++    disposition: keep-with-reason
++    reason: pre-existing duplication of artifactPathForStage between doctor/repair.ts and doctor/validate.ts; the file-internal comments document the intentional copy to avoid a cross-import cycle; Phase 4 will replace both with template-driven path resolution
+   - id: 2b7d648d9381
+     lines: 14
+     members:
+@@ -236,6 +236,20 @@ clones:
+       - packages/core/src/sidecar/read-all.ts:19:29
+     disposition: pending
+     reason: null
++  - id: c20b4e4f0469
++    lines: 9
++    members:
++      - packages/core/src/lanes/loader.ts:59:67
++      - packages/core/src/pipelines/loader.ts:72:80
++    disposition: keep-with-reason
++    reason: "lanes/loader mirrors pipelines/loader by workplan design: JSON-read+Zod-validate+id-match-filename idiom across two parallel module-shaped readers; extracting a shared helper would couple lane evolution to pipeline evolution"
++  - id: b223f2def90d
++    lines: 7
++    members:
++      - packages/core/src/lanes/loader.ts:69:75
++      - packages/core/src/pipelines/loader.ts:82:88
++    disposition: keep-with-reason
++    reason: second half of the lanes/loader vs pipelines/loader mirroring (Zod-validate + id-mismatch refusal); same rationale as c20b4e4f0469
+   - id: 68e3966349bd
+     lines: 11
+     members:
+diff --git a/packages/core/package.json b/packages/core/package.json
+index cdc2aed..40edaec 100644
+--- a/packages/core/package.json
++++ b/packages/core/package.json
+@@ -137,6 +137,10 @@
+       "types": "./dist/journal.d.ts",
+       "default": "./dist/journal.js"
+     },
++    "./lanes": {
++      "types": "./dist/lanes/index.d.ts",
++      "default": "./dist/lanes/index.js"
++    },
+     "./outline-split": {
+       "types": "./dist/outline-split.d.ts",
+       "default": "./dist/outline-split.js"
+diff --git a/packages/core/src/calendar/render.ts b/packages/core/src/calendar/render.ts
+index 1b6b54b..c380a85 100644
+--- a/packages/core/src/calendar/render.ts
++++ b/packages/core/src/calendar/render.ts
+@@ -16,8 +16,17 @@ function renderRow(e: Entry): string {
+   return `| ${e.uuid} | ${escapePipe(e.slug)} | ${escapePipe(e.title)} | ${escapePipe(e.description ?? '')} | ${escapePipe(e.keywords.join(', '))} | ${escapePipe(e.source)} | ${e.updatedAt} |`;
+ }
+ 
+-function bucketize(entries: Entry[]): Map<Stage, Entry[]> {
+-  const byStage = new Map<Stage, Entry[]>();
++/**
++ * Bucketize entries by stage. The map key is `string` rather than the
++ * legacy `Stage` enum so this function handles entries from any lane
++ * template — entries whose `currentStage` is outside the editorial
++ * pipeline's eight known stages simply don't land in any bucket here
++ * (the editorial calendar surface is intentionally editorial-only).
++ * Phase 4's lane-aware calendar rendering replaces this with a
++ * template-driven bucketization; see graphical-entries workplan.
++ */
++function bucketize(entries: Entry[]): Map<string, Entry[]> {
++  const byStage = new Map<string, Entry[]>();
+   for (const stage of STAGE_ORDER) byStage.set(stage, []);
+   for (const e of entries) {
+     const bucket = byStage.get(e.currentStage);
+diff --git a/packages/core/src/doctor/migrate.ts b/packages/core/src/doctor/migrate.ts
+index 3c5a6b2..0f7240a 100644
+--- a/packages/core/src/doctor/migrate.ts
++++ b/packages/core/src/doctor/migrate.ts
+@@ -215,22 +215,52 @@ export async function migrateCalendar(
+   return { entriesMigrated: sidecars.length, unmigratable };
+ }
+ 
+-function countIterationsByStage(events: JournalEvent[]): Partial<Record<Stage, number>> {
+-  const counts: Partial<Record<Stage, number>> = {};
++/**
++ * Per Phase 3 (graphical-entries): journal events now carry `stage` as
++ * any non-empty string (lane templates can name their own stages).
++ * The legacy migration is editorial-only — it parses pre-feature
++ * calendar.md whose section headings are the editorial 8-stage names.
++ * The function therefore returns a string-keyed map; downstream
++ * consumers that need the editorial-narrowing can narrow explicitly.
++ */
++function countIterationsByStage(events: JournalEvent[]): Record<string, number> {
++  const counts: Record<string, number> = {};
+   for (const e of events) {
+     if (e.kind === 'iteration') {
+-      const stage: Stage = e.stage;
++      const stage: string = e.stage;
+       counts[stage] = (counts[stage] ?? 0) + 1;
+     }
+   }
+   return counts;
+ }
+ 
++/**
++ * Editorial-specific prior-stage inference. The migration walks the
++ * legacy single-pipeline calendar.md, so off-pipeline entries (Blocked
++ * / Cancelled) are always editorial entries. Returning `Stage`
++ * preserves the editorial-narrow output type for the migration's
++ * editorial-only call sites.
++ *
++ * Per Phase 3 the journal-event `from` field is now any non-empty
++ * string; we narrow back to `Stage` via an explicit type guard. Off-
++ * vocabulary values (lane-specific stages that happen to appear in the
++ * journal) fall through to the default.
++ */
++function isEditorialStage(value: string): value is Stage {
++  return (
++    value === 'Ideas' || value === 'Planned' || value === 'Outlining'
++    || value === 'Drafting' || value === 'Final' || value === 'Published'
++    || value === 'Blocked' || value === 'Cancelled'
++  );
++}
++
+ function inferPriorStageFromJournal(events: JournalEvent[]): Stage {
+   for (let i = events.length - 1; i >= 0; i--) {
+     const e = events[i];
+     if (e && e.kind === 'stage-transition' && e.to !== 'Blocked' && e.to !== 'Cancelled') {
+-      return e.from;
++      if (isEditorialStage(e.from)) {
++        return e.from;
++      }
+     }
+   }
+   return 'Drafting'; // safe default when no transition history is available
+diff --git a/packages/core/src/doctor/repair.ts b/packages/core/src/doctor/repair.ts
+index cf97894..56f802a 100644
+--- a/packages/core/src/doctor/repair.ts
++++ b/packages/core/src/doctor/repair.ts
+@@ -1,7 +1,7 @@
+ import { readdir, readFile, writeFile, mkdir, stat } from 'node:fs/promises';
+ import { join, dirname, relative } from 'node:path';
+ import { sidecarsDir } from '../sidecar/paths.ts';
+-import { EntrySchema, type Entry, type Stage } from '../schema/entry.ts';
++import { EntrySchema, type Entry } from '../schema/entry.ts';
+ import { renderCalendar } from '../calendar/render.ts';
+ 
+ export interface RepairOptions {
+@@ -17,9 +17,10 @@ export interface RepairResult {
+  * Stage-conventional artifact path. Mirrors `artifactPathForStage` in
+  * validate.ts (kept here to avoid a cross-import; both files reach for
+  * the same canonical mapping). Returns null for stages with no on-disk
+- * artifact.
++ * artifact, including stages outside the editorial pipeline (Phase 3
++ * / Phase 4 — lane-aware path conventions land in lane code).
+  */
+-function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): string | null {
++function artifactPathForStage(projectRoot: string, slug: string, stage: string): string | null {
+   switch (stage) {
+     case 'Ideas':
+       return join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
+@@ -34,6 +35,10 @@ function artifactPathForStage(projectRoot: string, slug: string, stage: Stage):
+     case 'Blocked':
+     case 'Cancelled':
+       return null;
++    default:
++      // Lane-specific or unrecognized stage; no editorial-default path
++      // applies. Phase 4 introduces template-driven path resolution.
++      return null;
+   }
+ }
+ 
+diff --git a/packages/core/src/doctor/validate.ts b/packages/core/src/doctor/validate.ts
+index af60d09..6873ccd 100644
+--- a/packages/core/src/doctor/validate.ts
++++ b/packages/core/src/doctor/validate.ts
+@@ -163,11 +163,14 @@ async function loadSidecars(projectRoot: string): Promise<LoadedSidecar[]> {
+ 
+ /**
+  * Stage-conventional artifact path. Returns null when a stage does not have a
+- * primary on-disk artifact (e.g. Blocked / Cancelled).
++ * primary on-disk artifact (e.g. Blocked / Cancelled) OR when the stage is
++ * outside the editorial pipeline's eight known values (per Phase 3 / Phase
++ * 4 — lane-aware path conventions land in the lane code, not in this
++ * editorial-specific heuristic).
+  *
+  * Note: Published shares the Drafting/Final path (`docs/<slug>/index.md`).
+  */
+-function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): string | null {
++function artifactPathForStage(projectRoot: string, slug: string, stage: string): string | null {
+   switch (stage) {
+     case 'Ideas':
+       return join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
+@@ -182,6 +185,10 @@ function artifactPathForStage(projectRoot: string, slug: string, stage: Stage):
+     case 'Blocked':
+     case 'Cancelled':
+       return null;
++    default:
++      // Lane-specific or unrecognized stage; no editorial-default path
++      // applies. Phase 4 introduces template-driven path resolution.
++      return null;
+   }
+ }
+ 
+diff --git a/packages/core/src/entry/approve.ts b/packages/core/src/entry/approve.ts
+index a8a0c7f..f08482f 100644
+--- a/packages/core/src/entry/approve.ts
++++ b/packages/core/src/entry/approve.ts
+@@ -3,7 +3,7 @@ import { writeSidecar } from '../sidecar/write.ts';
+ import { appendJournalEvent } from '../journal/append.ts';
+ import { regenerateCalendar } from '../calendar/regenerate.ts';
+ import { nextStage } from '../schema/entry.ts';
+-import type { Entry, Stage } from '../schema/entry.ts';
++import type { Entry } from '../schema/entry.ts';
+ import { snapshotIndexForStage } from './snapshot.ts';
+ import {
+   addEntryAnnotation,
+@@ -18,8 +18,17 @@ interface ApproveOptions {
+ 
+ interface ApproveResult {
+   readonly entryId: string;
+-  readonly fromStage: Stage;
+-  readonly toStage: Stage;
++  /**
++   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
++   * plain string. The approve verb today is editorial-only — `nextStage`
++   * uses the hardcoded editorial successor map — but the result-type
++   * reports the raw sidecar string so non-editorial sidecars don't
++   * silently fail the `Stage`-narrow type check. Phase 4 introduces a
++   * lane-template-driven `nextStage` and the result type narrows to
++   * the per-lane stage union at that point.
++   */
++  readonly fromStage: string;
++  readonly toStage: string;
+   /** True when an `index.md` snapshot was preserved at
+    *  `<dir>/scrapbook/<priorStage>.md`. False when there was no
+    *  `index.md` to snapshot (common at Ideas) or the entry has no
+diff --git a/packages/core/src/entry/block.ts b/packages/core/src/entry/block.ts
+index 3cfe121..1e19cc0 100644
+--- a/packages/core/src/entry/block.ts
++++ b/packages/core/src/entry/block.ts
+@@ -2,7 +2,7 @@ import { readSidecar } from '../sidecar/read.ts';
+ import { writeSidecar } from '../sidecar/write.ts';
+ import { appendJournalEvent } from '../journal/append.ts';
+ import { regenerateCalendar } from '../calendar/regenerate.ts';
+-import type { Entry, Stage } from '../schema/entry.ts';
++import type { Entry } from '../schema/entry.ts';
+ 
+ interface BlockOptions {
+   readonly uuid: string;
+@@ -12,7 +12,14 @@ interface BlockOptions {
+ 
+ interface BlockResult {
+   readonly entryId: string;
+-  readonly fromStage: Stage;
++  /**
++   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
++   * plain string (lane-template-driven). `fromStage` reports whatever
++   * stage value the sidecar carried. Phase 4's lane-aware verb refactor
++   * will gate this verb on the lane template's off-pipeline stage set
++   * rather than the hardcoded `'Blocked' | 'Cancelled'` literals below.
++   */
++  readonly fromStage: string;
+   readonly toStage: 'Blocked';
+ }
+ 
+diff --git a/packages/core/src/entry/cancel.ts b/packages/core/src/entry/cancel.ts
+index 743a785..6e71a9a 100644
+--- a/packages/core/src/entry/cancel.ts
++++ b/packages/core/src/entry/cancel.ts
+@@ -2,7 +2,7 @@ import { readSidecar } from '../sidecar/read.ts';
+ import { writeSidecar } from '../sidecar/write.ts';
+ import { appendJournalEvent } from '../journal/append.ts';
+ import { regenerateCalendar } from '../calendar/regenerate.ts';
+-import type { Entry, Stage } from '../schema/entry.ts';
++import type { Entry } from '../schema/entry.ts';
+ 
+ interface CancelOptions {
+   readonly uuid: string;
+@@ -11,7 +11,13 @@ interface CancelOptions {
+ 
+ interface CancelResult {
+   readonly entryId: string;
+-  readonly fromStage: Stage;
++  /**
++   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
++   * plain string. Phase 4 introduces lane-template-driven verb gating;
++   * for now the cancel verb refuses the literal `'Blocked' | 'Cancelled'`
++   * stages and writes the literal `'Cancelled'` target.
++   */
++  readonly fromStage: string;
+   readonly toStage: 'Cancelled';
+ }
+ 
+diff --git a/packages/core/src/entry/induct.ts b/packages/core/src/entry/induct.ts
+index 819132c..2e45044 100644
+--- a/packages/core/src/entry/induct.ts
++++ b/packages/core/src/entry/induct.ts
+@@ -8,10 +8,12 @@ import type { Entry, Stage } from '../schema/entry.ts';
+ interface InductOptions {
+   readonly uuid: string;
+   /**
+-   * Linear-pipeline stage to teleport the entry into. Must be one of:
+-   * Ideas, Planned, Outlining, Drafting, Final, Published. (Blocked /
+-   * Cancelled are not valid induction targets — use `blockEntry` /
+-   * `cancelEntry` for those.)
++   * Linear-pipeline stage to teleport the entry into. The editorial
++   * default vocabulary is Ideas / Planned / Outlining / Drafting /
++   * Final / Published. Phase 4 makes this lane-template-driven; for
++   * now the parameter accepts the editorial-narrow `Stage` enum
++   * (callers in other lane templates should widen at the call boundary
++   * once the lane-aware API ships).
+    */
+   readonly targetStage: Stage;
+   readonly reason?: string;
+@@ -19,7 +21,13 @@ interface InductOptions {
+ 
+ interface InductResult {
+   readonly entryId: string;
+-  readonly fromStage: Stage;
++  /**
++   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
++   * plain string. `fromStage` reports whatever value the sidecar
++   * carried (any lane-template stage); `toStage` echoes the verb's
++   * `targetStage` argument which is still editorial-narrow today.
++   */
++  readonly fromStage: string;
+   readonly toStage: Stage;
+ }
+ 
+diff --git a/packages/core/src/entry/snapshot.ts b/packages/core/src/entry/snapshot.ts
+index 89c829c..dce914e 100644
+--- a/packages/core/src/entry/snapshot.ts
++++ b/packages/core/src/entry/snapshot.ts
+@@ -36,7 +36,7 @@ import {
+   writeFile,
+ } from 'node:fs/promises';
+ import { basename, dirname, join } from 'node:path';
+-import type { Entry, Stage } from '../schema/entry.ts';
++import type { Entry } from '../schema/entry.ts';
+ 
+ export interface SnapshotResult {
+   /** True when a snapshot file was written (or already matched on disk). */
+@@ -80,7 +80,10 @@ async function atomicWrite(absPath: string, content: string): Promise<void> {
+ export async function snapshotIndexForStage(
+   projectRoot: string,
+   entry: Entry,
+-  priorStage: Stage,
++  // Per Phase 3 (graphical-entries) Entry.currentStage is now any string
++  // (lane-template-driven). The snapshot filename is the lowercased
++  // stage name, so any non-empty string works.
++  priorStage: string,
+ ): Promise<SnapshotResult> {
+   if (!entry.artifactPath) {
+     // Legacy entries without an artifactPath: no anchor for the
+diff --git a/packages/core/src/index.ts b/packages/core/src/index.ts
+index 80bac3d..1eeac1f 100644
+--- a/packages/core/src/index.ts
++++ b/packages/core/src/index.ts
+@@ -26,3 +26,4 @@ export * from './content-index.ts';
+ export * as doctor from './doctor/index.ts';
+ export * from './overrides.ts';
+ export * as pipelines from './pipelines/index.ts';
++export * as lanes from './lanes/index.ts';
+diff --git a/packages/core/src/iterate/history.ts b/packages/core/src/iterate/history.ts
+index 1f16e43..6e89f32 100644
+--- a/packages/core/src/iterate/history.ts
++++ b/packages/core/src/iterate/history.ts
+@@ -16,12 +16,18 @@
+  */
+ 
+ import { readJournalEvents } from '../journal/read.ts';
+-import type { Stage } from '../schema/entry.ts';
+ 
++/**
++ * Per Phase 3 (graphical-entries) the `stage` field on journal events
++ * is any non-empty string (lane-template-driven). The iteration
++ * history surface reports whatever stage value the journal recorded;
++ * Phase 4's lane-aware history filtering replaces the narrow `Stage`
++ * type with a per-lane stage union.
++ */
+ export interface IterationListing {
+   readonly versionNumber: number;
+   readonly timestamp: string;
+-  readonly stage: Stage;
++  readonly stage: string;
+ }
+ 
+ export interface IterationContent extends IterationListing {
+@@ -64,7 +70,7 @@ export async function getEntryIteration(
+   projectRoot: string,
+   entryId: string,
+   versionNumber: number,
+-  stage?: Stage,
++  stage?: string,
+ ): Promise<IterationContent | null> {
+   const events = await readJournalEvents(projectRoot, { entryId });
+   for (const event of events) {
+diff --git a/packages/core/src/iterate/iterate.ts b/packages/core/src/iterate/iterate.ts
+index 31e9ff9..cd81fe8 100644
+--- a/packages/core/src/iterate/iterate.ts
++++ b/packages/core/src/iterate/iterate.ts
+@@ -5,7 +5,7 @@ import { readSidecar } from '../sidecar/read.ts';
+ import { writeSidecar } from '../sidecar/write.ts';
+ import { appendJournalEvent } from '../journal/append.ts';
+ import { getContentDir } from '../config.ts';
+-import type { Entry, Stage } from '../schema/entry.ts';
++import type { Entry } from '../schema/entry.ts';
+ 
+ interface IterateOptions {
+   uuid: string;
+@@ -14,7 +14,11 @@ interface IterateOptions {
+ 
+ interface IterateResult {
+   entryId: string;
+-  stage: Stage;
++  /**
++   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
++   * plain string. `stage` echoes the sidecar value untouched.
++   */
++  stage: string;
+   version: number;
+ }
+ 
+diff --git a/packages/core/src/journal/read.ts b/packages/core/src/journal/read.ts
+index e94aeb1..defd292 100644
+--- a/packages/core/src/journal/read.ts
++++ b/packages/core/src/journal/read.ts
+@@ -27,7 +27,12 @@ export async function readJournalEvents(projectRoot: string, opts: ReadOptions =
+     const parsed = JournalEventSchema.safeParse(json);
+     if (!parsed.success) continue;
+     const e = parsed.data;
+-    if (opts.entryId && e.entryId !== opts.entryId) continue;
++    // Not every event variant carries `entryId` (the Phase 3
++    // `lane-migration` event is project-scoped). Filter only when the
++    // field is present on the variant.
++    if (opts.entryId) {
++      if (!('entryId' in e) || e.entryId !== opts.entryId) continue;
++    }
+     if (opts.stage && 'stage' in e && e.stage !== opts.stage) continue;
+     if (opts.kinds && !opts.kinds.includes(e.kind)) continue;
+     events.push(e);
+diff --git a/packages/core/src/lanes/bootstrap.ts b/packages/core/src/lanes/bootstrap.ts
+new file mode 100644
+index 0000000..24e6c9e
+--- /dev/null
++++ b/packages/core/src/lanes/bootstrap.ts
+@@ -0,0 +1,124 @@
++/**
++ * Default-lane bootstrap (Phase 3 Task 3.4).
++ *
++ * `bootstrapDefaultLaneIfMissing(projectRoot)` is the migration hook
++ * that lets a pre-graphical-entries project — one with a legacy
++ * `sites.<defaultSite>.contentDir` block in its `.deskwork/config.json`
++ * but no `.deskwork/lanes/default.json` — start participating in the
++ * new lane-aware model without explicit operator setup.
++ *
++ * Behavior:
++ *
++ *   - If `.deskwork/lanes/default.json` already exists, returns
++ *     `{ created: false, reason: 'already-exists' }` without
++ *     side-effects.
++ *   - If the project has no readable `.deskwork/config.json` (e.g.
++ *     never installed), returns `{ created: false, reason:
++ *     'no-config' }` — there's no legacy site to migrate from.
++ *   - Otherwise, writes `.deskwork/lanes/default.json` with:
++ *       id: 'default'
++ *       name: 'Default'
++ *       pipelineTemplate: 'editorial'
++ *       contentDir: <projectConfig.sites[defaultSite].contentDir>
++ *     and appends a `lane-migration` journal event identifying the
++ *     legacy site as the source. Returns
++ *     `{ created: true, path: <pathWritten> }`.
++ *
++ * The function does NOT auto-fire from inside `loadLaneConfig`.
++ * Coupling a read with a write would surprise callers; the bootstrap
++ * is an explicit migration step that callers (CLI install flow,
++ * studio first-boot, doctor migration) invoke when appropriate.
++ *
++ * The default lane's `contentDir` is written verbatim from the legacy
++ * `sites.<defaultSite>.contentDir`. Path normalization (absolute vs
++ * relative, trailing slashes, symlink resolution) is intentionally
++ * left to doctor — the bootstrap goal is to preserve operator intent,
++ * not to second-guess it.
++ */
++
++import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
++import { dirname } from 'node:path';
++import { readConfig, configPath } from '../config.ts';
++import { appendJournalEvent } from '../journal/append.ts';
++import { laneConfigPath } from './loader.ts';
++import { LaneConfigSchema, type LaneConfig } from './types.ts';
++
++export type BootstrapResult =
++  | { created: false; reason: 'already-exists'; path: string }
++  | { created: false; reason: 'no-config'; path: string }
++  | { created: true; path: string; lane: LaneConfig };
++
++/**
++ * Bootstrap a `default` lane bound to `editorial` from the project's
++ * legacy `sites.<defaultSite>.contentDir`, if no default lane exists
++ * yet. Returns a structured result identifying what happened — never
++ * throws on the "nothing to do" cases (already-exists, no-config), so
++ * callers can invoke this unconditionally at install-flow boundaries.
++ *
++ * @param projectRoot - Absolute path to the project root.
++ * @throws Only on filesystem-write failure or if the assembled lane
++ *   config somehow fails its own schema validation (defensive guard
++ *   against future schema drift; should not happen in practice).
++ */
++export async function bootstrapDefaultLaneIfMissing(
++  projectRoot: string,
++): Promise<BootstrapResult> {
++  const targetPath = laneConfigPath(projectRoot, 'default');
++  if (existsSync(targetPath)) {
++    return { created: false, reason: 'already-exists', path: targetPath };
++  }
++
++  // Probe the legacy config. If it's absent or unreadable, there's
++  // no legacy site to migrate from — return "no-config" rather than
++  // bubbling the read error, so callers can treat this as a
++  // best-effort hook.
++  const cfgPath = configPath(projectRoot);
++  if (!existsSync(cfgPath)) {
++    return { created: false, reason: 'no-config', path: targetPath };
++  }
++  const config = readConfig(projectRoot);
++  const defaultSiteId = config.defaultSite;
++  const site = config.sites[defaultSiteId];
++  if (!site) {
++    throw new Error(
++      `bootstrapDefaultLaneIfMissing: config at ${cfgPath} declares `
++      + `defaultSite="${defaultSiteId}" but no matching site under "sites". `
++      + `Run /deskwork:install to fix the config.`,
++    );
++  }
++
++  const lane: LaneConfig = {
++    id: 'default',
++    name: 'Default',
++    pipelineTemplate: 'editorial',
++    contentDir: site.contentDir,
++  };
++
++  // Defensive: round-trip through the schema before writing, so the
++  // file on disk is guaranteed to satisfy the loader's contract.
++  const validated = LaneConfigSchema.safeParse(lane);
++  if (!validated.success) {
++    throw new Error(
++      `bootstrapDefaultLaneIfMissing: assembled lane config failed schema validation: `
++      + `${validated.error.message}`,
++    );
++  }
++
++  mkdirSync(dirname(targetPath), { recursive: true });
++  writeFileSync(targetPath, JSON.stringify(validated.data, null, 2) + '\n', 'utf8');
++
++  await appendJournalEvent(projectRoot, {
++    kind: 'lane-migration',
++    at: new Date().toISOString(),
++    migration: 'default-lane-from-legacy-site',
++    source: `sites.${defaultSiteId}`,
++    target: 'lanes.default',
++    details: {
++      legacySiteId: defaultSiteId,
++      contentDir: site.contentDir,
++      pipelineTemplate: 'editorial',
++    },
++  });
++
++  return { created: true, path: targetPath, lane: validated.data };
++}
+diff --git a/packages/core/src/lanes/detection.ts b/packages/core/src/lanes/detection.ts
+new file mode 100644
+index 0000000..c80b238
+--- /dev/null
++++ b/packages/core/src/lanes/detection.ts
+@@ -0,0 +1,78 @@
++/**
++ * artifactKind detection.
++ *
++ * `detectArtifactKind(artifactPath)` classifies an on-disk path as one
++ * of the four supported artifact kinds (`markdown`, `html-mockup`,
++ * `single-file-html`, `image`). Refuses unrecognized shapes with a
++ * descriptive error listing every supported extension.
++ *
++ * Detection logic:
++ *
++ *   - `.md` extension                              → `'markdown'`
++ *   - directory containing `<dir>/index.html`      → `'html-mockup'`
++ *   - loose `.html` file                           → `'single-file-html'`
++ *   - `.png` / `.jpg` / `.jpeg` / `.gif` /
++ *     `.webp` / `.svg` extensions                  → `'image'`
++ *   - anything else                                → throws
++ *
++ * The path may be a file OR a directory. The `html-mockup` case
++ * specifically requires the path to be a directory AND for an
++ * `index.html` to exist inside it; a directory with no index.html is
++ * NOT an html-mockup and the function falls through to the
++ * "unrecognized" refusal path.
++ */
++
++import { existsSync, statSync } from 'node:fs';
++import { extname, join } from 'node:path';
++import type { ArtifactKind } from './types.ts';
++
++const SUPPORTED_EXTENSIONS_HELP =
++  '.md, <dir>/index.html, .html, .png, .jpg, .jpeg, .gif, .webp, .svg';
++
++const IMAGE_EXTENSIONS = new Set([
++  '.png',
++  '.jpg',
++  '.jpeg',
++  '.gif',
++  '.webp',
++  '.svg',
++]);
++
++/**
++ * Classify `artifactPath` into one of the four supported artifact
++ * kinds. Throws with a clear, listing-style error for unrecognized
++ * extensions or shapes.
++ */
++export function detectArtifactKind(artifactPath: string): ArtifactKind {
++  // Directory case takes precedence: if the path is an existing
++  // directory with an index.html inside, it's an html-mockup. We
++  // check existence first because `extname` on a directory path can
++  // produce surprising results (e.g. `.com` for `foo.com/`); the
++  // existsSync+statSync probe avoids that ambiguity.
++  if (existsSync(artifactPath) && statSync(artifactPath).isDirectory()) {
++    const indexHtml = join(artifactPath, 'index.html');
++    if (existsSync(indexHtml)) {
++      return 'html-mockup';
++    }
++    throw new Error(
++      `detectArtifactKind: directory at ${artifactPath} has no index.html `
++      + `and is not a recognized artifact shape. Supported: ${SUPPORTED_EXTENSIONS_HELP}`,
++    );
++  }
++
++  const ext = extname(artifactPath).toLowerCase();
++  if (ext === '.md') {
++    return 'markdown';
++  }
++  if (ext === '.html') {
++    return 'single-file-html';
++  }
++  if (IMAGE_EXTENSIONS.has(ext)) {
++    return 'image';
++  }
++
++  throw new Error(
++    `detectArtifactKind: unsupported artifact extension at ${artifactPath}. `
++    + `Supported: ${SUPPORTED_EXTENSIONS_HELP}`,
++  );
++}
+diff --git a/packages/core/src/lanes/index.ts b/packages/core/src/lanes/index.ts
+new file mode 100644
+index 0000000..b0aceef
+--- /dev/null
++++ b/packages/core/src/lanes/index.ts
+@@ -0,0 +1,31 @@
++/**
++ * Lanes — barrel export.
++ *
++ * `LaneConfig` + `LaneConfigSchema` define the per-lane contract;
++ * `loadLaneConfig` + `listLaneConfigs` resolve operator-authored lane
++ * configs at runtime; `detectArtifactKind` classifies an on-disk
++ * artifact path; `bootstrapDefaultLaneIfMissing` migrates legacy
++ * single-site projects into the new lane-aware model.
++ */
++
++export {
++  LaneConfigSchema,
++  ArtifactKindSchema,
++  type LaneConfig,
++  type StrictLaneConfig,
++  type ArtifactKind,
++} from './types.ts';
++
++export {
++  loadLaneConfig,
++  listLaneConfigs,
++  lanesDir,
++  laneConfigPath,
++} from './loader.ts';
++
++export { detectArtifactKind } from './detection.ts';
++
++export {
++  bootstrapDefaultLaneIfMissing,
++  type BootstrapResult,
++} from './bootstrap.ts';
+diff --git a/packages/core/src/lanes/loader.ts b/packages/core/src/lanes/loader.ts
+new file mode 100644
+index 0000000..f4f7455
+--- /dev/null
++++ b/packages/core/src/lanes/loader.ts
+@@ -0,0 +1,156 @@
++/**
++ * Lane config loader + enumeration.
++ *
++ * Two functions, both sync:
++ *
++ *   - `loadLaneConfig(id, projectRoot)` resolves a lane config by id
++ *     from `<projectRoot>/.deskwork/lanes/<id>.json`. Refuses missing
++ *     files with a clear error (no fallback — lanes are project-owned;
++ *     unlike pipeline templates, there are no plugin defaults).
++ *     Cross-validates that the lane's `pipelineTemplate` resolves via
++ *     the Phase 2 template loader.
++ *
++ *   - `listLaneConfigs(projectRoot)` enumerates every `*.json` under
++ *     `<projectRoot>/.deskwork/lanes/` and returns the basenames.
++ *     Suitable for showing the operator a picker; callers resolve each
++ *     id through `loadLaneConfig` to get the full config.
++ *
++ * Design notes:
++ *
++ *   - Sync I/O matches the pipeline template loader. Lane configs are
++ *     small and read on cold paths.
++ *
++ *   - No caching. Same rationale as the pipeline template loader.
++ *
++ *   - The bootstrap helper for the legacy `sites.<defaultSite>` →
++ *     `default` lane migration lives in `./bootstrap.ts`, NOT here.
++ *     Mixing read-only resolution with side-effecting bootstrap would
++ *     surprise callers; callers explicitly invoke
++ *     `bootstrapDefaultLaneIfMissing` when appropriate.
++ */
++
++import { existsSync, readdirSync, readFileSync } from 'node:fs';
++import { join, basename } from 'node:path';
++import { LaneConfigSchema, type LaneConfig } from './types.ts';
++import { loadPipelineTemplate } from '../pipelines/loader.ts';
++
++/**
++ * Directory inside a project where lane configs live.
++ */
++export function lanesDir(projectRoot: string): string {
++  return join(projectRoot, '.deskwork', 'lanes');
++}
++
++/**
++ * Path to a specific lane config file under the project.
++ */
++export function laneConfigPath(projectRoot: string, id: string): string {
++  return join(lanesDir(projectRoot), `${id}.json`);
++}
++
++/**
++ * Read + parse + Zod-validate a single JSON file into a `LaneConfig`.
++ * Throws with a descriptive message on every failure mode (file
++ * missing, JSON parse error, schema violation, id mismatch with
++ * filename).
++ */
++function readAndValidate(path: string, expectedId: string): LaneConfig {
++  if (!existsSync(path)) {
++    throw new Error(`Lane config file not found: ${path}`);
++  }
++  const raw = readFileSync(path, 'utf8');
++  let parsed: unknown;
++  try {
++    parsed = JSON.parse(raw);
++  } catch (err) {
++    const detail = err instanceof Error ? err.message : String(err);
++    throw new Error(`Lane config at ${path} is not valid JSON: ${detail}`);
++  }
++  const result = LaneConfigSchema.safeParse(parsed);
++  if (!result.success) {
++    const issues = result.error.issues
++      .map((issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`)
++      .join('\n');
++    throw new Error(
++      `Lane config at ${path} failed Zod validation:\n${issues}`,
++    );
++  }
++  if (result.data.id !== expectedId) {
++    throw new Error(
++      `Lane config at ${path} declares id "${result.data.id}" but was loaded as "${expectedId}" — `
++      + `the JSON \`id\` field must equal the filename basename. `
++      + `Either rename the file to "${result.data.id}.json", or change the JSON's id to "${expectedId}".`,
++    );
++  }
++  return result.data;
++}
++
++/**
++ * Load a lane config by id. Refuses missing files with a clear error
++ * (no fallback). Cross-validates the referenced pipeline template at
++ * load time — if the template doesn't resolve, the lane config is
++ * effectively broken and the loader fails fast.
++ *
++ * @param id - The lane id (matches the JSON filename basename).
++ * @param projectRoot - Absolute path to the project root.
++ * @throws When the lane config file does not exist, the JSON fails to
++ *   parse, Zod validation fails, the JSON's `id` field disagrees with
++ *   the filename basename, or the referenced `pipelineTemplate` does
++ *   not resolve.
++ */
++export function loadLaneConfig(id: string, projectRoot: string): LaneConfig {
++  if (id.trim().length === 0) {
++    throw new Error(
++      `loadLaneConfig requires a non-empty id; received ${JSON.stringify(id)}`,
++    );
++  }
++  const path = laneConfigPath(projectRoot, id);
++  if (!existsSync(path)) {
++    throw new Error(
++      `Lane config "${id}" not found at ${path}. `
++      + `Lane configs are project-owned and must be authored under .deskwork/lanes/. `
++      + `(There are no plugin-default lanes; bootstrap a default lane via `
++      + `bootstrapDefaultLaneIfMissing if migrating from a pre-graphical-entries project.)`,
++    );
++  }
++  const lane = readAndValidate(path, id);
++
++  // Cross-validate the pipeline template reference. Delegating to
++  // loadPipelineTemplate lets its error message bubble up; we wrap it
++  // with lane context so the operator sees BOTH the lane id and the
++  // template id in the failure.
++  try {
++    loadPipelineTemplate(lane.pipelineTemplate, projectRoot);
++  } catch (err) {
++    const detail = err instanceof Error ? err.message : String(err);
++    throw new Error(
++      `Lane "${id}" at ${path} references pipelineTemplate "${lane.pipelineTemplate}" `
++      + `which failed to resolve:\n${detail}`,
++    );
++  }
++
++  return lane;
++}
++
++/**
++ * Enumerate every lane config id under `<projectRoot>/.deskwork/lanes/`.
++ * Missing directory is treated as empty — a project with no lanes
++ * configured returns an empty array (the bootstrap helper handles the
++ * legacy-default case explicitly; this function does not).
++ *
++ * The function does NOT validate any lane config — it just enumerates
++ * what's on disk. A malformed lane JSON still appears in the list; the
++ * operator finds out about the malformation at load time.
++ *
++ * @param projectRoot - Absolute path to the project root.
++ */
++export function listLaneConfigs(projectRoot: string): string[] {
++  const dir = lanesDir(projectRoot);
++  if (!existsSync(dir)) {
++    return [];
++  }
++  return readdirSync(dir)
++    .filter((entry) => entry.endsWith('.json'))
++    .map((entry) => basename(entry, '.json'))
++    .sort();
++}
+diff --git a/packages/core/src/lanes/types.ts b/packages/core/src/lanes/types.ts
+new file mode 100644
+index 0000000..e1c7ecf
+--- /dev/null
++++ b/packages/core/src/lanes/types.ts
+@@ -0,0 +1,94 @@
++/**
++ * LaneConfig — a per-lane configuration that binds a content tree to a
++ * pipeline template.
++ *
++ * Lanes are the graphical-entries unit of parallel-pipeline tracking
++ * (PRD § Lanes). A project hosts one or more lanes; each lane has its
++ * own content directory, its own pipeline template, and its own stage
++ * vocabulary derived from that template. Entries live inside a single
++ * lane; the entry's sidecar carries `lane: <laneId>` to identify
++ * membership.
++ *
++ * Plugin defaults: there are none. Lanes are project-owned; every lane
++ * config lives under `<projectRoot>/.deskwork/lanes/<id>.json`. The
++ * loader bootstrap helper auto-creates a `default` lane bound to
++ * `editorial` for pre-feature projects that have only a legacy
++ * `sites.<defaultSite>.contentDir` block — see `./bootstrap.ts`.
++ *
++ * Invariants enforced by the Zod schema below:
++ *
++ *   - `id` is a non-empty string; conventionally lowercase kebab-case
++ *     matching the JSON filename basename (the loader validates that
++ *     match at load time, not the schema, mirroring the
++ *     PipelineTemplate convention).
++ *   - `name` is a non-empty human-readable label.
++ *   - `pipelineTemplate` is a non-empty string referencing a
++ *     PipelineTemplate id; the loader cross-validates that the
++ *     referenced template resolves via `loadPipelineTemplate`.
++ *   - `contentDir` is a non-empty path; relative paths are resolved
++ *     against the project root by callers, absolute paths are taken
++ *     verbatim. Doctor may normalize later; the schema enforces
++ *     non-empty only.
++ *
++ * The on-disk JSON additionally permits a top-level `"$rationale"`
++ * string field as the JSON-with-comments workaround (matching the
++ * PipelineTemplate convention). The loader passes the field through
++ * the schema via `.passthrough()` and ignores it at runtime; it exists
++ * so operator-authored lane configs can carry inline documentation
++ * that survives `jq` / `cat` inspection.
++ */
++
++import { z } from 'zod';
++
++export const LaneConfigSchema = z.object({
++  id: z.string().min(1, 'id must be a non-empty string'),
++  name: z.string().min(1, 'name must be a non-empty string'),
++  pipelineTemplate: z.string().min(1, 'pipelineTemplate must be a non-empty string'),
++  contentDir: z.string().min(1, 'contentDir must be a non-empty string'),
++}).passthrough();
++
++/**
++ * The type inferred from the Zod schema. Equivalent to the PRD's
++ * `LaneConfig` interface — the schema is the source of truth and the
++ * inferred type tracks it without manual duplication.
++ *
++ * Note: `passthrough()` widens the inferred type to allow arbitrary
++ * extra keys; runtime callers should treat the named fields as the
++ * contract and ignore any extras.
++ */
++export type LaneConfig = z.infer<typeof LaneConfigSchema>;
++
++/**
++ * Narrower projection of `LaneConfig` exposing only the named fields
++ * the runtime contract documents. Mirrors `StrictPipelineTemplate` —
++ * downstream consumers that index named fields should accept this
++ * strict type so typos like `lane.pipelineTemlpate` fail at compile
++ * time rather than silently resolving to `unknown`.
++ */
++export type StrictLaneConfig = Pick<
++  LaneConfig,
++  'id' | 'name' | 'pipelineTemplate' | 'contentDir'
++>;
++
++/**
++ * The four artifact kinds the lane-aware entry model recognizes:
++ *   - `markdown`           — a single `.md` file (the legacy editorial
++ *                            artifact shape).
++ *   - `html-mockup`        — a directory containing `index.html` plus
++ *                            optional sibling assets (mockups / design
++ *                            specs / standalone HTML deliverables).
++ *   - `single-file-html`   — a loose `.html` file (not inside an
++ *                            html-mockup directory).
++ *   - `image`              — a raster or vector image file (.png /
++ *                            .jpg / .jpeg / .gif / .webp / .svg).
++ *
++ * Detection: see `./detection.ts` (`detectArtifactKind`).
++ */
++export const ArtifactKindSchema = z.enum([
++  'markdown',
++  'html-mockup',
++  'single-file-html',
++  'image',
++]);
++
++export type ArtifactKind = z.infer<typeof ArtifactKindSchema>;
+diff --git a/packages/core/src/pipelines/index.ts b/packages/core/src/pipelines/index.ts
+index 0e19ba9..4fa9495 100644
+--- a/packages/core/src/pipelines/index.ts
++++ b/packages/core/src/pipelines/index.ts
+@@ -9,6 +9,7 @@
+ export {
+   PipelineTemplateSchema,
+   type PipelineTemplate,
++  type StrictPipelineTemplate,
+ } from './types.ts';
+ 
+ export {
+diff --git a/packages/core/src/pipelines/types.ts b/packages/core/src/pipelines/types.ts
+index 86f4efc..e9069aa 100644
+--- a/packages/core/src/pipelines/types.ts
++++ b/packages/core/src/pipelines/types.ts
+@@ -133,3 +133,29 @@ export const PipelineTemplateSchema = z.object({
+  * contract and ignore any extras.
+  */
+ export type PipelineTemplate = z.infer<typeof PipelineTemplateSchema>;
++
++/**
++ * Narrower projection of `PipelineTemplate` exposing only the named
++ * fields the runtime contract documents. `PipelineTemplate` itself is
++ * widened by the schema's `.passthrough()` (which admits unknown extra
++ * keys like `$rationale`); downstream consumers that index named fields
++ * should accept this strict type instead so typos like
++ * `template.lockedSatges` fail at compile time rather than silently
++ * resolving to `unknown`.
++ *
++ * The runtime VALUES are the same — `PipelineTemplate` and
++ * `StrictPipelineTemplate` describe the same JSON. The only difference
++ * is the type-level surface: `StrictPipelineTemplate` lists exactly the
++ * keys the contract names, no more.
++ *
++ * Convention: loader functions return `PipelineTemplate` (the wide
++ * type). Functions whose parameter is the resolved template and which
++ * read its named fields should declare `StrictPipelineTemplate`; pass a
++ * `PipelineTemplate` to such a function with no conversion (the wide
++ * type is assignable to the narrow one through structural subtyping at
++ * the property set, since `Pick` drops keys without renaming).
++ */
++export type StrictPipelineTemplate = Pick<
++  PipelineTemplate,
++  'id' | 'name' | 'description' | 'linearStages' | 'lockedStages' | 'offPipelineStages'
++>;
+diff --git a/packages/core/src/schema/entry.ts b/packages/core/src/schema/entry.ts
+index bc28407..4d029bb 100644
+--- a/packages/core/src/schema/entry.ts
++++ b/packages/core/src/schema/entry.ts
+@@ -1,3 +1,48 @@
++/**
++ * Entry schema — the on-disk sidecar contract.
++ *
++ * Phase 3 (graphical-entries) migration-window state:
++ *
++ *   - `currentStage` was historically a hardcoded `StageEnum` covering
++ *     the eight pre-feature editorial stages. Per the graphical-entries
++ *     PRD and DESKWORK-STATE-MACHINE.md Commandment II (verbs are
++ *     universal and stage-gated only), stages now come from the lane's
++ *     pipeline template — every lane can declare its own
++ *     `linearStages` and `offPipelineStages`. The schema therefore
++ *     accepts ANY non-empty string for `currentStage`, `priorStage`,
++ *     and `iterationByStage` keys. Runtime validation that the stage
++ *     belongs to the entry's lane template is the caller's job, not
++ *     the schema's — see the Phase 4 verb-routing work for the
++ *     template-aware check.
++ *
++ *   - `lane` and `artifactKind` are NEW fields (Phase 3 Task 3.2).
++ *     Both are OPTIONAL during the migration window so existing
++ *     sidecars parse cleanly; doctor's lane-migration step (later
++ *     phase) back-fills them and then doctor enforces their presence.
++ *     The Zod-level optionality is intentional and explicit — we do
++ *     NOT want a read-side error to fire on legacy sidecars during
++ *     the rollout.
++ *
++ *   - The legacy `StageEnum` export stays as a back-compat read alias.
++ *     Editorial-default fast paths (calendar render, doctor heuristics
++ *     for the pre-feature editorial pipeline) may still depend on the
++ *     eight-stage shape; Phase 4's verb code will introduce the
++ *     template-driven generic API. Do NOT delete `StageEnum`,
++ *     `isLinearPipelineStage`, `isOffPipelineStage`, or `nextStage`
++ *     — they're load-bearing for the editorial lane until Phase 4
++ *     replaces them lane-by-lane.
++ *
++ *   - Per DESKWORK-STATE-MACHINE.md Commandment III, `reviewState` is
++ *     RETIRED. No `reviewState` field exists on Entry. Zod's default
++ *     is non-strict, so existing on-disk sidecars carrying a vestigial
++ *     `reviewState` key parse cleanly (the field is silently dropped
++ *     on read; absent on next write).
++ *
++ *   - See `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md`
++ *     Phase 3 for the migration plan; Phase 4 tightens the verb-side
++ *     reads.
++ */
++
+ export type Stage =
+   | 'Ideas' | 'Planned' | 'Outlining' | 'Drafting' | 'Final' | 'Published'
+   | 'Blocked' | 'Cancelled';
+@@ -5,12 +50,22 @@ export type Stage =
+ const LINEAR_PIPELINE: readonly Stage[] = ['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published'] as const;
+ const OFF_PIPELINE: readonly Stage[] = ['Blocked', 'Cancelled'] as const;
+ 
+-export function isLinearPipelineStage(s: Stage): boolean {
+-  return LINEAR_PIPELINE.includes(s);
++/**
++ * Editorial-default helpers. Per Phase 3 (graphical-entries) the
++ * sidecar's `currentStage` is now a plain string (lane-template-
++ * driven), so these helpers accept `string` rather than the narrow
++ * `Stage` union — callers can pass an `Entry.currentStage` without
++ * narrowing first. The semantic question being answered is
++ * "is this stage one of the editorial lane's linear / off-pipeline
++ * stages?" — a non-editorial stage name returns false. Phase 4's
++ * lane-aware helpers replace these with template-driven equivalents.
++ */
++export function isLinearPipelineStage(s: string): boolean {
++  return (LINEAR_PIPELINE as readonly string[]).includes(s);
+ }
+ 
+-export function isOffPipelineStage(s: Stage): boolean {
+-  return OFF_PIPELINE.includes(s);
++export function isOffPipelineStage(s: string): boolean {
++  return (OFF_PIPELINE as readonly string[]).includes(s);
+ }
+ 
+ const SUCCESSOR: Record<Stage, Stage | null> = {
+@@ -24,13 +79,49 @@ const SUCCESSOR: Record<Stage, Stage | null> = {
+   Cancelled: null,
+ };
+ 
+-export function nextStage(s: Stage): Stage | null {
+-  return SUCCESSOR[s];
++/**
++ * Editorial-default successor lookup. Per Phase 3 the input is widened
++ * to `string` (lane-template-driven `currentStage` values); inputs
++ * outside the editorial pipeline's eight known stages return `null`
++ * rather than throwing — callers handle the "no successor" case
++ * already, and Phase 4 introduces a lane-template-driven successor
++ * API that supersedes this editorial-only helper.
++ */
++export function nextStage(s: string): Stage | null {
++  if (
++    s === 'Ideas' || s === 'Planned' || s === 'Outlining' || s === 'Drafting'
++    || s === 'Final' || s === 'Published' || s === 'Blocked' || s === 'Cancelled'
++  ) {
++    return SUCCESSOR[s];
++  }
++  return null;
+ }
+ 
+ import { z } from 'zod';
+ 
+-const StageEnum = z.enum(['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published', 'Blocked', 'Cancelled']);
++/**
++ * Editorial-pipeline stage enum — kept as a back-compat export. New
++ * code that needs to validate a stage against an arbitrary lane
++ * template should use the template's `linearStages ∪
++ * offPipelineStages` set instead; see Phase 4. The enum continues to
++ * surface in the editorial-default fast paths until those are
++ * lane-aware.
++ */
++export const StageEnum = z.enum(['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published', 'Blocked', 'Cancelled']);
++
++/**
++ * Per Phase 3 Task 3.2.2: a stage on the sidecar is now any non-empty
++ * string (validated against the lane's template at runtime, not at
++ * the schema layer).
++ */
++const StageStringSchema = z.string().min(1, 'stage must be a non-empty string');
++
++/**
++ * Per Phase 3 Task 3.2.1: `artifactKind` is the four-case enum
++ * detection.ts produces. Optional during the migration window;
++ * doctor enforces presence after migration.
++ */
++const ArtifactKindEnum = z.enum(['markdown', 'html-mockup', 'single-file-html', 'image']);
+ 
+ export const EntrySchema = z.object({
+   // Identity
+@@ -42,14 +133,29 @@ export const EntrySchema = z.object({
+   source: z.string(),
+ 
+   // Pipeline state
++  // Per Phase 3 Task 3.2.2: currentStage / priorStage are
++  // template-validated at runtime, schema-validated only as
++  // non-empty strings. iterationByStage keys are likewise any
++  // non-empty string.
+   // Per DESKWORK-STATE-MACHINE.md (Commandment III), reviewState is
+-  // RETIRED — no `reviewState` field exists on Entry. zod's default
++  // RETIRED — no `reviewState` field exists on Entry. Zod's default
+   // is non-strict, so existing on-disk sidecars carrying a vestigial
+-  // `reviewState` key parse cleanly (the field is silently dropped on
+-  // read; absent on next write).
+-  currentStage: StageEnum,
+-  priorStage: StageEnum.optional(),
+-  iterationByStage: z.record(StageEnum, z.number().int().nonnegative()),
++  // `reviewState` key parse cleanly (the field is silently dropped
++  // on read; absent on next write).
++  currentStage: StageStringSchema,
++  priorStage: StageStringSchema.optional(),
++  iterationByStage: z.record(StageStringSchema, z.number().int().nonnegative()),
++
++  // Lane membership (Phase 3 Task 3.2.1). Optional during the
++  // migration window; doctor's lane-migration step back-fills the
++  // field and then doctor enforces presence. Identifies the
++  // `.deskwork/lanes/<lane>.json` config the entry lives under.
++  lane: z.string().min(1).optional(),
++
++  // Artifact-kind classification (Phase 3 Task 3.2.1). Optional
++  // during the migration window for the same reason. Mirrors the
++  // four-case detection in `lanes/detection.ts`.
++  artifactKind: ArtifactKindEnum.optional(),
+ 
+   // Editorial
+   targetVersion: z.string().optional(),
+diff --git a/packages/core/src/schema/journal-events.ts b/packages/core/src/schema/journal-events.ts
+index 17d67b9..ea690c2 100644
+--- a/packages/core/src/schema/journal-events.ts
++++ b/packages/core/src/schema/journal-events.ts
+@@ -3,7 +3,15 @@ import { EntrySchema } from './entry.ts';
+ import { AnnotationSchema } from './annotation.ts';
+ import { DraftAnnotationSchema } from './draft-annotation.ts';
+ 
+-const StageEnum = z.enum(['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published', 'Blocked', 'Cancelled']);
++/**
++ * Per Phase 3 (graphical-entries) Task 3.2.2: stage values on journal
++ * events are now any non-empty string, validated at runtime against
++ * the entry's lane template rather than against a global enum. The
++ * legacy `StageEnum` 8-value list is retired from the schema; readers
++ * that still want to narrow to the editorial-default vocabulary can
++ * do so explicitly via `schema/entry.ts#StageEnum`.
++ */
++const StageStringSchema = z.string().min(1, 'stage must be a non-empty string');
+ const ReviewStateEnum = z.enum(['in-review', 'iterating', 'approved']);
+ 
+ const EntryCreatedEvent = z.object({
+@@ -18,14 +26,14 @@ const EntryIngestedEvent = z.object({
+   at: z.string().datetime(),
+   entryId: z.string().uuid(),
+   sourcePath: z.string(),
+-  targetStage: StageEnum,
++  targetStage: StageStringSchema,
+ });
+ 
+ const IterationEvent = z.object({
+   kind: z.literal('iteration'),
+   at: z.string().datetime(),
+   entryId: z.string().uuid(),
+-  stage: StageEnum,
++  stage: StageStringSchema,
+   version: z.number().int().positive(),
+   markdown: z.string(),
+ });
+@@ -34,7 +42,7 @@ const AnnotationEvent = z.object({
+   kind: z.literal('annotation'),
+   at: z.string().datetime(),
+   entryId: z.string().uuid(),
+-  stage: StageEnum,
++  stage: StageStringSchema,
+   version: z.number().int().positive(),
+   annotation: AnnotationSchema,
+ });
+@@ -43,7 +51,7 @@ const ReviewStateChangeEvent = z.object({
+   kind: z.literal('review-state-change'),
+   at: z.string().datetime(),
+   entryId: z.string().uuid(),
+-  stage: StageEnum,
++  stage: StageStringSchema,
+   from: ReviewStateEnum.nullable(),
+   to: ReviewStateEnum.nullable(),
+ });
+@@ -52,8 +60,8 @@ const StageTransitionEvent = z.object({
+   kind: z.literal('stage-transition'),
+   at: z.string().datetime(),
+   entryId: z.string().uuid(),
+-  from: StageEnum,
+-  to: StageEnum,
++  from: StageStringSchema,
++  to: StageStringSchema,
+   reason: z.string().optional(),
+   metadata: z.record(z.string(), z.unknown()).optional(),
+ });
+@@ -74,6 +82,28 @@ const EntryAnnotationEvent = z.object({
+   annotation: DraftAnnotationSchema,
+ });
+ 
++/**
++ * Phase 3 (graphical-entries): records lane-aware migration steps that
++ * happen at project bootstrap. Today the only emitter is the default-
++ * lane bootstrap helper (legacy `sites.<defaultSite>.contentDir` → new
++ * `.deskwork/lanes/default.json` bound to `editorial`); future
++ * migrations (entry-sidecar lane back-fill, content-tree rehoming,
++ * etc.) will land additional events under this kind.
++ *
++ * The event is project-scoped (no `entryId`); `source` and `target`
++ * identify the migration's logical inputs and outputs, and `details`
++ * carries free-form key/value context (e.g. the legacy site id, the
++ * resolved contentDir).
++ */
++const LaneMigrationEvent = z.object({
++  kind: z.literal('lane-migration'),
++  at: z.string().datetime(),
++  migration: z.string().min(1),
++  source: z.string().min(1),
++  target: z.string().min(1),
++  details: z.record(z.string(), z.string()).optional(),
++});
++
+ export const JournalEventSchema = z.discriminatedUnion('kind', [
+   EntryCreatedEvent,
+   EntryIngestedEvent,
+@@ -82,6 +112,7 @@ export const JournalEventSchema = z.discriminatedUnion('kind', [
+   ReviewStateChangeEvent,
+   StageTransitionEvent,
+   EntryAnnotationEvent,
++  LaneMigrationEvent,
+ ]);
+ 
+ export type JournalEvent = z.infer<typeof JournalEventSchema>;
+diff --git a/packages/core/test/journal/append-read.test.ts b/packages/core/test/journal/append-read.test.ts
+index 3168455..3db6062 100644
+--- a/packages/core/test/journal/append-read.test.ts
++++ b/packages/core/test/journal/append-read.test.ts
+@@ -46,7 +46,8 @@ describe('journal append + read', () => {
+     await appendJournalEvent(projectRoot, e2);
+     const events = await readJournalEvents(projectRoot, { entryId: e1.entryId });
+     expect(events).toHaveLength(1);
+-    expect(events[0].entryId).toBe(e1.entryId);
++    const found = events[0];
++    expect('entryId' in found ? found.entryId : null).toBe(e1.entryId);
+   });
+ 
+   it('returns events in chronological order', async () => {
+@@ -57,7 +58,9 @@ describe('journal append + read', () => {
+       { kind: 'iteration', at: ts(3), entryId: '550e8400-e29b-41d4-a716-446655440000', stage: 'Drafting', version: 3, markdown: 'v3' },
+     ];
+     for (const e of events) await appendJournalEvent(projectRoot, e);
+-    const read = await readJournalEvents(projectRoot, { entryId: events[0].entryId });
++    const seed = events[0];
++    const seedEntryId = 'entryId' in seed ? seed.entryId : '';
++    const read = await readJournalEvents(projectRoot, { entryId: seedEntryId });
+     expect(read.map(e => 'version' in e ? e.version : null)).toEqual([1, 2, 3]);
+   });
+ });
+diff --git a/packages/core/test/lanes/bootstrap.test.ts b/packages/core/test/lanes/bootstrap.test.ts
+new file mode 100644
+index 0000000..20ff513
+--- /dev/null
++++ b/packages/core/test/lanes/bootstrap.test.ts
+@@ -0,0 +1,196 @@
++/**
++ * bootstrapDefaultLaneIfMissing integration tests (Phase 3 Task 3.4).
++ *
++ * Tests use a fresh tmp project root for each case. The legacy
++ * `sites.<defaultSite>.contentDir` is written by hand into
++ * `.deskwork/config.json`; the bootstrap reads that, writes
++ * `.deskwork/lanes/default.json`, and emits a journal event the test
++ * confirms by walking the on-disk journal directory.
++ */
++
++import { describe, it, expect, beforeEach, afterEach } from 'vitest';
++import {
++  existsSync,
++  mkdirSync,
++  mkdtempSync,
++  readdirSync,
++  readFileSync,
++  rmSync,
++  writeFileSync,
++} from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { bootstrapDefaultLaneIfMissing } from '../../src/lanes/bootstrap.ts';
++import { loadLaneConfig, laneConfigPath } from '../../src/lanes/loader.ts';
++
++function writeConfig(
++  projectRoot: string,
++  payload: Record<string, unknown>,
++): void {
++  const dir = join(projectRoot, '.deskwork');
++  mkdirSync(dir, { recursive: true });
++  writeFileSync(
++    join(dir, 'config.json'),
++    JSON.stringify(payload, null, 2),
++    'utf8',
++  );
++}
++
++function readLaneMigrationEvents(projectRoot: string): unknown[] {
++  const dir = join(projectRoot, '.deskwork', 'review-journal', 'history');
++  if (!existsSync(dir)) return [];
++  const events: unknown[] = [];
++  for (const name of readdirSync(dir)) {
++    if (!name.endsWith('.json')) continue;
++    const raw = readFileSync(join(dir, name), 'utf8');
++    const parsed: unknown = JSON.parse(raw);
++    if (
++      parsed
++      && typeof parsed === 'object'
++      && (parsed as { kind?: unknown }).kind === 'lane-migration'
++    ) {
++      events.push(parsed);
++    }
++  }
++  return events;
++}
++
++describe('bootstrapDefaultLaneIfMissing', () => {
++  let projectRoot: string;
++
++  beforeEach(() => {
++    projectRoot = mkdtempSync(join(tmpdir(), 'deskwork-lanes-bootstrap-'));
++  });
++
++  afterEach(() => {
++    rmSync(projectRoot, { recursive: true, force: true });
++  });
++
++  it('creates .deskwork/lanes/default.json from the legacy sites block', async () => {
++    writeConfig(projectRoot, {
++      version: 1,
++      sites: {
++        primary: {
++          contentDir: 'src/content/blog',
++          calendarPath: 'docs/calendar.md',
++        },
++      },
++      defaultSite: 'primary',
++    });
++
++    const result = await bootstrapDefaultLaneIfMissing(projectRoot);
++
++    expect(result.created).toBe(true);
++    if (!result.created) throw new Error('result.created should be true');
++    expect(result.path).toBe(laneConfigPath(projectRoot, 'default'));
++    expect(result.lane.id).toBe('default');
++    expect(result.lane.name).toBe('Default');
++    expect(result.lane.pipelineTemplate).toBe('editorial');
++    expect(result.lane.contentDir).toBe('src/content/blog');
++  });
++
++  it('writes a lane file that the loader can read back', async () => {
++    writeConfig(projectRoot, {
++      version: 1,
++      sites: { only: { contentDir: 'docs', calendarPath: 'docs/cal.md' } },
++      defaultSite: 'only',
++    });
++
++    await bootstrapDefaultLaneIfMissing(projectRoot);
++
++    const lane = loadLaneConfig('default', projectRoot);
++    expect(lane.contentDir).toBe('docs');
++    expect(lane.pipelineTemplate).toBe('editorial');
++  });
++
++  it('emits a lane-migration journal event identifying the legacy site', async () => {
++    writeConfig(projectRoot, {
++      version: 1,
++      sites: {
++        legacysite: {
++          contentDir: 'content',
++          calendarPath: 'content/cal.md',
++        },
++      },
++      defaultSite: 'legacysite',
++    });
++
++    await bootstrapDefaultLaneIfMissing(projectRoot);
++
++    const events = readLaneMigrationEvents(projectRoot);
++    expect(events).toHaveLength(1);
++    const event = events[0] as Record<string, unknown>;
++    expect(event.kind).toBe('lane-migration');
++    expect(event.migration).toBe('default-lane-from-legacy-site');
++    expect(event.source).toBe('sites.legacysite');
++    expect(event.target).toBe('lanes.default');
++    const details = event.details as Record<string, string>;
++    expect(details.legacySiteId).toBe('legacysite');
++    expect(details.contentDir).toBe('content');
++    expect(details.pipelineTemplate).toBe('editorial');
++  });
++
++  it('is idempotent: a second call with the lane already present returns "already-exists" without side effects', async () => {
++    writeConfig(projectRoot, {
++      version: 1,
++      sites: { primary: { contentDir: 'docs', calendarPath: 'docs/cal.md' } },
++      defaultSite: 'primary',
++    });
++
++    const first = await bootstrapDefaultLaneIfMissing(projectRoot);
++    expect(first.created).toBe(true);
++    const eventsAfterFirst = readLaneMigrationEvents(projectRoot);
++    expect(eventsAfterFirst).toHaveLength(1);
++
++    const second = await bootstrapDefaultLaneIfMissing(projectRoot);
++    expect(second.created).toBe(false);
++    if (second.created) throw new Error('second.created should be false');
++    expect(second.reason).toBe('already-exists');
++    // No additional journal event written on the second call.
++    const eventsAfterSecond = readLaneMigrationEvents(projectRoot);
++    expect(eventsAfterSecond).toHaveLength(1);
++  });
++
++  it('returns "no-config" when the project has no .deskwork/config.json (does NOT throw)', async () => {
++    // No config written for this projectRoot.
++    const result = await bootstrapDefaultLaneIfMissing(projectRoot);
++    expect(result.created).toBe(false);
++    if (result.created) throw new Error('result.created should be false');
++    expect(result.reason).toBe('no-config');
++    // No lane file written.
++    expect(existsSync(laneConfigPath(projectRoot, 'default'))).toBe(false);
++  });
++
++  it('integration smoke: pre-feature project → first invocation → default lane exists + loadable', async () => {
++    // Mirrors the workplan's Task 3.5.2 acceptance criterion: a
++    // pre-feature project's first invocation lands the default lane
++    // and the loader resolves it cleanly.
++    writeConfig(projectRoot, {
++      version: 1,
++      sites: {
++        audiocontrol: {
++          host: 'audiocontrol.org',
++          contentDir: 'src/content/posts',
++          calendarPath: 'docs/editorial-calendar.md',
++        },
++      },
++      defaultSite: 'audiocontrol',
++    });
++
++    // No .deskwork/lanes/ exists yet.
++    expect(existsSync(laneConfigPath(projectRoot, 'default'))).toBe(false);
++
++    const result = await bootstrapDefaultLaneIfMissing(projectRoot);
++    expect(result.created).toBe(true);
++
++    // The lane file exists and the loader resolves it (cross-validating
++    // the editorial pipeline template).
++    const lane = loadLaneConfig('default', projectRoot);
++    expect(lane.id).toBe('default');
++    expect(lane.contentDir).toBe('src/content/posts');
++    expect(lane.pipelineTemplate).toBe('editorial');
++
++    // A journal event landed.
++    expect(readLaneMigrationEvents(projectRoot)).toHaveLength(1);
++  });
++});
+diff --git a/packages/core/test/lanes/detection.test.ts b/packages/core/test/lanes/detection.test.ts
+new file mode 100644
+index 0000000..41e3403
+--- /dev/null
++++ b/packages/core/test/lanes/detection.test.ts
+@@ -0,0 +1,108 @@
++/**
++ * detectArtifactKind tests.
++ *
++ * Each supported case gets one test; refusal-on-unsupported has its
++ * own block. Tests touch the real filesystem for the html-mockup case
++ * (where the function probes for `<dir>/index.html`); other cases are
++ * purely extension-based and don't touch disk.
++ */
++
++import { describe, it, expect, beforeEach, afterEach } from 'vitest';
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { detectArtifactKind } from '../../src/lanes/detection.ts';
++
++describe('detectArtifactKind', () => {
++  describe('extension-based dispatch (no filesystem probe)', () => {
++    it('classifies .md as markdown', () => {
++      expect(detectArtifactKind('/path/to/post.md')).toBe('markdown');
++    });
++
++    it('classifies .html as single-file-html', () => {
++      expect(detectArtifactKind('/path/to/mockup.html')).toBe('single-file-html');
++    });
++
++    it('classifies .png as image', () => {
++      expect(detectArtifactKind('/path/to/sketch.png')).toBe('image');
++    });
++
++    it('classifies .jpg as image', () => {
++      expect(detectArtifactKind('/path/to/photo.jpg')).toBe('image');
++    });
++
++    it('classifies .jpeg as image', () => {
++      expect(detectArtifactKind('/path/to/photo.jpeg')).toBe('image');
++    });
++
++    it('classifies .gif as image', () => {
++      expect(detectArtifactKind('/path/to/anim.gif')).toBe('image');
++    });
++
++    it('classifies .webp as image', () => {
++      expect(detectArtifactKind('/path/to/img.webp')).toBe('image');
++    });
++
++    it('classifies .svg as image', () => {
++      expect(detectArtifactKind('/path/to/logo.svg')).toBe('image');
++    });
++
++    it('is case-insensitive on the extension', () => {
++      expect(detectArtifactKind('/path/Post.MD')).toBe('markdown');
++      expect(detectArtifactKind('/path/Sketch.PNG')).toBe('image');
++    });
++  });
++
++  describe('html-mockup directory detection', () => {
++    let projectRoot: string;
++
++    beforeEach(() => {
++      projectRoot = mkdtempSync(join(tmpdir(), 'deskwork-detect-'));
++    });
++
++    afterEach(() => {
++      rmSync(projectRoot, { recursive: true, force: true });
++    });
++
++    it('classifies a directory containing index.html as html-mockup', () => {
++      const dir = join(projectRoot, 'mockup-dir');
++      mkdirSync(dir);
++      writeFileSync(join(dir, 'index.html'), '<!doctype html>', 'utf8');
++      expect(detectArtifactKind(dir)).toBe('html-mockup');
++    });
++
++    it('refuses a directory without index.html', () => {
++      const dir = join(projectRoot, 'plain-dir');
++      mkdirSync(dir);
++      expect(() => detectArtifactKind(dir)).toThrow(/has no index\.html/);
++    });
++
++    it('refuses a directory with only an index.htm (no .html)', () => {
++      const dir = join(projectRoot, 'htm-dir');
++      mkdirSync(dir);
++      writeFileSync(join(dir, 'index.htm'), '<html/>', 'utf8');
++      expect(() => detectArtifactKind(dir)).toThrow(/has no index\.html/);
++    });
++  });
++
++  describe('refusal path', () => {
++    it('refuses unrecognized extensions with a clear listing-style error', () => {
++      expect(() => detectArtifactKind('/path/to/file.pdf'))
++        .toThrow(/unsupported artifact extension/);
++      expect(() => detectArtifactKind('/path/to/file.pdf'))
++        .toThrow(/\.md.*\.html.*\.png/s);
++    });
++
++    it('refuses paths with no extension', () => {
++      expect(() => detectArtifactKind('/path/to/Makefile'))
++        .toThrow(/unsupported artifact extension/);
++    });
++
++    it('refuses paths with the wrong audio/video extension', () => {
++      expect(() => detectArtifactKind('/path/to/song.mp3'))
++        .toThrow(/unsupported artifact extension/);
++      expect(() => detectArtifactKind('/path/to/clip.mp4'))
++        .toThrow(/unsupported artifact extension/);
++    });
++  });
++});
+diff --git a/packages/core/test/lanes/loader.test.ts b/packages/core/test/lanes/loader.test.ts
+new file mode 100644
+index 0000000..bdabfc8
+--- /dev/null
++++ b/packages/core/test/lanes/loader.test.ts
+@@ -0,0 +1,240 @@
++/**
++ * loadLaneConfig + listLaneConfigs tests.
++ *
++ * Each test uses a fresh tmp dir (mkdtempSync) for the projectRoot.
++ * Lane configs are project-owned with no plugin defaults; tests
++ * write the JSON into `.deskwork/lanes/` directly.
++ */
++
++import { describe, it, expect, beforeEach, afterEach } from 'vitest';
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import {
++  loadLaneConfig,
++  listLaneConfigs,
++  laneConfigPath,
++  lanesDir,
++} from '../../src/lanes/loader.ts';
++
++function writeLane(projectRoot: string, id: string, payload: unknown): void {
++  const dir = lanesDir(projectRoot);
++  mkdirSync(dir, { recursive: true });
++  writeFileSync(
++    join(dir, `${id}.json`),
++    JSON.stringify(payload, null, 2),
++    'utf8',
++  );
++}
++
++describe('loadLaneConfig', () => {
++  let projectRoot: string;
++
++  beforeEach(() => {
++    projectRoot = mkdtempSync(join(tmpdir(), 'deskwork-lanes-loader-'));
++  });
++
++  afterEach(() => {
++    rmSync(projectRoot, { recursive: true, force: true });
++  });
++
++  it('loads a valid lane config bound to the editorial preset', () => {
++    writeLane(projectRoot, 'default', {
++      id: 'default',
++      name: 'Default',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    });
++    const lane = loadLaneConfig('default', projectRoot);
++    expect(lane.id).toBe('default');
++    expect(lane.name).toBe('Default');
++    expect(lane.pipelineTemplate).toBe('editorial');
++    expect(lane.contentDir).toBe('docs');
++  });
++
++  it('passes through unknown extra fields (e.g. $rationale)', () => {
++    writeLane(projectRoot, 'default', {
++      $rationale: 'why this lane exists',
++      id: 'default',
++      name: 'Default',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    });
++    const lane = loadLaneConfig('default', projectRoot);
++    expect(lane.id).toBe('default');
++  });
++
++  it('throws when the lane config file does not exist', () => {
++    expect(() => loadLaneConfig('does-not-exist', projectRoot))
++      .toThrow(/Lane config "does-not-exist" not found/);
++  });
++
++  it('throws with the searched path in the error when the lane is missing', () => {
++    expect(() => loadLaneConfig('does-not-exist', projectRoot))
++      .toThrow(/\.deskwork\/lanes\/does-not-exist\.json/);
++  });
++
++  it('throws on malformed JSON', () => {
++    const dir = lanesDir(projectRoot);
++    mkdirSync(dir, { recursive: true });
++    writeFileSync(
++      join(dir, 'default.json'),
++      '{ this is not valid json',
++      'utf8',
++    );
++    expect(() => loadLaneConfig('default', projectRoot))
++      .toThrow(/not valid JSON/);
++  });
++
++  it('throws on Zod-invalid lane (missing required field)', () => {
++    writeLane(projectRoot, 'default', {
++      id: 'default',
++      name: 'Default',
++      // pipelineTemplate missing — required
++      contentDir: 'docs',
++    });
++    expect(() => loadLaneConfig('default', projectRoot))
++      .toThrow(/failed Zod validation/);
++  });
++
++  it('throws when the JSON id field disagrees with the filename basename', () => {
++    writeLane(projectRoot, 'default', {
++      id: 'mockups',
++      name: 'Default',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    });
++    expect(() => loadLaneConfig('default', projectRoot))
++      .toThrow(/declares id "mockups" but was loaded as "default"/);
++  });
++
++  it('throws when the referenced pipelineTemplate does not resolve', () => {
++    writeLane(projectRoot, 'default', {
++      id: 'default',
++      name: 'Default',
++      pipelineTemplate: 'does-not-exist',
++      contentDir: 'docs',
++    });
++    expect(() => loadLaneConfig('default', projectRoot))
++      .toThrow(/references pipelineTemplate "does-not-exist"/);
++  });
++
++  it('throws on empty / whitespace id', () => {
++    expect(() => loadLaneConfig('', projectRoot)).toThrow(/non-empty id/);
++    expect(() => loadLaneConfig('   ', projectRoot)).toThrow(/non-empty id/);
++  });
++
++  it('cross-validates a lane bound to a project-override pipeline template', () => {
++    // Write a custom pipeline override the lane references — the loader's
++    // cross-validation must resolve it via loadPipelineTemplate's
++    // override-takes-precedence path.
++    const pipelinesDir = join(projectRoot, '.deskwork', 'pipelines');
++    mkdirSync(pipelinesDir, { recursive: true });
++    writeFileSync(
++      join(pipelinesDir, 'visual.json'),
++      JSON.stringify(
++        {
++          id: 'visual',
++          name: 'Visual (project override)',
++          description: 'custom visual lane pipeline',
++          linearStages: ['Sketch', 'Refine', 'Final', 'Published'],
++          lockedStages: ['Final'],
++          offPipelineStages: ['Blocked', 'Cancelled'],
++        },
++        null,
++        2,
++      ),
++      'utf8',
++    );
++    writeLane(projectRoot, 'mockups', {
++      id: 'mockups',
++      name: 'Mockups',
++      pipelineTemplate: 'visual',
++      contentDir: 'src/mockups',
++    });
++    const lane = loadLaneConfig('mockups', projectRoot);
++    expect(lane.pipelineTemplate).toBe('visual');
++  });
++});
++
++describe('listLaneConfigs', () => {
++  let projectRoot: string;
++
++  beforeEach(() => {
++    projectRoot = mkdtempSync(join(tmpdir(), 'deskwork-lanes-list-'));
++  });
++
++  afterEach(() => {
++    rmSync(projectRoot, { recursive: true, force: true });
++  });
++
++  it('returns an empty array when no .deskwork/lanes/ directory exists', () => {
++    expect(listLaneConfigs(projectRoot)).toEqual([]);
++  });
++
++  it('returns an empty array when .deskwork/ exists but lanes/ does not', () => {
++    mkdirSync(join(projectRoot, '.deskwork'), { recursive: true });
++    expect(listLaneConfigs(projectRoot)).toEqual([]);
++  });
++
++  it('returns every .json basename in lanes/', () => {
++    writeLane(projectRoot, 'default', {
++      id: 'default',
++      name: 'Default',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    });
++    writeLane(projectRoot, 'mockups', {
++      id: 'mockups',
++      name: 'Mockups',
++      pipelineTemplate: 'visual',
++      contentDir: 'src/mockups',
++    });
++    expect(listLaneConfigs(projectRoot)).toEqual(['default', 'mockups']);
++  });
++
++  it('returns ids in stable sorted order', () => {
++    writeLane(projectRoot, 'zebra', {
++      id: 'zebra',
++      name: 'Zebra',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    });
++    writeLane(projectRoot, 'alpha', {
++      id: 'alpha',
++      name: 'Alpha',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    });
++    const ids = listLaneConfigs(projectRoot);
++    expect(ids).toEqual([...ids].sort());
++    expect(ids).toEqual(['alpha', 'zebra']);
++  });
++
++  it('ignores non-JSON files in lanes/', () => {
++    const dir = lanesDir(projectRoot);
++    mkdirSync(dir, { recursive: true });
++    writeFileSync(join(dir, 'README.md'), '# lane configs', 'utf8');
++    writeFileSync(join(dir, 'old.json.bak'), '{}', 'utf8');
++    writeLane(projectRoot, 'default', {
++      id: 'default',
++      name: 'Default',
++      pipelineTemplate: 'editorial',
++      contentDir: 'docs',
++    });
++    const ids = listLaneConfigs(projectRoot);
++    expect(ids).toEqual(['default']);
++  });
++});
++
++describe('path helpers', () => {
++  it('lanesDir resolves to .deskwork/lanes under projectRoot', () => {
++    expect(lanesDir('/proj')).toBe(join('/proj', '.deskwork', 'lanes'));
++  });
++
++  it('laneConfigPath resolves to .deskwork/lanes/<id>.json', () => {
++    expect(laneConfigPath('/proj', 'default')).toBe(
++      join('/proj', '.deskwork', 'lanes', 'default.json'),
++    );
++  });
++});
+diff --git a/packages/core/test/lanes/types.test.ts b/packages/core/test/lanes/types.test.ts
+new file mode 100644
+index 0000000..d7b8e4d
+--- /dev/null
++++ b/packages/core/test/lanes/types.test.ts
+@@ -0,0 +1,116 @@
++/**
++ * LaneConfig Zod schema invariant tests.
++ *
++ * Mirrors the structure of pipelines/types.test.ts — each schema
++ * invariant gets its own block.
++ */
++
++import { describe, it, expect } from 'vitest';
++import { LaneConfigSchema, ArtifactKindSchema } from '../../src/lanes/types.ts';
++
++/**
++ * Helper: build a minimally-valid lane config, optionally overriding
++ * any field. Keeps per-test fixtures focused on the field under test.
++ */
++function makeLane(overrides: Record<string, unknown> = {}): unknown {
++  return {
++    id: 'default',
++    name: 'Default',
++    pipelineTemplate: 'editorial',
++    contentDir: 'docs',
++    ...overrides,
++  };
++}
++
++describe('LaneConfigSchema', () => {
++  describe('happy path', () => {
++    it('accepts a minimally-valid lane', () => {
++      const result = LaneConfigSchema.safeParse(makeLane());
++      expect(result.success).toBe(true);
++    });
++
++    it('passes through unknown top-level fields (e.g. $rationale)', () => {
++      const result = LaneConfigSchema.safeParse(
++        makeLane({ $rationale: 'why this lane exists' }),
++      );
++      expect(result.success).toBe(true);
++    });
++  });
++
++  describe('required fields', () => {
++    it('rejects a missing id', () => {
++      const result = LaneConfigSchema.safeParse(makeLane({ id: undefined }));
++      expect(result.success).toBe(false);
++    });
++
++    it('rejects an empty id', () => {
++      const result = LaneConfigSchema.safeParse(makeLane({ id: '' }));
++      expect(result.success).toBe(false);
++    });
++
++    it('rejects a missing name', () => {
++      const result = LaneConfigSchema.safeParse(makeLane({ name: undefined }));
++      expect(result.success).toBe(false);
++    });
++
++    it('rejects an empty name', () => {
++      const result = LaneConfigSchema.safeParse(makeLane({ name: '' }));
++      expect(result.success).toBe(false);
++    });
++
++    it('rejects a missing pipelineTemplate', () => {
++      const result = LaneConfigSchema.safeParse(
++        makeLane({ pipelineTemplate: undefined }),
++      );
++      expect(result.success).toBe(false);
++    });
++
++    it('rejects an empty pipelineTemplate', () => {
++      const result = LaneConfigSchema.safeParse(
++        makeLane({ pipelineTemplate: '' }),
++      );
++      expect(result.success).toBe(false);
++    });
++
++    it('rejects a missing contentDir', () => {
++      const result = LaneConfigSchema.safeParse(
++        makeLane({ contentDir: undefined }),
++      );
++      expect(result.success).toBe(false);
++    });
++
++    it('rejects an empty contentDir', () => {
++      const result = LaneConfigSchema.safeParse(makeLane({ contentDir: '' }));
++      expect(result.success).toBe(false);
++    });
++  });
++
++  describe('field types', () => {
++    it('rejects non-string id', () => {
++      const result = LaneConfigSchema.safeParse(makeLane({ id: 42 }));
++      expect(result.success).toBe(false);
++    });
++
++    it('rejects non-string contentDir', () => {
++      const result = LaneConfigSchema.safeParse(
++        makeLane({ contentDir: ['docs'] }),
++      );
++      expect(result.success).toBe(false);
++    });
++  });
++});
++
++describe('ArtifactKindSchema', () => {
++  it('accepts every supported kind', () => {
++    expect(ArtifactKindSchema.safeParse('markdown').success).toBe(true);
++    expect(ArtifactKindSchema.safeParse('html-mockup').success).toBe(true);
++    expect(ArtifactKindSchema.safeParse('single-file-html').success).toBe(true);
++    expect(ArtifactKindSchema.safeParse('image').success).toBe(true);
++  });
++
++  it('rejects unknown kinds', () => {
++    expect(ArtifactKindSchema.safeParse('pdf').success).toBe(false);
++    expect(ArtifactKindSchema.safeParse('').success).toBe(false);
++    expect(ArtifactKindSchema.safeParse(null).success).toBe(false);
++  });
++});
+diff --git a/packages/core/test/schema/entry.test.ts b/packages/core/test/schema/entry.test.ts
+index 2591b2b..57832b5 100644
+--- a/packages/core/test/schema/entry.test.ts
++++ b/packages/core/test/schema/entry.test.ts
+@@ -72,14 +72,33 @@ describe('EntrySchema', () => {
+     expect(EntrySchema.safeParse(valid).success).toBe(true);
+   });
+ 
+-  it('rejects an entry with unknown stage', () => {
++  it('accepts an entry whose stage is not in the legacy editorial enum (Phase 3 graphical-entries)', () => {
++    // Per Phase 3 Task 3.2.2 the schema's `currentStage` accepts any
++    // non-empty string; runtime validation against the lane's pipeline
++    // template happens outside the schema. A stage value like
++    // `'Reviewing'` (legitimate in a custom template) must parse.
++    const customStage = {
++      uuid: '550e8400-e29b-41d4-a716-446655440002',
++      slug: 'x',
++      title: 'X',
++      keywords: [],
++      source: 'manual',
++      currentStage: 'Reviewing',
++      iterationByStage: {},
++      createdAt: '2026-04-30T10:00:00.000Z',
++      updatedAt: '2026-04-30T10:00:00.000Z',
++    };
++    expect(EntrySchema.safeParse(customStage).success).toBe(true);
++  });
++
++  it('rejects an entry with an empty-string stage', () => {
+     const invalid = {
+       uuid: '550e8400-e29b-41d4-a716-446655440002',
+       slug: 'x',
+       title: 'X',
+       keywords: [],
+       source: 'manual',
+-      currentStage: 'Reviewing',  // not a real stage
++      currentStage: '',
+       iterationByStage: {},
+       createdAt: '2026-04-30T10:00:00.000Z',
+       updatedAt: '2026-04-30T10:00:00.000Z',
+diff --git a/packages/core/test/sidecar/write.test.ts b/packages/core/test/sidecar/write.test.ts
+index bc31b91..783a2f7 100644
+--- a/packages/core/test/sidecar/write.test.ts
++++ b/packages/core/test/sidecar/write.test.ts
+@@ -62,7 +62,12 @@ describe('writeSidecar', () => {
+       createdAt: '2026-04-30T10:00:00.000Z',
+       updatedAt: '2026-04-30T10:00:00.000Z',
+     };
+-    // @ts-expect-error — intentional invalid input
++    // Previously suppressed via `@ts-expect-error`: the prior schema's
++    // narrow `StageEnum` made the literal type-incompatible at compile
++    // time. Per Phase 3 (graphical-entries) currentStage is now any
++    // string, so the literal IS structurally compatible — the
++    // assertion below still catches the runtime-only `uuid` validation
++    // failure (`'not-a-uuid'` is not a valid UUID).
+     await expect(writeSidecar(projectRoot, invalid)).rejects.toThrow(/schema/);
+   });
+ });
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...). Use `blocking` only for issues that would break the feature's stated goals in obvious ways; `high` for correctness bugs adopters will hit; `medium` for design issues that compound over time; `low` for hygiene; `informational` for context you think the operator should see but isn't itself a bug.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
+
+codex
+I’m reading the supplied diff as an independent audit, focusing on Phase 3 invariants: lane id/path handling, loader refusal behavior, migration writes, artifact detection, and schema broadening effects.
+codex
+### Lane ids can escape `.deskwork/lanes/` during load
+
+Finding-ID: AUDIT-BARRAGE-codex-01
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/lanes/loader.ts:43-45`, `packages/core/src/lanes/loader.ts:96-110`, `packages/core/src/lanes/types.ts:42-46`
+
+`loadLaneConfig` only rejects empty or whitespace-only ids, then passes the raw id into `laneConfigPath`, which does `join(lanesDir(projectRoot), `${id}.json`)`. An id like `../config` resolves outside `.deskwork/lanes/` to `.deskwork/config.json`; an absolute-ish or separator-containing id can make the loader read arbitrary JSON under the project root family rather than a lane file. The schema has the same issue: `LaneConfigSchema.id` is only `z.string().min(1)`.
+
+This breaks the lane id invariant implied by `.deskwork/lanes/<id>.json` and by the prior UI fix that required canonical lane ids. A reasonable correction is to define and enforce one lane-id regex in core, use it in `LaneConfigSchema`, `loadLaneConfig`, and `listLaneConfigs`, and reject ids containing path separators before constructing a filesystem path.
+
+### Artifact detection classifies missing files as valid artifacts
+
+Finding-ID: AUDIT-BARRAGE-codex-02
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/lanes/detection.ts:44-70`, `packages/core/test/lanes/detection.test.ts:15-50`
+
+`detectArtifactKind` only probes the filesystem for existing directories. For every file-shaped artifact, it dispatches purely by extension, so `/path/to/post.md`, `/path/to/mockup.html`, and `/path/to/sketch.png` are accepted even when nothing exists at those paths. The tests explicitly lock this in as “extension-based dispatch (no filesystem probe)”, but the feature scope says this classifies on-disk artifacts.
+
+That can let migration populate `artifactKind` for stale or mistyped `artifactPath` values, turning a missing artifact into apparently valid metadata. A reasonable correction is to require the path to exist, require file cases to be regular files, and keep the current directory-with-`index.html` rule for `html-mockup`.
+
+### Lane bootstrap can leave a lane file without its migration journal event
+
+Finding-ID: AUDIT-BARRAGE-codex-03
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/lanes/bootstrap.ts:102-123`
+
+`bootstrapDefaultLaneIfMissing` writes `.deskwork/lanes/default.json` before appending the `lane-migration` journal event. If `appendJournalEvent` fails after the write, the project is left with a default lane but no migration audit record. The next invocation returns `already-exists` at lines 64-66 and never repairs the missing event.
+
+The function’s documented behavior is “writes ... and appends a `lane-migration` journal event,” so this partial-success state violates the migration contract and makes audit history depend on a transient write failure. A reasonable correction is to make the operation compensating: if journal append fails, remove the just-created lane file or record enough state to retry the missing event when the lane already exists and was created by this bootstrap.
+tokens used
+35,428

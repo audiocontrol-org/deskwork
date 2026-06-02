@@ -125,6 +125,10 @@
       "types": "./dist/entry/create.d.ts",
       "default": "./dist/entry/create.js"
     },
+    "./entry/diff-slice": {
+      "types": "./dist/entry/diff-slice.d.ts",
+      "default": "./dist/entry/diff-slice.js"
+    },
     "./entry/induct": {
       "types": "./dist/entry/induct.d.ts",
       "default": "./dist/entry/induct.js"
@@ -137,6 +141,14 @@
       "types": "./dist/journal.d.ts",
       "default": "./dist/journal.js"
     },
+    "./groups": {
+      "types": "./dist/groups/index.d.ts",
+      "default": "./dist/groups/index.js"
+    },
+    "./lanes": {
+      "types": "./dist/lanes/index.d.ts",
+      "default": "./dist/lanes/index.js"
+    },
     "./outline-split": {
       "types": "./dist/outline-split.d.ts",
       "default": "./dist/outline-split.js"
@@ -148,6 +160,10 @@
     "./paths": {
       "types": "./dist/paths.d.ts",
       "default": "./dist/paths.js"
+    },
+    "./pipelines": {
+      "types": "./dist/pipelines/index.d.ts",
+      "default": "./dist/pipelines/index.js"
     },
     "./rename-slug": {
       "types": "./dist/rename-slug.d.ts",
@@ -207,14 +223,15 @@
     }
   },
   "scripts": {
-    "build": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/",
-    "prepack": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/",
-    "dev": "npm run build && tsc -b tsconfig.build.json --watch",
+    "build": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/ && mkdir -p dist/pipelines && cp src/pipelines/*.json dist/pipelines/",
+    "prepack": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/ && mkdir -p dist/pipelines && cp src/pipelines/*.json dist/pipelines/",
+    "dev": "npm run build && (node scripts/watch-pipelines.mjs & tsc -b tsconfig.build.json --watch)",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "diff": "^7.0.0",
     "github-slugger": "^2.0.0",
     "rehype-slug": "^6.0.0",
     "rehype-stringify": "^10.0.0",
@@ -226,6 +243,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@types/diff": "^7.0.0",
     "@types/node": "^22.10.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0",

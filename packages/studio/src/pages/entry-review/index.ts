@@ -61,6 +61,11 @@ import {
 import { renderDecisionStrip } from './decision-strip.ts';
 import { renderShortcutsOverlay } from './shortcuts.ts';
 import { renderEntryNotFound } from './not-found.ts';
+import {
+  renderMembersSection,
+  parseMembersViewModeQuery,
+  type MembersViewMode,
+} from './members-section.ts';
 
 export type EntryReviewIndexGetter = (site: string) => ContentIndex;
 
@@ -73,6 +78,15 @@ export interface EntryReviewQuery {
    *  multiple stages. Optional; omitted falls back to the first
    *  chronological match (single-stage case). */
   readonly stage?: string | null;
+  /**
+   * `?members=<mode>` from the request URL. Selects the initial view
+   * mode for the group review surface's Members section (Phase 7
+   * Direction B). Accepts `composed` (default) or `list`. The client
+   * controller persists the operator's choice per-group via
+   * localStorage keyed on the group UUID; this query string is the
+   * server-side initial pick.
+   */
+  readonly members?: string | null;
 }
 
 export interface EntryReviewResult {
@@ -214,6 +228,10 @@ export async function renderEntryReviewPage(
   const affordances = getAffordances(data.entry);
   const state = buildState(data);
   const titleField = stringField(fm.title) ?? `Draft: ${data.entry.slug}`;
+  const membersInitialView: MembersViewMode = parseMembersViewModeQuery(
+    query.members ?? null,
+  );
+  const membersSectionHtml = renderEntryMembersSection(data, membersInitialView);
 
   // Calendar-entry lookup for the scrapbook drawer. The data loader
   // already attempted this; we re-derive the strict CalendarEntry here
@@ -310,6 +328,7 @@ export async function renderEntryReviewPage(
       ${renderEditToolbar(outlineHtml.length > 0, titleField)}
       <article class="er-page" data-entry-uuid="${data.entry.uuid}">
         ${unsafe(pageGrid)}
+        ${unsafe(membersSectionHtml)}
       </article>
       ${renderMarginaliaTab()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
@@ -334,6 +353,7 @@ export async function renderEntryReviewPage(
         '/static/css/review-viewport.css',
         '/static/css/scrap-row.css',
         '/static/css/mobile-shell.css',
+        '/static/css/entry-review-members.css',
       ],
       bodyAttrs: 'data-review-ui="entry-review"',
       bodyHtml: body,
@@ -341,4 +361,39 @@ export async function renderEntryReviewPage(
       scriptModules: ['entry-review-client'],
     }),
   };
+}
+
+/**
+ * Render the optional Members section for the page body. Returns ''
+ * for non-group entries AND for empty groups that have an
+ * `artifactPath` (the existing body renderer is the fallback in that
+ * case). See `members-section.ts` for the four-shape contract.
+ */
+function renderEntryMembersSection(
+  data: EntryReviewData,
+  initialViewMode: MembersViewMode,
+): string {
+  const bundle = data.groupMembers;
+  if (bundle === null) {
+    return renderMembersSection({
+      group: data.entry,
+      members: [],
+      missingMemberUuids: [],
+      corruptMemberUuids: [],
+      orderedMembers: [],
+      laneConfigsById: new Map(),
+      templatesById: new Map(),
+      initialViewMode,
+    });
+  }
+  return renderMembersSection({
+    group: data.entry,
+    members: bundle.members,
+    missingMemberUuids: bundle.missingMemberUuids,
+    corruptMemberUuids: bundle.corruptMemberUuids,
+    orderedMembers: bundle.orderedMembers,
+    laneConfigsById: bundle.laneConfigsById,
+    templatesById: bundle.templatesById,
+    initialViewMode,
+  });
 }

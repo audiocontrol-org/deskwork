@@ -5,7 +5,14 @@ import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
 import { getContentDir } from '../config.ts';
-import type { Entry, Stage } from '../schema/entry.ts';
+import { resolveEntryStrictTemplate } from '../lanes/resolve.ts';
+import {
+  assertStageInTemplate,
+  isLockedStageInTemplate,
+  isOffPipelineStageInTemplate,
+  terminalLinearStage,
+} from '../pipelines/helpers.ts';
+import type { Entry } from '../schema/entry.ts';
 
 interface IterateOptions {
   uuid: string;
@@ -14,7 +21,11 @@ interface IterateOptions {
 
 interface IterateResult {
   entryId: string;
-  stage: Stage;
+  /**
+   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
+   * plain string. `stage` echoes the sidecar value untouched.
+   */
+  stage: string;
   version: number;
 }
 
@@ -50,14 +61,47 @@ function resolveIndexPath(projectRoot: string, sidecar: Entry): string {
   return join(contentDir, sidecar.slug, 'index.md');
 }
 
+/**
+ * Iterate an entry: read the document under review, append an
+ * `iteration` journal event with the captured markdown, and bump the
+ * per-stage iteration counter on the sidecar.
+ *
+ * Per Phase 4 (graphical-entries) iterate is lane-template-aware:
+ *
+ *   - Terminal linear stages (e.g. `Published`, `Shipped`) refuse —
+ *     terminal content is frozen.
+ *   - Off-pipeline stages (e.g. `Blocked`, `Cancelled`, `Archived`)
+ *     refuse — induct first.
+ *   - Locked stages (e.g. `Final`, `Approved`, `Edited`, `Reviewed`)
+ *     refuse — pre-publication review-freeze; iterate would silently
+ *     un-freeze content that should stay immutable until publish.
+ *   - Unknown stages surface the template's allowed list.
+ */
 export async function iterateEntry(projectRoot: string, opts: IterateOptions): Promise<IterateResult> {
   const sidecar = await readSidecar(projectRoot, opts.uuid);
+  const template = resolveEntryStrictTemplate(sidecar, projectRoot);
+  const stage = sidecar.currentStage;
 
-  if (sidecar.currentStage === 'Published') {
-    throw new Error('Cannot iterate: Published entries are frozen.');
+  assertStageInTemplate(template, stage, 'iterateEntry');
+
+  const terminal = terminalLinearStage(template);
+  if (stage === terminal) {
+    throw new Error(
+      `Cannot iterate: entry is at terminal stage "${stage}" of pipeline "${template.id}"; ` +
+        `terminal-stage content is frozen.`,
+    );
   }
-  if (sidecar.currentStage === 'Blocked' || sidecar.currentStage === 'Cancelled') {
-    throw new Error(`Cannot iterate: entry is ${sidecar.currentStage}; induct it back into the pipeline first.`);
+  if (isOffPipelineStageInTemplate(template, stage)) {
+    throw new Error(
+      `Cannot iterate: entry is ${stage} (off-pipeline); induct it back into the pipeline first.`,
+    );
+  }
+  if (isLockedStageInTemplate(template, stage)) {
+    throw new Error(
+      `Cannot iterate: entry is at locked stage "${stage}" of pipeline "${template.id}"; ` +
+        `the locked stage is the pre-publication review-freeze. Use \`induct\` to return ` +
+        `the entry to an earlier linear stage if further iteration is needed.`,
+    );
   }
 
   // Issue #222 — single document evolves; always read/write index.md.
@@ -66,18 +110,7 @@ export async function iterateEntry(projectRoot: string, opts: IterateOptions): P
   const artifactPath = resolveIndexPath(projectRoot, sidecar);
   const markdown = await readFile(artifactPath, 'utf8');
 
-  // Iteration is the operator's explicit "pin a new version" decision;
-  // the core helper records what was asked, not what the helper thinks
-  // counts as "real change." A real iteration can be motivated by
-  // marginalia, scrapbook additions, decisions captured outside the
-  // file body, or any reason the operator hasn't communicated to the
-  // system. Gating on a content-diff check earlier here put a hard
-  // error in front of the operator's review-surface Iterate button
-  // when they had added marginalia but not edited the file body.
-  // Removed (#188-followup): the orchestrating skill (`/deskwork:iterate`)
-  // is the right place to decide whether the file needs editing first.
-
-  const priorVersion = sidecar.iterationByStage[sidecar.currentStage] ?? 0;
+  const priorVersion = sidecar.iterationByStage[stage] ?? 0;
   const newVersion = priorVersion + 1;
 
   const at = new Date().toISOString();
@@ -87,7 +120,7 @@ export async function iterateEntry(projectRoot: string, opts: IterateOptions): P
     kind: 'iteration',
     at,
     entryId: sidecar.uuid,
-    stage: sidecar.currentStage,
+    stage,
     version: newVersion,
     markdown,
   });
@@ -98,14 +131,14 @@ export async function iterateEntry(projectRoot: string, opts: IterateOptions): P
   // automatically, so no destructure is needed here.
   const updated: Entry = {
     ...sidecar,
-    iterationByStage: { ...sidecar.iterationByStage, [sidecar.currentStage]: newVersion },
+    iterationByStage: { ...sidecar.iterationByStage, [stage]: newVersion },
     updatedAt: at,
   };
   await writeSidecar(projectRoot, updated);
 
   return {
     entryId: sidecar.uuid,
-    stage: sidecar.currentStage,
+    stage,
     version: newVersion,
   };
 }

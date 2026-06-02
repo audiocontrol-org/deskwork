@@ -215,22 +215,76 @@ export async function migrateCalendar(
   return { entriesMigrated: sidecars.length, unmigratable };
 }
 
-function countIterationsByStage(events: JournalEvent[]): Partial<Record<Stage, number>> {
-  const counts: Partial<Record<Stage, number>> = {};
+/**
+ * Per Phase 3 (graphical-entries): journal events now carry `stage` as
+ * any non-empty string (lane templates can name their own stages).
+ * The legacy migration is editorial-only — it parses pre-feature
+ * calendar.md whose section headings are the editorial 8-stage names.
+ * The function therefore returns a string-keyed map; downstream
+ * consumers that need the editorial-narrowing can narrow explicitly.
+ */
+function countIterationsByStage(events: JournalEvent[]): Record<string, number> {
+  const counts: Record<string, number> = {};
   for (const e of events) {
     if (e.kind === 'iteration') {
-      const stage: Stage = e.stage;
+      const stage: string = e.stage;
       counts[stage] = (counts[stage] ?? 0) + 1;
     }
   }
   return counts;
 }
 
+/**
+ * Editorial-specific prior-stage inference. The migration walks the
+ * legacy single-pipeline calendar.md, so off-pipeline entries (Blocked
+ * / Cancelled) are always editorial entries. Returning `Stage`
+ * preserves the editorial-narrow output type for the migration's
+ * editorial-only call sites.
+ *
+ * Per Phase 3 the journal-event `from` field is widened to
+ * `StageStringSchema` (any non-empty stage string, lane-template-
+ * driven). The migration explicitly is NOT lane-aware — it walks the
+ * pre-lanes calendar.md — so a non-editorial `from` value in the
+ * journal is a data shape the migration must not silently tolerate.
+ *
+ * Per AUDIT-20260530-12: pre-fix the loop wrapped the return in
+ * `isEditorialStage(e.from)` and let non-editorial values fall
+ * through to the default; the silent skip produced wrong prior-stage
+ * data without surfacing the unhandled value. The fix REFUSES non-
+ * editorial `from` with an actionable error naming the offending
+ * value, so the operator sees the boundary violation and can either
+ * (a) repair the journal or (b) abandon the editorial-migration code
+ * path entirely if the project has graduated to lane-aware data.
+ */
+function isEditorialStage(value: string): value is Stage {
+  return (
+    value === 'Ideas' || value === 'Planned' || value === 'Outlining'
+    || value === 'Drafting' || value === 'Final' || value === 'Published'
+    || value === 'Blocked' || value === 'Cancelled'
+  );
+}
+
 function inferPriorStageFromJournal(events: JournalEvent[]): Stage {
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i];
     if (e && e.kind === 'stage-transition' && e.to !== 'Blocked' && e.to !== 'Cancelled') {
-      return e.from;
+      if (isEditorialStage(e.from)) {
+        return e.from;
+      }
+      // Non-editorial `from` on a stage-transition event the migration
+      // would otherwise consult. The legacy single-pipeline migration
+      // is editorial-only by construction; tolerating a non-editorial
+      // value here would silently produce wrong prior-stage data.
+      // Refuse loudly per AUDIT-20260530-12.
+      throw new Error(
+        `inferPriorStageFromJournal: refusing non-editorial from value `
+        + `"${e.from}" on stage-transition event for entry `
+        + `"${e.entryId}" (at ${e.at}). This migration is editorial-`
+        + `only — non-editorial stage values indicate the project has `
+        + `already graduated to lane-aware data and the legacy migration `
+        + `path is not the right tool. Repair the journal entry or skip `
+        + `the legacy migration.`,
+      );
     }
   }
   return 'Drafting'; // safe default when no transition history is available

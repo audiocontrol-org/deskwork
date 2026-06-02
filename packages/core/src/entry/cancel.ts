@@ -1,43 +1,168 @@
+import { existsSync } from 'node:fs';
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
 import { regenerateCalendar } from '../calendar/regenerate.ts';
-import type { Entry, Stage } from '../schema/entry.ts';
+import type { Entry } from '../schema/entry.ts';
+import { resolveEntryStrictTemplate } from '../lanes/resolve.ts';
+import {
+  assertStageInTemplate,
+  isOffPipelineStageInTemplate,
+  terminalLinearStage,
+} from '../pipelines/helpers.ts';
+import { sidecarPath } from '../sidecar/paths.ts';
 
 interface CancelOptions {
   readonly uuid: string;
   readonly reason?: string;
+  /**
+   * Phase 7 Task 7.2 Step 7.2.6 (graphical-entries). When `true`,
+   * cancel cascades to every entry in `members[]` (recursively if any
+   * member is itself a group, though doctor's `group-recursive` rule
+   * disallows that shape per v1). The cascade is a best-effort
+   * walk — members already off-pipeline (Cancelled / Blocked / etc.)
+   * are SKIPPED rather than refused, so cascading on a partially-
+   * cancelled group still cancels the remainder.
+   *
+   * Default behaviour (no `cascade`): the group's OWN stage flips to
+   * Cancelled; members are untouched. Per the universal-verb-no-
+   * cascade rule (DESKWORK-STATE-MACHINE.md Commandment II + PRD §
+   * Group lifecycle edge cases), cancel is opt-in.
+   *
+   * Non-group entries (no `members[]` array, or empty) ignore this
+   * flag — there's nothing to cascade into.
+   */
+  readonly cascade?: boolean;
+}
+
+interface CancelledMember {
+  readonly entryId: string;
+  readonly slug: string;
+  readonly fromStage: string;
+}
+
+interface SkippedMember {
+  readonly entryId: string;
+  readonly slug: string;
+  readonly reason: string;
 }
 
 interface CancelResult {
   readonly entryId: string;
-  readonly fromStage: Stage;
-  readonly toStage: 'Cancelled';
+  /**
+   * Per Phase 4 (graphical-entries) the verb is lane-template-aware.
+   * `toStage` is whichever off-pipeline stage the template carries as
+   * its cancel destination — `Cancelled` is the reserved name and is
+   * present in every preset; operator-authored templates that drop it
+   * fail at runtime with a configuration error.
+   */
+  readonly fromStage: string;
+  readonly toStage: string;
+  /**
+   * Members the cascade actually transitioned to Cancelled. Empty
+   * when `cascade !== true` or when the entry has no members.
+   */
+  readonly cascadedMembers?: readonly CancelledMember[];
+  /**
+   * Members the cascade SKIPPED (already off-pipeline, or terminal
+   * stage). Surfaced so the CLI / operator can audit what was passed
+   * over. Empty when `cascade !== true`.
+   */
+  readonly skippedMembers?: readonly SkippedMember[];
 }
 
 /**
- * Move an entry to Cancelled. Records priorStage on the sidecar so a
- * later `inductEntry` can return it to the linear pipeline if the
- * decision is reversed.
- *
- * Refuses Published / Blocked / Cancelled.
+ * The reserved off-pipeline stage name for cancellations. Per
+ * DESKWORK-STATE-MACHINE.md and the PipelineTemplate schema's
+ * `linearStages.includes('Cancelled')` refinement, `Cancelled` is
+ * never a linear stage; templates that include `Cancelled` MUST list
+ * it under `offPipelineStages`. The verb checks the bound template's
+ * off-pipeline list at runtime to surface configuration drift.
  */
-export async function cancelEntry(
+const CANCEL_STAGE = 'Cancelled';
+
+/**
+ * Internal walker options. Augments the public `CancelOptions` with
+ * one cascade-internal field — `cascadeFrom` — that the public
+ * wrapper does NOT expose:
+ *
+ *   - `cascadeFrom`: when set, the walker attaches it to the
+ *     `stage-transition` event's `metadata.cascadeFrom` so the
+ *     event records the originating (top-level) group's UUID. Set
+ *     by the recursive cascade walker call only; unset on the
+ *     originator's own walker invocation (the top-level entry's
+ *     event is the cascade source, not a cascadee).
+ *
+ * Per Step 7.2.8 (#359) the originator semantic is the TOP-LEVEL
+ * cascade invoker — `cascadeFrom` does NOT track the nearest parent
+ * on transitively-cascaded entries. This keeps the audit trail
+ * single-hop ("which top-level cascade caused this cancel?") rather
+ * than requiring a walk through the journal to reconstruct.
+ */
+interface WalkerOptions extends CancelOptions {
+  readonly cascadeFrom?: string;
+}
+
+/**
+ * Internal cascade walker (Step 7.2.7, graphical-entries, GitHub
+ * #360 / AUDIT-20260529-18; metadata.cascadeFrom field added in
+ * Step 7.2.8 / #359).
+ *
+ * Does everything the public `cancelEntry` did before the walker /
+ * wrapper split EXCEPT call `regenerateCalendar` — the wrapper is
+ * responsible for the single boundary regenerate. Used by the
+ * cascade walk to recursively cancel every member without N+1
+ * calendar regenerations.
+ *
+ * Behaviour-preserving: same refusals, same `CancelResult` shape
+ * (including `cascadedMembers` / `skippedMembers` arrays when
+ * `cascade === true`), same journal events fired per entry. The
+ * only externally-observable difference is that `calendar.md` is
+ * NOT rewritten by this function; the caller must invoke
+ * `regenerateCalendar` itself to keep the calendar in sync.
+ *
+ * Step 7.2.8 addition: when invoked with `cascadeFrom` set, the
+ * walker attaches it to the `stage-transition` event's
+ * `metadata.cascadeFrom` so cascaded events carry the originating
+ * group's UUID. The top-level wrapper call leaves `cascadeFrom`
+ * unset (it IS the originator).
+ */
+async function cancelEntryWithoutCalendarRegen(
   projectRoot: string,
-  opts: CancelOptions,
+  opts: WalkerOptions,
 ): Promise<CancelResult> {
   const sidecar = await readSidecar(projectRoot, opts.uuid);
+  const template = resolveEntryStrictTemplate(sidecar, projectRoot);
   const from = sidecar.currentStage;
-  if (from === 'Published') {
-    throw new Error('Cannot cancel: Published is terminal.');
+
+  assertStageInTemplate(template, from, 'cancelEntry');
+
+  // Templates without `Cancelled` in offPipelineStages cannot host the
+  // cancel verb. The schema permits this (cancel-free templates are a
+  // valid experiment); the verb refuses at runtime with a clear error.
+  if (!template.offPipelineStages.includes(CANCEL_STAGE)) {
+    throw new Error(
+      `Cannot cancel: pipeline template "${template.id}" does not include "${CANCEL_STAGE}" ` +
+        `in offPipelineStages. The cancel verb requires the template to reserve "${CANCEL_STAGE}" ` +
+        `as its cancellation destination. ` +
+        `Available off-pipeline stages: ${template.offPipelineStages.join(', ') || '(none)'}.`,
+    );
   }
-  if (from === 'Blocked' || from === 'Cancelled') {
-    throw new Error(`Cannot cancel: entry is already ${from}.`);
+
+  const terminal = terminalLinearStage(template);
+  if (from === terminal) {
+    throw new Error(
+      `Cannot cancel: entry is at terminal stage "${from}" of pipeline "${template.id}".`,
+    );
   }
+  if (isOffPipelineStageInTemplate(template, from)) {
+    throw new Error(`Cannot cancel: entry is already ${from} (off-pipeline).`);
+  }
+
   const at = new Date().toISOString();
   const updated: Entry = {
     ...sidecar,
-    currentStage: 'Cancelled',
+    currentStage: CANCEL_STAGE,
     priorStage: from,
     updatedAt: at,
   };
@@ -47,10 +172,182 @@ export async function cancelEntry(
     at,
     entryId: sidecar.uuid,
     from,
-    to: 'Cancelled',
+    to: CANCEL_STAGE,
     ...(opts.reason !== undefined && { reason: opts.reason }),
+    // Per Step 7.2.8 (#359): attach `metadata.cascadeFrom` only when
+    // the walker was invoked from a cascade — i.e. on cascaded
+    // members, not on the originator's own event. The public
+    // `cancelEntry` wrapper never passes `cascadeFrom`, so the
+    // originator's event omits the field. The recursive walker
+    // calls below threads the TOP-LEVEL originator's UUID (not the
+    // nearest parent) so transitively-cascaded events still trace
+    // back to the cascade invocation in a single hop.
+    ...(opts.cascadeFrom !== undefined && {
+      metadata: { cascadeFrom: opts.cascadeFrom },
+    }),
   });
+
+  // Member cascade (Phase 7 Task 7.2 Step 7.2.6). Only fires when
+  // the caller explicitly opted in via `cascade: true`. Per the
+  // universal-verb-no-cascade rule (Commandment II + PRD § Group
+  // lifecycle), cancel does NOT propagate to members by default.
+  // When the flag IS set, we walk `members[]` and call THIS walker
+  // (not the public wrapper) recursively for each — recursive
+  // groups would cascade transitively, though doctor's
+  // `group-recursive` rule (Task 7.5.1) refuses that shape; the
+  // cascade here is the operator-visible behaviour the flag
+  // promises. Step 7.2.7 moved the recursive call from the public
+  // `cancelEntry` to this walker so calendar regeneration fires
+  // exactly once at the cascade boundary (the public wrapper)
+  // rather than N+1 times.
+  const cascadedMembers: CancelledMember[] = [];
+  const skippedMembers: SkippedMember[] = [];
+  if (
+    opts.cascade === true
+    && Array.isArray(sidecar.members)
+    && sidecar.members.length > 0
+  ) {
+    for (const memberUuid of sidecar.members) {
+      // Per AUDIT-20260530-23: narrow the recoverable-skip case to the
+      // genuinely-absent sidecar. Mirrors AUDIT-39's precedent: use
+      // existsSync() as the precondition probe, then let everything
+      // downstream (readSidecar parse failures, template-resolution
+      // configuration errors, writeSidecar I/O errors, journal-append
+      // errors) propagate so the caller sees real corruption / config
+      // / write failures instead of having them swallowed as "skipped
+      // member: read failed: ...". The narrow skip preserves the
+      // existing "missing member" contract documented in the
+      // SkippedMember interface.
+      if (!existsSync(sidecarPath(projectRoot, memberUuid))) {
+        skippedMembers.push({
+          entryId: memberUuid,
+          slug: '(unresolved)',
+          reason: 'sidecar not found',
+        });
+        continue;
+      }
+      const memberSidecar = await readSidecar(projectRoot, memberUuid);
+      const memberTemplate = resolveEntryStrictTemplate(
+        memberSidecar,
+        projectRoot,
+      );
+      const memberTerminal = terminalLinearStage(memberTemplate);
+      // Members already off-pipeline (or at terminal) are skipped
+      // — refusing would abort the cascade mid-walk, leaving the
+      // group partially cancelled which is exactly the failure
+      // mode the cascade exists to avoid.
+      if (memberSidecar.currentStage === memberTerminal) {
+        skippedMembers.push({
+          entryId: memberUuid,
+          slug: memberSidecar.slug,
+          reason: `at terminal stage "${memberTerminal}"`,
+        });
+        continue;
+      }
+      if (
+        isOffPipelineStageInTemplate(memberTemplate, memberSidecar.currentStage)
+      ) {
+        skippedMembers.push({
+          entryId: memberUuid,
+          slug: memberSidecar.slug,
+          reason: `already off-pipeline (${memberSidecar.currentStage})`,
+        });
+        continue;
+      }
+      // The recursive walker call unconditionally forces `cascade: true`:
+      // top-level opt-in propagates through the entire subtree (doctor's
+      // `group-recursive` rule normally refuses recursive groups, but
+      // the cancel path still has to behave correctly when one exists).
+      //
+      // Per Step 7.2.8 (#359): pass the TOP-LEVEL originator's UUID
+      // through `cascadeFrom` so every cascaded member's event
+      // records the cascade source as a single-hop back-link. If
+      // THIS walker invocation was itself cascaded (transitive
+      // case), we propagate the inherited `opts.cascadeFrom`;
+      // otherwise we ARE the originator and pass our own
+      // `sidecar.uuid` (the top-level group whose cancel started
+      // the cascade).
+      const memberResult = await cancelEntryWithoutCalendarRegen(projectRoot, {
+        uuid: memberUuid,
+        cascade: true,
+        cascadeFrom: opts.cascadeFrom ?? sidecar.uuid,
+        ...(opts.reason !== undefined && { reason: opts.reason }),
+      });
+      cascadedMembers.push({
+        entryId: memberUuid,
+        slug: memberSidecar.slug,
+        fromStage: memberResult.fromStage,
+      });
+      // Nested cascades from the recursive call appear in
+      // `memberResult.cascadedMembers` — flatten them into the
+      // top-level list so the caller sees one cascade summary
+      // rather than a nested tree.
+      if (memberResult.cascadedMembers !== undefined) {
+        cascadedMembers.push(...memberResult.cascadedMembers);
+      }
+      if (memberResult.skippedMembers !== undefined) {
+        skippedMembers.push(...memberResult.skippedMembers);
+      }
+    }
+  }
+
+  const result: CancelResult = {
+    entryId: sidecar.uuid,
+    fromStage: from,
+    toStage: CANCEL_STAGE,
+    ...(opts.cascade === true && { cascadedMembers }),
+    ...(opts.cascade === true && { skippedMembers }),
+  };
+  return result;
+}
+
+/**
+ * Move an entry to the template's cancel destination (canonically
+ * `Cancelled`). Records priorStage on the sidecar so a later
+ * `inductEntry` can return it to the linear pipeline if the decision
+ * is reversed.
+ *
+ * Refuses:
+ *   - terminal linear stage (e.g. `Published` for editorial) — already
+ *     shipped; cancellation is meaningless.
+ *   - any off-pipeline stage (e.g. `Blocked`, `Cancelled`, `Archived`)
+ *     — entry is already off-pipeline.
+ *   - unknown stages — surfaces the template's allowed stage list.
+ *
+ * Requires the template's `offPipelineStages` to include `Cancelled`.
+ * Templates that omit it raise a configuration error.
+ *
+ * Public-wrapper structure (Step 7.2.7, graphical-entries, GitHub
+ * #360 / AUDIT-20260529-18): delegates the per-entry transition (and
+ * the recursive cascade walk) to the internal
+ * `cancelEntryWithoutCalendarRegen` walker, then calls
+ * `regenerateCalendar` exactly ONCE at the cascade boundary. Prior
+ * to the split the recursive cascade re-entered the public wrapper,
+ * triggering N+1 calendar regenerations on a group with N cascaded
+ * members. The result shape, refusals, and per-entry journal
+ * semantics are unchanged.
+ */
+export async function cancelEntry(
+  projectRoot: string,
+  opts: CancelOptions,
+): Promise<CancelResult> {
+  // Per AUDIT-20260530-22: wrap the walker in try/finally so the
+  // boundary `regenerateCalendar` fires even when the walker throws
+  // mid-cascade (e.g. AUDIT-23's narrowed-catch propagating a corrupt
+  // member's parse error). Without the finally, the group + every
+  // member processed before the failure are already `Cancelled` on
+  // disk but `calendar.md` is never regenerated — PERSISTENT
+  // divergence between sidecar state and the calendar. The throw
+  // still propagates (caller sees the error); the calendar is just
+  // reconciled to whatever sidecar state actually landed.
+  //
   // #148: keep calendar.md in sync after every transition.
-  await regenerateCalendar(projectRoot);
-  return { entryId: sidecar.uuid, fromStage: from, toStage: 'Cancelled' };
+  // Step 7.2.7 boundary: a single regenerate covers the head entry
+  // AND every cascaded member, because the walker does not call
+  // regenerateCalendar itself.
+  try {
+    return await cancelEntryWithoutCalendarRegen(projectRoot, opts);
+  } finally {
+    await regenerateCalendar(projectRoot);
+  }
 }

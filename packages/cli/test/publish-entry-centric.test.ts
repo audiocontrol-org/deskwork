@@ -136,7 +136,7 @@ describe('deskwork publish — entry-centric dispatcher (#150)', () => {
     const res = publish('pub');
 
     expect(res.code).not.toBe(0);
-    expect(res.stderr).toMatch(/already Published/i);
+    expect(res.stderr).toMatch(/already at terminal stage "Published"/);
   });
 
   it('rejects --content-url with a clear error on entry-centric data', () => {

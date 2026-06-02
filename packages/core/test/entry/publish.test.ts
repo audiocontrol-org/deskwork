@@ -98,7 +98,7 @@ describe('publishEntry', () => {
     await setupEntry({ currentStage: 'Published' });
     await expect(
       publishEntry(projectRoot, { uuid, requireArtifact: false }),
-    ).rejects.toThrow(/already Published/i);
+    ).rejects.toThrow(/already.*Published|terminal stage.*Published/i);
   });
 
   it('refuses Blocked / Cancelled (induct first)', async () => {

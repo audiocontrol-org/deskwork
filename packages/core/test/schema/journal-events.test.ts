@@ -65,4 +65,121 @@ describe('JournalEventSchema', () => {
     };
     expect(JournalEventSchema.safeParse(event).success).toBe(true);
   });
+
+  it('parses a lane-create event (Phase 6 Task 6.1)', () => {
+    const event: JournalEvent = {
+      kind: 'lane-create',
+      at: '2026-05-28T10:00:00.000Z',
+      laneId: 'mockups',
+      details: {
+        name: 'Mockups',
+        pipelineTemplate: 'visual',
+        contentDir: 'src/mockups',
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a lane-update event (Phase 6 Task 6.1)', () => {
+    const event: JournalEvent = {
+      kind: 'lane-update',
+      at: '2026-05-28T10:00:00.000Z',
+      laneId: 'mockups',
+      details: {
+        changedFields: ['name'],
+        before: { name: 'Mockups' },
+        after: { name: 'Visual Mockups' },
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a lane-archive event (Phase 6 Task 6.1)', () => {
+    const event: JournalEvent = {
+      kind: 'lane-archive',
+      at: '2026-05-28T10:00:00.000Z',
+      laneId: 'stale-lane',
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a lane-restore event (Phase 6 Task 6.1)', () => {
+    const event: JournalEvent = {
+      kind: 'lane-restore',
+      at: '2026-05-28T10:00:00.000Z',
+      laneId: 'stale-lane',
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a lane-purge event (Phase 6 Task 6.1)', () => {
+    const event: JournalEvent = {
+      kind: 'lane-purge',
+      at: '2026-05-28T10:00:00.000Z',
+      laneId: 'empty-lane',
+      details: { purgedPath: '/proj/.deskwork/lanes/empty-lane.json' },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a lane-move event (Phase 6 Task 6.1)', () => {
+    const event: JournalEvent = {
+      kind: 'lane-move',
+      at: '2026-05-28T10:00:00.000Z',
+      entryId: '550e8400-e29b-41d4-a716-446655440000',
+      details: {
+        fromLane: 'default',
+        toLane: 'mockups',
+        fromStage: 'Drafting',
+        toStage: 'Sketch',
+        fromArtifactPath: 'old/path.md',
+        toArtifactPath: 'new/path.md',
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a pipeline-create event (Phase 6 Task 6.2)', () => {
+    const event: JournalEvent = {
+      kind: 'pipeline-create',
+      at: '2026-05-28T10:00:00.000Z',
+      pipelineId: 'my-blog',
+      details: {
+        name: 'My Blog',
+        linearStages: ['Idea', 'Drafting', 'Review', 'Live'],
+        lockedStages: [],
+        offPipelineStages: [],
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a pipeline-update rename-stage event (Phase 6 Task 6.2)', () => {
+    const event: JournalEvent = {
+      kind: 'pipeline-update',
+      at: '2026-05-28T10:00:00.000Z',
+      pipelineId: 'my-blog',
+      details: {
+        operation: 'rename-stage',
+        from: 'Drafting',
+        to: 'Writing',
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a pipeline-delete event with reassigned lanes (Phase 6 Task 6.2)', () => {
+    const event: JournalEvent = {
+      kind: 'pipeline-delete',
+      at: '2026-05-28T10:00:00.000Z',
+      pipelineId: 'old-blog',
+      details: {
+        purgedPath: '/proj/.deskwork/pipelines/old-blog.json',
+        reassignedLanes: [
+          { laneId: 'default', from: 'old-blog', to: 'editorial' },
+        ],
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
 });

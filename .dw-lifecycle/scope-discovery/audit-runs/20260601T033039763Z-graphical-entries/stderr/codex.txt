@@ -1,0 +1,1927 @@
+Reading additional input from stdin...
+OpenAI Codex v0.133.0
+--------
+workdir: /Users/orion/work/deskwork-work/graphical-entries
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e813b-ca66-7390-a26c-4d553cdf8f2e
+--------
+user
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface bugs, design issues, missed edge cases, and code-quality concerns in the work product captured in the diff below.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+graphical-entries
+
+## Feature scope (workplan / PRD summary)
+
+- [ ] Step 12.3.1: "Save markup" exports the composed canvas (base + markup) as PNG to `<entryDir>/scrapbook/screenshots/<comment-id>-<timestamp>-marked.png`.
+- [ ] Step 12.3.2: The raw capture stays at `<comment-id>-<timestamp>.png` (untouched).
+- [ ] Step 12.3.3: Comment annotation's `attachments[]` array updated to reference the marked file path.
+- [ ] Step 12.3.4: Attachment metadata gains `originalAttachment: <raw-file-path>` so the operator can re-mark the raw or compare versions.
+
+### Task 12.4: Studio rendering of marked attachments
+
+- [ ] Step 12.4.1: Comment renders the marked version by default with a small "original" toggle in the chrome.
+- [ ] Step 12.4.2: Clicking the marked version opens a full-size lightbox; clicking the toggle in the lightbox swaps to raw.
+
+### Task 12.5: Re-mark workflow
+
+- [ ] Step 12.5.1: Operator can re-mark an existing screenshot: opens the markup editor pre-loaded with the raw + prior markup (loaded as separate layer for further editing).
+- [ ] Step 12.5.2: Save creates a new file (e.g. `<comment-id>-<timestamp>-marked-v2.png`); the comment's `attachments[]` updates to the new version; prior versions preserved in the journal.
+
+### Task 12.6: Integration test + mobile verification
+
+- [ ] Step 12.6.1: Tmp-fixture: capture a fixture screenshot; mark with each of the 5 tools; save; verify the marked file persists alongside raw; verify the comment renders both versions.
+- [ ] Step 12.6.2: Touch-screen verification: run a Playwright test against an iPhone-class viewport; assert each tool works with touch input (no hover-only interaction).
+
+**Acceptance Criteria:**
+
+- [ ] Markup editor supports all five tools (arrow / box / freehand / text-label / blur-region) + undo / redo.
+- [ ] Marked screenshot persists alongside the raw capture; comment annotation references both via `attachments[]` + `originalAttachment`.
+- [ ] Re-mark workflow preserves prior markup versions in the journal.
+- [ ] Touch-screen markup works without hover-only interactions.
+
+## Closing milestone: scope-discovery v1 dogfood TF summary + audit handoff
+
+**Deliverable:** Final TF entry in `tooling-feedback.md` summarizing the dogfood result (what worked / what didn't / what needs follow-up); closing comment on the feature PR linking the log; handoff to the scope-discovery team to import as `AUDIT-<date>-<NN>` entries in their audit log. Per PRD § Secondary deliverable.
+
+### Task C.1: Aggregate TF entries + identify patterns
+
+- [ ] Step C.1.1: Walk every TF-NNN entry in `tooling-feedback.md`; tabulate by category (A / AM / CL / GATE / DSC / MISC) + severity (high / medium / low).
+- [ ] Step C.1.2: Identify recurring patterns — same root cause surfacing in multiple TF entries; promote those to GH issues if not already filed.
+- [ ] Step C.1.3: Tabulate dispositions: how many TF entries closed by an in-flight fix during this feature vs how many remain open at feature-close.
+
+### Task C.2: Write final TF summary
+
+- [ ] Step C.2.1: Append the closure entry to `tooling-feedback.md` (next TF-NNN id) with title shape `TF-NNN · MISC · n/a · Dogfood closure summary`.
+- [ ] Step C.2.2: Body: what worked (which protocol layers caught friction proactively); what didn't (which surfaces fell through to operator catch); what needs follow-up (recurring patterns justifying a v1.1 audit cycle).
+- [ ] Step C.2.3: Include a one-line summary per still-open TF entry naming the gap; list closed TF entries with their closing-commit SHAs.
+
+### Task C.3: Closing comment on the feature PR
+
+- [ ] Step C.3.1: Comment on the graphical-entries PR linking `tooling-feedback.md` + naming the total TF count + how many promoted to GH issues.
+- [ ] Step C.3.2: Tag the deskwork team for the audit-log import.
+
+### Task C.4: Audit-log handoff
+
+- [ ] Step C.4.1: The deskwork team imports the closure into `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` as `AUDIT-<date>-<NN>` entries — mirror of how the audiocontrol pilot's TF-001..TF-016 imported into AUDIT-20260525-05..09.
+- [ ] Step C.4.2: Each AUDIT entry references its source TF entry + summarizes the friction shape + the suggested fix.
+- [ ] Step C.4.3: The aggregated audit-log entries become the v1.1 workplan input for scope-discovery.
+
+**Acceptance Criteria:**
+
+- [ ] `tooling-feedback.md` carries a TF closure summary entry.
+- [ ] The feature PR has a closing comment with TF count + promoted-issue count.
+- [ ] The scope-discovery team has imported AUDIT entries derived from this feature's TF log.
+
+
+## Commit subjects in the audited range
+
+feat(graphical-entries): extend CommentAnnotation schema — replyTo + attachments + spatialAnchor — Step 8.1.1
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+---
+
+I walked the production change (`renderSwimCompact` + `renderUnbucketedCompactCell`), the reconciliation invariant, escaping, the CSS layout, and the strengthened count-consistency test. The core fix is **correct**: the compact cell is count-only (the right shape for a summary strip), the `data-row-shell` counts the strengthened test relies on are genuinely emitted by both the kanban (`swimlane-unbucketed.ts:58`) and list (`:163`) unbucketed rows, the empty-input guard returns `unsafe('')` so callers append unconditionally, no `currentStage` value reaches the compact cell so there's no new escaping surface, and the `.swim-compact` flex layout absorbs the trailing cell as the docstring claims. The three findings above are hygiene/informational, not correctness defects.
+
+## 2026-06-01 — audit-barrage lift (20260601T024506665Z-graphical-entries)
+
+### AUDIT-20260601-01 — `group list` is the sole verb left unguarded against extra positionals — silently swallows typos that every sibling verb (including read-only `show`) now refuses
+
+Finding-ID: AUDIT-20260601-01 (claude-01 + claude-02 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `packages/cli/src/commands/group.ts:127-128` (dispatch) and `:161-184` (`handleList`)
+
+The AUDIT-20260530-94 fix added `assertExactPositional` to seven verbs (show, create, update, add-member, remove-member, archive, restore) but `handleList` was not touched: `run` dispatches `case 'list'` with only `booleans.has('include-archived')` (`:127-128`) and `handleList` never receives or inspects `rest` (`:161-166`). So `deskwork group <root> list garbage` silently discards `garbage` and lists all groups — exactly the "quiet partial-effect / operator typo swallowed" shape the fix set out to close.
+
+The new function's own docstring (`:88-93`) frames the rationale as *"for state-mutating verbs the project convention is to refuse loudly,"* which would arguably exempt `list`. But that rationale doesn't match what was implemented: `handleShow` is read-only and **was** guarded (`:191`). So the line drawn is not "mutating vs read" — it's "every verb except `list`." That asymmetry is the defect: a user who fat-fingers `group list mygroup` (meaning `group show mygroup`) gets a full list with no error, while the same stray positional on any other verb exits 2. The new `extra-positional-refused.test.ts` covers all seven guarded verbs but not `list`, so the gap is unguarded by tests too. Fix: either call `assertExactPositional(rest, 0, 'list')` (threading `rest` into `handleList`), or correct the docstring to state that `list` is intentionally exempt and why — the current docstring asserts a "state-mutating" boundary the code doesn't actually follow.
+
+---
+
+### AUDIT-20260601-02 — `withJournalRollback` rolls back the sidecar but never the journal — a non-atomic / partial journal-append failure leaves a corrupt journal fragment with the sidecar reverted, the inverse of the inconsistency it set out to fix
+
+Finding-ID: AUDIT-20260601-02
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `packages/core/src/sidecar/with-journal-rollback.ts:91-116` (helper) + the six mutator call sites
+
+The helper's contract is "snapshot the sidecar, run mutate (sidecar-write + journal-append), restore the sidecar on throw." The only failure path it compensates is one where the sidecar write succeeded and the journal append failed *before mutating the journal* — which is precisely the failure mode the regression test induces (`mutator-rollback-on-journal-fail.test.ts:103-113` pre-creates `review-journal/history` as a file so the journal's `mkdir` throws ENOTDIR with nothing written). But the name `withJournalRollback` and the header's framing ("compensating-write helper for the sidecar-write + journal-append sequence") imply the *journal* is what gets rolled back. It isn't — the journal file is never snapshotted or touched. If `appendJournalEvent` fails *after* writing partial bytes (disk-full mid-write, interrupted append, a serializer that writes-then-throws), the journal retains a corrupt/partial line that nothing cleans up, while the sidecar is reverted to its pre-mutation state. That is sidecar-says-unchanged / journal-says-partially-mutated — an inconsistency in the opposite direction from the one being closed, and it is entirely unguarded by the test (which only exercises the pre-write mkdir failure).
+
+The fix as shipped is correct for the tested failure mode and is a reasonable generalization of the AUDIT-79 lane pattern, so this is not a blocking defect. But the operator should know the protection is one-sided: it assumes journal-append is all-or-nothing. Two reasonable hardenings: (a) rename to something like `withSidecarRollbackOnJournalFailure` so the name states what is actually restored (the journal-rollback name is an over-claim per the project's naming-reveals-intent guidance), and (b) if journal-append is in fact non-atomic, the helper should also capture and restore the journal-history file, or document in the header that journal atomicity is a precondition. As written, the docstring's "best-effort" caveat applies only to the *restore* side, not to the unaddressed partial-journal-write case.
+
+---
+
+### AUDIT-20260601-03 — `withJournalRollback`'s snapshot/restore clobbers a concurrent successful write to the same sidecar
+
+Finding-ID: AUDIT-20260601-03
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   informational
+Surface:    `packages/core/src/sidecar/with-journal-rollback.ts:108-116`
+
+The helper reads the sidecar body synchronously into `snapshot` (`:113`), then `await`s `mutate()`. On failure it overwrites the file with the captured `snapshot.body` (`restoreSidecar`, `:71-83`). If a second mutation against the same group UUID interleaves — snapshots the same original body, writes its own update successfully, and the first mutation's journal append *then* fails — the first mutation's rollback restores the stale original body, silently discarding the second mutation's committed write. The same race applies to the `create` rollback's `unlinkSync` (`:75`), which could delete a file a concurrent create just wrote.
+
+deskwork is a single-operator CLI with no documented concurrent-invocation model, so the practical likelihood is low and I would not block on it. I surface it because the helper is now a shared primitive (`packages/core/src/sidecar/`) that the header invites other entry mutators to adopt ("any sidecar-write-followed-by-journal-append call site"); a future caller in a server context (the studio writes to the same tree) could hit this. If the studio ever performs group mutations in-process, this becomes a real lost-update window. Worth a one-line note in the header that the helper assumes no concurrent mutation of the same UUID.
+
+---
+
+### AUDIT-20260601-04 — clones.yaml regeneration replaced operator-authored "why not extract" rationales with terse one-liners, weakening the audit trail for future revisit decisions
+
+Finding-ID: AUDIT-20260601-04
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   informational
+Surface:    `.dw-lifecycle/scope-discovery/clones.yaml:116-127` (ids `7fd4d02355a8`, `40b2115a7171`)
+
+Two `keep-with-reason` dispositions lost their substantive justification in this refresh. The prior reason for the group/pipeline and group/lane dispatcher clones was a specific paragraph — *"Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit"* — which records the actual engineering reason the clone is intentional. The replacements are *"Sibling verb-dispatch convention across group/lane/pipeline CRUD modules; shared shape is deliberate, not duplication"* and *"Sibling per-verb update-handler shape … parallel emit/fail handling is deliberate, not duplication."* These assert the conclusion ("deliberate, not duplication") but drop the *why-not-extract* argument that lets a future reader decide whether the disposition still holds as the code evolves.
+
+This isn't a disposition-survivor violation (no `keep-with-reason → pending` transition, so the gate is satisfied) and it's a curation call, not a bug. But per the project's "no IOU / preserve the rationale" posture, the terser reasons are a small regression in the durable record: the next contributor evaluating whether to finally extract a shared dispatcher helper now has less of the original reasoning to push against. Consider retaining the per-verb-family specificity sentence in at least one of the two reasons so the rationale survives the line-number churn that triggered the re-hash.
+
+## 2026-06-01 — audit-barrage lift (20260601T032129888Z-graphical-entries)
+
+### AUDIT-20260601-05 — `entry-lane-missing.audit()` swallows every non-ENOENT read failure and returns `[]`, making a schema-tightening GATE report false-clean
+
+Finding-ID: AUDIT-20260601-05 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/entry-lane-missing.ts` (the `audit()` try/catch around `readAllSidecarsPartitioned`, ~lines 76-86)
+
+The rule's whole purpose, per its own header, is to be the GATE that lets Step 8.0.2 tighten `resolveEntryTemplate` to throw on a missing `lane`: *"until canary projects report zero `entry-lane-missing` findings, the resolver retains its migration-window default."* That makes a **false-zero the dangerous direction** — a zero count is read as "safe to tighten." But the audit wraps the sidecar read in `try { … } catch { return []; }`. The comment frames the catch as benign ("Nothing useful this rule can say — leave the report empty"), yet any genuine failure (permission error on `.deskwork/entries/`, an I/O fault, a future change in the reader's error contract) is silently converted to "no findings." An operator (or the 8.0.2 implementer) reading a green `entry-lane-missing` cannot distinguish "every entry has a lane" from "the rule couldn't read the directory."
+
+The ENOENT case is already handled by the reader returning `[]` (the empty-project test exercises that), so this catch only ever fires on *unexpected* errors — exactly the ones a gate rule should surface, not bury. Per the project's "fallbacks/swallowed errors are bug-factories" guidance, this should emit a finding (e.g. severity `error`, message naming the read failure) rather than return `[]`, so a read fault blocks the gate instead of opening it. The swallow is also untested — the "empty project" test removes the dir (ENOENT path), never the non-ENOENT path.
+
+### AUDIT-20260601-06 — Hook summary says zero findings even though the same diff slush-records four audit findings
+
+Finding-ID: AUDIT-20260601-06
+Status:     acknowledged-slush-pile-2026-06-01
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/last-hook-run.json:5-8`; `docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md:4469-4519`
+
+The hook metadata records `"disposition": "fired-and-slushed"` but also `"findingsCount": 0`, `"promotedCount": 0`, and `"slushedCount": 0`. In the same diff, the audit log appends four findings from that run, all with `Status: acknowledged-slush-pile-2026-06-01`.
+
+That makes the durable machine-readable summary contradict the human-readable audit log. Any later aggregation that relies on `last-hook-run.json` will conclude this run produced no findings and no slush entries, while the audit log says it produced four. The counts should reflect the actual parsed results, e.g. findings 4, promoted 0, slushed 4, or the disposition should not claim a slush action occurred.
+
+
+## Diff under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/packages/core/src/entry/annotations.ts b/packages/core/src/entry/annotations.ts
+index 2e917ec5..b97dbcd1 100644
+--- a/packages/core/src/entry/annotations.ts
++++ b/packages/core/src/entry/annotations.ts
+@@ -35,6 +35,7 @@ import type { JournalEvent } from '../schema/journal-events.ts';
+ import type {
+   CommentAnnotation,
+   DraftAnnotation,
++  SpatialAnchor,
+ } from '../review/types.ts';
+ 
+ /**
+@@ -51,6 +52,27 @@ import type {
+  * casts; no `any`.
+  */
+ type StoredAnnotation = Extract<JournalEvent, { kind: 'entry-annotation' }>['annotation'];
++type StoredComment = Extract<StoredAnnotation, { type: 'comment' }>;
++type StoredSpatialAnchor = NonNullable<StoredComment['spatialAnchor']>;
++
++/**
++ * Defensive copy for {@link SpatialAnchor} — keeps the in-memory
++ * representation independent of the journal-event payload so later
++ * mutations on either side don't leak.
++ *
++ * Accepts the Zod-inferred {@link StoredSpatialAnchor} shape (where
++ * optional fields are `T | undefined`) and emits the canonical TS
++ * {@link SpatialAnchor} shape (where optional fields are `T?` under
++ * `exactOptionalPropertyTypes`). The bridge handles the same shape
++ * mismatch documented above for `toDraftAnnotation`.
++ */
++function cloneSpatialAnchor(input: StoredSpatialAnchor): SpatialAnchor {
++  const out: SpatialAnchor = { kind: input.kind };
++  if (input.selector !== undefined) out.selector = input.selector;
++  if (input.x !== undefined) out.x = input.x;
++  if (input.y !== undefined) out.y = input.y;
++  return out;
++}
+ 
+ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
+   const base = {
+@@ -68,6 +90,14 @@ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
+         text: stored.text,
+         ...(stored.category !== undefined ? { category: stored.category } : {}),
+         ...(stored.anchor !== undefined ? { anchor: stored.anchor } : {}),
++        // Phase 8 Step 8.1.1 — pass new optional fields through.
++        ...(stored.replyTo !== undefined ? { replyTo: stored.replyTo } : {}),
++        ...(stored.attachments !== undefined
++          ? { attachments: [...stored.attachments] }
++          : {}),
++        ...(stored.spatialAnchor !== undefined
++          ? { spatialAnchor: cloneSpatialAnchor(stored.spatialAnchor) }
++          : {}),
+       };
+       return out;
+     }
+@@ -295,6 +325,12 @@ function applyEdits(
+   // text/category edit unchanged.
+   const anchorPrefix = comment.anchorPrefix;
+   const anchorSuffix = comment.anchorSuffix;
++  // Phase 8 Step 8.1.1 — replyTo / attachments / spatialAnchor are
++  // immutable through `edit-comment` (the edit schema doesn't expose
++  // them); preserve unchanged the same way prefix/suffix are.
++  const replyTo = comment.replyTo;
++  const attachments = comment.attachments;
++  const spatialAnchor = comment.spatialAnchor;
+   for (const e of edits) {
+     if (e.type !== 'edit-comment') continue;
+     if (e.text !== undefined) text = e.text;
+@@ -314,6 +350,11 @@ function applyEdits(
+     ...(anchor !== undefined ? { anchor } : {}),
+     ...(anchorPrefix !== undefined ? { anchorPrefix } : {}),
+     ...(anchorSuffix !== undefined ? { anchorSuffix } : {}),
++    ...(replyTo !== undefined ? { replyTo } : {}),
++    ...(attachments !== undefined ? { attachments: [...attachments] } : {}),
++    ...(spatialAnchor !== undefined
++      ? { spatialAnchor: cloneSpatialAnchor(spatialAnchor) }
++      : {}),
+   };
+   return out;
+ }
+diff --git a/packages/core/src/review/types.ts b/packages/core/src/review/types.ts
+index d2a568ec..f4168d0e 100644
+--- a/packages/core/src/review/types.ts
++++ b/packages/core/src/review/types.ts
+@@ -46,6 +46,34 @@ export interface DraftRange {
+   end: number;
+ }
+ 
++/**
++ * Spatial anchor for graphical-entry comments (Phase 8 Step 8.1.1).
++ *
++ * Where a textual comment's `range` + `anchor` locates the comment in
++ * the raw markdown source, a `spatialAnchor` locates the comment on
++ * the entry's primary visual surface — a mockup, an image, an SVG
++ * diagram, anything rendered as the entry's content. The three `kind`s
++ * are mutually exclusive in interpretation:
++ *
++ *   - `pixel` — `x`/`y` are pixel coordinates against the rendered
++ *     visual's intrinsic dimensions. Used for image-style entries
++ *     where DOM selectors are not meaningful.
++ *   - `dom-selector` — `selector` is a CSS selector that identifies
++ *     the anchored element within the rendered HTML mockup.
++ *   - `svg-element` — `selector` is a CSS selector that resolves to
++ *     an SVG element (e.g. `g.layer-2 > rect[id="logo"]`).
++ *
++ * All fields are optional at the schema level so legacy comments
++ * without spatial anchors continue to parse; the renderer enforces
++ * that the right combination is present for each `kind` at use time.
++ */
++export interface SpatialAnchor {
++  kind: 'pixel' | 'dom-selector' | 'svg-element';
++  selector?: string;
++  x?: number;
++  y?: number;
++}
++
+ interface AnnotationBase {
+   /** ISO-8601 timestamp when the annotation was recorded. */
+   createdAt: string;
+@@ -97,6 +125,30 @@ export interface CommentAnnotation extends AnnotationBase {
+    * field. Optional for back-compat.
+    */
+   anchorSuffix?: string;
++  /**
++   * Phase 8 Step 8.1.1 — threading. The id of the root `comment`
++   * annotation this comment replies to. Absent when the comment is
++   * itself a root (top-level) comment. Threading is single-level:
++   * a reply's `replyTo` always points at a root comment, never at
++   * another reply.
++   */
++  replyTo?: string;
++  /**
++   * Phase 8 Step 8.1.1 — screenshot attachments. Relative paths under
++   * `<entryDir>/scrapbook/screenshots/`, each pointing at an
++   * operator-attached screenshot bound to this comment. Stored as
++   * relative paths so the entry tree is portable. Empty / absent
++   * when the comment has no attachments.
++   */
++  attachments?: string[];
++  /**
++   * Phase 8 Step 8.1.1 — spatial anchor for graphical entries. When
++   * present, the comment is anchored on the entry's primary visual
++   * (mockup, image, SVG) per the {@link SpatialAnchor} contract.
++   * Independent of `range` — a comment may carry both (a markdown
++   * range AND a spatial pin) or neither.
++   */
++  spatialAnchor?: SpatialAnchor;
+ }
+ 
+ export interface EditAnnotation extends AnnotationBase {
+diff --git a/packages/core/src/schema/draft-annotation.ts b/packages/core/src/schema/draft-annotation.ts
+index cd1d822a..6169e2e4 100644
+--- a/packages/core/src/schema/draft-annotation.ts
++++ b/packages/core/src/schema/draft-annotation.ts
+@@ -28,6 +28,23 @@ const RangeSchema = z.object({
+   end: z.number().int().nonnegative(),
+ });
+ 
++/**
++ * Phase 8 Step 8.1.1 — spatial anchor for graphical-entry comments.
++ * Mirror of {@link import('../review/types.ts').SpatialAnchor}.
++ *
++ * Three `kind`s — `pixel`, `dom-selector`, `svg-element` — capture
++ * which surface the anchor lives on. All position fields are optional
++ * at the schema level (the renderer enforces the right combination
++ * per `kind`). Adding `kind` values requires updating both this
++ * schema and the TS interface in lockstep.
++ */
++const SpatialAnchorSchema = z.object({
++  kind: z.enum(['pixel', 'dom-selector', 'svg-element']),
++  selector: z.string().optional(),
++  x: z.number().optional(),
++  y: z.number().optional(),
++});
++
+ const BaseFields = {
+   /** ISO-8601 timestamp when the annotation was recorded. */
+   createdAt: z.string().datetime(),
+@@ -48,6 +65,12 @@ const CommentAnnotation = z.object({
+   text: z.string(),
+   category: AnnotationCategoryEnum.optional(),
+   anchor: z.string().optional(),
++  // Phase 8 Step 8.1.1 — additive fields. Existing single-comment
++  // annotations without any of these continue to parse unchanged.
++  // The TS source-of-truth lives at `review/types.ts:CommentAnnotation`.
++  replyTo: z.string().optional(),
++  attachments: z.array(z.string()).optional(),
++  spatialAnchor: SpatialAnchorSchema.optional(),
+ });
+ 
+ const EditAnnotation = z.object({
+diff --git a/packages/core/test/schema/draft-annotation-thread-anchor.test.ts b/packages/core/test/schema/draft-annotation-thread-anchor.test.ts
+new file mode 100644
+index 00000000..433bd5ff
+--- /dev/null
++++ b/packages/core/test/schema/draft-annotation-thread-anchor.test.ts
+@@ -0,0 +1,259 @@
++/**
++ * Phase 8 Step 8.1.1 — CommentAnnotation schema delta.
++ *
++ * Three additive optional fields land on `CommentAnnotation`:
++ *
++ *   - `replyTo?: string` — root comment id for reply comments.
++ *   - `attachments?: string[]` — relative paths under
++ *     `<entryDir>/scrapbook/screenshots/`.
++ *   - `spatialAnchor?: { kind: 'pixel' | 'dom-selector' | 'svg-element';
++ *      selector?: string; x?: number; y?: number }` — spatial pin for
++ *     graphical entries.
++ *
++ * These tests assert the additive shape — existing single-comment
++ * annotations without the new fields continue to parse, each new field
++ * round-trips through `safeParse`, each `spatialAnchor.kind` is
++ * recognized, unknown kinds are rejected, and other annotation types
++ * (edit / approve / reject / resolve / address / edit-comment /
++ * delete-comment / archive-comment) are unaffected by the schema
++ * extension.
++ */
++
++import { describe, it, expect } from 'vitest';
++import { DraftAnnotationSchema } from '@/schema/draft-annotation';
++
++const COMMENT_BASE = {
++  type: 'comment' as const,
++  id: 'cmt_abc123',
++  workflowId: 'wf_1',
++  createdAt: '2026-05-31T10:00:00.000Z',
++  version: 1,
++  range: { start: 0, end: 4 },
++  text: 'sample comment',
++};
++
++describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () => {
++  it('parses a legacy comment with none of the new fields', () => {
++    const parsed = DraftAnnotationSchema.safeParse(COMMENT_BASE);
++    expect(parsed.success).toBe(true);
++    if (!parsed.success) return;
++    expect(parsed.data.type).toBe('comment');
++    if (parsed.data.type !== 'comment') return;
++    expect(parsed.data.replyTo).toBeUndefined();
++    expect(parsed.data.attachments).toBeUndefined();
++    expect(parsed.data.spatialAnchor).toBeUndefined();
++  });
++
++  it('parses and preserves replyTo', () => {
++    const input = { ...COMMENT_BASE, replyTo: 'cmt_root_xyz' };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(true);
++    if (!parsed.success) return;
++    if (parsed.data.type !== 'comment') return;
++    expect(parsed.data.replyTo).toBe('cmt_root_xyz');
++  });
++
++  it('parses and preserves attachments (array of relative paths)', () => {
++    const input = {
++      ...COMMENT_BASE,
++      attachments: [
++        'scrapbook/screenshots/comment-abc-12345.png',
++        'scrapbook/screenshots/comment-abc-12346.png',
++      ],
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(true);
++    if (!parsed.success) return;
++    if (parsed.data.type !== 'comment') return;
++    expect(parsed.data.attachments).toEqual([
++      'scrapbook/screenshots/comment-abc-12345.png',
++      'scrapbook/screenshots/comment-abc-12346.png',
++    ]);
++  });
++
++  it('parses and preserves spatialAnchor of kind "pixel"', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: { kind: 'pixel' as const, x: 100, y: 200 },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(true);
++    if (!parsed.success) return;
++    if (parsed.data.type !== 'comment') return;
++    expect(parsed.data.spatialAnchor).toEqual({ kind: 'pixel', x: 100, y: 200 });
++  });
++
++  it('parses and preserves spatialAnchor of kind "dom-selector"', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: {
++        kind: 'dom-selector' as const,
++        selector: '#header > h1',
++      },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(true);
++    if (!parsed.success) return;
++    if (parsed.data.type !== 'comment') return;
++    expect(parsed.data.spatialAnchor).toEqual({
++      kind: 'dom-selector',
++      selector: '#header > h1',
++    });
++  });
++
++  it('parses and preserves spatialAnchor of kind "svg-element"', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: {
++        kind: 'svg-element' as const,
++        selector: 'g.layer-2 > rect[id="logo"]',
++      },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(true);
++    if (!parsed.success) return;
++    if (parsed.data.type !== 'comment') return;
++    expect(parsed.data.spatialAnchor).toEqual({
++      kind: 'svg-element',
++      selector: 'g.layer-2 > rect[id="logo"]',
++    });
++  });
++
++  it('rejects spatialAnchor with an unknown kind', () => {
++    const input = {
++      ...COMMENT_BASE,
++      spatialAnchor: { kind: 'invalid', x: 1, y: 1 },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(false);
++  });
++
++  it('parses a comment with all three new fields set together', () => {
++    const input = {
++      ...COMMENT_BASE,
++      replyTo: 'cmt_root_xyz',
++      attachments: ['scrapbook/screenshots/comment-abc-12345.png'],
++      spatialAnchor: { kind: 'pixel' as const, x: 42, y: 84 },
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(true);
++    if (!parsed.success) return;
++    if (parsed.data.type !== 'comment') return;
++    expect(parsed.data.replyTo).toBe('cmt_root_xyz');
++    expect(parsed.data.attachments).toEqual([
++      'scrapbook/screenshots/comment-abc-12345.png',
++    ]);
++    expect(parsed.data.spatialAnchor).toEqual({ kind: 'pixel', x: 42, y: 84 });
++  });
++
++  it('rejects replyTo when supplied with a non-string value', () => {
++    const input = { ...COMMENT_BASE, replyTo: 42 };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(false);
++  });
++
++  it('rejects attachments when supplied with non-array value', () => {
++    const input = {
++      ...COMMENT_BASE,
++      attachments: 'scrapbook/screenshots/comment-abc-12345.png',
++    };
++    const parsed = DraftAnnotationSchema.safeParse(input);
++    expect(parsed.success).toBe(false);
++  });
++});
++
++describe('Other annotation types — unaffected by Phase 8 Step 8.1.1', () => {
++  const BASE = {
++    id: 'a_1',
++    workflowId: 'wf_1',
++    createdAt: '2026-05-31T10:00:00.000Z',
++  };
++
++  it('still parses an edit annotation', () => {
++    const parsed = DraftAnnotationSchema.safeParse({
++      ...BASE,
++      type: 'edit',
++      beforeVersion: 1,
++      afterMarkdown: 'new body',
++      diff: '--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n',
++    });
++    expect(parsed.success).toBe(true);
++  });
++
++  it('still parses an approve annotation', () => {
++    const parsed = DraftAnnotationSchema.safeParse({
++      ...BASE,
++      type: 'approve',
++      version: 2,
++    });
++    expect(parsed.success).toBe(true);
++  });
++
++  it('still parses a reject annotation (with and without reason)', () => {
++    expect(
++      DraftAnnotationSchema.safeParse({
++        ...BASE,
++        type: 'reject',
++        version: 2,
++      }).success,
++    ).toBe(true);
++    expect(
++      DraftAnnotationSchema.safeParse({
++        ...BASE,
++        type: 'reject',
++        version: 2,
++        reason: 'needs more receipts',
++      }).success,
++    ).toBe(true);
++  });
++
++  it('still parses a resolve annotation', () => {
++    const parsed = DraftAnnotationSchema.safeParse({
++      ...BASE,
++      type: 'resolve',
++      commentId: 'cmt_abc123',
++      resolved: true,
++    });
++    expect(parsed.success).toBe(true);
++  });
++
++  it('still parses an address annotation', () => {
++    const parsed = DraftAnnotationSchema.safeParse({
++      ...BASE,
++      type: 'address',
++      commentId: 'cmt_abc123',
++      version: 3,
++      disposition: 'addressed',
++    });
++    expect(parsed.success).toBe(true);
++  });
++
++  it('still parses an edit-comment annotation', () => {
++    const parsed = DraftAnnotationSchema.safeParse({
++      ...BASE,
++      type: 'edit-comment',
++      commentId: 'cmt_abc123',
++      text: 'edited text',
++    });
++    expect(parsed.success).toBe(true);
++  });
++
++  it('still parses a delete-comment annotation', () => {
++    const parsed = DraftAnnotationSchema.safeParse({
++      ...BASE,
++      type: 'delete-comment',
++      commentId: 'cmt_abc123',
++    });
++    expect(parsed.success).toBe(true);
++  });
++
++  it('still parses an archive-comment annotation', () => {
++    const parsed = DraftAnnotationSchema.safeParse({
++      ...BASE,
++      type: 'archive-comment',
++      commentId: 'cmt_abc123',
++      priorStage: 'Drafting',
++    });
++    expect(parsed.success).toBe(true);
++  });
++});
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...). Use `blocking` only for issues that would break the feature's stated goals in obvious ways; `high` for correctness bugs adopters will hit; `medium` for design issues that compound over time; `low` for hygiene; `informational` for context you think the operator should see but isn't itself a bug.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
+
+codex
+I’ll verify the schema/type flow in the repository before writing findings, because the diff adds fields in one schema and the risk is usually at the journal-event boundary.
+exec
+/bin/zsh -lc "sed -n '1,220p' packages/core/src/schema/journal-events.ts" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+import { z } from 'zod';
+import { EntrySchema } from './entry.ts';
+import { AnnotationSchema } from './annotation.ts';
+import { DraftAnnotationSchema } from './draft-annotation.ts';
+
+/**
+ * Per Phase 3 (graphical-entries) Task 3.2.2: stage values on journal
+ * events are now any non-empty string, validated at runtime against
+ * the entry's lane template rather than against a global enum. The
+ * legacy `StageEnum` 8-value list is retired from the schema; readers
+ * that still want to narrow to the editorial-default vocabulary can
+ * do so explicitly via `schema/entry.ts#StageEnum`.
+ *
+ * Per AUDIT-20260530-11: `.trim().min(1)` rejects whitespace-only
+ * stage values. Mirrors the sibling schema in `./entry.ts`; both
+ * schemas agree that "stage value" excludes raw-whitespace inputs.
+ */
+const StageStringSchema = z
+  .string()
+  .trim()
+  .min(1, 'stage must be a non-empty string');
+const ReviewStateEnum = z.enum(['in-review', 'iterating', 'approved']);
+
+const EntryCreatedEvent = z.object({
+  kind: z.literal('entry-created'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  entry: EntrySchema,
+});
+
+const EntryIngestedEvent = z.object({
+  kind: z.literal('entry-ingested'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  sourcePath: z.string(),
+  targetStage: StageStringSchema,
+});
+
+const IterationEvent = z.object({
+  kind: z.literal('iteration'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  stage: StageStringSchema,
+  version: z.number().int().positive(),
+  markdown: z.string(),
+});
+
+const AnnotationEvent = z.object({
+  kind: z.literal('annotation'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  stage: StageStringSchema,
+  version: z.number().int().positive(),
+  annotation: AnnotationSchema,
+});
+
+// LEGACY READ-ONLY. Per `DESKWORK-STATE-MACHINE.md` Commandment III,
+// review-state is retired — new code MUST NOT emit `review-state-change`
+// events. This variant remains in the discriminated union solely so
+// historical journals parse cleanly for read paths (calendar render,
+// audit-log import, etc.). Any new code path that appends a journal
+// event of this kind should be rejected in code review.
+const ReviewStateChangeEvent = z.object({
+  kind: z.literal('review-state-change'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  stage: StageStringSchema,
+  from: ReviewStateEnum.nullable(),
+  to: ReviewStateEnum.nullable(),
+});
+
+/**
+ * `metadata.cascadeFrom` (Step 7.2.8, graphical-entries, GitHub #359):
+ * when a `stage-transition` event is emitted for a cascaded member of
+ * a group cancel `--cascade` walk, `metadata.cascadeFrom` carries the
+ * UUID of the originating (top-level) group whose cascade invocation
+ * propagated to this entry. The originator's OWN event does NOT carry
+ * `cascadeFrom` — only the cascaded members' events do. The field is
+ * the top-level originator's UUID even on transitively-cascaded entries
+ * (recursive groups), so audit consumers can answer "which cascade
+ * invocation caused this cancel?" with a single field read.
+ *
+ * `metadata` is `.passthrough()` so future enhancement to the metadata
+ * bag doesn't require a schema-level enumeration churn; consumers MAY
+ * record additional keys without invalidating existing events.
+ */
+const StageTransitionEvent = z.object({
+  kind: z.literal('stage-transition'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  from: StageStringSchema,
+  to: StageStringSchema,
+  reason: z.string().optional(),
+  metadata: z
+    .object({
+      cascadeFrom: z.string().uuid().optional(),
+    })
+    .passthrough()
+    .optional(),
+});
+
+/**
+ * Phase 34a: entry-keyed annotation event. Distinct from `AnnotationEvent`
+ * (which uses the lighter `AnnotationSchema` and is keyed on
+ * `(entryId, stage, version)`), this event carries the full
+ * `DraftAnnotation` shape used by the longform review surface, keyed
+ * on `entryId` only. The two stores intentionally do not interoperate
+ * — see `entry/annotations.ts` and the api.ts header for the split
+ * contract.
+ */
+const EntryAnnotationEvent = z.object({
+  kind: z.literal('entry-annotation'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  annotation: DraftAnnotationSchema,
+});
+
+/**
+ * Phase 3 (graphical-entries): records lane-aware migration steps that
+ * happen at project bootstrap. Today the only emitter is the default-
+ * lane bootstrap helper (legacy `sites.<defaultSite>.contentDir` → new
+ * `.deskwork/lanes/default.json` bound to `editorial`); future
+ * migrations (entry-sidecar lane back-fill, content-tree rehoming,
+ * etc.) will land additional events under this kind.
+ *
+ * The event is project-scoped (no `entryId`); `source` and `target`
+ * identify the migration's logical inputs and outputs, and `details`
+ * carries free-form key/value context (e.g. the legacy site id, the
+ * resolved contentDir).
+ */
+const LaneMigrationEvent = z.object({
+  kind: z.literal('lane-migration'),
+  at: z.string().datetime(),
+  migration: z.string().min(1),
+  source: z.string().min(1),
+  target: z.string().min(1),
+  // `details` is an intentionally free-form context bag. Lane bootstrap
+  // carries strings (siteId, contentDir, templateId); future migration
+  // kinds may need numbers (entry counts), booleans (dry-run flags),
+  // or nested arrays (per-entry results). `z.unknown()` so the schema
+  // doesn't churn each time a migration variant lands; readers walk the
+  // shape they need.
+  details: z.record(z.string(), z.unknown()).optional(),
+});
+
+/**
+ * Phase 6 Task 6.1 (graphical-entries): lane-lifecycle events emitted
+ * by the `/deskwork:lane` verb family. Each event is project-scoped
+ * (no `entryId`); `laneId` identifies the lane the operation acted on
+ * and `details` carries kind-specific context (the source / target
+ * fields on `lane-update` / `lane-move`, the stage chosen on
+ * `lane-move`, etc.).
+ *
+ * The six kinds mirror the six mutating verbs:
+ *
+ *   - `lane-create`  — a new lane config was written.
+ *   - `lane-update`  — an existing lane's `name`, `pipelineTemplate`,
+ *                      or `contentDir` was updated.
+ *   - `lane-archive` — a lane was soft-archived (its `archivedAt`
+ *                      field was set; the JSON stays on disk).
+ *   - `lane-restore` — a lane's `archivedAt` field was cleared.
+ *   - `lane-purge`   — a lane's JSON was deleted from disk. Refused
+ *                      when any entry still references the lane.
+ *   - `lane-move`    — an entry was moved from one lane to another;
+ *                      the entry's `lane` and `currentStage` were
+ *                      updated and the artifact file (plus
+ *                      scrapbook) was relocated under the new lane's
+ *                      `contentDir`.
+ *
+ * `lane-move` additionally carries `entryId` (UUID) because the move
+ * is also an entry-state mutation; the dashboard / studio surfaces
+ * may key on it. The other five kinds are project-level and do not
+ * carry an entry id.
+ */
+const LaneCreateEvent = z.object({
+  kind: z.literal('lane-create'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+  details: z.object({
+    name: z.string().min(1),
+    pipelineTemplate: z.string().min(1),
+    contentDir: z.string().min(1),
+  }),
+});
+
+const LaneUpdateEvent = z.object({
+  kind: z.literal('lane-update'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+  details: z.object({
+    changedFields: z.array(z.string().min(1)).min(1),
+    before: z.record(z.string(), z.unknown()),
+    after: z.record(z.string(), z.unknown()),
+  }),
+});
+
+const LaneArchiveEvent = z.object({
+  kind: z.literal('lane-archive'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+});
+
+const LaneRestoreEvent = z.object({
+  kind: z.literal('lane-restore'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+});
+
+const LanePurgeEvent = z.object({
+  kind: z.literal('lane-purge'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+  details: z.object({
+    purgedPath: z.string().min(1),
+  }),
+});
+
+const LaneMoveEvent = z.object({
+  kind: z.literal('lane-move'),
+  at: z.string().datetime(),
+
+exec
+/bin/zsh -lc "sed -n '1,390p' packages/core/src/entry/annotations.ts" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+/**
+ * Entry-keyed annotation store (Phase 34a — T2).
+ *
+ * The longform editorial review surface keys annotations by entry UUID,
+ * not by workflow id. This module is the entry-side equivalent of
+ * `review/pipeline.ts`'s `appendAnnotation` / `readAnnotations` /
+ * `mintAnnotation`.
+ *
+ * Storage model: annotations live as `entry-annotation` events in the
+ * existing journal (`.deskwork/review-journal/history/`), not as a
+ * separate sidecar tree. The journal already keys events by `entryId`
+ * and orders by ISO timestamp; reads filter to
+ * `kind === 'entry-annotation'` and project the `annotation` payload.
+ *
+ * The two annotation stores (workflow-keyed in `review/pipeline.ts`,
+ * entry-keyed here) intentionally do not interoperate — workflow
+ * annotations are NOT visible from the entry-keyed listing, and vice
+ * versa. See the `routes/api.ts` header for the split contract.
+ *
+ * Phase 35 (issue #199) — append-only edit + delete journal:
+ *   - `edit-comment` annotations replace a prior comment's text /
+ *     range / category / anchor in the FOLDED view.
+ *   - `delete-comment` annotations tombstone a prior comment in the
+ *     FOLDED view.
+ *
+ * `listEntryAnnotations` returns the FOLDED view by default. The raw
+ * unfolded stream (for audit views) is accessible via
+ * `listEntryAnnotationsRaw`.
+ */
+
+import { randomUUID } from 'node:crypto';
+import { appendJournalEvent } from '../journal/append.ts';
+import { readJournalEvents } from '../journal/read.ts';
+import type { JournalEvent } from '../schema/journal-events.ts';
+import type {
+  CommentAnnotation,
+  DraftAnnotation,
+  SpatialAnchor,
+} from '../review/types.ts';
+
+/**
+ * The Zod schema (`DraftAnnotationSchema`) infers each optional field
+ * as `T | undefined`, while `DraftAnnotation` (the canonical TS source
+ * of truth) declares them as `field?: T` under `exactOptionalPropertyTypes`.
+ * The two are runtime-equivalent but TS-incompatible: assigning the
+ * Zod-inferred type to `DraftAnnotation` requires either a type assertion
+ * or per-variant reconstruction.
+ *
+ * `toDraftAnnotation` picks fields explicitly and only includes optional
+ * ones when defined — same pattern as `entry/block.ts`'s
+ * `...(opts.reason !== undefined && { reason: opts.reason })`. No `as`
+ * casts; no `any`.
+ */
+type StoredAnnotation = Extract<JournalEvent, { kind: 'entry-annotation' }>['annotation'];
+type StoredComment = Extract<StoredAnnotation, { type: 'comment' }>;
+type StoredSpatialAnchor = NonNullable<StoredComment['spatialAnchor']>;
+
+/**
+ * Defensive copy for {@link SpatialAnchor} — keeps the in-memory
+ * representation independent of the journal-event payload so later
+ * mutations on either side don't leak.
+ *
+ * Accepts the Zod-inferred {@link StoredSpatialAnchor} shape (where
+ * optional fields are `T | undefined`) and emits the canonical TS
+ * {@link SpatialAnchor} shape (where optional fields are `T?` under
+ * `exactOptionalPropertyTypes`). The bridge handles the same shape
+ * mismatch documented above for `toDraftAnnotation`.
+ */
+function cloneSpatialAnchor(input: StoredSpatialAnchor): SpatialAnchor {
+  const out: SpatialAnchor = { kind: input.kind };
+  if (input.selector !== undefined) out.selector = input.selector;
+  if (input.x !== undefined) out.x = input.x;
+  if (input.y !== undefined) out.y = input.y;
+  return out;
+}
+
+function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
+  const base = {
+    id: stored.id,
+    workflowId: stored.workflowId,
+    createdAt: stored.createdAt,
+  };
+  switch (stored.type) {
+    case 'comment': {
+      const out: DraftAnnotation = {
+        ...base,
+        type: 'comment',
+        version: stored.version,
+        range: { start: stored.range.start, end: stored.range.end },
+        text: stored.text,
+        ...(stored.category !== undefined ? { category: stored.category } : {}),
+        ...(stored.anchor !== undefined ? { anchor: stored.anchor } : {}),
+        // Phase 8 Step 8.1.1 — pass new optional fields through.
+        ...(stored.replyTo !== undefined ? { replyTo: stored.replyTo } : {}),
+        ...(stored.attachments !== undefined
+          ? { attachments: [...stored.attachments] }
+          : {}),
+        ...(stored.spatialAnchor !== undefined
+          ? { spatialAnchor: cloneSpatialAnchor(stored.spatialAnchor) }
+          : {}),
+      };
+      return out;
+    }
+    case 'edit':
+      return {
+        ...base,
+        type: 'edit',
+        beforeVersion: stored.beforeVersion,
+        afterMarkdown: stored.afterMarkdown,
+        diff: stored.diff,
+      };
+    case 'approve':
+      return {
+        ...base,
+        type: 'approve',
+        version: stored.version,
+      };
+    case 'reject':
+      return {
+        ...base,
+        type: 'reject',
+        version: stored.version,
+        ...(stored.reason !== undefined ? { reason: stored.reason } : {}),
+      };
+    case 'resolve':
+      return {
+        ...base,
+        type: 'resolve',
+        commentId: stored.commentId,
+        resolved: stored.resolved,
+      };
+    case 'address':
+      return {
+        ...base,
+        type: 'address',
+        commentId: stored.commentId,
+        version: stored.version,
+        disposition: stored.disposition,
+        ...(stored.reason !== undefined ? { reason: stored.reason } : {}),
+      };
+    case 'edit-comment':
+      return {
+        ...base,
+        type: 'edit-comment',
+        commentId: stored.commentId,
+        ...(stored.text !== undefined ? { text: stored.text } : {}),
+        ...(stored.range !== undefined
+          ? { range: { start: stored.range.start, end: stored.range.end } }
+          : {}),
+        ...(stored.category !== undefined ? { category: stored.category } : {}),
+        ...(stored.anchor !== undefined ? { anchor: stored.anchor } : {}),
+      };
+    case 'delete-comment':
+      return {
+        ...base,
+        type: 'delete-comment',
+        commentId: stored.commentId,
+      };
+    case 'archive-comment':
+      return {
+        ...base,
+        type: 'archive-comment',
+        commentId: stored.commentId,
+        ...(stored.priorStage !== undefined ? { priorStage: stored.priorStage } : {}),
+      };
+  }
+}
+
+/**
+ * Append an entry-keyed annotation. The annotation should already have
+ * its `id` and `createdAt` minted (use `mintEntryAnnotation`).
+ *
+ * Phase 35: validates that `edit-comment` and `delete-comment`
+ * annotations reference an existing `comment` annotation in the same
+ * entry's stream. Throws when the referent is missing — preferable to
+ * silently persisting an orphan that the folder will skip over.
+ */
+export async function addEntryAnnotation(
+  projectRoot: string,
+  entryId: string,
+  annotation: DraftAnnotation,
+): Promise<void> {
+  if (
+    annotation.type === 'edit-comment' ||
+    annotation.type === 'delete-comment' ||
+    annotation.type === 'archive-comment'
+  ) {
+    const raw = await listEntryAnnotationsRaw(projectRoot, entryId);
+    const referent = raw.find(
+      (a): a is CommentAnnotation =>
+        a.type === 'comment' && a.id === annotation.commentId,
+    );
+    if (!referent) {
+      throw new Error(
+        `addEntryAnnotation refused: ${annotation.type} references unknown commentId ${annotation.commentId}`,
+      );
+    }
+  }
+  await appendJournalEvent(projectRoot, {
+    kind: 'entry-annotation',
+    at: annotation.createdAt,
+    entryId,
+    annotation,
+  });
+}
+
+/**
+ * List the FOLDED active-comment view of every entry-keyed annotation
+ * for `entryId`, in chronological order:
+ *
+ *   - For each `comment`, apply every later `edit-comment` whose
+ *     `commentId` matches (in journal order). Missing fields preserve
+ *     the prior value.
+ *   - Drop any `comment` for which a `delete-comment` annotation
+ *     exists.
+ *
+ * Non-comment annotations (resolve / address / approve / reject / edit
+ * / orphaned edit-comment / delete-comment) pass through unchanged so
+ * the renderer can still see them. (Edit-comment / delete-comment that
+ * fail validation at write time can never reach this code — only ones
+ * whose target later disappeared via journal damage would surface.)
+ *
+ * Returns an empty array when there are none — never throws, never
+ * returns null.
+ */
+export async function listEntryAnnotations(
+  projectRoot: string,
+  entryId: string,
+): Promise<DraftAnnotation[]> {
+  const raw = await listEntryAnnotationsRaw(projectRoot, entryId);
+  return foldAnnotations(raw);
+}
+
+/**
+ * List the RAW (unfolded) entry-keyed annotation stream — every
+ * `comment` / `edit-comment` / `delete-comment` / etc. as recorded on
+ * disk, in chronological order. Useful for audit views.
+ */
+export async function listEntryAnnotationsRaw(
+  projectRoot: string,
+  entryId: string,
+): Promise<DraftAnnotation[]> {
+  const events = await readJournalEvents(projectRoot, { entryId });
+  const out: DraftAnnotation[] = [];
+  for (const event of events) {
+    if (event.kind === 'entry-annotation') {
+      out.push(toDraftAnnotation(event.annotation));
+    }
+  }
+  return out;
+}
+
+/**
+ * Pure fold over the raw annotation stream. Single pass to gather
+ * edit + delete journals indexed by `commentId`, then one walk to emit
+ * either the (possibly-edited) comment or skip it (if deleted) — and
+ * pass non-comment annotations through unchanged.
+ *
+ * Chronological order is taken from the input array's order (callers
+ * must pass the journal-sorted stream from `readJournalEvents`).
+ */
+function foldAnnotations(raw: DraftAnnotation[]): DraftAnnotation[] {
+  const editsByCommentId = new Map<string, DraftAnnotation[]>();
+  const deletedCommentIds = new Set<string>();
+  const archivedCommentIds = new Set<string>();
+  for (const a of raw) {
+    if (a.type === 'edit-comment') {
+      const arr = editsByCommentId.get(a.commentId) ?? [];
+      arr.push(a);
+      editsByCommentId.set(a.commentId, arr);
+    } else if (a.type === 'delete-comment') {
+      deletedCommentIds.add(a.commentId);
+    } else if (a.type === 'archive-comment') {
+      archivedCommentIds.add(a.commentId);
+    }
+  }
+
+  const out: DraftAnnotation[] = [];
+  for (const a of raw) {
+    if (
+      a.type === 'edit-comment' ||
+      a.type === 'delete-comment' ||
+      a.type === 'archive-comment'
+    ) {
+      // Fold-only events; not surfaced in the active view.
+      continue;
+    }
+    if (a.type === 'comment') {
+      if (deletedCommentIds.has(a.id)) continue;
+      if (archivedCommentIds.has(a.id)) continue;
+      const edits = editsByCommentId.get(a.id);
+      if (!edits || edits.length === 0) {
+        out.push(a);
+        continue;
+      }
+      out.push(applyEdits(a, edits));
+      continue;
+    }
+    // Drop resolve/address annotations whose target comment was archived
+    // — without this, the marginalia column would render an "address"
+    // badge or a "resolve" status against a comment that no longer
+    // appears in the active sidebar.
+    if (
+      (a.type === 'resolve' || a.type === 'address') &&
+      archivedCommentIds.has(a.commentId)
+    ) {
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
+
+function applyEdits(
+  comment: CommentAnnotation,
+  edits: DraftAnnotation[],
+): CommentAnnotation {
+  let text = comment.text;
+  let range = comment.range;
+  let category = comment.category;
+  let anchor = comment.anchor;
+  // #200 — preserve prefix/suffix through edits. Edits don't currently
+  // mutate them (the operator can edit text/category/range/anchor via
+  // the existing edit-comment fields), but they must survive a
+  // text/category edit unchanged.
+  const anchorPrefix = comment.anchorPrefix;
+  const anchorSuffix = comment.anchorSuffix;
+  // Phase 8 Step 8.1.1 — replyTo / attachments / spatialAnchor are
+  // immutable through `edit-comment` (the edit schema doesn't expose
+  // them); preserve unchanged the same way prefix/suffix are.
+  const replyTo = comment.replyTo;
+  const attachments = comment.attachments;
+  const spatialAnchor = comment.spatialAnchor;
+  for (const e of edits) {
+    if (e.type !== 'edit-comment') continue;
+    if (e.text !== undefined) text = e.text;
+    if (e.range !== undefined) range = { start: e.range.start, end: e.range.end };
+    if (e.category !== undefined) category = e.category;
+    if (e.anchor !== undefined) anchor = e.anchor;
+  }
+  const out: CommentAnnotation = {
+    id: comment.id,
+    workflowId: comment.workflowId,
+    createdAt: comment.createdAt,
+    type: 'comment',
+    version: comment.version,
+    range,
+    text,
+    ...(category !== undefined ? { category } : {}),
+    ...(anchor !== undefined ? { anchor } : {}),
+    ...(anchorPrefix !== undefined ? { anchorPrefix } : {}),
+    ...(anchorSuffix !== undefined ? { anchorSuffix } : {}),
+    ...(replyTo !== undefined ? { replyTo } : {}),
+    ...(attachments !== undefined ? { attachments: [...attachments] } : {}),
+    ...(spatialAnchor !== undefined
+      ? { spatialAnchor: cloneSpatialAnchor(spatialAnchor) }
+      : {}),
+  };
+  return out;
+}
+
+/**
+ * Mint a server-assigned `id` and `createdAt` onto a draft annotation.
+ *
+ * Generic-and-intersected like `mintAnnotation` in `review/pipeline.ts`
+ * so the caller's discriminated `type` narrowing survives.
+ */
+export function mintEntryAnnotation<
+  T extends Omit<DraftAnnotation, 'id' | 'createdAt'>,
+>(partial: T): T & { id: string; createdAt: string } {
+  return {
+    ...partial,
+    id: randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+exec
+/bin/zsh -lc 'rg -n "entry-annotation|DraftAnnotationSchema|CommentAnnotation|attachments|spatialAnchor|replyTo" packages/core/src packages/core/test' in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+packages/core/test/entry-annotations.test.ts:40:    projectRoot = await mkdtemp(join(tmpdir(), 'dw-entry-annotations-'));
+packages/core/test/entry-annotations.test.ts:109:    projectRoot = await mkdtemp(join(tmpdir(), 'dw-entry-annotations-'));
+packages/core/test/entry-annotations.test.ts:177:    projectRoot = await mkdtemp(join(tmpdir(), 'dw-entry-annotations-fold-'));
+packages/core/test/entry-annotations.test.ts:400:    projectRoot = await mkdtemp(join(tmpdir(), 'dw-entry-annotations-archive-'));
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:2: * Phase 8 Step 8.1.1 — CommentAnnotation schema delta.
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:4: * Three additive optional fields land on `CommentAnnotation`:
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:6: *   - `replyTo?: string` — root comment id for reply comments.
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:7: *   - `attachments?: string[]` — relative paths under
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:9: *   - `spatialAnchor?: { kind: 'pixel' | 'dom-selector' | 'svg-element';
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:15: * round-trips through `safeParse`, each `spatialAnchor.kind` is
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:23:import { DraftAnnotationSchema } from '@/schema/draft-annotation';
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:35:describe('CommentAnnotation schema — Phase 8 Step 8.1.1 additive fields', () => {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:37:    const parsed = DraftAnnotationSchema.safeParse(COMMENT_BASE);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:42:    expect(parsed.data.replyTo).toBeUndefined();
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:43:    expect(parsed.data.attachments).toBeUndefined();
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:44:    expect(parsed.data.spatialAnchor).toBeUndefined();
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:47:  it('parses and preserves replyTo', () => {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:48:    const input = { ...COMMENT_BASE, replyTo: 'cmt_root_xyz' };
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:49:    const parsed = DraftAnnotationSchema.safeParse(input);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:53:    expect(parsed.data.replyTo).toBe('cmt_root_xyz');
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:56:  it('parses and preserves attachments (array of relative paths)', () => {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:59:      attachments: [
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:64:    const parsed = DraftAnnotationSchema.safeParse(input);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:68:    expect(parsed.data.attachments).toEqual([
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:74:  it('parses and preserves spatialAnchor of kind "pixel"', () => {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:77:      spatialAnchor: { kind: 'pixel' as const, x: 100, y: 200 },
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:79:    const parsed = DraftAnnotationSchema.safeParse(input);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:83:    expect(parsed.data.spatialAnchor).toEqual({ kind: 'pixel', x: 100, y: 200 });
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:86:  it('parses and preserves spatialAnchor of kind "dom-selector"', () => {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:89:      spatialAnchor: {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:94:    const parsed = DraftAnnotationSchema.safeParse(input);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:98:    expect(parsed.data.spatialAnchor).toEqual({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:104:  it('parses and preserves spatialAnchor of kind "svg-element"', () => {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:107:      spatialAnchor: {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:112:    const parsed = DraftAnnotationSchema.safeParse(input);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:116:    expect(parsed.data.spatialAnchor).toEqual({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:122:  it('rejects spatialAnchor with an unknown kind', () => {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:125:      spatialAnchor: { kind: 'invalid', x: 1, y: 1 },
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:127:    const parsed = DraftAnnotationSchema.safeParse(input);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:134:      replyTo: 'cmt_root_xyz',
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:135:      attachments: ['scrapbook/screenshots/comment-abc-12345.png'],
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:136:      spatialAnchor: { kind: 'pixel' as const, x: 42, y: 84 },
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:138:    const parsed = DraftAnnotationSchema.safeParse(input);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:142:    expect(parsed.data.replyTo).toBe('cmt_root_xyz');
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:143:    expect(parsed.data.attachments).toEqual([
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:146:    expect(parsed.data.spatialAnchor).toEqual({ kind: 'pixel', x: 42, y: 84 });
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:149:  it('rejects replyTo when supplied with a non-string value', () => {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:150:    const input = { ...COMMENT_BASE, replyTo: 42 };
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:151:    const parsed = DraftAnnotationSchema.safeParse(input);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:155:  it('rejects attachments when supplied with non-array value', () => {
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:158:      attachments: 'scrapbook/screenshots/comment-abc-12345.png',
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:160:    const parsed = DraftAnnotationSchema.safeParse(input);
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:173:    const parsed = DraftAnnotationSchema.safeParse({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:184:    const parsed = DraftAnnotationSchema.safeParse({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:194:      DraftAnnotationSchema.safeParse({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:201:      DraftAnnotationSchema.safeParse({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:211:    const parsed = DraftAnnotationSchema.safeParse({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:221:    const parsed = DraftAnnotationSchema.safeParse({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:232:    const parsed = DraftAnnotationSchema.safeParse({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:242:    const parsed = DraftAnnotationSchema.safeParse({
+packages/core/test/schema/draft-annotation-thread-anchor.test.ts:251:    const parsed = DraftAnnotationSchema.safeParse({
+packages/core/src/entry/annotations.ts:9: * Storage model: annotations live as `entry-annotation` events in the
+packages/core/src/entry/annotations.ts:13: * `kind === 'entry-annotation'` and project the `annotation` payload.
+packages/core/src/entry/annotations.ts:36:  CommentAnnotation,
+packages/core/src/entry/annotations.ts:42: * The Zod schema (`DraftAnnotationSchema`) infers each optional field
+packages/core/src/entry/annotations.ts:54:type StoredAnnotation = Extract<JournalEvent, { kind: 'entry-annotation' }>['annotation'];
+packages/core/src/entry/annotations.ts:56:type StoredSpatialAnchor = NonNullable<StoredComment['spatialAnchor']>;
+packages/core/src/entry/annotations.ts:94:        ...(stored.replyTo !== undefined ? { replyTo: stored.replyTo } : {}),
+packages/core/src/entry/annotations.ts:95:        ...(stored.attachments !== undefined
+packages/core/src/entry/annotations.ts:96:          ? { attachments: [...stored.attachments] }
+packages/core/src/entry/annotations.ts:98:        ...(stored.spatialAnchor !== undefined
+packages/core/src/entry/annotations.ts:99:          ? { spatialAnchor: cloneSpatialAnchor(stored.spatialAnchor) }
+packages/core/src/entry/annotations.ts:190:      (a): a is CommentAnnotation =>
+packages/core/src/entry/annotations.ts:200:    kind: 'entry-annotation',
+packages/core/src/entry/annotations.ts:246:    if (event.kind === 'entry-annotation') {
+packages/core/src/entry/annotations.ts:315:  comment: CommentAnnotation,
+packages/core/src/entry/annotations.ts:317:): CommentAnnotation {
+packages/core/src/entry/annotations.ts:328:  // Phase 8 Step 8.1.1 — replyTo / attachments / spatialAnchor are
+packages/core/src/entry/annotations.ts:331:  const replyTo = comment.replyTo;
+packages/core/src/entry/annotations.ts:332:  const attachments = comment.attachments;
+packages/core/src/entry/annotations.ts:333:  const spatialAnchor = comment.spatialAnchor;
+packages/core/src/entry/annotations.ts:341:  const out: CommentAnnotation = {
+packages/core/src/entry/annotations.ts:353:    ...(replyTo !== undefined ? { replyTo } : {}),
+packages/core/src/entry/annotations.ts:354:    ...(attachments !== undefined ? { attachments: [...attachments] } : {}),
+packages/core/src/entry/annotations.ts:355:    ...(spatialAnchor !== undefined
+packages/core/src/entry/annotations.ts:356:      ? { spatialAnchor: cloneSpatialAnchor(spatialAnchor) }
+packages/core/src/review/types.ts:53: * the raw markdown source, a `spatialAnchor` locates the comment on
+packages/core/src/review/types.ts:86:export interface CommentAnnotation extends AnnotationBase {
+packages/core/src/review/types.ts:132:   * a reply's `replyTo` always points at a root comment, never at
+packages/core/src/review/types.ts:135:  replyTo?: string;
+packages/core/src/review/types.ts:137:   * Phase 8 Step 8.1.1 — screenshot attachments. Relative paths under
+packages/core/src/review/types.ts:141:   * when the comment has no attachments.
+packages/core/src/review/types.ts:143:  attachments?: string[];
+packages/core/src/review/types.ts:151:  spatialAnchor?: SpatialAnchor;
+packages/core/src/review/types.ts:216:export interface EditCommentAnnotation extends AnnotationBase {
+packages/core/src/review/types.ts:236:export interface DeleteCommentAnnotation extends AnnotationBase {
+packages/core/src/review/types.ts:254:export interface ArchiveCommentAnnotation extends AnnotationBase {
+packages/core/src/review/types.ts:263:  | CommentAnnotation
+packages/core/src/review/types.ts:269:  | EditCommentAnnotation
+packages/core/src/review/types.ts:270:  | DeleteCommentAnnotation
+packages/core/src/review/types.ts:271:  | ArchiveCommentAnnotation;
+packages/core/src/schema/journal-events.ts:4:import { DraftAnnotationSchema } from './draft-annotation.ts';
+packages/core/src/schema/journal-events.ts:112:  kind: z.literal('entry-annotation'),
+packages/core/src/schema/journal-events.ts:115:  annotation: DraftAnnotationSchema,
+packages/core/src/schema/draft-annotation.ts:9: * The union variants here mirror `CommentAnnotation | EditAnnotation |
+packages/core/src/schema/draft-annotation.ts:60:const CommentAnnotation = z.object({
+packages/core/src/schema/draft-annotation.ts:70:  // The TS source-of-truth lives at `review/types.ts:CommentAnnotation`.
+packages/core/src/schema/draft-annotation.ts:71:  replyTo: z.string().optional(),
+packages/core/src/schema/draft-annotation.ts:72:  attachments: z.array(z.string()).optional(),
+packages/core/src/schema/draft-annotation.ts:73:  spatialAnchor: SpatialAnchorSchema.optional(),
+packages/core/src/schema/draft-annotation.ts:113:const EditCommentAnnotation = z.object({
+packages/core/src/schema/draft-annotation.ts:123:const DeleteCommentAnnotation = z.object({
+packages/core/src/schema/draft-annotation.ts:129:const ArchiveCommentAnnotation = z.object({
+packages/core/src/schema/draft-annotation.ts:136:export const DraftAnnotationSchema = z.discriminatedUnion('type', [
+packages/core/src/schema/draft-annotation.ts:137:  CommentAnnotation,
+packages/core/src/schema/draft-annotation.ts:143:  EditCommentAnnotation,
+packages/core/src/schema/draft-annotation.ts:144:  DeleteCommentAnnotation,
+packages/core/src/schema/draft-annotation.ts:145:  ArchiveCommentAnnotation,
+
+codex
+The main contract risk I’m seeing is not the happy-path parse: the new fields do parse. The sharper question is whether future save/re-mark workflows have a mutation path and whether the schema enforces the path semantics it documents.
+exec
+/bin/zsh -lc "nl -ba packages/core/src/review/types.ts | sed -n '45,160p'" in /Users/orion/work/deskwork-work/graphical-entries
+exec
+/bin/zsh -lc "nl -ba packages/core/src/schema/draft-annotation.ts | sed -n '20,150p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+    20	  'saas-vocabulary',
+    21	  'fake-authority',
+    22	  'structural',
+    23	  'other',
+    24	]);
+    25	
+    26	const RangeSchema = z.object({
+    27	  start: z.number().int().nonnegative(),
+    28	  end: z.number().int().nonnegative(),
+    29	});
+    30	
+    31	/**
+    32	 * Phase 8 Step 8.1.1 — spatial anchor for graphical-entry comments.
+    33	 * Mirror of {@link import('../review/types.ts').SpatialAnchor}.
+    34	 *
+    35	 * Three `kind`s — `pixel`, `dom-selector`, `svg-element` — capture
+    36	 * which surface the anchor lives on. All position fields are optional
+    37	 * at the schema level (the renderer enforces the right combination
+    38	 * per `kind`). Adding `kind` values requires updating both this
+    39	 * schema and the TS interface in lockstep.
+    40	 */
+    41	const SpatialAnchorSchema = z.object({
+    42	  kind: z.enum(['pixel', 'dom-selector', 'svg-element']),
+    43	  selector: z.string().optional(),
+    44	  x: z.number().optional(),
+    45	  y: z.number().optional(),
+    46	});
+    47	
+    48	const BaseFields = {
+    49	  /** ISO-8601 timestamp when the annotation was recorded. */
+    50	  createdAt: z.string().datetime(),
+    51	  /** Workflow the annotation belongs to (legacy field; entry-keyed
+    52	   * annotations still carry it for type compatibility with the
+    53	   * workflow-keyed `DraftAnnotation` union, but the entry-store does
+    54	   * not key off it). */
+    55	  workflowId: z.string(),
+    56	  /** Server-assigned id. */
+    57	  id: z.string(),
+    58	} as const;
+    59	
+    60	const CommentAnnotation = z.object({
+    61	  ...BaseFields,
+    62	  type: z.literal('comment'),
+    63	  version: z.number().int(),
+    64	  range: RangeSchema,
+    65	  text: z.string(),
+    66	  category: AnnotationCategoryEnum.optional(),
+    67	  anchor: z.string().optional(),
+    68	  // Phase 8 Step 8.1.1 — additive fields. Existing single-comment
+    69	  // annotations without any of these continue to parse unchanged.
+    70	  // The TS source-of-truth lives at `review/types.ts:CommentAnnotation`.
+    71	  replyTo: z.string().optional(),
+    72	  attachments: z.array(z.string()).optional(),
+    73	  spatialAnchor: SpatialAnchorSchema.optional(),
+    74	});
+    75	
+    76	const EditAnnotation = z.object({
+    77	  ...BaseFields,
+    78	  type: z.literal('edit'),
+    79	  beforeVersion: z.number().int(),
+    80	  afterMarkdown: z.string(),
+    81	  diff: z.string(),
+    82	});
+    83	
+    84	const ApproveAnnotation = z.object({
+    85	  ...BaseFields,
+    86	  type: z.literal('approve'),
+    87	  version: z.number().int(),
+    88	});
+    89	
+    90	const RejectAnnotation = z.object({
+    91	  ...BaseFields,
+    92	  type: z.literal('reject'),
+    93	  version: z.number().int(),
+    94	  reason: z.string().optional(),
+    95	});
+    96	
+    97	const ResolveAnnotation = z.object({
+    98	  ...BaseFields,
+    99	  type: z.literal('resolve'),
+   100	  commentId: z.string(),
+   101	  resolved: z.boolean(),
+   102	});
+   103	
+   104	const AddressAnnotation = z.object({
+   105	  ...BaseFields,
+   106	  type: z.literal('address'),
+   107	  commentId: z.string(),
+   108	  version: z.number().int(),
+   109	  disposition: z.enum(['addressed', 'deferred', 'wontfix']),
+   110	  reason: z.string().optional(),
+   111	});
+   112	
+   113	const EditCommentAnnotation = z.object({
+   114	  ...BaseFields,
+   115	  type: z.literal('edit-comment'),
+   116	  commentId: z.string(),
+   117	  text: z.string().optional(),
+   118	  range: RangeSchema.optional(),
+   119	  category: AnnotationCategoryEnum.optional(),
+   120	  anchor: z.string().optional(),
+   121	});
+   122	
+   123	const DeleteCommentAnnotation = z.object({
+   124	  ...BaseFields,
+   125	  type: z.literal('delete-comment'),
+   126	  commentId: z.string(),
+   127	});
+   128	
+   129	const ArchiveCommentAnnotation = z.object({
+   130	  ...BaseFields,
+   131	  type: z.literal('archive-comment'),
+   132	  commentId: z.string(),
+   133	  priorStage: z.string().optional(),
+   134	});
+   135	
+   136	export const DraftAnnotationSchema = z.discriminatedUnion('type', [
+   137	  CommentAnnotation,
+   138	  EditAnnotation,
+   139	  ApproveAnnotation,
+   140	  RejectAnnotation,
+   141	  ResolveAnnotation,
+   142	  AddressAnnotation,
+   143	  EditCommentAnnotation,
+   144	  DeleteCommentAnnotation,
+   145	  ArchiveCommentAnnotation,
+   146	]);
+
+ succeeded in 0ms:
+    45	  start: number;
+    46	  end: number;
+    47	}
+    48	
+    49	/**
+    50	 * Spatial anchor for graphical-entry comments (Phase 8 Step 8.1.1).
+    51	 *
+    52	 * Where a textual comment's `range` + `anchor` locates the comment in
+    53	 * the raw markdown source, a `spatialAnchor` locates the comment on
+    54	 * the entry's primary visual surface — a mockup, an image, an SVG
+    55	 * diagram, anything rendered as the entry's content. The three `kind`s
+    56	 * are mutually exclusive in interpretation:
+    57	 *
+    58	 *   - `pixel` — `x`/`y` are pixel coordinates against the rendered
+    59	 *     visual's intrinsic dimensions. Used for image-style entries
+    60	 *     where DOM selectors are not meaningful.
+    61	 *   - `dom-selector` — `selector` is a CSS selector that identifies
+    62	 *     the anchored element within the rendered HTML mockup.
+    63	 *   - `svg-element` — `selector` is a CSS selector that resolves to
+    64	 *     an SVG element (e.g. `g.layer-2 > rect[id="logo"]`).
+    65	 *
+    66	 * All fields are optional at the schema level so legacy comments
+    67	 * without spatial anchors continue to parse; the renderer enforces
+    68	 * that the right combination is present for each `kind` at use time.
+    69	 */
+    70	export interface SpatialAnchor {
+    71	  kind: 'pixel' | 'dom-selector' | 'svg-element';
+    72	  selector?: string;
+    73	  x?: number;
+    74	  y?: number;
+    75	}
+    76	
+    77	interface AnnotationBase {
+    78	  /** ISO-8601 timestamp when the annotation was recorded. */
+    79	  createdAt: string;
+    80	  /** Workflow the annotation belongs to. */
+    81	  workflowId: string;
+    82	  /** Monotonic id within the workflow (server-assigned). */
+    83	  id: string;
+    84	}
+    85	
+    86	export interface CommentAnnotation extends AnnotationBase {
+    87	  type: 'comment';
+    88	  /** Draft version the comment was attached to. */
+    89	  version: number;
+    90	  /** Character range against the raw markdown of that version. */
+    91	  range: DraftRange;
+    92	  /** Free-text operator comment. */
+    93	  text: string;
+    94	  /** Optional category for review-report aggregation. */
+    95	  category?: AnnotationCategory;
+    96	  /**
+    97	   * The displayed text the operator selected when making the comment.
+    98	   * On later versions, the client re-locates the anchor per the W3C
+    99	   * Web Annotation TextQuoteSelector algorithm (see `rebaseAnchor` in
+   100	   * `plugins/deskwork-studio/public/src/entry-review/range-utils.ts`):
+   101	   *
+   102	   *   1. Single match of `anchor` in the current text → rebase to that
+   103	   *      position. Back-compat path; works for legacy comments that
+   104	   *      pre-date the prefix/suffix fields.
+   105	   *   2. Multiple matches with `anchorPrefix`/`anchorSuffix` → score
+   106	   *      each candidate by boundary character match against the
+   107	   *      captured surrounding context; highest non-zero non-tied score
+   108	   *      wins.
+   109	   *   3. Otherwise → unresolved-from-v{N}.
+   110	   */
+   111	  anchor?: string;
+   112	  /**
+   113	   * Up to ~64 characters of the displayed text *immediately before*
+   114	   * the anchor at capture time. Used by `rebaseAnchor` to
+   115	   * disambiguate when the anchor quote appears multiple times in a
+   116	   * later version (see `anchor` JSDoc). W3C Web Annotation Model
+   117	   * TextQuoteSelector's `prefix` field
+   118	   * (https://www.w3.org/TR/annotation-model/#text-quote-selector).
+   119	   * Optional for back-compat with legacy comments.
+   120	   */
+   121	  anchorPrefix?: string;
+   122	  /**
+   123	   * Up to ~64 characters of the displayed text *immediately after*
+   124	   * the anchor at capture time. W3C TextQuoteSelector's `suffix`
+   125	   * field. Optional for back-compat.
+   126	   */
+   127	  anchorSuffix?: string;
+   128	  /**
+   129	   * Phase 8 Step 8.1.1 — threading. The id of the root `comment`
+   130	   * annotation this comment replies to. Absent when the comment is
+   131	   * itself a root (top-level) comment. Threading is single-level:
+   132	   * a reply's `replyTo` always points at a root comment, never at
+   133	   * another reply.
+   134	   */
+   135	  replyTo?: string;
+   136	  /**
+   137	   * Phase 8 Step 8.1.1 — screenshot attachments. Relative paths under
+   138	   * `<entryDir>/scrapbook/screenshots/`, each pointing at an
+   139	   * operator-attached screenshot bound to this comment. Stored as
+   140	   * relative paths so the entry tree is portable. Empty / absent
+   141	   * when the comment has no attachments.
+   142	   */
+   143	  attachments?: string[];
+   144	  /**
+   145	   * Phase 8 Step 8.1.1 — spatial anchor for graphical entries. When
+   146	   * present, the comment is anchored on the entry's primary visual
+   147	   * (mockup, image, SVG) per the {@link SpatialAnchor} contract.
+   148	   * Independent of `range` — a comment may carry both (a markdown
+   149	   * range AND a spatial pin) or neither.
+   150	   */
+   151	  spatialAnchor?: SpatialAnchor;
+   152	}
+   153	
+   154	export interface EditAnnotation extends AnnotationBase {
+   155	  type: 'edit';
+   156	  /** Version that was edited (the source of the edit). */
+   157	  beforeVersion: number;
+   158	  /** Full markdown of the new version the edit produced. */
+   159	  afterMarkdown: string;
+   160	  /** Unified diff of afterMarkdown against the beforeVersion's markdown. */
+
+exec
+/bin/zsh -lc "nl -ba packages/core/src/entry/annotations.ts | sed -n '300,365p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+   300	    // — without this, the marginalia column would render an "address"
+   301	    // badge or a "resolve" status against a comment that no longer
+   302	    // appears in the active sidebar.
+   303	    if (
+   304	      (a.type === 'resolve' || a.type === 'address') &&
+   305	      archivedCommentIds.has(a.commentId)
+   306	    ) {
+   307	      continue;
+   308	    }
+   309	    out.push(a);
+   310	  }
+   311	  return out;
+   312	}
+   313	
+   314	function applyEdits(
+   315	  comment: CommentAnnotation,
+   316	  edits: DraftAnnotation[],
+   317	): CommentAnnotation {
+   318	  let text = comment.text;
+   319	  let range = comment.range;
+   320	  let category = comment.category;
+   321	  let anchor = comment.anchor;
+   322	  // #200 — preserve prefix/suffix through edits. Edits don't currently
+   323	  // mutate them (the operator can edit text/category/range/anchor via
+   324	  // the existing edit-comment fields), but they must survive a
+   325	  // text/category edit unchanged.
+   326	  const anchorPrefix = comment.anchorPrefix;
+   327	  const anchorSuffix = comment.anchorSuffix;
+   328	  // Phase 8 Step 8.1.1 — replyTo / attachments / spatialAnchor are
+   329	  // immutable through `edit-comment` (the edit schema doesn't expose
+   330	  // them); preserve unchanged the same way prefix/suffix are.
+   331	  const replyTo = comment.replyTo;
+   332	  const attachments = comment.attachments;
+   333	  const spatialAnchor = comment.spatialAnchor;
+   334	  for (const e of edits) {
+   335	    if (e.type !== 'edit-comment') continue;
+   336	    if (e.text !== undefined) text = e.text;
+   337	    if (e.range !== undefined) range = { start: e.range.start, end: e.range.end };
+   338	    if (e.category !== undefined) category = e.category;
+   339	    if (e.anchor !== undefined) anchor = e.anchor;
+   340	  }
+   341	  const out: CommentAnnotation = {
+   342	    id: comment.id,
+   343	    workflowId: comment.workflowId,
+   344	    createdAt: comment.createdAt,
+   345	    type: 'comment',
+   346	    version: comment.version,
+   347	    range,
+   348	    text,
+   349	    ...(category !== undefined ? { category } : {}),
+   350	    ...(anchor !== undefined ? { anchor } : {}),
+   351	    ...(anchorPrefix !== undefined ? { anchorPrefix } : {}),
+   352	    ...(anchorSuffix !== undefined ? { anchorSuffix } : {}),
+   353	    ...(replyTo !== undefined ? { replyTo } : {}),
+   354	    ...(attachments !== undefined ? { attachments: [...attachments] } : {}),
+   355	    ...(spatialAnchor !== undefined
+   356	      ? { spatialAnchor: cloneSpatialAnchor(spatialAnchor) }
+   357	      : {}),
+   358	  };
+   359	  return out;
+   360	}
+   361	
+   362	/**
+   363	 * Mint a server-assigned `id` and `createdAt` onto a draft annotation.
+   364	 *
+   365	 * Generic-and-intersected like `mintAnnotation` in `review/pipeline.ts`
+
+exec
+/bin/zsh -lc "nl -ba packages/core/test/schema/draft-annotation-thread-anchor.test.ts | sed -n '55,165p'" in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 0ms:
+    55	
+    56	  it('parses and preserves attachments (array of relative paths)', () => {
+    57	    const input = {
+    58	      ...COMMENT_BASE,
+    59	      attachments: [
+    60	        'scrapbook/screenshots/comment-abc-12345.png',
+    61	        'scrapbook/screenshots/comment-abc-12346.png',
+    62	      ],
+    63	    };
+    64	    const parsed = DraftAnnotationSchema.safeParse(input);
+    65	    expect(parsed.success).toBe(true);
+    66	    if (!parsed.success) return;
+    67	    if (parsed.data.type !== 'comment') return;
+    68	    expect(parsed.data.attachments).toEqual([
+    69	      'scrapbook/screenshots/comment-abc-12345.png',
+    70	      'scrapbook/screenshots/comment-abc-12346.png',
+    71	    ]);
+    72	  });
+    73	
+    74	  it('parses and preserves spatialAnchor of kind "pixel"', () => {
+    75	    const input = {
+    76	      ...COMMENT_BASE,
+    77	      spatialAnchor: { kind: 'pixel' as const, x: 100, y: 200 },
+    78	    };
+    79	    const parsed = DraftAnnotationSchema.safeParse(input);
+    80	    expect(parsed.success).toBe(true);
+    81	    if (!parsed.success) return;
+    82	    if (parsed.data.type !== 'comment') return;
+    83	    expect(parsed.data.spatialAnchor).toEqual({ kind: 'pixel', x: 100, y: 200 });
+    84	  });
+    85	
+    86	  it('parses and preserves spatialAnchor of kind "dom-selector"', () => {
+    87	    const input = {
+    88	      ...COMMENT_BASE,
+    89	      spatialAnchor: {
+    90	        kind: 'dom-selector' as const,
+    91	        selector: '#header > h1',
+    92	      },
+    93	    };
+    94	    const parsed = DraftAnnotationSchema.safeParse(input);
+    95	    expect(parsed.success).toBe(true);
+    96	    if (!parsed.success) return;
+    97	    if (parsed.data.type !== 'comment') return;
+    98	    expect(parsed.data.spatialAnchor).toEqual({
+    99	      kind: 'dom-selector',
+   100	      selector: '#header > h1',
+   101	    });
+   102	  });
+   103	
+   104	  it('parses and preserves spatialAnchor of kind "svg-element"', () => {
+   105	    const input = {
+   106	      ...COMMENT_BASE,
+   107	      spatialAnchor: {
+   108	        kind: 'svg-element' as const,
+   109	        selector: 'g.layer-2 > rect[id="logo"]',
+   110	      },
+   111	    };
+   112	    const parsed = DraftAnnotationSchema.safeParse(input);
+   113	    expect(parsed.success).toBe(true);
+   114	    if (!parsed.success) return;
+   115	    if (parsed.data.type !== 'comment') return;
+   116	    expect(parsed.data.spatialAnchor).toEqual({
+   117	      kind: 'svg-element',
+   118	      selector: 'g.layer-2 > rect[id="logo"]',
+   119	    });
+   120	  });
+   121	
+   122	  it('rejects spatialAnchor with an unknown kind', () => {
+   123	    const input = {
+   124	      ...COMMENT_BASE,
+   125	      spatialAnchor: { kind: 'invalid', x: 1, y: 1 },
+   126	    };
+   127	    const parsed = DraftAnnotationSchema.safeParse(input);
+   128	    expect(parsed.success).toBe(false);
+   129	  });
+   130	
+   131	  it('parses a comment with all three new fields set together', () => {
+   132	    const input = {
+   133	      ...COMMENT_BASE,
+   134	      replyTo: 'cmt_root_xyz',
+   135	      attachments: ['scrapbook/screenshots/comment-abc-12345.png'],
+   136	      spatialAnchor: { kind: 'pixel' as const, x: 42, y: 84 },
+   137	    };
+   138	    const parsed = DraftAnnotationSchema.safeParse(input);
+   139	    expect(parsed.success).toBe(true);
+   140	    if (!parsed.success) return;
+   141	    if (parsed.data.type !== 'comment') return;
+   142	    expect(parsed.data.replyTo).toBe('cmt_root_xyz');
+   143	    expect(parsed.data.attachments).toEqual([
+   144	      'scrapbook/screenshots/comment-abc-12345.png',
+   145	    ]);
+   146	    expect(parsed.data.spatialAnchor).toEqual({ kind: 'pixel', x: 42, y: 84 });
+   147	  });
+   148	
+   149	  it('rejects replyTo when supplied with a non-string value', () => {
+   150	    const input = { ...COMMENT_BASE, replyTo: 42 };
+   151	    const parsed = DraftAnnotationSchema.safeParse(input);
+   152	    expect(parsed.success).toBe(false);
+   153	  });
+   154	
+   155	  it('rejects attachments when supplied with non-array value', () => {
+   156	    const input = {
+   157	      ...COMMENT_BASE,
+   158	      attachments: 'scrapbook/screenshots/comment-abc-12345.png',
+   159	    };
+   160	    const parsed = DraftAnnotationSchema.safeParse(input);
+   161	    expect(parsed.success).toBe(false);
+   162	  });
+   163	});
+   164	
+   165	describe('Other annotation types — unaffected by Phase 8 Step 8.1.1', () => {
+
+exec
+/bin/zsh -lc 'npm --workspace @deskwork/core test -- --run packages/core/test/schema/draft-annotation-thread-anchor.test.ts' in /Users/orion/work/deskwork-work/graphical-entries
+ exited 1 in 272ms:
+
+> @deskwork/core@0.26.5 test
+> vitest run --run packages/core/test/schema/draft-annotation-thread-anchor.test.ts
+
+
+ RUN  v4.1.5 /Users/orion/work/deskwork-work/graphical-entries/packages/core
+
+No test files found, exiting with code 1
+
+filter: packages/core/test/schema/draft-annotation-thread-anchor.test.ts
+include: test/**/*.test.ts
+exclude:  **/node_modules/**, **/.git/**
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/orion/work/deskwork-work/graphical-entries/packages/core
+npm error workspace @deskwork/core@0.26.5
+npm error location /Users/orion/work/deskwork-work/graphical-entries/packages/core
+npm error command failed
+npm error command sh -c vitest run --run packages/core/test/schema/draft-annotation-thread-anchor.test.ts
+
+exec
+/bin/zsh -lc 'npm --workspace @deskwork/core test -- test/schema/draft-annotation-thread-anchor.test.ts' in /Users/orion/work/deskwork-work/graphical-entries
+ succeeded in 305ms:
+
+ RUN  v4.1.5 /Users/orion/work/deskwork-work/graphical-entries/packages/core
+
+
+ Test Files  1 passed (1)
+      Tests  18 passed (18)
+   Start at  20:31:13
+   Duration  91ms (transform 17ms, setup 0ms, import 28ms, tests 4ms, environment 0ms)
+
+
+codex
+### `attachments: string[]` cannot carry the required raw/marked metadata
+
+Finding-ID: AUDIT-BARRAGE-codex-01
+Status:     open
+Severity:   high
+Surface:    packages/core/src/review/types.ts:137-143; packages/core/src/schema/draft-annotation.ts:71-72; packages/core/test/schema/draft-annotation-thread-anchor.test.ts:56-71
+
+The feature scope requires marked attachments to reference both the rendered marked file and the raw original via `originalAttachment`. This diff models `attachments` as a bare `string[]` in both the TypeScript type and Zod schema, and the test only asserts arrays of path strings. There is no place to store per-attachment metadata such as `{ path, originalAttachment }`, version metadata, tool metadata, or similar.
+
+That shape will force a later incompatible schema change or an out-of-band side table to satisfy Step 12.3.4 and the re-mark workflow. A reasonable fix is to introduce an attachment object now, or a deliberate backwards-compatible union if legacy string paths must be supported, with tests proving `originalAttachment` round-trips.
+
+### Folded edits make the new comment fields immutable, leaving no append-only update path for save/re-mark
+
+Finding-ID: AUDIT-BARRAGE-codex-02
+Status:     open
+Severity:   high
+Surface:    packages/core/src/schema/draft-annotation.ts:113-121; packages/core/src/entry/annotations.ts:328-357
+
+The append-only annotation store updates comments through `edit-comment` events and `applyEdits()`, but the new `replyTo`, `attachments`, and `spatialAnchor` fields are explicitly preserved unchanged because `edit-comment` does not expose them. That means the future “Save markup updates the comment annotation’s `attachments[]`” and “Re-mark updates to the new version while preserving prior versions” flows have no normal journaled mutation path for an existing comment.
+
+This matters because mutating the original `comment` event would violate the journal model, while emitting an `edit-comment` cannot change the attachment list. The fix should extend the edit-comment schema and folding logic for the fields that are meant to evolve, especially `attachments`, and add a folded-view test showing an attachment update wins without rewriting the original comment event.
+
+### Attachment paths are documented as portable scrapbook-relative paths but validated as arbitrary strings
+
+Finding-ID: AUDIT-BARRAGE-codex-03
+Status:     open
+Severity:   medium
+Surface:    packages/core/src/review/types.ts:137-143; packages/core/src/schema/draft-annotation.ts:71-72; packages/core/test/schema/draft-annotation-thread-anchor.test.ts:155-162
+
+The type docs say attachments are “Relative paths under `<entryDir>/scrapbook/screenshots/`” so the entry tree remains portable, but the schema accepts any string in the array. Absolute paths, `../` traversal, empty strings, and paths outside `scrapbook/screenshots/` all parse successfully. The negative test only rejects a non-array value, not invalid path contents.
+
+That weakens the persistence contract before the renderer/lightbox starts consuming these paths. A reasonable fix is a small path schema that rejects absolute paths, empty segments, traversal, and non-`scrapbook/screenshots/` prefixes, with tests for each rejected case.
+tokens used
+40,288

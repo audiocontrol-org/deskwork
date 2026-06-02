@@ -1,0 +1,239 @@
+/**
+ * Multi-lane swimlane dashboard — Press Bay MOBILE rules.
+ *
+ * Phone-viewport responsive rules + the mobile lane-sheet
+ * (slide-up bottom sheet) that replaces the desktop lane-rail at
+ * narrow widths.
+ *
+ * Step 5.3.3 — Mobile lane sheet trigger + container.
+ *
+ *  The bay-head trigger `.lane-sheet-trigger` lives in `.bh-row-1`
+ *  after `.bh-meta`. Per `.claude/rules/affordance-placement.md`,
+ *  the trigger sits ON the bay-head (the local chrome of the
+ *  component the rail belongs to), NOT on the page-level masthead.
+ *
+ *  Desktop (> 720px): trigger hidden; `.lane-sheet-container` is
+ *  the regular left-column wrapper around the rail (the bay-shell
+ *  grid puts it in column 1). The container is structurally
+ *  transparent at desktop — it has no styles other than
+ *  `display: contents` so the rail's grid placement is unchanged.
+ *
+ *  Mobile (<= 720px): trigger visible; container becomes a fixed-
+ *  position slide-up sheet covering the bottom of the viewport.
+ *
+ * Step 5.3.1 (focus-strip overflow) lives in
+ * `dashboard-swimlane-chips.css` because the focus-strip overflow
+ * applies at both desktop and mobile widths.
+ */
+
+/* Desktop default — trigger hidden. */
+.lane-sheet-trigger {
+  display: none;
+}
+
+/* Default container behavior on desktop — `display: contents`
+ * collapses the wrapper element so the underlying `<aside class=
+ * "lane-rail">` lands in the bay-shell grid's left column exactly
+ * as it did before the wrapper was introduced. */
+.lane-sheet-container {
+  display: contents;
+}
+
+/* The backdrop element is unconditionally present in the DOM but
+ * only visible when the sheet is open at mobile widths. */
+.lane-sheet-backdrop {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .bay-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .lane-rail {
+    display: none;
+    /* The mobile lane-rail is reached via the masthead "Lanes ▾"
+       trigger introduced in Task 5.1A's mobile sheet. Outside that
+       sheet's scope the rail is hidden on phone; the focus-chip
+       strip is the operator's only lane affordance at narrow
+       widths. */
+  }
+
+  .bay {
+    padding: 0.5rem 0.6rem 1.2rem;
+  }
+
+  .swim-head {
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+  }
+
+  .stage-grid {
+    /* On phone, stage columns stack vertically so the operator's
+       scroll preserves the linear stage sequence. Task 5.1B's
+       view-toggle introduces an alternative list view; both are
+       single-column on phone. */
+    flex-direction: column;
+  }
+
+  .stage-col {
+    min-height: auto;
+    border-bottom: 1px solid var(--er-paper-3);
+  }
+
+  .stage-col:last-child {
+    border-bottom: none;
+  }
+
+  /* ----- Task 5.1B mobile pass ----- */
+
+  /* View-toggle narrows on phone — labels shrink so both cells fit
+   * comfortably in the wrapped swim-head row (mockup line 830-841). */
+  .view-toggle .vt-cell {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.62rem;
+    gap: 0.2rem;
+  }
+
+  .view-toggle .vt-cell .vt-icon {
+    font-size: 0.78rem;
+  }
+
+  /* Task 5.1C mobile pass — chip shrinks to icon-only (≥30×30 hit
+   * target per spec / ≥24×24 WCAG 2.2 SC 2.5.8 AA). The label hides
+   * on phone; the aria-label still carries the full action for
+   * assistive tech. Padding shrinks in lockstep with the view-toggle
+   * cells above. */
+  .swim-compose {
+    min-height: 30px;
+    min-width: 30px;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .swim-compose .sc-label {
+    display: none;
+  }
+
+  /* Mobile kanban tile view = the v0.19 collapsible-stage-tile
+   * pattern (single-column vertical stack — NOT a 2-column wrap,
+   * which would obscure the linear stage sequence). The
+   * `.stage-grid { flex-direction: column }` rule above already
+   * places columns in a single stack; the `.stage-col` becomes a
+   * one-line tile by default — operators tap the per-stage chevron
+   * to expand. This matches `DESIGN-STANDARDS.md § Collapsible
+   * stage tiles mobile-only navigation`. No 2-column rule needed
+   * here — the absence of one is the rule. */
+
+  /* List-body on phone — narrower padding so titles fit; rows still
+   * dense (title + slug + state + overflow). */
+  .list-body .lb-group-head {
+    padding: 0.35rem 0.55rem;
+  }
+
+  .list-body .lb-row {
+    padding: 0.35rem 0.55rem;
+    gap: 0.5rem;
+  }
+
+  .list-body .lb-row .lb-title {
+    font-size: 0.88rem;
+  }
+
+  /* ----- Step 5.3.3 — Mobile lane-sheet ----- */
+
+  /* Mobile trigger styling — small chip in the bay-head's row 1.
+   * Sized to match the existing `.swim-compose` aesthetic so it
+   * reads as a bay-head affordance rather than a generic toolbar
+   * button. Min hit target 30×30 per WCAG 2.2 SC 2.5.8 AA. */
+  .lane-sheet-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 30px;
+    min-width: 30px;
+    padding: 0.25rem 0.55rem;
+    margin-left: 0.5rem;
+    background: var(--er-paper);
+    border: 1px solid var(--er-paper-3);
+    border-radius: 99px;
+    font-family: var(--er-font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--er-ink);
+    cursor: pointer;
+  }
+
+  .lane-sheet-trigger:hover {
+    background: var(--er-paper-2);
+    border-color: var(--er-ink-soft);
+  }
+
+  .lane-sheet-trigger:focus-visible {
+    outline: 2px solid var(--er-proof-blue);
+    outline-offset: 2px;
+  }
+
+  /* Container morphs from `display: contents` (transparent) into a
+   * proper block element so the slide-up panel can position itself
+   * inside it. The container itself stays at z-index 0 / no
+   * background; the rail and backdrop are the visible surfaces. */
+  .lane-sheet-container {
+    display: block;
+  }
+
+  /* Backdrop — full-bleed dim layer, tappable to dismiss. Only
+   * visible when the sheet is open (body attr set by the shared
+   * controller). */
+  .lane-sheet-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0);
+    z-index: 999;
+    pointer-events: none;
+    transition: background 0.18s ease;
+  }
+
+  body[data-lane-sheet-open] .lane-sheet-backdrop {
+    background: rgba(26, 22, 20, 0.32);
+    pointer-events: auto;
+  }
+
+  /* Rail repositions into the slide-up panel. The desktop rail rule
+   * inside this `@media (max-width: 720px)` block sets `display:
+   * none` on `.lane-rail`. We override that within the sheet
+   * container so the rail is always present in the DOM at mobile
+   * widths (the slide-up reveal animates via transform on the open
+   * class — keeping `display: block` always lets the close-direction
+   * transition fire). */
+  .lane-sheet-container .lane-rail {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--er-paper);
+    border-top: 2px solid var(--er-ink);
+    border-radius: 8px 8px 0 0;
+    padding: 1rem;
+    transform: translateY(100%);
+    transition: transform 0.18s ease;
+    z-index: 1000;
+  }
+
+  /* Open-state — slide the panel in. Both the rail's slide-up and
+   * the backdrop's reveal key off the same `body[data-lane-sheet-open]`
+   * attribute (owned by the shared `createSlideUpSheet` controller),
+   * so the two surfaces always animate in lockstep regardless of which
+   * close path fires (trigger toggle, backdrop tap, Escape, rail-row
+   * activation). Pre-AUDIT-20260530-40 this rule keyed off a separate
+   * `.lane-sheet-container.is-open` class maintained by the local
+   * controller; collapsing onto the body attribute eliminates the
+   * hand-sync requirement between the two flags. */
+  body[data-lane-sheet-open] .lane-sheet-container .lane-rail {
+    transform: translateY(0);
+  }
+}

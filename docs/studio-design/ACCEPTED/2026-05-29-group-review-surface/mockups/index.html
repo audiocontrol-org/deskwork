@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Group review surface — design pass · 2026-05-29</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --er-paper:     #F5F1E8;
+    --er-paper-2:   #ECE6D4;
+    --er-paper-3:   #DFD7BF;
+    --er-ink:       #1A1614;
+    --er-ink-soft:  #3A3530;
+    --er-faded:     #8A7F70;
+    --er-red-pencil:  #B8362A;
+    --er-proof-blue:  #2A4B7C;
+    --er-stamp-green: #2E5D45;
+    --er-kraft:       #8A7250;
+    --display: "Newsreader", Georgia, serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--er-paper);
+    font-family: var(--display);
+    color: var(--er-ink);
+    min-height: 100vh;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0.03 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 32px 64px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .masthead {
+    border-bottom: 1px solid var(--er-paper-3);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--er-red-pencil);
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 2.4rem;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin: 0 0 12px;
+    color: var(--er-ink);
+  }
+  .lede {
+    font-family: var(--display);
+    font-size: 1.05rem;
+    line-height: 1.5;
+    color: var(--er-ink-soft);
+    max-width: 64ch;
+  }
+  .lede a {
+    color: var(--er-proof-blue);
+    text-decoration: underline;
+    text-decoration-thickness: 0.5px;
+    text-underline-offset: 3px;
+  }
+
+  .section-head {
+    margin: 48px 0 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--er-paper-3);
+  }
+  .section-head h2 {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.5rem;
+    color: var(--er-red-pencil);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .section-head .count {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .card {
+    background: var(--er-paper);
+    border: 1px solid var(--er-paper-3);
+    padding: 22px 24px 24px;
+    border-radius: 2px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .card::before {
+    content: "";
+    position: absolute;
+    top: -1px; left: -1px; right: -1px;
+    height: 3px;
+    background: var(--er-red-pencil);
+  }
+  .card.kraft::before { background: var(--er-kraft); }
+  .card.blue::before { background: var(--er-proof-blue); }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(26, 22, 20, 0.08);
+  }
+  .card .id {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin-bottom: 4px;
+  }
+  .card .name {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.25rem;
+    line-height: 1.15;
+    margin-bottom: 10px;
+    color: var(--er-ink);
+    letter-spacing: -0.01em;
+  }
+  .card .summary {
+    font-family: var(--display);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--er-ink-soft);
+    margin-bottom: 14px;
+    flex: 1;
+  }
+  .card .tradeoff {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    color: var(--er-faded);
+    border-top: 1px dashed var(--er-paper-3);
+    padding-top: 10px;
+    line-height: 1.5;
+  }
+  .card .tradeoff strong {
+    color: var(--er-ink-soft);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.625rem;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--er-paper-3);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    line-height: 1.7;
+    color: var(--er-ink-soft);
+  }
+  .footer .label {
+    font-size: 0.6875rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin-bottom: 6px;
+  }
+  .footer ol { padding-left: 20px; margin: 4px 0 16px; }
+  .footer li { margin-bottom: 4px; }
+  .footer a {
+    color: var(--er-proof-blue);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="masthead">
+      <div class="kicker">Design pass · 2026-05-29 · graphical-entries Phase 7</div>
+      <h1>Group review surface</h1>
+      <p class="lede">
+        Three directions for the group review surface (Tasks 7.3 + 7.4 folded) and three directions for the "Member of:" affordance that appears on member entries' rows in the lane dashboard.
+        Read <a href="../brief.md">brief.md</a> for the full design context, constraints, and decision criteria.
+      </p>
+    </div>
+
+    <div class="section-head">
+      <h2>Group review surface</h2>
+      <span class="count">3 directions</span>
+    </div>
+
+    <div class="grid">
+      <a class="card" href="direction-A-members-list.html">
+        <div class="id">Direction A</div>
+        <div class="name">Members-as-list with sticky lane-stage summary strip</div>
+        <div class="summary">Default render = flat member list. Task 7.4's multi-lane composition is reframed as a one-line sticky summary strip at the top — same pipeline-shape signal, no horizontal scroll on mobile.</div>
+        <div class="tradeoff">
+          <strong>Trade-off</strong>
+          Most operator-readable on narrow viewports; least faithful to the Phase 5 swimlane shape; cheapest implementation.
+        </div>
+      </a>
+
+      <a class="card blue" href="direction-B-composed-default.html">
+        <div class="id">Direction B</div>
+        <div class="name">Composed multi-lane default with list toggle</div>
+        <div class="summary">Default render = miniature multi-lane swimlane scoped to the group's members. Section-head toggle flips to flat list. Includes empty-members fallback frame.</div>
+        <div class="tradeoff">
+          <strong>Trade-off</strong>
+          Honors "structure over scrolling"; reuses Phase 5 swimlane primitive; requires per-group toggle state.
+        </div>
+      </a>
+
+      <a class="card kraft" href="direction-C-stacked.html">
+        <div class="id">Direction C</div>
+        <div class="name">Stacked composed-then-list (no toggle)</div>
+        <div class="summary">Both views always visible — compact composed strip on top, flat member list below. No mode state for the operator to track.</div>
+        <div class="tradeoff">
+          <strong>Trade-off</strong>
+          No toggle to learn; double chrome cost; composed strip drops off-screen as list grows.
+        </div>
+      </a>
+    </div>
+
+    <div class="section-head">
+      <h2>"Member of:" badge on lane dashboard rows</h2>
+      <span class="count">3 directions</span>
+    </div>
+
+    <div class="grid">
+      <a class="card kraft" href="member-badge-1-pulltab.html">
+        <div class="id">Direction 1</div>
+        <div class="name">Pull-tab on row edge</div>
+        <div class="summary">Vertical kraft-color tab on the row's left edge with a member-count badge. Tap expands inline to list parent groups with back-links. Mirrors the marginalia-tab / outline-tab affordance precedent.</div>
+        <div class="tradeoff">
+          <strong>Trade-off</strong>
+          Most discoverable structurally; introduces a new row-chrome class on the dashboard.
+        </div>
+      </a>
+
+      <a class="card kraft" href="member-badge-2-kicker.html">
+        <div class="id">Direction 2</div>
+        <div class="name">Kicker line above slug</div>
+        <div class="summary">"MEMBER OF v0.18-row-rebuild ↪" line above the row's title in mono caps + kraft color. Multi-parent uses `+N` overflow that opens a popover.</div>
+        <div class="tradeoff">
+          <strong>Trade-off</strong>
+          Cheap chrome; reads naturally; adds one extra line of vertical space per member row.
+        </div>
+      </a>
+
+      <a class="card kraft" href="member-badge-3-trailing-chip.html">
+        <div class="id">Direction 3</div>
+        <div class="name">Trailing inline chip near ⋮</div>
+        <div class="summary">Small bordered chip immediately left of the row's overflow `⋮` — glyph plus parent count. Tap opens popover.</div>
+        <div class="tradeoff">
+          <strong>Trade-off</strong>
+          Co-located with existing row affordances; risks clustering with v0.20 overflow vocabulary; the glyph isn't pre-loaded operator vocabulary.
+        </div>
+      </a>
+    </div>
+
+    <div class="footer">
+      <div class="label">How to pick</div>
+      <ol>
+        <li>Open each mockup at iPhone-13 viewport (390×844) and a desktop viewport (≥1280px).</li>
+        <li>Pick one direction from each section (A / B / C and 1 / 2 / 3).</li>
+        <li>Move this proposal from <a href="../">PROPOSED/</a> to <code>ACCEPTED/2026-05-29-group-review-surface/</code> with the picks noted in <code>brief.md</code>.</li>
+        <li>File <code>REJECTED/2026-05-29-group-review-surface-alternatives/brief.md</code> referencing the un-picked directions.</li>
+        <li>Update <code>DESIGN-STANDARDS.md</code>'s change log with the decision.</li>
+      </ol>
+    </div>
+  </div>
+</body>
+</html>

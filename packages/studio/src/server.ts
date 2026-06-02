@@ -44,6 +44,8 @@ import { renderShortformReviewPage } from './pages/shortform-review.ts';
 import { renderEntryReviewPage } from './pages/entry-review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
+import { renderLanesPage } from './pages/lanes.ts';
+import { renderPipelinesPage } from './pages/pipelines.ts';
 import { renderScrapbookPage, ScrapbookPageError } from './pages/scrapbook.ts';
 import {
   renderContentTopLevel,
@@ -298,13 +300,33 @@ export function createApp(ctx: StudioContext): Hono {
       getIndex,
     ]);
     if (overridden !== null) return c.html(overridden);
-    return c.html(await renderDashboard(ctx, getIndex));
+    // Phase 5 Task 5.1: thread the request URL so the dashboard can
+    // honour `?focus=<csv>` server-side.
+    return c.html(await renderDashboard(ctx, getIndex, c.req.url));
   });
   app.get('/dev/editorial-help', async (c) => {
     const overridden = await runTemplateOverride(ctx, 'help', [ctx]);
     if (overridden !== null) return c.html(overridden);
     return c.html(renderHelpPage(ctx));
   });
+  // Phase 6 Task 6.3: studio lane-management page. Server-renders
+  // the lane registry + a copy-builder New Lane form + per-row
+  // Edit / Archive / Restore / Purge clipboard buttons. The page
+  // never mutates sidecar state — every button copies an equivalent
+  // /deskwork:lane <verb> slash command per THESIS Consequence 2.
+  app.get('/dev/lanes', async (c) => c.html(await renderLanesPage(ctx)));
+  app.get('/dev/lanes/', async (c) => c.html(await renderLanesPage(ctx)));
+  // Phase 6 Task 6.4: studio pipeline-editor page. Server-renders
+  // the pipeline registry (plugin presets + project overrides) with
+  // a copy-builder New form, per-row View / Edit / Delete affordances
+  // (Edit surfaces the five mutually-exclusive update operations as
+  // collapsed sub-forms), and an error banner + inline error rows
+  // when any override JSON fails to load. Per THESIS Consequence 2
+  // no button mutates server state — every action copies an
+  // equivalent /deskwork:pipeline <verb> slash command to the
+  // clipboard.
+  app.get('/dev/pipelines', async (c) => c.html(await renderPipelinesPage(ctx)));
+  app.get('/dev/pipelines/', async (c) => c.html(await renderPipelinesPage(ctx)));
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx)),
   );
@@ -323,6 +345,7 @@ export function createApp(ctx: StudioContext): Hono {
         {
           version: c.req.query('v') ?? null,
           stage: c.req.query('stage') ?? null,
+          members: c.req.query('members') ?? null,
         },
         getIndex,
       );

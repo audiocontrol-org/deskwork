@@ -12,8 +12,17 @@
  * signals "paused, expected to resume"; `cancel` signals "abandoned,
  * resumption is rare".
  *
+ * Phase 7 Task 7.2 Step 7.2.6 (graphical-entries): `--cascade` opts
+ * the operator into member-cascade behaviour for group entries (entries
+ * whose `members[]` is non-empty per Task 7.1.2). Default behaviour
+ * (no flag): the group's own stage flips to Cancelled; members are
+ * untouched. With `--cascade`: every member is also cancelled
+ * (members already off-pipeline are skipped, not refused). The flag
+ * is a no-op on non-group entries.
+ *
  * Usage:
- *   deskwork cancel <project-root> [--site <slug>] <slug-or-uuid> [--reason "<text>"]
+ *   deskwork cancel <project-root> [--site <slug>] <slug-or-uuid>
+ *                                   [--reason "<text>"] [--cascade]
  */
 
 import { readConfig } from '@deskwork/core/config';
@@ -24,21 +33,22 @@ import { resolveEntryUuid } from '@deskwork/core/sidecar';
 import type { DeskworkConfig } from '@deskwork/core/config';
 
 const KNOWN_FLAGS = ['site', 'reason'] as const;
+const BOOLEAN_FLAGS = ['cascade'] as const;
 
 export async function run(argv: string[]): Promise<void> {
   let parsed;
   try {
-    parsed = parseArgs(argv, KNOWN_FLAGS);
+    parsed = parseArgs(argv, KNOWN_FLAGS, BOOLEAN_FLAGS);
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err), 2);
   }
 
-  const { positional, flags } = parsed;
+  const { positional, flags, booleans } = parsed;
 
   if (positional.length < 2) {
     fail(
       'Usage: deskwork cancel <project-root> [--site <slug>] ' +
-        '<slug-or-uuid> [--reason "<text>"]',
+        '<slug-or-uuid> [--reason "<text>"] [--cascade]',
       2,
     );
   }
@@ -62,11 +72,13 @@ export async function run(argv: string[]): Promise<void> {
     fail(err instanceof Error ? err.message : String(err));
   }
 
+  const cascade = booleans.has('cascade');
   let result;
   try {
     result = await cancelEntry(projectRoot, {
       uuid,
       ...(flags.reason !== undefined && { reason: flags.reason }),
+      ...(cascade && { cascade: true }),
     });
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
@@ -79,5 +91,10 @@ export async function run(argv: string[]): Promise<void> {
     fromStage: result.fromStage,
     toStage: result.toStage,
     ...(flags.reason !== undefined && { reason: flags.reason }),
+    ...(cascade && {
+      cascade: true,
+      cascadedMembers: result.cascadedMembers ?? [],
+      skippedMembers: result.skippedMembers ?? [],
+    }),
   });
 }

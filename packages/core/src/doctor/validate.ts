@@ -5,7 +5,6 @@ import {
   isLinearPipelineStage,
   isOffPipelineStage,
   type Entry,
-  type Stage,
 } from '../schema/entry.ts';
 import { extractEntriesForMigration } from '../calendar/parse.ts';
 import { readJournalEvents } from '../journal/read.ts';
@@ -172,11 +171,14 @@ async function loadSidecars(projectRoot: string): Promise<LoadedSidecar[]> {
 
 /**
  * Stage-conventional artifact path. Returns null when a stage does not have a
- * primary on-disk artifact (e.g. Blocked / Cancelled).
+ * primary on-disk artifact (e.g. Blocked / Cancelled) OR when the stage is
+ * outside the editorial pipeline's eight known values (per Phase 3 / Phase
+ * 4 — lane-aware path conventions land in the lane code, not in this
+ * editorial-specific heuristic).
  *
  * Note: Published shares the Drafting/Final path (`docs/<slug>/index.md`).
  */
-function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): string | null {
+function artifactPathForStage(projectRoot: string, slug: string, stage: string): string | null {
   switch (stage) {
     case 'Ideas':
       return join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
@@ -190,6 +192,10 @@ function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): 
       return join(projectRoot, 'docs', slug, 'index.md');
     case 'Blocked':
     case 'Cancelled':
+      return null;
+    default:
+      // Lane-specific or unrecognized stage; no editorial-default path
+      // applies. Phase 4 introduces template-driven path resolution.
       return null;
   }
 }
@@ -336,7 +342,7 @@ async function validateIterationHistory(projectRoot: string): Promise<Validation
     // entries. Treating that as drift would flag every migrated entry.
     const allStages = new Set<string>([...stages, ...Object.keys(journalCount)]);
     for (const stage of allStages) {
-      const sidecarN = entry.iterationByStage[stage as Stage] ?? 0;
+      const sidecarN = entry.iterationByStage[stage] ?? 0;
       const journalN = journalCount[stage] ?? 0;
       if (sidecarN === 0) continue; // migration tolerance: only flag stages the sidecar tracks
       if (journalN > sidecarN) {

@@ -1,0 +1,8 @@
+Loaded cached credentials.
+Loading extension: nanobanana
+Attempt 1 failed: You have exhausted your capacity on this model.. Retrying after 10000ms...
+Attempt 2 failed: You have exhausted your capacity on this model.. Retrying after 10000ms...
+Error when talking to Gemini API Full report available at: /var/folders/sk/jzwspmzn1g17x97x7s7l_dch0000gn/T/gemini-client-error-Turn.run-sendMessageStream-2026-05-31T07-15-35-857Z.json
+[API Error: You have exhausted your capacity on this model.]
+An unexpected critical error occurred:
+[object Object]

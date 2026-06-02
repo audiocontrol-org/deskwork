@@ -1,0 +1,8 @@
+{
+  "agent": "ui-route-enumerator",
+  "featureSlug": "graphical-entries",
+  "modulesInScope": [
+    "."
+  ],
+  "routes": []
+}

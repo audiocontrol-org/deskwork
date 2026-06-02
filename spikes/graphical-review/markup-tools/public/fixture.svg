@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Synthetic editorial dashboard mockup">
+  <rect x="0" y="0" width="600" height="400" fill="#f6f1e8" />
+  <!-- Title bar -->
+  <rect x="0" y="0" width="600" height="48" fill="#fffaf0" stroke="#c8b89e" stroke-width="1" />
+  <text x="20" y="30" font-family="Georgia, serif" font-size="18" font-weight="bold" fill="#1c1c1c">Editorial Dashboard</text>
+
+  <!-- Three lane cards -->
+  <g>
+    <!-- Published card -->
+    <rect x="20" y="70" width="170" height="100" fill="#fffaf0" stroke="#c8b89e" stroke-width="1" rx="6" />
+    <rect x="20" y="70" width="6" height="100" fill="#2f5d3a" />
+    <text x="36" y="96" font-family="Georgia, serif" font-size="14" font-weight="bold" fill="#1c1c1c">Published</text>
+    <text x="36" y="118" font-family="Georgia, serif" font-size="12" fill="#4a3b2c">12 entries</text>
+
+    <!-- Drafting card -->
+    <rect x="215" y="70" width="170" height="100" fill="#fffaf0" stroke="#c8b89e" stroke-width="1" rx="6" />
+    <rect x="215" y="70" width="6" height="100" fill="#b07a1a" />
+    <text x="231" y="96" font-family="Georgia, serif" font-size="14" font-weight="bold" fill="#1c1c1c">Drafting</text>
+    <text x="231" y="118" font-family="Georgia, serif" font-size="12" fill="#4a3b2c">5 entries</text>
+
+    <!-- Ideas card -->
+    <rect x="410" y="70" width="170" height="100" fill="#fffaf0" stroke="#c8b89e" stroke-width="1" rx="6" />
+    <rect x="410" y="70" width="6" height="100" fill="#4a4a8a" />
+    <text x="426" y="96" font-family="Georgia, serif" font-size="14" font-weight="bold" fill="#1c1c1c">Ideas</text>
+    <text x="426" y="118" font-family="Georgia, serif" font-size="12" fill="#4a3b2c">23 entries</text>
+  </g>
+
+  <!-- Recent entries list -->
+  <g>
+    <text x="20" y="210" font-family="Georgia, serif" font-size="14" font-weight="bold" fill="#1c1c1c">Recent entries</text>
+    <line x1="20" y1="220" x2="580" y2="220" stroke="#c8b89e" stroke-width="1" />
+
+    <text x="20" y="248" font-family="Georgia, serif" font-size="13" fill="#1c1c1c">Press-check ritual</text>
+    <text x="450" y="248" font-family="Georgia, serif" font-size="12" fill="#4a3b2c" text-anchor="end">Published</text>
+
+    <text x="20" y="278" font-family="Georgia, serif" font-size="13" fill="#1c1c1c">Pipeline templates rationale</text>
+    <text x="450" y="278" font-family="Georgia, serif" font-size="12" fill="#4a3b2c" text-anchor="end">Drafting</text>
+
+    <text x="20" y="308" font-family="Georgia, serif" font-size="13" fill="#1c1c1c">Graphical entries — PRD</text>
+    <text x="450" y="308" font-family="Georgia, serif" font-size="12" fill="#4a3b2c" text-anchor="end">Drafting</text>
+
+    <text x="20" y="338" font-family="Georgia, serif" font-size="13" fill="#1c1c1c">Shortform calendar</text>
+    <text x="450" y="338" font-family="Georgia, serif" font-size="12" fill="#4a3b2c" text-anchor="end">Ideas</text>
+  </g>
+
+  <text x="300" y="380" font-family="Georgia, serif" font-size="11" fill="#4a3b2c" text-anchor="middle" font-style="italic">Synthetic fixture — Phase 1 Task 1.4.3 markup spike</text>
+</svg>

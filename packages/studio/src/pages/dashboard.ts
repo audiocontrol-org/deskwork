@@ -20,9 +20,12 @@
  * removed in v0.19.
  *
  * The renderer's data flow:
- *   1. loadDashboardData reads every sidecar and groups by stage.
- *   2. Each stage renders via `renderStageSection`.
- *   3. The Distribution placeholder renders below the stage sections.
+ *   1. loadDashboardData reads every sidecar and groups by lane and by
+ *      stage.
+ *   2. The multi-lane swimlane shell (Phase 5 Task 5.1+) renders one
+ *      swimlane per focused lane; per-stage columns and rows come from
+ *      the lane's resolved pipeline template.
+ *   3. The Distribution placeholder renders below the swimlane shell.
  *   4. The mobile-only Compose chrome (FAB + slide-up sheet) renders
  *      at the page tail; CSS hides it on desktop.
  *
@@ -37,14 +40,15 @@ import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
 import { renderMasthead } from './masthead.ts';
 import { renderMastheadMenu } from './masthead-menu.ts';
-import { loadDashboardData, DASHBOARD_STAGE_ORDER } from './dashboard/data.ts';
-import {
-  renderStageSection,
-  renderDistributionPlaceholder,
-} from './dashboard/section.ts';
+import { loadDashboardData } from './dashboard/data.ts';
+import { renderDistributionPlaceholder } from './dashboard/section.ts';
 import { renderHeader, renderFilterStrip } from './dashboard/header.ts';
 import { renderShortformSection } from './dashboard/shortform-section.ts';
 import { renderAdjacentSection } from './dashboard/adjacent-section.ts';
+import {
+  renderSwimlanesShell,
+  parseFocusCsv,
+} from './dashboard/swimlane-shell.ts';
 import type { ContentIndex } from '@deskwork/core/content-index';
 
 /**
@@ -58,10 +62,26 @@ export type DashboardIndexGetter = (site: string) => ContentIndex;
 /**
  * Render the studio dashboard. Async because sidecar reads hit disk;
  * the route handler in server.ts awaits the result before sending it.
+ *
+ * Phase 5 Task 5.1: the eight-stage `<section>` loop was replaced by
+ * the multi-lane swimlane shell (Direction 3 Press Bay v11). The
+ * shortform + adjacent sections render BELOW the bay shell as siblings
+ * (per ambiguity resolution 2 — Distribution renders inside the
+ * swimlanes when a lane's template lists it, no longer as a separate
+ * top-level section). The legacy `DASHBOARD_STAGE_ORDER` constant
+ * stays in `./dashboard/data.ts` as a back-compat read view for the
+ * `data.byStage` map; production rendering reads `data.lanes` instead.
+ *
+ * @param requestUrl - The full request URL (e.g. `c.req.url` from
+ *   Hono). Used to parse the `?focus=<csv>` query param into a
+ *   server-side focus filter. When absent, the dashboard server-
+ *   renders every lane as focused and lets the client controller
+ *   apply localStorage afterwards.
  */
 export async function renderDashboard(
   ctx: StudioContext,
   getIndex?: DashboardIndexGetter,
+  requestUrl?: string,
 ): Promise<string> {
   // Touch the parameter so the unused-param check stays satisfied.
   void getIndex;
@@ -70,10 +90,19 @@ export async function renderDashboard(
   const now = ctx.now ? ctx.now() : new Date();
 
   const defaultSite = ctx.config.defaultSite;
-  const stageSections = DASHBOARD_STAGE_ORDER.map((stage) => {
-    const bucket = data.byStage.get(stage) ?? [];
-    return renderStageSection(stage, bucket, defaultSite).__raw;
-  }).join('\n');
+
+  // Phase 5 Task 5.1: emit the bay shell (one swimlane per focused
+  // lane). Per Commandment II of DESKWORK-STATE-MACHINE.md, stage
+  // labels come from each lane's template — no hardcoded
+  // "Drafting" / "Published" anywhere in this render path.
+  const focusFromUrl = parseFocusFromRequest(requestUrl);
+  const swimlanes = renderSwimlanesShell({
+    lanes: data.lanes,
+    defaultSite,
+    projectRoot: ctx.projectRoot,
+    focusFromUrl,
+    parentsByMemberUuid: data.parentsByMemberUuid,
+  });
 
   // v7 architecture (Step 2.2.9 — studio-mobile-first): the Desk absorbs
   // the Shortform-by-platform view as its second section, plus reserved
@@ -109,6 +138,12 @@ export async function renderDashboard(
   );
   const adjacentSection = renderAdjacentSection();
 
+  // Per ambiguity resolution 2 (Task 5.1): the shortform + adjacent
+  // sections render BELOW the new bay shell as siblings. The
+  // Distribution placeholder remains a top-level sibling because no
+  // lane template currently lists "Distribution" as a stage — if a
+  // future template does, the swimlanes will render it inline and a
+  // separate placeholder commit retires the top-level sibling.
   const body = html`
   ${masthead}
   ${renderMastheadMenu()}
@@ -116,7 +151,7 @@ export async function renderDashboard(
   ${renderHeader(data, ctx.projectRoot, now)}
   <main class="er-container">
     ${renderFilterStrip()}
-    ${unsafe(stageSections)}
+    ${swimlanes}
     ${renderDistributionPlaceholder()}
     ${shortformSection}
     ${adjacentSection}
@@ -134,12 +169,42 @@ export async function renderDashboard(
       '/static/css/dashboard-mobile.css',
       '/static/css/dashboard-desk-sections.css',
       '/static/css/dashboard-row-affordances.css',
+      '/static/css/dashboard-swimlane-shell.css',
+      '/static/css/dashboard-swimlane-rail.css',
+      '/static/css/dashboard-swimlane-presets.css',
+      '/static/css/dashboard-swimlane-chips.css',
+      '/static/css/dashboard-swimlane-collapse.css',
+      '/static/css/dashboard-swimlane-list.css',
+      '/static/css/dashboard-swimlane-compose.css',
+      '/static/css/dashboard-swimlane-drag.css',
+      '/static/css/dashboard-swimlane-mobile.css',
+      '/static/css/dashboard-lane-stack.css',
       '/static/css/mobile-shell.css',
     ],
     bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,
     scriptModules: ['editorial-studio-client'],
   });
+}
+
+/**
+ * Parse the `?focus=<csv>` query parameter from a request URL.
+ * Returns null when the parameter is missing or empty so the caller
+ * can distinguish "URL did not specify focus" from "URL specified
+ * an empty focus set."
+ */
+function parseFocusFromRequest(requestUrl: string | undefined): readonly string[] | null {
+  if (requestUrl === undefined) return null;
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(requestUrl);
+  } catch {
+    // Malformed URL — treat as "no override" rather than throwing.
+    // The dashboard's render path should never crash because a route
+    // handler handed it a string the URL parser can't accept.
+    return null;
+  }
+  return parseFocusCsv(parsedUrl.searchParams.get('focus'));
 }
 
 /**

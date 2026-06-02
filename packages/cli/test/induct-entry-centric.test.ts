@@ -5,6 +5,12 @@
  * Cancelled → priorStage, Final → Drafting, pipeline → require --to),
  * the explicit `--to <Stage>` override, and the off-pipeline target
  * refusal.
+ *
+ * Phase 7.35 (graphical-entries) — AUDIT-20260530-20 regression
+ * coverage: the CLI is now template-aware. The visual-lane tests
+ * exercise non-editorial templates end-to-end; the invalid-stage test
+ * pins the error-message contract (must name `template.linearStages`,
+ * NOT the editorial six).
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -53,6 +59,7 @@ function writeSidecar(
   slug: string,
   currentStage: string,
   priorStage?: string,
+  lane?: string,
 ): void {
   writeFileSync(
     join(project, '.deskwork', 'entries', `${uuid}.json`),
@@ -62,9 +69,20 @@ function writeSidecar(
       currentStage,
       iterationByStage: {},
       ...(priorStage !== undefined && { priorStage }),
+      ...(lane !== undefined && { lane }),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }),
+    'utf-8',
+  );
+}
+
+function writeLane(id: string, pipelineTemplate: string): void {
+  const dir = join(project, '.deskwork', 'lanes');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, `${id}.json`),
+    JSON.stringify({ id, name: id, pipelineTemplate, contentDir: 'docs' }),
     'utf-8',
   );
 }
@@ -156,5 +174,74 @@ describe('deskwork induct — entry-centric stage teleport', () => {
     const res = induct('mistaken2', '--to', 'Cancelled');
     expect(res.code).not.toBe(0);
     expect(res.stderr).toMatch(/Target must be a linear-pipeline stage|deskwork cancel/i);
+  });
+
+  // ---- Template-awareness (AUDIT-20260530-20) ---------------------
+  //
+  // The CLI must resolve the entry's lane → pipeline template before
+  // validating `--to`. Editorial-narrow `isLinearPipelineTarget` is
+  // gone; the guard now consults `template.linearStages`.
+
+  it('inducts visual-lane Cancelled → Sketched (--to Sketched on a visual entry)', () => {
+    // AUDIT-20260530-20 repro: pre-fix CLI rejected `--to Sketched`
+    // with "must be a linear-pipeline stage (Ideas, Planned, ...)"
+    // because the editorial-only guard never saw the entry's template.
+    writeLane('mockups', 'visual');
+    const uuid = '550e8400-e29b-41d4-a716-446655440010';
+    writeSidecar(uuid, 'icon-set', 'Cancelled', 'Sketched', 'mockups');
+
+    const res = induct('icon-set', '--to', 'Sketched');
+    expect(res.stderr).toBe('');
+    expect(res.code).toBe(0);
+
+    const sidecar = readSidecar(uuid);
+    expect(sidecar.currentStage).toBe('Sketched');
+  });
+
+  it('inducts editorial-lane Cancelled → Drafting (regression — editorial path still works)', () => {
+    writeLane('default', 'editorial');
+    const uuid = '550e8400-e29b-41d4-a716-446655440011';
+    writeSidecar(uuid, 'editorial-revival', 'Cancelled', 'Drafting', 'default');
+
+    const res = induct('editorial-revival', '--to', 'Drafting');
+    expect(res.stderr).toBe('');
+    expect(res.code).toBe(0);
+
+    expect(readSidecar(uuid).currentStage).toBe('Drafting');
+  });
+
+  it('refuses --to <stage-unknown-to-template> with the template\'s linearStages in the error', () => {
+    // Visual lane: linearStages are Sketched / Iterating / Approved /
+    // Shipped. Drafting belongs to editorial, NOT visual. The error
+    // must name the visual stages, NOT the editorial six — the
+    // editorial-narrow hardcoded list is the precise bug being fixed.
+    writeLane('mockups', 'visual');
+    const uuid = '550e8400-e29b-41d4-a716-446655440012';
+    writeSidecar(uuid, 'visual-mistake', 'Sketched', undefined, 'mockups');
+
+    const res = induct('visual-mistake', '--to', 'Drafting');
+    expect(res.code).not.toBe(0);
+    // The error must name the visual template's actual linear stages.
+    expect(res.stderr).toMatch(/Sketched/);
+    expect(res.stderr).toMatch(/Iterating/);
+    expect(res.stderr).toMatch(/Approved/);
+    expect(res.stderr).toMatch(/Shipped/);
+    // It must NOT recite the editorial-narrow hardcoded vocabulary.
+    expect(res.stderr).not.toMatch(/Ideas, Planned, Outlining, Drafting, Final, Published/);
+  });
+
+  it('defaults --to from visual-lane Archived → priorStage (off-pipeline detection is template-aware)', () => {
+    // Visual template adds `Archived` to offPipelineStages. The
+    // CLI's default-stage path must treat any of the template's
+    // off-pipeline stages — not just hardcoded Blocked/Cancelled —
+    // as eligible for the priorStage shortcut.
+    writeLane('mockups', 'visual');
+    const uuid = '550e8400-e29b-41d4-a716-446655440013';
+    writeSidecar(uuid, 'archived-asset', 'Archived', 'Iterating', 'mockups');
+
+    const res = induct('archived-asset');
+    expect(res.stderr).toBe('');
+    expect(res.code).toBe(0);
+    expect(readSidecar(uuid).currentStage).toBe('Iterating');
   });
 });

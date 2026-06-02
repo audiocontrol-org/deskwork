@@ -79,6 +79,27 @@ export function loadDispositionsFile(
         `--dispositions[${commentId}].disposition: must be 'addressed' | 'deferred' | 'wontfix'`,
       );
     }
+    // Phase 8 Step 8.5.2 — `addressed` MUST carry a non-empty `reason`.
+    // Pairs with Step 8.1.2's write-side schema gate (commit 91954561)
+    // by failing fast at parse time with a friendlier error shape: the
+    // operator sees the offending commentId + the expected file shape
+    // BEFORE any journal-write attempt. Exit code 2 (usage error,
+    // matching the OutOfRangePositionError / Task 0.66 precedent for
+    // CLI-shape failures). `deferred` and `wontfix` accept an optional
+    // `reason` — only `addressed` is gated, per the Step 8.1.2 contract.
+    if (
+      r.disposition === 'addressed'
+      && (typeof r.reason !== 'string' || r.reason.length === 0)
+    ) {
+      fail(
+        `--dispositions[${commentId}].reason: required (non-empty) when `
+        + `disposition === 'addressed'. The reason records what the iteration `
+        + `did to satisfy the operator's margin note (e.g. "addressed by `
+        + `adding § X at line N"). Expected shape:\n`
+        + `  { "${commentId}": { "disposition": "addressed", "reason": "<text>" } }`,
+        2,
+      );
+    }
     const entry: DispositionEntry = { disposition: r.disposition };
     if (typeof r.reason === 'string' && r.reason.length > 0) {
       entry.reason = r.reason;

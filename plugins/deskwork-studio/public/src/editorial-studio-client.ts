@@ -8,8 +8,19 @@
 import { copyOrShowFallback } from './clipboard.ts';
 import { initComposeChip } from './dashboard/compose-chip.ts';
 import { initRowActions } from './dashboard/row-actions.ts';
+import { initRowMemberTab } from './dashboard/row-member-tab.ts';
 import { initStageTiles } from './dashboard/stage-tiles.ts';
+import { initSwimlane } from './dashboard/swimlane.ts';
+import { initSwimlaneCollapse } from './dashboard/swimlane-collapse.ts';
+import { initSwimlaneViewToggle } from './dashboard/swimlane-view-toggle.ts';
+import { initSwimlaneCompose } from './dashboard/swimlane-compose.ts';
+import { initSwimlaneMobileSheet } from './dashboard/swimlane-mobile-sheet.ts';
+import { initSwimlaneDrag } from './dashboard/swimlane-drag.ts';
+import { initSwimlanePresets } from './dashboard/swimlane-presets.ts';
+import { initLaneStack } from './dashboard/lane-stack.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
+import { initLanesPage } from './lanes/lanes-page.ts';
+import { initPipelinesPage } from './pipelines/pipelines-page.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
   const site = btn.dataset.site;
@@ -513,8 +524,33 @@ function init(): void {
   initLocaleDates();
   initComposeChip();
   initStageTiles();
+  initSwimlane();
+  initSwimlaneCollapse();
+  initSwimlaneViewToggle();
+  initSwimlaneCompose();
+  initSwimlaneMobileSheet();
+  initSwimlaneDrag();
+  // AUDIT-20260528-10: lane-stack accordion controller wires the
+  // mobile lane-stack's `<header class="lane-head">` ↔ `<div
+  // class="lane-body">` accordion contract. Idempotent — no-op when
+  // the lane-stack is absent (non-dashboard pages).
+  initLaneStack();
+  // Task 5.5: must run AFTER initSwimlane / initSwimlaneCollapse /
+  // initSwimlaneViewToggle — the preset controller's deep-link
+  // apply path calls their `reapply*FromStorage` exports, which
+  // require each init function to have populated the controller's
+  // module-level singleton state.
+  initSwimlanePresets();
   initRowActions();
+  // Phase 7 Task 7.3 Direction 1 — row "Member of:" pull-tab toggle.
+  initRowMemberTab();
   initMastheadPopover();
+  // Phase 6 Task 6.3: lanes-page controller (idempotent — no-op
+  // when [data-lanes-container] is absent on the dashboard).
+  initLanesPage();
+  // Phase 6 Task 6.4: pipelines-page controller (idempotent — no-op
+  // when [data-pipelines-container] is absent).
+  initPipelinesPage();
 }
 
 init();

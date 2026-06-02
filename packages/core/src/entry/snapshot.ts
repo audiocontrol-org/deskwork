@@ -36,7 +36,8 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import type { Entry, Stage } from '../schema/entry.ts';
+import type { Entry } from '../schema/entry.ts';
+import { stageNameToFilesystemToken } from '../pipelines/stage-token.ts';
 
 export interface SnapshotResult {
   /** True when a snapshot file was written (or already matched on disk). */
@@ -80,7 +81,10 @@ async function atomicWrite(absPath: string, content: string): Promise<void> {
 export async function snapshotIndexForStage(
   projectRoot: string,
   entry: Entry,
-  priorStage: Stage,
+  // Per Phase 3 (graphical-entries) Entry.currentStage is now any string
+  // (lane-template-driven). The snapshot filename is the lowercased
+  // stage name, so any non-empty string works.
+  priorStage: string,
 ): Promise<SnapshotResult> {
   if (!entry.artifactPath) {
     // Legacy entries without an artifactPath: no anchor for the
@@ -106,10 +110,17 @@ export async function snapshotIndexForStage(
     return { snapshotted: false, skipReason: 'no-index-md' };
   }
   const content = await readFile(indexPath, 'utf8');
+  // Phase 4 Task 4.1.6: use the filesystem-safe tokenizer rather than a
+  // raw `toLowerCase()`. Editorial stages happen to lowercase cleanly
+  // (`Drafting` -> `drafting`), but lane-template stages may contain
+  // whitespace or characters that the lowercase form alone doesn't
+  // sanitize. The tokenizer enforces the filesystem-safe contract and
+  // throws with a descriptive error if a custom stage name cannot be
+  // safely represented.
   const targetPath = join(
     dir,
     'scrapbook',
-    `${priorStage.toLowerCase()}.md`,
+    `${stageNameToFilesystemToken(priorStage)}.md`,
   );
 
   if (await fileExists(targetPath)) {

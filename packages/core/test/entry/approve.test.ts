@@ -73,8 +73,12 @@ describe('approveEntryStage', () => {
     expect(result.toStage).toBe('Final');
     const sidecar = await readSidecar(projectRoot, uuid);
     expect(sidecar.currentStage).toBe('Final');
-    // reviewState is RETIRED; assert against the raw on-disk JSON since the
-    // typed Entry no longer carries the field.
+    // Per DESKWORK-STATE-MACHINE.md Commandment III, reviewState is
+    // RETIRED — the schema field is gone, so it's necessarily absent
+    // from any read sidecar. Assert via `in` against the typed shape
+    // AND via the raw on-disk JSON to prove approve strips the
+    // planted legacy field on write-back.
+    expect('reviewState' in sidecar).toBe(false);
     const rawSidecar = await readFile(sidecarPath(projectRoot, uuid), 'utf8');
     expect(rawSidecar).not.toContain('reviewState');
   });

@@ -99,6 +99,10 @@ function seedAddress(
   atMsAgo = 30_000,
 ): void {
   const at = new Date(Date.now() - atMsAgo).toISOString();
+  // Phase 8 Step 8.1.2 (graphical-entries): `reason` is required on
+  // address events whose disposition is `addressed`. Seed a stable
+  // sentinel so the schema accepts the fixture event.
+  const reason = disposition === 'addressed' ? 'test fixture reason' : undefined;
   const event = {
     kind: 'entry-annotation',
     at,
@@ -111,6 +115,7 @@ function seedAddress(
       commentId,
       version: 1,
       disposition,
+      ...(reason ? { reason } : {}),
     },
   };
   writeEvent(at, entryId, `address-${commentId}`, event);

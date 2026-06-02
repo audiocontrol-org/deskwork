@@ -22,7 +22,19 @@ import {
   wrapRange,
 } from './range-utils.ts';
 import { computeMarkPencilPosition } from './pencil-position.ts';
-import { buildSidebarItem } from './sidebar-render.ts';
+import {
+  buildSidebarItem,
+  type DiffHunk,
+  type DiffSliceFetcher,
+  type DiffSlicePayload,
+} from './sidebar-render.ts';
+import {
+  buildSidebarThread,
+  expandThreadForRoot,
+  findThreadRootByCommentId,
+} from './thread-render.ts';
+import { groupCommentsIntoThreads, type Thread } from './threads.ts';
+import { cssEscapeForSelector } from './css-escape.ts';
 import {
   createCommentEditApi,
   createEditDeleteHandlers,
@@ -103,6 +115,65 @@ export function createAnnotationsController(
     `${ENTRY_API}/${encodeURIComponent(entryId)}/annotations`;
   const annotateUrl = (): string =>
     `${ENTRY_API}/${encodeURIComponent(entryId)}/annotate`;
+  // Phase 8 Step 8.6.1 — fetch the diff slice for an addressed
+  // comment. Wired into `buildSidebarItem` so the "addressed" stamp
+  // becomes click-interactive. Throws on non-200 so the toggle's
+  // error branch surfaces an inline marker instead of silently
+  // rendering an empty expansion. Validates the response shape with
+  // explicit per-field type guards (no `as` casts) — the server
+  // contract is owned by `routes/api.ts`'s diff-slice route + the
+  // `computeDiffSlice` return type, but the client doesn't trust the
+  // wire format on read.
+  const fetchDiffSlice: DiffSliceFetcher = async (
+    commentId: string,
+    revision: number,
+  ): Promise<DiffSlicePayload> => {
+    const url =
+      `${ENTRY_API}/${encodeURIComponent(entryId)}/diff-slice` +
+      `?commentId=${encodeURIComponent(commentId)}` +
+      `&revision=${encodeURIComponent(String(revision))}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const body: unknown = await res.json();
+    if (typeof body !== 'object' || body === null) {
+      throw new Error('expected JSON object response');
+    }
+    const reason = Reflect.get(body, 'reason');
+    const hunksRaw = Reflect.get(body, 'hunks');
+    const notes = Reflect.get(body, 'notes');
+    if (typeof reason !== 'string' || !Array.isArray(hunksRaw)) {
+      throw new Error('malformed diff-slice response');
+    }
+    const hunks: DiffHunk[] = [];
+    for (const raw of hunksRaw) {
+      if (typeof raw !== 'object' || raw === null) {
+        throw new Error('malformed hunk entry');
+      }
+      const oldStart = Reflect.get(raw, 'oldStart');
+      const oldLines = Reflect.get(raw, 'oldLines');
+      const newStart = Reflect.get(raw, 'newStart');
+      const newLines = Reflect.get(raw, 'newLines');
+      const lines = Reflect.get(raw, 'lines');
+      if (
+        typeof oldStart !== 'number' ||
+        typeof oldLines !== 'number' ||
+        typeof newStart !== 'number' ||
+        typeof newLines !== 'number' ||
+        !Array.isArray(lines) ||
+        !lines.every((l) => typeof l === 'string')
+      ) {
+        throw new Error('malformed hunk fields');
+      }
+      hunks.push({ oldStart, oldLines, newStart, newLines, lines });
+    }
+    return {
+      reason,
+      hunks,
+      ...(typeof notes === 'string' ? { notes } : {}),
+    };
+  };
   const editApi = createCommentEditApi(entryId, showToast);
   const editDeleteHandlers = createEditDeleteHandlers({
     api: editApi,
@@ -136,20 +207,56 @@ export function createAnnotationsController(
     if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  function addSidebarItem(annotation: CommentAnnotation, status: AnnotationStatus): void {
-    sidebarEmpty.hidden = true;
-    const li = buildSidebarItem(annotation, status, {
+  /**
+   * Per-card render deps shared by `addSidebarItem` (single comment)
+   * and `addSidebarThread` (root + replies). Centralizing the deps
+   * payload keeps the two entry points in lockstep — adding a new
+   * dep (e.g. an attachment-preview callback in a later task) hits
+   * one site instead of two.
+   */
+  function sidebarItemDeps(): Parameters<typeof buildSidebarItem>[2] {
+    return {
       draftBody,
       addressByCommentId,
+      fetchDiffSlice,
       onResolve: (a, s) => { void resolveComment(a, s); },
       onEdit: editDeleteHandlers.onEdit,
       onDelete: editDeleteHandlers.onDelete,
       onHoverEnter: (id) => setActiveHighlight(id, true),
       onHoverLeave: (id) => setActiveHighlight(id, false),
       onScrollTo: (id) => scrollToHighlight(id),
-    });
+    };
+  }
+
+  function addSidebarItem(annotation: CommentAnnotation, status: AnnotationStatus): void {
+    sidebarEmpty.hidden = true;
+    const li = buildSidebarItem(annotation, status, sidebarItemDeps());
     sidebarList.appendChild(li);
     sidebarIndex.set(annotation.id, li);
+  }
+
+  /**
+   * Phase 8 Task 8.2 — render an entire thread (root + replies) as
+   * a single sidebar item. The root card carries the reply-count
+   * badge + collapsed-replies container per `thread-render.ts`.
+   * Reply cards inside the thread are indexed in `sidebarIndex` by
+   * their own comment id so the per-comment Resolve / Edit / Delete
+   * round-trips continue to find their <li> targets.
+   */
+  function addSidebarThread(thread: Thread, status: AnnotationStatus): void {
+    sidebarEmpty.hidden = true;
+    const li = buildSidebarThread(thread, status, sidebarItemDeps());
+    sidebarList.appendChild(li);
+    sidebarIndex.set(thread.root.id, li);
+    // Index reply cards too — each reply has its own sidebar <li>
+    // nested inside the root, and per-comment Resolve / Edit /
+    // Delete need to be able to find that nested element by id.
+    for (const reply of thread.replies) {
+      const replyEl = li.querySelector<HTMLElement>(
+        `.er-marginalia-item--reply[data-annotation-id="${cssEscapeForSelector(reply.id)}"]`,
+      );
+      if (replyEl !== null) sidebarIndex.set(reply.id, replyEl);
+    }
   }
 
   // ---- Composer ----
@@ -330,21 +437,83 @@ export function createAnnotationsController(
       rebased.sort((a, b) => b.ann.version - a.ann.version);
       unanchored.sort((a, b) => b.version - a.version);
 
-      for (const a of current) {
-        wrapRange(draftBody, a.range, a.id);
-        addSidebarItem(a, 'current');
+      // Phase 8 Task 8.2 — group comments into threads BEFORE
+      // rendering so each root + its replies render as a single
+      // sidebar item (sidebar-grouped placement). Each per-status
+      // bucket is grouped independently — a reply whose root falls
+      // in a different status bucket renders as an orphan reply at
+      // its own status (the renderer surfaces the broken-thread
+      // state visibly so the operator can resolve it). This
+      // bucket-local grouping matches the existing per-status
+      // ordering invariants (current first, then rebased by
+      // version-desc, then unanchored).
+      const currentThreads = groupCommentsIntoThreads(current);
+      const rebasedThreads = groupCommentsIntoThreads(
+        rebased.map((r) => r.ann),
+      );
+      const unanchoredThreads = groupCommentsIntoThreads(unanchored);
+      const rebasedRangeById = new Map<string, DraftRange>();
+      for (const r of rebased) rebasedRangeById.set(r.ann.id, r.range);
+
+      for (const thread of currentThreads) {
+        wrapRange(draftBody, thread.root.range, thread.root.id);
+        for (const reply of thread.replies) {
+          if (reply.range !== undefined) {
+            wrapRange(draftBody, reply.range, reply.id);
+          }
+        }
+        addSidebarThread(thread, 'current');
       }
-      for (const r of rebased) {
-        wrapRange(draftBody, r.range, r.ann.id);
-        addSidebarItem(r.ann, 'rebased');
+      for (const thread of rebasedThreads) {
+        const rootRange = rebasedRangeById.get(thread.root.id) ?? thread.root.range;
+        wrapRange(draftBody, rootRange, thread.root.id);
+        for (const reply of thread.replies) {
+          const replyRange = rebasedRangeById.get(reply.id) ?? reply.range;
+          wrapRange(draftBody, replyRange, reply.id);
+        }
+        addSidebarThread(thread, 'rebased');
       }
-      for (const a of unanchored) {
-        addSidebarItem(a, 'unresolved');
+      for (const thread of unanchoredThreads) {
+        addSidebarThread(thread, 'unresolved');
       }
+      maybeApplyHashPermalink();
       updateResolvedFooter();
     } catch (e) {
       showToast(`Failed to load annotations: ${e instanceof Error ? e.message : String(e)}`, true);
     }
+  }
+
+  // ---- Permalinks (Phase 8 Task 8.2 Step 8.2.3) ----
+
+  /**
+   * Parse `#comment/<id>` out of the current `window.location.hash`
+   * and scroll the corresponding sidebar item into view. When the
+   * targeted comment is part of a thread with replies (root OR
+   * reply), expand the thread so the operator lands inside an
+   * already-open thread rather than staring at a collapsed badge.
+   *
+   * Called once at the end of `loadAnnotations()` so the initial
+   * paint settles before we scroll, AND from the `hashchange`
+   * listener wired at the bottom of `createAnnotationsController`
+   * so subsequent permalink clicks within the same page session
+   * also resolve.
+   *
+   * No-op when the hash isn't `#comment/<id>` shape or the id
+   * doesn't resolve to a sidebar item.
+   */
+  function maybeApplyHashPermalink(): void {
+    const hash = window.location.hash;
+    const match = /^#comment\/(.+)$/.exec(hash);
+    if (match === null) return;
+    const commentId = decodeURIComponent(match[1] ?? '');
+    if (commentId === '') return;
+    const item = sidebarIndex.get(commentId);
+    if (item === undefined) return;
+    const rootLi = findThreadRootByCommentId(sidebarList, commentId);
+    if (rootLi !== null) expandThreadForRoot(rootLi);
+    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    item.classList.add('active');
+    setTimeout(() => item.classList.remove('active'), 1800);
   }
 
   // ---- Resolve / re-open ----
@@ -390,6 +559,7 @@ export function createAnnotationsController(
       draftBody,
       addressByCommentId,
       resolvedHistory,
+      fetchDiffSlice,
       onReopen: (a, s) => { void reopenComment(a, s); },
     });
   }
@@ -516,6 +686,14 @@ export function createAnnotationsController(
       setTimeout(() => setActiveHighlight(id, false), 1800);
     }
   }
+
+  // Phase 8 Task 8.2 Step 8.2.3 — re-resolve `#comment/<id>` when
+  // the operator clicks a permalink while the page is already
+  // loaded. The initial-load case is handled by the explicit
+  // `maybeApplyHashPermalink()` call inside `loadAnnotations`.
+  window.addEventListener('hashchange', () => {
+    maybeApplyHashPermalink();
+  });
 
   return {
     closeComposer,

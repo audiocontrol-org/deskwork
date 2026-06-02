@@ -35,6 +35,7 @@ import type { JournalEvent } from '../schema/journal-events.ts';
 import type {
   CommentAnnotation,
   DraftAnnotation,
+  SpatialAnchor,
 } from '../review/types.ts';
 
 /**
@@ -51,6 +52,56 @@ import type {
  * casts; no `any`.
  */
 type StoredAnnotation = Extract<JournalEvent, { kind: 'entry-annotation' }>['annotation'];
+type StoredComment = Extract<StoredAnnotation, { type: 'comment' }>;
+type StoredSpatialAnchor = NonNullable<StoredComment['spatialAnchor']>;
+
+/**
+ * Local exhaustiveness guard. If a future `SpatialAnchor` variant is
+ * added to the discriminated union (e.g. `audio-region`,
+ * `video-frame`) but the matching `case` is not added to
+ * `cloneSpatialAnchor` below, the compiler now flags the missing arm at
+ * the `assertNever` call site (parameter `_input` is typed `never`).
+ * Without this guard, the rewritten switch would silently fall through
+ * the switch with no `default` arm, returning `undefined` at runtime —
+ * the lockstep contract between the TS union and the clone path would
+ * be enforced only by convention.
+ *
+ * AUDIT-20260601-09 — companion guard to the AUDIT-20260601-07
+ * discriminated-union refactor.
+ */
+function assertNever(_input: never, context: string): never {
+  throw new Error(`Unhandled discriminated-union variant in ${context}`);
+}
+
+/**
+ * Defensive copy for {@link SpatialAnchor} — keeps the in-memory
+ * representation independent of the journal-event payload so later
+ * mutations on either side don't leak.
+ *
+ * Post-AUDIT-20260601-07, {@link SpatialAnchor} is a discriminated
+ * union — each `kind` declares only the fields its variant requires
+ * — so the clone path narrows on `input.kind` and emits the matching
+ * variant. The Zod-inferred {@link StoredSpatialAnchor} shape is also
+ * a discriminated union (the schema is a `z.discriminatedUnion`), so
+ * the narrow flows symmetrically.
+ *
+ * Per AUDIT-20260601-09, the `default` arm calls `assertNever` so
+ * adding a new {@link SpatialAnchor} variant without updating this
+ * switch is a compile-time error (the parameter narrows to `never`
+ * only when every variant is handled above).
+ */
+function cloneSpatialAnchor(input: StoredSpatialAnchor): SpatialAnchor {
+  switch (input.kind) {
+    case 'pixel':
+      return { kind: 'pixel', x: input.x, y: input.y };
+    case 'dom-selector':
+      return { kind: 'dom-selector', selector: input.selector };
+    case 'svg-element':
+      return { kind: 'svg-element', selector: input.selector };
+    default:
+      return assertNever(input, 'cloneSpatialAnchor');
+  }
+}
 
 function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
   const base = {
@@ -68,6 +119,14 @@ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
         text: stored.text,
         ...(stored.category !== undefined ? { category: stored.category } : {}),
         ...(stored.anchor !== undefined ? { anchor: stored.anchor } : {}),
+        // Phase 8 Step 8.1.1 — pass new optional fields through.
+        ...(stored.replyTo !== undefined ? { replyTo: stored.replyTo } : {}),
+        ...(stored.attachments !== undefined
+          ? { attachments: [...stored.attachments] }
+          : {}),
+        ...(stored.spatialAnchor !== undefined
+          ? { spatialAnchor: cloneSpatialAnchor(stored.spatialAnchor) }
+          : {}),
       };
       return out;
     }
@@ -100,12 +159,57 @@ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
         resolved: stored.resolved,
       };
     case 'address':
+      // Phase 8 Step 8.1.2 (Part 2) — `AddressAnnotation` is now a
+      // discriminated union over `disposition`. The compiler can't pick
+      // a single variant from `stored.disposition` (which is the full
+      // enum) at the object-literal site, so each disposition branches
+      // explicitly. The `addressed` variant requires non-empty
+      // `reason`; the read-side schema (`DraftAnnotationSchema`'s
+      // top-level `.superRefine`) has already rejected the event if
+      // the contract was violated on disk, so reaching this branch
+      // with `disposition === 'addressed'` and a missing reason is
+      // unreachable — but the type system needs the explicit narrow.
+      if (stored.disposition === 'addressed') {
+        // `stored.reason` is `string | undefined` from the schema's
+        // optional declaration; the runtime superRefine enforced
+        // non-empty when disposition === 'addressed', so a missing
+        // reason here would have failed the read-side parse and never
+        // reached this code path.
+        if (typeof stored.reason !== 'string' || stored.reason.length === 0) {
+          throw new Error(
+            `toDraftAnnotation: addressed annotation ${stored.id} reached the ` +
+              `read fold path without a non-empty reason — the Phase 8 Step ` +
+              `8.1.2 contract on DraftAnnotationSchema's top-level superRefine ` +
+              `should have rejected this event before it reached toDraftAnnotation. ` +
+              `This indicates a bypassed schema parse (e.g. legacy data read ` +
+              `directly) or a schema regression.`,
+          );
+        }
+        return {
+          ...base,
+          type: 'address',
+          commentId: stored.commentId,
+          version: stored.version,
+          disposition: 'addressed',
+          reason: stored.reason,
+        };
+      }
+      if (stored.disposition === 'deferred') {
+        return {
+          ...base,
+          type: 'address',
+          commentId: stored.commentId,
+          version: stored.version,
+          disposition: 'deferred',
+          ...(stored.reason !== undefined ? { reason: stored.reason } : {}),
+        };
+      }
       return {
         ...base,
         type: 'address',
         commentId: stored.commentId,
         version: stored.version,
-        disposition: stored.disposition,
+        disposition: 'wontfix',
         ...(stored.reason !== undefined ? { reason: stored.reason } : {}),
       };
     case 'edit-comment':
@@ -119,6 +223,13 @@ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
           : {}),
         ...(stored.category !== undefined ? { category: stored.category } : {}),
         ...(stored.anchor !== undefined ? { anchor: stored.anchor } : {}),
+        // Phase 8 Step 8.4.1 — attachments patch field. The fold path
+        // (`applyEdits` below) treats a present array as a full
+        // replacement of the prior value, identical to every other
+        // edit-comment field's full-replace semantics.
+        ...(stored.attachments !== undefined
+          ? { attachments: [...stored.attachments] }
+          : {}),
       };
     case 'delete-comment':
       return {
@@ -295,12 +406,27 @@ function applyEdits(
   // text/category edit unchanged.
   const anchorPrefix = comment.anchorPrefix;
   const anchorSuffix = comment.anchorSuffix;
+  // Phase 8 Step 8.1.1 — replyTo / spatialAnchor remain immutable
+  // through `edit-comment` (the edit schema doesn't expose them);
+  // preserve unchanged the same way prefix/suffix are.
+  //
+  // Phase 8 Step 8.4.1 — `attachments` IS now mutable via
+  // `edit-comment` (a screenshot attached after the comment was
+  // originally posted lands as an `edit-comment` event carrying the
+  // full intended attachment list). Full-replacement semantics: a
+  // present `attachments` field on the edit REPLACES the prior list;
+  // an absent `attachments` PRESERVES the prior list. Callers wishing
+  // to add a single screenshot pass `[...prior, newPath]`.
+  const replyTo = comment.replyTo;
+  let attachments = comment.attachments;
+  const spatialAnchor = comment.spatialAnchor;
   for (const e of edits) {
     if (e.type !== 'edit-comment') continue;
     if (e.text !== undefined) text = e.text;
     if (e.range !== undefined) range = { start: e.range.start, end: e.range.end };
     if (e.category !== undefined) category = e.category;
     if (e.anchor !== undefined) anchor = e.anchor;
+    if (e.attachments !== undefined) attachments = [...e.attachments];
   }
   const out: CommentAnnotation = {
     id: comment.id,
@@ -314,6 +440,11 @@ function applyEdits(
     ...(anchor !== undefined ? { anchor } : {}),
     ...(anchorPrefix !== undefined ? { anchorPrefix } : {}),
     ...(anchorSuffix !== undefined ? { anchorSuffix } : {}),
+    ...(replyTo !== undefined ? { replyTo } : {}),
+    ...(attachments !== undefined ? { attachments: [...attachments] } : {}),
+    ...(spatialAnchor !== undefined
+      ? { spatialAnchor: cloneSpatialAnchor(spatialAnchor) }
+      : {}),
   };
   return out;
 }

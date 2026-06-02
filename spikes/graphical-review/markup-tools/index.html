@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Markup-tools spike (Excalidraw)</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <h1>Markup-tools spike (Excalidraw)</h1>
+      <p class="lede">
+        Phase 1 Task 1.4.3 — Excalidraw mounted on top of a fixture
+        editorial dashboard image. Draw arrows, boxes, freehand, text;
+        export the composed scene as a PNG.
+      </p>
+    </header>
+
+    <main class="markup-main">
+      <div class="toolbar" role="toolbar" aria-label="Markup actions">
+        <button id="fixture-btn" type="button">Add fixture image</button>
+        <button id="export-btn" type="button">Save markup (PNG)</button>
+        <button id="reset-btn" type="button">Reset scene</button>
+        <span class="status" id="status" aria-live="polite">Markup editor mounting…</span>
+      </div>
+      <p class="hint">
+        Excalidraw's native toolbar (top of the editor) carries the
+        arrow / rectangle / freehand / text / image / eraser tools. The
+        "blur" effect is achieved by inserting an opaque rectangle
+        styled with the canvas's blur stroke style — see the spike's
+        findings doc for the limitation.
+      </p>
+
+      <!-- Excalidraw mounts here. Sized to wrap the fixture image so the
+           operator can mark up directly over it. -->
+      <div id="markup-mount"></div>
+
+      <details class="export-debug">
+        <summary>Exported PNG preview (after Save)</summary>
+        <div id="export-preview"><p class="placeholder">No export yet.</p></div>
+      </details>
+    </main>
+
+    <footer class="footnotes">
+      <p>
+        Excalidraw is mounted via React. Each shape created by the user
+        emits an element entry in the scene; the export combines the
+        fixture image (added as an Excalidraw image element) with the
+        markup layer into a single PNG.
+      </p>
+    </footer>
+
+    <script type="module" src="./src/main.jsx"></script>
+  </body>
+</html>

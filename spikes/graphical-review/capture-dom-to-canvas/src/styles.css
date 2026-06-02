@@ -1,0 +1,333 @@
+/* Phase 1 Task 1.4.2 — page chrome + fidelity-stress fixture.
+ * Self-contained CSS — no external imports beyond the local @font-face
+ * declaration loaded by index.html via the head <link>.
+ * The fixture deliberately exercises features known to stress
+ * DOM-to-canvas rasterizers: web fonts, flex/grid, pseudo-elements,
+ * box-shadow, border-radius, inline SVG, multi-line text. */
+
+/* Web-font @font-face declaration. Same-origin, deliberately points at a
+ * filename that does NOT exist on disk in the spike — the goal is to
+ * measure html-to-image's behaviour when a declared web font fails to
+ * resolve. Capture should fall through to the @font-face's CSS-cascade
+ * fallback chain (Georgia, serif), and the spike's probe records which
+ * font the rasterized output actually used.
+ *
+ * Browsers honour `font-display: swap`: the fixture renders immediately
+ * with the fallback, then the browser would normally swap to the
+ * downloaded face. Because the download fails (404), the fallback stays.
+ * html-to-image's `font-embed-css` inlines @font-face rules; an inlined
+ * rule that points at a missing URL is the realistic adopter shape. */
+@font-face {
+  font-family: 'LoraTest';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./lora-600.woff2') format('woff2');
+}
+
+:root {
+  --ink: #1c1c1c;
+  --paper: #f6f1e8;
+  --rule: #c8b89e;
+  --accent: #6d3a1f;
+  --pane-bg: #fffaf0;
+
+  --c-published: #2f5d3a;
+  --c-drafting: #b07a1a;
+  --c-ideas: #4a4a8a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  background: var(--paper);
+  line-height: 1.5;
+}
+
+.masthead {
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid var(--rule);
+  background: var(--pane-bg);
+}
+
+.masthead h1 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.6rem;
+  letter-spacing: 0.02em;
+}
+
+.lede {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 0.95rem;
+  color: #4a3b2c;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 2fr);
+  gap: 1.5rem;
+  padding: 1.5rem 2rem;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+.controls-pane,
+.preview-pane,
+.fixture-pane {
+  background: var(--pane-bg);
+  border: 1px solid var(--rule);
+  padding: 1rem;
+}
+
+.fixture-pane {
+  margin: 0 2rem 1.5rem;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+button {
+  font: inherit;
+  background: var(--ink);
+  color: var(--pane-bg);
+  border: 1px solid var(--ink);
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #888;
+  border-color: #888;
+  cursor: not-allowed;
+}
+
+.status {
+  font-size: 0.9rem;
+  color: var(--accent);
+  margin: 0.25rem 0;
+  min-height: 1.2em;
+}
+
+.status.error {
+  color: #7a1f1f;
+  font-weight: bold;
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: #4a3b2c;
+  margin: 0.5rem 0 0 0;
+}
+
+.meta {
+  font-size: 0.85rem;
+  color: #4a3b2c;
+  margin: 0.5rem 0 0 0;
+  font-family: "SF Mono", Menlo, monospace;
+}
+
+#preview-container {
+  min-height: 200px;
+  background: #2a2a2a;
+  border: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+#preview-container img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+#preview-container .placeholder {
+  color: #aaa;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.footnotes {
+  padding: 1rem 2rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.85rem;
+  color: #4a3b2c;
+}
+
+/* ---------- Fidelity-stress fixture ---------- */
+
+.fixture {
+  /* Fixed dimensions so probe assertions on captured size are stable. */
+  width: 640px;
+  max-width: 100%;
+  padding: 1.5rem;
+  background: var(--paper);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-family: 'LoraTest', Georgia, serif;
+}
+
+.fx-head {
+  margin-bottom: 1rem;
+}
+
+.fx-title {
+  font-family: 'LoraTest', Georgia, serif;
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin: 0 0 0.25rem 0;
+  color: var(--ink);
+}
+
+.fx-tagline {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4a3b2c;
+  font-style: italic;
+}
+
+/* CSS grid with pseudo-element stamps */
+.fx-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.fx-card {
+  position: relative;
+  padding: 0.75rem;
+  background: var(--pane-bg);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.fx-card h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.fx-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #4a3b2c;
+}
+
+/* ::before pseudo-element — colored corner ribbon */
+.fx-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 100%;
+}
+
+.fx-card--published::before { background: var(--c-published); }
+.fx-card--drafting::before  { background: var(--c-drafting); }
+.fx-card--ideas::before     { background: var(--c-ideas); }
+
+/* ::after pseudo-element — small status tag in the top-right */
+.fx-card::after {
+  content: 'LANE';
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  font-weight: bold;
+}
+
+/* Flex layout with multi-line text */
+.fx-flex {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin: 1rem 0;
+}
+
+.fx-aside {
+  flex: 1;
+  padding: 0.75rem;
+  background: var(--pane-bg);
+  border-left: 4px solid var(--accent);
+  font-size: 0.9rem;
+}
+
+.fx-aside p {
+  margin: 0;
+}
+
+.fx-icon {
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: center;
+}
+
+.fx-icon figcaption {
+  font-size: 0.75rem;
+  color: #4a3b2c;
+  margin-top: 0.25rem;
+}
+
+/* Pseudo-element-only divider */
+.fx-divider {
+  position: relative;
+  height: 1rem;
+  margin: 1rem 0;
+}
+
+.fx-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--rule);
+}
+
+.fx-divider::after {
+  content: '◆';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--paper);
+  padding: 0 0.5rem;
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+/* System font fallback paragraph */
+.fx-system {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0 0;
+  color: #4a3b2c;
+}
+
+.fx-system code {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  background: var(--pane-bg);
+  padding: 0 0.2rem;
+  border-radius: 3px;
+}

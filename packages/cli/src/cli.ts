@@ -31,10 +31,13 @@ const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promi
   customize: () => import('./commands/customize.ts'),
   distribute: () => import('./commands/distribute.ts'),
   doctor: () => import('./commands/doctor.ts'),
+  group: () => import('./commands/group.ts'),
   induct: () => import('./commands/induct.ts'),
   ingest: () => import('./commands/ingest.ts'),
   install: () => import('./commands/install.ts'),
   iterate: () => import('./commands/iterate.ts'),
+  lane: () => import('./commands/lane.ts'),
+  pipeline: () => import('./commands/pipeline.ts'),
   publish: () => import('./commands/publish.ts'),
   'repair-install': () => import('./commands/repair-install.ts'),
   'shortform-start': () => import('./commands/shortform-start.ts'),
@@ -142,6 +145,12 @@ function printUsage(): void {
   out.write('  annotations     list an entry\'s comments + dispositions (pending by default)\n');
   out.write('  doctor          audit / repair calendar + sidecar + frontmatter\n');
   out.write('  customize       copy a plugin default into .deskwork/<category>/<name>.ts\n');
+  out.write('  group           CRUD on group entries (list, show, create, update,\n');
+  out.write('                  add-member, remove-member, archive, restore)\n');
+  out.write('  lane            CRUD on lane configs (list, show, create, update,\n');
+  out.write('                  archive, restore, purge, move)\n');
+  out.write('  pipeline        CRUD on pipeline templates (list, show, create,\n');
+  out.write('                  update, delete)\n');
   out.write('  repair-install  prune stale entries from Claude Code\'s plugin registry\n\n');
   out.write('Skill-only verbs (use via /deskwork:<verb>):\n');
   out.write('  status          per-entry state summary\n\n');

@@ -126,7 +126,7 @@ describe('deskwork approve — entry-centric dispatcher (#147)', () => {
     const res = approve('final-idea');
 
     expect(res.code).not.toBe(0);
-    expect(res.stderr).toContain('uses `publish`');
+    expect(res.stderr).toContain('Use `publish`, not `approve`');
     expect(readSidecar(uuid).currentStage).toBe('Final');
   });
 

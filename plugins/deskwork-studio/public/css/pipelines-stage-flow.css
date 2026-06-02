@@ -1,0 +1,212 @@
+/*
+ * pipelines-stage-flow.css — stage flow visualization for the View
+ * panel inside `/dev/pipelines` (Phase 6 Task 6.4 step 6.4.2).
+ *
+ * Sibling stylesheet to `pipelines-page.css`. Separated because the
+ * stage-flow vocabulary (`.pipelines-stage*`) is a self-contained
+ * visual language — pill chips, lock badges, off-pipeline dashed
+ * borders, arrows — that may be reused elsewhere (a future "what
+ * stages does this entry traverse?" surface on the entry-review page,
+ * etc.). Keeping it in its own file makes that reuse cleaner.
+ *
+ * Press-check tokens (proof-blue, kraft, paper, ink) come from
+ * editorial-review.css. This file adds no new tokens.
+ */
+
+.pipelines-view-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem;
+  background: var(--er-paper, #F5F1E8);
+  border-left: 3px solid var(--er-kraft, #8A7250);
+}
+
+.pipelines-view-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pipelines-view-heading {
+  margin: 0;
+  font-family: var(--er-font-display, Georgia, serif);
+  font-style: italic;
+  font-size: 1.15rem;
+  color: var(--er-ink, #1A1614);
+}
+
+.pipelines-view-desc {
+  margin: 0;
+  color: var(--er-faded, #8A7F70);
+  font-size: 0.85rem;
+}
+
+.pipelines-view-subheading {
+  margin: 0.25rem 0;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-ink-soft, #3A332E);
+}
+
+.pipelines-stage-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.pipelines-stage-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pipelines-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  background: var(--er-paper-2, #ECE6D4);
+  border: 1px solid var(--er-paper-3, #DFD7BF);
+  color: var(--er-ink, #1A1614);
+  /*
+   * Prevent a long stage name from rendering as a single un-wrapping
+   * chip wider than the viewport. The chip itself shrinks to fit its
+   * container; the inner label handles the actual text-wrap (see
+   * `.pipelines-stage-label`). Tested via a 60-char fixture in
+   * `pipelines-page.test.ts`.
+   */
+  max-width: 100%;
+}
+
+.pipelines-stage-label {
+  /*
+   * `overflow-wrap: anywhere` lets a long single-word stage name break
+   * at any character boundary so it never overflows the chip. The
+   * combination with `min-width: 0` on the chip lets the flex item
+   * shrink below its natural content size, which is what makes the
+   * wrap actually apply in narrow viewports.
+   */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pipelines-stage--linear {
+  background: var(--er-paper, #F5F1E8);
+  border-color: var(--er-ink-soft, #3A332E);
+}
+
+.pipelines-stage--linear.pipelines-stage--locked {
+  border-color: var(--er-proof-blue, #2A4B7C);
+  color: var(--er-proof-blue, #2A4B7C);
+}
+
+.pipelines-stage--off {
+  background: var(--er-paper-3, #DFD7BF);
+  border-color: var(--er-kraft, #8A7250);
+  color: var(--er-kraft, #8A7250);
+  border-style: dashed;
+}
+
+.pipelines-stage-badge {
+  display: inline-block;
+  padding: 0 0.3rem;
+  border-radius: 2px;
+  background: var(--er-proof-blue, #2A4B7C);
+  color: var(--er-paper, #F5F1E8);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pipelines-stage-arrow {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  color: var(--er-faded, #8A7F70);
+}
+
+/* ---- Source chips ---- */
+
+.pipelines-source {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pipelines-source--preset {
+  border: 1px solid var(--er-kraft, #8A7250);
+  color: var(--er-kraft, #8A7250);
+  background: var(--er-paper, #F5F1E8);
+}
+
+.pipelines-source--override {
+  border: 1px solid var(--er-proof-blue, #2A4B7C);
+  color: var(--er-proof-blue, #2A4B7C);
+  background: var(--er-paper, #F5F1E8);
+}
+
+.pipelines-source--error {
+  border: 1px solid var(--er-red-pencil, #B8362A);
+  color: var(--er-red-pencil, #B8362A);
+  background: var(--er-paper, #F5F1E8);
+}
+
+/* ---- Error rows ---- */
+
+.pipelines-row--error .pipelines-cell {
+  background: var(--er-paper-2, #ECE6D4);
+}
+
+.pipelines-error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--er-red-pencil, #B8362A);
+}
+
+.pipelines-error-kind {
+  margin: 0;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--er-red-pencil, #B8362A);
+}
+
+.pipelines-error-path {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--er-ink-soft, #3A332E);
+}
+
+.pipelines-error-message {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  background: var(--er-paper, #F5F1E8);
+  border: 1px solid var(--er-paper-3, #DFD7BF);
+  border-radius: 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  color: var(--er-ink-soft, #3A332E);
+}
+
+.pipelines-error-dependents {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--er-ink-soft, #3A332E);
+}
