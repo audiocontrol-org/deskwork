@@ -27,21 +27,19 @@ Phase 1 is **not** a TDD-shaped implementation task — it's a design/capture ph
 
 The PRD seeded from the feature-definition already contains the Problem, Scope, Approach. This task adds the 21-row disposition table and the open-questions list to the PRD body.
 
-- [ ] **Step 1: Read the seeded PRD** to confirm what `/dw-lifecycle:setup` produced.
+- [x] **Step 1: Read the seeded PRD** to confirm what `/dw-lifecycle:setup` produced.
 
-Run: `cat docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/prd.md` (or use Read tool).
-
-- [ ] **Step 2: Enumerate all 21 entries from `agent-discipline.md`** by file position.
+- [x] **Step 2: Enumerate all 21 entries from `agent-discipline.md`** by file position.
 
 Run: `grep -n '^## ' .claude/rules/agent-discipline.md`
 
 Expected: 20 top-level headings (entry 18 "Project workflow conventions" is a cluster of 5 sub-rules under one `## `).
 
-- [ ] **Step 3: Add the disposition table to the PRD body.**
+- [x] **Step 3: Add the disposition table to the PRD body.** (Landed in the scaffold commit + iterated to rev 2.)
 
 Use Edit tool to insert a `## Disposition table` section into `prd.md` after the Approach section. The table columns are: `# | Line | Rule | Type | Action | Destination | Residue`. Source the initial 21 rows from the brainstorming transcript (the triage table the operator already saw); leave the action for rule 2 as `DELETE`, rule 12 as `DEFER`, and the upstream-scope entries (9, 10, 11, 13, 17) flagged for PRD review.
 
-- [ ] **Step 4: Add the "Open questions for PRD review" section.**
+- [x] **Step 4: Add the "Open questions for PRD review" section.** (Now resolved → "Resolved questions (revision 2)" in the PRD.)
 
 The four open questions from the feature-definition:
 1. Upstream-scope split for entries 9, 10, 11, 13, 17 — this feature or sibling feature?
@@ -49,80 +47,47 @@ The four open questions from the feature-definition:
 3. Entry 18 cluster — triage as cluster or per-sub-rule?
 4. Marketplace-clone-script-contract sub-rule (lives inside entry 19's section) — disposition target?
 
-- [ ] **Step 5: Commit** the PRD body with the disposition table.
-
-```bash
-git add docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/prd.md
-git commit -m "docs(decompose-agent-discipline): author PRD disposition table + open questions"
-```
+- [x] **Step 5: Commit** the PRD body with the disposition table. (Scaffold commit `a06c173`.)
 
 ### Task 2: Ingest the PRD into deskwork and start review
 
 **Files:** PRD frontmatter is mutated by `/deskwork:ingest` (adds `deskwork.id` UUID).
 
-- [ ] **Step 1: Verify the PRD has no `deskwork:` frontmatter yet.**
+- [x] **Step 1: Verified** the PRD carried a `deskwork.id` in frontmatter (stamped by setup) but had **no calendar row** — setup left it half-ingested.
 
-Run: `head -20 docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/prd.md`
+- [x] **Step 2: Invoked `/deskwork:ingest`** on the PRD path. Dry-run → `--apply`; the existing UUID `38410ae2…` was honored (no duplicate), entry landed in **Drafting**. Committed `f110ae1`.
 
-If `/dw-lifecycle:setup` already wired ingest (some setup variants do), skip to Step 3.
+- [x] **Step 3: ~~Invoke `/deskwork:review-start`~~ — RETIRED VERB.** The `review-*` family was retired with the entry-centric pipeline redesign (state-machine Commandment III). There is no review-start step: an ingested entry's review surface renders continuously in the studio. Review = leave margin notes → `/deskwork:iterate`. Boot the studio (`deskwork-studio`, Tailscale-aware) and hand the operator `/dev/editorial-review/<uuid>`.
 
-- [ ] **Step 2: Invoke `/deskwork:ingest` on the PRD path.**
+- [x] **Step 4: Reported the studio review URL** (`/dev/editorial-review/38410ae2-…`, magic-DNS).
 
-Per `.claude/CLAUDE.md`'s feature-lifecycle workflow, setup is supposed to register the PRD with deskwork; if it didn't, run `/deskwork:ingest docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/prd.md` manually.
-
-- [ ] **Step 3: Invoke `/deskwork:review-start` on the PRD.**
-
-Per workflow: this creates a review entry and returns the studio review URL.
-
-- [ ] **Step 4: Report the studio review URL to the operator.**
-
-The operator opens it, leaves margin notes on the disposition table + open-questions.
-
-- [ ] **Step 5: Commit** any frontmatter changes deskwork made.
-
-```bash
-git add docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/prd.md
-git commit -m "docs(decompose-agent-discipline): ingest PRD + start deskwork review"
-```
+- [x] **Step 5: Committed** the ingest artifacts (`f110ae1`).
 
 ### Task 3: Iterate margin notes until the disposition table is stable
 
 This task loops; no fixed step count.
 
-- [ ] **Step 1: Wait for operator to leave margin notes** in the studio review surface. Operator says "iterate" when ready.
+- [x] **Step 1: Operator left 8 margin notes** in the studio review surface and invoked `/deskwork:iterate`.
 
-- [ ] **Step 2: Invoke `/deskwork:iterate`** to read margin notes and address them.
+- [x] **Step 2: Invoked `/deskwork:iterate`** to read margin notes and address them.
 
-Per the "Empty revisions beat missed changes" rule in `agent-discipline.md` (lines 256–274): run iterate when asked even if no disk delta is expected. Don't precondition on "but nothing's pending."
+- [x] **Step 3: Addressed all 8 notes** — confirmed deletes (rows 2, 18a), resolved upstream-scope to in-scope (rows 9/10/11/13/17), made the "least dumb thing" calls on the remaining open questions, captured the review/audit-retirement scope item. Dispositions recorded (all `addressed`).
 
-- [ ] **Step 3: For each margin note**, edit the disposition table or open-questions list to reflect the operator's input. Mark addressed comments via the iterate skill's mechanism (sidecar updates).
+- [x] **Step 4: Snapshotted revision 2** (iterationByStage Drafting: 1).
 
-- [ ] **Step 4: Snapshot the new revision** (the iterate skill handles this).
+- [x] **Step 5: Committed** the revision.
 
-- [ ] **Step 5: Commit** the revision.
-
-```bash
-git add docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/
-git commit -m "docs(decompose-agent-discipline): iterate PRD revision N — <summary of changes>"
-```
-
-- [ ] **Step 6: Report new revision to operator;** wait for next margin notes OR for Approve. Loop to Step 1 until operator clicks Approve and the deskwork workflow state is `applied`.
+- [x] **Step 6: Operator approved** (`/deskwork:approve`) — entry advanced Drafting → Final. The disposition table is stable. (Stable signal is **Final**, not the retired `applied` state.)
 
 ### Task 4: Extend the workplan with Phase 2 task breakdown
 
 Once the PRD's disposition table is `applied`, the per-rule task breakdown can be enumerated.
 
-- [ ] **Step 1: Verify deskwork workflow state is `applied`.**
+- [x] **Step 1: Verify the PRD's deskwork stage is `Final`.** (Entry-centric model has no `applied` state — the "stable, ready for Phase 2" signal is reaching **Final**, which locks content.) Verified: `currentStage: Final` in `.deskwork/entries/38410ae2-….json`.
 
-Run: `deskwork status docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/prd.md` (or the equivalent CLI verb the operator's deskwork install exposes).
+- [x] **Step 2: Populate Phase 2 sub-phases (2a–2e)** with per-rule tasks derived from the approved disposition table. Done via the `superpowers:writing-plans` discipline (the core of `/dw-lifecycle:extend` step 2) — workplan-only population, no PRD re-iteration needed since the disposition table is approved/Final and unchanged. Also fixed the `/deskwork:review-start` and sibling-feature drift.
 
-Expected: state == `applied`.
-
-- [ ] **Step 2: Invoke `/dw-lifecycle:extend decompose-agent-discipline`** to add Phase 2 sub-phases (2a through 2e per the feature-definition) with the per-rule tasks derived from the stabilized disposition table.
-
-The extend skill re-iterates the PRD via deskwork (operator clicks Iterate → agent runs `/deskwork:iterate`) when scope additions affect the PRD; for workplan-only additions deriving from an already-applied disposition table, the re-iteration is informational.
-
-- [ ] **Step 3: Commit** the extended workplan.
+- [x] **Step 3: Commit** the extended workplan.
 
 ```bash
 git add docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/workplan.md
@@ -143,63 +108,192 @@ Expected: every Phase 2 task has a `[#NNN]` link.
 
 ## Phase 2 — Per-disposition implementation cycles
 
-> **Phase 2 task breakdown is populated by Task 4 (above) after the PRD's disposition table is `applied`.** The structure below names the sub-phases and their scope shape; the actual per-rule TDD-shaped tasks are added via `/dw-lifecycle:extend` once Phase 1 completes.
+> **This breakdown was populated from the operator-approved disposition table** (PRD revision 2, Final). Each task is one disposition; commit at every task boundary, landing the new home AND the `agent-discipline.md` edit in the same commit. Doc-composition tasks verify structurally (content-in-home + entry-shrunk/deleted + commit-msg-names-both); the two tool-level tasks (2b) are TDD-shaped (failing test → tool change → green → shrink entry).
 >
-> This is not a placeholder for laziness — it is an artifact of the workflow's design. The operator explicitly wanted the disposition plan developed via deskwork review tooling, which means the per-rule tasks are derived from operator-confirmed dispositions, not from agent-speculated ones. Per the "Capture mode vs scope mode" rule in `agent-discipline.md`, capturing speculative tasks pre-Phase-1 would be the same anti-pattern in implementation-task form.
+> **Shared closing convention for every task below:** the same commit that establishes the new home edits `.claude/rules/agent-discipline.md` — deleting the entry, or replacing it with a 1-line pointer of the form `> See [<destination>] for <topic>.` (a markdown blockquote pointer, not a `## ` heading, so it doesn't read as a full rule). The commit subject names the entry number + destination.
+>
+> **Pre-feature line anchors** (from the 566-line agent-discipline.md at feature start) are recorded per task so the implementer can locate each entry even after earlier tasks shift line numbers — match by `## ` heading text, not by line number.
 
 ### Phase 2a — Pure deletes and DONE pointer-shrinks
 
-**Disposition class:** entries whose body either (a) is superseded by mechanization that already exists and gets deleted outright, or (b) documents an existing skill/CLI that should hold the canonical text — agent-discipline.md shrinks to a 1-line pointer.
+**Disposition class:** entries superseded by existing mechanization (delete outright), or entries that document a skill/CLI which already owns the canonical text (shrink to a pointer).
 
-**First-draft entries from PRD:** 2 (delete), 3, 4, 20 (DONE-pointer-shrink). Subject to PRD review.
+#### Task 2a.1 — Entry 2: delete "Use /dw-lifecycle:review after every implementation step"
 
-**Acceptance criteria for each task in this sub-phase:**
-- The canonical home of the content is established (skill body owns it for DONE entries; nothing owns it for deletes).
-- agent-discipline.md is edited in the same commit: entry deleted, or shrunk to a single pointer line linking to the canonical home.
-- Commit message names which entry was processed and points at the canonical home.
+**Files:** Modify `.claude/rules/agent-discipline.md` (entry `## Use /dw-lifecycle:review after every implementation step`).
 
-### Phase 2b — Tooling fixes
+- [ ] **Step 1: Confirm the rule is dead.** Per PRD row 2 + [#387](https://github.com/audiocontrol-org/deskwork/issues/387): review is not hooked into the iterate cycle and not operationally enforced (superseded by the audit-barrage hook).
+- [ ] **Step 2: Delete the entire `## Use /dw-lifecycle:review after every implementation step` section** (heading + body). No replacement, no pointer — the rule has no surviving home in this feature (skill retirement itself is #387).
+- [ ] **Step 3: Grep for dangling references.** Run: `grep -rn "Use /dw-lifecycle:review after every" .claude/`. Expected: zero hits after the delete.
+- [ ] **Step 4: Commit.** `git commit -m "refactor(agent-discipline): delete dead entry 2 (review-after-every-step); superseded by audit-barrage hook — see #387"`
 
-**Disposition class:** entries whose pathological behavior is best closed by removing the bait at the tool level (deleting a CLI flag, adding a gate, making a write-helper refuse the bad shape).
+#### Task 2a.2 — Entry 18a: delete "Stay on feature/deskwork-plugin"
 
-**First-draft entries from PRD:** 15 (`--no-tailscale` flag removal/no-op-alias), 17 (namespace-write gate + doctor rule). Subject to PRD review.
+**Files:** Modify `.claude/rules/agent-discipline.md` (the `### Stay on feature/deskwork-plugin for ongoing work` sub-rule inside `## Project workflow conventions`).
 
-**Acceptance criteria for each task in this sub-phase:**
-- The tool-side change ships AND the flag/shape that triggered the rule is gone or guarded.
-- A test exists exercising the new failure path (per the TDD-enforcement discipline in agent-discipline.md entry 3).
-- The corresponding entry in agent-discipline.md is deleted (when the rule is wholly addressed) or shrunk to a 1-line pointer (when the rule retains residual judgment scope).
+- [ ] **Step 1: Delete the `### Stay on feature/deskwork-plugin for ongoing work` sub-section** (heading + body). Stale: this feature's branch is `feature/decompose-agent-discipline`.
+- [ ] **Step 2: Confirm the parent `## Project workflow conventions` heading still has its other sub-rules** (18b–e) — only 18a is removed here.
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): delete stale entry 18a (stay-on-feature/deskwork-plugin)"`
+
+#### Task 2a.3 — Entry 3: shrink to pointer (promote-findings + doctor rules already own it)
+
+**Files:** Modify `.claude/rules/agent-discipline.md` (entry `## Audit findings: scope-don't-defer + TDD enforcement`).
+
+- [ ] **Step 1: Verify the canonical home exists.** Run: `ls plugins/dw-lifecycle/skills/promote-findings/SKILL.md plugins/dw-lifecycle/src/scope-discovery/doctor-rules/fix-task-tdd-discipline.ts`. Both must exist.
+- [ ] **Step 2: Replace the entry body** with a pointer: `> The scope-into-workplan + TDD-first-fix discipline is mechanized — see /dw-lifecycle:promote-findings, the check-fix-task-tdd commit-msg gate, and the fix-task-tdd-discipline doctor rule.` Keep the operator's verbatim "Filing a bug report isn't good enough…" framing (≤3 lines) as the irreducible anchor; drop the full table + cross-reference list (the skill bodies own them).
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): shrink entry 3 to pointer — promote-findings + tdd-discipline doctor rule own canonical text"`
+
+#### Task 2a.4 — Entry 4: shrink to pointer (audit-barrage SKILL owns it)
+
+**Files:** Modify `.claude/rules/agent-discipline.md` (entry `## Audit-barrage: structured cross-model audit`).
+
+- [ ] **Step 1: Verify** `plugins/dw-lifecycle/skills/audit-barrage/SKILL.md` exists.
+- [ ] **Step 2: Replace the entry body** with a pointer to `/dw-lifecycle:audit-barrage` SKILL.md, keeping only the ≤3-line "third independent audit surface — additive, not substitutable" framing that the agent needs always-on; drop the verb-pair invocation contract, override paths, and self-dogfood narrative (the SKILL owns them).
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): shrink entry 4 to pointer — audit-barrage SKILL owns canonical text"`
+
+#### Task 2a.5 — Entry 20: shrink to pointer (hygiene-family SKILLs own it)
+
+**Files:** Modify `.claude/rules/agent-discipline.md` (entry `## Closure is a structural step, not aspirational`).
+
+- [ ] **Step 1: Verify** the hygiene-family skills exist: `ls plugins/dw-lifecycle/skills/close-shipped/SKILL.md plugins/dw-lifecycle/skills/complete/SKILL.md`.
+- [ ] **Step 2: Replace the entry body** with a pointer to the hygiene family (`/dw-lifecycle:close-shipped`, `:complete`, `:debt-report`, `:worktree-report`, `:dismantle-worktrees`), keeping only the ≤4-line "agent posts evidence, operator decides" contract that governs always-on behavior; drop the per-verb waypoint table (the SKILLs own it).
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): shrink entry 20 to pointer — hygiene-family SKILLs own canonical text"`
+
+### Phase 2b — Tooling fixes (TDD-shaped)
+
+**Disposition class:** entries whose pathological behavior is closed at the tool level. Each ships a test exercising the new path (per the TDD-enforcement discipline) before the rule entry is touched.
+
+#### Task 2b.1 — Entry 15: make `--no-tailscale` a no-op alias with a stderr warning
+
+Per PRD row 15 + the marketplace-clone-script adopter-contract: the flag stays **parseable** (no hard removal — adopters scripted against it), but its dangerous default-suppressing behavior is neutralized. The studio already auto-detects Tailscale; `--no-tailscale` becomes a no-op that prints a one-line stderr notice so a human sees it was ineffective.
+
+**Files:**
+- Modify: `packages/studio/src/server.ts` (the `--no-tailscale` arg handling)
+- Test: `packages/studio/test/cli-args.test.ts` (existing test file)
+- Modify: `.claude/rules/agent-discipline.md` (entry `## Never pass --no-tailscale to deskwork-studio unprompted`)
+
+- [ ] **Step 1: Write the failing test** in `packages/studio/test/cli-args.test.ts`: assert that parsing `['--no-tailscale']` still succeeds (flag is accepted), that the resulting config does NOT disable Tailscale binding (no-op), and that a deprecation notice is emitted. Match the existing test's arg-parser entry point + assertion style in that file.
+- [ ] **Step 2: Run it, verify it fails.** Run: `npm --workspace @deskwork/studio test -- cli-args`. Expected: FAIL (current behavior disables Tailscale).
+- [ ] **Step 3: Implement** the no-op-alias + stderr notice in `packages/studio/src/server.ts`. Keep the flag in the parser (no usage error); stop letting it suppress Tailscale auto-detection; emit `console.error('--no-tailscale is deprecated and now a no-op; the studio auto-detects Tailscale. Use --host to control binding.')`.
+- [ ] **Step 4: Run the test, verify it passes.** Run: `npm --workspace @deskwork/studio test -- cli-args`. Expected: PASS. Also run the full studio suite to catch regressions: `npm --workspace @deskwork/studio test`.
+- [ ] **Step 5: Delete the agent-discipline.md entry** `## Never pass --no-tailscale to deskwork-studio unprompted` — the bait (a flag that strands the operator) is gone at the source, so the rule has nothing left to guard. (If review surfaces residual judgment, leave a ≤2-line pointer instead.)
+- [ ] **Step 6: Commit.** `git commit -m "fix(studio): make --no-tailscale a no-op alias + deprecation notice; delete agent-discipline entry 15"`
+
+#### Task 2b.2 — Entry 17: gate top-level deskwork-metadata writes + doctor rule
+
+Per PRD row 17: schema-write helpers refuse top-level (non-namespaced) deskwork-field writes (fail loud, no fallback), and a doctor rule scans existing sidecars/frontmatter for legacy top-level fields.
+
+**Files:**
+- Modify: `packages/core/src/sidecar/write.ts` and/or `packages/core/src/frontmatter.ts` (the write path)
+- Create: `packages/core/src/doctor/rules/namespaced-deskwork-metadata.ts` (new doctor rule, mirroring an existing rule in `packages/core/src/doctor/rules/`)
+- Test: `packages/core/test/` (new test file for both the write-refusal and the doctor rule)
+- Modify: `.claude/rules/agent-discipline.md` (entry `## Namespace deskwork-owned metadata in user-supplied documents`)
+
+- [ ] **Step 1: Write the failing test** asserting (a) the frontmatter/sidecar write helper throws a descriptive error when handed a top-level deskwork-owned field (e.g. top-level `id:` instead of `deskwork.id`), and (b) the new doctor rule flags a fixture file carrying a legacy top-level field.
+- [ ] **Step 2: Run it, verify it fails.** Run: `npm --workspace @deskwork/core test -- namespaced-deskwork`. Expected: FAIL.
+- [ ] **Step 3: Implement** the write-side refusal (throw, per the no-fallback rule) + the doctor rule (read-side scan). Register the doctor rule where the others are registered.
+- [ ] **Step 4: Run the test, verify it passes.** Run: `npm --workspace @deskwork/core test -- namespaced-deskwork`, then `npm --workspace @deskwork/core test`.
+- [ ] **Step 5: Shrink the agent-discipline.md entry** to a ≤3-line pointer: `> deskwork metadata is namespaced under deskwork.* — the schema-write helpers refuse top-level writes and the namespaced-deskwork-metadata doctor rule scans for legacy ones.` (Shrink, not delete: the read-side "look only at data.deskwork?.<field>" convention is still agent-facing guidance.)
+- [ ] **Step 6: Commit.** `git commit -m "feat(core): gate top-level deskwork-metadata writes + doctor rule; shrink agent-discipline entry 17"`
 
 ### Phase 2c — Composes into in-repo dw-lifecycle skills
 
-**Disposition class:** entries whose content composes into a skill body already inside `plugins/dw-lifecycle/skills/<name>/SKILL.md`. Pure in-repo edits.
+**Disposition class:** entries whose content composes into a skill body already inside `plugins/dw-lifecycle/skills/<name>/SKILL.md`. Pure in-repo edits. Each task: compose the discipline into the named skill at the right step, then shrink the agent-discipline.md entry to a pointer in the same commit.
 
-**First-draft entries from PRD:** 1, 5, 6, 11, 18a. Subject to PRD review.
+#### Task 2c.1 — Entry 1: /frontend-design discipline → /dw-lifecycle:implement + :setup
 
-**Acceptance criteria for each task in this sub-phase:**
-- The target SKILL.md is edited to incorporate the rule's discipline at the right step.
-- agent-discipline.md is shrunk to a pointer.
-- Commit message names target skill + entry.
+**Files:** Modify `plugins/dw-lifecycle/skills/implement/SKILL.md` (add a design-task precondition step), `plugins/dw-lifecycle/skills/setup/SKILL.md` (design-shaped-work check); modify `.claude/rules/agent-discipline.md` (entry `## Use /frontend-design for all design tasks`).
+
+- [ ] **Step 1: Compose** into `implement/SKILL.md` a precondition step: before picking up a task that involves a design decision (new UI surface, affordance placement, visual language), the implementer runs `/frontend-design` first to produce mockups. Mirror the rule's "skip only when fully determined upstream" carve-out.
+- [ ] **Step 2: Add** to `setup/SKILL.md` a note that design-shaped features route through `/frontend-design` before implementation.
+- [ ] **Step 3: Shrink** the agent-discipline.md entry to a ≤3-line pointer naming the two skill steps + the "/frontend-design first for design tasks" rule.
+- [ ] **Step 4: Commit.** `git commit -m "refactor(agent-discipline): compose entry 1 (frontend-design) into implement+setup skills"`
+
+#### Task 2c.2 — Entry 5: tooling-feedback discipline → scope-inventory + setup
+
+**Files:** Modify `plugins/dw-lifecycle/skills/scope-inventory/SKILL.md` (file-friction-as-you-go discipline), confirm `plugins/dw-lifecycle/skills/setup/SKILL.md` seeds the `tooling-feedback.md` template; modify `.claude/rules/agent-discipline.md` (entry `## scope-discovery v1 — dogfood feedback via tooling-feedback.md`).
+
+- [ ] **Step 1: Compose** the "file a TF entry the moment friction surfaces; one observable friction per entry with Repro/Workaround/Suggested-fix" discipline into `scope-inventory/SKILL.md`.
+- [ ] **Step 2: Verify** `setup/SKILL.md` already copies the `tooling-feedback.md` starter template (`grep -n tooling-feedback plugins/dw-lifecycle/skills/setup/SKILL.md`); add the step if missing.
+- [ ] **Step 3: Shrink** the agent-discipline.md entry to a pointer.
+- [ ] **Step 4: Commit.** `git commit -m "refactor(agent-discipline): compose entry 5 (tooling-feedback) into scope-inventory+setup skills"`
+
+#### Task 2c.3 — Entry 6: inventory-vs-discovery reading discipline → scope-inventory
+
+**Files:** Modify `plugins/dw-lifecycle/skills/scope-inventory/SKILL.md` (output-interpretation section); modify `.claude/rules/agent-discipline.md` (entry `## Inventory vs discovery — how to read scope-discovery reports`).
+
+- [ ] **Step 1: Compose** the three-category report-reading discipline (registered-pattern / discovered-candidate / novel-shape-candidate, and the "green ≠ no novel anti-patterns" hard test) into `scope-inventory/SKILL.md`'s output section.
+- [ ] **Step 2: Shrink** the agent-discipline.md entry to a pointer that keeps the single hard test ("read the stderr categories line + synthesis.md before saying 'no findings'") and points to the skill for the full taxonomy.
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): compose entry 6 (inventory-vs-discovery) into scope-inventory skill"`
+
+#### Task 2c.4 — Entry 11: orchestrator≠implementation → :setup/:issues exit-step + :implement gate
+
+**Files:** Modify `plugins/dw-lifecycle/skills/setup/SKILL.md` + `plugins/dw-lifecycle/skills/issues/SKILL.md` (exit-step: "infrastructure ready; implementation happens in a separate session at <worktree>"), `plugins/dw-lifecycle/skills/implement/SKILL.md` (precondition note that implement runs in the feature worktree session, not the orchestrator session); modify `.claude/rules/agent-discipline.md` (entry `## The orchestrator session is separate from the implementation session`).
+
+- [ ] **Step 1: Compose** the session-boundary handoff into the `setup` + `issues` skills' closing report and the `implement` skill's opening precondition.
+- [ ] **Step 2: Shrink** the agent-discipline.md entry to a ≤4-line pointer keeping the operator's verbatim "you are the orchestrator, not the implementer" anchor.
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): compose entry 11 (orchestrator-vs-implementation) into setup/issues/implement skills"`
+
+#### Task 2c.5 — Entry 8 (dispatch-report half): sub-agent flags → :implement
+
+**Files:** Modify `plugins/dw-lifecycle/skills/implement/SKILL.md` (sub-agent-report handling: every "out of scope but flagging" note becomes a fix-now or a filed issue); modify `.claude/rules/agent-discipline.md` (entry `## Operator owns scope decisions` — the sub-agent-dispatch-report portion only).
+
+- [ ] **Step 1: Compose** the "sub-agent dispatch reports are action lists, not disclosures" discipline into `implement/SKILL.md`'s review-the-dispatch-report step.
+- [ ] **Step 2: Shrink** the agent-discipline.md entry's failure-mode-2 (sub-agent notes) prose, leaving failure-mode-1 (operator-hedge-default-to-ASK) intact — that half is handled by Task 2e.2.
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): compose entry 8 dispatch-report half into implement skill"`
+
+#### Task 2c.6 — Entry 13: packaging-is-UX → :complete / close-shipped install-evaluation
+
+**Files:** Modify `plugins/dw-lifecycle/skills/complete/SKILL.md` and/or `plugins/dw-lifecycle/skills/close-shipped/SKILL.md` (install-evaluation handling: treat install state as ground truth, don't paper over packaging defects); modify `.claude/rules/agent-discipline.md` (entry `## Packaging is UX — never paper over install bugs`).
+
+- [ ] **Step 1: Compose** the "packaging IS UX — catalog install-level defects as top-priority blockers; fix the public path, don't reconstruct the intended surface locally" discipline into the close-shipped/complete install-verification step.
+- [ ] **Step 2: Shrink** the agent-discipline.md entry to a pointer keeping the operator's "Packaging IS UX" anchor.
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): compose entry 13 (packaging-is-UX) into complete/close-shipped skills"`
+
+#### Task 2c.7 — Entry 19: issue-closure-verification → close-shipped + :complete
+
+**Files:** Modify `plugins/dw-lifecycle/skills/close-shipped/SKILL.md` + `plugins/dw-lifecycle/skills/complete/SKILL.md`; modify `.claude/rules/agent-discipline.md` (entry `## Issue closure requires verification in a formally-installed release`, EXCLUDING sub-rule 19b — that's Task 2e.9).
+
+- [ ] **Step 1: Verify** `close-shipped/SKILL.md` already encodes the "label pending-verification, don't close; operator verifies against the released artifact" contract (`grep -n pending-verification plugins/dw-lifecycle/skills/close-shipped/SKILL.md`); strengthen if partial.
+- [ ] **Step 2: Shrink** the agent-discipline.md entry to a ≤4-line pointer keeping the load-bearing rule ("no issue closes until verified in a formally-installed release; agent posts evidence, operator/author decides") and pointing to close-shipped + complete for the mechanism. Leave sub-rule 19b in place for Task 2e.9.
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): compose entry 19 (issue-closure-verification) into close-shipped/complete skills"`
 
 ### Phase 2d — Composes into deskwork plugin skills
 
-**Disposition class:** entries whose content composes into a skill in the `deskwork` plugin source (`plugins/deskwork/skills/<name>/SKILL.md` or the cross-plugin equivalent). Reaches into a different plugin.
+**Disposition class:** entries composing into `deskwork`-plugin skill bodies. **In-scope per PRD Resolved Question #1** ("all deskwork-family plugins are in scope") — no sibling feature, no `[debt: #NNN]` deferral route.
 
-**First-draft entries from PRD:** 9, 10, 13, 19. Subject to PRD review — operator may re-scope these to a sibling feature.
+#### Task 2d.1 — Entry 9: capture-vs-scope → /dw-lifecycle:define + /deskwork:iterate
 
-**Acceptance criteria for each task in this sub-phase:**
-- Either: (a) the deskwork-plugin skill is edited in this feature's branch, OR (b) the entry is removed from this feature's scope and a sibling feature is filed (with a workplan-side `[debt: #NNN]` link per the closure-is-structural rule).
-- agent-discipline.md is shrunk to a pointer (route (a)) or carries a forward-pointer to the sibling feature (route (b)).
+**Files:** Modify `plugins/dw-lifecycle/skills/define/SKILL.md` (capture-mode discipline during interview) + `plugins/deskwork/skills/iterate/SKILL.md` (capture-mode during spec iteration); modify `.claude/rules/agent-discipline.md` (entry `## Capture mode vs scope mode...`).
+
+- [ ] **Step 1: Compose** the "specs capture everything; scoping is a later explicit pass; no reflexive YAGNI/deferred/out-of-scope during capture" discipline into `define/SKILL.md` and `deskwork/skills/iterate/SKILL.md`.
+- [ ] **Step 2: Shrink** the agent-discipline.md entry to a ≤5-line pointer keeping the operator's verbatim "I don't need you to push back on scope… capture everything we know… THEN scope" anchor.
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): compose entry 9 (capture-vs-scope) into define+iterate skills"`
+
+#### Task 2d.2 — Entry 10: empty-revisions → /deskwork:iterate + /deskwork:approve
+
+**Files:** Modify `plugins/deskwork/skills/iterate/SKILL.md` + `plugins/deskwork/skills/approve/SKILL.md` (run the capture even if it looks like a no-op); modify `.claude/rules/agent-discipline.md` (entry `## Empty revisions beat missed changes...`).
+
+- [ ] **Step 1: Compose** the "run the operation as asked; don't pre-decide a no-op skip; empty revisions beat missed changes" discipline into the iterate + approve skill bodies.
+- [ ] **Step 2: Shrink** the agent-discipline.md entry to a ≤3-line pointer keeping the operator's verbatim "I'd rather have empty revisions than miss changes" anchor.
+- [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): compose entry 10 (empty-revisions) into iterate+approve skills"`
 
 ### Phase 2e — Shrunk-stays
 
-**Disposition class:** entries that remain in agent-discipline.md because the discipline is irreducibly always-on and resists mechanization. Each entry gets shrunk to its minimum useful form.
+**Disposition class:** irreducibly always-on disciplines that resist mechanization. Each is rewritten to 3–10 lines, preserving the "Why" + "How to apply" structure; elision is in the example/rationale prose. **No new `project-conventions.md` file** (PRD Resolved Question #2 — a second always-loaded rule file buys zero context-cost reduction); shrink in place.
 
-**First-draft entries from PRD:** 7, 14, 16, 18b–e. Subject to PRD review (the cluster could also move wholesale to a `project-conventions.md` sibling rule file).
+Each task below: rewrite the named entry in `.claude/rules/agent-discipline.md` to its minimum useful form, then commit. Group-commit is acceptable within a sub-cluster (e.g. all of 18b–e in one commit) since these are in-place shrinks with no external home.
 
-**Acceptance criteria for each task in this sub-phase:**
-- Entry is rewritten in 3–10 lines (down from its current size).
-- The "Why" and "How to apply" structure is preserved per the CLAUDE.md memory-write convention; the elision is in the example/rationale prose.
-- If the cluster gets moved to `project-conventions.md`, the move is a separate commit per rule, and agent-discipline.md gets a 1-line pointer to the new file.
+- [ ] **Task 2e.1 — Entry 7** (`## Read documentation before quoting commands`): shrink ~10 → ≤5 lines. Keep: the rule + the "source-of-truth > plausible recall, especially when it feels obvious" why. Drop: the deskwork-plugin install-command worked example.
+- [ ] **Task 2e.2 — Entry 8 hedge-half** (`## Operator owns scope decisions`, failure-mode-1): after Task 2c.5 removed the dispatch-report half, shrink the remaining operator-hedge-default-to-ASK guidance to ≤4 lines.
+- [ ] **Task 2e.3 — Entry 14** (`## Use the deskwork plugin only through the publicly-advertised distribution channel`): shrink to ≤6 lines. Keep: "no privileged shortcuts; if the public path is broken, fix+push it." Drop: the long re-read-the-docs enumerations.
+- [ ] **Task 2e.4 — Entry 16** (`## Memory-vs-rule placement: durable lessons go in this file`): shrink to ≤3 lines (meta-rule about this file). Keep the operator's emphatic anchor; drop the per-target enumeration.
+- [ ] **Task 2e.5 — Entry 18b** (`### Don't pitch /schedule check-ins on this project`): shrink to ≤3 lines.
+- [ ] **Task 2e.6 — Entry 18c** (`### No test infrastructure in CI`): shrink to ≤4 lines (keep the "local-only smokes instead" how-to).
+- [ ] **Task 2e.7 — Entry 18d** (`### Content-management databases preserve, they don't delete`): shrink to ≤5 lines (keep the operator's verbatim anchor + the "added-by-mistake" narrow exception).
+- [ ] **Task 2e.8 — Entry 18e** (`### Stay in agent-as-user dogfood mode`): shrink to ≤4 lines.
+- [ ] **Task 2e.9 — Sub-rule 19b** (marketplace-clone script names + flags are an adopter contract, inside entry 19's section): shrink to ≤2 lines — "documented script paths/flags/exit-codes are an adopter contract; don't rename/remove, alias instead." Keep it inside the (now-shrunk) entry 19 section.
+- [ ] **Group commit** (or per-task commits): `git commit -m "refactor(agent-discipline): shrink-in-place entries 7, 8-hedge, 14, 16, 18b-e, 19b (stays-cluster)"`
 
 ---
 
@@ -241,7 +335,7 @@ After this commit lands, the feature is ready for `/dw-lifecycle:review` → `/d
 | Risk | Mitigation |
 |---|---|
 | Disposition table iteration in Phase 1 takes more cycles than expected (operator surfaces structural concerns not yet captured) | The Phase 1 → Phase 2 gate is `applied`, not a time-bounded target. Capturing fully before scoping is exactly the discipline agent-discipline.md entry 9 names. |
-| Phase 2d (deskwork-plugin composes) requires authoring in a different plugin's source; risks scope creep | PRD review's Open Question #1 explicitly asks whether these entries stay in scope or move to a sibling feature. Defer in-feature commitment until applied. |
+| Phase 2d (deskwork-plugin composes) requires authoring in a different plugin's source; risks scope creep | RESOLVED at PRD revision 2: operator confirmed "all deskwork-family plugins are in scope" — entries 9, 10 stay in-feature, no sibling feature. The risk is accepted; commits are per-rule so blast radius stays small. |
 | Tooling fix for `--no-tailscale` (entry 15) breaks an adopter who scripted against the flag | Disposition target is no-op-alias with stderr warning, not hard removal. Per the "marketplace-clone script names + flags are an adopter contract" sub-rule, the flag stays parseable. |
 | Entry 12 ("Just for now") is deferred but its discipline still applies to this feature's own commits | Pre-commit audit-barrage hook continues to fire; deferring rule 12 doesn't deactivate it. |
 | The disposition table is the workplan's source of truth — if it drifts from agent-discipline.md after Phase 1 applied, Phase 2 tasks become wrong | Task 4 (extend the workplan) snapshots the applied disposition table into workplan task descriptions. Any post-applied disposition changes require a new PRD revision per the "extend re-iterates via deskwork" rule. |
