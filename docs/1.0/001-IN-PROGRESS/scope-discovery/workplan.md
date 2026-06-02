@@ -2336,6 +2336,81 @@ Closes AUDIT-20260601-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 - [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
+
+### Task 5.118 (fix-finding-AUDIT-20260602-41): AUDIT-20260602-41 — `defaultIsAncestorOfHead` comment claims a fail-closed safet…
+
+Closes AUDIT-20260602-41. Surface: `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts` (`defaultIsAncestorOfHead`, the comment block + `catch { return false; }`) ↔ `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts` (new branch: `const onSameHistory = await args.isAncestorOfHead(marker.tip); if (!onSameHistory) { return { kind: 'allow-marker-diverged-history', ... } }`). Severity: high.
+
+- [x] Step 0: working-code invariant — pre-Phase-22, `isAncestorOfHead`'s return value was unused (Phase 17 only compared marker.tip === HEAD). The Phase 22 Task 3 diverged-history branch made `false` mean "allow the commit." A bare-`catch → false` then silently allowed git errors. The fix MUST preserve the legitimate "tip is not an ancestor" case (`exit 1` → return `false` → allow boot case) while distinguishing it from "git errored" (`exit > 1` OR spawn failed → unknown → return `true` → refuse).
+- [x] Step 1: failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` — real-git fixture with mkdtemp + git init + a tip ref that doesn't exist. Pre-fix returned `false` (would silently allow); fix returns `true` (refuses).
+- [x] Step 1b: regression-lock test at the same file — exit-0 ancestor case still returns `true` (Option D invariant). Test block count for this finding: 8 (well above the ≥2 threshold).
+- [x] Step 2: RED confirmed against pre-fix bare-`catch` semantics.
+- [x] Step 3: extracted shared `isAncestorOfHead` to `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts` with fail-closed semantic: map error `.status === 1` → false; anything else → true. Removed the duplicated helpers from both CLI shims (`check-implement-hook-ran.ts` and `implement-hook.ts`) and pointed both at the shared util. This addresses AUDIT-41 (safety) AND AUDIT-42 (DRY) AND AUDIT-43 (coverage) in one cohesive change.
+- [x] Step 4: GREEN — 8/8 git-ancestry.test.ts + 10/10 check-implement-hook-ran.test.ts (unchanged behavior under the DI stub) + tsc clean.
+- [ ] Step 5: commit with `Closes AUDIT-20260602-41` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` (cited in Step 1)
+- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is 8 (≥2 per Option D discipline)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.119 (fix-finding-AUDIT-20260602-42) (non-bug): AUDIT-20260602-42 — Duplicated 13-line `isAncestorOfHead` helper dispositioned w…
+
+Closes AUDIT-20260602-42. Surface: `.dw-lifecycle/scope-discovery/clones.yaml` (clone group `700e9d4b0f18` — now dropped from the baseline). The helpers themselves were at `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts` and `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` — now consolidated to a single helper in `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts`.
+
+**Shape**: non-bug. The audit's substantive complaint was that the "deferred to a follow-up" disposition reason was deferral phrasing rather than a substantive justification — exactly the discipline AUDIT-20260601-78 / -81 / -82 / -83 cluster has flagged before.
+
+**Disposition (Step 1):** Replaced the deferral with a real fix: extracted the helper into `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts` as part of AUDIT-41's resolution. Both CLI shims now import the shared helper. `check-clones --refresh-baseline` confirms clone group `700e9d4b0f18` dropped (-1 net; 0 new). The "deferred" reason in clones.yaml is moot because the dispositioned clone no longer exists.
+
+- [x] Step 1: write the disposition prose (≥40 chars, substantive). Done — the substantive action is the DRY extraction.
+- [x] Step 2: apply the action — extracted to `git-ancestry.ts`; deleted the duplicated helpers; `check-clones --refresh-baseline` confirms the clone group is dropped.
+- [ ] Step 3: commit with `Closes AUDIT-20260602-42` in subject (paired with AUDIT-41 since they share the same fix).
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (helpers consolidated; clone group dropped from baseline).
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+
+
+### Task 5.120 (fix-finding-AUDIT-20260602-43): AUDIT-20260602-43 — The real default ancestry helper (`defaultIsAncestorOfHead`)…
+
+Closes AUDIT-20260602-43. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-ran.test.ts` (all four Phase 22 Task 3 tests inject `isAncestorOfHead: async () => opts.isAncestorOfHead ?? true`) vs. the untested production helper. Severity: medium.
+
+- [x] Step 1: failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exercising the bug via a real git fixture (mkdtemp + git init + bad ref).
+- [x] Step 2: RED confirmed.
+- [x] Step 3: shared helper at `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts` is now under coverage.
+- [x] Step 4: 8/8 git-ancestry.test.ts pass; suite covers ancestor / not-ancestor / sibling / bad-ref / malformed-sha / non-git-dir / nonexistent-path / regression-lock.
+- [ ] Step 5: commit with `Closes AUDIT-20260602-43` in subject (paired with AUDIT-41/-42).
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` (cited in Step 1)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.121 (fix-finding-AUDIT-20260602-44) (non-bug): AUDIT-20260602-44 — Task 3 workplan rewrote the RED gate into a self-justifying …
+
+Closes AUDIT-20260602-44. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 2 (~line 4119) + Task 3 (~line 4142) Step 2 notes.
+
+**Shape**: non-bug. Substantive surface fix.
+
+**Disposition (Step 1):** Replaced both "TDD-discipline note — written in the same change" rationalizations (Task 2 Step 2 and Task 3 Step 2) with honest acknowledgements that the RED gate was SKIPPED. The audit caught the same shape twice (AUDIT-37 on Task 2, AUDIT-44 on Task 3) — the pattern is real. Marked both Step 2 boxes back to `[ ]` so future re-walks see the skip explicitly. Added context in each note that the AUDIT-41/-43 follow-up (this commit's real-git integration test against fail-closed semantics) is the retroactive RED→GREEN observation for the production helper — the path the compressed Task 3 cycle had skipped. Task 2's helper (`computeAuditedDiff`) is purely DI-bag input/output and doesn't have an equivalent integration to retroactively cover; that Step 2 stays acknowledged-but-skipped without a redemption path.
+
+- [x] Step 1: write the disposition prose (≥40 chars, substantive).
+- [x] Step 2: apply the action — both Step 2 notes updated to honest acknowledgements.
+- [ ] Step 3: commit with `Closes AUDIT-20260602-44` in subject (paired with AUDIT-41/-42/-43).
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (Task 2 + Task 3 Step 2 notes rewritten).
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+
 ### Task 5.28 (fix-finding-AUDIT-20260531-11): AUDIT-20260531-11 — Fix-tasks 5.25 and 5.26 reintroduce the exact bare-`*.test.t…
 
 Closes AUDIT-20260531-11. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.25 acceptance criteria + Task 5.26 acceptance criteria, added in this diff) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:67-95`.
@@ -4045,7 +4120,7 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 
 - [x] Step 0a — refactor precondition: extracted diff-computation into pure-function helper `computeAuditedDiff` at `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audited-diff.ts`. Takes a DI bag of three git-diff callbacks; lets the test inject outputs directly without a real git fixture.
 - [x] Step 1: tests written at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/audited-diff.test.ts`. 11 tests covering: A) commit-range non-empty wins; B) range empty + staged wins; C) range empty + staged empty + unstaged wins; D) all empty → source='empty'; whitespace-only diffs treated as empty (2 tests); short-circuit ordering verified (no call to later layers when earlier is non-empty, 2 tests); cure-message asserts (3 tests).
-- [x] Step 2: TDD-discipline note — helper implementation + tests written in the same change, so the literal RED→GREEN cycle was compressed. The tests express the contract; the implementation matches. Mitigation: the same tests will catch any future regression on the contract.
+- [ ] Step 2: RED gate SKIPPED (AUDIT-20260602-37 / -44 surfaced this pattern). The helper implementation and tests were written in the same change without observing a RED state first. This is a TDD-discipline violation that AUDIT-37/-44 correctly flagged; not a mitigated trade-off. Marked open so the next task-walk re-runs Step 2 against the live helper, or the operator decides to acknowledge with a substantive reason that names what the lost RED→GREEN observation actually cost (e.g. "the bug we were testing for could not have been observed without RED, so we cannot prove the test would have caught it pre-fix"). Compressed-cycle assertions are not substantive reasons.
 - [x] Step 3: helper implemented (audited-diff.ts) + wired into `implement-hook` (refactored gitDiff call site; added gitDiffCached + gitDiffWorktree helpers; refuses with EMPTY_DIFF_CURE_MESSAGE + exit 1 when source==='empty'; emits a fallback-source notice to stderr when source !== 'commit-range').
 - [x] Step 4: GREEN — 11/11 audited-diff tests + 445/445 promote-findings suite + tsc clean.
 - [ ] Step 5: commit with `Closes #399` in subject (paired with Task 1 + Task 3 in the issue's resolution).
@@ -4068,7 +4143,7 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 **Step 0 — working-code invariant.** Pre-fix, the gate correctly refuses commits when the marker is genuinely stale (the operator ran a commit, then ran another without firing the hook). The fix MUST preserve that — only the "marker on different history line" case becomes boot-case.
 
 - [x] Step 1: tests written at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-ran.test.ts` (added `isAncestorOfHead` to `makeArgs` + a dedicated describe block with 4 scenarios). Scenario A — marker.tip is an ancestor of HEAD AND ≠ HEAD → refuse (preserved). Scenario B — marker.tip is NOT an ancestor of HEAD → new `allow-marker-diverged-history` result. Scenario C — marker.tip === HEAD → short-circuit, `isAncestorOfHead` never called. Scenario D — marker absent + no prior runs → `allow-no-prior-run` unchanged.
-- [x] Step 2: TDD-discipline note — library extension (new `isAncestorOfHead` dep + new `allow-marker-diverged-history` result variant) + tests written in the same change. Tests express the contract; 10/10 pass after the library change.
+- [ ] Step 2: RED gate SKIPPED (AUDIT-20260602-44 surfaced this — recurrence of AUDIT-37's shape on Task 2). The library extension (new `isAncestorOfHead` dep + new result variant) + tests + CLI plumbing were written in the same change without observing a RED state first. Cycle-compression rationalization is NOT a substantive disposition. The audit caught the rationalization in real-time; the fix is to acknowledge the skip honestly. AUDIT-41/-43 follow-up (the real-git integration test) gave the helper its actual RED→GREEN observation against fail-closed semantics — that retroactively gives the production code path the test discipline this Step 2 had compressed away.
 - [x] Step 3: implemented — added `isAncestorOfHead: (tip: string) => Promise<boolean>` to `CheckImplementHookRanArgs`. Added `allow-marker-diverged-history` to the result union. Branch added between `marker.tip === head` and `refuse-marker-stale`: when marker.tip ≠ head AND not an ancestor of head, emit `allow-marker-diverged-history` with a reason naming reset/rebase/sync + #399. CLI shim wires the default `git merge-base --is-ancestor <tip> HEAD` via `defaultIsAncestorOfHead`. Mirrored in `implement-hook.ts`: when `readLatestBarrageTip` returns a tip that's not an ancestor of HEAD, fall back to `HEAD~10..HEAD` baseline instead of `<diverged-tip>..HEAD` (which would walk main's shipped commits as "new diff").
 - [x] Step 4: GREEN — 10/10 check-implement-hook-ran.test.ts + 449/449 promote-findings suite + 20/20 subcommands suite + tsc clean.
 - [x] Step 5: `git rm --cached .dw-lifecycle/scope-discovery/last-hook-run.json` in this commit. `git ls-files .dw-lifecycle/scope-discovery/last-hook-run.json` returns empty post-commit; the file is now gitignored AND untracked (parity restored with the gitignore intent that was undone by `ac90d329` on main).

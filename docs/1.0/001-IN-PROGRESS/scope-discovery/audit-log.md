@@ -2668,3 +2668,153 @@ Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:226-228` (`const headingMatch = headingRe.exec(updated)` — single `.exec`, first match only)
 
 `tickClosureCriteria` locates the task block via a single `headingRe.exec(updated)` per flip, which returns only the *first* heading carrying the canonical `(fix-finding-<id>)`. This feature's entire history is duplicate-finding churn (re-minted fix-tasks, AUDIT-65 dup-of-52, etc.), and the workplan already contains repeated task numbers (two `### Task 5.112` headings in this very diff). If a single canonical AUDIT-id ever appears in two `(fix-finding-…)` headings, only the first block is swept; the second keeps its `- [ ]` boxes and continues tripping the `check-open-findings` / unchecked-closure count forever, with no error surfaced. The closure-count test at the end of the existing suite (`apply-audit-flips-cli.test.ts:558-560`, `uncheckedClosureLines` global count) would catch a *global* nonzero only if exercised on such input — it isn't. Loop the match (`while ((m = headingRe.exec(updated)))`) or assert single-occurrence and log when a canonical id resolves to >1 block, so a duplicate doesn't silently half-sweep.
+
+## 2026-06-02 — audit-barrage lift (20260602T225322565Z-scope-discovery)
+
+### AUDIT-20260602-34 — Empty diff rendered — cannot audit absent code; emitting blank-diff signal rather than confabulating
+
+Finding-ID: AUDIT-20260602-34
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   informational
+Surface:    (the audit-barrage prompt itself — the "## Diff under audit" section is blank)
+
+The audited prompt rendered an empty "Diff under audit" section. There is no code, no hunk, and no file path
+below the section header — only the instruction text "The actual code under review. Read it carefully."
+followed immediately by "## What to look for". Every commit-subject and prior-finding section above it is
+populated, but the payload the findings are supposed to anchor to is missing.
+
+Any code-level finding I emitted here would be unanchored to a real line range and would therefore be
+fabrication — precisely the cross-model confabulation that Phase 22 Task 2 (#399 Friction 2) is scoped to
+prevent: when the commit range is empty (HEAD == lastBarrageTip with all novel work staged-uncommitted), the
+renderer emits a blank diff and invites every model to confabulate against it. The live repro of that bug
+produced the confabulated AUDIT-20260602-01 on feature/deskwork-plugin. This blank render is the same shape.
+
+The correct response per the project's discipline is to refuse to fire findings and surface a loud signal
+instead. So this is the signal: the audit could not run because no diff was supplied. The fix is the one
+already specced in Task 2 — computeAuditedDiff() should fall back to `git diff --cached` / `git diff`
+(worktree) when the commit-range diff is empty, and when ALL are empty the caller should refuse to fire with a
+cure message ("no novel work to audit; check that you've staged the change you intended to audit") rather than
+rendering a blank "Diff under audit" section and proceeding to the barrage.
+```
+
+If you want a real audit of the Phase 22 work, point me at the actual changes — either re-run the barrage after the Task 2 staged-fallback fix lands, or tell me which commit/range to diff (e.g. `0a35e0e9` for the auto-position regex relaxation) and I'll review the concrete code with anchored findings. I just won't manufacture findings against a diff that wasn't included.
+
+## 2026-06-02 — audit-barrage lift (20260602T225651474Z-scope-discovery)
+
+### AUDIT-20260602-35 — Comment and test rationale claim header-only diffs fall through to the fallback chain — the code does not do that
+
+Finding-ID: AUDIT-20260602-35
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audited-diff.ts:68-69` (doc comment) + `:78,82,86` (the three `.trim().length > 0` checks); mirrored in `audited-diff.test.ts:64-66`
+
+Both the helper's doc comment and the test comment justify the `.trim()` checks by claiming they handle git's *header-only* output: *"git can emit a header-only diff in some edge cases (e.g. mode-bit changes with no content delta) … the fallback should still fire."* That is false. A real header-only diff is `diff --git a/file b/file\nold mode 100644\nnew mode 100755\n` — three lines of non-whitespace text. `rangeDiff.trim()` leaves it non-empty, so `computeAuditedDiff` returns `source: 'commit-range'` and feeds the contentless-delta diff to the barrage. `.trim()` only collapses *pure-whitespace* payloads (`'   \n\n  \t  \n'`), which is the only case the two whitespace tests at `audited-diff.test.ts:75-101` actually exercise.
+
+This matters two ways. (1) The comment documents behavior the code doesn't have — a maintainer reading "we want the fallback to fire there too" will believe mode-bit-only changes are handled, and they aren't. (2) If a mode-bit-only change is genuinely the only delta in the range, the barrage fires against a diff with no reviewable content — the exact blank-input-confabulation failure mode #399 exists to prevent, just one layer deeper. The fix is to decide which is true: either drop the misleading header-only claim from the comment/test (the likely correct call, since a mode change *is* a real change worth auditing), or, if contentless diffs should be treated as empty, add a real content-detection check (e.g. require at least one `+`/`-` hunk line) and a test that injects an actual `diff --git … old mode … new mode` string.
+
+### AUDIT-20260602-36 — Fallback chain has no path for untracked files; cure message misdiagnoses "nothing in working tree"
+
+Finding-ID: AUDIT-20260602-36
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `implement-hook.ts:179-188` (`gitDiffWorktree` runs bare `git diff`) + `audited-diff.ts:84-87` (the `unstaged` layer) + `EMPTY_DIFF_CURE_MESSAGE` at `audited-diff.ts:90-96`
+
+`gitDiffWorktree` runs `git diff` (worktree-vs-index), which by design does **not** report untracked files. The post-`git reset --hard origin/main` scenario Friction 2 targets is "operator's new work sitting staged-uncommitted" — staged work is covered by `gitDiffCached`. But the equally-common sibling scenario is the operator having created **brand-new untracked files** they haven't `git add`-ed yet. Those appear in neither `git diff --cached` (not staged) nor `git diff` (untracked, never shown). The chain returns `source: 'empty'` and refuses — even though real new work exists on disk.
+
+The cure message compounds this: line `'  - Nothing is in the working tree (\`git diff\`).'` asserts the working tree is empty when it may be full of untracked files. The `git add` corrective action would in fact fix it, so the operator can recover, but the *diagnosis* is wrong and will read as "deskwork can't see my work" rather than "stage your new files." A reasonable fix: either add a `git diff --cached` against `$(git ls-files --others --exclude-standard)` style untracked probe to the chain (or run `git status --porcelain` to detect untracked-only state), or — at minimum — amend the cure line to `'  - Nothing tracked is in the working tree (untracked files are not audited until staged — \`git add\` them).'` so the diagnosis matches reality.
+
+### AUDIT-20260602-37 — Workplan rewrote the RED gate out of the TDD steps and documented the skip as acceptable — discipline-erosion pattern
+
+Finding-ID: AUDIT-20260602-37
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 2 — the Step 1/Step 2 rewrite (diff lines replacing the original `- [ ] Step 1: write failing tests` / `- [ ] Step 2: confirm RED` with `- [x] Step 1: tests written` / `- [x] Step 2: TDD-discipline note … the literal RED→GREEN cycle was compressed`)
+
+The original plan specced a hard RED gate: "Step 1: write failing tests … Step 2: confirm RED … Step 3: implement." The execution collapsed that into "tests + implementation written in the same change" and rewrote Step 2 from a verification gate into a self-justifying note: *"the literal RED→GREEN cycle was compressed. The tests express the contract; the implementation matches. Mitigation: the same tests will catch any future regression."* That rationalization is exactly the shape the project's `fix-task-tdd-discipline` doctor rule and `check-fix-task-tdd` commit gate exist to stop — a checked "write failing test" box that did not gate a failing run is decoupled from the reality it's supposed to assert (the same shape AUDIT-20260602-30 flagged for the orphan-sweep).
+
+The concrete risk for *this* helper: a pure function whose every branch is a `.trim().length > 0` short-circuit is precisely the code where an implementation-after-test author unconsciously writes tests that mirror the code's structure rather than the contract — and a never-observed RED run means no one confirmed the tests can fail. The "mitigation" sentence is the giveaway: a test suite that never went red is not evidence it *can* go red. Reasonable resolution: either back out the implementation, confirm the suite goes red against a stub, and re-commit (true TDD), or — if the operator accepts the compression — record it as an explicit operator decision in the issue rather than a self-issued "compressed, mitigated" note in the workplan. The latter is the disposition the project's "no just-for-now" rule demands; a workplan annotation is not it.
+
+### AUDIT-20260602-38 — `EMPTY_DIFF_CURE_MESSAGE` prints the literal placeholder `<lastBarrageTip>` instead of the real range, and is wrong in the boot case
+
+Finding-ID: AUDIT-20260602-38
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `audited-diff.ts:90-96` (`EMPTY_DIFF_CURE_MESSAGE` is a module-level `const`) consumed at `implement-hook.ts:288-291`
+
+The cure is a static string literal containing `'  - The commit range (<lastBarrageTip>..HEAD) is empty.'`. The operator sees the literal characters `<lastBarrageTip>..HEAD`, not the actual range the run computed (e.g. `ac90d329..HEAD`). Worse, when `lastBarrageTip === null` the caller's range is `HEAD~10..HEAD` (`implement-hook.ts:278`), so the message names a range concept that wasn't even used on this run. The cure tells the operator to reason about "the commit range" but won't show them which one.
+
+Because the message is a `const`, making it accurate requires turning it into a function `emptyDiffCure(range: string): string` (or interpolating at the call site) so it can name the concrete range. The three `EMPTY_DIFF_CURE_MESSAGE` assertions at `audited-diff.test.ts:148-162` would carry over to a function form unchanged. Low severity because the corrective actions are still actionable, but the headline diagnostic line is unactionable as written.
+
+### AUDIT-20260602-39 — Swallowed `maxBuffer`/git errors make a >50MB legitimate diff indistinguishable from an empty tree → refusal with an actively wrong cure
+
+Finding-ID: AUDIT-20260602-39
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `implement-hook.ts:163-176` (`gitDiffCached`) and `:179-188` (`gitDiffWorktree`) — both `catch { return ''; }` with `maxBuffer: 50 * 1024 * 1024`
+
+Both new helpers (and the pre-existing `gitDiff`) swallow every `execFileSync` failure into `return ''`. `execFileSync` throws `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` when output exceeds `maxBuffer`. So a genuine, large diff (>50MB — plausible for a big refactor or a generated-file churn) is caught, returned as `''`, treated as empty by `computeAuditedDiff`, and — if all three layers overflow or error — produces `source: 'empty'` and the "no novel work to audit" refusal. That cure message would then be precisely backwards: there is a huge amount of work to audit, and the tool reports there is none.
+
+The fallback chain amplifies this over the single pre-existing `gitDiff` call: three swallow points now feed one "empty → refuse" decision, and none of them distinguishes "git produced nothing" from "git produced too much" from "git errored." At minimum, the maxBuffer-overflow case should surface a distinct error rather than masquerading as an empty tree. This is adjacent to the prior slush-piled AUDIT-20260602-17 (missing real-git integration test) but is a distinct correctness concern: it's about *error classification*, not test coverage. A `catch (e)` that re-throws (or returns a sentinel) on `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` while still tolerating "not a git repo" would keep the fallback honest.
+
+### AUDIT-20260602-40 — `audited-diff` helper is filed under `promote-findings/` but belongs to the audit-barrage input path, not finding promotion
+
+Finding-ID: AUDIT-20260602-40
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   informational
+Surface:    new file path `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audited-diff.ts` + test `__tests__/scope-discovery/promote-findings/audited-diff.test.ts`
+
+`computeAuditedDiff` computes the *input diff fed to the audit-barrage prompt* — it runs strictly upstream of finding promotion (the barrage produces the audit-log; `promote-findings` later consumes that log to scope workplan tasks). Placing it in the `promote-findings/` module couples a barrage-input concern to the finding-promotion namespace, which will mislead future readers about the data-flow ordering and invites `promote-findings` code to reach into diff-computation it has no business touching. The only caller is `implement-hook.ts`, which orchestrates barrage → log → promote; the helper would sit more cohesively under a `scope-discovery/audit-barrage/` (or sibling) module that owns barrage-input shaping. Informational only — no behavioral defect — but worth correcting before other barrage-input helpers accrete in the wrong package and cement the misplacement.
+
+---
+
+That's my triage. I checked: the fallback ordering and short-circuit semantics (correct — the call-ordering tests at `audited-diff.test.ts:103-145` genuinely verify no later layer runs once an earlier one is non-empty); the `source: 'empty'` → exit-1 + cure wiring (`implement-hook.ts:286-289`, correct); the fallback-source stderr notice (`:291-297`, useful and non-fatal); the DI seam (clean — pure function over three injected callbacks, no fs/child_process leak). The genuine code-level issues that were *already* on record and slush-piled (fail-open `origin/main` → AUDIT-15; empty-string opt-out → AUDIT-16; missing real-git integration test → AUDIT-17) I did not re-report. My six findings are new surface introduced by this diff: a comment that overclaims (-01), an untracked-files gap in the fallback chain (-02), the RED-gate rewrite (-03), an unactionable cure placeholder (-04), error-classification swallowing (-05), and a module-cohesion misplacement (-06).
+
+## 2026-06-02 — audit-barrage lift (20260602T230315311Z-scope-discovery)
+
+### AUDIT-20260602-41 — `defaultIsAncestorOfHead` comment claims a fail-closed safety posture, but the new diverged-history branch makes it fail-OPEN — a git error silently allows a genuinely-stale commit
+
+Finding-ID: AUDIT-20260602-41
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts` (`defaultIsAncestorOfHead`, the comment block + `catch { return false; }`) ↔ `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts` (new branch: `const onSameHistory = await args.isAncestorOfHead(marker.tip); if (!onSameHistory) { return { kind: 'allow-marker-diverged-history', ... } }`)
+
+The default ancestry helper's comment asserts a specific safety contract: *"On exec error (no git, no .git/, bad ref), treat as 'not an ancestor' — the safe default falls through to the existing refuse-marker-stale path rather than silently allowing."* That statement was true **before** this diff, when a `false` return meant "not ancestor → fall through to refuse." It is now **false**. The library code this diff adds routes `isAncestorOfHead(...) === false` to `allow-marker-diverged-history` (an ALLOW), and only `true` continues to `refuse-marker-stale`. So the safety posture inverted: any error inside `git merge-base --is-ancestor` (the marker points at a GC'd/missing commit, a transient git failure, a detached/odd ref state) now yields `false` → **ALLOW**, not refuse.
+
+This matters because the genuine-stale case the gate exists to catch — operator committed, then committed again without firing the hook — is exactly a case where `marker.tip` is a real ancestor of HEAD. If `git merge-base` errors for that marker (e.g. the marker tip isn't present in the local object store), the helper returns `false`, the gate emits `allow-marker-diverged-history`, and the stale commit sails through. The gate is silently bypassable on any ancestry-check error, and the comment actively tells a future maintainer the opposite is true. Fix: either make the default fail-closed for the gate context (distinguish exit-1 "not ancestor" from exit>1 "error", and on error refuse rather than allow), or — at minimum — correct the comment to state the real consequence (`false` now ALLOWS via the diverged-history branch) so the inversion is intentional and auditable. The mirror helper in `implement-hook.ts` carries only the neutral `"anything else = not"` comment and does not make the false claim, so the defect is specific to the `subcommands/check-implement-hook-ran.ts` copy.
+
+### AUDIT-20260602-42 — Duplicated 13-line `isAncestorOfHead` helper dispositioned with a "deferred to a follow-up" deferral phrase
+
+Finding-ID: AUDIT-20260602-42
+Status:     open
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/clones.yaml` new clone group `700e9d4b0f18` (members `check-implement-hook-ran.ts:116:128` + `implement-hook.ts:191:203`); the helpers themselves at `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts` (`defaultIsAncestorOfHead`) and `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` (`isAncestorOfHead`)
+
+This diff introduces two byte-near-identical `git merge-base --is-ancestor <tip> HEAD` helpers — one in each CLI shim — and the clone detector flags them as a new group. The disposition reason recorded in the diff is: *"DRY would require a shared git-helpers module — modest scope, **deferred to a follow-up**."* Per the audit contract, a deferral phrase landing in the diff is itself a finding: "deferred to a follow-up" is an IOU with no issue number, no owner, and no tracking surface — the exact `// for now` nucleation-site pattern `.claude/rules/agent-discipline.md` § "Just for now is bullshit" names. Comments and clones.yaml reasons don't track work; issues and workplans do.
+
+Beyond the deferral phrasing, the duplication is load-bearing: Finding-01 shows the two copies have already diverged in their *comments* (one makes a false safety claim, the other doesn't) and in their *call-site semantics* (gate copy: false→allow-commit; implement-hook copy: false→re-baseline to HEAD~10). Two copies of a git primitive that already disagree about what `false` means is precisely the drift that a shared helper prevents. Reasonable fix: extract a single `gitMergeBaseIsAncestor(repoRoot, tip)` into the existing subcommand-shared module, give it ONE documented error contract, and have both call sites consume it — or, if the duplication is genuinely accepted, file a tracked issue and reference its number in the clones.yaml reason instead of "deferred to a follow-up."
+
+### AUDIT-20260602-43 — The real default ancestry helper (`defaultIsAncestorOfHead`) has zero test coverage; only the injected DI stub is exercised
+
+Finding-ID: AUDIT-20260602-43
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-ran.test.ts` (all four new tests inject `isAncestorOfHead: async () => opts.isAncestorOfHead ?? true`) vs. the untested `defaultIsAncestorOfHead` in `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts`
+
+Every new test drives the library function through the DI seam with a hand-supplied boolean. That validates the *branching* on the boolean but proves nothing about the production default, which is where Finding-01's fail-open lives. The tests pass `isAncestorOfHead: false` to mean "history diverged" and assert `allow-marker-diverged-history` — but the default impl produces `false` for BOTH "definitively not an ancestor" AND "git errored," and no test distinguishes them. So the suite can be 10/10 green while the production gate silently allows commits on any `merge-base` error. The contract the tests claim to lock ("diverged → allow; same-line stale → refuse") is under-specified precisely at the error boundary.
+
+A test that injects a callback which *throws* (or a thin integration test that runs `defaultIsAncestorOfHead` against a real tmp repo with a tip that isn't in the object store) would surface the fail-open. This is the same blind-spot shape the project's own memory notes ("TDD spec tests have systematic blind spots") warns about: passing the DI-seam suite ≠ the real default behaves safely. Add an error-path test before treating the diverged-history guard as verified.
+
+### AUDIT-20260602-44 — Task 3 workplan rewrote the RED gate into a self-justifying "TDD-discipline note" — recurrence of the AUDIT-…-37 shape in a new task
+
+Finding-ID: AUDIT-20260602-44
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 3 — the Step 1/Step 2 diff replacing `- [ ] Step 1: write failing tests` / `- [ ] Step 2: confirm RED` with `- [x] Step 1: tests written …` / `- [x] Step 2: TDD-discipline note — library extension … + tests written in the same change. Tests express the contract; 10/10 pass after the library change.`
+
+The original plan specced a hard RED gate (write failing test → confirm RED → implement). The execution collapsed it into "tests + library change in the same edit" and rewrote the gate-step into a note that asserts compliance rather than demonstrating it. A prior barrage already flagged this exact shape for Task 2 (AUDIT-20260602-37); this is a distinct, fresh instance in Task 3, so it is not a re-report of the same checkbox — the pattern recurred rather than regressed. The concern is sharpened by Finding-03: the suite that "10/10 pass" never went red against a stub, so there is no evidence the tests *can* fail — and the one branch most likely to hide a bug (the error→false→allow path) has no test at all. "Tests express the contract; 10/10 pass" is the same reassurance the project's `check-fix-task-tdd` gate exists to distrust.
+
+Per `.claude/rules/agent-discipline.md`, the correct disposition for an accepted TDD compression is an explicit operator decision recorded in the issue, not a self-issued "compressed, mitigated" annotation in the workplan. Either confirm the suite goes red against a stubbed library (true RED→GREEN) and note that, or record the compression as an operator-accepted deviation referencing #399.
+
+---
+
+I checked and found clean: the short-circuit semantics (tip===HEAD returns `allow-marker-matches-head` before any ancestry call — the `ancestryCalls === 0` test genuinely proves it); the new `allow-marker-diverged-history` result variant is correctly threaded through the `summarize` switch and the `result.kind.startsWith('allow')` exit-code mapping; the `implement-hook.ts` divergence guard correctly nulls `rawBarrageTip` when non-ancestor and emits a non-fatal stderr notice before falling back to the `HEAD~10..HEAD` baseline; and the marker-untrack (`last-hook-run.json` deletion) matches the workplan's stated Step 5 intent. My four findings are new surface from this diff: a fail-open inversion the comment denies (-01), a deferral-phrased duplicate helper that has already drifted (-02), the untested production default behind it (-03), and the recurred RED-gate-rewrite in the Task 3 workplan (-04).

@@ -33,6 +33,7 @@ import {
   checkImplementHookRan,
   type CheckImplementHookRanResult,
 } from '../scope-discovery/promote-findings/check-implement-hook-ran.js';
+import { isAncestorOfHead } from '../scope-discovery/util/git-ancestry.js';
 
 export interface CheckImplementHookRanCliOptions {
   readonly repoRoot?: string;
@@ -107,23 +108,11 @@ function defaultGitHead(repoRoot: string): string {
   }
 }
 
-// Phase 22 Task 3 (#399 Friction 1): `git merge-base --is-ancestor`
-// returns exit-0 when `tip` is an ancestor of HEAD, exit-1 when not,
-// and exit > 1 on real errors. Map exit-0 → true; anything else → false.
-// On exec error (no git, no .git/, bad ref), treat as "not an ancestor"
-// — the safe default falls through to the existing refuse-marker-stale
-// path rather than silently allowing.
-function defaultIsAncestorOfHead(repoRoot: string, tip: string): boolean {
-  try {
-    execFileSync('git', ['merge-base', '--is-ancestor', tip, 'HEAD'], {
-      cwd: repoRoot,
-      stdio: ['ignore', 'ignore', 'ignore'],
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Per AUDIT-20260602-41/-42/-43: ancestry helper extracted to a shared
+// utility (`scope-discovery/util/git-ancestry.ts`) so the fail-closed
+// semantic is defined exactly once. The two CLI shims that need it
+// (this file + implement-hook.ts) both import from there. The shared
+// helper has its own integration-test suite against a real git fixture.
 
 export interface RunArgs {
   readonly opts: CheckImplementHookRanCliOptions;
@@ -162,15 +151,16 @@ export async function runCheckImplementHookRan(args: RunArgs): Promise<number> {
       const log = await readHookRunLog(repoRootResolved);
       return log.length > 0;
     });
-  const isAncestorOfHead =
-    args.isAncestorOfHead ?? (async (tip: string) => defaultIsAncestorOfHead(repoRootResolved, tip));
+  const isAncestorOfHeadFn =
+    args.isAncestorOfHead ??
+    (async (tip: string) => isAncestorOfHead({ repoRoot: repoRootResolved, tip }));
   const result = await checkImplementHookRan({
     repoRoot: repoRootResolved,
     readMarker,
     gitHeadResolver,
     isScopeDiscoveryOptedIn,
     hasAnyPriorHookRun,
-    isAncestorOfHead,
+    isAncestorOfHead: isAncestorOfHeadFn,
   });
   args.stderr.write(`${summarize(result)}\n`);
   if (result.kind.startsWith('allow')) return 0;

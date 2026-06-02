@@ -57,6 +57,7 @@ import {
   computeAuditedDiff,
   EMPTY_DIFF_CURE_MESSAGE,
 } from '../scope-discovery/promote-findings/audited-diff.js';
+import { isAncestorOfHead } from '../scope-discovery/util/git-ancestry.js';
 
 export interface ImplementHookCliOptions {
   readonly featureSlug: string;
@@ -186,19 +187,10 @@ function gitDiffWorktree(repoRoot: string): string {
   }
 }
 
-// Phase 22 Task 3 (#399 Friction 1): mirror of the helper in
-// check-implement-hook-ran.ts. exit-0 = ancestor; anything else = not.
-function isAncestorOfHead(repoRoot: string, tip: string): boolean {
-  try {
-    execFileSync('git', ['merge-base', '--is-ancestor', tip, 'HEAD'], {
-      cwd: repoRoot,
-      stdio: ['ignore', 'ignore', 'ignore'],
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Per AUDIT-20260602-41/-42/-43: the ancestry helper is imported from
+// scope-discovery/util/git-ancestry.ts. The shared implementation has
+// the fail-closed semantic + a real-git integration test suite. Both
+// CLI shims use it.
 
 interface DwlVerbInvocation {
   readonly stdout: string;
@@ -297,7 +289,7 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
   // fall through to the HEAD~10 fallback when the marker is from
   // another timeline.
   const lastBarrageTip =
-    rawBarrageTip !== null && isAncestorOfHead(repoRootResolved, rawBarrageTip)
+    rawBarrageTip !== null && isAncestorOfHead({ repoRoot: repoRootResolved, tip: rawBarrageTip })
       ? rawBarrageTip
       : null;
   if (rawBarrageTip !== null && lastBarrageTip === null) {
