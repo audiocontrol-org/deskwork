@@ -78,6 +78,11 @@ export function inferFindingShape(finding: OpenFinding): FindingShape {
   // The lowercase form below matches because `surface` is .toLowerCase()'d
   // at the top of the function.
   if (/(?:^|\/|`|\s)development-notes\.md/.test(surface)) return 'non-bug';
+  // Agent-discipline prose under `.claude/` — rules markdown + CLAUDE.md
+  // are doc-prose, not source. Per AUDIT-20260602-07: findings against
+  // these files have no vitest contract and must render as non-bug.
+  if (/\.claude\/rules\//.test(surface)) return 'non-bug';
+  if (/(?:^|\/|`|\s)\.claude\/claude\.md/.test(surface)) return 'non-bug';
   if (/\.dw-lifecycle\//.test(surface)) return 'non-bug';
   if (/last-hook-run\.json/.test(surface)) return 'non-bug';
   if (/hook-run-log\.jsonl/.test(surface)) return 'non-bug';

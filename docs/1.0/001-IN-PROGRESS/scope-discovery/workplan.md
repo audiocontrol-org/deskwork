@@ -821,21 +821,23 @@ Closes AUDIT-20260602-06. Surface: `packages/studio/src/server.ts:157-172` (the 
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
-### Task 5.118 (fix-finding-AUDIT-20260602-07): AUDIT-20260602-07 — Shipped `agent-discipline.md` is internally inconsistent — e…
+### Task 5.118 (fix-finding-AUDIT-20260602-07) (non-bug): AUDIT-20260602-07 — Shipped `agent-discipline.md` is internally inconsistent — e…
 
 Closes AUDIT-20260602-07. Surface: `.claude/rules/agent-discipline.md` — audit-barrage section ("third independent audit surface … the SDD two-reviewer cycle") vs. the deleted entry 2 ("Use /dw-lifecycle:review after every implementation step"). Severity: low.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260602-07` in subject
+**Shape**: non-bug. This finding's surface is non-source agent-discipline prose. The disposition below is the substantive prose edit — not a code change verified by a failing test.
+
+**Disposition (Step 1):** Updated both surviving "third independent audit surface (alongside ... SDD two-reviewer cycle)" lines — one in `.claude/rules/agent-discipline.md:19` and the canonical home in `plugins/dw-lifecycle/skills/audit-barrage/SKILL.md:10` — to drop the "third" framing and explicitly note that the SDD reference is being retired under #387. The prose now reads internally consistent with the deleted entry 2 (no longer claiming a review discipline that the rule no longer mandates). Additionally extended `inferFindingShape`'s non-bug allowlist to recognize `.claude/rules/*.md` and `.claude/CLAUDE.md` (with regression tests), so future findings on agent-discipline prose don't recur the AUDIT-05 / AUDIT-07 shape-classifier mismatch.
+
+- [x] Step 1: write the disposition prose (≥40 chars, substantive).
+- [x] Step 2: apply the action named in Step 1 (the file edit).
+- [ ] Step 3: commit with `Closes AUDIT-20260602-07` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (the substantive edits are present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
 
 ### Task 5.110 (fix-finding-AUDIT-20260601-76): AUDIT-20260601-76 — Auto-promotion swept a positive `informational` "clean repor…
 

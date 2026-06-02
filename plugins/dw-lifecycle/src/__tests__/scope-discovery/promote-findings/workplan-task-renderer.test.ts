@@ -181,6 +181,24 @@ describe('inferFindingShape — Phase 18 Task 1 (AUDIT-02)', () => {
       ),
     ).toBe('non-bug');
   });
+
+  // AUDIT-20260602-07: .claude/rules/*.md and .claude/CLAUDE.md are agent-discipline
+  // prose, not source code. Findings against them have no vitest contract; the
+  // allowlist must recognize the .claude/ directory so promote-findings doesn't
+  // mint phantom test paths.
+  it('infers non-bug for .claude/rules/<name>.md surface (AUDIT-20260602-07)', () => {
+    expect(
+      inferFindingShape(
+        finding({ surface: '.claude/rules/agent-discipline.md — audit-barrage section' }),
+      ),
+    ).toBe('non-bug');
+  });
+
+  it('infers non-bug for .claude/CLAUDE.md surface', () => {
+    expect(
+      inferFindingShape(finding({ surface: '.claude/CLAUDE.md line 99' })),
+    ).toBe('non-bug');
+  });
 });
 
 describe('renderFixTaskBlock — non-bug variant (Phase 18 Task 1)', () => {

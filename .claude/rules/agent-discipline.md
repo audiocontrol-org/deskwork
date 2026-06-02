@@ -16,7 +16,7 @@ The discipline is mechanized — see **`/dw-lifecycle:promote-findings`** (scope
 
 ## Audit-barrage: structured cross-model audit
 
-Audit-barrage is the **third independent audit surface** (alongside the in-band self-audit and the SDD two-reviewer cycle) — **additive, not substitutable**; it fires multiple CLI model families in parallel for genetic diversity in failure modes. Cross-model agreement (two+ models flagging the same root cause) is the HIGH-confidence signal.
+Audit-barrage is an **independent audit surface alongside the in-band self-audit** — **additive, not substitutable**; it fires multiple CLI model families in parallel for genetic diversity in failure modes. Cross-model agreement (two+ models flagging the same root cause) is the HIGH-confidence signal. (Note: pre-decompose this rule named three surfaces including the SDD two-reviewer cycle; that cycle is being retired separately under [#387](https://github.com/audiocontrol-org/deskwork/issues/387) and is no longer named here to keep the file internally consistent.)
 
 > See **`/dw-lifecycle:audit-barrage`** ([SKILL.md](../../plugins/dw-lifecycle/skills/audit-barrage/SKILL.md)) for when to run, the render+fire verb pair, triage steps, and override paths.
 
