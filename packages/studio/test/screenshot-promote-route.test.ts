@@ -361,6 +361,33 @@ describe('POST /api/dev/editorial-review/screenshots/orphan/:filename/promote-to
     },
   );
 
+  // AUDIT-20260602-05 — Bug-repro: a JSON array body must be rejected
+  // with 400. Pre-fix the promote route's inline body parse omitted
+  // the Array.isArray check that the shared readJsonObjectBody helper
+  // enforces; arrays passed the typeof object guard and the route
+  // proceeded as a no-sourceEntry promote.
+  it(
+    'returns 400 when the body is a JSON array (AUDIT-20260602-05)',
+    async () => {
+      const commentId = await seedComment(projectRoot);
+      await seedOrphan(projectRoot, FILENAME);
+      const app = createApp({ projectRoot, config: cfg });
+      const res = await app.fetch(
+        new Request(
+          `http://x/api/dev/editorial-review/screenshots/orphan/${encodeURIComponent(FILENAME)}/promote-to-entry/${ENTRY_UUID}/comment/${commentId}`,
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify([{ sourceEntry: SOURCE_ENTRY }]),
+          },
+        ),
+      );
+      expect(res.status).toBe(400);
+      const obj = (await res.json()) as Record<string, unknown>;
+      expect(obj.error).toMatch(/object/);
+    },
+  );
+
   it('returns 409 when an entry-anchored file of the same name already exists', async () => {
     const commentId = await seedComment(projectRoot);
     await seedOrphan(projectRoot, FILENAME);

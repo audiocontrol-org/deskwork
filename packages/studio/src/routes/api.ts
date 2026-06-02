@@ -636,20 +636,18 @@ export function createApiRouter(ctx: StudioContext): Hono {
       const idsResult = readValidEntryAndCommentIds(c);
       if (idsResult instanceof Response) return idsResult;
       const { entryId, commentId } = idsResult;
-      let body: unknown = {};
-      // Body is optional. Only attempt JSON parse when content-type
-      // hints at it — a bare POST without a body is the in-entry
-      // (non-cross-entry) common case.
+      // AUDIT-20260602-05 — route the optional body through the
+      // shared readJsonObjectBody helper so arrays + non-object
+      // shapes are rejected with the same contract every sibling
+      // route enforces. The body is OPTIONAL, so only call the
+      // helper when content-type hints at JSON; a bare POST is the
+      // common in-entry case.
+      let body: Record<string, unknown> = {};
       const contentType = c.req.header('content-type') ?? '';
       if (contentType.toLowerCase().includes('application/json')) {
-        try {
-          body = await c.req.json();
-        } catch {
-          return c.json({ error: 'invalid JSON body' }, 400);
-        }
-        if (typeof body !== 'object' || body === null) {
-          return c.json({ error: 'expected JSON object body' }, 400);
-        }
+        const parsed = await readJsonObjectBody(c);
+        if (parsed instanceof Response) return parsed;
+        body = parsed;
       }
       const sourceRaw = Reflect.get(body, 'sourceEntry');
       const sourceEntry =
