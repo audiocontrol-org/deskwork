@@ -62,10 +62,9 @@ const OFF_PIPELINE: readonly Stage[] = ['Blocked', 'Cancelled'] as const;
  * @deprecated Use `isLinearPipelineStageInTemplate(template, stage)` from
  *   `@deskwork/core/pipelines`. Resolve `template` via
  *   `resolveEntryStrictTemplate(entry, projectRoot)` from
- *   `@deskwork/core/lanes`. The editorial-narrow form here is kept for
- *   non-verb callers that operate on the editorial vocabulary
- *   specifically (e.g. the legacy calendar migration parser); new code
- *   should use the template-aware helper.
+ *   `@deskwork/core/lanes`. The legacy editorial helpers will be
+ *   deleted in a future cleanup once their last callers (legacy
+ *   calendar migration parser) are themselves removed.
  */
 export function isLinearPipelineStage(s: string): boolean {
   return (LINEAR_PIPELINE as readonly string[]).includes(s);
@@ -75,7 +74,9 @@ export function isLinearPipelineStage(s: string): boolean {
  * @deprecated Use `isOffPipelineStageInTemplate(template, stage)` from
  *   `@deskwork/core/pipelines`. Resolve `template` via
  *   `resolveEntryStrictTemplate(entry, projectRoot)` from
- *   `@deskwork/core/lanes`.
+ *   `@deskwork/core/lanes`. The legacy editorial helpers will be
+ *   deleted in a future cleanup once their last callers (legacy
+ *   calendar migration parser) are themselves removed.
  */
 export function isOffPipelineStage(s: string): boolean {
   return (OFF_PIPELINE as readonly string[]).includes(s);
@@ -102,9 +103,9 @@ const SUCCESSOR: Record<Stage, Stage | null> = {
  * @deprecated Use `nextStageInTemplate(template, stage)` from
  *   `@deskwork/core/pipelines`. Resolve `template` via
  *   `resolveEntryStrictTemplate(entry, projectRoot)` from
- *   `@deskwork/core/lanes`. The editorial-narrow form here is kept for
- *   non-verb callers that operate on the editorial vocabulary
- *   specifically (e.g. the legacy calendar migration parser).
+ *   `@deskwork/core/lanes`. The legacy editorial helpers will be
+ *   deleted in a future cleanup once their last callers (legacy
+ *   calendar migration parser) are themselves removed.
  */
 export function nextStage(s: string): Stage | null {
   if (
