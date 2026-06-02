@@ -51,7 +51,7 @@ Overrides:
 
 | Goal | Flag |
 |---|---|
-| Loopback only (skip Tailscale even if running) | `--no-tailscale` |
+| Loopback only (non-interactive smokes / CI) | `DESKWORK_STUDIO_NO_TAILSCALE=1` env var |
 | Bind ONLY to a specific address (LAN/Wi-Fi opt-in) | `--host 0.0.0.0` (or a specific IP) |
 
 The studio has **no authentication** and **no rate-limiting**. Tailscale is treated as a trusted network. `--host` overrides print a loud warning when bound beyond loopback.

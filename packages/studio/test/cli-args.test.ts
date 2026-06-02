@@ -54,10 +54,30 @@ describe('parseCliArgs', () => {
     expect(args.hostOverride).toBe('10.0.0.1');
   });
 
-  it('--no-tailscale opts out of auto-detection', () => {
-    const args = parseCliArgs(['--no-tailscale']);
-    expect(args.noTailscale).toBe(true);
+  it('--no-tailscale is a deprecated no-op — it does NOT suppress Tailscale auto-detection', () => {
+    // Agent-discipline rule (decompose-agent-discipline, entry 15): the flag
+    // stranded operators who were off-keyboard. It is now a no-op; the studio
+    // always auto-detects Tailscale unless the env-var escape hatch is set.
+    const args = parseCliArgs(['--no-tailscale'], { env: {}, stderr: () => {} });
+    expect(args.noTailscale).toBe(false);
     expect(args.hostOverride).toBeNull();
+  });
+
+  it('--no-tailscale still parses (no usage error) and emits a deprecation notice to stderr', () => {
+    const lines: string[] = [];
+    const args = parseCliArgs(['--no-tailscale'], { env: {}, stderr: (s) => lines.push(s) });
+    expect(args.noTailscale).toBe(false);
+    expect(lines.join('')).toMatch(/deprecated/i);
+  });
+
+  it('DESKWORK_STUDIO_NO_TAILSCALE=1 env var enables loopback-only (the non-interactive escape hatch)', () => {
+    const args = parseCliArgs([], { env: { DESKWORK_STUDIO_NO_TAILSCALE: '1' }, stderr: () => {} });
+    expect(args.noTailscale).toBe(true);
+  });
+
+  it('no env var and no flag → Tailscale stays enabled', () => {
+    const args = parseCliArgs([], { env: {}, stderr: () => {} });
+    expect(args.noTailscale).toBe(false);
   });
 
   it('--port and --host can combine', () => {
