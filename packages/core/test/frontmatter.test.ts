@@ -3,6 +3,7 @@ import {
   parseFrontmatter,
   stringifyFrontmatter,
   updateFrontmatter,
+  removeFrontmatterPaths,
   readFrontmatter,
   writeFrontmatter,
 } from '../src/frontmatter.ts';
@@ -353,15 +354,22 @@ describe('namespaced-deskwork-metadata write guard', () => {
   // PATCH itself is namespaced. This locks the migration path: the rule writes
   // `{deskwork:{id}}` (patch) then removeFrontmatterPaths(['id']) — it never
   // passes the legacy top-level id back through stringifyFrontmatter.
-  it('updateFrontmatter round-trips a legacy top-level id without throwing (migration path)', () => {
+  // AUDIT-20260602-07: drive the FULL migration sequence the doctor rule runs
+  // (updateFrontmatter patch → removeFrontmatterPaths(['id'])), not just the
+  // first step — that's the parse→patch→remove→re-emit path AUDIT-03 named as
+  // the at-risk surface. Asserts the end state has NO top-level id, HAS the
+  // namespaced deskwork.id, and that no step throws.
+  it('full legacy migration sequence (patch + remove) does not throw and lands the namespaced shape', () => {
     const legacy = '---\nid: 38410ae2-uuid\ntitle: Legacy\n---\nbody';
     let out = '';
     expect(() => {
-      out = updateFrontmatter(legacy, { deskwork: { id: '38410ae2-uuid' } });
+      const withDeskwork = updateFrontmatter(legacy, { deskwork: { id: '38410ae2-uuid' } });
+      out = removeFrontmatterPaths(withDeskwork, [['id']]);
     }).not.toThrow();
-    // The pre-existing top-level id is preserved by the AST patch (the
-    // migration rule removes it in a separate removeFrontmatterPaths step).
-    expect(out).toContain('id: 38410ae2-uuid');
-    expect(out).toContain('deskwork:');
+    const { data } = parseFrontmatter(out);
+    // Top-level id is gone; the binding now lives only under deskwork.id.
+    expect(data.id).toBeUndefined();
+    expect((data.deskwork as { id?: string } | undefined)?.id).toBe('38410ae2-uuid');
+    expect(data.title).toBe('Legacy');
   });
 });
