@@ -39,8 +39,15 @@
 // sanctions). Pre-fix, only `Phase` matched, so adopter workplans
 // using the other two sanctioned terms would hard-stop the
 // unconditional implement-hook at the first auto-promote.
-const PHASE_HEADING_RE = /^##\s+(?:Phase|Milestone|Sprint)\b/i;
-const PHASE_NUMBER_RE = /^##\s+(?:Phase|Milestone|Sprint)\s+(\d+)/i;
+// Phase 22 Task 1 (#399 Friction 3): accept h2 OR h3 phase headings.
+// Deskwork's own workplan uses `### Phase N` h3 throughout; its only
+// `##` headings are structural (`## Workplan: …`, `## Extension: …`).
+// Before the relaxation, promote-findings --auto aborted with "no
+// parseable `## Phase N: ...` headings" immediately after a sync from
+// such a workplan. h4+ stays excluded — those collide with task-heading
+// conventions (`#### Task N.M: ...`).
+const PHASE_HEADING_RE = /^#{2,3}\s+(?:Phase|Milestone|Sprint)\b/i;
+const PHASE_NUMBER_RE = /^#{2,3}\s+(?:Phase|Milestone|Sprint)\s+(\d+)/i;
 // Per AUDIT-20260530-12: accept the canonical renderer-output shape
 // `### Task N.M (fix-finding-AUDIT-...): title` (and the cross-model
 // variant with nested parens). Capture groups stay on the leading
@@ -178,7 +185,7 @@ export function computeAutoPosition(workplanText: string): AutoPosition {
   const phases = collectPhases(lines);
   if (phases.length === 0) {
     throw new AutoPositionError(
-      'workplan has no parseable `## Phase N: ...` / `## Milestone N: ...` / `## Sprint N: ...` headings; auto-position requires at least one such heading as an insertion anchor. Add one of the three (PROJECT-MANAGEMENT.md-sanctioned) or use --task-number with the propose/apply flow.',
+      'workplan has no parseable `## Phase N: ...` / `### Phase N: ...` / `## Milestone N: ...` / `### Milestone N: ...` / `## Sprint N: ...` / `### Sprint N: ...` headings; auto-position requires at least one such heading (h2 OR h3) as an insertion anchor. Add one of the three sanctioned vocabularies (Phase/Milestone/Sprint, per PROJECT-MANAGEMENT.md) or use --task-number with the propose/apply flow.',
     );
   }
   const taskHeadings = collectTaskHeadings(lines);

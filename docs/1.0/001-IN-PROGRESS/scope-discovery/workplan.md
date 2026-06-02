@@ -4024,16 +4024,16 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 
 **Step 0 — working-code invariant.** Pre-fix, auto-position correctly anchors on `## Phase N`, `## Milestone N`, and `## Sprint N` headings. The fix MUST preserve those matches — h3 acceptance is additive, not a replacement.
 
-- [ ] Step 1: write failing tests: workplan with only `### Phase N` headings → currently throws `AutoPositionError`. Workplan with only `## Phase N` (existing behavior) → currently works. Workplan with BOTH levels → resolves correctly (prefer h2 for symmetry with PROJECT-MANAGEMENT.md sanctioned levels? OR walk both at the same priority? — pick at Step 1).
-- [ ] Step 2: confirm RED.
-- [ ] Step 3: implement — relax to `/^#{2,3}\s+(?:Phase|Milestone|Sprint)\b/i` (h2 OR h3). Same for `PHASE_NUMBER_RE`. Update inline doc/comment so the heading convention is explicit.
-- [ ] Step 4: confirm GREEN; full `auto-position.test.ts` suite stays green.
+- [x] Step 1: write failing tests: workplan with only `### Phase N` headings → throws `AutoPositionError` pre-fix. Workplan with only `## Phase N` (existing behavior) → works. Workplan with BOTH levels → mixed-level test asserts the FIRST unchecked task's phase wins (which lands on the h3 phase when h2 is fully checked). Picked: walk h2 and h3 at the same priority (no h2-preference); the workplan's existing convention already uses one or the other consistently within a single file.
+- [x] Step 2: confirm RED (4 of 6 new tests failed pre-fix; 2 regression-locks for h4/h1 rejection passed pre-fix).
+- [x] Step 3: implement — relaxed `PHASE_HEADING_RE` + `PHASE_NUMBER_RE` to `/^#{2,3}\s+(?:Phase|Milestone|Sprint)\b/i`. Updated AutoPositionError message to name both h2 + h3 sanctioned forms. Added a Phase 22 Task 1 comment block above the regex constants explaining the relaxation.
+- [x] Step 4: GREEN — 24/24 in auto-position.test.ts; 434/434 across the whole promote-findings test directory.
 - [ ] Step 5: commit with `Closes #399` in subject (this task closes Friction 3; Friction 1+2 land in sibling commits and share the trailer).
 
 **Acceptance Criteria:**
-- [ ] New failing tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` covering h3 anchors + h3/h2-mixed workplans.
-- [ ] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0.
-- [ ] Existing h2-only tests still pass (regression-lock).
+- [x] New failing tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` covering h3 Phase/Milestone/Sprint anchors + h2/h3-mixed workplan + h4/h1 regression-locks (6 new tests).
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0.
+- [x] Existing h2-only tests still pass (regression-lock — the original 18 tests in this file unchanged).
 
 ### Task 2: `implement-hook` diff includes staged + unstaged work when the commit range is empty ([#399](https://github.com/audiocontrol-org/deskwork/issues/399) Friction 2)
 

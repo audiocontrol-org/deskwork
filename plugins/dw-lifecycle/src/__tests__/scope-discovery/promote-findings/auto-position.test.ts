@@ -215,6 +215,112 @@ describe('computeAutoPosition — sanctioned heading vocabulary (AUDIT-20260530-
   });
 });
 
+// Phase 22 Task 1 (#399 Friction 3): the deskwork plugin's own workplan
+// uses `### Phase N` h3 throughout (its only `##` headings are
+// structural). After a sync-from-main, promote-findings --auto aborts
+// with "no parseable `## Phase N: ...` headings" because PHASE_HEADING_RE
+// was h2-only. Accept h2 OR h3 — both are sanctioned workplan conventions.
+describe('computeAutoPosition — accepts h3 phase headings (#399 Friction 3)', () => {
+  it('accepts a workplan whose only phase headings are h3 (`### Phase N`)', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Workplan: feature shipping',
+      '',
+      '### Phase 5: current',
+      '',
+      '#### Task 5.1: pending',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.phaseNumber).toBe(5);
+    expect(pos.phaseHeading).toBe('### Phase 5: current');
+  });
+
+  it('accepts `### Milestone N` h3 headings', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '### Milestone 3: current',
+      '',
+      '#### Task 3.1: pending',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.phaseNumber).toBe(3);
+    expect(pos.phaseHeading).toBe('### Milestone 3: current');
+  });
+
+  it('accepts `### Sprint N` h3 headings', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '### Sprint 7: current',
+      '',
+      '#### Task 7.1: pending',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    expect(pos.phaseNumber).toBe(7);
+    expect(pos.phaseHeading).toBe('### Sprint 7: current');
+  });
+
+  it('treats h2 and h3 phase headings as the same heading namespace (mixed-level workplan)', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '## Phase 1: h2 (older convention)',
+      '',
+      '### Task 1.1: done',
+      '',
+      '- [x] Step 1.',
+      '',
+      '### Phase 2: h3 (newer convention)',
+      '',
+      '### Task 2.1: pending',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const pos = computeAutoPosition(wp);
+    // Anchor is the FIRST unchecked task's phase — Phase 2 (h3).
+    expect(pos.phaseNumber).toBe(2);
+    expect(pos.phaseHeading).toBe('### Phase 2: h3 (newer convention)');
+  });
+
+  // Regression-lock: h4+ are NOT phase headings (Task headings are h3/h4
+  // in the workplan; widening to h4 would confuse them).
+  it('does NOT match h4 (`#### Phase N`) — too narrow a heading for a phase', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '#### Phase 1: not a phase heading',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    expect(() => computeAutoPosition(wp)).toThrow(/Phase|Milestone|Sprint/i);
+  });
+
+  // Regression-lock: h1 (`# Phase N`) is the workplan title level, not a
+  // phase heading. Workplans use `# Workplan: <feature>` at h1.
+  it('does NOT match h1 (`# Phase N`) — h1 is reserved for the workplan title', () => {
+    const wp = [
+      '# Phase 1: this looks like a phase but it is a title-level heading',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    expect(() => computeAutoPosition(wp)).toThrow(/Phase|Milestone|Sprint/i);
+  });
+});
+
 /**
  * AUDIT-20260530-03 regression: pre-fix, `nextTaskNumberFactory`
  * always emitted `<phase>.<minor>`. On the actual scope-discovery
