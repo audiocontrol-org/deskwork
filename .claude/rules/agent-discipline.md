@@ -16,42 +16,9 @@ When the work requires a design decision — a new UI surface, a redesign of an 
 
 ## Audit findings: scope-don't-defer + TDD enforcement
 
-Phase 13 of scope-discovery operationalizes the anti-deferral discipline this rules file already calls for. The triad mechanizes the discipline so the agent cannot accidentally bypass it:
+> *"Filing a bug report isn't good enough. It MUST BE SCOPED INTO THE WORKPLAN… A broken implementation is not done — it's broken. And… TDD principles should apply such that a test that exercises the bug is written before the fix is implemented."* (operator)
 
-| Verb / surface | Status transition | Discipline enforced |
-|---|---|---|
-| `/dw-lifecycle:promote-findings` | walks `Status: open` audit-log entries; default disposition is "scope into workplan as TDD-first task block tagged `(fix-finding-AUDIT-<id>)`". The agent CAN ONLY pick that disposition; `acknowledged-<ref>` and `informational` require operator-supplied substantive reasons that pass the validator (≥40 chars; banned-phrase canon). | Filing the finding is not the disposition; scoping into the workplan is. |
-| `dw-lifecycle check-open-findings` (implement-loop gate) | refuses `/dw-lifecycle:implement` task pickup while ≥1 `Status: open` finding exists on the feature. No `--ignore-open-findings` flag in v1; the strictness IS the discipline. | "Broken implementation is not done — it's broken." |
-| `dw-lifecycle check-fix-task-tdd` (commit-msg gate) + `fix-task-tdd-discipline` (doctor rule) | refuses `Closes AUDIT-<id>` commits where the cited workplan task block's test file is missing, empty, or whose vitest exits non-zero. The doctor rule walks every `[x]`-checked fix-finding task across every feature and flags violations. | "TDD principles should apply such that a test that exercises the bug is written before the fix is implemented." |
-| `dw-lifecycle apply-audit-flips` | walks commits, parses `Closes AUDIT-<id>` (subject + comma-separated trailer); proposes `open → fixed-<sha>` flips. Default dry-run; `--apply` writes. | Closing a finding via commit no longer requires a manual status-flip commit. |
-| `dw-lifecycle close-shipped-audit-findings` | walks `git rev-list <from>..<to>`; for each `fixed-<sha>` entry in range, proposes `verified-<date>`. Default dry-run; operator confirms. | Verification still requires the formally-installed-release check; the verb proposes candidates, never auto-flips. |
-| `/dw-lifecycle:re-audit-fixed-findings` + `dw-lifecycle re-audit-fixed-findings` | cross-references a fresh audit-barrage run-dir against existing `fixed-<sha>` entries; proposes `verified-<date>` for entries that don't re-surface; flags re-surfacing entries as fix-did-not-actually-fix. | Empirical re-audit evidence, not just SHA-membership. |
-
-### Operator's verbatim framing (the disciplinary anchor)
-
-> *"Filing a bug report isn't good enough. It MUST BE SCOPED INTO THE WORKPLAN, otherwise it won't get picked up by the implementation loop. Unless there's truly a good reason NOT to fix a problem, it should be relentlessly scoped into the workplan, not relentlessly deferred — ESPECIALLY problems with the implementation underway. A broken implementation is not done — it's broken. And, along with the discipline to scope the fix, TDD principles should apply such that a test that exercises the bug is written before the fix is implemented — and the implementation isn't considered a candidate for completion until tests are green."*
-
-The triad above is the structural mechanization of that framing.
-
-### How this rule pairs with sibling rules
-
-- **`Just for now is bullshit` (above)** — names the implementation-side IOU pathology. The triad is the audit-side counterpart: filed-and-forgotten audit findings are the same shape as code-comment IOUs.
-- **`Use /dw-lifecycle:review after every implementation step` (above)** — produces the findings. The triad ensures they get worked.
-- **`scope-discovery v1 — dogfood feedback via tooling-feedback.md` (below)** — TF closures lift into the audit-log via `/dw-lifecycle:tooling-feedback-import`, then promote-findings routes them into workplans like any other finding.
-
-### How to apply
-
-- Run `dw-lifecycle apply-audit-flips --feature <slug> --since <ref>` after each batch of `Closes AUDIT-<id>` commits to keep the audit-log in sync without manual flips.
-- Let `dw-lifecycle check-fix-task-tdd` run via a commit-msg hook (or invoke it manually before commits) to catch missing tests at the right moment.
-- After a release, run `close-shipped-audit-findings` AND `re-audit-fixed-findings` (they complement, not replace, each other) to graduate `fixed-<sha>` entries to `verified-<date>` with appropriate evidence.
-- Don't manually flip audit-log statuses when the verbs cover it — the verbs are idempotent and report what they would do before writing.
-
-### Cross-references
-
-- Closure triad code: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-flip-from-commit.ts`, `close-shipped-audit-findings.ts`, `cross-reference-audit-run.ts`, `tdd-enforcement.ts`.
-- Doctor rule: `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/fix-task-tdd-discipline.ts`.
-- Commit-msg gate: `plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts`.
-- Promote-findings library: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/` (Phase 13 Task 1 shipped this).
+The discipline is mechanized — see **`/dw-lifecycle:promote-findings`** (scope-into-workplan as the only default disposition), the **`check-open-findings`** implement-loop gate, the **`check-fix-task-tdd`** commit-msg gate, and the **`fix-task-tdd-discipline`** doctor rule. Don't re-derive the policy here; the verbs own it.
 
 ## Audit-barrage: structured cross-model audit
 
