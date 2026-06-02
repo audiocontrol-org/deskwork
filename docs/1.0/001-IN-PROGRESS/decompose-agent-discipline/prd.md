@@ -103,7 +103,7 @@ This is broader than deleting one rule entry — it proposes retiring two skills
 - Every cross-reference in `.claude/rules/agent-discipline.md` (the "Use /dw-lifecycle:review after every implementation step" rule = row 2, plus the audit-barrage rule's "three independent audit surfaces" framing, which names review as surface #2 of 3) and in `.claude/CLAUDE.md` (the sub-agent-delegation table lists `code-reviewer`).
 - The `/dw-lifecycle:review` invocations baked into other skills' "after every commit" steps.
 
-**Open decision (operator's to make at scoping time):** is this retirement *in scope for this feature*, or its own feature? It is mechanically separable from the agent-discipline.md decomposition: row 2's rule entry can be **deleted now** (the rule is dead regardless), and the skill-retirement can be a follow-on. The recommendation is to **delete the rule entry in this feature** and **track the review/audit-skill retirement as its own feature** (it's a multi-skill architectural change touching the closure triad, not a rule-decomposition) — but per the "operator owns scope decisions" rule, this is flagged for the operator's call rather than pre-decided. If the operator wants it folded in, Phase 2 gains a sub-phase for it.
+**Decision (operator, at revision-2 approval — "follow your recommendation"):** the retirement is **split into its own feature**, tracked at **[#387](https://github.com/audiocontrol-org/deskwork/issues/387)**. This feature (`decompose-agent-discipline`) does the mechanically-separable part: **delete row 2's dead rule entry** (the rule is dead regardless of the skill's fate). The skill retirement — removing `/dw-lifecycle:review` + `/dw-lifecycle:audit`, rehoming the audit-log lifecycle + closure-triad entry points, and updating the "three audit surfaces" framing — is a multi-skill architectural change carried by #387, not by this feature's Phase 2.
 
 ## Acceptance Criteria
 
@@ -118,7 +118,7 @@ This is broader than deleting one rule entry — it proposes retiring two skills
 - [ ] Entry 18a (Stay on feature/deskwork-plugin) is deleted entirely (stale convention).
 - [ ] All `deskwork`-plugin composes (entries 9, 10, 13, and the deskwork-side of 17) land inside this feature — no sibling feature is filed for them.
 - [ ] No new always-loaded rule file (`project-conventions.md` or similar) is created; the STAYS cluster shrinks in place or routes into a skill/gate/SessionStart home.
-- [ ] The operator-raised "retire `/dw-lifecycle:review` + `/dw-lifecycle:audit` in favor of audit-barrage" item has an explicit operator scoping decision recorded (folded into Phase 2 as a sub-phase, OR filed as its own feature) before this feature reaches `/dw-lifecycle:complete`.
+- [ ] The operator-raised "retire `/dw-lifecycle:review` + `/dw-lifecycle:audit` in favor of audit-barrage" item is split to its own feature ([#387](https://github.com/audiocontrol-org/deskwork/issues/387)); this feature only deletes row 2's dead rule entry (see acceptance criterion for entry 2).
 - [ ] No commit in this feature's range introduces a `// TODO|// FIXME|// for now` comment without paired GitHub issue link (existing pre-commit hook + audit-barrage gate continue to apply mid-stream).
 - [ ] Audit-log entry for this feature summarizes per-disposition outcomes by entry number.
 
