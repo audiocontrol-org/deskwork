@@ -307,3 +307,42 @@ describe('updateFrontmatter — round-trip preservation (Issue #37)', () => {
     expect(out).toMatch(/^---\ntitle: Post\ndatePublished: "2020-10-01"\ntags:\n  - one\n  - two\n/);
   });
 });
+
+describe('namespaced-deskwork-metadata write guard', () => {
+  // agent-discipline rule (decompose-agent-discipline, entry 17): deskwork must
+  // namespace its metadata under `deskwork.*`; it must never write a reserved
+  // field (e.g. `id`) at the top level, which would claim the operator's global
+  // frontmatter keyspace (the v0.7.0 Issue #38 regression). The write helpers
+  // fail loud — no fallback — so the bad shape can't reach disk.
+
+  it('updateFrontmatter throws when a deskwork-reserved key is written at the top level', () => {
+    expect(() =>
+      updateFrontmatter('---\ntitle: x\n---\nbody', { id: 'b1d3-uuid' }),
+    ).toThrow(/deskwork\.id/);
+  });
+
+  it('updateFrontmatter accepts the namespaced form', () => {
+    const out = updateFrontmatter('---\ntitle: x\n---\nbody', {
+      deskwork: { id: 'b1d3-uuid' },
+    });
+    expect(out).toContain('deskwork:');
+    expect(out).toContain('id: b1d3-uuid');
+  });
+
+  it('stringifyFrontmatter throws when a deskwork-reserved key is at the top level', () => {
+    expect(() => stringifyFrontmatter({ id: 'b1d3-uuid' }, 'body')).toThrow(
+      /deskwork\.id/,
+    );
+  });
+
+  it('stringifyFrontmatter accepts the namespaced form', () => {
+    const out = stringifyFrontmatter({ deskwork: { id: 'b1d3-uuid' } }, 'body');
+    expect(out).toContain('deskwork:');
+  });
+
+  it('does not flag unrelated top-level keys', () => {
+    expect(() =>
+      stringifyFrontmatter({ title: 'x', slug: 'y', tags: ['a'] }, 'body'),
+    ).not.toThrow();
+  });
+});

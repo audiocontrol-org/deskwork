@@ -305,15 +305,9 @@ When a recurring agent failure surfaces in conversation and the lesson would oth
 
 ## Namespace deskwork-owned metadata in user-supplied documents
 
-Any frontmatter, config, or other metadata deskwork embeds into operator-owned files (markdown frontmatter, config files, etc.) MUST live under a `deskwork:` namespace. We cannot assume the global keyspace is unused.
+Deskwork metadata embedded in operator-owned files MUST be namespaced under `deskwork.*` — the host renderer owns the global frontmatter keyspace (`id`, `state`, `date`, `tags`, `slug`), and claiming a top-level key collides (v0.7.0's top-level `id:` → Issue #38). On **read**, look only at `data.deskwork?.<field>` — never fall back to top-level.
 
-**Why:** the host renderer (Astro for writingcontrol, blog renderers for audiocontrol) owns the global frontmatter keyspace. Names like `id`, `state`, `date`, `tags`, `slug` may already be in use by the renderer's content-collection schema or by other plugins. Claiming a top-level key for deskwork-internal purposes is a guaranteed collision sooner or later. v0.7.0 shipped with a top-level `id:` field; v0.7.2 namespaced it under `deskwork.id` after operator pushback (Issue #38).
-
-**How to apply:**
-- Frontmatter writes: nested under `deskwork: { id: ..., otherField: ... }`. Never write top-level `id:` or any other deskwork-only field at the top level.
-- Frontmatter reads: look only at `data.deskwork?.<field>`. Don't fall back to top-level on read; that would silently couple deskwork's behavior to a global key the operator might be using for something else.
-- Schema docs: tell operators to permit `deskwork: z.object({...}).passthrough()` (or top-level `.passthrough()`) in their content-collection schemas — not a top-level `id:` field.
-- Future deskwork metadata fields go in the same namespace by default. Only deviate with explicit operator approval.
+The **write** side is now gated: `frontmatter.ts`'s write helpers throw on a top-level reserved key (`assertNamespacedDeskworkKeys`), and the `legacy-top-level-id-migration` doctor rule cleans already-written legacy data. So the always-on residue is just the read-side convention above + "new deskwork fields go under `deskwork.*` by default."
 
 ## Project workflow conventions
 

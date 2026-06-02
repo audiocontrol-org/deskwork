@@ -63,6 +63,37 @@ export interface ParsedMarkdown {
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
+/**
+ * Frontmatter keys deskwork owns and must ONLY ever write under its
+ * `deskwork:` namespace, never at the top level. v0.7.0 wrote a top-level
+ * `id:` and collided with the host renderer's content-collection keyspace
+ * (Issue #38). The `legacy-top-level-id-migration` doctor rule cleans
+ * already-written legacy data; this set is the WRITE-side guard that stops
+ * any new code from re-introducing the bad shape.
+ *
+ * agent-discipline rule "Namespace deskwork-owned metadata" (entry 17).
+ */
+const DESKWORK_RESERVED_TOPLEVEL_KEYS = new Set(['id']);
+
+/**
+ * Fail loud (no fallback) if `data` carries a deskwork-reserved key at the
+ * top level. Deskwork's own writes are always the namespaced `{deskwork:
+ * {…}}` shape, so a top-level reserved key means a caller built the wrong
+ * shape — throwing surfaces the bug instead of silently claiming the
+ * operator's keyspace.
+ */
+function assertNamespacedDeskworkKeys(data: FrontmatterData): void {
+  for (const key of Object.keys(data)) {
+    if (DESKWORK_RESERVED_TOPLEVEL_KEYS.has(key)) {
+      throw new Error(
+        `Refusing to write deskwork-owned frontmatter key '${key}' at the top ` +
+          `level — it collides with the host renderer's keyspace. Nest it as ` +
+          `'deskwork.${key}' instead (e.g. { deskwork: { ${key}: … } }).`,
+      );
+    }
+  }
+}
+
 /** Split a markdown string into its frontmatter data and body. */
 export function parseFrontmatter(markdown: string): ParsedMarkdown {
   const match = markdown.match(FRONTMATTER_RE);
@@ -104,6 +135,7 @@ export function stringifyFrontmatter(
   data: FrontmatterData,
   body: string,
 ): string {
+  assertNamespacedDeskworkKeys(data);
   const doc = buildDocument(data);
   return `---\n${doc.toString({ lineWidth: 0 }).replace(/\n$/, '')}\n---\n${body}`;
 }
@@ -123,6 +155,7 @@ export function updateFrontmatter(
   markdown: string,
   patch: FrontmatterData,
 ): string {
+  assertNamespacedDeskworkKeys(patch);
   const match = markdown.match(FRONTMATTER_RE);
   if (!match) {
     // No existing frontmatter — emit a fresh block. The body becomes
