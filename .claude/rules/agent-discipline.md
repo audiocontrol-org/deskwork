@@ -44,70 +44,17 @@ The operator decides what's in scope; never pre-decide for them. Don't unilatera
 
 > The paired failure mode — sub-agent dispatch reports' "out of scope but flagging" notes are action lists, not dispositions — is composed into `plugins/dw-lifecycle/skills/implement/SKILL.md` § Composed disciplines.
 
-## Capture mode vs scope mode: specs capture everything we know; scoping is a later, explicit pass
+## Capture mode vs scope mode: specs capture everything; scoping is a later, explicit pass
 
-A design spec / PRD / definition is a **capture artifact**. Its job is to record every aspect of the problem space that's known or knowably-implied so the operator (and future agents) have a complete picture to scope, plan, and build from. Scoping — deciding what ships in v1, what defers, what gets a follow-up feature — is a **separate, explicit pass** that happens AFTER capture, with operator approval at each cut.
+A spec / PRD / definition is a **capture artifact** — record everything known or knowably-implied (every edge case, cross-cut impact, and open question) so the operator has a complete picture. **Scoping is a separate, explicit, operator-driven pass AFTER capture.** Never insert scope-cuts the operator didn't ask for (*"YAGNI,"* *"deferred,"* *"not in v1,"* *"out of scope for now,"* scope-advisory tables) — that's scope-pushback dressed as discipline, the same shape as "just for now," and it compounds with the agent's hallucination + forgetting tendencies. Operator: *"I don't need you to push back on scope… capture everything we know. THEN we can worry about how to scope it."*
 
-The agent does NOT scope-cut during capture. Phrases like *"YAGNI until concrete use"*, *"deferred to a follow-up"*, *"not in v1"*, *"out of scope for now"*, *"keeps things simple"*, *"smaller commitment"* — when inserted by the agent into a spec without the operator having said so in the conversation — are scope-pushback dressed up as discipline. They are the same shape as the *"just for now"* failure mode codified below: they make the operator (and future readers) believe the issue is handled when it isn't.
+> Composed into the define + deskwork:iterate skills — see `plugins/dw-lifecycle/skills/define/SKILL.md` § Composed discipline.
 
-The operator's framing, verbatim: *"I don't need you to push back on scope. I need you to help me find the hidden areas where undiscovered scope is implied but not specified. Your obsession with limiting scope added to your propensity to hallucinate and forget is wildly counterproductive. We MUST capture everything we know into the documentation. THEN, we can worry about how to scope it. But, pushing back on scope is a version of 'just for now' which, per project guidelines, you know to be bullshit."*
+## Empty revisions beat missed changes
 
-### The failure modes this rule names
+When the operator invokes a capture/snapshot (`/deskwork:iterate`, `/deskwork:approve`, etc.), **run it as asked** — don't pre-decide a no-op skip. Captures are append-only and disk-cheap; an empty revision is bounded noise, a missed change is unbounded baseline drift. Run it even when your own judgment says "nothing pending." Operator: *"I'd rather have empty revisions than miss changes."*
 
-1. **Reflexive scope-narrowing during spec writing.** The agent encounters a question like *"can a group be a member of another group?"* and answers *"recursive groups deferred to v2 — YAGNI until a concrete use surfaces."* No operator said so. The agent invented the deferral. The information that *"recursive groups are a real concept the operator may or may not want"* is now hidden behind a YAGNI label and won't get surfaced when the operator does their own scoping pass.
-
-2. **Spec hedges that disclaim instead of capture.** Phrases like *"Per-project iteration handlers ... are a future extension hook — not in v1, but the architecture leaves room"* sound disciplined but they hide the actual concept under a "not in v1" disclaimer. The operator can't scope something they can't see clearly.
-
-3. **Scope-pushback as commentary.** Tables, sidebar callouts, or paragraphs in the agent's reply that read *"each revision has added scope, not subtracted. Worth noting if you want to consider splitting the feature."* The operator did not ask for scope advisory. They asked for capture. Scope advisory becomes a wedge — every iteration round becomes an opportunity for the agent to argue for cutting, instead of for completeness.
-
-4. **The compound failure with hallucination and forgetting.** The agent has two well-documented tendencies: hallucinating facts (Socratic-prompt-engineering thesis) and forgetting context across turns. Scope-narrowing AMPLIFIES both: forgetting means knowledge is already at risk; narrowing the capture means even less of what's known reaches the documentation. The operator's verbatim phrase: *"Your obsession with limiting scope added to your propensity to hallucinate and forget is wildly counterproductive."* Comprehensive capture is the antidote to forgetting; scope-cuts disable the antidote.
-
-### What to capture during capture mode
-
-When writing or iterating a spec / PRD / definition:
-
-- **State everything the design implies, even when not explicitly raised.** If lanes can be archived, address what happens to their entries (still flow? frozen? hidden?). If groups have lifecycle independence, address every edge case (group approved while members in Drafting; group cancelled with active members; member added to an archived group). If a new annotation field is added, address legacy migration. If new files appear on disk, address their lifecycle, deletion semantics, backup story, conflict resolution.
-- **Surface known UX concerns even if the implementation seems obvious.** Search, filtering, bulk operations, multi-select, keyboard navigation, default values on new screens, error states, empty states, loading states. Operators have opinions on all of these and they belong in the captured doc.
-- **Enumerate edge cases.** "What happens when ____" for every named operation. Empty inputs, maximum inputs, concurrent operations, partial failures, network unavailability (where relevant), file-system race conditions.
-- **Cross-cut impacts.** When a new concept touches the existing model, write out every existing concept it affects. New annotations affect comments, journals, doctor, studio rendering, schema migration — all of those land in the spec.
-- **Open questions and unknowns.** When the agent doesn't know the answer to an implied question, write the question into the spec as a flagged open question — don't omit it. *"Should a member be allowed in multiple groups? — unresolved; needs operator decision."* The capture surfaces the unknown so it can be answered, not deferred via silence.
-
-### What NOT to do during capture mode
-
-- Don't write phrases that pre-scope: *"deferred"*, *"YAGNI"*, *"out of scope"*, *"v1 ships only X"*, *"future extension"*, *"not in v1"*, *"keep simple"*, *"smaller commitment"*, *"this could grow later"*. (Exception: if the operator explicitly said so in the conversation, quote them and link to the message.)
-- Don't add scope-advisory tables or commentary to spec-iteration responses. Each iteration's response reports what was captured + asks if anything else surfaces — it doesn't editorialize about feature size.
-- Don't compress related concepts into a single bullet to "keep things tidy" when each concept has its own behaviors. Tidiness is not the goal; completeness is.
-- Don't decline to capture a concern because *"the operator hasn't asked yet"* — if the design implies it, the design implies it. Capture, then let the operator decide whether to keep, cut, or defer.
-
-### When scoping IS appropriate
-
-After capture, when the operator says *"now let's scope this for v1"* or *"what's the minimum viable cut"* or *"split this into shippable phases"*, the agent helps with that work explicitly. Scope-cuts are operator-driven and documented as the operator's decisions (not as agent recommendations baked into the spec quietly).
-
-### Why this rule exists
-
-The 2026-05-16 `graphical-entries` brainstorm produced four iteration rounds in which the agent inserted scope-pushback at every round — "each revision has added scope", "smaller commitment", "phase 1 ships X only", "consider splitting", "not in v1". The operator's correction made the cost explicit: the agent's scope-narrowing tendency compounds with hallucination + forgetting to actively erode the documentation. The rule exists so future spec passes default to comprehensive capture and treat scoping as a separate operator-driven activity.
-
-This rule is a direct sibling of *"'Just for now' is bullshit"* (below). Both name a pattern where the agent's "discipline" hides real work behind a labeled deferral. The Just-for-now rule is about implementation IOUs; this rule is about spec-time IOUs.
-
-## Empty revisions beat missed changes — never skip a capture/snapshot because it might be a no-op
-
-When the operator invokes a capture or snapshot operation (`/deskwork:iterate`, `/deskwork:approve`, `/dw-lifecycle:review`, similar journal-append flows), the agent runs the operation as asked. The agent does NOT pre-decide "this would be a no-op, so I'll skip it." Doing so risks missing real changes — disk state the agent didn't notice, edits made outside the studio between the prior capture and now, or operator-side state the agent can't see.
-
-The operator's framing, verbatim: *"I'd rather have empty revisions than miss changes."*
-
-**Why:** capture operations are append-only and disk-cheap. An empty revision is journal noise (one extra file, one sidecar counter bump) — bounded, recoverable, easy to ignore on read. A missed change is unbounded: the agent's working assumption about disk state diverges from reality, and every subsequent operation builds on the wrong baseline until the operator catches the drift.
-
-**How to apply:**
-
-- When the operator says "run iterate" / "run approve" / "snapshot this", run it. Don't precondition on "but there's nothing pending."
-- When the agent's *own* judgment would skip a capture ("disk hasn't changed since last iterate; no point"), run it anyway. Cheap insurance.
-- The reverse failure mode — running captures the operator didn't ask for — still applies. The agent doesn't volunteer extra captures; but when asked, it doesn't second-guess.
-- If a capture flow ITSELF should warn / refuse on no-op state, that's a tool-design concern (file as a friction issue if the operator wants), not an agent-side filter.
-
-**What this rule does NOT mean:**
-
-- The agent doesn't run captures continuously just to be safe. Captures are operator-triggered; this rule governs how to respond when one is triggered, not how often to trigger.
-- The agent still surfaces what happened (e.g. "revision 6 — 0 addressed comments, no disk delta") so the operator sees the empty revision and understands why.
+> Composed into the deskwork:iterate + deskwork:approve skills — see `plugins/deskwork/skills/approve/SKILL.md` § Composed discipline.
 
 ## The orchestrator session is separate from the implementation session
 
