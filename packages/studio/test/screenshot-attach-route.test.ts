@@ -228,4 +228,60 @@ describe('POST /api/dev/editorial-review/entry/:entryId/comment/:commentId/attac
     expect(status).toBe(404);
     expect(asObj(body).error).toMatch(/unknown commentId/);
   });
+
+  // AUDIT-20260602-02 — Bug-repro: the attach route MUST reject a
+  // relativePath that doesn't resolve under the entry's
+  // scrapbook/screenshots/ dir. Pre-fix the route stored the
+  // client-supplied path verbatim, defeating the render layer's
+  // documented security boundary.
+  it(
+    'returns 400 when relativePath contains a parent-dir traversal (AUDIT-20260602-02)',
+    async () => {
+      const commentId = await seedComment(projectRoot, 'note');
+      const app = createApp({ projectRoot, config: cfg });
+      const { status, body } = await postAttach(app, ENTRY_UUID, commentId, {
+        relativePath: '../../../../etc/passwd',
+      });
+      expect(status).toBe(400);
+      expect(asObj(body).error).toMatch(/relativePath/);
+    },
+  );
+
+  it(
+    'returns 400 when relativePath is absolute (AUDIT-20260602-02)',
+    async () => {
+      const commentId = await seedComment(projectRoot, 'note');
+      const app = createApp({ projectRoot, config: cfg });
+      const { status } = await postAttach(app, ENTRY_UUID, commentId, {
+        relativePath: '/etc/passwd.png',
+      });
+      expect(status).toBe(400);
+    },
+  );
+
+  it(
+    'returns 400 when relativePath points outside the entry scrapbook dir (AUDIT-20260602-02)',
+    async () => {
+      const commentId = await seedComment(projectRoot, 'note');
+      const app = createApp({ projectRoot, config: cfg });
+      // Looks like a project-relative path but resolves to a
+      // sibling entry's tree — not the attach route's contract.
+      const { status } = await postAttach(app, ENTRY_UUID, commentId, {
+        relativePath: 'docs/bar/scrapbook/screenshots/decoy.png',
+      });
+      expect(status).toBe(400);
+    },
+  );
+
+  it(
+    'returns 400 when relativePath has a malformed filename (AUDIT-20260602-02)',
+    async () => {
+      const commentId = await seedComment(projectRoot, 'note');
+      const app = createApp({ projectRoot, config: cfg });
+      const { status } = await postAttach(app, ENTRY_UUID, commentId, {
+        relativePath: 'docs/foo/scrapbook/screenshots/.hidden.png',
+      });
+      expect(status).toBe(400);
+    },
+  );
 });

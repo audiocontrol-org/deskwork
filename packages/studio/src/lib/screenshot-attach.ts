@@ -42,6 +42,7 @@ import type {
   DraftAnnotation,
 } from '@deskwork/core/review/types';
 import {
+  assertSafeAttachmentRelativePath,
   assertSafeScreenshotFilename,
   entryScreenshotsDir,
   orphanScreenshotsDir,
@@ -126,6 +127,13 @@ export async function attachScreenshotToCommentServer(
   if (typeof newRelativePath !== 'string' || newRelativePath.length === 0) {
     throw new Error('newRelativePath is required');
   }
+  // AUDIT-20260602-02 — validate the attachment path against the
+  // entry's scrapbook-screenshots dir shape. The render layer's
+  // docstring asserts the persistence-layer filename regex is the
+  // security boundary; without this check the attach route would
+  // bypass that boundary by accepting any client-supplied string.
+  const entry = await readSidecar(projectRoot, entryId);
+  assertSafeAttachmentRelativePath(projectRoot, entry, newRelativePath);
   const comment = await findCommentByIdFolded(projectRoot, entryId, commentId);
   if (comment === null) {
     throw new Error(`unknown commentId ${commentId} on entry ${entryId}`);

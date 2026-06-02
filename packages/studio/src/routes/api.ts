@@ -140,6 +140,16 @@ function mapAnnotationWriteError(c: Context, err: unknown): Response {
   if (msg.includes('unknown commentId')) {
     return c.json({ error: msg }, 404);
   }
+  // AUDIT-20260602-02 — relativePath shape / filename-regex throws
+  // are validation failures; map to 400. The attach helper validates
+  // the path against the entry's scrapbook-screenshots dir before
+  // appending; any throw from that boundary is a client-input issue.
+  if (
+    msg.startsWith('relativePath ') ||
+    msg.startsWith('screenshot filename')
+  ) {
+    return c.json({ error: msg }, 400);
+  }
   return c.json({ error: msg }, 500);
 }
 

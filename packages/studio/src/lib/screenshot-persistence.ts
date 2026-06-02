@@ -38,7 +38,7 @@
 
 import { existsSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, join, relative } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { readSidecar } from '@deskwork/core/sidecar';
 import type { Entry } from '@deskwork/core/schema/entry';
 import { resolveIndexPath } from './entry-resolver.ts';
@@ -121,6 +121,58 @@ export function entryScreenshotsDir(projectRoot: string, entry: Entry): string {
  */
 export function orphanScreenshotsDir(projectRoot: string): string {
   return join(projectRoot, '.deskwork', 'screenshots-orphan');
+}
+
+/**
+ * AUDIT-20260602-02 — Validate that a client-supplied attachment
+ * `relativePath` resolves to a file directly under the entry's
+ * scrapbook-screenshots dir, with a filename that satisfies
+ * `assertSafeScreenshotFilename`.
+ *
+ * Throws a descriptive error on mismatch — the attach route maps the
+ * throw to a 400. The check is the same security boundary the
+ * persistence layer enforces at write time; this helper extends it to
+ * the attach surface so a client can't bypass the persistence regex
+ * by attaching an arbitrary path string after the fact.
+ *
+ * The route's documented contract:
+ *   - relativePath must be project-root-relative (no absolute path).
+ *   - relativePath must not contain `..` segments.
+ *   - relativePath, resolved against projectRoot, must equal
+ *     `<entryScreenshotsDir>/<filename>` exactly.
+ *   - `<filename>` (the basename) must pass the persistence-layer
+ *     filename regex.
+ */
+export function assertSafeAttachmentRelativePath(
+  projectRoot: string,
+  entry: Entry,
+  relativePath: string,
+): void {
+  if (typeof relativePath !== 'string' || relativePath.length === 0) {
+    throw new Error('relativePath (non-empty string) is required');
+  }
+  if (isAbsolute(relativePath)) {
+    throw new Error(
+      `relativePath must be project-root-relative (got absolute: ${JSON.stringify(relativePath)})`,
+    );
+  }
+  if (relativePath.includes('..')) {
+    throw new Error(
+      `relativePath must not contain '..' segments (got ${JSON.stringify(relativePath)})`,
+    );
+  }
+  const expectedDir = entryScreenshotsDir(projectRoot, entry);
+  const resolved = resolve(projectRoot, relativePath);
+  const resolvedDir = dirname(resolved);
+  if (resolvedDir !== expectedDir) {
+    throw new Error(
+      `relativePath must resolve under ${expectedDir} (got ${JSON.stringify(relativePath)} resolving to ${resolvedDir})`,
+    );
+  }
+  // The basename portion must satisfy the same regex the persistence
+  // layer enforces at write time — sharing one boundary between
+  // persist + attach.
+  assertSafeScreenshotFilename(basename(resolved));
 }
 
 /**
