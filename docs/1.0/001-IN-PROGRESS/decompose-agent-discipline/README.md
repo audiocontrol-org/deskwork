@@ -3,7 +3,7 @@ slug: decompose-agent-discipline
 targetVersion: "1.0"
 date: 2026-05-30
 branch: feature/decompose-agent-discipline
-parentIssue:
+parentIssue: "#388"
 ---
 
 # Feature: decompose-agent-discipline
@@ -25,4 +25,4 @@ Phase 2 implementation runs in a **separate session** opened against this worktr
 - PRD: `prd.md` (deskwork entry `38410ae2-0e2a-4d09-84b4-f441b38c1e59`, stage Final)
 - Workplan: `workplan.md`
 - Spun-off feature: [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — retire `/dw-lifecycle:review` + `/dw-lifecycle:audit` in favor of audit-barrage
-- Parent Issue: _(filed in Task 5)_
+- Parent Issue: [#388](https://github.com/audiocontrol-org/deskwork/issues/388)

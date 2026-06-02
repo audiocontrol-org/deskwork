@@ -16,7 +16,7 @@ date: 2026-05-30
 
 ---
 
-## Phase 1 — Develop the disposition plan via deskwork review
+## Phase 1 — Develop the disposition plan via deskwork review  ·  [#389](https://github.com/audiocontrol-org/deskwork/issues/389)
 
 Phase 1 is **not** a TDD-shaped implementation task — it's a design/capture phase that runs through the deskwork review tooling. The deliverable is a PRD whose disposition table is stable enough that Phase 2 tasks can be enumerated against it via `/dw-lifecycle:extend`.
 
@@ -96,17 +96,13 @@ git commit -m "docs(decompose-agent-discipline): extend workplan with Phase 2 di
 
 ### Task 5: File GitHub issues for Phase 2
 
-- [ ] **Step 1: Invoke `/dw-lifecycle:issues`** to file the parent feature issue + per-Phase-2-sub-phase issues from the extended workplan.
+- [x] **Step 1: Invoked `/dw-lifecycle:issues`.** Filed parent **[#388](https://github.com/audiocontrol-org/deskwork/issues/388)**, Phase 1 **[#389](https://github.com/audiocontrol-org/deskwork/issues/389)**, Phase 2 **[#390](https://github.com/audiocontrol-org/deskwork/issues/390)**. The helper works at `## Phase N` granularity (not per-sub-phase); the 2a–2e sub-phase breakdown lives in this workplan under #390. (Phase 1 is already complete — evidence posted on #389, closure left to the operator.)
 
-- [ ] **Step 2: Verify** the workplan was back-filled with issue links.
-
-Run: `grep -n 'issues/' docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/workplan.md`
-
-Expected: every Phase 2 task has a `[#NNN]` link.
+- [x] **Step 2: Verified** back-fill — the two `## Phase N` headings carry their `[#NNN]` links; parentIssue `#388` filled into README + prd frontmatter. Per-task links are not added by the helper (phase-level linking is the tool's design); individual Phase 2 tasks reference #390.
 
 ---
 
-## Phase 2 — Per-disposition implementation cycles
+## Phase 2 — Per-disposition implementation cycles  ·  [#390](https://github.com/audiocontrol-org/deskwork/issues/390)
 
 > **This breakdown was populated from the operator-approved disposition table** (PRD revision 2, Final). Each task is one disposition; commit at every task boundary, landing the new home AND the `agent-discipline.md` edit in the same commit. Doc-composition tasks verify structurally (content-in-home + entry-shrunk/deleted + commit-msg-names-both); the two tool-level tasks (2b) are TDD-shaped (failing test → tool change → green → shrink entry).
 >
