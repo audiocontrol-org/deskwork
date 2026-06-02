@@ -1,5 +1,5 @@
 /**
- * Real-git fixture tests for `isAncestorOfHead`.
+ * Real-git fixture tests for `checkAncestry`.
  *
  * Per AUDIT-20260602-41/-43: the production helper was being shipped
  * with bare `catch { return false; }` and zero coverage; only the DI
@@ -18,7 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { isAncestorOfHead } from '../../../scope-discovery/util/git-ancestry.js';
+import { checkAncestry } from '../../../scope-discovery/util/git-ancestry.js';
 
 function git(repoRoot: string, ...args: string[]): string {
   return execFileSync('git', args, {
@@ -88,66 +88,64 @@ function makeRepoWithDivergence(name: string): {
   return { repoRoot, a, b, c, d };
 }
 
-describe('isAncestorOfHead — real-git fixture (AUDIT-20260602-43)', () => {
-  it('returns true when tip IS an ancestor of HEAD (exit 0)', () => {
+describe('checkAncestry — tri-state real-git fixture (AUDIT-20260602-43/-45)', () => {
+  it('returns `ancestor` when tip IS an ancestor of HEAD (exit 0)', () => {
     const { repoRoot, a } = makeRepoWithDivergence('ancestor');
     // HEAD is on `diverged` branch which descends from A.
-    expect(isAncestorOfHead({ repoRoot, tip: a })).toBe(true);
+    expect(checkAncestry({ repoRoot, tip: a })).toBe('ancestor');
   });
 
-  it('returns false when tip is NOT an ancestor of HEAD (exit 1)', () => {
+  it('returns `not-ancestor` when tip is NOT an ancestor of HEAD (exit 1)', () => {
     const { repoRoot, b } = makeRepoWithDivergence('not-ancestor');
     // HEAD is on `diverged`; B lives on main and is not reachable from HEAD.
-    expect(isAncestorOfHead({ repoRoot, tip: b })).toBe(false);
+    expect(checkAncestry({ repoRoot, tip: b })).toBe('not-ancestor');
   });
 
-  it('returns false when tip is a sibling-branch tip (diverged history; the canonical post-reset scenario)', () => {
+  it('returns `not-ancestor` when tip is a sibling-branch tip (the canonical post-reset scenario)', () => {
     const { repoRoot, c } = makeRepoWithDivergence('sibling');
     // HEAD is on `diverged`; C is main's tip, not in diverged's history.
-    expect(isAncestorOfHead({ repoRoot, tip: c })).toBe(false);
+    expect(checkAncestry({ repoRoot, tip: c })).toBe('not-ancestor');
   });
 
-  // AUDIT-20260602-41 fix: bare error path must return TRUE (fail-closed),
-  // NOT false. False on unknown would allow what should be refused.
-  it('returns true when tip ref does not exist (git error; fail-closed per AUDIT-41)', () => {
+  // AUDIT-20260602-45 fix: the helper used to collapse "git errored"
+  // into the same boolean as "tip is an ancestor" (return `true`),
+  // which was fail-closed for the gate but fail-OPEN for implement-hook.
+  // Tri-state forces each caller to handle `unknown` explicitly.
+  it('returns `unknown` when tip ref does not exist (AUDIT-45)', () => {
     const { repoRoot } = makeRepoWithDivergence('bad-ref');
     expect(
-      isAncestorOfHead({ repoRoot, tip: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef' }),
-    ).toBe(true);
+      checkAncestry({ repoRoot, tip: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef' }),
+    ).toBe('unknown');
   });
 
-  it('returns true when tip is a malformed SHA (git error; fail-closed)', () => {
+  it('returns `unknown` when tip is a malformed SHA', () => {
     const { repoRoot } = makeRepoWithDivergence('malformed');
-    expect(isAncestorOfHead({ repoRoot, tip: 'not-a-sha-at-all' })).toBe(true);
+    expect(checkAncestry({ repoRoot, tip: 'not-a-sha-at-all' })).toBe('unknown');
   });
 
-  it('returns true when repoRoot is not a git repository (spawn returns >1 exit OR fails; fail-closed)', () => {
+  it('returns `unknown` when repoRoot is not a git repository (git exits with status > 1)', () => {
     const nonGitRoot = join(workDir, 'no-git');
     mkdirSync(nonGitRoot, { recursive: true });
     expect(
-      isAncestorOfHead({ repoRoot: nonGitRoot, tip: '1234567890abcdef' }),
-    ).toBe(true);
+      checkAncestry({ repoRoot: nonGitRoot, tip: '1234567890abcdef' }),
+    ).toBe('unknown');
   });
 
-  it('returns true when repoRoot does not exist (spawn fails; fail-closed)', () => {
+  it('returns `unknown` when repoRoot does not exist (spawn fails)', () => {
     expect(
-      isAncestorOfHead({
+      checkAncestry({
         repoRoot: join(workDir, 'nonexistent-path-shouldnt-be-here'),
         tip: '1234567890abcdef',
       }),
-    ).toBe(true);
+    ).toBe('unknown');
   });
 
-  // Regression-lock for the working-code invariant per Option D (HIGH
-  // discipline). The pre-AUDIT-41 behavior correctly returned `true`
-  // for the legitimate ancestor case; this test pins that so any future
-  // re-edit of the fail-closed logic can't accidentally re-introduce
-  // the bare-`catch` pathology.
-  it('regression-lock: exit-0 ancestor case still returns true (Option D invariant)', () => {
+  // Regression-lock for the working-code invariant per Option D.
+  it('regression-lock: exit-0 ancestor case still returns `ancestor`', () => {
     const { repoRoot, a, b } = makeRepoWithDivergence('regression-ancestor');
     // Switch HEAD to main (where B is the tip; A is B's parent).
     git(repoRoot, 'checkout', 'main');
     git(repoRoot, 'checkout', b);
-    expect(isAncestorOfHead({ repoRoot, tip: a })).toBe(true);
+    expect(checkAncestry({ repoRoot, tip: a })).toBe('ancestor');
   });
 });

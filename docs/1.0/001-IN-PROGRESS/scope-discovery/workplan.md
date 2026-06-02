@@ -2337,6 +2337,43 @@ Closes AUDIT-20260601-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
+
+### Task 5.121 (fix-finding-AUDIT-20260602-45): AUDIT-20260602-45 — Fail-closed helper is fail-closed for the gate but fail-OPEN…
+
+Closes AUDIT-20260602-45. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:60-67` (error → `return true`) consumed at `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:289-291` AND `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts` (the `allow-marker-diverged-history` branch). Severity: high.
+
+- [x] Step 0: working-code invariant — pre-AUDIT-41, the helper returned `boolean` with `catch { return false; }`; the value was unused (Phase 17 only compared `marker.tip === HEAD`). AUDIT-41's fix made the boolean carry safety semantics, but `true` then meant opposite things at each call site (gate: refuse; implement-hook: trust). The fix MUST distinguish the two call sites by forcing each to handle the error case explicitly.
+- [x] Step 1: refactored to tri-state — `AncestryResult = 'ancestor' | 'not-ancestor' | 'unknown'`. RED observed on the test side: the existing `git-ancestry.test.ts` assertions returned `.toBe(true)` / `.toBe(false)`; after the type change, they had to be rewritten to `.toBe('ancestor')` / `.toBe('not-ancestor')` / `.toBe('unknown')`. The boolean-shape tests failed verbatim against the new return type — that's the RED gate.
+- [x] Step 1b: regression-lock — exit-0 ancestor case still returns `'ancestor'`, exit-1 case still returns `'not-ancestor'`. Test block count: 8 (well above ≥2 per Option D).
+- [x] Step 2: RED confirmed (the type change makes the old assertions fail).
+- [x] Step 3: implemented — `git-ancestry.ts` returns the tri-state. Each call site adapts: `check-implement-hook-ran` maps `'ancestor'` and `'unknown'` to `true` (refuse-stale path), `'not-ancestor'` to `false` (allow-diverged path). `implement-hook` accepts ONLY `'ancestor'` as a trustworthy tip; `'not-ancestor'` and `'unknown'` both fall back to the `HEAD~10` baseline. Each call site has an inline comment explaining its safety direction.
+- [x] Step 4: 18/18 tests pass (8 git-ancestry + 10 check-implement-hook-ran). tsc clean.
+- [ ] Step 5: commit with `Closes AUDIT-20260602-45` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exercising the tri-state semantic
+- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is 8 (≥2 per Option D discipline)
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exits 0
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.122 (fix-finding-AUDIT-20260602-46): AUDIT-20260602-46 — Shared-helper doc comment documents only the gate's interpre…
+
+Closes AUDIT-20260602-46. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:1-49` (file-level doc comment). Severity: medium.
+
+- [x] Step 1: addressed alongside AUDIT-45 (the doc comment was rewritten as part of the tri-state refactor; the new comment documents both callers' opposite safety dispositions explicitly + uses the tri-state shape that makes the doc reflect the type).
+- [x] Step 2: RED was observable as a consequence — the boolean-era doc couldn't have referred to "the tri-state result" because the type was a boolean. The doc rewrite is a type-change consequence.
+- [x] Step 3: doc rewritten; both per-caller dispositions named explicitly.
+- [x] Step 4: visual diff confirms the doc now names both callers + their `unknown` policies.
+- [ ] Step 5: commit with `Closes AUDIT-20260602-46` in subject (paired with AUDIT-45 since they share the same fix).
+
+**Acceptance Criteria:**
+
+- [x] The file-level doc comment names both consumers + their `unknown`-state dispositions
+- [x] `npx vitest run` exits 0 (the doc change rides on AUDIT-45's test suite)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.118 (fix-finding-AUDIT-20260602-41): AUDIT-20260602-41 — `defaultIsAncestorOfHead` comment claims a fail-closed safet…
 
 Closes AUDIT-20260602-41. Surface: `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts` (`defaultIsAncestorOfHead`, the comment block + `catch { return false; }`) ↔ `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts` (new branch: `const onSameHistory = await args.isAncestorOfHead(marker.tip); if (!onSameHistory) { return { kind: 'allow-marker-diverged-history', ... } }`). Severity: high.
@@ -2354,7 +2391,7 @@ Closes AUDIT-20260602-41. Surface: `plugins/dw-lifecycle/src/subcommands/check-i
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` (cited in Step 1)
 - [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is 8 (≥2 per Option D discipline)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.119 (fix-finding-AUDIT-20260602-42) (non-bug): AUDIT-20260602-42 — Duplicated 13-line `isAncestorOfHead` helper dispositioned w…
@@ -2373,7 +2410,7 @@ Closes AUDIT-20260602-42. Surface: `.dw-lifecycle/scope-discovery/clones.yaml` (
 
 - [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [x] The named action has landed in this branch (helpers consolidated; clone group dropped from baseline).
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
 
 
 ### Task 5.120 (fix-finding-AUDIT-20260602-43): AUDIT-20260602-43 — The real default ancestry helper (`defaultIsAncestorOfHead`)…
@@ -2390,7 +2427,7 @@ Closes AUDIT-20260602-43. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 
 - [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` (cited in Step 1)
 - [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.121 (fix-finding-AUDIT-20260602-44) (non-bug): AUDIT-20260602-44 — Task 3 workplan rewrote the RED gate into a self-justifying …
@@ -2409,7 +2446,7 @@ Closes AUDIT-20260602-44. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 - [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [x] The named action has landed in this branch (Task 2 + Task 3 Step 2 notes rewritten).
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
 
 ### Task 5.28 (fix-finding-AUDIT-20260531-11): AUDIT-20260531-11 — Fix-tasks 5.25 and 5.26 reintroduce the exact bare-`*.test.t…
 

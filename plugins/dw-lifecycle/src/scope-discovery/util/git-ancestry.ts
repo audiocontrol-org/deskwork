@@ -1,40 +1,51 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts
  *
- * Phase 22 Task 3 follow-up (AUDIT-20260602-41/-42/-43): shared
- * ancestry helper used by `check-implement-hook-ran` and `implement-hook`
- * to decide whether a marker tip lives on the same history line as HEAD.
+ * Shared ancestry helper used by `check-implement-hook-ran` and
+ * `implement-hook` to decide whether a marker tip lives on the same
+ * history line as HEAD.
  *
- * The function returns:
- *   - `true`  — tip IS an ancestor of HEAD (same-history-line). Library
- *               callers fall through to refuse-marker-stale (the marker
- *               is genuinely stale on the same timeline; the operator
- *               must run implement-hook before the next commit).
- *   - `false` — tip is NOT an ancestor of HEAD. Library callers treat
- *               this as the diverged-history boot case (allow). Only
- *               returned when git is healthy and confirms the negative.
+ * The function returns a tri-state result. Each caller chooses its own
+ * disposition for the `unknown` case — they are NOT symmetric.
  *
- * **Fail-closed posture (AUDIT-20260602-41 fix).** `execFileSync` throws
- * with `status` set on the error object. Map:
- *   - status === 1  → tip is genuinely not an ancestor; return `false`.
- *   - status === 0  → tip is an ancestor; return `true`.
- *   - anything else → git error (tip ref missing, no .git/, exec failed,
- *                     non-git working directory). UNKNOWN state. Return
- *                     `true` so the caller refuses the commit rather
- *                     than allowing via the diverged-history path on
- *                     bad data. "Refuse on unknown" is the safe default
- *                     for a security-relevant gate.
+ *   - `'ancestor'`     — tip IS an ancestor of HEAD (same-history-line).
+ *   - `'not-ancestor'` — tip is NOT an ancestor of HEAD. Returned only
+ *                       when git is healthy AND confirms the negative.
+ *   - `'unknown'`      — git error: tip ref missing, no .git/, spawn
+ *                       failure, non-git working directory. Caller
+ *                       decides what this means in its context.
  *
- * Pre-AUDIT-41, both `defaultIsAncestorOfHead` helpers (one in each CLI
- * shim) had a bare `catch { return false; }` block. That was sound for
- * the original Phase 17 use of the binary (only callers compared with
- * HEAD via marker.tip === head; ancestry was never consulted). The
- * Phase 22 Task 3 diverged-history branch turned `false` into "allow",
- * which made the catch silently allow git errors. This file restores
- * the fail-closed semantic the comment had always claimed.
+ * **Why tri-state (AUDIT-20260602-45 fix).** Before this rewrite, the
+ * helper returned a boolean with a hardcoded `catch → true` fallback
+ * that was fail-CLOSED for the commit gate (`true` → refuse) but
+ * fail-OPEN for `implement-hook` (`true` → trust the diverged tip and
+ * walk it as a barrage range). A single fixed error policy cannot be
+ * safe for both callers because their safe directions are inverted.
+ * Returning `'unknown'` forces each caller to make the safety choice
+ * explicit at the call site, where the consequence is visible.
+ *
+ * The pre-Phase-22 helpers (with `catch { return false; }`) had this
+ * shape implicitly because the return value was never compared against
+ * anything but `marker.tip === head`. The diverged-history branch
+ * landed in Phase 22 Task 3 made the boolean ambiguous; the tri-state
+ * resolves the ambiguity at the type level.
+ *
+ * Per-caller disposition (documented for the two known consumers):
+ *
+ *   - `check-implement-hook-ran`: `unknown` → fall through to
+ *     `refuse-marker-stale`. The commit gate is security-relevant; the
+ *     safe default on unknown state is to refuse.
+ *
+ *   - `implement-hook` (barrage baseline): `unknown` → fall back to
+ *     the `HEAD~10..HEAD` baseline. The dangerous outcome would be to
+ *     trust a diverged tip and walk main's shipped commits as "new
+ *     diff"; the safe default on unknown is to drop the marker tip and
+ *     re-baseline.
  */
 
 import { execFileSync } from 'node:child_process';
+
+export type AncestryResult = 'ancestor' | 'not-ancestor' | 'unknown';
 
 export interface IsAncestorOfHeadOptions {
   readonly repoRoot: string;
@@ -42,28 +53,24 @@ export interface IsAncestorOfHeadOptions {
 }
 
 /**
- * Returns true iff `tip` is an ancestor of HEAD in the repository at
- * `repoRoot`. Fails closed on git errors — see the file-level doc.
+ * Run `git merge-base --is-ancestor <tip> HEAD` in `repoRoot` and map
+ * the result to the `AncestryResult` tri-state.
  *
- * Pure-ish: takes options, runs git, returns a boolean. Has no side
- * effects on disk and does not read files outside of `cwd`. The
- * underlying `git merge-base --is-ancestor` is the canonical command
- * for the question.
+ * Pure-ish: takes options, runs git, returns the discriminator. No
+ * side effects on disk.
  */
-export function isAncestorOfHead(opts: IsAncestorOfHeadOptions): boolean {
+export function checkAncestry(opts: IsAncestorOfHeadOptions): AncestryResult {
   try {
     execFileSync('git', ['merge-base', '--is-ancestor', opts.tip, 'HEAD'], {
       cwd: opts.repoRoot,
       stdio: ['ignore', 'ignore', 'ignore'],
     });
-    return true; // exit 0 → tip is ancestor
+    return 'ancestor'; // exit 0
   } catch (err) {
     const status = (err as { status?: number | null }).status;
-    if (status === 1) return false; // exit 1 → tip is NOT ancestor
-    // Any other exit code (>1) OR no `status` at all (spawn failed,
-    // ENOENT, non-git directory) is unknown state. Fail closed:
-    // return true so the caller treats the marker as on-same-history
-    // and refuses-marker-stale. Per AUDIT-20260602-41.
-    return true;
+    if (status === 1) return 'not-ancestor';
+    // exit > 1 OR no `status` at all (spawn failure, ENOENT, non-git
+    // directory). Cannot determine ancestry — let the caller decide.
+    return 'unknown';
   }
 }

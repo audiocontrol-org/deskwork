@@ -2774,7 +2774,7 @@ That's my triage. I checked: the fallback ordering and short-circuit semantics (
 ### AUDIT-20260602-41 — `defaultIsAncestorOfHead` comment claims a fail-closed safety posture, but the new diverged-history branch makes it fail-OPEN — a git error silently allows a genuinely-stale commit
 
 Finding-ID: AUDIT-20260602-41
-Status:     open
+Status:     fixed-bbb362fa3895fc5e989f144d1a4908b0b1383b9c
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts` (`defaultIsAncestorOfHead`, the comment block + `catch { return false; }`) ↔ `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts` (new branch: `const onSameHistory = await args.isAncestorOfHead(marker.tip); if (!onSameHistory) { return { kind: 'allow-marker-diverged-history', ... } }`)
 
@@ -2785,7 +2785,7 @@ This matters because the genuine-stale case the gate exists to catch — operato
 ### AUDIT-20260602-42 — Duplicated 13-line `isAncestorOfHead` helper dispositioned with a "deferred to a follow-up" deferral phrase
 
 Finding-ID: AUDIT-20260602-42
-Status:     open
+Status:     fixed-bbb362fa3895fc5e989f144d1a4908b0b1383b9c
 Severity:   medium
 Surface:    `.dw-lifecycle/scope-discovery/clones.yaml` new clone group `700e9d4b0f18` (members `check-implement-hook-ran.ts:116:128` + `implement-hook.ts:191:203`); the helpers themselves at `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts` (`defaultIsAncestorOfHead`) and `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` (`isAncestorOfHead`)
 
@@ -2796,7 +2796,7 @@ Beyond the deferral phrasing, the duplication is load-bearing: Finding-01 shows 
 ### AUDIT-20260602-43 — The real default ancestry helper (`defaultIsAncestorOfHead`) has zero test coverage; only the injected DI stub is exercised
 
 Finding-ID: AUDIT-20260602-43
-Status:     open
+Status:     fixed-bbb362fa3895fc5e989f144d1a4908b0b1383b9c
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-ran.test.ts` (all four new tests inject `isAncestorOfHead: async () => opts.isAncestorOfHead ?? true`) vs. the untested `defaultIsAncestorOfHead` in `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts`
 
@@ -2807,7 +2807,7 @@ A test that injects a callback which *throws* (or a thin integration test that r
 ### AUDIT-20260602-44 — Task 3 workplan rewrote the RED gate into a self-justifying "TDD-discipline note" — recurrence of the AUDIT-…-37 shape in a new task
 
 Finding-ID: AUDIT-20260602-44
-Status:     open
+Status:     fixed-bbb362fa3895fc5e989f144d1a4908b0b1383b9c
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 3 — the Step 1/Step 2 diff replacing `- [ ] Step 1: write failing tests` / `- [ ] Step 2: confirm RED` with `- [x] Step 1: tests written …` / `- [x] Step 2: TDD-discipline note — library extension … + tests written in the same change. Tests express the contract; 10/10 pass after the library change.`
 
@@ -2818,3 +2818,36 @@ Per `.claude/rules/agent-discipline.md`, the correct disposition for an accepted
 ---
 
 I checked and found clean: the short-circuit semantics (tip===HEAD returns `allow-marker-matches-head` before any ancestry call — the `ancestryCalls === 0` test genuinely proves it); the new `allow-marker-diverged-history` result variant is correctly threaded through the `summarize` switch and the `result.kind.startsWith('allow')` exit-code mapping; the `implement-hook.ts` divergence guard correctly nulls `rawBarrageTip` when non-ancestor and emits a non-fatal stderr notice before falling back to the `HEAD~10..HEAD` baseline; and the marker-untrack (`last-hook-run.json` deletion) matches the workplan's stated Step 5 intent. My four findings are new surface from this diff: a fail-open inversion the comment denies (-01), a deferral-phrased duplicate helper that has already drifted (-02), the untested production default behind it (-03), and the recurred RED-gate-rewrite in the Task 3 workplan (-04).
+
+## 2026-06-02 — audit-barrage lift (20260602T232134182Z-scope-discovery)
+
+### AUDIT-20260602-45 — Fail-closed helper is fail-closed for the gate but fail-OPEN for `implement-hook` — the consolidation reintroduces the Friction-1 bug on the git-error path
+
+Finding-ID: AUDIT-20260602-45
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:60-67` (error → `return true`) consumed at `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:289-291` AND `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts` (the `allow-marker-diverged-history` branch)
+
+The single shared helper now returns `true` on any git error (exit > 1 / spawn failure). The commit's doc comment justifies this as "fail-closed … the safe default for a security-relevant gate." That reasoning is correct **only for one of the two callers.** The two consumers want *opposite* behavior on error:
+
+- **`check-implement-hook-ran` (the commit gate):** `false` → `allow-marker-diverged-history` (ALLOW the commit); `true` → `refuse-marker-stale` (REFUSE). Safe-on-error = refuse = `true`. The new `true`-on-error is correct here. ✓
+- **`implement-hook` (`:289-291`):** `lastBarrageTip = (rawBarrageTip !== null && isAncestorOfHead(...)) ? rawBarrageTip : null`. Here `true` → use `rawBarrageTip..HEAD` as the audited range; `false` → fall back to the safe `HEAD~10..HEAD` baseline. Safe-on-error = `false`. The new `true`-on-error is **wrong** here. ✗
+
+Before this commit both helpers had `catch { return false; }`, so on a git error `implement-hook` fell back to `HEAD~10` — the *safe* baseline that Phase 22 Task 3 explicitly designed ("fall back to `HEAD~10..HEAD` … instead of `<diverged-tip>..HEAD` which would walk main's shipped commits as new diff"). After this commit, an error while checking a non-resolvable/diverged tip (e.g. a marker tip GC'd or otherwise absent from the object store after a `reset --hard` — precisely the Friction-1 scenario) returns `true`, so `implement-hook` trusts the diverged tip and computes `<diverged-tip>..HEAD`. That is the exact behavior Task 3 set out to prevent, reintroduced through the error path. A single boolean helper with one fixed error policy *cannot* be safe for both callers because their safe directions are inverted. The fix that resolved AUDIT-41's fail-open silently created a fail-open of opposite polarity in the sibling caller.
+
+Evidence it was an oversight, not a deliberate trade-off: the fix's own workplan (Task 5.118 Step 0) reasons *only* about the gate ("`exit > 1` … → return `true` → refuse") and never mentions `implement-hook`'s use of the same return value; and no test asserts what `implement-hook` does on the error path (the new `git-ancestry.test.ts` tests the helper in isolation only). A correct fix returns a three-state result (`ancestor | not-ancestor | unknown`) and lets each caller choose its own error disposition — gate refuses on `unknown`, `implement-hook` falls back to `HEAD~10` on `unknown`.
+
+### AUDIT-20260602-46 — Shared-helper doc comment documents only the gate's interpretation of `true`/`false` — relocating, not fixing, the "comment lies about semantics" defect AUDIT-41 named
+
+Finding-ID: AUDIT-20260602-46
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:1-49` (file-level doc comment)
+
+AUDIT-20260602-41's core complaint was that the helper's comment asserted a safety posture the code didn't have. This commit consolidates the helper but the new doc comment carries the *same* class of defect: it describes a single, universal caller interpretation that is false for one of the two real callers. The comment states `true` → "Library callers fall through to refuse-marker-stale" and `false` → "Library callers treat this as the diverged-history boot case (allow)." That is the `check-implement-hook-ran` semantics verbatim — but `implement-hook` is also a "library caller" of this exact function, and it reads `true` as "use `tip..HEAD`" and `false` as "fall back to `HEAD~10`," which has nothing to do with refuse/allow.
+
+A maintainer reading "`false` → allow / boot case; refuse on unknown is the safe default for a security-relevant gate" will (a) not realize `implement-hook` depends on this function at all, and (b) be actively misled that `true`-on-error is the *safe* default everywhere, when it is the *unsafe* default for `implement-hook` (Finding-01). The comment should either name both callers and their opposite polarities explicitly, or — better, paired with Finding-01's three-state refactor — describe a neutral tri-state contract (`ancestor` / `not-ancestor` / `unknown`) and leave the allow/refuse and range-fallback interpretations to each call site's own documentation. As written, the comment is once again telling a future maintainer the opposite of what one of the call sites actually does.
+
+---
+
+What I checked and found clean: the new `allow-marker-diverged-history` result variant threading and the `result.kind.startsWith('allow')` exit-code mapping (unchanged, correct); the gate's short-circuit (`marker.tip === HEAD` returns before any ancestry call); the real-git test fixture build (`makeRepoWithDivergence` genuinely produces A→B→C / A→D divergence and the exit-0/exit-1/exit-128 cases map to the asserted booleans); the clone-group `700e9d4b0f18` drop from the baseline (matches the consolidation); and the DI-seam async wrapper in `check-implement-hook-ran.ts:151-163` (sound — sync helper wrapped in an async arrow). My two findings are one defect viewed two ways: the consolidated helper's single error policy is correct for the gate and a regression for `implement-hook` (-01), and the doc comment documents only the gate's polarity so the regression reads as intentional safety (-02). Both trace to the same root cause — a boolean helper serving two callers whose safe-on-error directions are opposite — and both are resolved by returning a tri-state result.

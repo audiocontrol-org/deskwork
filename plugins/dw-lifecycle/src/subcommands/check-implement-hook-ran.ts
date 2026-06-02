@@ -33,7 +33,7 @@ import {
   checkImplementHookRan,
   type CheckImplementHookRanResult,
 } from '../scope-discovery/promote-findings/check-implement-hook-ran.js';
-import { isAncestorOfHead } from '../scope-discovery/util/git-ancestry.js';
+import { checkAncestry } from '../scope-discovery/util/git-ancestry.js';
 
 export interface CheckImplementHookRanCliOptions {
   readonly repoRoot?: string;
@@ -151,9 +151,17 @@ export async function runCheckImplementHookRan(args: RunArgs): Promise<number> {
       const log = await readHookRunLog(repoRootResolved);
       return log.length > 0;
     });
+  // Per AUDIT-20260602-45: the gate's safe direction on unknown is to
+  // REFUSE the commit. Map `'ancestor'` and `'unknown'` to `true` (the
+  // library interprets `true` as on-same-history → refuse-marker-stale);
+  // map `'not-ancestor'` to `false` (the library allows via diverged-history).
+  // This is the inverse safety mapping from implement-hook's call site.
   const isAncestorOfHeadFn =
     args.isAncestorOfHead ??
-    (async (tip: string) => isAncestorOfHead({ repoRoot: repoRootResolved, tip }));
+    (async (tip: string) => {
+      const result = checkAncestry({ repoRoot: repoRootResolved, tip });
+      return result !== 'not-ancestor';
+    });
   const result = await checkImplementHookRan({
     repoRoot: repoRootResolved,
     readMarker,
