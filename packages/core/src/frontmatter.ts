@@ -72,6 +72,17 @@ const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
  * any new code from re-introducing the bad shape.
  *
  * agent-discipline rule "Namespace deskwork-owned metadata" (entry 17).
+ *
+ * ⚠️ MAINTENANCE GUARDRAIL — do NOT "complete" this set from the rule's list.
+ * The rule names five renderer-owned keys (`id`, `state`, `date`, `tags`,
+ * `slug`) as collision-prone, but this set may contain ONLY keys that are
+ * *exclusively deskwork-owned yet collide* — currently just `id`. The other
+ * four are the RENDERER's / OPERATOR's keys: these same write helpers are the
+ * path through which operator content legitimately writes `slug`/`tags`/
+ * `date`/`state` at the top level (see the "does not flag unrelated top-level
+ * keys" test). Adding any of them here would throw on every legitimate
+ * frontmatter write. `id` is the lone exception because deskwork claimed it
+ * top-level in v0.7.0 and now owns it under `deskwork.id`.
  */
 const DESKWORK_RESERVED_TOPLEVEL_KEYS = new Set(['id']);
 

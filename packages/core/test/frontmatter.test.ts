@@ -345,4 +345,23 @@ describe('namespaced-deskwork-metadata write guard', () => {
       stringifyFrontmatter({ title: 'x', slug: 'y', tags: ['a'] }, 'body'),
     ).not.toThrow();
   });
+
+  // AUDIT-20260602-03: the guard is PATCH-scoped on updateFrontmatter, not
+  // full-document-scoped. A legacy file that still carries a top-level `id:`
+  // (the exact shape legacy-top-level-id-migration exists to clean) must
+  // round-trip through updateFrontmatter without throwing, as long as the
+  // PATCH itself is namespaced. This locks the migration path: the rule writes
+  // `{deskwork:{id}}` (patch) then removeFrontmatterPaths(['id']) — it never
+  // passes the legacy top-level id back through stringifyFrontmatter.
+  it('updateFrontmatter round-trips a legacy top-level id without throwing (migration path)', () => {
+    const legacy = '---\nid: 38410ae2-uuid\ntitle: Legacy\n---\nbody';
+    let out = '';
+    expect(() => {
+      out = updateFrontmatter(legacy, { deskwork: { id: '38410ae2-uuid' } });
+    }).not.toThrow();
+    // The pre-existing top-level id is preserved by the AST patch (the
+    // migration rule removes it in a separate removeFrontmatterPaths step).
+    expect(out).toContain('id: 38410ae2-uuid');
+    expect(out).toContain('deskwork:');
+  });
 });
