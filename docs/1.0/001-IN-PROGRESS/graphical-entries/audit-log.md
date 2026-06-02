@@ -4658,7 +4658,7 @@ A reasonable fix is to mirror `read.ts`: return `[]` only on ENOENT, and either 
 ### AUDIT-20260602-01 — Orphan-promote moves + deletes the file BEFORE validating the comment exists — unknown-commentId (a handled 404 path) destroys the operator's screenshot
 
 Finding-ID: AUDIT-20260602-01
-Status:     open
+Status:     fixed-c25d914a
 Severity:   high
 Surface:    `packages/studio/src/lib/screenshot-attach.ts:promoteOrphanToEntry` (the `await moveFile(orphanPath, writtenPath)` line through the trailing `attachScreenshotToCommentServer` call, ~lines 200-235)
 
@@ -4673,7 +4673,7 @@ The fix is to validate the comment exists *before* moving the file: call `findCo
 ### AUDIT-20260602-02 — `attachScreenshotToCommentServer` stores `relativePath` verbatim with no path-shape validation, defeating the render layer's documented security boundary
 
 Finding-ID: AUDIT-20260602-02
-Status:     open
+Status:     fixed-2a44aa07
 Severity:   medium
 Surface:    `packages/studio/src/lib/screenshot-attach.ts:attachScreenshotToCommentServer` (~lines 120-150); `packages/studio/src/routes/api.ts` attach route (~lines 565-595); `plugins/deskwork-studio/public/src/entry-review/sidebar-render.ts:buildAttachmentStrip` (~lines 279-322)
 
@@ -4686,7 +4686,7 @@ The blast radius is bounded (operator-only dev tooling), but the studio binds to
 ### AUDIT-20260602-03 — Paste/drop always synthesizes a `.png` filename regardless of the actual image MIME type
 
 Finding-ID: AUDIT-20260602-03
-Status:     open
+Status:     fixed-069d100b
 Severity:   medium
 Surface:    `plugins/deskwork-studio/public/src/entry-review/screenshot-paste-drop.ts:persistAsOrphan` (~the `const filename = \`${timestamp}-${hash}.png\`` line) and `IMAGE_TYPES` allowlist
 
@@ -4699,7 +4699,7 @@ The fix is to derive the extension from the blob's MIME type (`image/jpeg → .j
 ### AUDIT-20260602-04 — New-comment body parser silently drops a non-string `replyTo` instead of rejecting it, unlike the sibling `attachments` validation
 
 Finding-ID: AUDIT-20260602-04
-Status:     open
+Status:     fixed-d84cc66f
 Severity:   medium
 Surface:    `packages/studio/src/routes/entry-annotation-body.ts` (the `comment` branch, the new `attachments` + `replyTo` handling, ~lines 84-120)
 
@@ -4712,7 +4712,7 @@ Per the project's "throw errors, no silent fallbacks" guideline, the two optiona
 ### AUDIT-20260602-05 — Promote route accepts a JSON array body without error, diverging from the shared `readJsonObjectBody` helper's array rejection
 
 Finding-ID: AUDIT-20260602-05
-Status:     open
+Status:     fixed-cd19600f
 Severity:   low
 Surface:    `packages/studio/src/routes/api.ts` promote-to-entry handler (the inline body parse, ~lines 605-625) vs `readJsonObjectBody` (~lines 145-160)
 
@@ -4723,7 +4723,7 @@ The new shared helper `readJsonObjectBody` explicitly rejects arrays: `if (typeo
 ### AUDIT-20260602-06 — Dead disjunct in the promote-route error mapping
 
 Finding-ID: AUDIT-20260602-06
-Status:     open
+Status:     fixed-07d2c85b
 Severity:   low
 Surface:    `packages/studio/src/routes/api.ts` promote-to-entry catch block (~lines 645-665)
 
