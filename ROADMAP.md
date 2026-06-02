@@ -6,6 +6,12 @@ For released history see [GitHub releases](https://github.com/audiocontrol-org/d
 
 ## Recently shipped
 
+### Decompose `agent-discipline.md` (566 → 157 lines)
+
+Shipped as the `decompose-agent-discipline` feature (parent [#388](https://github.com/audiocontrol-org/deskwork/issues/388); merged via PR [#391](https://github.com/audiocontrol-org/deskwork/pull/391)). Docs at `docs/1.0/003-COMPLETE/decompose-agent-discipline/`.
+
+Triaged all 21 rule entries to their most effective home: 3 deletes (dead/stale/bait-removed), 2 TDD tool-fixes (`--no-tailscale` deprecated no-op + `DESKWORK_STUDIO_NO_TAILSCALE` env hatch; frontmatter namespace write-guard), pointer-shrinks of entries whose skill bodies already owned the text, composition into skill bodies (`implement`/`setup`/`issues`/`scope-inventory`/`complete`/`define`/`deskwork:iterate`/`deskwork:approve`), and minimum-form stays-shrunk for irreducible always-on defaults. Entry 12 ("Just for now") left untouched per operator decision. Post-merge audit-barrage surfaced + fixed a security-posture inversion in the `--no-tailscale` change (AUDIT-01) that the green test suite missed. Spun off [#387](https://github.com/audiocontrol-org/deskwork/issues/387) (retire review/audit skills) and [#392](https://github.com/audiocontrol-org/deskwork/issues/392) (promote-findings non-code task shape).
+
 ### Audit-barrage — multi-model parallel auditing (Design A)
 
 Shipped as Phase 12 of the scope-discovery feature (parent [#353](https://github.com/audiocontrol-org/deskwork/issues/353)).

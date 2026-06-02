@@ -317,10 +317,10 @@ Per PRD row 17: schema-write helpers refuse top-level (non-namespaced) deskwork-
 
 #### Task 2c.5 — Entry 8 (dispatch-report half): sub-agent flags → :implement
 
-**Files:** Modify `plugins/dw-lifecycle/skills/implement/SKILL.md` (sub-agent-report handling: every "out of scope but flagging" note becomes a fix-now or a filed issue); modify `.claude/rules/agent-discipline.md` (entry `## Operator owns scope decisions` — the sub-agent-dispatch-report portion only).
+**Files:** Modify `plugins/dw-lifecycle/skills/implement/SKILL.md` (sub-agent-report handling: every "flag for triage" adjacent-issue note becomes a fix-now or a filed issue); modify `.claude/rules/agent-discipline.md` (entry `## Operator owns scope decisions` — the sub-agent-dispatch-report portion only).
 
-- [ ] **Step 1: Compose** the "sub-agent dispatch reports are action lists, not disclosures" discipline into `implement/SKILL.md`'s review-the-dispatch-report step.
-- [ ] **Step 2: Shrink** the agent-discipline.md entry's failure-mode-2 (sub-agent notes) prose, leaving failure-mode-1 (operator-hedge-default-to-ASK) intact — that half is handled by Task 2e.2.
+- [x] **Step 1: Composed** the "sub-agent dispatch reports are action lists, not disclosures" discipline into `implement/SKILL.md`'s review-the-dispatch-report step.
+- [x] **Step 2: Shrank** the agent-discipline.md entry's failure-mode-2 (sub-agent notes) prose, leaving failure-mode-1 (operator-hedge-default-to-ASK) intact — that half is handled by Task 2e.2.
 - [ ] **Step 3: Commit.** `git commit -m "refactor(agent-discipline): compose entry 8 dispatch-report half into implement skill"`
 
 #### Task 2c.6 — Entry 13: packaging-is-UX → :complete / close-shipped install-evaluation
