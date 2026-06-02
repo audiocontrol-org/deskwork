@@ -166,14 +166,9 @@ These are not project-management entries. They are **debt that compounds invisib
 
 ## Packaging is UX — never paper over install bugs
 
-When asked to evaluate UX on a real install (deployed plugin, marketplace tarball, anything an operator actually adopts), treat the install state as ground truth. Do NOT copy missing files into the cache, inject scripts via playwright, or otherwise reconstruct the *"intended"* surface to perform the evaluation.
+When evaluating on a real install, treat the install state as ground truth — never copy missing files into the cache or reconstruct the *"intended"* surface to make the evaluation pass. Install-level defects (404s, missing bundles, dead UI) are top-priority blockers; fix the public path (file the packaging issue, fix source, push, re-release), don't paper over. Operator: *"Packaging IS UX."*
 
-**Why:** The operator framed it directly: *"We're actually looking for all blockers to adoption and usage. Packaging IS UX."* If the bundled marketplace install ships a non-functional surface (404'd assets, broken bootloop, dead buttons, missing client JS), that is the real experience every adopting operator gets. Working around it produces an evaluation of a surface that no operator actually sees.
-
-**How to apply:**
-- Catalog every install-level defect (missing bundles, 404s, console errors, broken auto-refresh, dead UI) as a top-priority blocker in the UX report — these are not *"infrastructure issues to fix first."*
-- The fix path is: file a packaging issue, update the release process, then re-evaluate. Not: silently restore the missing files locally to pretend the surface worked.
-- Same principle: when dogfooding deskwork on this project, install via the documented marketplace path. Do NOT bypass the install UX with manual config-file creation. The friction surfaces the design questions.
+> Composed into the complete / close-shipped skills (install-verification step) — see `plugins/dw-lifecycle/skills/complete/SKILL.md` § Composed disciplines.
 
 ## Use the deskwork plugin only through the publicly-advertised distribution channel
 
@@ -260,42 +255,11 @@ When working on deskwork (or any tool the project is building), use the tool act
 
 ## Issue closure requires verification in a formally-installed release
 
-**No issue gets closed until the fix has been verified in a formally-installed release.** This applies uniformly — to operator-filed issues, customer-filed issues, AND agent-filed issues (e.g. issues filed during a dogfood walk). Who filed it doesn't change the bar.
+No issue closes until its fix is verified in a **formally-installed release** — uniformly for operator-, customer-, and agent-filed issues. A commit / passing local test / green workspace suite is a status update, not "fixed" (it masks packaging defects, wrong-environment success, and address-the-wrong-problem). After a commit: post hash + change, issue **stays open**. After release: post version, **still open** until a real install + walk-through proves the symptoms gone. The closing transition is the **operator's** (or issue author's) call — the agent posts evidence, never closes.
 
-A commit, a passing local test, a green workspace test suite — none of those are "fixed." Each is a status update that the implementation is plausible. The release is what makes the fix reachable by adopters, and an install + walk-through against the released artifact is what proves the fix actually fixes the thing.
+> Composed into the complete / close-shipped skills — see `plugins/dw-lifecycle/skills/complete/SKILL.md` § Composed disciplines. The post-release labeling is mechanized by `/dw-lifecycle:close-shipped`.
 
-**Why:** local + workspace tests can pass while the marketplace install or packaging breaks the fix. v0.11.0 shipped to npm with `@deskwork/core` missing a `zod` dependency that workspace tests didn't catch (because zod was hoisted from another workspace package's dev-deps). The release-blocking smoke caught it BEFORE tag/push specifically because the smoke runs `npm install` from the registry — exactly the adopter path. That's the gap closure-on-commit ignores.
-
-Three failure modes that closing-on-commit masks:
-- **Packaging defects:** the fix lands in source but the published artifact doesn't include it (excluded by the `files` whitelist, missed by a build script's `cp` step, etc.).
-- **Wrong-environment success:** the fix works in the dev workspace where `node_modules/.bin/deskwork` resolves through the workspace symlink, but breaks in the marketplace-installed cache copy adopters actually run.
-- **Address-the-wrong-problem:** the agent's smoke exercises a synthetic case that doesn't reflect the lived friction; only a real walk-through against the released artifact catches that the user-facing experience hasn't actually changed.
-
-Closing while a fix is committed-but-not-released *also* loses the triage signal — issue lists filtered by "open" are how the operator decides what's still pending. A prematurely-closed issue disappears from the queue and looks done when it isn't.
-
-This is closely related to the *"Packaging is UX — never paper over install bugs"* rule above (which is about ground-truth-vs-reasoning during evaluation). This rule is specifically about **disposition**: when can the agent say "this is fixed."
-
-**How to apply:**
-- After committing a fix: post a comment with the commit hash + description of what changed. The issue **stays open**.
-- After the fix ships in a release: post a comment naming the version and noting the fix is now reachable by adopters. The issue **still stays open** until the fix is verified against the released artifact (run a real install + walk-through, prove the original symptoms are gone).
-- The closing transition is the operator's call (or the issue author's, whichever is the disposition holder). The agent doesn't close issues; the agent posts evidence and waits for the operator's go-ahead.
-- For multi-issue release batches: list which issues are believed-fixed-pending-verification in the release notes. Don't close any of them on tag/push — verify post-release, then ask the operator before closing.
-- The same logic generalizes: status updates on shared artifacts (issue dispositions, PR review states, calendar workflow approvals) where another party owns the disposition belong to that party, not the agent.
-
-This rule supersedes the previous version that distinguished agent-filed from customer-filed issues. The earlier wording allowed *"closing after the fix lands"* for agent-filed issues, which conflated commit with release and made the agent the implicit verifier of its own fixes. Releases verified by re-installing the released artifact are the only durable signal.
-
-Once a script at `~/.claude/plugins/marketplaces/deskwork/scripts/<name>.sh` is documented for adopters (e.g., in a `.claude/settings.json` SessionStart hook snippet, or in a README troubleshooting section), its **path, name, and CLI flag set become a contract**. Breaking changes silently break deployed adopter configurations.
-
-**Why:** adopters wire these scripts into their Claude Code session-start hooks (per `plugins/deskwork/README.md` Troubleshooting section, post-#131). Their `.claude/settings.json` references the absolute marketplace-clone path with specific flags. When `/plugin marketplace update deskwork` runs, the script gets updated in place — but the adopter's settings.json doesn't. If the new script renames a flag, the hook fires with an unknown flag and exits 2; the operator's session boots with a broken hook and no obvious diagnostic. Same shape as a public API breakage.
-
-**How to apply:**
-- **Path stability:** never rename or relocate a script that's been documented for adopters. Adding new scripts under `scripts/` is fine; moving an existing one isn't.
-- **Flag stability:** documented flags (`--quiet`, `--check`, `--dry-run`, etc.) are forever. Adding new flags is fine; removing or renaming existing ones is a breaking change. When a flag's behavior is genuinely improved, keep the old flag as an alias or a no-op so existing hooks don't fail (e.g., `--dry-run` aliases to `--check` after the v0.10.1 rename; `--json` is now a no-op for back-compat with v0.9.8 of `deskwork repair-install`).
-- **Behavior stability:** documented exit-code contracts (0 healthy/repaired, 1 failure, 2 usage error) shouldn't churn. Adopters write their hooks against these.
-- **Output stability:** `--quiet` mode's silent-on-healthy contract is load-bearing for hook UX. Don't add new "informational" stdout in `--quiet` mode without thinking about whether it'll spam adopter sessions.
-- The same discipline applies to the `deskwork` / `deskwork-studio` / `dw-lifecycle` CLI subcommands more broadly, but the marketplace-clone scripts have a special exposure because they get wired directly into session-start hooks rather than invoked via the bin shim. Friction in the bin shim is recoverable; friction in the script is invisible until the operator notices their session-start hook stopped working.
-
-The repair-install.sh script (post-#131) prints a one-line version banner when not `--quiet`. Operators triaging "did the fix land?" can see the version without reading the file. That banner format is now also part of the contract — keep it stable enough that adopters can grep for it if they ever build automation around it.
+**Marketplace-clone script contract (sub-rule):** once a `~/.claude/plugins/marketplaces/deskwork/scripts/<name>.sh` is documented for adopters (e.g. wired into a SessionStart hook), its **path, name, flag set, and exit-code contract become a frozen adopter contract** — never rename/remove; add an alias or no-op instead (e.g. `--dry-run` aliases `--check`). The same applies to documented CLI subcommands.
 
 ## Closure is a structural step, not aspirational
 
