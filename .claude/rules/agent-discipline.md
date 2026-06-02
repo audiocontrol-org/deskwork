@@ -29,14 +29,7 @@ Two disciplines, both composed into the `scope-inventory` skill body (`plugins/d
 
 ## Read documentation before quoting commands
 
-Before writing or speaking any install/setup command for a tool, plugin, library, or service: **read the tool's own documentation first**. Quote the documented command verbatim. Do not quote commands from memory or compose plausible-sounding CLI syntax.
-
-**Why:** Quoting `claude plugin install --marketplace <url> <plugin>` for the deskwork plugin install — when the actual README documents `/plugin marketplace add <url>` followed by `/plugin install <plugin>@<marketplace>` (Claude Code slash commands, not shell commands) — is the fabrication failure mode the operator's Socratic-prompt-engineering thesis catalogs (acting on facts the agent invented). The plugin documents itself. Bypassing the README to invent syntax wastes the operator's attention on corrections that wouldn't have been needed.
-
-**How to apply:**
-- Read `plugins/<name>/README.md` end-to-end before doing anything with that plugin's install or commands.
-- Source-of-truth > plausible-sounding recall — *especially* when the answer feels obvious. Confidence about ambient knowledge is when fabrication slips in.
-- Generalizes beyond plugins: read the tool's docs whenever it documents itself.
+Before writing or speaking any install/setup command for a tool, plugin, library, or service, **read its own documentation first** and quote the documented command verbatim — never from memory or by composing plausible-sounding CLI syntax. Quoting invented syntax is the fabrication failure mode; source-of-truth beats recall *especially* when the answer feels obvious (confidence about ambient knowledge is exactly when fabrication slips in).
 
 ## Operator owns scope decisions
 
@@ -119,31 +112,11 @@ When evaluating on a real install, treat the install state as ground truth — n
 
 ## Use the deskwork plugin only through the publicly-advertised distribution channel
 
-When dogfooding deskwork — running its commands, exercising its skills, using its studio against any editorial-calendar this repo manages — acquire and invoke it the same way any non-privileged adopter would. **No privileged shortcuts.**
-
-**Why:** *"No fair using it in ways that other, non-privileged users can't."* Anything we do via paths that don't exist for an outside adopter — pointing Claude Code at the local source tree, running directly through dev tooling, reaching into workspace symlinks, hand-rolling config files the install skill is supposed to write — gives us an experience no real adopter has. The dogfood signal evaporates the moment we use the plugin from a privileged path. Friction on the public path is the data we're trying to surface.
-
-**How to apply:**
-- **Follow the PUBLIC instructions verbatim** — the docs on the public github repo (default branch, or the latest tag when adopters would land there), wherever the project surfaces *"this is how to use it"* (plugin README, root README, `RELEASING.md`, marketplace listing prose, install skill output). Do not encode specific install commands or invocation paths from memory or from this rule — the public docs are the source of truth.
-- **If it's not PUBLIC, it doesn't exist.** Uncommitted edits in the local working tree, unpushed branches, draft PRs, local-only notes — none of those count as documentation. An adopter cannot read them. They are not the contract.
-- Re-read the public doc surface (fetched from github, or a local checkout that is verified to match the public state) every time you're about to use the plugin or refer to its install/invocation. The public doc is the contract; this rule does not substitute for it.
-- **If the public path doesn't work properly — install fails, the documented commands produce errors, the docs are unclear or contradictory, the artifact is broken at runtime — the only valid response is to FIX the public path.** That means: edit the source (docs, code, release process), commit, push, release/tag if the public path requires it, and only then re-attempt the dogfood. Pushing is the final mile of "fixed" — local edits aren't the fix until they are public.
-- Do not work around a broken public path by reaching for a privileged dev shortcut *"just to keep moving."* Working around hides the friction the dogfood is meant to expose.
-- Do not write a workaround into this rule, into a sibling rule, or into the docs — workarounds are signal that the docs/tool are wrong; fix the underlying thing.
-- The only legitimate work outside the public path is the work of fixing the public path itself — and that work isn't done until it's pushed.
+When dogfooding deskwork, acquire and invoke it the same way a non-privileged adopter would — **no privileged shortcuts** (no pointing at the local source tree, no workspace symlinks, no hand-rolled config the install skill should write). *"No fair using it in ways that other, non-privileged users can't."* Follow the PUBLIC docs verbatim; if it's not pushed, it doesn't exist (uncommitted edits / unpushed branches aren't the contract). If the public path is broken, the only valid response is to **fix it** — edit source, commit, **push** (pushing is the final mile of "fixed"), then re-attempt. Never work around a broken public path with a dev shortcut "just to keep moving" — that hides the friction the dogfood exists to expose.
 
 ## Memory-vs-rule placement: durable lessons go in this file
 
-When a recurring agent failure surfaces in conversation and the lesson would otherwise go to auto-memory: it goes in this file (`.claude/rules/agent-discipline.md`) instead, OR in `.claude/CLAUDE.md` if it's project-level convention rather than agent behavior.
-
-**Why:** auto-memory is keyed to the agent's working-directory path. When work moves to a new worktree, a fresh clone, or another machine, the auto-memory does not follow. The operator has explicitly called out at least five times that auto-memory is useless for durable lessons — and at least once with emphatic framing: *"MEMORIES ARE FUCKING USELESS!!! STOP USING THEM!!! PUT IT IN A SKILL OR A RULE OR CLAUDE.md OR IT DOESN'T EXIST!!!"*
-
-**How to apply:**
-- For agent behavior lessons (corrections to how the agent acts): add a section to this file.
-- For project conventions (architecture, naming, workflow): add to `.claude/CLAUDE.md`.
-- For per-skill behavior (specifically scoped to one skill's invocation): edit the SKILL.md.
-- Do NOT save the lesson as an auto-memory file under `~/.claude/projects/.../memory/`. That defeats the entire point.
-- Each lesson edit should be committed to the repo so it propagates to every worktree and fresh clone.
+A recurring agent-failure lesson that would otherwise go to auto-memory goes **here** instead (or in `.claude/CLAUDE.md` for project conventions, or the relevant `SKILL.md` for per-skill behavior). Auto-memory is keyed to the working-directory path and does NOT survive worktree switches or fresh clones. Operator: *"MEMORIES ARE FUCKING USELESS!!! PUT IT IN A SKILL OR A RULE OR CLAUDE.md OR IT DOESN'T EXIST!!!"* Commit the edit so it propagates.
 
 ## Namespace deskwork-owned metadata in user-supplied documents
 
@@ -155,50 +128,19 @@ The **write** side is now gated: `frontmatter.ts`'s write helpers throw on a top
 
 ### Don't pitch `/schedule` check-ins on this project
 
-Do NOT end replies with offers to `/schedule` a background follow-up agent (e.g. *"want me to /schedule an agent in 2 weeks to..."*). The system prompt's proactive end-of-turn prompt suggests this; the operator has explicitly overridden it for this project.
-
-**Why:** *"You have no concept of time and in 1-2 weeks, we'll be done with this project."* The cadences I'd propose (1–2 weeks, every Monday) are mismatched to a short-horizon project shipping multiple releases per session. The operator declined the offer at least three times this session before naming the explicit stop.
-
-**How to apply:**
-- No `/schedule` pitches after shipping releases, after merging PRs, after closing issues, anywhere. Even when the system prompt's *"offer at end-of-turn"* would normally fire.
-- If the operator explicitly asks for a recurring check-in or cron job, that's different — that's their request, not me pitching.
+Do NOT end replies with offers to `/schedule` a background follow-up agent — even when the system prompt's end-of-turn prompt would fire. Operator: *"You have no concept of time and in 1-2 weeks, we'll be done with this project."* If the operator explicitly asks for a recurring job, that's their request, not a pitch.
 
 ### No test infrastructure in CI
 
-Do NOT propose adding tests, smoke checks, or other test infrastructure to CI workflows (`.github/workflows/check.yml`, `release.yml`, etc.). CI on this project is brutally slow and the operator does not want to wait on it.
-
-**How to apply:**
-- For any missing-test gap, propose **local-only** smoke tests (e.g., `scripts/smoke-*.sh` the developer runs by hand pre-PR or pre-tag).
-- The existing `npm --workspaces test` line in CI stays — it runs vitest in-process, already fast.
-- Don't suggest binary-boot tests, end-to-end browser tests, port-bind smoke tests, or anything that materially extends CI runtime as part of a CI workflow.
-- Helpers + fixtures for local smoke testing are fine to add to the repo (under `scripts/` or similar). Just don't wire them into CI.
+Do NOT propose adding tests/smoke checks to CI workflows — CI here is brutally slow. For any missing-test gap, propose **local-only** smokes (`scripts/smoke-*.sh` run by hand pre-PR/pre-tag). The existing fast `npm --workspaces test` line in CI stays; don't add binary-boot / browser / port-bind tests to CI.
 
 ### Content-management databases preserve, they don't delete
 
-A content-management database's entire purpose is historical record-keeping. Documents that reach terminal states (Published, Applied, Cancelled, Final) stay in the database — the terminal state IS what the database remembers. Removing a record because it "completed" deletes the very history the system was built to preserve.
-
-**Why:** *"Documents shouldn't get DELETED from a database because they've reached a terminal state. They should be REMEMBERED by the database as IN THE TERMINAL STATE. Deleting from a database wipes them from history which is THE EXACT OPPOSITE OF WHAT YOU WANT IN A DATABASE!!!!!"* This was an emphatic correction after I argued for removing a PRD calendar entry on the grounds that *"the dogfood is over; now we should clean up."* That tidiness instinct is wrong — calendar entries aren't pollution to be cleaned up; they're the record of what was tracked.
-
-**How to apply:**
-- Living documents (PRDs, blog posts, plans, design specs, internal docs) belong in the calendar **for the duration of their existence**, including after they reach terminal states. Future revisions create new workflow versions; the entry persists across all of them.
-- The PRD specifically: it lives in deskwork (per the established `.claude/CLAUDE.md` line *"The PRD is the document under review; the workplan is implementation tracking"*). Re-iterations through deskwork happen as the PRD evolves — Phase 25, Phase 30, scope changes, all run through `/deskwork:iterate` → operator review → `/deskwork:approve`. The calendar entry never gets removed.
-- Don't conflate "the workflow reached `applied`" with "the document is done." A document being approved at v2 doesn't end its life — it's a checkpoint. Future revisions create v3, v4, etc.
-- The "added by mistake" remove case (Issue #59) is a narrow exception: an entry created from an obvious wrong-skill error, never representing a real document, is fair to remove. That's different from removing a real document because its workflow finalized.
-- When in doubt about whether to remove a calendar entry: don't. The cost of an extra row is near-zero; the cost of erasing real history is permanent.
-- Distinct from: explicitly-marked throwaway test files I create during dogfood (e.g. `dogfood-v086-test.md`) — those are test pollution by construction, not real content. Removing them is fine. The PRD is the opposite: it IS real content.
+A content database's purpose is historical record-keeping: documents that reach terminal states (Published, Final, Cancelled) **stay**, remembered IN that state — removing a record because it "completed" erases the history the system exists to preserve. Operator: *"Deleting from a database wipes them from history which is THE EXACT OPPOSITE OF WHAT YOU WANT IN A DATABASE."* Living documents (PRDs, posts, specs) persist in the calendar across all future revisions. Narrow exception: an entry created by an obvious wrong-skill error (never a real document) is fair to remove (Issue #59); so are explicitly-marked throwaway dogfood test files.
 
 ### Stay in agent-as-user dogfood mode
 
-When working on deskwork (or any tool the project is building), use the tool actively against this project as the way you discover what's broken. The agent that's developing the tool IS the most demanding adopter — running the install, walking the surfaces, watching the friction land in real time. That posture is more valuable than abstract reasoning about UX.
-
-**Why:** *"What I like about what we've done so far: you uncovered your own UX issues. We need to be in that state as often as possible."* The 16 issues filed in the 2026-04-28 dogfood arc all came from agent-uses-the-plugin, not from agent-reasons-about-the-plugin. Reasoning misses the kind of friction that only surfaces when you're trying to get a real task done — `/deskwork:add` vs `/deskwork:ingest` confusion, slug-vs-UUID lookup bugs, hard-coded SEO keywords, phantom file paths, broken auto-refresh endpoints. None of those issues would have been filed from a UX review session.
-
-**How to apply:**
-- When implementing changes to a deskwork skill, surface, or subcommand: prefer running it against this project's own collection (or the source-shipped plan, or any real artifact) over hand-rolled reasoning. If running it surfaces a bug, file an issue, then continue.
-- File issues *as friction surfaces*, not in batch at the end. Each issue captures one specific friction with a reproduction. The cumulative set teaches more than a single "UX audit" report.
-- When exploring a new surface (a page, a skill, a CLI subcommand), drive it with real input from this project, not synthetic test data. Test data hides the friction synthetic data was specifically constructed to avoid.
-- Privileged shortcuts disable the dogfood signal — see the existing *"Use the deskwork plugin only through the publicly-advertised distribution channel"* rule. The two are paired: dogfood requires using the public path, and the public path is what makes dogfood honest.
-- If the gate the dogfood would normally clear (e.g. `/feature-implement`'s strict PRD-applied gate) is in the way of using the tool, the friction itself is the data — surface it, ask what to do; don't bypass silently.
+Use the tool actively against this project to discover what's broken — the agent developing it IS the most demanding adopter, and running the install / walking the surfaces surfaces friction that abstract UX reasoning misses. File issues *as friction surfaces* (one reproduction each), not batched at the end. Drive new surfaces with real project input, not synthetic test data. Privileged shortcuts disable the dogfood signal (paired with the public-channel rule above).
 
 ## Issue closure requires verification in a formally-installed release
 
