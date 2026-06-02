@@ -159,16 +159,29 @@ export function parseCliArgs(argv: string[], opts: ParseCliArgsOptions = {}): Cl
     );
   }
   if (noTailscaleFlagSeen) {
-    // The flag is a no-op (it used to force loopback-only and stranded
-    // off-keyboard operators). Warn loudly that the protection it once gave is
-    // gone — the no-auth studio now binds to the tailnet by default.
-    stderr(
-      'deskwork-studio: --no-tailscale is deprecated and now a NO-OP. The studio ' +
-        'auto-detects Tailscale and (having no authentication) will be reachable ' +
-        'by every peer on your tailnet. If you passed --no-tailscale to keep it ' +
-        'loopback-only, that no longer works: set DESKWORK_STUDIO_NO_TAILSCALE=1 ' +
-        '(or use --host 127.0.0.1) to restore loopback-only binding.\n',
-    );
+    // Per AUDIT-20260602-06: split the deprecation notice into two branches.
+    // When loopback-only is ALREADY in effect (via the env-var escape hatch),
+    // the "will be reachable on the tailnet" claim is factually wrong; we
+    // acknowledge the deprecation without making a false exposure claim.
+    // When loopback-only is NOT in effect, the full exposure warning fires.
+    if (noTailscale) {
+      stderr(
+        'deskwork-studio: --no-tailscale is deprecated and now a NO-OP. ' +
+          'Loopback-only is active via DESKWORK_STUDIO_NO_TAILSCALE — the flag is redundant ' +
+          'and can be removed.\n',
+      );
+    } else {
+      // The flag is a no-op (it used to force loopback-only and stranded
+      // off-keyboard operators). Warn loudly that the protection it once gave is
+      // gone — the no-auth studio now binds to the tailnet by default.
+      stderr(
+        'deskwork-studio: --no-tailscale is deprecated and now a NO-OP. The studio ' +
+          'auto-detects Tailscale and (having no authentication) will be reachable ' +
+          'by every peer on your tailnet. If you passed --no-tailscale to keep it ' +
+          'loopback-only, that no longer works: set DESKWORK_STUDIO_NO_TAILSCALE=1 ' +
+          '(or use --host 127.0.0.1) to restore loopback-only binding.\n',
+      );
+    }
   }
   return {
     projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve(process.cwd(), projectRoot),

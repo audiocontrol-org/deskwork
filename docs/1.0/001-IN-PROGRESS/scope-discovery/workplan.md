@@ -808,16 +808,16 @@ Closes AUDIT-20260602-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 Closes AUDIT-20260602-06. Surface: `packages/studio/src/server.ts:157-172` (the `if (noTailscaleFlagSeen)` block). Severity: low.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
 - [ ] Step 5: commit with `Closes AUDIT-20260602-06` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `packages/studio/test/cli-args.test.ts` (cited in Step 1)
+- [x] `npx vitest run packages/studio/test/cli-args.test.ts` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 

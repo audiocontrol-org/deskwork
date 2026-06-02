@@ -110,6 +110,33 @@ describe('parseCliArgs', () => {
     expect(lines.join('')).toMatch(/DESKWORK_STUDIO_NO_TAILSCALE/);
   });
 
+  // AUDIT-20260602-06: the --no-tailscale deprecation notice fires
+  // unconditionally on the flag, but its text claims "the studio WILL be
+  // reachable on the tailnet" — which is factually wrong when the env-var
+  // escape hatch is ALSO set (loopback-only IS in effect). On a no-auth
+  // surface a false exposure warning erodes its own signal value. Suppress
+  // the deprecation notice's exposure-claim text when noTailscale === true.
+  it('--no-tailscale + DESKWORK_STUDIO_NO_TAILSCALE=1 does NOT emit the false exposure-warning text', () => {
+    const lines: string[] = [];
+    const args = parseCliArgs(['--no-tailscale'], {
+      env: { DESKWORK_STUDIO_NO_TAILSCALE: '1' },
+      stderr: (s) => lines.push(s),
+    });
+    expect(args.noTailscale).toBe(true);
+    const notice = lines.join('');
+    // The factually-wrong exposure claim MUST NOT appear when loopback-only is active.
+    expect(notice).not.toMatch(/will be reachable/i);
+    expect(notice).not.toMatch(/no longer works/i);
+  });
+
+  it('--no-tailscale WITHOUT the env-var escape still emits the exposure-warning text', () => {
+    // Negative case: when loopback-only is NOT in effect, the warning is correct and must fire.
+    const lines: string[] = [];
+    parseCliArgs(['--no-tailscale'], { env: {}, stderr: (s) => lines.push(s) });
+    const notice = lines.join('');
+    expect(notice).toMatch(/reachable|tailnet/i);
+  });
+
   it('--port and --host can combine', () => {
     const args = parseCliArgs(['--port', '8080', '--host', '0.0.0.0']);
     expect(args.port).toBe(8080);
