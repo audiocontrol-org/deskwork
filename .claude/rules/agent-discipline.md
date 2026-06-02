@@ -6,7 +6,7 @@ Project-scoped rules for how an agent should behave when working on deskwork. Th
 
 For any design decision — a new UI surface, a redesign, an affordance-placement decision, a visual-language choice, anything asking *"what should this look like / how should this work"* — invoke **`/frontend-design`** first; it produces 2–3 mockups the operator picks from before implementation. Skip only when the design is fully determined upstream. Applies to dispatch prompts too.
 
-> Composed into the implement + setup skills (precondition step) — see `plugins/dw-lifecycle/skills/implement/SKILL.md` § Composed disciplines.
+> Composed into the implement + setup skills (precondition step) — see `plugins/dw-lifecycle/skills/{implement,setup}/SKILL.md` § Composed disciplines.
 
 ## Audit findings: scope-don't-defer + TDD enforcement
 
@@ -41,13 +41,13 @@ The operator decides what's in scope; never pre-decide for them. Don't unilatera
 
 A spec / PRD / definition is a **capture artifact** — record everything known or knowably-implied (every edge case, cross-cut impact, and open question) so the operator has a complete picture. **Scoping is a separate, explicit, operator-driven pass AFTER capture.** Never insert scope-cuts the operator didn't ask for (*"YAGNI,"* *"deferred,"* *"not in v1,"* *"out of scope for now,"* scope-advisory tables) — that's scope-pushback dressed as discipline, the same shape as "just for now," and it compounds with the agent's hallucination + forgetting tendencies. Operator: *"I don't need you to push back on scope… capture everything we know. THEN we can worry about how to scope it."*
 
-> Composed into the define + deskwork:iterate skills — see `plugins/dw-lifecycle/skills/define/SKILL.md` § Composed discipline.
+> Composed into the define + deskwork:iterate skills — see `plugins/dw-lifecycle/skills/define/SKILL.md` and `plugins/deskwork/skills/iterate/SKILL.md` § Composed disciplines.
 
 ## Empty revisions beat missed changes
 
 When the operator invokes a capture/snapshot (`/deskwork:iterate`, `/deskwork:approve`, etc.), **run it as asked** — don't pre-decide a no-op skip. Captures are append-only and disk-cheap; an empty revision is bounded noise, a missed change is unbounded baseline drift. Run it even when your own judgment says "nothing pending." Operator: *"I'd rather have empty revisions than miss changes."*
 
-> Composed into the deskwork:iterate + deskwork:approve skills — see `plugins/deskwork/skills/approve/SKILL.md` § Composed discipline.
+> Composed into the deskwork:iterate + deskwork:approve skills — see `plugins/deskwork/skills/{iterate,approve}/SKILL.md` § Composed disciplines.
 
 ## The orchestrator session is separate from the implementation session
 
@@ -108,7 +108,7 @@ These are not project-management entries. They are **debt that compounds invisib
 
 When evaluating on a real install, treat the install state as ground truth — never copy missing files into the cache or reconstruct the *"intended"* surface to make the evaluation pass. Install-level defects (404s, missing bundles, dead UI) are top-priority blockers; fix the public path (file the packaging issue, fix source, push, re-release), don't paper over. Operator: *"Packaging IS UX."*
 
-> Composed into the complete / close-shipped skills (install-verification step) — see `plugins/dw-lifecycle/skills/complete/SKILL.md` § Composed disciplines.
+> Composed into the complete skill (install-verification step) — see `plugins/dw-lifecycle/skills/complete/SKILL.md` § Composed disciplines.
 
 ## Use the deskwork plugin only through the publicly-advertised distribution channel
 
@@ -146,7 +146,7 @@ Use the tool actively against this project to discover what's broken — the age
 
 No issue closes until its fix is verified in a **formally-installed release** — uniformly for operator-, customer-, and agent-filed issues. A commit / passing local test / green workspace suite is a status update, not "fixed" (it masks packaging defects, wrong-environment success, and address-the-wrong-problem). After a commit: post hash + change, issue **stays open**. After release: post version, **still open** until a real install + walk-through proves the symptoms gone. The closing transition is the **operator's** (or issue author's) call — the agent posts evidence, never closes.
 
-> Composed into the complete / close-shipped skills — see `plugins/dw-lifecycle/skills/complete/SKILL.md` § Composed disciplines. The post-release labeling is mechanized by `/dw-lifecycle:close-shipped`.
+> Composed into the complete skill — see `plugins/dw-lifecycle/skills/complete/SKILL.md` § Composed disciplines. The post-release labeling is mechanized by `/dw-lifecycle:close-shipped`.
 
 **Marketplace-clone script contract (sub-rule):** once a `~/.claude/plugins/marketplaces/deskwork/scripts/<name>.sh` is documented for adopters (e.g. wired into a SessionStart hook), its **path, name, flag set, and exit-code contract become a frozen adopter contract** — never rename/remove; add an alias or no-op instead (e.g. `--dry-run` aliases `--check`). The same applies to documented CLI subcommands.
 
