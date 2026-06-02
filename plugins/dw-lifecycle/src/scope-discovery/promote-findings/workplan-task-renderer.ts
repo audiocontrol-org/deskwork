@@ -72,6 +72,12 @@ export function inferFindingShape(finding: OpenFinding): FindingShape {
   if (/(?:^|\/|`|\s)workplan\.md/.test(surface)) return 'non-bug';
   if (/(?:^|\/|`|\s)tooling-feedback\.md/.test(surface)) return 'non-bug';
   if (/(?:^|\/|`|\s)clones\.yaml/.test(surface)) return 'non-bug';
+  // Journal files — DEVELOPMENT-NOTES.md and per-day journal-arithmetic
+  // findings. Per AUDIT-20260602-05: without this entry the renderer
+  // mints unsatisfiable vitest acceptance criteria for journal findings.
+  // The lowercase form below matches because `surface` is .toLowerCase()'d
+  // at the top of the function.
+  if (/(?:^|\/|`|\s)development-notes\.md/.test(surface)) return 'non-bug';
   if (/\.dw-lifecycle\//.test(surface)) return 'non-bug';
   if (/last-hook-run\.json/.test(surface)) return 'non-bug';
   if (/hook-run-log\.jsonl/.test(surface)) return 'non-bug';

@@ -161,6 +161,26 @@ describe('inferFindingShape — Phase 18 Task 1 (AUDIT-02)', () => {
   it('infers code-defect when surface is undefined (safest default — still TDD-able)', () => {
     expect(inferFindingShape(finding({ surface: undefined }))).toBe('code-defect');
   });
+
+  // AUDIT-20260602-05: journal files (DEVELOPMENT-NOTES.md and siblings)
+  // are non-source markdown; without this allowlist entry, the renderer
+  // mints unsatisfiable vitest acceptance criteria for journal-arithmetic
+  // findings (AUDIT-03/04 surfaced this against DEVELOPMENT-NOTES.md).
+  it('infers non-bug for DEVELOPMENT-NOTES.md surface (AUDIT-20260602-05)', () => {
+    expect(
+      inferFindingShape(
+        finding({ surface: 'DEVELOPMENT-NOTES.md — "Open findings at session end: 0"' }),
+      ),
+    ).toBe('non-bug');
+  });
+
+  it('infers non-bug for repo-relative DEVELOPMENT-NOTES.md surface', () => {
+    expect(
+      inferFindingShape(
+        finding({ surface: '/Users/orion/work/deskwork/DEVELOPMENT-NOTES.md:1234' }),
+      ),
+    ).toBe('non-bug');
+  });
 });
 
 describe('renderFixTaskBlock — non-bug variant (Phase 18 Task 1)', () => {
