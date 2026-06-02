@@ -53,6 +53,10 @@ import {
   parseSlushCounts,
   parsePromoteCount,
 } from './implement-hook-counters.js';
+import {
+  computeAuditedDiff,
+  EMPTY_DIFF_CURE_MESSAGE,
+} from '../scope-discovery/promote-findings/audited-diff.js';
 
 export interface ImplementHookCliOptions {
   readonly featureSlug: string;
@@ -153,6 +157,35 @@ function gitDiff(repoRoot: string, range: string): string {
   }
 }
 
+// Phase 22 Task 2 (#399 Friction 2): staged + unstaged diff helpers.
+// `git diff --cached` shows index-vs-HEAD; `git diff` shows worktree-vs-index.
+// Both are needed for the fallback chain when the commit range is empty.
+function gitDiffCached(repoRoot: string): string {
+  try {
+    return execFileSync('git', ['diff', '--cached'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 50 * 1024 * 1024,
+    });
+  } catch {
+    return '';
+  }
+}
+
+function gitDiffWorktree(repoRoot: string): string {
+  try {
+    return execFileSync('git', ['diff'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 50 * 1024 * 1024,
+    });
+  } catch {
+    return '';
+  }
+}
+
 interface DwlVerbInvocation {
   readonly stdout: string;
   readonly stderr: string;
@@ -243,7 +276,33 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
   }
   const lastBarrageTip = await readLatestBarrageTip(repoRootResolved);
   const range = lastBarrageTip !== null ? `${lastBarrageTip}..${head}` : `HEAD~10..${head}`;
-  const diff = gitDiff(repoRootResolved, range);
+  // Phase 22 Task 2 (#399 Friction 2): the commit-range diff can be
+  // empty in the immediate post-`git reset --hard origin/main` state
+  // (HEAD has no novel commits over lastBarrageTip; operator's work is
+  // staged-uncommitted). Fall back to staged → unstaged → empty so the
+  // barrage either audits real work or refuses with a loud cure rather
+  // than firing on a blank "Diff under audit" section.
+  const auditedDiff = computeAuditedDiff({
+    range,
+    deps: {
+      gitDiffRange: (r) => gitDiff(repoRootResolved, r),
+      gitDiffCached: () => gitDiffCached(repoRootResolved),
+      gitDiffWorktree: () => gitDiffWorktree(repoRootResolved),
+    },
+  });
+  if (auditedDiff.source === 'empty') {
+    args.stderr.write(`${EMPTY_DIFF_CURE_MESSAGE}\n`);
+    return 1;
+  }
+  if (auditedDiff.source !== 'commit-range') {
+    // Tell the operator which fallback we used so the diagnostic chain
+    // is auditable post-hoc — relevant when reviewing a barrage that
+    // produced findings from staged-but-uncommitted work.
+    args.stderr.write(
+      `implement-hook: commit range was empty; auditing ${auditedDiff.source} changes instead (per #399 Friction 2 fallback).\n`,
+    );
+  }
+  const diff = auditedDiff.diff;
   const commitSubjects = gitLogSubjects(repoRootResolved, range);
   const workplanSummary = await tailFile(workplanPath, 60);
   const auditLogExcerpt = await tailFile(auditLogPath, 80);

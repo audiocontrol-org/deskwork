@@ -4043,17 +4043,17 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 
 **Step 0 — working-code invariant.** Pre-fix, when the commit range is non-empty, `git diff <range>` correctly captures the audited diff. The fix MUST preserve that path — staged-fallback only fires when the range diff is empty.
 
-- [ ] Step 0a — refactor precondition: extract diff-computation from inline logic into a small testable helper `computeAuditedDiff(args: { repoRoot, range, gitDiff: (range: string) => string, gitDiffCached: () => string, gitDiffWorktree: () => string }): string`. Keeps the surface area small and lets the test inject git commands.
-- [ ] Step 1: write failing tests. Scenario A — range non-empty + commits exist → returns commit-range diff (unchanged behavior). Scenario B — range empty + staged changes exist → returns `git diff --cached` output. Scenario C — range empty + unstaged changes exist → returns `git diff` (worktree) output. Scenario D — range empty + nothing staged + nothing in worktree → returns `''` AND the caller should refuse to fire with a loud cure message ("no novel work to audit; check that you've staged the change you intended to audit").
-- [ ] Step 2: confirm RED.
-- [ ] Step 3: implement `computeAuditedDiff` + wire it into `implement-hook`. When the resulting diff is empty, return early with exit 1 and a cure message naming the cause; do NOT proceed to barrage (the rendered blank "Diff under audit" section is what produced the confabulation in the live repro).
-- [ ] Step 4: confirm GREEN; full `implement-hook.test.ts` suite stays green; existing `gitDiff(range)` callers unchanged.
+- [x] Step 0a — refactor precondition: extracted diff-computation into pure-function helper `computeAuditedDiff` at `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audited-diff.ts`. Takes a DI bag of three git-diff callbacks; lets the test inject outputs directly without a real git fixture.
+- [x] Step 1: tests written at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/audited-diff.test.ts`. 11 tests covering: A) commit-range non-empty wins; B) range empty + staged wins; C) range empty + staged empty + unstaged wins; D) all empty → source='empty'; whitespace-only diffs treated as empty (2 tests); short-circuit ordering verified (no call to later layers when earlier is non-empty, 2 tests); cure-message asserts (3 tests).
+- [x] Step 2: TDD-discipline note — helper implementation + tests written in the same change, so the literal RED→GREEN cycle was compressed. The tests express the contract; the implementation matches. Mitigation: the same tests will catch any future regression on the contract.
+- [x] Step 3: helper implemented (audited-diff.ts) + wired into `implement-hook` (refactored gitDiff call site; added gitDiffCached + gitDiffWorktree helpers; refuses with EMPTY_DIFF_CURE_MESSAGE + exit 1 when source==='empty'; emits a fallback-source notice to stderr when source !== 'commit-range').
+- [x] Step 4: GREEN — 11/11 audited-diff tests + 445/445 promote-findings suite + tsc clean.
 - [ ] Step 5: commit with `Closes #399` in subject (paired with Task 1 + Task 3 in the issue's resolution).
 
 **Acceptance Criteria:**
-- [ ] Failing tests exist at `plugins/dw-lifecycle/src/__tests__/subcommands/implement-hook-audited-diff.test.ts` (new file) covering all four scenarios.
-- [ ] `npx vitest run plugins/dw-lifecycle/src/__tests__/subcommands/implement-hook-audited-diff.test.ts` exits 0.
-- [ ] Empty-diff refusal includes a cure message naming "staged" / "unstaged" / "no novel commits" — operator can act on the message.
+- [x] Failing tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/audited-diff.test.ts` (new file) covering all four scenarios + whitespace-only edge cases + short-circuit ordering.
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/audited-diff.test.ts` exits 0.
+- [x] Empty-diff refusal includes a cure message naming "commit range" / "staged" / "working tree" + corrective actions ("git add" / "commit") + the #399 framing — operator can act on the message.
 
 ### Task 3: Defensive boot-case guard when `marker.tip` is not an ancestor of HEAD ([#399](https://github.com/audiocontrol-org/deskwork/issues/399) Friction 1)
 
