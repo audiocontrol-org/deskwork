@@ -2857,7 +2857,7 @@ What I checked and found clean: the new `allow-marker-diverged-history` result v
 ### AUDIT-20260602-47 — Tri-state→caller mappings are untested — the exact integration point AUDIT-45's bug lived at has no test
 
 Finding-ID: AUDIT-20260602-47
-Status:     acknowledged-slush-pile-2026-06-02
+Status:     fixed-f823d960
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:155-164` (the `result !== 'not-ancestor'` collapse) AND `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:295-301` (the `ancestry === 'ancestor'` trust gate) — neither exercised by the only test touched in this diff, `git-ancestry.test.ts`.
 
@@ -2868,7 +2868,7 @@ This is the same blind-spot shape AUDIT-43 named ("the suite is green while the 
 ### AUDIT-20260602-48 — Duplicate Task number `5.121` in the workplan — collides with the existing AUDIT-44 task
 
 Finding-ID: AUDIT-20260602-48
-Status:     acknowledged-slush-pile-2026-06-02
+Status:     fixed-f823d960
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new `### Task 5.121 (fix-finding-AUDIT-20260602-45)` (added near line 2340) vs. pre-existing `### Task 5.121 (fix-finding-AUDIT-20260602-44) (non-bug)` (line ~2433).
 
@@ -2906,3 +2906,31 @@ Severity:   low
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:52` — `export interface IsAncestorOfHeadOptions`.
 
 The function was renamed `isAncestorOfHead` → `checkAncestry` and the return type changed to `AncestryResult`, but its options interface is still `IsAncestorOfHeadOptions`. The name now references a function that no longer exists and a boolean question (`is ancestor`) the helper no longer answers as a yes/no. Per the project guideline "names that don't reveal intent," rename to `CheckAncestryOptions` (or `AncestryOptions`) so the type vocabulary tracks the function it parameterizes. Pure hygiene, but it's the kind of residual drift that makes the next reader hunt for a function that isn't there.
+
+## 2026-06-02 — audit-barrage lift (20260602T234715812Z-scope-discovery)
+
+### AUDIT-20260602-52 — Release v0.35.0 ships AUDIT-45 (HIGH) as `fixed` while the same commit records AUDIT-47 stating its call-site fix has no regression test
+
+Finding-ID: AUDIT-20260602-52
+Status:     fixed-f823d960
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:2826` (AUDIT-45 `open → fixed-7cdf1896`) and `:2842` (AUDIT-46 flip) + the co-added AUDIT-47 block (`:2855+`); `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:2358` (Task 5.121 final criterion flipped to `[x]`); release commit `064de848`.
+
+This diff flips AUDIT-20260602-45 — severity **HIGH**, "the consolidation reintroduces the Friction-1 bug on the git-error path" — from `open` to `fixed-7cdf1896`, and v0.35.0 then ships on top of it. In the *same* commit, the diff adds AUDIT-20260602-47, whose body states verbatim that the two call-site mappings the AUDIT-45 fix exists to get right ("the gate shim's `result !== 'not-ancestor'` collapse" and "implement-hook's `ancestry === 'ancestor' ? rawBarrageTip : null`") are **untested** — "the exact integration point AUDIT-45's bug lived at has no test." Task 5.121's checked criteria only claim a test "exercising the tri-state semantic" in `git-ancestry.test.ts`, which per AUDIT-47 tests the helper *in isolation*, not the call sites where the fail-open regression actually occurred.
+
+The net effect is that a HIGH-severity correctness fix is marked `fixed` and released with documented-zero regression coverage at the call site that carried the bug. This is the precise failure mode the project's `agent-discipline.md` rule ("Issue closure requires verification") and the AUDIT-03 reporting convention name: a `fixed-<sha>` self-assertion that a co-recorded finding contradicts. A reasonable fix is to not mark AUDIT-45 `fixed` (revert to `open`/`fix-shipped-pending-verification`) until the call-site regression test AUDIT-47 specifies exists — driving `runImplementHook` with `checkAncestry` returning `'unknown'`/`'not-ancestor'` and asserting the audited range is `HEAD~10..HEAD`, not `<tip>..HEAD`. Closing the high-severity finding on the strength of an isolation-only helper test overstates fix quality.
+
+### AUDIT-20260602-53 — Release commit carries five freshly-slushed findings (3 medium) without surfacing the slush breakdown per the AUDIT-03 convention
+
+Finding-ID: AUDIT-20260602-53
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   informational
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:2855–2908` (AUDIT-47..51 all `acknowledged-slush-pile-2026-06-02`); release commit `064de848` / hook-log tip `7cdf1896` (`fired-and-slushed`).
+
+The same change-set that cuts v0.35.0 also records AUDIT-47/48/49 (medium) and AUDIT-50/51 (low) and parks all five into the slush pile rather than scoping them into the workplan. AUDIT-47 (untested call-site dispositions) and AUDIT-48 (duplicate `Task 5.121` heading, an identifier collision gates parse) are real, unfixed defects, not noise. Per this project's documented quantitative-reporting convention (CLAUDE.md "Audit findings (AUDIT-03)"), a release that reports "0 open" is misleading when slush-pile entries carry unfixed defects; the honest headline pairs the count with the HIGH/MEDIUM slush breakdown. Nothing in this diff (no release note, no journal line, no commit-body acknowledgment) surfaces that v0.35.0 ships carrying `5 acknowledged-slush-pile (3 medium: AUDIT-47/48/49)`.
+
+This is informational, not a correctness defect — slushing is a legitimate operator process choice and I am not re-litigating the dispositions. I surface it because the release is the moment the AUDIT-03 convention is meant to fire, and the diff ships over the slush silently. The cheap remedy is one line in the release/journal record naming the carried slush count + severity, so a future reader cannot mistake the shipped state for "all clear."
+
+---
+
+What I checked and found clean: the version bump is fully consistent at `0.35.0` across all eleven manifests — `marketplace.json` (metadata + 3 plugin `ref`s + 3 plugin `version`s), root `package.json`, `packages/{core,cli,studio}`, and both `.claude-plugin/plugin.json` + `package.json` for all three plugins, including the internal `@deskwork/core`/`@deskwork/cli`/`@deskwork/studio` dependency pins — no drift between a plugin shell version and its package dependency. The `hook-run-log.jsonl` appends are factual records (`fired-and-slushed` for `7cdf1896`, `no-new-diff-skip` with `runDir:null` for `b1e22e6a`) and internally consistent. The workplan checkbox flips (Task 5.121/5.122 audit-log-status criteria → `[x]`) match the audit-log status flips they describe. My one substantive finding is the closure-vs-test-coverage inconsistency (-01); the rest of the diff is mechanical and correct.
