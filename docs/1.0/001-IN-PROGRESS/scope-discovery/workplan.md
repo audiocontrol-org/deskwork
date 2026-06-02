@@ -4011,3 +4011,77 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 - **A general "exclude-by-author" or "exclude-by-pattern" filter** — the upstream-base-ref mechanism is sufficient for the merge-from-main case; broader filtering is YAGNI until a second concrete case surfaces.
 - **Auto-detection of the upstream base** (e.g. parsing `git config branch.<name>.merge`) — the default `origin/main` covers the deskwork project; per-project override via env or flag handles non-default cases.
 - **Migration of the existing pre-push hook to use the new flag retroactively** — once shipped, all future merge-from-main pushes use the new default; no historical replay needed.
+
+## Phase 22: `implement-hook` survives sync-from-main ([#399](https://github.com/audiocontrol-org/deskwork/issues/399))
+
+`/dw-lifecycle:implement` and its `implement-hook` chain break in three compounding ways immediately after a `git reset --hard origin/main` operation on a feature branch (the canonical "sync to main, drop superseded in-flight work" pattern; cf. feature/deskwork-plugin Phase 39 Task 39.0 discovery). The bug surface spans the marker layer, the diff-range computation, and the auto-position anchor — each independent, each addressable, all three required for the loop to survive the routine sync. The PR for these fixes goes from `feature/scope-discovery` → `main`; once on `main`, the next sync-from-main on `feature/deskwork-plugin` carries the fix.
+
+### Task 1: Auto-position accepts h3 (`###`) phase headings ([#399](https://github.com/audiocontrol-org/deskwork/issues/399) Friction 3)
+
+`plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:42` hardcodes `PHASE_HEADING_RE = /^##\s+(?:Phase|Milestone|Sprint)\b/i` — h2 only. Deskwork's own workplan uses `### Phase N` h3 throughout; its only `##` headings are structural (`## Workplan: …`, `## Extension: …`). After a sync-from-main, `promote-findings --auto` finds zero anchors and aborts the entire hook chain. Per `/dw-lifecycle:implement` failure policy this is a hard loop-stop.
+
+**Severity: medium** (loop-stop on a routine workflow; no data corruption).
+
+**Step 0 — working-code invariant.** Pre-fix, auto-position correctly anchors on `## Phase N`, `## Milestone N`, and `## Sprint N` headings. The fix MUST preserve those matches — h3 acceptance is additive, not a replacement.
+
+- [ ] Step 1: write failing tests: workplan with only `### Phase N` headings → currently throws `AutoPositionError`. Workplan with only `## Phase N` (existing behavior) → currently works. Workplan with BOTH levels → resolves correctly (prefer h2 for symmetry with PROJECT-MANAGEMENT.md sanctioned levels? OR walk both at the same priority? — pick at Step 1).
+- [ ] Step 2: confirm RED.
+- [ ] Step 3: implement — relax to `/^#{2,3}\s+(?:Phase|Milestone|Sprint)\b/i` (h2 OR h3). Same for `PHASE_NUMBER_RE`. Update inline doc/comment so the heading convention is explicit.
+- [ ] Step 4: confirm GREEN; full `auto-position.test.ts` suite stays green.
+- [ ] Step 5: commit with `Closes #399` in subject (this task closes Friction 3; Friction 1+2 land in sibling commits and share the trailer).
+
+**Acceptance Criteria:**
+- [ ] New failing tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` covering h3 anchors + h3/h2-mixed workplans.
+- [ ] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` exits 0.
+- [ ] Existing h2-only tests still pass (regression-lock).
+
+### Task 2: `implement-hook` diff includes staged + unstaged work when the commit range is empty ([#399](https://github.com/audiocontrol-org/deskwork/issues/399) Friction 2)
+
+`plugins/dw-lifecycle/src/subcommands/implement-hook.ts:245-247` computes `range = lastBarrageTip..HEAD` and passes it to `git diff <range>`. When HEAD has no novel commits over `lastBarrageTip` (the immediate post-reset state: HEAD == origin/main, no new commits yet, all the operator's new work is staged-uncommitted), the diff is empty AND the staged + unstaged changes in the index/working tree aren't included. The audit renders a blank "Diff under audit" section, and any sibling CLI model that emits code-level findings against a blank diff is fabricating — captured in the live repro as a confabulated AUDIT-20260602-01 finding on feature/deskwork-plugin.
+
+**Severity: high** (silently invites cross-model confabulation against blank diffs; the false findings become real workplan tasks via auto-promote).
+
+**Step 0 — working-code invariant.** Pre-fix, when the commit range is non-empty, `git diff <range>` correctly captures the audited diff. The fix MUST preserve that path — staged-fallback only fires when the range diff is empty.
+
+- [ ] Step 0a — refactor precondition: extract diff-computation from inline logic into a small testable helper `computeAuditedDiff(args: { repoRoot, range, gitDiff: (range: string) => string, gitDiffCached: () => string, gitDiffWorktree: () => string }): string`. Keeps the surface area small and lets the test inject git commands.
+- [ ] Step 1: write failing tests. Scenario A — range non-empty + commits exist → returns commit-range diff (unchanged behavior). Scenario B — range empty + staged changes exist → returns `git diff --cached` output. Scenario C — range empty + unstaged changes exist → returns `git diff` (worktree) output. Scenario D — range empty + nothing staged + nothing in worktree → returns `''` AND the caller should refuse to fire with a loud cure message ("no novel work to audit; check that you've staged the change you intended to audit").
+- [ ] Step 2: confirm RED.
+- [ ] Step 3: implement `computeAuditedDiff` + wire it into `implement-hook`. When the resulting diff is empty, return early with exit 1 and a cure message naming the cause; do NOT proceed to barrage (the rendered blank "Diff under audit" section is what produced the confabulation in the live repro).
+- [ ] Step 4: confirm GREEN; full `implement-hook.test.ts` suite stays green; existing `gitDiff(range)` callers unchanged.
+- [ ] Step 5: commit with `Closes #399` in subject (paired with Task 1 + Task 3 in the issue's resolution).
+
+**Acceptance Criteria:**
+- [ ] Failing tests exist at `plugins/dw-lifecycle/src/__tests__/subcommands/implement-hook-audited-diff.test.ts` (new file) covering all four scenarios.
+- [ ] `npx vitest run plugins/dw-lifecycle/src/__tests__/subcommands/implement-hook-audited-diff.test.ts` exits 0.
+- [ ] Empty-diff refusal includes a cure message naming "staged" / "unstaged" / "no novel commits" — operator can act on the message.
+
+### Task 3: Defensive boot-case guard when `marker.tip` is not an ancestor of HEAD ([#399](https://github.com/audiocontrol-org/deskwork/issues/399) Friction 1)
+
+`.dw-lifecycle/scope-discovery/last-hook-run.json` is currently tracked on `origin/main` — the `chore(graphical-entries): backfill hook-run-log for 696 pre-policy commits` commit (`ac90d329`) re-added it after the earlier untrack (`dce5733c`). A `git reset --hard origin/main` overwrites the marker with main's stale value; the marker's `tip` field points at a commit on main's history that is no longer an ancestor of (post-reset) HEAD. The commit-msg gate `check-implement-hook-ran` then refuses every subsequent commit (`marker is stale: marker.tip=<old> but HEAD=<new>`), and `check-barrage-tip` sees `<old>..HEAD` as "new diff" and fires the barrage against shipped main commits.
+
+**Severity: high** (blocks every commit on a feature branch after a routine sync until manual intervention; wastes cross-model audit spend on already-shipped code).
+
+**Two-part fix:**
+- **(a) Defensive runtime guard** — when `marker.tip` is not an ancestor of HEAD (history has diverged via reset / rebase / sync), treat the marker as boot-case rather than as a stale-gate trigger. This handles the live bug AND any future reset/rewind scenarios without depending on the file-tracking state.
+- **(b) Untrack the marker** — `git rm --cached .dw-lifecycle/scope-discovery/last-hook-run.json` so the next merge to main drops the file from main's tree. The hook-run-log stays tracked (per the explicit `backfill hook-run-log for 696 pre-policy commits` design intent); the marker is per-session state and shouldn't be.
+
+**Step 0 — working-code invariant.** Pre-fix, the gate correctly refuses commits when the marker is genuinely stale (the operator ran a commit, then ran another without firing the hook). The fix MUST preserve that — only the "marker on different history line" case becomes boot-case.
+
+- [ ] Step 1: write failing tests for the gate behavior. Scenario A — marker.tip is an ancestor of HEAD AND marker.tip ≠ HEAD → refuse (existing behavior; stale within the same history line). Scenario B — marker.tip is NOT an ancestor of HEAD (history diverged) → allow (boot case; the reset/rewind made the marker irrelevant). Scenario C — marker.tip == HEAD → allow (existing). Scenario D — marker absent + bootstrap sentinel present → existing behavior unchanged.
+- [ ] Step 2: confirm RED on Scenario B.
+- [ ] Step 3: implement — extract an `isMarkerStaleOnSameHistory(marker.tip, HEAD)` helper that returns true ONLY when marker.tip is an ancestor of HEAD AND marker.tip ≠ HEAD. Wire into `check-implement-hook-ran`. Mirror in `check-barrage-tip` so it doesn't compute a diff against a non-ancestor tip — if marker.tip isn't an ancestor of HEAD, treat as "no prior marker" and use the `HEAD~10..HEAD` fallback (which is what `implement-hook.ts:245` does when `lastBarrageTip === null`).
+- [ ] Step 4: confirm GREEN; existing gate tests still pass.
+- [ ] Step 5: `git rm --cached .dw-lifecycle/scope-discovery/last-hook-run.json` in this commit so the file untracks on the next merge to main (already gitignored on `feature/scope-discovery`; the untrack restores parity with the gitignore intent).
+- [ ] Step 6: commit with `Closes #399` in subject (paired with Tasks 1 + 2).
+
+**Acceptance Criteria:**
+- [ ] Failing tests exist at the appropriate gate-test files exercising the non-ancestor case.
+- [ ] `npx vitest run` exits 0 for the gate tests + the existing AUDIT-20260601-06/07/08 regression-lock suite (sentinel backfill behavior).
+- [ ] `git ls-files .dw-lifecycle/scope-discovery/last-hook-run.json` returns empty on `feature/scope-discovery` after this commit (untrack confirmed).
+- [ ] GH #399 closed after verification on `feature/deskwork-plugin` post-sync from updated main.
+
+### Phase 22 — Out of Scope
+
+- **Force-untrack `hook-run-log.jsonl`** — the operator explicitly chose to track that file (per `ac90d329`'s commit message: "backfill hook-run-log for 696 pre-policy commits" was deliberate). The marker is per-session state and shouldn't be tracked; the log is durable history and should. The fix targets the marker only.
+- **Migration of in-progress feature branches' broken markers** — operators on stuck branches re-run `dw-lifecycle implement-hook` once after the fix lands; the next marker write reflects the post-fix shape. No bulk-rewrite tooling needed.
+- **A general "marker sanity" doctor rule** — useful but separate. The runtime guard inside the gates is sufficient for the immediate symptom; a doctor rule that surfaces stale-marker shapes proactively is a follow-up if recurrence is observed.
