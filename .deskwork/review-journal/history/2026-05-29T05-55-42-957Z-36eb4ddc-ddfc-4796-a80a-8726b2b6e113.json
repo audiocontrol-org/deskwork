@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T05:55:42.957Z",
+  "entryId": "9845c268-670f-4793-b986-0433e9ef4fb9",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "9845c268-670f-4793-b986-0433e9ef4fb9",
+    "version": 5,
+    "range": {
+      "start": 68309,
+      "end": 68326
+    },
+    "text": "We need to ensure we steer clear of in-flight work being done in the feature/graphical-entries. That effort has significant architectural and UI implications that could easily supersede any work we do in overlapping concerns. You will need to add a step to review what’s being build in that branch to identify which of our burndown issues are in that blast radius so we can mark them as blocked.",
+    "category": "other",
+    "anchor": "Scope of Phase 38",
+    "id": "a15f5134-ba0f-460e-b27b-c768d5fc41aa",
+    "createdAt": "2026-05-29T05:55:42.957Z"
+  }
+}

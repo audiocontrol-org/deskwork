@@ -29,6 +29,8 @@ import {
   formatOverrideJournalEntry,
   runCompleteGate,
 } from '../lifecycle-integration/complete-tbd-gate.js';
+import { runGitStdout } from './lib/process-probes.js';
+import { autoDetectWorktreeBase, parsePorcelain } from '../worktree-report/scan.js';
 
 export interface CompleteGateCliOptions {
   readonly workplan: string;
@@ -98,6 +100,29 @@ export function parseCompleteGateArgs(
   };
 }
 
+// Compose the dismantle hint shown after a clean gate pass. Resolves the
+// worktree-base via `git worktree list --porcelain` so the suggested
+// invocation lines up with the operator's actual layout. Returns null when
+// the worktree-base cannot be resolved (e.g. running outside a git repo
+// during tests, or in a fresh clone with only the main worktree) — silent
+// skip rather than a noisy guess.
+function formatDismantleHint(_root: string): string | null {
+  let porcelain;
+  try {
+    porcelain = parsePorcelain(runGitStdout(['worktree', 'list', '--porcelain']));
+  } catch {
+    return null;
+  }
+  if (porcelain.length === 0) return null;
+  const base = autoDetectWorktreeBase(porcelain);
+  if (base.length === 0) return null;
+  const lines: string[] = [];
+  lines.push('Post-merge hint: this worktree becomes dismantleable once the PR merges.');
+  lines.push(`  dw-lifecycle dismantle-worktrees propose --worktree-base ${base}`);
+  lines.push('surfaces it (and any sibling stale worktrees) in a single batched proposal.');
+  return lines.join('\n');
+}
+
 export async function completeGate(rawArgs: string[]): Promise<void> {
   const opts = parseCompleteGateArgs(rawArgs);
   const root = repoRoot();
@@ -120,6 +145,20 @@ export async function completeGate(rawArgs: string[]): Promise<void> {
       writeFileSync(opts.journalOverrideFile, entry, 'utf8');
     }
     process.stdout.write('OK\n');
+    // Post-gate dismantle hint. The complete-gate is the natural shipping
+    // waypoint where the operator graduates the feature; this is the
+    // moment to remind them the worktree itself is the fourth structural-
+    // closure stream (per `.claude/rules/agent-discipline.md` § "Closure
+    // is a structural step"). The hint is informational — never blocking.
+    // The session-end-hygiene block surfaces the same observation at every
+    // session boundary, so this is a duplicate-but-strictly-better cue at
+    // the most expensive miss point (the operator about to merge a feature).
+    const hint = formatDismantleHint(root);
+    if (hint !== null) {
+      process.stdout.write('\n');
+      process.stdout.write(hint);
+      process.stdout.write('\n');
+    }
   } catch (err) {
     if (err instanceof CompleteGateRefusedError) {
       process.stderr.write(err.message);

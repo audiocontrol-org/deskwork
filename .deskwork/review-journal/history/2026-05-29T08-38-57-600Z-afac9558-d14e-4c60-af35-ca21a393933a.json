@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:38:57.600Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "address",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "commentId": "6460d9c5-9830-4ef2-863e-38836f0336b8",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": "Cross-machine cleanup explicitly out of scope. Added to PRD Out-of-Scope with operator's verbatim framing. Local git-worktree-list-registered worktrees only; no SSH/synced-FS reach.",
+    "id": "ed8c22c3-af75-41d6-9edc-be9bca3cef08",
+    "createdAt": "2026-05-29T08:38:57.600Z"
+  }
+}

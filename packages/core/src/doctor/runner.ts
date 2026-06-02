@@ -14,7 +14,6 @@ import { buildContentIndex } from '../content-index.ts';
 import { resolveCalendarPath } from '../paths.ts';
 import { readWorkflows } from '../review/pipeline.ts';
 import type { DeskworkConfig } from '../config.ts';
-import missingFrontmatterId from './rules/missing-frontmatter-id.ts';
 import orphanFrontmatterId from './rules/orphan-frontmatter-id.ts';
 import duplicateId from './rules/duplicate-id.ts';
 import slugCollision from './rules/slug-collision.ts';
@@ -44,11 +43,10 @@ import type {
  * frontmatter-id rules (which depend on UUIDs being persisted on
  * disk to be useful in long-lived data).
  *
- * `legacy-top-level-id-migration` (Issue #38) runs BEFORE
- * `missing-frontmatter-id` so that v0.7.0/v0.7.1-shaped files migrate
- * to the namespaced form first; on the same run, the
- * missing-frontmatter-id rule then sees the migrated files as bound
- * (via `deskwork.id`) and doesn't re-report them.
+ * `legacy-top-level-id-migration` (Issue #38) runs before
+ * `orphan-frontmatter-id` so v0.7.0/v0.7.1-shaped files migrate to the
+ * namespaced form first; orphan detection then reads the migrated
+ * `deskwork.id` rather than the legacy top-level field.
  */
 export const RULES: ReadonlyArray<DoctorRule> = [
   calendarUuidMissing,
@@ -58,7 +56,6 @@ export const RULES: ReadonlyArray<DoctorRule> = [
   entryLaneMissing,
   entryAnchorShape,
   entryAddressReasonMissing,
-  missingFrontmatterId,
   orphanFrontmatterId,
   duplicateId,
   slugCollision,
@@ -311,16 +308,12 @@ async function resolveAndApply(
 function reportOnlySkipReason(
   rule: DoctorRule,
   _finding: import('./types.ts').Finding,
-):
-  | 'prerequisite-missing'
-  | 'editorial-decision'
-  | 'schema-rejected'
-  | 'no-action-needed' {
+): 'editorial-decision' | 'schema-rejected' {
+  // After missing-frontmatter-id was retired (#219), no bundled rule
+  // maps to 'prerequisite-missing' or 'no-action-needed' here; the
+  // surviving report-only rules resolve to one of these two. The full
+  // SkipReason union still lives in types.ts for plan-supplied reasons.
   switch (rule.id) {
-    case 'missing-frontmatter-id':
-      // Always "no candidate file found" — the operator hasn't
-      // scaffolded the body file yet (run /deskwork:outline).
-      return 'prerequisite-missing';
     case 'slug-collision':
       // Editorial: which slug "owns" the public URL.
       return 'editorial-decision';
@@ -342,9 +335,9 @@ function reportOnlySkipReason(
  */
 export const yesInteraction: DoctorInteraction = {
   async pickChoice(_plan): Promise<string | undefined> {
-    // `--yes` skips ambiguous cases by design — the workplan calls
-    // out missing-frontmatter-id with multiple candidates as the
-    // canonical example.
+    // `--yes` skips `prompt` plans by design — there's no way to choose
+    // between multiple candidate resolutions without an interactive UI,
+    // so an ambiguous multi-choice repair is left for the operator.
     return undefined;
   },
   async confirmApply(_plan): Promise<boolean> {

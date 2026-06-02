@@ -44,3 +44,9 @@ Default = run the inventory. Skipping is the exception, not the rule.
 - **feature-dev not installed.** Warning at start; the `code-explorer` step is skipped. Skill continues.
 - **scope-discovery not installed.** Step 5 silently skips. No warning, no error. (To opt in, run `/dw-lifecycle:install-scope-discovery` in the project.)
 - **`/scope-inventory` fails.** The error is surfaced in the report; the definition file still lands. The operator can re-run scope-inventory manually after addressing the cause.
+
+## Composed discipline: capture mode vs scope mode
+
+Composed from `.claude/rules/agent-discipline.md` (feature `decompose-agent-discipline`); the rules file now points here.
+
+A definition / spec / PRD is a **capture artifact** — its job is to record every aspect of the problem space that's known or knowably-implied, so the operator (and future agents) have a complete picture to scope from. **Scoping is a separate, explicit, operator-driven pass that happens AFTER capture.** During the interview, do NOT scope-cut. Phrases the agent inserts unprompted — *"YAGNI until concrete use,"* *"deferred to a follow-up,"* *"not in v1,"* *"out of scope for now,"* *"keeps it simple"* — are scope-pushback dressed as discipline (the same shape as "just for now"). Capture everything; state every edge case and cross-cut impact the design implies; write open questions into the doc rather than omitting them. The operator's framing: *"I don't need you to push back on scope. I need you to help me find the hidden areas where undiscovered scope is implied but not specified… capture everything we know. THEN we can worry about how to scope it."* Scope-narrowing compounds with the agent's hallucination + forgetting tendencies — comprehensive capture is the antidote. Only help scope when the operator explicitly asks ("now let's scope for v1"), and record those cuts as the operator's decisions.

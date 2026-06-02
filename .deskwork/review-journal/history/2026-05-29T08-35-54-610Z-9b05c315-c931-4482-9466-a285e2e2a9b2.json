@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:35:54.610Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "version": 1,
+    "range": {
+      "start": 13948,
+      "end": 13969
+    },
+    "text": "don’t care about cross-machine cleanup. that’s outside the purview of this tool",
+    "category": "other",
+    "anchor": "Cross-machine concern",
+    "id": "6460d9c5-9830-4ef2-863e-38836f0336b8",
+    "createdAt": "2026-05-29T08:35:54.610Z"
+  }
+}

@@ -35,6 +35,17 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
   beforeEach(async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'dw-regen-'));
     await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
+    // Post-merge (#232): regenerateCalendar resolves the calendar path
+    // via config; seed a minimal config so the resolver can find the
+    // default site's calendarPath.
+    await writeFile(
+      join(projectRoot, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: { main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' } },
+        defaultSite: 'main',
+      }),
+    );
   });
 
   afterEach(async () => {

@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { iterateEntry } from '@/iterate/iterate';
 import { writeSidecar } from '@/sidecar/write';
 import { readSidecar } from '@/sidecar/read';
+import { sidecarPath } from '@/sidecar/paths';
 import { readJournalEvents } from '@/journal/read';
 import type { Entry } from '@/schema/entry';
 
@@ -102,8 +103,14 @@ describe('iterateEntry', () => {
     );
 
     await iterateEntry(projectRoot, { uuid });
+    // reviewState is RETIRED (Commandment III): the read→write of iterate
+    // drops the planted legacy field. Assert both the typed read AND
+    // the raw on-disk JSON to prove the legacy field doesn't survive
+    // the round-trip.
     const updated = await readSidecar(projectRoot, uuid);
     expect('reviewState' in updated).toBe(false);
+    const rawSidecar = await readFile(sidecarPath(projectRoot, uuid), 'utf8');
+    expect(rawSidecar).not.toContain('reviewState');
   });
 
   it('produces v(N+1) from existing iteration N', async () => {

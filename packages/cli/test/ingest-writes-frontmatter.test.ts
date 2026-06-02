@@ -4,8 +4,8 @@
  *
  * Before the fix, ingest minted a UUID for the calendar entry but
  * never persisted it back into the file it was binding. The calendar
- * entry was orphaned at creation; doctor immediately flagged
- * `missing-frontmatter-id`.
+ * entry was orphaned at creation — the source file carried no
+ * `deskwork.id` linking it to the entry.
  *
  * The fix: after appending the calendar row, ingest patches the
  * source file's frontmatter to include `deskwork.id: <uuid>` (round-

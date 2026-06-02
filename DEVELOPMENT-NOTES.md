@@ -4,6 +4,68 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-06 (studio-bridge brainstorming + feature bootstrap): design a phone-first control channel from deskwork-studio to the local Claude Code session
+### Feature: studio-bridge (NEW exploratory feature, branched from deskwork-plugin)
+### Worktree: deskwork-plugin (this session) + studio-bridge (newly created at end-of-session)
+
+**Goal:** explore whether the deskwork-studio web UI can host a chat-shaped control channel back to the operator's locally-running Claude Code session — so the operator can dispatch skill commands, git operations, and prescribed actions from a phone or iPad without resorting to a terminal. Motivating use case: writingcontrol.org creative-writing flow on phone.
+
+**Accomplished:**
+
+- **Brainstormed end-to-end via `superpowers:brainstorming`** — followed the skill's gated checklist (context exploration → clarifying questions one-at-a-time → 2-3 approaches → design sections with per-section approval → spec doc → self-review → user review → transition). The skill's HARD-GATE held cleanly; no implementation snuck in.
+- **Converged on a single-process consolidation** — initial brainstorm proposed two options (file-watch IPC vs separate MCP daemon). Operator's reframe collapsed both: *"the studio server could also be the mcp server."* Final shape: `@deskwork/studio` gains a loopback-only `/mcp` endpoint + four new HTTP routes (`/api/chat/{send,stream,state,history}`) on the existing Hono app. One process, one queue, one source of truth. File-IPC race conditions sidestepped entirely by virtue of the in-process queue.
+- **Captured 13 explicit decisions** with rationale in the design spec's "Decisions log" table — process model, entry mode, terminal-interrupt behavior, tool-use visibility, surface placement, context-passing, affordance routing, persistence, generality, auth, network-split, failure mode, bridge scope. Each decision was a one-at-a-time multiple-choice question; operator's selections drove the table.
+- **Wrote the design spec** (`docs/1.0/001-IN-PROGRESS/studio-bridge/design.md`, 267 lines) — architecture diagram, components table, data flow walkthrough, error handling, testing strategy, out-of-scope list, decisions log, open questions / future work.
+- **Self-review found one ambiguity**: I'd conflated `agentListening` (currently in `await_studio_message`) with "available to receive" — meant mid-processing operator messages would have been wrongly 503'd. Split into `listenModeOn` (true across processing) + `awaitingMessage` (true only inside the await call); rejection rule keys on `listenModeOn`, mid-processing messages queue normally.
+- **Bootstrapped `studio-bridge` as a new exploratory feature** — operator's call: don't fold this into deskwork-plugin's tracked work unless it proves out. Created branch `feature/studio-bridge` + worktree `~/work/deskwork-work/studio-bridge/`. Wrote PRD + workplan + README + moved design spec into the new feature dir (526 lines total across the four docs). Skipped the canonical `deskwork ingest` + `review-start` step — experiment status doesn't warrant calendar coupling.
+- **Cleaned up the parent feature branch**: removed the design spec from `feature/deskwork-plugin`'s docs dir (now lives only on `feature/studio-bridge`); added a Phase 37 row to deskwork-plugin's README pointing at the new feature.
+- **Workplan structured for parallelism**: 8 phases with explicit dependency graph. Phase 1 (server primitives) unblocks Phases 2/3/4 to run concurrently; Phase 5 waits on 4; Phase 6 can start after 1+3; Phase 7 waits on 4+5+6; Phase 8 (validation gate against writingcontrol from a real phone) waits on everything. Each phase has tasks + acceptance criteria + file-size discipline notes.
+
+**Didn't Work:**
+
+- **First proposal of "soft interleave" for the terminal-vs-bridge question.** I'd offered a 30-second-timeout-loop approach so the bridge could yield to terminal input. Operator's actual workflow (different worktrees for desktop dev vs phone creative writing) made the question moot — the conflict between surfaces is rare in practice. Settled on (i) terminal turns are normal CC interactions; bridge stays on; agent re-enters await loop afterward. Simpler, fewer corner cases.
+- **First framing of context-passing.** I proposed three options (heavy auto-context / lightweight pointer / no context) optimized for a chat-with-Claude-about-prose workflow. Operator's reframe blew that up entirely: chat is for prescribed commands (skill invocations + git + free-form prescribed actions), NOT prose-discussion. Q4e essentially answered itself once the workflow was clear; locked in lightweight pointer for the free-form case but most messages carry their context in the command itself.
+- **Initial architecture had MCP exposed on Tailscale alongside web routes.** Operator caught it: *"the mcp service should be localhost only, no? the browser doesn't need talk to the mcp service."* Real architectural correction with a security implication — without the loopback split, anyone on the tailnet could connect their own Claude Code session to the studio's MCP and impersonate the agent. Updated design with the binding split + 403 guard + smoke test for it.
+- **Optimistic queue-while-offline model.** I'd designed for the bridge accepting messages while offline and draining when reconnected, with a 50-message backpressure cap. Operator preferred pessimistic: *"If the bridge is down, we don't accept new messages from the browser."* Plus *"I care **much** more about not losing any text I write than I do about preserving the conversation"* — added localStorage draft buffering so unsent typed text survives tab close / refresh. Removed the queue-while-offline complexity entirely.
+
+**Course Corrections:**
+
+- [PROCESS] Operator: *"the mcp service should be localhost only, no? the browser doesn't need talk to the mcp service, afaict"* — caught a thesis-and-security-relevant misdesign in the architecture diagram. The browser talks to HTTP routes; only the local CC needs MCP. Loopback-bind on `/mcp` + 403 guard for non-loopback closes the impersonation hole I'd left open. Updated the spec; added a smoke check.
+- [COMPLEXITY] Operator: *"I want to be able to edit documents using the studio edit interfaces on my phone. I won't be writing by telling claude code what text to add. Most of what I'll be asking claude code to do is plugin commands from the studio affordances pasted into the chat or other fairly prescribed actions like git commit and push or other skill invocations"* — major scope sharpening. Reframed the chat from "discuss prose with the agent" to "remote command interface for prescribed actions." Document save / scrapbook upload / margin-note APIs are explicitly out of scope (existing studio routes unchanged). Affordance routing pre-fills chat input but never auto-dispatches.
+- [PROCESS] Operator: *"the bridge doesn't handle document save operations. That's already built into the web app. The bridge is *only* a control channel to talk to claude via mcp"* — explicit scope boundary I should have stated more sharply earlier. Added "Out of scope" sections to both the design spec and the PRD to make this load-bearing distinction unmissable to future readers.
+- [PROCESS] Operator: *"We should be pessimistic about bridge failure. If the bridge is down, we don't accept new messages from the browser. ... I care **much** more about not losing any text I write than I do about preserving the conversation"* — corrected my optimistic-enqueue overengineering. Bridge offline → 503 + browser disables Send + localStorage drafts. Filesystem + git is the durability story; no reassembly heroics.
+- [PROCESS] Operator's instruction: *"write the prd & the workplan, but this is a new feature that will be developed in its own branch and worktree--especially since this is just exploratory at this point"* — overrode the brainstorming skill's default terminal state (`superpowers:writing-plans`) in favor of a feature-bootstrap path. Branched off, scaffolded the new feature dir with PRD + workplan + README + moved design spec, skipped the deskwork-ingest step (exploratory status doesn't warrant calendar coupling). Aligned with `agent-discipline.md`'s "operator owns scope decisions" rule — separating studio-bridge from deskwork-plugin is a scope call I shouldn't have pre-decided.
+
+**Quantitative:**
+
+- Messages from operator: ~16
+- Skill invocations: 4 (`/dw-lifecycle:extend`, `superpowers:brainstorming`, `/session-start`, this `/session-end`)
+- Sub-agent dispatches: 0 (single-thread design conversation; delegating would have hidden the back-and-forth)
+- Commits: 3
+  - `ff6dc1b` (feature/deskwork-plugin): provisional design-spec commit during brainstorming
+  - `c231e66` (feature/studio-bridge): bootstrap exploratory feature — moves spec, adds prd/workplan/README
+  - `fcd8ab7` (feature/deskwork-plugin): cleanup — removes the moved spec from the parent feature dir
+- New branches: 1 (`feature/studio-bridge`)
+- New worktrees: 1 (`~/work/deskwork-work/studio-bridge/`)
+- New feature: 1 (studio-bridge — exploratory; 8-phase workplan; validation gate at Phase 8)
+- Course corrections: 5 substantive (1 [PROCESS] security, 1 [COMPLEXITY] reframe, 3 [PROCESS] scope/error-model)
+- GitHub issues filed: 0 (design session, no shipped code)
+- Files changed across the session: 5 (design spec, prd.md, workplan.md, README.md (new), README.md (parent feature edit))
+
+**Insights:**
+
+- **The studio-as-MCP-server consolidation is a thesis-aligned upgrade I wouldn't have proposed without the operator's reframe.** I had been building toward a separate MCP daemon (Flavor A2 in my A1/A2 split) because that's what felt "official." The operator's offhand observation collapsed two roles into one daemon, sidestepped a class of file-IPC bugs, and made the architecture meaningfully simpler. Lesson: the cleanest design often emerges from the operator's framing of *what the existing thing already is*, not from the agent's framing of *what should be added*.
+- **Brainstorming's HARD-GATE earned its discipline this time.** Three different points in the conversation, I had impulses to start sketching code or jumping to writing-plans. The gate kept me asking questions instead. The 13-decision table at the bottom of the spec is the artifact that proves the gate was load-bearing — every decision is operator-grounded, not author-decided.
+- **Pessimistic-on-failure was the right call but I had to be told.** My instinct was to design for graceful degradation (queue while offline, drain when back, cap at N to prevent runaway). Operator's framing (*"don't lose text I write"* > *"preserve the conversation"*) inverted the priority. The right design carried localStorage draft persistence on the client, 503 on the server, no reassembly. Simpler AND safer. Lesson: when I'm tempted to add an "intelligent" recovery path, ask what the operator's actual priority is first — recovery often isn't it.
+- **Bridge scope discipline matters more than I initially treated it.** I had subtly hand-waved "the agent can do anything via tools" without sharply distinguishing the bridge contract from existing studio mutation routes. Operator's pushback (*"the bridge is *only* a control channel"*) is exactly the kind of scope hardening that prevents the bridge from accumulating responsibilities later. The "Out of scope" section now in both the design spec and PRD codifies this — future agents reading the spec will see the boundary as load-bearing, not aspirational.
+- **The "exploratory feature on its own branch" pattern is the right shape for design experiments.** Trying to fold this into deskwork-plugin's mainline as Phase 36+ would have created pressure to ship even if the validation gate (Phase 8) showed the design isn't right. The branch isolation gives Phase 8 honest agency: succeed → integrate; fail → preserve and explore alternatives. The cost of the isolation is small (one worktree, minor doc duplication); the cost of NOT isolating an unproven design idea is much larger.
+
+**Open follow-ups (not blockers):**
+
+- Phase 1 of studio-bridge can start any time. No dependencies; touches only `packages/studio/src/bridge/` (new dir). Single-thread or a `typescript-pro` dispatch — the work is pure TS.
+- Studio-bridge's `feature/studio-bridge` branch has its own DEVELOPMENT-NOTES.md fork point (this entry won't be visible there). When future studio-bridge sessions run, they'll write to the studio-bridge branch's DEVELOPMENT-NOTES.md; the journal will diverge from this branch's. If the experiment integrates, the merge will need to interleave the two histories.
+- The new `/deskwork:listen` skill's prose is the load-bearing piece that makes the listen loop work. It's prose, not code — needs careful authoring in Phase 6 to ensure the agent actually loops correctly and re-enters await after terminal-side interruptions. Worth a dedicated dispatch to `documentation-engineer` to draft + test against a real CC session.
+
 ## 2026-05-12 (Phase 2 Task 2.2 v7 architecture): operator pivot from Shortform mockup pick to cross-cutting bottom-bar redesign — 7 mockup iterations land star-nav (Desk-as-hub, ← + ⋮ masthead) + Steps 2.2.5–2.2.9 shipped under review
 ### Feature: studio-mobile-first
 ### Worktree: deskwork-studio-mobile-first
@@ -3534,3 +3596,323 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - Address TBD markers: line 1990: markers: defer — - [ ] Step 7.2.9: extend cancel-cascade test coverage — add recursive-cascade regression test (3-level group nesting) AND per-member `priorStage` assertions to close test-coverage gaps surfaced by Ste; line 1998: markers: defer — - [ ] Step 7.3.5: wire member-of pull-tab on the **mobile lane-stack** + the **desktop list-mode-body** so the pull-tab affordance reaches the same viewport classes the rest of the dashboard reaches. 
 - Dismantle stale worktrees: (no stale worktrees flagged)
 
+## 2026-05-29: Merge sync + #142 closure + Phase 38 bootstrap + 38·0 blast-radius gate
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Sync the feature branch with main, look at the deskwork-core burndown, and act on the highest-impact item — which the operator scoped up to "the entire core + studio burndown" as a tracked Phase 38, then drove canonically through `/dw-lifecycle:extend` → deskwork PRD re-iteration → `/dwi`.
+
+**Accomplished:**
+
+- **Merged `origin/main` (326 commits) into `feature/deskwork-plugin`** (`1a1f95e`). Resolved two append-only journal conflicts (DEVELOPMENT-NOTES.md, USAGE-JOURNAL.md) as unions. The merge pulled new `ajv`/scope-discovery deps; ran `npm install` so the pre-commit scope-discovery gate could run (not bypassed). Committed package-lock sync (`48c8b3a`).
+- **Deleted the `.audiocontrol.org` dogfood sandbox** (operator decision). It was a gitignored 593MB clone of `oletizi/audiocontrol.org` on `feature/adopt-deskwork-plugin` — fully pushed, only `.deskwork/config.json` local-only (captured in transcript). It was tripping the jscpd clone gate (the gate scans gitignored dirs; main's worktree has no such dir, which is why the gate passed there but not here). Removing it let the merge commit pass the hook honestly.
+- **Closed #142 as superseded by graphical-entries (#301)** (`b3100a9`): posted a cross-reference comment, moved it out of the deskwork-core operator-triage bucket into a "Superseded" section, closed not-planned.
+- **Phase 38 bootstrapped via `/dw-lifecycle:extend`** (`fed6c9a`): the core+studio burndown tranche. Plan at `docs/superpowers/plans/2026-05-28-deskwork-core-studio-burndown.md` (38a detailed to TDD granularity; 38b–38h enumerated from the burndown for just-in-time expansion). Operator decisions captured via AskUserQuestion: #246 → make approve universal (option a); uniform Final→Published mechanics.
+- **PRD re-iterated through deskwork per the lifecycle gate** (the binding "PRD extension always re-iterates via deskwork" rule): inducted Final→Drafting → snapshot v5 → operator margin note → addressed → v6 (`716c17d`) → `/deskwork:approve` → Final (`3a1f77c`).
+- **`/dwi` ran sub-phase 38·0 — graphical-entries (#301) blast-radius review** (`2b5a35c`, `505da9e`): a `code-explorer` dispatch (through the dispatch wrapper; return validated) read the live `feature/graphical-entries` branch (Phases 1–6 done: pipeline templates + lanes + template-aware verbs + swimlane dashboard; 7–12 not started) and classified all 66 burndown issues: 16 HIGH / 12 MEDIUM / 38 LOW. Report at `38-0-blast-radius-review.md`.
+
+**Didn't Work:**
+
+- **The clone gate scans gitignored directories.** `.jscpd.json` lacks `"gitignore": true`, so the gate enumerated ~65 `.audiocontrol.org` sandbox files as NEW clones, blocking the merge commit. Not a real finding — local-environment-only. Resolved by deleting the sandbox (operator's call). Underlying gate-config gap left as-is (not in scope).
+- **`code-explorer` lacks the Write tool**, so it couldn't persist its own report despite the brief instructing it to. It returned the full content in its response; the controller wrote `38-0-blast-radius-review.md`. Worth encoding in dispatch briefs: only dispatch report-writing to agents whose toolset includes Write.
+- **`deskwork doctor --check` exited 1 after the PRD approve** with 13 findings — verified as the known #300/#219 doctor false-positives (the PRD's id IS in calendar.md) + pre-existing unrelated entries, NOT corruption from the approve. Live dogfood evidence for the 38c doctor-rule fixes.
+- **`session-end-hygiene` range conflated merge-in with session work** (#340-shaped): `0030c55..HEAD` swept in 326 merged origin/main commits, so its "issues filed this session" listed scope-discovery/hygiene issues from other branches. Recommendation hand-corrected below.
+
+**Course Corrections:**
+
+- **[PROCESS] Operator vetoed bypassing canon.** When offered "light in-thread TDD + review" vs "full `/dwi` orchestration" for #246, the operator chose the canonical path: *"A. we bypass the canon at our peril."* Drove the full `/dw-lifecycle:extend` → deskwork re-iteration → `/dwi` lifecycle instead of a quick fix.
+- **[PROCESS] Operator's blast-radius margin note caught the keystone risk before any code.** The note on the PRD ("steer clear of in-flight graphical-entries work … add a step to review what's being built … mark blast-radius issues blocked") became gating sub-phase 38·0 — which then found that #246 itself (the thing the whole effort was scoped around) is already being rewritten on `feature/graphical-entries`. A Phase-38 edit to `approve.ts` would have been throwaway. Operator confirmed reassigning #246/#230 to #301.
+- **[PROCESS] Outward-facing actions surfaced for decision, not pre-decided.** Held the 16-HIGH/12-MEDIUM issue Blocked-labeling for operator go-ahead (they chose: hold; block list lives in the report) rather than mass-labeling unilaterally.
+
+**Quantitative:**
+
+- Messages from operator: ~20
+- Commits this session: 8 (1 merge + 7 substantive: `b3100a9`, `48c8b3a`, `fed6c9a`, `716c17d`, `3a1f77c`, `2b5a35c`, `505da9e`) + this session-end
+- Sub-agent dispatches: 1 (`code-explorer` for the 38·0 blast-radius review; returned via the dispatch wrapper, validate-return passed)
+- Skill invocations: `/dw-lifecycle:session-start`, `/deskwork:iterate`, `/deskwork:approve`, `/dw-lifecycle:extend`, `superpowers:writing-plans`, `superpowers:test-driven-development` (loaded, not yet executed — code phase is 38b), `/dw-lifecycle:implement` (38·0), `/dw-lifecycle:session-end`
+- Issues closed: 1 (#142)
+- deskwork PRD revisions: v5 → v6; stage Final → Drafting → Final
+- Releases: 0 (docs/setup session)
+
+**Insights:**
+
+- **The blast-radius gate is the highest-leverage thing this session produced.** Without it, Phase 38 would have started with #246 — and thrown the work away on the #301 merge. The pattern generalizes: before burning down a backlog, check it against in-flight large features; a one-dispatch overlap review can save a sub-phase of throwaway work. Bake 38·0 into the burndown-tranche playbook.
+- **"Make approve universal" is real and correct — it just belongs on the graphical-entries branch.** The spec/skill (DESKWORK-STATE-MACHINE Commandment II, approve SKILL.md) already say approve is universal; only the core code lags. graphical-entries' template-aware verb rewrite is exactly where that lag gets closed (`preTerminalLinearStage(template)` at `approve.ts:109-115`). #246 isn't wrong — it's mislocated.
+- **Canon caught what a shortcut would have missed.** The operator's "we bypass canon at our peril" + the mandatory deskwork PRD re-iteration is what created the surface for the margin note that surfaced the #246/#301 collision. A light in-thread fix would have shipped the throwaway edit.
+
+### Hygiene observations
+
+- No new TBD/defer markers introduced into the workplan this session; the markers the helper flagged are pre-existing (Phases 19–35) and unrelated to Phase 38. Phase 38's own deferrals are tracked as explicit dispositions (38f/38g gates, 38·0 block list in the report), not bare TBDs.
+- Issues touched this session: closed #142 (superseded by #301). No issues filed. (The helper's "issues filed this session" list is merge-range noise — scope-discovery/hygiene issues from other branches pulled in by the origin/main merge; the #340-shaped calendar-date scoping bug.)
+- Doctor `--check` exits 1 on the known #300/#219 false-positive family (surfaced live by the PRD approve) — addressed by 38c, not a blocker.
+
+### Next session recommendation (hygiene)
+
+- **Resume:** `/dwi` at Phase 38 sub-phase 38b — the LOW-overlap unblocked work set (20 core + 18 studio, per `38-0-blast-radius-review.md`). Start with core quick fixes #256 (CLI `--version`) → #221 → #232 → #198, then the 38c doctor-rule family (#219/#65/#223; SKIP #300 here — already fixed on the graphical-entries branch).
+- **Coordinate (#301):** #246/#230 land on `feature/graphical-entries` (verb-model rewrite), not Phase 38.
+- **Note:** the deskwork-studio still runs detached on port 47328 from this session.
+
+## 2026-05-29 (cont.): Phase 38 burndown — 38·1 + 38b + 38c-partial (clean wins; clusters held for decisions)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Resume Phase 38 via `/dwi`. Per the session-start hygiene recommendation, start at the infra prerequisite (38·1 clone-gate), then walk the core burndown sub-phases (38b quick fixes, 38c mediums) in a batched cadence the operator confirmed.
+
+**Accomplished:**
+
+- **38·1 — clone-gate gitignore (#354)** (`37683c8`, `fdc25c3`). Set `"gitignore": true` in the scope-discovery `.jscpd.json` (repo-root symlinks to it) + the adopter template seed, so the jscpd clone gate stops scanning gitignored dirs. Verified jscpd 4.2.3's option reads `cwd/.gitignore`; the real `.audiocontrol.org` reproducer is covered by `.gitignore:97`. Regression `clone-detector.gitignore.test.ts` (config-wiring assertion + cwd-scan behavior guard). Reviewed; audit-logged `AUDIT-20260529-01/02`.
+- **38b — core quick fixes.** Of the four: **#256** (CLI `--version`/`-v`/`version`) fixed (`d6d3032`) + reviewed; **#221** (dotted slugs) and **#198** (iterate `--dispositions` longform/outline) were ALREADY landed on-branch in prior commits — re-verified green (4/4, 12/12), open pending release-verification; **#232** (calendar honors per-site `calendarPath`) is the one real decision — operator chose option (b), fixed for the write sites (`517159b`) + reviewed.
+- **#232 implementation (option b).** `regenerateCalendar` + `doctor` repair now resolve `resolveCalendarPath(projectRoot, readConfig(projectRoot))` (default site — entries carry no `site` field) instead of the hardcoded `.deskwork/calendar.md`. Chose internal config-read over threading config through 5 stage-helpers (far less churn; throws if config absent — no fallback). 14 core unit tests gained a config.json fixture. Regression `calendar-path-honored.test.ts`.
+- **38c — clean self-contained wins.** **#64** (ingest derives title from first ATX heading, not just slug) fixed (`953565c`); **#58** (`/deskwork:add` → ingest redirect) prose (`411d762`); **#226** verified already-landed (`afc81e9`).
+- **Fixed the pre-existing core `tsc` debt** the operator flagged (`45af283`): 7 type errors in retired-`reviewState` test code + unused imports. Rewrote retirement tests to plant a legacy field on disk and assert absence in raw JSON (genuinely verifying stripping). core typecheck now clean (0 errors).
+- **Review cycle ran on every production commit** (`/dw-lifecycle:review` → dispatched `feature-dev:code-reviewer` through the dispatch wrapper, return-grammar validated each time). Findings were integrated or filed, never IOU'd.
+
+**Didn't Work:**
+
+- **#232 validate read-side over-reach.** First implementation also pointed `validateCalendarSidecar` at the configured path; it broke `doctor.test` (calendar-uuid-missing: a legacy row-primary calendar with no sidecars → orphans correctly flagged). Reverted to the hardcoded path: validate was ALREADY blind to custom calendarPaths, so scoping to the operator-approved write sites introduced no new divergence. The conflation of the entry-centric calendar with the legacy per-site calendar is the #234 surface question. Filed [#357](https://github.com/audiocontrol-org/deskwork/issues/357).
+- **#64 first heading extractor matched the trimmed line** — so a 4-space-indented `# x` (CommonMark indented code) was mis-read as a heading; Setext headings silently unhandled. The review caught both; fixed immediately in `ece678a` (untrimmed 0–3 space match + ATX-only documented + 3 edge-case tests).
+- **38c is much larger + more entangled than 38b.** The doctor-model cluster (#219/#65/#218) and calendar-surface cluster (#223/#234) need decisions, not code — held rather than rushed.
+
+**Course Corrections:**
+
+- **[PROCESS] Operator: "why not fix the broken test? if not now, when?"** — I'd dismissed the 7 pre-existing core `tsc` errors as out-of-scope. That's the "we'll fix it later" dodge the rules forbid once I've read them. Fixed all 7 immediately (`45af283`). Lesson: encountered-and-read inherited debt is mine to dispose now or file — not to wave off.
+- **[PROCESS] Operator chose option (b) for #232** via AskUserQuestion — I'd surfaced the architecture fork rather than guess (the issue itself escalates it). Correct boundary: operator owns the deprecate-vs-keep-a-required-config-key call.
+- **[PROCESS] Held the 38c clusters for decisions** rather than piecemeal — the #232 validate over-reach was a live lesson in not conflating surfaces before the design question is settled.
+
+**Quantitative:**
+
+- Commits this session: 11 (5 fix + 1 tsc-cleanup + 5 docs/review-record).
+- Issues fixed (pending release-verification): #354, #256, #232 (write sites), #64, #58. Verified already-landed: #221, #198, #226.
+- Issues filed this session (mine): #357 (validate read-side), #358 (writeSidecar hardening) — both review residuals, tracked not IOU'd. (The session-end-hygiene helper's list also shows #355/#356/#359/#360 — those are NOT this session's work; merge-range / same-GitHub-user noise, the #340-shaped scoping bug.)
+- Sub-agent dispatches: 4 `feature-dev:code-reviewer` (38·1, #256, #232+tsc, #64) — all wrapper-validated.
+- Test posture: core 530/530, cli 216 passed, core+cli tsc 0 errors.
+- Releases: 0.
+
+**Insights:**
+
+- **The dispatch-wrapper review loop earns its cost.** Two review passes (#232, #64) surfaced real defects in my own new code (the validate over-reach's doctor.test break; the indented-code heading false-positive). Both would have shipped without the adversarial pass.
+- **"Open" ≠ "code not landed."** Three 38b/38c issues (#221/#198/#226) were already fixed on-branch; they stay open only because closure waits for release-verification. Triage-before-implement saved redoing them.
+- **Scope discipline cuts both ways.** #232 taught: don't EXPAND a fix into adjacent surfaces (validate) without the design decision; the tsc-debt correction taught: don't CONTRACT away inherited debt I've read. The operator owns scope; the agent's job is to surface and not pre-decide in either direction.
+
+### Hygiene observations
+
+- No NEW bare TBD/defer markers introduced this session. The session-end-hygiene helper flagged ~15 markers — all pre-existing (Phases 12–26 historical deferral prose), unrelated to Phase 38.
+- Issues filed this session by me: #357, #358 (both #232-review residuals, with full analysis). The helper's broader list (#355/#356/#359/#360) is merge-range / same-user noise from other branches, not this session.
+- 38c residuals are tracked two-track (GitHub issue + workplan): #357/#358 + the AUDIT-20260529-04/05/08 entries. No code-comment IOUs.
+
+### Next session recommendation (hygiene)
+
+- **Decisions needed first (unblock the two largest 38c clusters):** (1) **doctor-model** — patch #219's legacy `missing-frontmatter-id` rule to be stage/artifact-aware, OR retire it (option 3 in the issue) in favor of the entry-centric validators; this also frames #218 (the missing legacy→sidecars migration rule) and #65. (2) **#357 surface question** — is the entry-centric calendar the same surface as the per-site `calendarPath` or distinct? Unblocks #223/#234 + the validate read-side.
+- **#62** needs a UX call (ingest default for no-frontmatter legacy active docs).
+- **Resume (no decision needed):** `/dwi` at **#267** — CLI to enumerate pending annotations; clean self-contained medium.
+- **Note:** #357/#358 are the live review residuals; triage when the calendar/sidecar clusters are picked up.
+
+## 2026-05-29 (cont. 2): Phase 38c — take up the decision cluster, then implement (#219 retired, #267 shipped, #62/#218 resolved)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Resume Phase 38c. Operator chose to "take up the decisions" (the decision-gated 38c clusters) before coding, then `/dwi` to implement the unblocked work.
+
+**Accomplished:**
+
+- **Took all 5 38c decisions** via `AskUserQuestion`, recorded two-track (workplan + per-issue comments): doctor-model → **retire** `missing-frontmatter-id` (#219 opt 3; #65 moot); calendar-surface (#223/#234/#357) + the #218 migration-rule → **defer to graphical-entries #301** (lanes generalize the per-site-vs-entry-centric surface question); #62 + #218 → reconciled (see below).
+- **#219 — retired `missing-frontmatter-id`** (`4b24a9e`). The Phase-30 reversal (sidecars SSOT, markdown downstream) made the rule's "every UUID has matching frontmatter" invariant false (Ideas/Planned unscaffolded + youtube/tool never have artifacts). Deleted rule + de-registered; re-anchored the runner-plumbing tests (issue-#44 skipReason / JSON / grouped-output / exit-code matrix) to surviving rules; dropped 2 `prerequisite-missing` scenarios (no surviving rule produces that disposition); refreshed the clones baseline (a pre-existing 3-way `collectMarkdownFiles` clone → 2-way). Regression `missing-frontmatter-id-retired.test.ts`. Implemented via `typescript-pro` dispatch (wrapper-validated) + TDD.
+- **#267 — new `deskwork annotations` verb** (`90e5d82`). `deskwork annotations <project-root> <slug-or-uuid> [--all] [--json]` — surfaces pending annotations (the gap: `iterate` reported `addressedComments: []` with no way to see them). Thin verb over the existing `listEntryAnnotations` reader; pending = a comment with no `address` disposition (latest-`createdAt`-wins fold, mirroring the studio). Operator-approved verb shape before implementing. TDD + `typescript-pro` dispatch.
+- **`/dw-lifecycle:review` on every production commit** (parallel Track-2 spec + Track-3 code-quality, dispatch-wrapper-validated): #219 → Track-2 PASS, Track-3 1 medium (`reportOnlySkipReason` return-type lie) fixed `7a916ae`; #267 → Track-2 PASS, Track-3 2 test-coverage gaps (latest-wins fold + unknown-flag exit-2) fixed `e515fa4`. Track-1 (controller independent gate) re-run by me each time, not the implementer's reported output. Audit-log `AUDIT-20260529-09/10/11/12`.
+- **#62 + #218 — resolved-in-substance, NO code** (`c6dd2e2`, `646a02a`). Both decisions rested on stale premises that the pre-implementation does-it-already-exist check caught:
+  - #62 ("default-to-Ideas is wrong"): #206 already changed the no-`state` default to **Drafting** (closed + tested); #63 already binds `deskwork.id` on `--apply`. The literal "refuse / require --state" pick would have reverted #206 and broken 4 tests. Operator reconciled → keep #206.
+  - #218 ("legacy→sidecars migration not shipped"): `migrateCalendar` + `detectLegacySchema` exist, are wired into `doctor` via `maybeMigrate` (check + `--fix=all`), and are tested. The "not available" caveat I was about to write would have been **false**. Operator reconciled → resolved-pending-verification, no caveat, per-site gap stays with #301.
+
+**Didn't Work:**
+
+- **Two decision framings I authored were built on stale premises (#62, #218).** Both issues were filed in earlier phases and silently fixed on-branch since. Had I implemented the literal decisions, #62 would have reverted a shipped+tested decision (#206) and #218 would have shipped a false adopter-facing caveat. The pre-task "verify current behavior before acting" check is what caught both.
+
+**Course Corrections:**
+
+- [PROCESS] Self-caught (not operator-driven): framed the #62 AskUserQuestion on a stale "defaults to Ideas" premise. Verified current behavior before implementing → found #206 superseded it → surfaced the conflict and let the operator reconcile rather than silently reverse a prior decision.
+- [PROCESS] Self-caught: the #218 "migration missing" premise was stale (migration exists + wired + tested). Surfaced before writing a false caveat.
+- [PROCESS] The implementer correctly used the project's `<project-root>`-first positional convention for the new verb (matching doctor/approve), which my brief had abbreviated — accepted as correct.
+
+**Quantitative:**
+
+- Operator turns: ~7 (session-start, "take up decisions", "is everything scoped", "approve—do it", two `/dwi`, session-end).
+- Commits this session: 11 (`0dc4d8a`..`e2172b1`; range `29dbdb6..HEAD` shows 12 — one, `87535bf`, predates this session's start within the range).
+- Sub-agent dispatches: 6 — 2 implementers (`typescript-pro`: #219, #267) + 4 reviewers (`feature-dev:code-reviewer`: 2 per task), all dispatch-wrapper-validated.
+- Issues commented (decisions/dispositions): 8 (#357, #234, #223, #219, #65, #218, #62, #267). Issues FILED: 0.
+- Operator corrections: 0 (operator made decisions + approved; both course-corrections were agent-self-caught).
+- Code tasks completed: 2 (#219 retire, #267 verb). No-code dispositions: 2 (#62, #218).
+- Tests: core 538/538, cli 220 passed + 29 pre-existing skips, core+cli `tsc --noEmit` clean.
+
+**Insights:**
+
+- **"Open ≠ code-not-landed" is a confirmed recurring pattern** (3 issues last session: #221/#198/#226; 2 this session: #62/#218). The pre-task does-it-already-exist check is now clearly load-bearing — issues filed in earlier phases get fixed on-branch but keep stale framing in triage notes. Triage-before-implement should be standard for any "old" issue.
+- **The design→decide→implement→review→verify loop earned its cost every time this session.** AskUserQuestion surfaced the decisions; the verify-before-acting check caught two stale premises; the adversarial review caught a type-lie (#219) and two untested invariants (#267). None of those would have surfaced from "just implement the issue."
+- **Surfacing a stale-premise conflict beats silently overriding a prior decision.** Both #62 and #218 had prior shipped decisions (#206, the migrate-gate wiring) that the new decision would have contradicted. Stopping to reconcile with the operator — rather than barreling ahead on the literal instruction — preserved #206's friction-removal and avoided a false caveat.
+
+### Hygiene observations
+
+- **No NEW bare TBD/defer markers introduced this session.** The `session-end-hygiene` helper flagged ~17 markers (workplan lines 488–1920) — ALL pre-existing Phases 12–26 historical prose, unrelated to this session's 38c work (lines ~1895–1925). This is the recurring #361/#340-shaped whole-file-scan scoping bug; the session diff introduced none.
+- **Issues FILED this session: ZERO.** I commented on 8 existing issues (#357/#234/#223/#219/#65/#218/#62/#267) recording decisions/dispositions. The helper's "filed this session" list (#366/#364/#363/#362) is merge-range / same-GitHub-user noise from OTHER branches — the same #361 scoping bug, NOT this session's work.
+- The two decision commits (`0dc4d8a`/`5bb6cd5`) legitimately carry "defer" in their subjects — they record the operator's #301 deferral two-track (workplan + issue comments), not IOUs.
+- All 38c decision residuals tracked two-track (workplan checkboxes + per-issue comments + audit-log AUDIT-09/10/11/12). No code-comment IOUs.
+
+### Next session recommendation (hygiene)
+
+- **Resume:** `/dwi` at **#215** (verify-only — parts landed, issue 2 was #232 which is done; likely closeable-pending-release-verification, cheap), then **#59** (new "remove mistakenly-added entry" subcommand; the verb name/shape is a public CLI contract — propose before implementing, as with #267). After that, 38d (studio quick fixes: #68/#98/#71/#233/#229/#177) opens the studio lane.
+- **Disregard helper noise:** the auto-generated "Resume: install deskwork in audiocontrol.org" and the #366/#364/#363/#362 triage list are #361-scoping-bug artifacts, not this session's actual next steps.
+- **Release-verification queue:** #219, #267, #62, #218 (+ prior #354/#256/#232/#64/#58/#221/#198/#226) are all fixed-pending-release-verification — a `/release` + marketplace walk would let the operator close the accumulated batch.
+## 2026-05-29 (Phase 13 capture + Task 1 land): scope-discovery extension — audit-finding lifecycle (anti-deferral discipline) captured, parent issue #355 filed, promote-findings library + CLI + skill shipped + reviewed
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** capture Phase 13 (audit-finding lifecycle — anti-deferral discipline + workplan promotion) into the workplan, PRD extension, README; file the parent issue; then start Task 1 implementation. The trigger: Phase 12's self-dogfood demonstrated the workflow gap — the agent lifted 11 audit-log findings into the canonical log and went straight from "findings lifted" to "fix dispatch" without scoping the fix work into the workplan. Operator's framing (verbatim): *"Filing a bug report isn't good enough. It MUST BE SCOPED INTO THE WORKPLAN, otherwise it won't get picked up by the implementation loop. Unless there's truly a good reason NOT to fix a problem, it should be relentlessly scoped into the workplan, not relentlessly deferred — ESPECIALLY problems with the implementation underway. A broken implementation is not done — it's broken. And, along with the discipline to scope the fix, TDD principles should apply such that a test that exercises the bug is written before the fix is implemented — and the implementation isn't considered a candidate for completion until tests are green."*
+
+**Accomplished:**
+
+- **Phase 13 captured exhaustively in the workplan + PRD + README.** `6ee47a1` adds Phase 13 to `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (6 tasks, full step-by-step capture per the capture-mode rule), to the PRD as an extension paragraph + a Phase 13 acceptance criteria block, and to the README phase status table. `dc92137` back-fills the GH parent issue link.
+- **GH issue [#355](https://github.com/audiocontrol-org/deskwork/issues/355) filed** as the Phase 13 parent issue — captures the trigger (Phase 12 self-dogfood gap), the verbatim operator framing, the 6 tasks, and the cross-references to the sibling rules (`Just for now is bullshit`, `Operator owns scope decisions`).
+- **Branch hygiene fixed before implementation started.** The Phase 12 work had been authored on a separate `feature/scope-discovery-phase-12` branch — awkward naming that violated the project convention of staying on `feature/scope-discovery`. Operator flagged: *"this will all be implemented in THIS feature branch and worktree. why in the world would you create a separate, awkwardly named branch instead of using the one we're already in?"* Cure: rebased the 7 Phase-12 commits onto `origin/main` (`dc92137` Phase 13 docs base), fast-forwarded `feature/scope-discovery` to the rebased tip, force-pushed, deleted `feature/scope-discovery-phase-12` locally + on origin. Clean rebase; no conflicts. The worktree at `/Users/orion/work/deskwork-work/scope-discovery` now tracks `feature/scope-discovery` as it should.
+- **Phase 13 Task 1 implemented and committed at `9bd4247`.** `/dw-lifecycle:promote-findings` ships as 9 components per the task brief:
+  - `types.ts` — `OpenFinding`, `PromotionProposal`, `WorkplanInsertion`, `DeferralRecord`, `InformationalRecord`, `ProposalFile`, fs-seam callback types
+  - `audit-log-walker.ts` — `walkOpenFindings` reuses the existing `parseAuditLogFile` from `util/audit-log-parser.ts`
+  - `workplan-task-renderer.ts` — `renderFixTaskBlock` emits the TDD-first task block (5 Steps + Acceptance Criteria); clips long headings to 80 chars + ellipsis
+  - `workplan-editor.ts` — `insertTaskBlock` + `applyTaskBlocks` with atomic all-or-nothing validation (phase exists, anchor in-range, anchor sits inside named phase); sorts insertions DESC
+  - `substantive-reason-validator.ts` — `validateAcknowledgedReason` mirrors hygiene's `promote-deferrals` validator (≥40 chars, banned phrases); duplicates the hygiene canon + adds the Phase 13 PRD-mandated phrases per the brief
+  - `audit-log-editor.ts` — `flipAuditLogStatus` + `applyStatusFlips`; drift checks; preserves entry body verbatim
+  - `subcommands/promote-findings.ts` — CLI verb; `--feature` required, `--repo-root`, `--bucket` (rejects non-`open` with exit 2), `--limit`, `--apply`, `--output`, `--task-number`, `--help`. Propose-then-apply protocol. Registered in `cli.ts`.
+  - `SKILL.md` + `commands/promote-findings.md` + shortcuts (`/dwpf` Scheme A, `/dw-pf` Scheme B, `/dw-promote-findings` Scheme C)
+  - 89 vitest scenarios across 6 test files using `mkdtempSync` real-fs fixtures
+- **Code review surfaced 5 valid findings on Task 1 — addressed inline at `b02a224`.** Two BLOCKING, three HIGH. Each fix shipped with regression tests:
+  - **BLOCKING #1 — audit-log-editor field-block boundary.** `findStatusLineForEntry` could false-match a `Status:`-starting line in body prose (e.g., a quoted before/after example). Fix: restrict the scan to the FIELD BLOCK (stop at blank line, non-field-shaped line, or heading). Tests cover body-prose `Status:`, walking past intervening fields, and refusal when entry has no Status field.
+  - **BLOCKING #2 — partial-apply double-insert on workplan re-run.** If the workplan write succeeded but the audit-log write failed, re-running `--apply` would double-insert the task block (no idempotency guard). Fix: workplan-editor now scans for `(fix-finding-<id>)` markers already present and skips those insertions; apply.ts wraps the audit-log write in a try/catch that surfaces partial-apply state in the error message + tells the operator the workplan side is idempotent on re-run. Tests cover partial-apply re-run + full-idempotent no-op.
+  - **HIGH #3 — `deferred` substring subsumed `deferred to v<N>` regex.** The PRD-mandated `deferred to v<N>` entry was dead code (any string matching it also matched the broader `deferred`). Fix: promoted `deferred to v<N>` to fire BEFORE bare `deferred` so the more-specific PRD display name surfaces in error messages.
+  - **HIGH #4 — equal `insertAfterLine` non-deterministic.** Stable-sort isn't spec-guaranteed for equal-keyed elements in older engines. Fix: deterministic tiebreaker using input-array index DESCENDING — processing higher-index first means lower-index ends up at lower output line number (input order preserved). Test covers two insertions with equal anchors.
+  - **HIGH/LOW #5 — blank informational rationale silently accepted.** Fix: `preValidate` refuses `rationale.trim() === ''` with descriptive `ApplyProposalError`. Test covers the apply-boundary rejection.
+- **Pre-commit gate handled deliberately-duplicated validator clones.** The dispatch brief told the implementer to duplicate the banned-phrase rules in `substantive-reason-validator.ts` (module owns its contract; cross-skill import would couple `dw-lifecycle` hygiene canon to scope-discovery's anti-deferral contract). The clone detector caught the new clones; disposed via `batch-dispose --disposition keep-with-reason` with the duplication rationale. A second iteration of the same gate fired after the `deferred to v<N>` reorder shifted line numbers and re-registered the clone — same disposition, same rationale.
+- **Test signal end-of-Task-1.** Plugin suite at 2097/2097 (1995 baseline + 96 promote-findings + 6 shortcut test updates). `tsc --noEmit` clean. Smoke `dw-lifecycle promote-findings --feature scope-discovery` emits `no open findings on feature scope-discovery` + exits 0 (audit-log has zero `Status: open` entries today).
+
+**Didn't Work:**
+
+- **Initial deskwork iterate attempt on the PRD failed.** The scope-discovery PRD entry is at `currentStage: Published` in the deskwork calendar; iterate refused per Commandment III (Published is immutable). The prior Phase 11 + 12 extensions had landed via git directly with the entry already Published; the operator-facing deskwork-iterate loop ended when v1 shipped. Documented the gap and proceeded with git-direct PRD edits per the established sibling pattern.
+- **Dispatch-wrapper `validate-return` rejected the implementer's return block** on grammar grounds (`Searched: 9 steps` doesn't fit the canonical `<N> matches/files/results/...` vocabulary). The implementation passed every on-disk verification (vitest, tsc, smoke); the grammar rejection was a false-positive of exactly the shape tracked at [#350](https://github.com/audiocontrol-org/deskwork/issues/350). Didn't re-dispatch over the grammar quibble; cited #350 in the commit message and moved on.
+- **First commit attempt blocked by pre-commit clone-detector gate.** As above — the validator module deliberately duplicates the hygiene canon; gate flagged 3 NEW clone groups. Required `check-clones --refresh-baseline` to add them as pending, then `batch-dispose --disposition keep-with-reason`. Same shape (1 new clone group) reappeared after the post-review `deferred to v<N>` reorder; disposed identically. Friction but routine; the gate is doing its job.
+- **Auto-mode classifier blocked `git push origin main` once.** The Phase 13 docs commit needed to land on main; the classifier flagged "Pushing directly to main branch bypasses pull request review." Surfaced the blocker to the operator; they explicitly authorized; second attempt succeeded. The same path would have been smooth if I'd asked first.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"Did you scope the fixes into the workplan?"* — earlier in the session, after lifting 11 Phase 12 self-dogfood findings into the canonical audit-log, I went straight from "findings lifted" to "fix dispatch" without scoping the fix work into the workplan. The fixes got addressed ad-hoc in a parallel session. This correction is the trigger that made Phase 13 necessary; the framing the operator gave (*"Filing a bug report isn't good enough..."*) is captured verbatim in the PRD extension paragraph + the GH issue #355.
+- **[PROCESS]** *"this will all be implemented in THIS feature branch and worktree. why in the world would you create a separate, awkwardly named branch instead of using the one we're already in?"* — the Phase 12 work had been authored on `feature/scope-discovery-phase-12` (separate branch, awkward name) instead of staying on `feature/scope-discovery` per the project convention. Cure: rebased + force-pushed + deleted the awkward branch. Generalizes to: when extending an in-flight feature, do NOT create a sibling branch named after the phase; stay on the feature branch and add commits there.
+- **[COMPLEXITY]** *Operator's anti-deferral discipline rule — verbatim cited above.* The session's most foundational correction: the agent's pathology of preferring deferral over scoping into the workplan is what Phase 13 mechanizes against. The pattern surfaces as: code comments saying *"will fix later,"* GH issues filed and called dispositioned, audit-log findings left at `Status: open` with no workplan task to drive them through the implement loop. Phase 13's structural cure: `/dw-lifecycle:promote-findings` makes "scope into workplan" the default + only agent-pickable disposition; the operator can pick deferral but only with a substantive-reason validator pass; mechanical TDD check enforces tests-pass-before-task-complete; implement-loop strict refusal on any open finding (no escape hatch).
+
+**Quantitative:**
+
+- Messages this session: ~25
+- Commits landed on `feature/scope-discovery` this session (post-rebase tip):
+  - `6ee47a1` docs(scope-discovery): Phase 13 extension — audit-finding lifecycle
+  - `dc92137` docs(scope-discovery): back-fill Phase 13 parent issue (#355)
+  - `9bd4247` feat(scope-discovery Phase 13 Task 1): promote-findings library + CLI + skill
+  - `b02a224` fix(scope-discovery promote-findings): address Phase 13 Task 1 review
+- Commits rebased onto `origin/main` during the branch-state cure (Phase 12 work):
+  - `f952734` feat(scope-discovery Phase 12 Task 1): audit-barrage CLI invocation contracts
+  - `7b19661` feat(scope-discovery Phase 12 Task 2): audit-barrage CLI verb + subprocess orchestration library
+  - `7037a80` feat(scope-discovery Phase 12 Task 3): audit-barrage prompt template + YAML config loader
+  - `131ea8b` docs(scope-discovery Phase 12 Task 6): self-dogfood audit-barrage — acceptance signal met
+  - `f386705` fix(scope-discovery): restore audit-log prior entries that the Phase 12 self-dogfood commit accidentally overwrote
+  - `63d4612` fix(audit-barrage): address 11 dogfood findings + ship Phase 12 Tasks 4/5/7
+  - `3da9053` docs(scope-discovery audit-log): flip AUDIT-20260529-01..11 to fixed-08971e4
+- New production-code lines (Phase 13 Task 1 alone): ~3062 insertions across 24 files; 89 new tests at land, +7 more added by the review fixes (96 total promote-findings tests)
+- Plugin test suite: 2097/2097 passing
+- GH issues filed this session: 1 ([#355](https://github.com/audiocontrol-org/deskwork/issues/355) Phase 13 parent)
+- Corrections: 3 ([PROCESS] x2 + [COMPLEXITY] x1)
+
+**Insights:**
+
+- **The anti-deferral discipline is the most operator-load-bearing project rule.** It generalizes the existing `Just for now is bullshit` rule from the implementation-side ("don't write code comments that promise future fixes") to the audit-side ("don't let audit-log findings sit at `Status: open` without a workplan task"). The implementation-side rule was reactive (catch the bad shape); the audit-side rule is proactive (force the good shape). Phase 13 is the structural mechanization — the operator-discipline-displacement counterpart to Phase 12.
+- **TDD-first as a mechanical check is a different shape from TDD-first as a process convention.** The existing `superpowers:test-driven-development` skill is process-shaped: write a failing test, then minimal impl, then refine. Phase 13 Task 3 (mechanical TDD enforcement, still unbuilt) takes the same discipline and makes it a doctor rule + commit-msg gate — the workflow refuses to mark a fix-finding task `[x]` without a passing test cited at the path the workplan task names. The mechanization is what survives the agent's tendency to "remember" to do TDD after the fact.
+- **Reviewer false-positives still cost less than skipping reviews.** The review cycle on `9bd4247` produced 5 valid findings, 4 of which were genuinely subtle (the body-prose `Status:` false-match, the partial-apply double-insert, the dead-code regex entry, the equal-anchor sort instability). Each would have been a latent regression — the kind the audit-barrage later catches expensively. The cost of dispatching a reviewer + applying the fixes (this session: ~10 minutes wall-time) is dwarfed by the cost of the regressions surfacing later. Worth keeping the discipline.
+- **Per-skill clone disposition surfaces an interesting trade-off.** The deliberate duplication of hygiene's banned-phrase list in the new validator was the right call (module ownership of contract; loose coupling between dw-lifecycle's hygiene + scope-discovery's anti-deferral). But the clone detector caught it twice (once after initial land, once after the post-review reorder). The friction is the gate doing its job — catching ALL textual clones — and the cure is the same shape both times (`batch-dispose --disposition keep-with-reason`). If this becomes routine, the workflow improvement is an `--auto-dispose-with-reason "<rationale>"` flag at the `--apply` step rather than the two-call refresh+dispose pattern.
+
+---
+
+### Hygiene observations
+
+- workplan /Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:700 — markers: out-of-scope — ### Phase 12 — Out of Scope (deferred to Design B / Design C per ROADMAP)
+- workplan /Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:860 — markers: defer — - [ ] Step 1: Add section to `.claude/rules/agent-discipline.md` titled "Audit findings: scope-don't-defer + TDD enforcement". Names the default-is-promote shape; cites the operator's verbatim framing
+- workplan /Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:868 — markers: out-of-scope — ### Phase 13 — Out of Scope
+
+## 2026-05-29: Phase 11 — stale worktree discovery + dismantle (Tasks 1–4 shipped)
+### Feature: hygiene
+### Worktree: hygiene
+
+**Goal:** extend the hygiene feature with a mechanism to find + dismantle stale worktrees. Drive PRD capture → operator iteration → publish → file issue → implement → ship to main.
+
+**Accomplished:**
+
+- **PRD capture + iteration cycle.** Authored Phase 11 PRD addition (~95 LOC) capturing 9 staleness signals, 7 safety rails, 3 verb-shape directions, edge cases, configuration, and 7 open questions for operator iteration. Operator left 7 marginalia in the studio against v1; iterated to v2 addressing all 7 (Option A verb shape; 30-day threshold; 3-of-9 signals; opt-in `--archive-first`; auto-detected worktree-base; rejected `:dismantle-all-shipped` shortcut; cross-machine cleanup out of scope). Published PRD via `deskwork publish` (`#246` divergence captured). Filed [#356](https://github.com/audiocontrol-org/deskwork/issues/356) with task breakdown + acceptance gates.
+- **Task 1 — `/dw-lifecycle:worktree-report`.** Read-only sibling of `:debt-report`. 6 modules (types, staleness, scan, git-probes, gh-pr-state, feature-doc, formatters) all under 300 LOC. CLI subcommand wired with all flags. SKILL.md authored mirroring `:debt-report`. 32 vitest tests cover every staleness signal + every overriding verdict + threshold-count behavior + canonical signal ordering + porcelain parser variants + auto-detect base + corrupt + orphan happy paths. Commit `fb94325`.
+- **Task 2 — `/dw-lifecycle:dismantle-worktrees propose|apply`.** Batched-proposal pattern matching `:triage-issues` + `:promote-deferrals`. 6 modules (types, preflight, dismantle, propose, apply, index). All-or-nothing validation; per-worktree best-effort dispatch. Substantive-reason validator reused from `promote-deferrals`. Composition with `:archive-branch` via `--archive-first` (order: remove worktree first, then archive — preflight refuses on checked-out branches). 20 vitest tests cover every safety-rail refusal + every dispatch route. Commit `2ff389e`.
+- **Task 3 — Lifecycle integration.** `session-end-hygiene` extended with a fourth observation stream (`worktree-stale`); `dismantleCandidates` added to `NextSessionRecommendation`; markdown renderer emits the new observation rows + "- Dismantle stale worktrees:" recommendation line. `agent-discipline.md` § "Closure is a structural step" rewritten to name worktrees as the fourth structural-closure stream + cross-link to [#347](https://github.com/audiocontrol-org/deskwork/issues/347). `session-start-recommendation` needs no code change (does textual read of the markdown block). Step 3 (complete-gate worktree suggestion) deferred to polish.
+- **Task 4 — Documentation.** Plugin README hygiene-family section: "three classes" → "four classes" of permanent debt; core-verbs table grows with `:worktree-report` + `:dismantle-worktrees`; quick-reference shell snippets include the new verbs. Task 4 Step 3 (burndown sheet update) deferred — closure rule is authoritative.
+- **Shipped on main.** Seven commits landed via rebase + push: `245a235` PRD extension, `f1851f2` iterate v2, `e1cfb4a` publish + issue file, `fb94325` Task 1, `2ff389e` Task 2, `2715edd` gitignore, `cf7e988` Tasks 3+4. Pre-commit hooks caught two clone groups during implementation; both extracted into shared modules (`subcommands/lib/parse-flag-value.ts`, `process-probes.ts`, `build-worktree-opts.ts`) before commit.
+
+**Didn't Work:**
+
+- **scope-widen between tasks.** The implement SKILL's auto-invocation requires a baseline `scope-manifest.yaml` from `scope-inventory`; the hygiene feature never ran scope-inventory. Skipped per the SKILL's silent-fallback shape. Tracked as a "hygiene feature didn't opt into the scope-discovery audit loop" observation; future feature setups should consider running `scope-inventory` once at setup time.
+- **Initial orphan-detection over-eager.** First implementation flagged 38 false-positive "orphans" — every sibling git project under the auto-detected `/Users/orion/work/` base. Fixed via the `.git`-file-shape signal: only flag paths whose `.git` exists as a FILE (gitdir: pointer to admin dir), not as a DIRECTORY (which signals a sibling standalone repo). Post-fix: 0 false positives, 4–5 actual stale candidates surfaced cleanly.
+- **`/deskwork:approve` for Final → Published.** The SKILL prescribes `deskwork approve` but `core/approve.ts` refuses Final → Published with [#246](https://github.com/audiocontrol-org/deskwork/issues/246)'s documented error pointing at `publish` as the right verb. Used `deskwork publish` since the SKILL's intent matched. Divergence already captured in `docs/1.0/burndown/operator-triage.md` § #246.
+
+**Course Corrections:**
+
+- **[PROCESS]** Auto mode flagged force-push to `feature/hygiene` after rebase — rule says force-push needs explicit authorization. Operator confirmed authorization was implicit in "get our changes into main." Used `--force-with-lease` (safer form) and pushed; documented in the session journal earlier.
+- **[PROCESS]** Operator authorized in-session override of the orchestrator-vs-implementation-session rule via `AskUserQuestion`. Session was already in the feature worktree; the session-isolation half of the rule was relaxed for this one-time pass.
+- **[COMPLEXITY]** `scan.ts` was 541 LOC after initial implementation — over the 300–500 line cap. Split into 4 modules (`scan.ts`, `git-probes.ts`, `gh-pr-state.ts`, `feature-doc.ts`) before commit. All files under 300 LOC post-split.
+
+**Quantitative:**
+
+- Messages: ~100 (estimate including the audit + burndown + Phase 11 arc)
+- Commits this session: 7 (Phase 11) + earlier audit/closure/burndown commits in the same continuous session
+- Issues closed via repo-wide audit: 68 of 178 → 110 remaining; per-feature burndown sheets at `docs/1.0/burndown/`
+- Issues filed this session: #356 (Phase 11), plus 4 unrelated by other tools (#357, #358, #359, #360)
+- Tests added: 52 worktree-related (32 + 20)
+- Full plugin suite: 1947 of 1948 pass (1 pre-existing unrelated flake)
+- Files changed across Phase 11: ~35
+
+**Insights:**
+
+- **The PRD iteration loop closes a real gap.** Operator left 7 specific marginalia in the studio and got back a v2 PRD addressing each one verbatim. The mechanical `--dispositions` flag on `deskwork iterate` made the per-comment disposition trail durable.
+- **Dogfooding closes its own loops.** Live smoke against the operator's `~/work/` set surfaced the orphan-detection false-positive immediately; the test fixture would never have caught it. The first run produced 38 false orphans; the second run (after the `.git`-file-shape signal) produced 0. The smoke also showed the closure-rule cascade work — `feature/studio-bridge` (the example the rule explicitly mentions as parked-by-operator-decision) appears in the report with the expected `dismantle` disposition (0 commits ahead of main).
+- **Phase 11 closes the #347 failure mode at its source.** The "stale-branch sessions silently re-implement shipped work" mode the operator captured at #347 is structurally prevented by `:worktree-report` + `:dismantle-worktrees`: every shipped feature's worktree gets a structural prompt to dismantle, instead of relying on the operator to remember. The session-end-hygiene integration ensures the recommendation surfaces at every session boundary.
+
+### Hygiene observations
+
+- workplan docs/1.0/001-IN-PROGRESS/hygiene/workplan.md:335 — markers: out-of-scope — `- **No \`:dismantle-all-shipped\` shortcut** (rejected per PRD Out of Scope).` *(intentional Out-of-Scope annotation, not actionable TBD; flagged as a known scanner false-positive)*
+- workplan docs/1.0/001-IN-PROGRESS/hygiene/workplan.md:336 — markers: out-of-scope — `- **No cross-machine cleanup** (out of scope per PRD Out of Scope).` *(same as above)*
+- issue #360 [OPEN] filed this session: perf(graphical-entries): group cancel --cascade runs regenerateCalendar N+1 times
+- issue #359 [OPEN] filed this session: feat(graphical-entries): record cascadeFrom on stage-transition events emitted by group cancel --cascade
+- issue #358 [OPEN] filed this session: writeSidecar serializes raw input, not Zod-validated result.data — retired/unknown fields can persist to disk
+- issue #357 [OPEN] filed this session: doctor --check (validateCalendarSidecar) reads hardcoded .deskwork/calendar.md, ignores per-site calendarPath — false-clean for custom-calendarPath adopters
+- issue #356 [OPEN] filed this session: Phase 11: Stale worktree discovery + dismantle (hygiene extension)
+
+### Next session recommendation (scope-discovery)
+
+- Resume: Phase 13 Task 2 (implement-loop refusal gate) — Phase 13 Task 1 landed + reviewed + on `feature/scope-discovery`. Task 2 augments `/dw-lifecycle:implement` to refuse advancing while any feature audit-log has `Status: open`. Plan in the workplan; the `open-findings-gate.ts` pure-function + the `subcommands/implement.ts` wiring + the refusal-message tests.
+- Triage: #360, #359, #358, #357, #356 (the five new GH issues from this session — all `graphical-entries`/hygiene scope, not `scope-discovery` directly; route to those features' workplans when the operator picks them up).
+- Address TBD markers: line 700 (Phase 12 out-of-scope — legitimate scope-cut; leave); line 860 (Phase 13 Task 6 Step 1 defer marker is intentional task-step text, not a scope deferral); line 868 (Phase 13 out-of-scope — legitimate scope-cut; leave). All three are workplan section structure, not actual TBD residue — no action needed.
+
+### Hygiene observations (stale worktrees)
+
+- worktree `/Users/orion/work/deskwork-work/deskwork-dw-lifecycle` `feature/deskwork-dw-lifecycle` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/deskwork-triage` `feature/deskwork-triage` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/scope-discovery` `feature/scope-discovery` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/studio-bridge` `feature/studio-bridge` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/visual-verification-gate` `feature/visual-verification-gate` — 3 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: Phase 11 Task 5 — extend `scripts/smoke-hygiene.sh` with a worktree-verbs round-trip fixture. Then Task 6 (operator-driven dogfood batched-proposal cycle).
+- Triage: #356 (Phase 11 umbrella); #357/#358 (calendarPath + Zod-validation drift in core); #359/#360 (graphical-entries cascade perf + provenance). The four unrelated bugs were filed by other tooling during this session and need their own dispositions.
+- Address TBD markers: lines 335 + 336 are Out-of-Scope annotations from the Phase 11 PRD — false-positive from the scanner, leave as-is.
+- Dismantle stale worktrees: 5 candidates surfaced — `deskwork-dw-lifecycle`, `deskwork-triage`, `scope-discovery`, `studio-bridge`, `visual-verification-gate`. The Phase 11 verbs are now shipped on main; the operator can run `dw-lifecycle dismantle-worktrees propose` followed by per-worktree disposition decisions then `apply` to burn this set down. `studio-bridge` is the operator's explicit "leave parked until security gap closes" exception per `agent-discipline.md` § "studio-bridge" — set decision `skip` on that one.

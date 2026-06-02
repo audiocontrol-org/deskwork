@@ -37,6 +37,14 @@ describe('validateAll - frontmatter-sidecar', () => {
   beforeEach(async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
     await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
+    await writeFile(
+      join(projectRoot, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: { main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' } },
+        defaultSite: 'main',
+      }),
+    );
   });
   afterEach(async () => {
     await rm(projectRoot, { recursive: true, force: true });

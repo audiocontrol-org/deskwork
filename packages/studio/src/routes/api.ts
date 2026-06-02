@@ -79,7 +79,7 @@ const UUID_RE =
  */
 function readValidEntryId(c: Context): { entryId: string } | Response {
   const entryId = c.req.param('entryId');
-  if (!UUID_RE.test(entryId)) {
+  if (!entryId || !UUID_RE.test(entryId)) {
     return c.json({ error: `malformed entryId: ${entryId}` }, 400);
   }
   return { entryId };
@@ -92,7 +92,7 @@ function readValidEntryId(c: Context): { entryId: string } | Response {
  */
 function readValidCommentId(c: Context): { commentId: string } | Response {
   const commentId = c.req.param('commentId');
-  if (!UUID_RE.test(commentId)) {
+  if (!commentId || !UUID_RE.test(commentId)) {
     return c.json({ error: `malformed commentId: ${commentId}` }, 400);
   }
   return { commentId };

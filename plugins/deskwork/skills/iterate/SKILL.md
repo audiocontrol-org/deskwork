@@ -100,3 +100,15 @@ Per Phase 8 Step 8.1.2's schema tightening, the `reason` field is **required** f
 Legacy dispositions files (or omitted-`reason` shapes) where `addressed` lacks a non-empty `reason` are **REFUSED by the CLI at parse time** (exit 2) — the helper exits with a clear error naming the offending `commentId` and showing the expected shape before any journal-write runs. Existing reasonless `addressed` annotations already in the journal (pre-Step-8.1.2 data) continue to be read; the studio renders them with "no reason recorded" text near the stamp. The contract is forward-only — every NEW iteration must supply a reason.
 
 Use the Write tool to create the file before invoking the helper.
+
+## Composed disciplines
+
+Composed from `.claude/rules/agent-discipline.md` (feature `decompose-agent-discipline`); the rules file now points here.
+
+### Capture mode vs scope mode
+
+When rewriting the content file to address marginalia on a spec / PRD / design doc, stay in **capture mode**: record everything the operator's notes imply, including edge cases and cross-cut impacts. Do NOT insert scope-cuts (*"YAGNI,"* *"deferred,"* *"not in v1,"* *"out of scope for now"*) the operator didn't ask for — scoping is a separate, explicit, operator-driven pass. Write open questions into the doc rather than omitting them. (Full discipline: `plugins/dw-lifecycle/skills/define/SKILL.md` § Composed discipline.)
+
+### Empty revisions beat missed changes
+
+When the operator invokes iterate, **run it as asked** — don't pre-decide "this would be a no-op, so I'll skip it." Capture operations are append-only and disk-cheap; an empty revision is bounded journal noise, while a missed change is unbounded (your working assumption about disk state diverges from reality and every later operation builds on the wrong baseline). Even when your own judgment says "disk hasn't changed since last iterate; no point," run it anyway — cheap insurance. Still surface what happened (e.g. "revision 6 — 0 addressed comments, no disk delta"). Operator's framing: *"I'd rather have empty revisions than miss changes."*

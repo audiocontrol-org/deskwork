@@ -37,7 +37,7 @@ Operators can override built-in studio templates and doctor rules without forkin
 
 ```
 /deskwork:customize templates dashboard
-/deskwork:customize doctor missing-frontmatter-id
+/deskwork:customize doctor orphan-frontmatter-id
 ```
 
 See the customize skill for the full list of overridable names and the safety rules.
@@ -99,7 +99,7 @@ Examples:
 ```sh
 deskwork doctor                                  # audit-only across every site
 deskwork doctor --site main                      # audit one site
-deskwork doctor --fix=missing-frontmatter-id     # interactive backfill of ids
+deskwork doctor --fix=orphan-frontmatter-id      # resolve files whose id has no calendar match
 deskwork doctor --fix=all --yes                  # non-interactive repair (skips ambiguous prompts)
 ```
 
@@ -285,7 +285,7 @@ The explicit `/plugin install` re-fetches the payload at the current catalog ver
 /plugin install dw-lifecycle@deskwork
 ```
 
-**To pin to a stable release**, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`.
+**To pin to a stable release**, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#<tag>` (pick a tag from the [releases page](https://github.com/audiocontrol-org/deskwork/releases)).
 
 See the [root README § Getting updates](../../README.md#getting-updates) for the full update flow including filesystem layout, registry inspection, and the rationale for the two-step model.
 

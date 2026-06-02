@@ -16,10 +16,15 @@
  *   deskwork outline draft-me --author "Jane"
  */
 
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { isRetired, printRetiredError } from './commands/retired.ts';
 
 const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promise<void> }>> = {
   add: () => import('./commands/add.ts'),
+  annotations: () => import('./commands/annotations.ts'),
   approve: () => import('./commands/approve.ts'),
   block: () => import('./commands/block.ts'),
   cancel: () => import('./commands/cancel.ts'),
@@ -44,6 +49,15 @@ const rawArgv = process.argv.slice(3);
 if (!subcommand || subcommand === 'help' || subcommand === '--help') {
   printUsage();
   process.exit(subcommand ? 0 : 2);
+}
+
+// Version reporting (#256) — handled before the subcommand parser so
+// `--version`, `-v`, and the `version` subcommand all answer "which
+// version of the suite am I running?" instead of failing with "unknown
+// subcommand". Lockstep versioning means cli + core share a version.
+if (subcommand === '--version' || subcommand === '-v' || subcommand === 'version') {
+  printVersion();
+  process.exit(0);
 }
 
 // Retired verbs (v0.11.0): print a stable migration error before the
@@ -81,6 +95,35 @@ function pathLike(s: string): boolean {
   return s === '.' || s.startsWith('/') || s.startsWith('./') || s.startsWith('../');
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** Read a package.json `version` field without `any` / `as` casts. Throws if absent. */
+function readPackageVersion(pkgJsonPath: string): string {
+  const parsed: unknown = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
+  if (!isRecord(parsed) || typeof parsed.version !== 'string') {
+    throw new Error(`no string "version" field in ${pkgJsonPath}`);
+  }
+  return parsed.version;
+}
+
+/**
+ * Print the running suite versions. @deskwork/cli is read from this
+ * package's own package.json (always present, sibling of dist/); core is
+ * resolved via its `./package.json` export (declared in core's exports
+ * map). @deskwork/studio is not a dependency of the CLI, so it is not
+ * reachable here and is intentionally omitted.
+ */
+function printVersion(): void {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const cliVersion = readPackageVersion(join(here, '..', 'package.json'));
+  process.stdout.write(`@deskwork/cli  ${cliVersion}\n`);
+  const require = createRequire(import.meta.url);
+  const coreVersion = readPackageVersion(require.resolve('@deskwork/core/package.json'));
+  process.stdout.write(`@deskwork/core ${coreVersion}\n`);
+}
+
 function printUsage(): void {
   const out = subcommand ? process.stdout : process.stderr;
   out.write('Usage: deskwork <subcommand> [args...]\n\n');
@@ -99,6 +142,7 @@ function printUsage(): void {
   out.write('  shortform-start enqueue a shortform draft for review\n');
   out.write('  distribute      record a posted shortform URL on the calendar\n\n');
   out.write('Maintenance:\n');
+  out.write('  annotations     list an entry\'s comments + dispositions (pending by default)\n');
   out.write('  doctor          audit / repair calendar + sidecar + frontmatter\n');
   out.write('  customize       copy a plugin default into .deskwork/<category>/<name>.ts\n');
   out.write('  group           CRUD on group entries (list, show, create, update,\n');

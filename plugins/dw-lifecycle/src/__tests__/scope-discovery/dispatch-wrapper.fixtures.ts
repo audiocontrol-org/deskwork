@@ -324,6 +324,14 @@ const REGEX_SAMPLE_REASONS: ReadonlyArray<string> = [
   'in a later pass',
   'filed as a follow-up',
   'follow-up issue',
+  // Phase 14 Task 2 — comment markers (case-sensitive).
+  'TODO add validation',
+  'FIXME this parser bug',
+  'XXX needs proper handling',
+  // Ambiguous nouns require deferral context.
+  'placeholder until F3',
+  'left a placeholder pending the contract decision',
+  'defer to v2',
 ];
 
 if (REGEX_SAMPLE_REASONS.length !== FORBIDDEN_DEFERRAL_REGEXES.length) {

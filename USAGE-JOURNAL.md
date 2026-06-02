@@ -13,6 +13,20 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-06 (studio-bridge brainstorming + feature bootstrap): design-only session — no plugin usage exercised
+
+**Arc:** Single-session brainstorming of a new exploratory feature (studio ↔ Claude Code bridge — control channel from studio web UI to local CC session) followed by feature scaffolding on its own branch + worktree. No deskwork plugin or studio usage this session — pure design + documentation.
+
+**Should plugin usage have been exercised?** Possibly. The studio-bridge design assumes things about the existing studio that I took on documentation-trust rather than verifying live:
+
+- That the studio's existing mobile UX (review surface, scrapbook, dashboard) is usable on a phone over Tailscale magic-DNS without significant friction. **insight** — the bridge's whole motivation is "use the studio on phone for editing while talking to claude for commands." If the studio's existing mobile UX has structural issues (touch-target sizes, scroll containers, viewport meta, etc.), the bridge layers complexity on top of an unstable foundation. A 10-minute live walk on a phone before designing the bridge would have surfaced any blockers; I didn't do that.
+- That the existing decision-strip's `copyOrShowFallback` pattern works correctly in mobile browsers (clipboard API quirks across iOS Safari, embedded Tailscale browsers, etc.). The bridge's "fall back to clipboard when bridge offline" assumption depends on this being functional. Not verified this session.
+- That the studio's startup banner prints the Tailscale magic-DNS URL the way `agent-discipline.md` documents — a recurring landmine the operator has called out before. Not freshly verified this session.
+
+**friction (potential)** — the bridge's Phase 8 validation gate (*"real creative-writing session on writingcontrol from a phone, no terminal fallback"*) is the first time these assumptions get tested in the actual mobile context. If the existing studio's mobile UX has friction, Phase 8 will combine *validation-of-the-bridge* with *discovery-of-pre-existing-mobile-friction*, muddying the signal. Better hygiene next session: one short phone walk against the live studio (writingcontrol or this project) BEFORE Phase 8, to baseline the existing mobile experience independently of bridge work.
+
+The design conversation itself is captured canonically in `DEVELOPMENT-NOTES.md`; nothing else to add in the usage-journal sense.
+
 ## 2026-05-12 (Task 2.2 v7 architecture): driving the studio against the live workspace to walk 7 cross-bar mockup iterations + 4 implementation cycles — agent ran phone-viewport Playwright probes while operator viewed mockups; one HMR regression caught only by operator-side browser fall-back
 
 **Arc:** Session was a mix of design-time mockup review (where the operator drove the studio in browser as the picking surface) and implementation-time live probing (where the agent ran headless Playwright against the workspace dev studio at phone viewport, 390×844). The picking phase was operator-led: 7 cross-bar mockup iterations + 2 desk-states a11y-audit revisions, all served from `/static/mockups/` on the workspace dev studio. The implementing phase was agent-led: each step's commit verified via Playwright at the magic-DNS Tailscale URL, with operator screenshots arriving when the agent's probe missed something.

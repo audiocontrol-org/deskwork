@@ -580,7 +580,9 @@ describe('buildContentTree — frontmatter id binding (Phase 19c)', () => {
     });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('my-post');
-    expect(warnings[0]).toMatch(/doctor/);
+    // The remedy now points at ingest --apply (Phase 30 / Issue #219):
+    // the retired missing-frontmatter-id doctor rule no longer binds ids.
+    expect(warnings[0]).toMatch(/ingest --apply/);
 
     expect(projects).toHaveLength(1);
     const node = findNode(projects[0], 'my-post');

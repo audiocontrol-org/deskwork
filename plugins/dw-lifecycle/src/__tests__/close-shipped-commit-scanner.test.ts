@@ -121,14 +121,14 @@ describe('extractReferencesFromCommit', () => {
     return { sha: 'aaaaaaa', subject, body };
   }
 
-  it('extracts plain #NNN references', () => {
+  it('does NOT extract plain #NNN references (no fix verb)', () => {
+    // Per Phase 13 / #366 — bare `#N` mentions are references, not fix-
+    // shipped signals. The scanner only honors GitHub's own auto-close
+    // grammar (Closes / Fixes / Resolves). Adopters who want the looser
+    // behavior would compose their own walker on top of the raw commit
+    // stream.
     const refs = extractReferencesFromCommit(mkCommit('see #42'));
-    expect(refs.length).toBe(1);
-    const first = refs[0];
-    expect(first).toBeDefined();
-    if (first === undefined) return;
-    expect(first.issue).toBe(42);
-    expect(first.verb).toBe('plain');
+    expect(refs.length).toBe(0);
   });
 
   it('extracts Closes #NNN as closes (case-insensitive)', () => {
@@ -162,30 +162,31 @@ describe('extractReferencesFromCommit', () => {
     );
   });
 
-  it('extracts Refs as refs verb', () => {
+  it('does NOT extract `Refs #NN` references (Refs is a citation, not a fix verb)', () => {
+    // Per Phase 13 / #366 — `Refs:` cites an issue without claiming the
+    // commit fixed it. close-shipped is about fix-shipping evidence, not
+    // mere citation. Dropped along with `plain` and `parens`.
     const refs = extractReferencesFromCommit(mkCommit('docs: note\n\nRefs #88'));
-    expect(refs.length).toBe(1);
-    const first = refs[0];
-    expect(first).toBeDefined();
-    if (first === undefined) return;
-    expect(first.issue).toBe(88);
-    expect(first.verb).toBe('refs');
+    expect(refs.length).toBe(0);
   });
 
-  it('extracts (#NNN) at end of subject as parens verb', () => {
+  it('does NOT extract `(#NNN)` at end of subject (GitHub-PR-merge marker, not a fix signal)', () => {
+    // Per Phase 13 / #366 — the squash-merge convention `(#PR-NUMBER)` at
+    // the end of a subject names the PR that landed the commit, not an
+    // issue the commit fixed. Adopters who want PR-number tracking would
+    // compose a separate walker.
     const refs = extractReferencesFromCommit(
       mkCommit('feat(area): subject (#7)'),
     );
-    expect(refs.length).toBe(1);
-    const first = refs[0];
-    expect(first).toBeDefined();
-    if (first === undefined) return;
-    expect(first.issue).toBe(7);
-    expect(first.verb).toBe('parens');
+    expect(refs.length).toBe(0);
   });
 
-  it('picks the strongest verb when the same issue appears multiple times', () => {
-    // Plain reference in subject + Closes in body -> closes wins.
+  it('surfaces only the fix-verb match when the same issue also appears as a bare mention', () => {
+    // Bare `#50` in subject is dropped post-Phase-13; the `Closes #50`
+    // in the body is the only fix-shipping signal. Pre-Phase-13 this
+    // exercised the strongest-verb-wins selection between `plain` and
+    // `closes`; post-Phase-13 the bare mention is silently ignored and
+    // only the verb-prefixed match surfaces.
     const commit = mkCommit('mention #50 in passing', 'Closes #50');
     const refs = extractReferencesFromCommit(commit);
     expect(refs.length).toBe(1);
@@ -205,26 +206,171 @@ describe('extractReferencesFromCommit', () => {
     expect(refs.length).toBe(0);
   });
 
-  it('extracts real refs when the URL also appears', () => {
+  it('extracts only the fix-verb refs when the URL + parens marker also appear', () => {
+    // Subject parens marker `(#42)` dropped (Phase 13). URL stripped pre-
+    // match. Body's `Closes #43` survives. Pre-fix this returned [42, 43];
+    // post-fix [43] is the correct fix-shipping signal set.
     const commit = mkCommit(
       'feat: subject (#42)',
       'Closes #43.\n\nSee https://github.com/owner/repo/pull/100 for context.',
     );
     const refs = extractReferencesFromCommit(commit);
     const issues = refs.map((r) => r.issue).sort((a, b) => a - b);
-    expect(issues).toEqual([42, 43]);
+    expect(issues).toEqual([43]);
   });
 
-  it('handles multiple distinct issues in one commit', () => {
+  it('extracts only the explicitly-verb-prefixed issues from comma-separated lists', () => {
+    // Pre-fix, `Closes #10, #11, #12.` matched all three (via plain). Per
+    // Phase 13 / #366, only `#10` has the Closes verb prefix; #11 and #12
+    // are bare mentions and get dropped. This aligns with GitHub's own
+    // auto-close grammar, which requires the verb to precede each issue.
     const commit = mkCommit('chore: subject', 'Closes #10, #11, #12.');
     const refs = extractReferencesFromCommit(commit);
     const issues = refs.map((r) => r.issue).sort((a, b) => a - b);
-    expect(issues).toEqual([10, 11, 12]);
+    expect(issues).toEqual([10]);
   });
 
   it('ignores non-digit "#word" shapes', () => {
     const refs = extractReferencesFromCommit(mkCommit('docs: header #foo bar'));
     expect(refs.length).toBe(0);
+  });
+
+  // --- Phase 13 Task 1 acceptance cases (per workplan + #366) ---
+
+  it('Phase 13 (a): subject with explicit Closes verb surfaces the ref', () => {
+    // `feat: close #501 — actually fixes thing` → ref #501 (Closes verb).
+    const refs = extractReferencesFromCommit(
+      mkCommit('feat: close #501 — actually fixes thing'),
+    );
+    expect(refs.length).toBe(1);
+    const first = refs[0];
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    expect(first.issue).toBe(501);
+    expect(first.verb).toBe('closes');
+  });
+
+  it('Phase 13 (b): body with Fixes verb surfaces the ref', () => {
+    // `Fixes #502\n\nLonger body...` → ref #502 (Fixes verb).
+    const refs = extractReferencesFromCommit(
+      mkCommit('feat(x): add new thing', 'Fixes #502\n\nLonger body.'),
+    );
+    expect(refs.length).toBe(1);
+    const first = refs[0];
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    expect(first.issue).toBe(502);
+    expect(first.verb).toBe('fixes');
+  });
+
+  it('Phase 13 (c): subject with bare mention (no fix verb) does NOT surface', () => {
+    // `feat(x): scoping #503 into workplan` → no ref (bare mention).
+    // Pre-fix this would have matched #503 as `plain`. Post-fix the bare
+    // mention is correctly dropped because it doesn't claim a fix.
+    const refs = extractReferencesFromCommit(
+      mkCommit('feat(x): scoping #503 into workplan'),
+    );
+    expect(refs.length).toBe(0);
+  });
+
+  it('Phase 13 (d): PR-merge commit subject does NOT surface any ref', () => {
+    // `Merge pull request #504 from foo/bar` → no PR-number ref surfaces.
+    // The PR-merge convention is structurally meaningless as a fix-
+    // shipped signal — the actual fix commits travel inside the merge.
+    // The unconditional subject filter drops the whole commit's
+    // contribution regardless of any body fix-keyword references too,
+    // because merge-commit bodies typically restate the PR description
+    // and the underlying squashed commits are the authoritative source.
+    const refs = extractReferencesFromCommit(
+      mkCommit('Merge pull request #504 from foo/bar'),
+    );
+    expect(refs.length).toBe(0);
+  });
+
+  // --- Phase 14 Task 1: configurable end-of-subject parens (#369) ---
+
+  it('Phase 14 (a): end-of-subject `(#42)` with knob=true surfaces #42 as parens verb', () => {
+    // The deskwork project's commit-message convention uses end-of-subject
+    // `(#NNN)` to name fix-shipping commits. Adopters with this convention
+    // opt in via `.dw-lifecycle/close-shipped-config.yaml`. The knob ONLY
+    // re-enables the parens shape — body parens and mid-subject parens
+    // stay dropped regardless.
+    const refs = extractReferencesFromCommit(
+      mkCommit('feat(area): subject (#42)'),
+      { treatEndOfSubjectParensAsFixMarker: true },
+    );
+    expect(refs.length).toBe(1);
+    const first = refs[0];
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    expect(first.issue).toBe(42);
+    expect(first.verb).toBe('parens');
+  });
+
+  it('Phase 14 (b): end-of-subject `(#42)` with knob=false does NOT surface (Phase 13 strict)', () => {
+    const refs = extractReferencesFromCommit(
+      mkCommit('feat(area): subject (#42)'),
+      { treatEndOfSubjectParensAsFixMarker: false },
+    );
+    expect(refs.length).toBe(0);
+  });
+
+  it('Phase 14 (b2): omitted config still applies Phase 13 strict behavior (back-compat)', () => {
+    // No config argument at all — preserves the pre-Phase-14 call sites
+    // until they're threaded through; default is the strict Phase 13
+    // behavior so nothing surfaces.
+    const refs = extractReferencesFromCommit(mkCommit('feat(area): subject (#42)'));
+    expect(refs.length).toBe(0);
+  });
+
+  it('Phase 14 (c): mid-subject `(#42)` does NOT surface regardless of knob', () => {
+    // Anchor is end-of-subject only; back-fill / cite shapes that put
+    // parens mid-subject stay dropped under both modes.
+    const onWithKnob = extractReferencesFromCommit(
+      mkCommit('feat(area): subject (#42) trailing text'),
+      { treatEndOfSubjectParensAsFixMarker: true },
+    );
+    expect(onWithKnob.length).toBe(0);
+    const offWithKnob = extractReferencesFromCommit(
+      mkCommit('feat(area): subject (#42) trailing text'),
+      { treatEndOfSubjectParensAsFixMarker: false },
+    );
+    expect(offWithKnob.length).toBe(0);
+  });
+
+  it('Phase 14 (d): body `Closes #43` + end-of-subject `(#42)` with knob=true surfaces both', () => {
+    // Body fix-keyword still works; the parens knob adds the subject ref
+    // on top. Each issue gets its own strongest-verb record.
+    const commit = mkCommit('feat(area): subject (#42)', 'Closes #43.');
+    const refs = extractReferencesFromCommit(commit, {
+      treatEndOfSubjectParensAsFixMarker: true,
+    });
+    const issues = refs.map((r) => r.issue).sort((a, b) => a - b);
+    expect(issues).toEqual([42, 43]);
+    const r42 = refs.find((r) => r.issue === 42);
+    const r43 = refs.find((r) => r.issue === 43);
+    expect(r42?.verb).toBe('parens');
+    expect(r43?.verb).toBe('closes');
+  });
+
+  it('Phase 13 (e): markdown link `[#505](https://...)` paired with `Resolves #505` surfaces #505', () => {
+    // Markdown link `[#505](https://...)` is a body citation. The Resolves
+    // verb elsewhere in the body is what claims the fix-shipped signal.
+    // URL gets stripped pre-match; the bare `[#505]` token alone would
+    // have matched `plain` (now dropped); `Resolves #505` matches the
+    // fix-verb pattern and surfaces #505.
+    const refs = extractReferencesFromCommit(
+      mkCommit(
+        'feat(x): subject',
+        'See [#505](https://github.com/owner/repo/issues/505) for context.\n\nResolves #505',
+      ),
+    );
+    expect(refs.length).toBe(1);
+    const first = refs[0];
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    expect(first.issue).toBe(505);
+    expect(first.verb).toBe('resolves');
   });
 });
 

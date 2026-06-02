@@ -128,6 +128,56 @@ describe('runPreflight', () => {
     }
   });
 
+  it('passes tag-doesnotexist when runGit returns empty on failure (swallowing variant)', () => {
+    // Regression for the Phase 11 dogfood failure: `dismantle-worktrees
+    // apply` calls archive-branch with `runGitStdout` from
+    // subcommands/lib/process-probes.ts. That runner SWALLOWS non-zero
+    // exits and returns the empty string instead of throwing. The
+    // pre-fix preflight assumed an exception-on-failure runGit and
+    // false-failed every "tag does not exist" probe (rev-parse returns
+    // empty → no throw → `exists = true` → tag-exists thrown). The fix
+    // checks the returned value too. This test exercises the swallow-
+    // and-return-empty contract end-to-end.
+    const { runGit } = makeStub([
+      {
+        match: (a) => a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/heads/') === true,
+        respond: () => 'abc\n',
+      },
+      {
+        match: (a) => a[0] === 'worktree',
+        respond: () => '',
+      },
+      {
+        match: (a) =>
+          a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/tags/') === true,
+        // Swallowing runGit: returns empty string instead of throwing
+        // when git rev-parse exits non-zero on a missing tag.
+        respond: () => '',
+      },
+      {
+        match: (a) => a[0] === 'rev-parse' && a.length === 2,
+        respond: () => 'shashasha\n',
+      },
+      {
+        match: (a) => a[0] === 'log',
+        respond: () => 'subject\n',
+      },
+      {
+        match: (a) => a[0] === 'rev-list' && a[1] === '--count',
+        respond: () => '5\n',
+      },
+    ]);
+    expect(() =>
+      runPreflight({
+        branch: 'feature/parked',
+        tagName: 'archived/feature-parked-2026-05-29',
+        force: false,
+        compareRef: 'origin/main',
+        runGit,
+      }),
+    ).not.toThrow();
+  });
+
   it('throws tag-exists when the candidate tag already exists', () => {
     const { runGit } = makeStub([
       {

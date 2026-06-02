@@ -48,6 +48,14 @@ const STATUS_FIXED_PATTERN = /^Status:\s*fixed-([0-9a-f]{7,40})\b/im;
 // one Finding-ID line to the next (or to EOF).
 const FINDING_ID_PATTERN = /^Finding-ID:\s+([A-Z0-9\-]+)\s*$/im;
 
+// Phase 14 / #369 Task 2: optional per-entry `Tracks-Issue: NNN` field.
+// When present, the walker treats this as the canonical issue for the
+// entry and skips body-scrape — preserves the entry's intent over any
+// prose-cited fix-keyword text (e.g. `Closes #50` inside a test-fixture
+// description). When absent, the walker falls back to body scrape so
+// pre-Phase-14 entries keep working.
+const TRACKS_ISSUE_PATTERN = /^Tracks-Issue:\s+(\d+)\s*$/im;
+
 // Issue-number extraction patterns. Closes/Fixes/Resolves/Refs win
 // over a plain inline `#NNN`. Each captures one named group `n`.
 const ISSUE_PATTERNS: readonly RegExp[] = [
@@ -64,6 +72,17 @@ interface ParsedEntry {
   readonly heading: string;
   readonly bodyText: string;
 }
+
+// Phase 14 / #369 Task 2: entries can be marked at either level-3
+// (`### entry-name`) or level-2 (`## AUDIT-NNN — ...`) headings. The
+// hygiene feature's audit-log uses `## AUDIT-...` directly under the
+// canonical-queue-queries header; the scope-discovery audit-log uses
+// `## DATE` parent + `### entry-name` children. Both shapes are now
+// recognized as entry boundaries. The splitter still treats every
+// recognized heading as a hard reset of the buffer so per-entry
+// `Status:` / `Finding-ID:` / `Tracks-Issue:` lines stay scoped to
+// their entry, not bleeding across multi-entry files.
+const ENTRY_HEADING_RE = /^(?:###?\s+)(.+)$/;
 
 function splitIntoEntries(content: string): readonly ParsedEntry[] {
   const lines = content.split('\n');
@@ -82,9 +101,10 @@ function splitIntoEntries(content: string): readonly ParsedEntry[] {
   }
 
   for (const line of lines) {
-    if (line.startsWith('### ')) {
+    const headingMatch = ENTRY_HEADING_RE.exec(line);
+    if (headingMatch && headingMatch[1] !== undefined) {
       flush();
-      currentHeading = line.slice(4).trim();
+      currentHeading = headingMatch[1].trim();
       currentFindingId = null;
       buffer = [line];
       continue;
@@ -100,6 +120,15 @@ function splitIntoEntries(content: string): readonly ParsedEntry[] {
 }
 
 function extractIssueFromEntry(bodyText: string): number | null {
+  // Phase 14 / #369 Task 2: explicit `Tracks-Issue:` field wins. When
+  // present, body fix-keyword text (which may be prose-cited as a code
+  // example) is ignored. When absent, fall back to body scrape so
+  // pre-Phase-14 entries keep working.
+  const tracksMatch = TRACKS_ISSUE_PATTERN.exec(bodyText);
+  if (tracksMatch && tracksMatch[1]) {
+    const n = Number.parseInt(tracksMatch[1], 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
   return extractIssueFromBody(bodyText, ISSUE_PATTERNS);
 }
 
@@ -187,4 +216,5 @@ export const __testing = {
   parseAuditLog,
   isReachable,
   STATUS_FIXED_PATTERN,
+  TRACKS_ISSUE_PATTERN,
 } as const;

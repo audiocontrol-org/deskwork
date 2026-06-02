@@ -1,0 +1,25 @@
+{
+  "id": "38410ae2-0e2a-4d09-84b4-f441b38c1e59",
+  "timestamp": "2026-05-30T18:34:57.156Z",
+  "event": "ingest",
+  "slug": "decompose-agent-discipline/prd",
+  "entryId": "38410ae2-0e2a-4d09-84b4-f441b38c1e59",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/prd.md",
+  "frontmatterSnapshot": {
+    "slug": "decompose-agent-discipline",
+    "title": "decompose-agent-discipline",
+    "targetVersion": "1.0",
+    "date": "2026-05-30",
+    "parentIssue": null,
+    "deskwork": {
+      "id": "38410ae2-0e2a-4d09-84b4-f441b38c1e59"
+    }
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}

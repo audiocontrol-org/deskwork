@@ -21,6 +21,10 @@ The helper creates the parent issue, then one issue per phase (referencing the p
 
 4. Report: parent issue URL/number, list of phase issue URLs/numbers.
 
+## Composed discipline: orchestrator → implementation handoff
+
+This is the last orchestrator-session step. After filing issues, the closing report names the feature worktree path and states that implementation happens in a **separate session** opened against that worktree (`/dw-lifecycle:implement`) — NOT this orchestrator session. The two-session split keeps orchestration context out of implementation. Operator's framing: *"you are the orchestrator, not the implementer."* (Composed from `.claude/rules/agent-discipline.md`, feature `decompose-agent-discipline`.)
+
 ## Error handling
 
 - **`gh` CLI not authenticated.** Surface the gh error verbatim. Operator runs `gh auth login` and retries.

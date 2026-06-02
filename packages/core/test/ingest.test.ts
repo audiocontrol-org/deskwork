@@ -846,3 +846,42 @@ describe('candidateToEntry', () => {
     expect(entry.datePublished).toBeUndefined();
   });
 });
+
+describe('discoverIngestCandidates — title derivation (#64)', () => {
+  it('derives title from the first markdown heading when frontmatter has no title', () => {
+    write('posts/prd.md', '## PRD: deskwork-plugin\n\nbody text.\n');
+    const r = discoverIngestCandidates([join(project, 'posts/prd.md')], baseOpts());
+    expect(r.candidates).toHaveLength(1);
+    expect(r.candidates[0].title).toBe('PRD: deskwork-plugin');
+  });
+
+  it('prefers a frontmatter title over a body heading', () => {
+    write('posts/p2.md', '---\ntitle: From Frontmatter\n---\n\n# A Heading\n\nbody.\n');
+    const r = discoverIngestCandidates([join(project, 'posts/p2.md')], baseOpts());
+    expect(r.candidates[0].title).toBe('From Frontmatter');
+  });
+
+  it('falls back to a humanized slug when neither frontmatter title nor a heading exists', () => {
+    write('posts/no-heading.md', 'just body text, no heading here.\n');
+    const r = discoverIngestCandidates([join(project, 'posts/no-heading.md')], baseOpts());
+    expect(r.candidates[0].title).toBe('No Heading');
+  });
+
+  it('ignores headings inside fenced code blocks', () => {
+    write('posts/fenced.md', '```\n# Fake Heading\n```\n\n## Real Heading\n\nbody.\n');
+    const r = discoverIngestCandidates([join(project, 'posts/fenced.md')], baseOpts());
+    expect(r.candidates[0].title).toBe('Real Heading');
+  });
+
+  it('does not treat a 4-space-indented #-line (indented code) as a heading', () => {
+    write('posts/indented.md', '    # Indented Not A Heading\n\nbody.\n');
+    const r = discoverIngestCandidates([join(project, 'posts/indented.md')], baseOpts());
+    expect(r.candidates[0].title).toBe('Indented');
+  });
+
+  it('does not handle Setext headings (ATX only) — falls back to the slug', () => {
+    write('posts/setext.md', 'My Setext Title\n===============\n\nbody.\n');
+    const r = discoverIngestCandidates([join(project, 'posts/setext.md')], baseOpts());
+    expect(r.candidates[0].title).toBe('Setext');
+  });
+});

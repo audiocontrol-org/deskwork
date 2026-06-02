@@ -27,9 +27,9 @@
  * Exit codes (Issue #44, Phase 22):
  *   0  Audit clean. OR --fix succeeded for every applicable finding.
  *      "Applicable" here means: anything that wasn't skipped because
- *      a prerequisite outside doctor's scope hasn't happened yet (e.g.
- *      the body file hasn't been scaffolded, so missing-frontmatter-id
- *      can't bind).
+ *      a prerequisite outside doctor's scope hasn't happened yet (a
+ *      rule can defer with `skipReason: 'prerequisite-missing'` when
+ *      the operator's next action is a lifecycle step, not a doctor fix).
  *   1  Findings present (audit-only mode). OR --fix encountered real
  *      follow-ups: ambiguous cases requiring interactive resolution,
  *      schema rejections needing the operator to patch the host
@@ -173,9 +173,9 @@ export async function run(argv: string[]): Promise<void> {
 
     // Exit-code logic (Issue #44):
     //   - applied → success.
-    //   - skipped because the prerequisite isn't met (e.g. no body file
-    //     yet for missing-frontmatter-id) → success. The operator's
-    //     next action is `/deskwork:outline`, not "look at doctor."
+    //   - skipped because the prerequisite isn't met (a rule reported
+    //     `prerequisite-missing`) → success. The operator's next action
+    //     is a lifecycle step, not "look at doctor."
     //   - skipped because the operator chose "leave as-is" on an orphan
     //     prompt → success. The operator made a choice; respect it.
     //   - everything else (ambiguous, schema-rejected, editorial-

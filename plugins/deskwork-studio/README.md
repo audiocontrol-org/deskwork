@@ -51,7 +51,7 @@ Overrides:
 
 | Goal | Flag |
 |---|---|
-| Loopback only (skip Tailscale even if running) | `--no-tailscale` |
+| Loopback only (non-interactive smokes / CI) | `DESKWORK_STUDIO_NO_TAILSCALE=1` env var |
 | Bind ONLY to a specific address (LAN/Wi-Fi opt-in) | `--host 0.0.0.0` (or a specific IP) |
 
 The studio has **no authentication** and **no rate-limiting**. Tailscale is treated as a trusted network. `--host` overrides print a loud warning when bound beyond loopback.
@@ -70,4 +70,4 @@ The studio is **dev-only** — no auth, localhost binding only.
 
 ### Updates + pinning
 
-Tracks the default branch of `audiocontrol-org/deskwork`. Update with `/plugin marketplace update deskwork && /reload-plugins`. Pin to a tagged release via `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. Full story in the [root README](../../README.md#getting-updates).
+Tracks the default branch of `audiocontrol-org/deskwork`. Update with `/plugin marketplace update deskwork && /reload-plugins`. Pin to a tagged release via `/plugin marketplace add audiocontrol-org/deskwork#<tag>` (pick a tag from the [releases page](https://github.com/audiocontrol-org/deskwork/releases)). Full story in the [root README](../../README.md#getting-updates).

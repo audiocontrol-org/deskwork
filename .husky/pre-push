@@ -24,4 +24,23 @@
 # release run 25126363101).
 
 set -eu
+
+# >>> dw-lifecycle scope-discovery pre-push gate >>>
+# Phase 17 Task 5 (#383's sibling) — pre-push gate that refuses pushes
+# containing commits with no matching audit-barrage hook-run entry.
+# Catches --no-verify bypasses of the commit-msg gate.
+
+DW_CLI="npx tsx plugins/dw-lifecycle/src/cli.ts"
+$DW_CLI check-implement-hook-coverage
+gate_exit=$?
+
+if [ "$gate_exit" -ne 0 ]; then
+  echo "" >&2
+  echo "pre-push: dw-lifecycle check-implement-hook-coverage refused this push." >&2
+  echo "  See stderr above for the uncovered commits + cure." >&2
+  echo "" >&2
+  exit 1
+fi
+
 exit 0
+# <<< dw-lifecycle scope-discovery pre-push gate <<<

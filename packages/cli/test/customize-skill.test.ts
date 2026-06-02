@@ -81,19 +81,19 @@ describe('deskwork customize', () => {
   });
 
   it('copies a doctor rule default into .deskwork/doctor/<name>.ts', () => {
-    const res = run([project, 'doctor', 'missing-frontmatter-id']);
+    const res = run([project, 'doctor', 'orphan-frontmatter-id']);
     expect(res.code).toBe(0);
-    expect(res.stdout).toMatch(/Customized doctor\/missing-frontmatter-id/);
+    expect(res.stdout).toMatch(/Customized doctor\/orphan-frontmatter-id/);
 
     const dest = join(
       project,
       '.deskwork',
       'doctor',
-      'missing-frontmatter-id.ts',
+      'orphan-frontmatter-id.ts',
     );
     expect(existsSync(dest)).toBe(true);
     const source = readFileSync(
-      join(doctorRulesDir, 'missing-frontmatter-id.ts'),
+      join(doctorRulesDir, 'orphan-frontmatter-id.ts'),
       'utf-8',
     );
     expect(readFileSync(dest, 'utf-8')).toBe(source);
@@ -211,7 +211,7 @@ describe('deskwork customize — npm-installed shape (#95 regression)', () => {
   );
 
   it(
-    '@deskwork/core tarball ships dist/doctor/rules/missing-frontmatter-id.ts (customize anchor)',
+    '@deskwork/core tarball ships dist/doctor/rules/orphan-frontmatter-id.ts (customize anchor)',
     { timeout: 30_000 },
     () => {
       const pkgRoot = packAndExtract(corePackageRoot);
@@ -220,11 +220,11 @@ describe('deskwork customize — npm-installed shape (#95 regression)', () => {
         'dist',
         'doctor',
         'rules',
-        'missing-frontmatter-id.ts',
+        'orphan-frontmatter-id.ts',
       );
       expect(existsSync(customizeAnchor)).toBe(true);
       const expected = readFileSync(
-        join(doctorRulesDir, 'missing-frontmatter-id.ts'),
+        join(doctorRulesDir, 'orphan-frontmatter-id.ts'),
         'utf-8',
       );
       expect(readFileSync(customizeAnchor, 'utf-8')).toBe(expected);

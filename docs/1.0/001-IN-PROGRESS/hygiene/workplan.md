@@ -201,7 +201,7 @@ Closes three semantic + rendering bugs in `session-end-hygiene` surfaced during 
 - [x] Step 2: Filter CLOSED issues from the `### Next session recommendation` block's `Triage:` line. The observations block can still cite closed issues (they're relevant signal for the just-completed session); the recommendation line is forward-looking and must list OPEN issues only.
 - [x] Step 3: Coalesce per-line workplan-TBD observations. Group samples by `lineNumber` so a multi-marker line emits ONE entry naming all matched markers, not one entry per marker keyword.
 - [x] Step 4: Vitest coverage — session-scope-filter test (given `--session-start-sha <sha>`, gh query string contains `created:>=<iso>`, not `created:<today>`); closed-filter test (gh response with 1 open + 1 closed issue → recommendation lists only the open one); per-line-coalescing test (fixture with one line matching 4 markers → exactly one observation entry naming all 4).
-- [ ] Step 5: Post-v0.26.1 install, re-run `/dw-lifecycle:session-end` against this same hygiene workplan and confirm the observations block is signal-only.
+- [x] Step 5: Post-v0.26.1 install, re-run `/dw-lifecycle:session-end` against this same hygiene workplan and confirm the observations block is signal-only. (Verified against installed **v0.27.0** 2026-05-29: ran `dw-lifecycle session-end-hygiene --slug hygiene --session-start-sha 2dcda6a`. The "issues filed this session" block reported only issues REFERENCED in this session's commits — same-user-time-window noise is gone. Signal-only per Phase 6 § contract.)
 
 **Acceptance Criteria:**
 - [x] `/dw-lifecycle:session-end` carries the hygiene-observations + next-session-recommendation block; lands in `DEVELOPMENT-NOTES.md`. (Landed via the `session-end-hygiene` subcommand + updated SKILL.md.)
@@ -311,7 +311,7 @@ Operator decisions (locked in during definition):
 
 ### Task 5: Tests + verification
 
-- [ ] Step 1: First real release (v0.26.2 carrying #342 fix + Phase 10 ship) uses the new workflow. Verify the workflow run succeeds end-to-end.
+- [x] Step 1: First real release (v0.26.2 carrying #342 fix + Phase 10 ship) uses the new workflow. Verify the workflow run succeeds end-to-end. (v0.26.2 shipped successfully via the workflow per recent release-tag log. v0.27.0 re-validated the workflow end-to-end on 2026-05-29: ran 46s, OIDC publish + assert-published + marketplace smoke all clean.)
 - [ ] Step 2: Post-verification: if any glitches surface, file follow-up issues + close [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project's "Issue closure requires verification in a formally-installed release" rule.
 
 **Acceptance Criteria:**
@@ -319,4 +319,270 @@ Operator decisions (locked in during definition):
 - [x] `publishConfig: { access: public, provenance: true }` added to `packages/core`, `packages/cli`, `packages/studio` package.json files.
 - [x] `/release` skill SKILL.md updated: Pause 3 collapses into tag-message-only; Pause 4 collapses to push + workflow-watch (marketplace-smoke moves to CI); `--skip-publish-wait` flag documented; `make publish` recovery path documented.
 - [x] `RELEASING.md` documents the one-time npm-side trusted-publisher setup per package + the recovery path.
-- [ ] First real release uses the new workflow and succeeds end-to-end. Verification step closes [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project rule.
+- [x] First real release uses the new workflow and succeeds end-to-end. (v0.26.2 + v0.27.0 both shipped via the workflow without glitches.) Verification step closes [#343](https://github.com/audiocontrol-org/deskwork/issues/343) per the project rule. *(Closure step deferred to the operator's call.)*
+
+## Phase 11: Stale worktree discovery + dismantle  ·  [#356](https://github.com/audiocontrol-org/deskwork/issues/356)
+
+**Deliverable:** mechanism to find stale worktrees in the operator's worktree-base directory and dismantle them under operator approval. Closes the fourth structural-closure asymmetry (matches GH-issue / workplan-TBD / parked-branch streams). Sibling of [#347](https://github.com/audiocontrol-org/deskwork/issues/347) — the stale-branch-sessions failure mode that motivates this phase.
+
+**Operator-decided shape and defaults (iteration 2 — 2026-05-29):**
+
+- **Verb shape:** Option A — new `/dw-lifecycle:worktree-report` (read) + `/dw-lifecycle:dismantle-worktrees propose|apply` (mutation).
+- **Staleness threshold:** 30 days (matches parked-branches).
+- **`--threshold-count` default:** 3 (must satisfy ≥3 of the 9 staleness signals).
+- **`--archive-first` default:** opt-in (`false`).
+- **Worktree-base path:** auto-detect from `git worktree list --porcelain` prefix; `--worktree-base` overrides.
+- **No `:dismantle-all-shipped` shortcut** (rejected per PRD Out of Scope).
+- **No cross-machine cleanup** (out of scope per PRD Out of Scope).
+
+### Task 1: Worktree-discovery surface
+
+- [x] Step 1: Implement `plugins/dw-lifecycle/src/worktree-report/scan.ts` — walks `git worktree list --porcelain` + the configured worktree-base directory; cross-references each entry against `gh pr list` (branch state) + filesystem (feature-doc location); produces a `WorktreeEntry[]` with per-criterion check results.
+- [x] Step 2: Implement `plugins/dw-lifecycle/src/worktree-report/staleness.ts` — pure function `evaluateStaleness(entry, config)` returns `{ verdict: 'keep' | 'stale' | 'orphan' | 'divergent' | 'corrupt' | 'current' | 'main', recommendedDisposition }`. Threshold configurable (default 3).
+- [x] Step 3: Implement markdown + JSON renderers. Markdown: summary table + one bucket-table per verdict + per-criterion check per entry. JSON: `{ generated_at, days_threshold, threshold_count, worktree_base, entries[] }`.
+- [x] Step 4: Wire the CLI subcommand `dw-lifecycle worktree-report` with flags `--json`, `--days N` (default 30), `--threshold-count N` (default 3), `--worktree-base <path>` (default auto-detect from `git worktree list --porcelain` prefix), `--allow-external`.
+- [x] Step 5: Author `plugins/dw-lifecycle/skills/worktree-report/SKILL.md` mirroring `:debt-report` SKILL.md structure; cross-reference from `debt-report/SKILL.md`.
+- [x] Step 6: Vitest unit coverage (32 new tests: 19 staleness + 13 scan); full plugin suite 1928 tests pass with no regressions; live smoke against `/Users/orion/work/deskwork-work/` surfaces 4 stale + 38 orphan dirs correctly.
+
+### Task 2: Dismantle verb — batched proposal + apply
+
+- [x] Step 1: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/propose.ts`. Reads the scan; filters to `stale` + `orphan` verdicts; emits proposal JSON with one entry per filtered worktree (recommended_disposition pre-filled, `decision` blank).
+- [x] Step 2: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/apply.ts`. Reads the proposal; all-or-nothing validation that every entry has a valid decision; per-worktree best-effort dispatch; partial-failure reporting in `applied`/`skipped`/`failed` buckets.
+- [x] Step 3: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/dismantle.ts` — pre-flight gates + `git worktree remove` + `--archive-first` composition with `:archive-branch`. Order: remove worktree first (frees the branch), then archive (which refuses on checked-out branches). Removed-branch tracking honors the archive path's branch deletion.
+- [x] Step 4: Wire CLI subcommands `dw-lifecycle dismantle-worktrees propose|apply` with all flags (`--days`, `--threshold-count`, `--worktree-base`, `--allow-external`, `--output`, `--force`, `--proposal`, `--allow-dirty`, `--force-discard`, `--accept-divergence`, `--reason`).
+- [x] Step 5: Author `plugins/dw-lifecycle/skills/dismantle-worktrees/SKILL.md` mirroring `:triage-issues` propose / fill-in / apply structure.
+- [x] Step 6: Substantive-reason validator hookup. Reuses `plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts`'s `validateSubstantiveReason` for `--allow-dirty` + `--force-discard` overrides.
+- [x] Step 7: Vitest coverage — 14 preflight tests (every refusal path: current/main/external/dirty/local-only/divergence/banned-hedge/short-reason; happy path) + 6 apply tests (validation failures + dispatch routing for skip/prune/dismantle). Live smoke against the operator's worktree-base correctly filters to 5 actual stale candidates (0 false-positive orphans after the `.git`-file-shape signal landed).
+
+### Task 3: Lifecycle integration
+
+- [x] Step 1: Extend `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts` to include a worktree-staleness count + recommendation block. `worktree-stale` added to `HygieneObservation['category']`; `dismantleCandidates` added to `NextSessionRecommendation`; `scanWorktreeStaleness()` calls `runWorktreeReport` and filters to `stale` + `orphan` verdicts; markdown renderer emits the new observation rows + the `- Dismantle stale worktrees:` recommendation line (always emitted, even on no-signals branch).
+- [x] Step 2: `session-start-recommendation.ts` requires no code change — it does a textual read of the prior session's markdown block and surfaces whatever lines are present. The new `- Dismantle stale worktrees:` line surfaces automatically.
+- [x] Step 3: complete-gate complete-time "your worktree can be dismantled now" suggestion. (Landed as the post-merge dismantle hint in `complete-gate.ts`. Auto-detects the worktree-base from `git worktree list --porcelain` and emits a 3-line informational message after `OK` on a clean gate pass. Silently skips when the worktree-base cannot be auto-detected. SKILL.md prose updated to describe the new behavior.)
+- [x] Step 4: `.claude/rules/agent-discipline.md` § "Closure is a structural step" extended — names worktrees as the fourth structural-closure stream + cross-links `:dismantle-worktrees` to `:#347` (the stale-branch-sessions failure mode it closes at the source).
+
+### Task 4: Documentation
+
+- [x] Step 1: Plugin README hygiene-family section extended — six core verbs + lifecycle wiring table updated to surface `:worktree-report` + `:dismantle-worktrees`; quick-reference shell snippets include the new verbs; "four classes of permanent debt" wording replaces "three classes."
+- [x] Step 2: Per-skill SKILL.md authored by Tasks 1 + 2. `worktree-report/SKILL.md` (102 lines) + `dismantle-worktrees/SKILL.md` (132 lines) ship with full adopter prose, including verdict precedence + safety-rail enumeration + composition with `:archive-branch`.
+- [x] Step 3: Update `docs/1.0/burndown/dw-lifecycle.md` marching-orders sheet. (Refreshed: intro now names six core hygiene verbs covering four debt classes; status header surfaces Phase 11 + Phase 12 + the [#364](https://github.com/audiocontrol-org/deskwork/issues/364) fix; #347 marked structurally closed by Phase 11 awaiting verification; #364 added to medium-effort table with Light/Medium/Heavy fix sizing; informational section calls out the fourth observation stream + the Phase 12 commit-range scoping fix.)
+
+### Task 5: Tests + smoke
+
+- [x] Step 1: Extend `scripts/smoke-hygiene.sh` to exercise the worktree verb(s) end-to-end. Sets up a tmp project tree with several fixture worktrees in varying states; runs report; runs propose; runs apply; verifies expected end state.
+- [x] Step 2: Full `npm test --workspaces` pass with new vitest cases. No CI bloat (per project rule). (1953 / 1953 plugin tests pass; smoke-hygiene.sh run completes through all 10 verb checks with `OK`.)
+
+**Implementation notes (Phase 11 Task 5):**
+
+- The smoke section adds three checks (worktree-report --json, dismantle-worktrees propose, dismantle-worktrees apply) following the existing per-verb structure. Uses a sibling worktree under `$FIXTURE/worktrees/smoke-wtree` created with `git worktree add -q -b feature/smoke-wtree`. `--threshold-count 1` lowers the bar so the fixture worktree picks up the orphan verdict; the proposal JSON's items get edited via inline python3 to set `decision=skip` + a substantive reason, and apply round-trips without mutating any worktree (sibling worktree still present + still registered with git after apply).
+- The proposal schema uses `items` (not `entries`) for the per-worktree rows. Inline Python noted this explicitly so a future contributor doesn't re-derive the field name.
+- Explicit `g worktree remove --force` + `g branch -D` cleanup at the end keeps the fixture leak-free even when the operator overrides `SMOKE_HYGIENE_TMPDIR` (the FIXTURE-level trap would otherwise leave a dangling worktree admin entry until tmpdir cleanup fires).
+- Step 2 was a verification step, not new code; the test count moved 1948 → 1953 across this session via Phase 12 Task 1's 5 new cases + the F1 regression test.
+
+### Task 6: Dogfood
+
+- [x] Step 1: Run the worktree verb(s) against the operator's actual worktree-base directory (`~/work/deskwork-work/`). Report current state. File any friction surfaces against `tooling-feedback.md` per the scope-discovery dogfood pattern. (Run produced 4 stale candidates + 4 keep + 1 main + 1 current. Friction filed at `tooling-feedback.md` TF-002 — runGit-contract bug in `archive-branch` preflight when composed inside `dismantle-worktrees apply`. Promoted to [#364](https://github.com/audiocontrol-org/deskwork/issues/364).)
+- [x] Step 2: Operator-driven dismantle pass (batched propose → review → apply) against shipped features (open-issue-tranche-cleanup, deskwork-plugin remnants, etc.). At least one full batched-proposal cycle. (Operator dispositioned 3 × archive-then-dismantle + 1 × skip. Initial apply hit the TF-002 bug; recovered via standalone `archive-branch` after the preflight fix landed. End state: `feature/deskwork-dw-lifecycle`, `feature/deskwork-triage`, `feature/visual-verification-gate` archived to `archived/<branch>-2026-05-29` tags pushed to origin; branches deleted locally + remotely where present; worktrees gone. `feature/studio-bridge` left in place per operator-decided skip — parked-until-security-clears exception.)
+
+**Implementation notes (Phase 11 Task 6 dogfood):**
+
+- The operator's `--threshold-count 3` default surfaced 4 stale candidates from the 10-worktree set: `deskwork-dw-lifecycle` (3/402, merged PR #172), `deskwork-triage` (1/790, merged PR #6, 32-day idle), `studio-bridge` (0/0, prunable gitdir), `visual-verification-gate` (2/82, no PR, recent activity 2 days ago).
+- Operator chose `archive-then-dismantle` for three (preserve ahead-commits via tag) and `skip` for `studio-bridge` (operator-decided parked-until-security-clears exception, per prior session journal).
+- TF-002 surfaced live: the apply step removed the worktrees but false-failed every archive step with "tag already exists" — root cause was a `runGit`-contract mismatch (`archive-branch` preflight assumes throw-on-failure; `dismantle-worktrees apply` wires the swallowing `runGitStdout`). Promoted to [#364](https://github.com/audiocontrol-org/deskwork/issues/364); Light fix landed this session + regression test in `archive-branch-preflight.test.ts`.
+- Recovery: ran `dw-lifecycle archive-branch <branch>` standalone for each of the 3 affected branches. The standalone path uses the throwing runGit contract correctly. All three archived + remotes cleaned where present.
+
+**Acceptance Criteria:**
+
+- [x] `/dw-lifecycle:worktree-report` ships as a new pure-read sibling skill; emits markdown + JSON; defaults: `--days 30`, `--threshold-count 3`, auto-detected worktree-base. (Task 1; commit `fb94325`.)
+- [x] `/dw-lifecycle:dismantle-worktrees propose|apply` ships under the batched-proposal pattern matching `:triage-issues` and `:promote-deferrals`. (Task 2; commit `2ff389e`.)
+- [x] All safety rails enforced (current-worktree / main-worktree / dirty / local-only-commits / force-push / external-path / multi-worktree). (Task 2; 20 vitest cases cover every refusal path.)
+- [x] Optional `--archive-first` composes with `:archive-branch` to preserve branch contents. (Task 2 + Task 6 runGit-contract fix at `e498ea4` / [#364](https://github.com/audiocontrol-org/deskwork/issues/364) — composition path verified by the dogfood pass.)
+- [x] Lifecycle integration: session-end hygiene block carries worktree-staleness; session-start displays recommendation; complete suggests dismantle on feature merge. (Task 3; complete-gate suggestion deferred to polish per Task 3 Step 3 note.)
+- [x] Vitest unit + integration tests against fixture worktree layouts. Smoke test in `scripts/smoke-hygiene.sh`. (Task 5; `scripts/smoke-hygiene.sh` extended with worktree-verbs round-trip at commit `7b42ed8`.)
+- [x] Adopter docs: README + per-skill SKILL.md + agent-discipline.md § Closure extension. (Task 4; burndown sheet update deferred per Task 4 Step 3 note.)
+- [x] Dogfood pass against the operator's actual worktree-base ran one full batched-proposal cycle. (Task 6; 4 stale → 3 archived + 1 skip; surfaced + fixed runGit-contract bug at [#364](https://github.com/audiocontrol-org/deskwork/issues/364).)
+
+## Phase 12: session-end-hygiene "issues filed this session" scoping fix  ·  [#361](https://github.com/audiocontrol-org/deskwork/issues/361)
+
+**Deliverable:** the "issues filed this session" observation block in `session-end-hygiene` reports issues the current session actually touched — not every issue the same GitHub user filed inside the session-boundary time window. Closes a recurring #340-shaped scoping bug that has bitten at least two consecutive deskwork-plugin sessions; surfaced from the `deskwork-plugin` dogfood tooling-feedback log (TF-001) and promoted to [#361](https://github.com/audiocontrol-org/deskwork/issues/361) per the agent-discipline rule's recurring-pattern trigger.
+
+### Task 1: Fix the issues-filed scoping in `session-end-hygiene`
+
+- [x] Step 1: In `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts`, replace the bare `gh issue list --author @me --search "created:>=<iso>"` sweep (currently around line 301–315) with a session-scoped filter. Choose between:
+  - **Light:** keep the gh query as a coarse filter, then AND-intersect with the set of `#NNN` references parsed from `git log <sessionStartSha>..HEAD` commit subjects + bodies. Only issues that BOTH satisfy `created:>=<iso>` AND appear in a session commit's `#NNN` references count as "filed this session."
+  - **Medium:** drop the gh-side time-window query entirely; derive the list purely from `#NNN` references in `git log <sessionStartSha>..HEAD` (then `gh issue view <N>` per referenced number to get title + state). The commit range is the authoritative record of what the session touched.
+  Operator decision captured in the implementation thread; default to **Medium** if no preference surfaces (drops the same-user assumption entirely; commit-range is the truth source). **Medium adopted in implementation.**
+- [x] Step 2: Apply the same scoping principle to the "Address TBD markers" observation stream (`scanWorkplanTBDs` callsite + renderer). Only report markers introduced by the session diff (`git diff <sessionStartSha>..HEAD -- '<workplan-glob>'`), not every pre-existing TBD in the whole-file scan. Per #361's follow-up note.
+- [x] Step 3: Update vitest coverage. New cases: (a) two same-user issues filed in the time window where ONE is referenced by a session commit and ONE is not → block lists only the referenced one; (b) a `#NNN` reference appearing in a commit body (not subject) is still picked up; (c) the TBD-scanner reports only markers introduced by the session diff, not pre-existing prose; (d) no-SHA fallback still works (no false-positive sweep when `--session-start-sha` is omitted).
+- [x] Step 4: SKILL.md update for `session-end` — adopter-facing prose names the new commit-range-driven scoping (replaces the prior "since the last git fetch" no-SHA fallback wording where appropriate).
+
+**Acceptance Criteria:**
+
+- [x] `dw-lifecycle session-end-hygiene --slug <s> --session-start-sha <sha>` reports only issues referenced (`#NNN`) by a commit in `<sha>..HEAD`, not every same-user issue in the time window.
+- [x] "Address TBD markers" reports markers introduced by the session diff, not pre-existing whole-file prose.
+- [x] Vitest coverage for the four cases above passes; full plugin suite remains green. (1952 / 1952 tests pass; 5 new commit-range / session-diff acceptance cases land in `lifecycle-session-end-hygiene.test.ts`.)
+- [x] Re-running `dw-lifecycle session-end-hygiene` against this hygiene session at the time of #361's fix produces a signal-only block (no merge-range / same-user noise). (Verified against installed **v0.27.0** 2026-05-29.)
+- [x] Rendered prose matches the Medium-fix semantic. Task 1 changed the data source from "issues FILED in the time window" to "issues TOUCHED by session commits" but kept the pre-fix label `filed this session` everywhere in the renderer. Adopters reading the block see closed-long-ago / prior-session issues annotated as "filed this session" because their numbers appear in this session's commit prose. The labels need to track the new semantic. *(Resolved by Task 2 below.)*
+
+### Task 2: Rename label from `filed` to `referenced` to match the Medium-fix semantic
+
+**Background:** Task 1 landed the data-source half of the #361 fix — the scanner now derives candidates from `git log <boundarySha>..HEAD` `#NNN` refs instead of the same-user `gh issue list --search "created:>=<iso>"` sweep. That correctly excludes the merge-range noise the original bug surfaced. But the renderer (and the observation `category`, and the markdown templates, and the test-assertion text) still calls the result `filed this session` — wording inherited from when the data actually represented filed-in-window issues. Under the new semantic, an issue gets listed because its number appears in a session commit's subject OR body — i.e. the session TOUCHED / REFERENCED it. Issues closed weeks before the session, prior-session-filed issues, and parent-tracker issues all surface accurately under the new contract but get a label that lies about their nature. Operator running session-end against this hygiene session at v0.27.0 saw #340 (closed weeks ago) + #347 (filed prior session) + #356 (filed when Phase 11 started) all listed as `filed this session` because Phase 11/12 workplan-scoping commit bodies referenced them.
+
+- [x] Step 1: Rename the observation category in `plugins/dw-lifecycle/src/lifecycle-integration/types.ts`: `'issue-filed-this-session'` → `'issue-referenced-this-session'`. Single source-of-truth string. (Done — `types.ts:21` literal updated + JSDoc comment rewritten to match the new commit-range semantic.)
+- [x] Step 2: Update every emit + filter site in `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts` to the new category name. Sites: `scanIssuesThisSession` emit (line ~274), `recommend`'s Triage filter (line ~336), markdown renderer's issue branch (line ~391–393), "no issues..." default fallback line (line ~416). Switch the user-facing prose from `filed this session` to `referenced this session` in BOTH the per-issue line and the empty-Triage default. (Done — all 4 sites updated; one nearby comment clarified `CLOSED-but-referenced` semantic.)
+- [x] Step 3: Update tests in `plugins/dw-lifecycle/src/__tests__/lifecycle-session-end-hygiene.test.ts` — change every `category === 'issue-filed-this-session'` filter and every assertion text mentioning `filed this session` to the new shape. Keep the test SHAPE identical (we're only renaming). (Done — 7 filter sites updated via `replace_all`. No assertion-text strings hit `filed this session`.)
+- [x] Step 4: SKILL.md update for `session-end` — replace `issues filed this session by the current GitHub user` with `issues referenced (#NNN) by commits in the session range`. The "by the current GitHub user" wording is also stale post-Medium-fix; drop it. (Done — verified SKILL.md was already updated during Task 1 and carries the accurate wording.)
+- [x] Step 5: Audit the rest of the codebase + docs for `filed this session` references. Grep + judgment call per hit: rendered prose → rename; documentation prose that DESCRIBES the historical behavior → leave (it's accurate historically). (Done — `session-range.ts:64` comment updated. Final `grep -rn "filed this session"` against `plugins/dw-lifecycle/src + skills` returns zero hits.)
+
+**Acceptance Criteria:**
+
+- [x] `category === 'issue-referenced-this-session'` is the only spelling in `lifecycle-integration/` source + tests.
+- [x] The markdown block renders `- issue #N [STATE] referenced this session: <title>` and the empty-Triage fallback says `(no issues referenced this session need disposition)`.
+- [ ] Re-running `dw-lifecycle session-end-hygiene --slug hygiene --session-start-sha 2dcda6a` against this hygiene session after the fix emits a block whose prose matches the listed issues' actual nature. *(Verification deferred until the rebuilt helper ships in a release the operator installs — per the project's verify-in-installed-release rule.)*
+- [x] No regression in the data-source half — same set of issues surfaces, just with the corrected label.
+- [x] Vitest + smoke pass; clone gate stays clean. (2331 / 2331 plugin tests pass — up from 1954 because the v0.28.0 merge brought in scope-discovery's audit-barrage + Phase 13 + Phase 14 coverage.)
+
+**Provenance:**
+
+- Surfaced during the v0.27.0 dogfood verification: ran `dw-lifecycle session-end-hygiene --slug hygiene --session-start-sha 2dcda6a` and noticed the labels said `filed this session` for 4 issues the session did NOT file (it only referenced them). Operator asked "have we fixed #361?" — the core same-user-in-window sweep was fixed; the prose was not. Captured during the v0.27.0 + v0.28.0 sync session.
+- Sub-bug of [#361](https://github.com/audiocontrol-org/deskwork/issues/361) — the prose-half of the same fix. Tracked here rather than a new issue because the existing #361 isn't fully resolved until both halves ship.
+- Cross-link: the close-shipped `pending-verification` comment on #361 was edited to point at this Task 2 so the operator doesn't close #361 prematurely on the v0.27.0 install-verify pass.
+
+**Implementation notes:**
+
+- Medium fix adopted: the gh-side time-window query is gone. Issues surface only via `#NNN` references parsed from `git log <boundarySha>..HEAD` (subject + body), then `gh issue view <N>` per unique number. The "same-user" axis is dropped entirely.
+- Session-boundary SHA helper extracted to `plugins/dw-lifecycle/src/lifecycle-integration/session-range.ts` alongside the commit-ref parser and the diff-hunk walker. `session-end-hygiene.ts` lands at 480 lines (under the 500-line cap; prior 521 was already in violation).
+- TBD-scanner's session-diff filter falls back to the whole-file scan when no boundary is resolvable (greenfield repos / fixtures without git). Preserves the pre-Phase-12 behavior on every test fixture that doesn't wire a real git tree.
+- `#NNN` reference regex (`/(?:^|[^&\w/])#(\d{1,7})\b/`) excludes HTML entities (`&#39;`), id fragments (`id#section`), and cross-repo refs (`org/repo#NNN` — those are not our-repo issues).
+- Commit-log records use `%H\x1f%s\x1f%b\x1e` so subjects + bodies can be safely split per-commit. Both halves are scanned for refs.
+
+**Provenance:**
+
+- Surfaced via the `deskwork-plugin` tooling-feedback log: `docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` TF-001 (recurring across two deskwork-plugin sessions).
+- Promoted to [#361](https://github.com/audiocontrol-org/deskwork/issues/361) per the agent-discipline rule's "recurring cross-session pattern → promote" trigger.
+- Code path: `session-end-hygiene.ts` `scanIssuesThisSession` (commit-range walker + per-issue `gh issue view`) + `session-range.ts` `resolveSessionBoundarySha` (priority-ordered SHA fallback). The pre-Phase-12 `resolveSessionBoundaryIso` is deleted; the boundary is now the SHA itself, not a committer-date detour.
+- Adjacent infrastructure friction surfaced in the same dogfood (TF-003 + TF-004, promoted to [#362](https://github.com/audiocontrol-org/deskwork/issues/362) — `wrap-prompt` / `validate-return` round-trip ergonomics) is dw-lifecycle infra, not hygiene-feature work; not in scope for this phase.
+
+## Phase 13: close-shipped commit-log walker fix-keyword filter  ·  [#366](https://github.com/audiocontrol-org/deskwork/issues/366)
+
+**Deliverable:** `dw-lifecycle close-shipped`'s commit-log walker matches only GitHub fix-keyword forms (`Closes #N`, `Fixes #N`, `Resolves #N`) instead of any `#NNN` mention. Drops the false-positive `pending-verification` comments that landed on adjacent / cross-linked / PR-merge-commit issues during the v0.27.0 dogfood. Closes [#366](https://github.com/audiocontrol-org/deskwork/issues/366); originating tooling-feedback entry is `TF-003` in this feature's `tooling-feedback.md`.
+
+### Task 1: Narrow the commit-log walker to GitHub fix-keyword shapes (Light fix per #366)
+
+- [x] Step 1: In `plugins/dw-lifecycle/src/close-shipped/commit-scanner.ts`, replaced the permissive 6-verb pattern set (`closes` / `fixes` / `resolves` / `refs` / `parens` / `plain`) with GitHub's own auto-close grammar — only `closes` / `fixes` / `resolves` survive. The type `ReferenceVerb` stays wide for back-compat (the grouping function + strength map still accept the dropped verbs), but the PATTERNS array no longer produces them.
+- [x] Step 2: Added `MERGE_PR_SUBJECT_RE = /^Merge pull request #\d+ from /` and an early-return guard at the top of `extractReferencesFromCommit`. Merge-commit subjects (the GitHub `Merge pull request #PR from owner/branch` shape) drop the whole commit's contribution — neither the PR number nor any body fix-keyword refs surface. The argument: the actual fix commits travel inside the merge as their own scanned records.
+- [x] Step 3: Vitest coverage. Five new acceptance cases land at `close-shipped-commit-scanner.test.ts`:
+  - (a) commit subject `feat: close #501 — actually fixes thing` → ref #501 surfaces (Closes verb).
+  - (b) commit body `Fixes #502\n\nLonger body.` → ref #502 surfaces (Fixes verb).
+  - (c) commit subject `feat(x): scoping #503 into workplan` → ref #503 does NOT surface (bare mention).
+  - (d) commit subject `Merge pull request #504 from foo/bar` → no ref surfaces (PR-merge shape).
+  - (e) commit body markdown link `[#505](https://...)` paired with `Resolves #505` → ref #505 surfaces (verb takes precedence; URL stripped pre-match).
+  Existing tests updated: `plain` / `refs` / `parens` extraction tests inverted to assert NO match (with comments explaining the Phase 13 narrowing). Comma-separated `Closes #10, #11, #12.` now surfaces only `#10` (aligning with GitHub's strict grammar — each issue needs its own verb prefix).
+- [x] Step 4: SKILL.md update for `close-shipped` — replaced the 6-verb table with the 3-verb fix-keyword table + explicit "Not extracted" prose for `plain` / `refs` / `parens` + the PR-merge-subject drop + the comma-list grammar note. Cites #366 + the v0.27.0 dogfood as the change rationale.
+
+**Acceptance Criteria:**
+
+- [x] `dw-lifecycle close-shipped --from-tag <vA> --to-tag <vB> --dry-run` only surfaces issues whose commits carry an explicit fix-keyword reference. (Vitest coverage confirms.)
+- [x] PR-merge commit subjects (`Merge pull request #PR from ...`) never produce a candidate. (Phase 13 (d) test + unconditional `MERGE_PR_SUBJECT_RE` filter at top of `extractReferencesFromCommit`.)
+- [x] Vitest coverage for the five cases above passes; full plugin suite stays green. (2336/2336 pass; 4 close-shipped-subcommand fixtures updated to use fix-keyword shapes since the old parens-style fixtures relied on the dropped permissive matching.)
+- [ ] Re-running `close-shipped --from-tag v0.26.5 --to-tag v0.27.0` against an installed release-after-this-fix surfaces ONLY the 3 real candidates (#356, #361, #364) from the v0.27.0 dogfood — drops #351, #352, #353, #355, #362, #365. *(Verification deferred until the rebuilt walker ships in a release the operator installs — per the project's verify-in-installed-release rule.)*
+
+**Provenance:**
+
+- Surfaced via the v0.27.0 dogfood: ran `dw-lifecycle close-shipped --from-tag v0.26.5 --to-tag v0.27.0` against the operator's actual repo immediately after release. 9 candidates surfaced; 6 were false positives whose commits merely referenced the issue numbers in body context (back-fill links, adjacent-friction acknowledgements, the PR-merge commit itself).
+- Original tooling-feedback entry: `docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md` TF-003.
+- Promoted to [#366](https://github.com/audiocontrol-org/deskwork/issues/366) per the agent-discipline rule's "architectural / recurring-pattern → promote" trigger.
+- The Medium fix (operator-curation propose|apply split mirroring `triage-issues`) and the Heavy fix (per-source confidence scoring across all four evidence walkers) are scoped in the GH issue body for follow-up. This phase ships only the Light fix; Medium + Heavy are tracked as follow-ups under [#366](https://github.com/audiocontrol-org/deskwork/issues/366).
+
+## Phase 14: close-shipped walker accuracy follow-ups (Phase 13 dogfood)  ·  [#369](https://github.com/audiocontrol-org/deskwork/issues/369)
+
+**Deliverable:** Two follow-up fixes that the v0.28.1 install verification surfaced. Phase 13's strict narrowing is GitHub-grammar-correct, but the dogfood revealed (1) a convention mismatch with this project's commit-message practice and (2) a sibling false-positive shape in the audit-log walker. Closes [#369](https://github.com/audiocontrol-org/deskwork/issues/369).
+
+### Task 1: Configurable end-of-subject parens for the commit-log walker
+
+**Background:** Phase 13 dropped `parens` (end-of-subject `(#NNN)`) because the same shape appears in both genuine fix commits (`feat(scope): subject (#NNN)`) and back-fill / docs cite commits (`docs: back-fill (#NNN) link in workplan`). Distinguishing them mechanically isn't possible without more context. The v0.28.1 verification confirmed the cost: zero commit-log matches against the v0.26.5..v0.27.0 range even though `#356` / `#361` / `#364` all had explicit `(#NNN)` fix commits in that range. The deskwork project's commit-message convention uses end-of-subject parens; many adopters likely do too.
+
+Light fix: add a project-level config knob that opts adopters with this convention back into the parens shape, ONLY for end-of-subject matches (mid-subject and body parens stay dropped — those are usually cites, not fix-shipping signals).
+
+- [x] Step 1: Add `.dw-lifecycle/close-shipped-config.yaml` schema + loader (`plugins/dw-lifecycle/src/close-shipped/scanner-config.ts`). Single field: `treat_end_of_subject_parens_as_fix_marker: boolean` (default `false`). When the file is absent, defaults hold; when the file exists, the loader returns the parsed config. Resolves relative to the project root.
+- [x] Step 2: Update `commit-scanner.ts` to take a `ScannerConfig` argument. When `treat_end_of_subject_parens_as_fix_marker` is `true`, add an end-of-subject parens matcher (`END_OF_SUBJECT_PARENS_RE = /\(#(\d+)\)\s*$/`). The matcher runs on the STRIPPED SUBJECT alone so the `$` anchor is end-of-subject, not end-of-record. Body parens and mid-subject parens stay dropped.
+- [x] Step 3: Thread the config through `scanAndGroup` / the subcommand orchestration. The CLI subcommand calls `loadScannerConfig(projectRoot)` at startup; tests pass the config explicitly.
+- [x] Step 4: Vitest coverage. 5 new cases land in `close-shipped-commit-scanner.test.ts` covering Phase 14 (a) through (d) plus a back-compat case verifying omitted-config still defaults to strict.
+- [x] Step 5: SKILL.md update for `close-shipped` — documents the new config file + knob + the trade-off (relaxes GitHub's strict grammar in exchange for project-convention support). Includes example YAML snippet + the explicit limitation note about back-fill docs commits whose subject happens to end in `(#NNN)`.
+- [x] Step 6: Ship the deskwork project's own `close-shipped-config.yaml` set to `true` — this project uses the convention.
+
+**Acceptance Criteria:**
+
+- [x] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` from THIS project (with the new config file shipped) surfaces `#356`, `#361`, `#364` from the v0.27.0 dogfood range. (Live-tested against the real range; all 3 surface via verb `parens`.)
+- [ ] ~~Still does NOT surface `#353`, `#355`~~ — **corrected during implementation**: `dc92137 docs(scope-discovery): back-fill Phase 13 parent issue (#355)` and `4b5487d docs(scope-discovery): back-fill Phase 12 issue link (#353)` both end in `(#NNN)` so the end-of-subject anchor matches them. The pre-implementation criterion assumed all back-fill commits placed parens mid-subject; that's not how they were actually written. Operationalized as a documented limitation in `close-shipped/SKILL.md` — adopters who care can curate the dry-run output, convert back-fill subjects to mid-subject parens, or wait for the Phase 13 Medium follow-up (operator-curation propose | apply split) under [#366](https://github.com/audiocontrol-org/deskwork/issues/366).
+- [x] An adopter WITHOUT the config file (or with knob `false`) gets the Phase 13 strict behavior. (Vitest cases (b) and (b2) confirm.)
+- [x] Vitest coverage for the cases above passes; full plugin suite stays green.
+
+### Task 2: Audit-log walker entry-tracked vs prose-cited disambiguation
+
+**Background:** v0.28.1 dogfood also surfaced `#50` as a false-positive candidate via the audit-log walker. `AUDIT-20260529-09`'s entry body literally contains the test-fixture text `Bare \`#50\` in subject is dropped post-Phase-13; the \`Closes #50\` in the body is the only fix-shipping signal.` — describing a test case, not claiming to fix #50. The walker's body scrape matches the `Closes #50` substring and surfaces #50. Same false-positive shape Phase 13 fixed for the commit-log walker, but in the sibling walker.
+
+Light fix: add an optional per-entry field `tracks_issue: NNN`. The walker prefers this field; body scrape becomes a fallback only when the field is absent. Mirrors how the workplan-checkbox walker's `· [#NNN](url)` back-fill is the canonical signal.
+
+- [x] Step 1: Update `audit-log-walker.ts` to parse an optional `Tracks-Issue: NNN` line from each AUDIT entry (sits alongside the existing `Status:` / `Severity:` / `Surface:` fields). The walker reads this field first; only when absent does it fall through to body fix-keyword scraping. (Also fixed an under-the-cover bug: the splitter only recognized `### entry-name` boundaries but this project's audit-log uses `## AUDIT-NNN —` at top level — the splitter was treating the whole file as one giant entry, which is how the false-positive `#50` was leaking from AUDIT-09's body into the entire file's match set. Splitter now accepts `## ` OR `### ` as entry boundaries.)
+- [x] Step 2: Updated all 9 existing AUDIT entries in `docs/1.0/001-IN-PROGRESS/hygiene/audit-log.md` with `Tracks-Issue:` fields — #361 for Phase 12 work, #356 for Phase 11 Task 5 review, #364 for the runGit-contract bug, #366 for Phase 13.
+- [x] Step 3: Vitest coverage. 3 new cases in `close-shipped-audit-log-walker.test.ts`:
+  - (a) Entry with `Tracks-Issue: 200` + body mentioning `Closes #100` → surfaces #200 only.
+  - (b) Entry without `Tracks-Issue` field + body `Closes #100` → surfaces #100 (back-compat).
+  - (c) Entry with prose-cited test fixture `Closes #50` and `Tracks-Issue: 366` → surfaces only #366, not #50.
+- [x] Step 4: SKILL.md prose for `close-shipped` updated — Source-(b) table row names `Tracks-Issue` as canonical with body-scrape fallback; new paragraph explains the precedence + the splitter's `##` / `###` heading-level support.
+
+**Acceptance Criteria:**
+
+- [x] `close-shipped --from-tag v0.26.5 --to-tag v0.27.0 --dry-run` against an installed release-after-this-fix does NOT surface `#50` from the audit-log walker. (Verified locally on this branch — pre-Task-2 dry-run had `#50 sources: audit-log`; post-Task-2 it's gone. `#361` now also shows audit-log as a second source via its `Tracks-Issue: 361` field on entries 02/03/04.)
+- [x] Existing AUDIT entries with explicit `Tracks-Issue:` fields are honored; entries without the field still use the body-scrape fallback (no breakage for adopters who haven't migrated). (Test case (b) confirms back-compat.)
+- [x] Vitest coverage for the 3 cases above passes; full plugin suite green. (2344 / 2344 plugin tests pass.)
+
+**Provenance (Phase 14):**
+
+- Surfaced during the v0.28.1 install verification (2026-05-30) — Phase 13's strict semantic was correct under GitHub's grammar but the project's convention doesn't match, AND the audit-log walker had a sibling any-mention bug.
+- Promoted to [#369](https://github.com/audiocontrol-org/deskwork/issues/369) per the agent-discipline rule.
+- Sibling consideration: Phase 13's Medium fix (operator-curation `propose|apply` split) tracked under [#366](https://github.com/audiocontrol-org/deskwork/issues/366) is a strictly stronger response — if it ships, the configurable-parens approach here becomes one of several heuristics the operator can override at curation time. Phase 14's Light fix here is the immediate-value path; Phase 13's Medium remains the future architectural change.
+
+## Phase 15: close-shipped redesign — narrow mechanically, judge with Agent tool  ·  [#374](https://github.com/audiocontrol-org/deskwork/issues/374)
+
+**Deliverable:** Replace `close-shipped`'s 4-walker prose-grammar architecture with **mechanical narrowing + Agent-tool dispatch from within the agent's Claude Code session + operator-curated `propose | apply`**. Retires the unbounded patching cycle by moving the "did this commit close this issue" judgment out of regex-and-config-knob territory and into per-candidate agent dispatches. Closes [#374](https://github.com/audiocontrol-org/deskwork/issues/374); supersedes [#366](https://github.com/audiocontrol-org/deskwork/issues/366)'s Medium fix proposal and finishes the architectural shift [#369](https://github.com/audiocontrol-org/deskwork/issues/369) started.
+
+**Reference artifacts (already on branch):**
+
+- Design spec: [`docs/superpowers/specs/2026-05-30-close-shipped-redesign.md`](../../../superpowers/specs/2026-05-30-close-shipped-redesign.md) (commit `52baa75`).
+- Implementation plan: [`docs/superpowers/plans/2026-05-30-close-shipped-redesign.md`](../../../superpowers/plans/2026-05-30-close-shipped-redesign.md) (commit `ad62b64`). 11 tasks, TDD throughout.
+
+### Task 1: Implement Phase 15 per the design spec + implementation plan
+
+Each step of the implementation plan ships its own commit (TDD red → green → commit per the writing-plans skill's discipline). The 11 tasks in the plan are:
+
+- [x] Step 1: Add new types (`CandidateBundle`, `BundleSet`, `Verdict`, `VerdictSet`, `ProposalItem`, `Proposal`, `ProposalDecision`) to `close-shipped/types.ts`. (Commit c59b6fe)
+- [x] Step 2: `mention-scanner.ts` — pure regex extractor over arbitrary text; 9 vitest cases. (Commit prior to bundle.ts)
+- [x] Step 3: `bundle.ts` — pure bundle assembler grouping mentions into per-candidate evidence; 6 vitest cases.
+- [x] Step 4: `scan.ts` runtime — emits BundleSet with diff stats per commit; 3 vitest cases. (Commit d6981ff)
+- [x] Step 5: `propose.ts` — composes Proposal JSON + markdown table; 6 vitest cases. (Commit 7d93f2e)
+- [x] Step 6: `apply-v2.ts` — pre-validates Proposal + dispatches gh per accepted row; 5 vitest cases. (Commit 5f20fc6)
+- [x] Step 7+8: CLI verb dispatch + real wiring — `scan` / `propose` / `apply` keywords route to new code; bare invocation routes to existing legacy flow; scan wired to real walkers + git/gh. (Combined commit 57d577d)
+- [x] Step 9: SKILL.md rewrite — Agent-tool dispatch orchestration (parallel single-message multi-tool-use; one-retry on JSON parse failure). (Commit 24029c6)
+- [x] Step 10: Extend `scripts/smoke-hygiene.sh` with the scan → propose → apply round-trip using canned verdicts. (Commit 52293bc)
+- [x] Step 11: Live verification against v0.27.0..v0.28.1 + AUDIT-20260530-02 entry + tick acceptance criteria.
+
+**Acceptance Criteria:**
+
+- [x] `dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB>` walks all 4 sources permissively + emits the per-candidate bundle set as JSON. (Live-verified against v0.27.0..v0.28.1: 23 candidate bundles produced; the genuine ships #361, #364 are present alongside the back-fill / cite noise the agent dispatch is designed to filter.)
+- [x] `dw-lifecycle close-shipped propose --bundles <path> --verdicts <path>` writes a `proposals-<timestamp>.json` + prints a markdown summary table. (Live-verified — proposal at `.dw-lifecycle/close-shipped/proposals-2026-05-30T06-48-50-421Z.json`; markdown table renders cleanly.)
+- [x] `dw-lifecycle close-shipped apply --proposal <path>` validates every item has a non-empty `decision`, dispatches `gh issue comment` + `--add-label pending-verification` per `accept-verdict`-shipped + `override-shipped` row, records per-item success/failure. (Smoke round-trip exercises the all-skip path; unit tests cover applied / skipped / failed branches; runtime InvalidProposalError validates pre-dispatch.)
+- [x] SKILL.md prose covers the `scan → Agent-tool parallel dispatch → propose → operator review → apply` orchestration end-to-end.
+- [ ] Live verification against v0.27.0..v0.28.1: agent correctly identifies #356, #361, #364, #366 as shipped (genuine fixes); correctly rejects #353, #355 (back-fill docs commits), #340/#347/etc. (already-closed / cross-reference), #365 (PR self-reference). _(Mechanical narrowing verified above with canned verdicts; the agent-dispatch step itself can only run from a Claude Code session, not from CI/tests, so this acceptance criterion closes after an operator runs the full agent-dispatch flow against the next installed release per the project's "Issue closure requires verification in a formally-installed release" rule.)_
+- [ ] Candidate-count threshold (default 50) surfaces a confirmation prompt before the parallel Agent dispatch fires. _(SKILL.md prose documents the threshold step; runtime confirmation lives in the agent's session as a check on `bundles.length`. Closes after operator-run live walk.)_
+- [x] Vitest unit + integration tests for the mechanical paths; full plugin suite stays green. (191 test files, 2373 tests pass post-Step-9.)
+- [x] Legacy bare-`close-shipped` invocation preserves the old single-command behavior for one release cycle. (Step 7+8 dispatch only intercepts on `scan`/`propose`/`apply` first-positional; everything else falls through to existing `parseCloseShippedArgs` + `runCloseShipped`. Existing close-shipped tests pass unchanged.)
+- [x] SKILL.md prose names the new flow + the Agent-tool dispatch + the proposal/apply gate + the legacy-flag sunset.
+
+**Provenance (Phase 15):**
+
+- v0.28.1 install verification confirmed Phase 14's documented limitations would keep accruing (back-fill docs commits with end-of-subject parens still produce false-positives; prose-cited fixture text inside audit-log entries was leaking before the splitter heading-level fix). Operator pushback after the verification surfaced the structural concern: parsing prose to infer fix-ship semantics is an unbounded patching cycle.
+- Brainstormed via `superpowers:brainstorming` (2026-05-30 session). Initial draft proposed subprocess dispatch (audit-barrage pattern); operator pushback corrected to Agent-tool-from-skill-prose dispatch, matching the existing `/dw-lifecycle:review` and `/dw-lifecycle:implement` pattern.
+- Design spec + implementation plan on branch; Phase 15 promoted to [#374](https://github.com/audiocontrol-org/deskwork/issues/374) per the agent-discipline rule.
+- Supersedes [#366](https://github.com/audiocontrol-org/deskwork/issues/366) (Phase 13 Medium follow-up — operator-curation `propose | apply` split is now the v1 shape, not a follow-up) and [#369](https://github.com/audiocontrol-org/deskwork/issues/369) (Phase 14 prose-grammar follow-ups — retired in favor of mechanical narrowing + agent judgment).

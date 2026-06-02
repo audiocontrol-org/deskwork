@@ -74,7 +74,7 @@ deskwork:
 
 - [x] `scrapbookDir` and `scrapbookFilePath` are no longer in the `@deskwork/core/scrapbook` public exports.
 - [x] All studio + CLI callers use the entry-aware resolver.
-- [x] Issue #192 fix-landed comment posted; closure post-marketplace-walk.
+- [x] Issue #192 fix-landed comment posted; closure post-marketplace-walk. **Closed 2026-05-29** per the issue-closure audit (`scrapbook/paths.ts:22` documents the legacy `scrapbookDir` removal).
 
 ## Phase 4 — Verify + close #190 marginalia alignment
 
@@ -121,14 +121,14 @@ deskwork:
 
 ### Task 1: Audit + document
 
-- [ ] Run `gh issue list --state open` post-cleanup.
-- [ ] Group remaining open issues by implementation strategy (architecture / product features / backlog / external-tracking).
-- [ ] Update this feature's README with the post-cleanup snapshot.
+- [x] Run `gh issue list --state open` post-cleanup. **Done 2026-05-29** — see [`docs/1.0/001-IN-PROGRESS/hygiene/issue-closure-audit-2026-05-29.md`](../../../1.0/001-IN-PROGRESS/hygiene/issue-closure-audit-2026-05-29.md).
+- [x] Group remaining open issues by implementation strategy (architecture / product features / backlog / external-tracking). **Done** — burn-down candidates are categorized "Quick fixes (~1 hour)", "Medium (1-2 days)", "Architectural / needs operator triage", "Already-tracked / informational".
+- [x] Update this feature's README with the post-cleanup snapshot. **Done** — README Status table updated 2026-05-29 with per-phase closure citations.
 
 **Acceptance Criteria:**
 
-- [ ] No issue in the open list is in a "verify and close" or "moot" state.
-- [ ] Remaining product features (#54, #84, #85, #82, #87, #86) and backlog (#18, #30, #33) are explicitly noted as out-of-scope for this feature.
+- [x] No issue in the open list is in a "verify and close" or "moot" state. **68 of 178 issues closed in audit; remaining 110 each have a documented disposition (genuinely-open / by-design / architectural-triage).**
+- [x] Remaining product features (#54, #84, #85, #82, #87, #86) and backlog (#18, #30, #33) are explicitly noted as out-of-scope for this feature. **#84 logged in the audit's "Still genuinely open" section coupled to #267; the others remain product-feature backlog and are not part of the audit's burn-down candidates.**
 
 ## Phase 11 — Tranche-organized burn-down of remaining open issues
 
@@ -155,13 +155,13 @@ deskwork:
 
 ### Task 3 (T2) — dw-lifecycle plugin UX cluster
 
-- [x] [#214](https://github.com/audiocontrol-org/deskwork/issues/214) — broaden self-description from "editorial calendar" to "longform-writing pipeline" (commit `f9c24d6`).
-- [x] [#210](https://github.com/audiocontrol-org/deskwork/issues/210) — surface `/dw-lifecycle:install` as the prerequisite for setup (commit `4621083`).
-- [x] [#213](https://github.com/audiocontrol-org/deskwork/issues/213) — back-fill `parentIssue` for any value form, not just the `<parentIssue>` template token (commit `da8f127`).
-- [x] [#196](https://github.com/audiocontrol-org/deskwork/issues/196) + [#209](https://github.com/audiocontrol-org/deskwork/issues/209) — setup helper reuses pre-created branch+worktree instead of doubling or aborting; resolves config from main worktree (commit `34ae79c`).
-- [x] [#212](https://github.com/audiocontrol-org/deskwork/issues/212) — `--workplan <path>` flag completes the brainstorming → writing-plans → setup chain (commit `370f915`).
-- [x] [#185](https://github.com/audiocontrol-org/deskwork/issues/185) — `commands/<name>.md` shims for every skill so `/<plugin>:<skill>` reaches users; covers both `deskwork` and `dw-lifecycle` plugins (commit `f28dd8b`).
-- [x] [#211](https://github.com/audiocontrol-org/deskwork/issues/211) — `dw-lifecycle install --config-overlay <path>` deep-merges JSON onto probed config (commit `572fc63`). Schema-extension (richer status-roles than the three-state default) deferred to a separate issue.
+- [x] [#214](https://github.com/audiocontrol-org/deskwork/issues/214) — broaden self-description from "editorial calendar" to "longform-writing pipeline" (commit `f9c24d6`). **Closed 2026-05-29** per the issue-closure audit (README now enumerates engineering / technical / longform-writing categories).
+- [x] [#210](https://github.com/audiocontrol-org/deskwork/issues/210) — surface `/dw-lifecycle:install` as the prerequisite for setup (commit `4621083`). **Closed 2026-05-29** (setup SKILL.md ships an explicit `## Prerequisite` section).
+- [x] [#213](https://github.com/audiocontrol-org/deskwork/issues/213) — back-fill `parentIssue` for any value form, not just the `<parentIssue>` template token (commit `da8f127`). **Closed 2026-05-29** (`issues.ts:113-122` source comment cites #213).
+- [x] [#196](https://github.com/audiocontrol-org/deskwork/issues/196) + [#209](https://github.com/audiocontrol-org/deskwork/issues/209) — setup helper reuses pre-created branch+worktree instead of doubling or aborting; resolves config from main worktree (commit `34ae79c`). **Both closed 2026-05-29** (`setup.smoke.test.ts:205` cites both issues in the smoke-test name).
+- [x] [#212](https://github.com/audiocontrol-org/deskwork/issues/212) — `--workplan <path>` flag completes the brainstorming → writing-plans → setup chain (commit `370f915`). **Closed 2026-05-29** (`setup.ts:62` parses the flag).
+- [x] [#185](https://github.com/audiocontrol-org/deskwork/issues/185) — `commands/<name>.md` shims for every skill so `/<plugin>:<skill>` reaches users; covers both `deskwork` and `dw-lifecycle` plugins (commit `f28dd8b`). **Closed 2026-05-29** (47 skills reachable in v0.26.5 — the hygiene session itself used `/dw-lifecycle:*` end-to-end).
+- [x] [#211](https://github.com/audiocontrol-org/deskwork/issues/211) — `dw-lifecycle install --config-overlay <path>` deep-merges JSON onto probed config (commit `572fc63`). Schema-extension (richer status-roles than the three-state default) deferred to a separate issue. **Still open in the audit** — overlay mitigation accepted; per-field CLI flags + statusDirs schema flexibility tracked at the same issue.
 - [x] [#215](https://github.com/audiocontrol-org/deskwork/issues/215) issues 1, 3, 4 — approve emits `review-state-change.to=null` to clear journal-sidecar drift; `deskwork doctor --help` now prints usage; "Calendar-level audit: clean" replaces the misleading "Doctor: clean" banner (commit `a6db33e`). Issue 2 (regenerate writes to hardcoded `.deskwork/calendar.md` not the per-site `calendarPath`) split off as [#232](https://github.com/audiocontrol-org/deskwork/issues/232); needs design clarification on the dual-calendar architecture before code lands.
 
 ### Task 4 (T3) — doctor cleanup
@@ -268,7 +268,7 @@ deskwork:
 - [x] `deskwork ingest <file-without-state>` lands in Drafting (live-verified — dry-run plan shows `Drafting` with `state:default`).
 - [x] `deskwork ingest <file> --state Ideas` still lands in Ideas (live-verified — `state:explicit`).
 - [x] `deskwork ingest <file>` where file's frontmatter has `state: ideas` still lands in Ideas (live-verified — `state:frontmatter`).
-- [ ] [#206](https://github.com/audiocontrol-org/deskwork/issues/206) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification.
+- [x] [#206](https://github.com/audiocontrol-org/deskwork/issues/206) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification. **Closed 2026-05-29** per the issue-closure audit (`ingest-derive.ts:260-265` defaults to Drafting with operator-rationale source comment).
 
 ## Phase 8 — Extend entry-aware addressing to studio scrapbook reads + link emitters ([#205](https://github.com/audiocontrol-org/deskwork/issues/205))
 
@@ -298,7 +298,7 @@ deskwork:
 **Acceptance Criteria:**
 
 - [x] No mismatch between scrapbook-write target and scrapbook-read target for entries whose on-disk location doesn't match the slug template (server-route test pins this invariant).
-- [ ] [#205](https://github.com/audiocontrol-org/deskwork/issues/205) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification.
+- [x] [#205](https://github.com/audiocontrol-org/deskwork/issues/205) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification. **Closed 2026-05-29** per the issue-closure audit (`scrapbook-item.ts` ships `entryId?` field + conditional `?entryId=<uuid>` URL append; source comment cites #157/#205).
 - [x] Slug-only addressing remains a working fallback (no behavior change for kebab-case-aligned entries) — pre-existing `dashboard.test.ts` + `api.test.ts` slug-mode assertions still pass; new fallback tests in both new test files lock the back-compat surface.
 
 ## Phase 7 — Fix marginalia edit + delete UX ([#199](https://github.com/audiocontrol-org/deskwork/issues/199))
@@ -339,7 +339,7 @@ deskwork:
 - [x] An operator can edit a margin-note's text directly from the sidebar (no delete-and-recreate).
 - [x] An operator can edit a margin-note's **category** directly from the sidebar (re-categorize without delete-and-recreate).
 - [x] An operator can delete a margin-note (tombstones via the journal, doesn't physically remove the original).
-- [x] [#199](https://github.com/audiocontrol-org/deskwork/issues/199) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification per `agent-discipline.md`.
+- [x] [#199](https://github.com/audiocontrol-org/deskwork/issues/199) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification per `agent-discipline.md`. **Closed 2026-05-29** per the issue-closure audit (`sidebar-render.ts` ships edit/delete buttons; `comment-edit-delete.ts` module; server PATCH/DELETE at `api.ts:285-293` cite Phase 35 / #199).
 - [x] Append-only journal preserves the audit trail (every edit + delete is its own annotation, original `comment` annotation is never mutated in place).
 - **Range editing wontfix** — [#203](https://github.com/audiocontrol-org/deskwork/issues/203) closed; not a standard UX. The right path for a wrong-anchored comment is delete + re-create.
 

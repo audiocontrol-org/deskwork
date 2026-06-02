@@ -1,4 +1,4 @@
-generated_at: 2026-06-01T07:18:30.957Z
+generated_at: 2026-06-02T20:33:25.747Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -250,36 +250,29 @@ clones:
       - packages/core/src/pipelines/loader.ts:235:241
     disposition: keep-with-reason
     reason: Renderer editorial-preset-from-bundle loader mirrors the lanes/loader + pipelines/loader Zod-validate idiom by design (third member of the parallel-readers symmetry; extracting a shared helper would couple calendar evolution to pipeline+lane evolution); extends keep-with-reason on prior clone b223f2def90d.
-  - id: "800396267262"
+  - id: db7dfc711fad
     lines: 28
     members:
       - packages/core/src/content-index.ts:120:147
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:62:94
-    disposition: pending
-    reason: null
+      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:67:94
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: d90106a0fd59
     lines: 23
     members:
-      - packages/core/src/doctor/repair.ts:23:45
-      - packages/core/src/doctor/validate.ts:172:204
+      - packages/core/src/doctor/repair.ts:25:47
+      - packages/core/src/doctor/validate.ts:181:213
     disposition: keep-with-reason
     reason: pre-existing duplication of artifactPathForStage between doctor/repair.ts and doctor/validate.ts; the file-internal comments document the intentional copy to avoid a cross-import cycle; Phase 4 will replace both with template-driven path resolution
-  - id: 2b7d648d9381
+  - id: ab480e7452f8
     lines: 14
     members:
       - packages/core/src/doctor/rules/calendar-uuid-missing.ts:155:168
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:282:295
+      - packages/core/src/doctor/rules/duplicate-id.ts:115:128
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:160:173
       - packages/core/src/doctor/rules/workflow-stale.ts:103:116
-    disposition: pending
-    reason: null
-  - id: 6ce82987b6bb
-    lines: 15
-    members:
-      - packages/core/src/doctor/rules/duplicate-id.ts:114:128
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:281:116
-    disposition: pending
-    reason: null
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: 2d803bd758f4
     lines: 16
     members:
@@ -315,13 +308,14 @@ clones:
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:158:174
     disposition: keep-with-reason
     reason: Doctor rule contract boilerplate (end of plan choices array + apply()'s plan.kind guard + payload coercion); each rule independently implements the DoctorRule interface against the same contract, so shape similarity is interface-driven not duplication; extracting a base class would violate composition-over-inheritance
-  - id: 2ccdcd76762f
+  - id: 481cc645cc12
     lines: 15
     members:
       - packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:208:222
+      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:218:232
       - packages/core/src/doctor/rules/workflow-stale.ts:103:116
-    disposition: pending
-    reason: null
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: bf1260ae927f
     lines: 18
     members:
@@ -329,45 +323,24 @@ clones:
       - packages/core/src/entry/snapshot.ts:63:80
     disposition: pending
     reason: null
-  - id: 18718b4e0ad7
-    lines: 16
-    members:
-      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:218:233
-      - packages/core/src/doctor/rules/workflow-stale.ts:103:296
-    disposition: pending
-    reason: null
-  - id: 98a17ac7f3a7
-    lines: 26
-    members:
-      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:64:89
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:59:84
-    disposition: pending
-    reason: null
-  - id: 8b1f12469501
-    lines: 13
-    members:
-      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:89:101
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:84:96
-    disposition: pending
-    reason: null
   - id: 189be54baaa8
     lines: 9
     members:
-      - packages/core/src/doctor/runner.ts:188:196
-      - packages/core/src/doctor/runner.ts:215:223
+      - packages/core/src/doctor/runner.ts:185:193
+      - packages/core/src/doctor/runner.ts:212:220
     disposition: pending
     reason: null
   - id: 41b3f9fce647
     lines: 8
     members:
-      - packages/core/src/doctor/validate.ts:147:154
+      - packages/core/src/doctor/validate.ts:156:163
       - packages/core/src/doctor/validate.ts:43:50
     disposition: pending
     reason: null
   - id: 5c72154b2f6d
     lines: 9
     members:
-      - packages/core/src/entry/annotations.ts:442:450
+      - packages/core/src/entry/annotations.ts:458:466
       - packages/core/src/review/pipeline.ts:358:366
     disposition: pending
     reason: null
@@ -578,24 +551,10 @@ clones:
   - id: e2b6e847597b
     lines: 7
     members:
-      - packages/studio/src/routes/api.ts:341:347
-      - packages/studio/src/routes/api.ts:520:526
+      - packages/studio/src/routes/api.ts:396:402
+      - packages/studio/src/routes/api.ts:719:725
     disposition: ignore-with-justification
     reason: Surface-level structural similarity between POST /annotate and PATCH /comments preamble (different parser functions parseEntryAnnotationBody vs parseEditCommentFields, different mint paths downstream); extracting a shared parser-callback wrapper would obscure each route's distinct validation contract for a 7-line saving
-  - id: 918b3c68f28e
-    lines: 9
-    members:
-      - packages/studio/src/routes/api.ts:354:362
-      - packages/studio/src/routes/api.ts:539:547
-    disposition: pending
-    reason: null
-  - id: 29e3abdb5a22
-    lines: 15
-    members:
-      - packages/studio/src/routes/api.ts:533:362
-      - packages/studio/src/routes/api.ts:557:571
-    disposition: pending
-    reason: null
   - id: 3dac81177cbc
     lines: 8
     members:
@@ -643,8 +602,8 @@ clones:
   - id: d6093f110268
     lines: 10
     members:
-      - packages/studio/src/server.ts:407:416
-      - packages/studio/src/server.ts:416:425
+      - packages/studio/src/server.ts:458:467
+      - packages/studio/src/server.ts:467:476
     disposition: pending
     reason: null
   - id: 22fbdfa51c64
@@ -841,7 +800,7 @@ clones:
     lines: 11
     members:
       - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/check-deprecations-harness.ts:10:20
-      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:36
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:40
     disposition: pending
     reason: null
   - id: 94802334249e
@@ -878,7 +837,7 @@ clones:
     lines: 15
     members:
       - plugins/dw-lifecycle/src/debt-report/index.ts:14:28
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:153:167
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:143:157
     disposition: keep-with-reason
     reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
   - id: a0d4744c1099
@@ -1014,6 +973,34 @@ clones:
       - plugins/dw-lifecycle/src/triage-issues/propose.ts:204:224
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape on purpose. The propose-step finale (proposal-file shape construction, defaultOutputPath ISO-stamp computation, output-path collision check, JSON write) is canonical batched-proposal protocol surface shared across both hygiene skills; promotion to a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 394213e6df18
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:112:122
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:117:127
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 7632ba487d34
+    lines: 15
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:38:52
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:54:68
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 2781f314de77
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:77:83
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:82:88
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 24dde2d5a138
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:88:98
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:99:109
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: 1801f1b7dd0b
     lines: 8
     members:
@@ -1251,7 +1238,7 @@ clones:
     lines: 17
     members:
       - plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-queue.ts:134:150
-      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:213
+      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:223
     disposition: pending
     reason: null
   - id: b55096bc507f
@@ -1272,21 +1259,21 @@ clones:
     lines: 7
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:311:317
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:245:251
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:315:321
     disposition: pending
     reason: null
   - id: 3c6b6627d081
     lines: 14
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:168:181
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:157:112
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:227:112
     disposition: pending
     reason: null
   - id: 92d75db1cad2
     lines: 16
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:187:202
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:170:127
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:240:127
     disposition: pending
     reason: null
   - id: 7698568d0d6c
@@ -1300,35 +1287,35 @@ clones:
     lines: 9
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:562:570
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:267:275
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:337:345
     disposition: pending
     reason: null
   - id: 0fbb9fcd1915
     lines: 13
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:158:170
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:228:240
       - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:100:112
     disposition: pending
     reason: null
   - id: 9746ccb605f4
     lines: 15
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:171:185
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:241:255
       - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:113:127
     disposition: pending
     reason: null
   - id: 8c1a1eaa3a28
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:211:219
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:226:234
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:281:289
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:296:304
     disposition: pending
     reason: null
   - id: d063bccc5fe8
     lines: 10
     members:
       - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:111:120
-      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:202:211
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:212:221
     disposition: pending
     reason: null
   - id: 8f81364fec2d
@@ -1345,6 +1332,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-config.ts:75:84
     disposition: pending
     reason: null
+  - id: 6018afb62ce2
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:289:297
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/tdd-enforcement.ts:374:382
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: d724eab25113
     lines: 8
     members:
@@ -1394,17 +1388,270 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
+  - id: 11a36455541f
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:103:111
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:103:111
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: d6607615e28e
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:112:127
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:127
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: f65e258cb71f
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:303:311
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:193:201
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:187:195
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: e827d6cb8973
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:489:496
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:229:236
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 192d55419363
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:496:507
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:528:539
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:236:247
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 69c3cc2125ab
+    lines: 17
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:86:102
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:86:100
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 044582e5231a
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:103:111
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:83:90
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 4c483642ea0e
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:106:121
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:84:99
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 808397c61b8b
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:122:131
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:147:111
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 2fb54234f46e
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:130:136
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:110:116
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: c0fd6697055c
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:246:254
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:149:157
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: b7e746a25294
+    lines: 19
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:335:353
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:146:164
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:262:280
+      - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:194:212
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:157:175
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:578:596
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:229:247
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 4295f8a2a16b
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:100:108
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:86:93
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 7ab9addc4c45
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:110:119
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:102:111
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 05782de08529
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:179:185
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:311:317
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: ec4640c729a3
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:310:316
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:162:168
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 2a3bc18a22b5
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:112:120
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:205:213
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:188:196
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:157:165
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: c816c920dad7
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:63:72
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:84:93
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: dc5aa4894209
+    lines: 14
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:72:85
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:102:117
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 936c743dd938
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:84:91
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:122:131
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 87d757d3458e
+    lines: 34
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:58:91
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:78:111
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: a430638c6638
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:75:83
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:57:65
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:88:96
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 9f9c5b9009b8
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:69:78
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:84:94
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: bef89978806b
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:85:92
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:99:106
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:121
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 373ba2a9115d
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:86:94
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:75:83
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 90c51e757597
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:61:69
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:85:94
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: ba294b0620a2
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:51:59
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:79:87
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: d641fc42624b
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:78:84
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:113:121
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 5542b0b267c1
+    lines: 17
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:105:121
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:111:127
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: d64242911330
+    lines: 22
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:154:175
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:137:158
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: f6b4a78d5804
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:21:31
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:28:38
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 82a8fb12e17f
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:276:288
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:293
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: e6134a663544
+    lines: 18
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:77:94
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:85:100
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 88b7f7830725
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:95:104
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:102:111
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: 13b12da5062e
     lines: 28
     members:
-      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:108:135
+      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:117:144
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:156:183
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: d200b954f2ef
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:437:445
+      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:715:723
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:426:434
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
@@ -1412,35 +1659,35 @@ clones:
     lines: 42
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:103:144
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:89:130
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:79:120
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: b2488178b829
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:166:175
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:146:155
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:136:145
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 17910c70e661
     lines: 7
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:334:340
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:192:198
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:182:188
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 462b9a9ecf0d
     lines: 12
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:383:394
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:221:231
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:211:221
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 913d6ef9c4da
     lines: 8
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:57:64
-      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:38:54
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:38:44
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
   - id: 31ae172c82fa
@@ -1454,16 +1701,9 @@ clones:
     lines: 23
     members:
       - plugins/dw-lifecycle/src/subcommands/complete-parent-closure.ts:75:97
-      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:48:82
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:48:72
     disposition: keep-with-reason
     reason: "Parent-closure subcommand + walk + apply + tests duplicate gh-runtime helpers (detectRepoFromGit, RunGh shape, parseApproval, runOne dispatch, isRawIssue type-guard, raw-issue JSON shape) per the workplan's domain-isolation intent; shared gh-runtime extraction tracked at #335"
-  - id: 9cfccf0a8979
-    lines: 11
-    members:
-      - plugins/dw-lifecycle/src/subcommands/debt-report.ts:39:49
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:35:45
-    disposition: keep-with-reason
-    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
   - id: 0a9bedfbb1cf
     lines: 7
     members:
@@ -1471,6 +1711,27 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/doctor.ts:94:100
     disposition: pending
     reason: null
+  - id: 7c810f52eec2
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:100:106
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:123:131
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: ddc1fbf772ac
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:85:93
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:86:94
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: dbcaeca8aacd
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:93:101
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:102:157
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: d7a6cf2d3473
     lines: 10
     members:
@@ -1482,65 +1743,87 @@ clones:
     lines: 7
     members:
       - plugins/dw-lifecycle/src/subcommands/issues.ts:40:46
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:149:155
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:139:145
     disposition: keep-with-reason
     reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: d8800df1666a
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:106:113
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:149:156
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:104:111
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: 52b437adb7e8
     lines: 34
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:120:153
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:134:167
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:124:157
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 8e5f16a18cc8
     lines: 13
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:175:187
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:192:204
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:182:194
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 2a9a858b5922
     lines: 28
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:189:216
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:206:233
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:196:223
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 3e0f9e6532b9
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:232:241
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:248:257
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:238:247
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 48c9db6582fb
     lines: 8
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:38:45
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:47:54
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:37:44
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: abc1afffaf43
     lines: 20
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:51:70
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:63:82
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:53:72
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: d290e3525f10
     lines: 18
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:73:90
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:87:104
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:77:94
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 777751b1eafd
     lines: 24
     members:
       - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:91:114
-      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:107:130
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:97:120
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 3fe264e943fc
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:158:164
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:74:80
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
+  - id: 593fa69c2e1d
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:90:102
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:88:100
+    disposition: keep-with-reason
+    reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: ec203342fa99
     lines: 12
     members:

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# >>> dw-lifecycle scope-discovery hook >>>
+# Phase 17 Task 5 (#383's sibling) — commit-msg gate that refuses
+# commits when the audit-barrage hook hasn't run since the parent
+# commit. Closes the agent-discretion loophole the 2026-05-31 session
+# exposed.
+#
+# Per the in-repo dogfood pattern (mirrored from .husky/pre-commit),
+# invoke the in-tree CLI via npx tsx so the v0.30.0+ verb is available
+# even when the installed binary lags.
+
+DW_CLI="npx tsx plugins/dw-lifecycle/src/cli.ts"
+
+$DW_CLI check-implement-hook-ran
+gate_exit=$?
+
+if [ "$gate_exit" -ne 0 ]; then
+  echo "" >&2
+  echo "commit-msg: dw-lifecycle check-implement-hook-ran refused this commit." >&2
+  echo "  See stderr above for the cure command." >&2
+  echo "" >&2
+  exit 1
+fi
+
+exit 0
+# <<< dw-lifecycle scope-discovery hook <<<

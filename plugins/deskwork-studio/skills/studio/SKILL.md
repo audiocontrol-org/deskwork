@@ -36,11 +36,11 @@ To override:
 
 | Goal | Flag |
 |---|---|
-| Loopback only (skip Tailscale even if it's running) | `--no-tailscale` |
+| Loopback only (non-interactive smokes / CI) | `DESKWORK_STUDIO_NO_TAILSCALE=1` env var |
 | Bind ONLY to a specific address (no auto-detect) | `--host <addr>` |
 | Reach from any local interface (LAN + Wi-Fi + Tailscale + everything) | `--host 0.0.0.0` |
 
-The studio has **no authentication** and **no rate-limiting**. Tailscale is treated as a trusted network — peers on the same tailnet are usually devices the operator owns. `--host` exposing beyond loopback prints a loud warning in the startup banner.
+The studio has **no authentication** and **no rate-limiting**. Tailscale is treated as a trusted network — peers on the same tailnet are usually devices the operator owns. `--host` exposing beyond loopback prints a loud warning in the startup banner. (The old `--no-tailscale` flag is a deprecated no-op — it stranded off-keyboard operators on a loopback-only URL; loopback-only is now the `DESKWORK_STUDIO_NO_TAILSCALE=1` env var, which is non-interactive by construction.)
 
 ### Step 4 — Launch
 
@@ -54,7 +54,7 @@ Or with explicit overrides:
 
 ```
 deskwork-studio --project-root /absolute/path/to/project --port 47321
-deskwork-studio --no-tailscale                # loopback only
+DESKWORK_STUDIO_NO_TAILSCALE=1 deskwork-studio  # loopback only (non-interactive)
 deskwork-studio --host 0.0.0.0                # all interfaces (LAN + Wi-Fi + Tailscale)
 deskwork-studio --host 100.64.0.5             # bind to a specific Tailscale IP only
 ```
@@ -65,7 +65,7 @@ The wrapper resolves the studio binary in this order (npm-published architecture
 2. **Already installed at the pinned version.** When `<pluginRoot>/node_modules/@deskwork/studio/package.json` version === plugin manifest version (`<pluginRoot>/.claude-plugin/plugin.json#version`) and `<pluginRoot>/node_modules/.bin/deskwork-studio` is executable, dispatch directly. (Warm-cache path.)
 3. **First-run / version-drift install.** Run `npm install --omit=dev --workspaces=false @deskwork/studio@<plugin-manifest-version>` against the public npm registry, scoped to `<pluginRoot>` (the `--workspaces=false` flag prevents npm from walking up and treating the plugin as a workspace member). Concurrent invocations are serialized by a directory-based lock (`<pluginRoot>/.deskwork-install.lock`; `mkdir` is atomic on POSIX, macOS-portable). After install, dispatch via `<pluginRoot>/node_modules/.bin/deskwork-studio`.
 
-The server logs (loopback only — when Tailscale isn't running or `--no-tailscale` is passed):
+The server logs (loopback only — when Tailscale isn't running or `DESKWORK_STUDIO_NO_TAILSCALE=1` is set):
 
 ```
 deskwork-studio listening on:

@@ -1,0 +1,38 @@
+# Audit-barrage model battery — defaults shipped by the dw-lifecycle plugin.
+#
+# Project-overridable at:
+#   .dw-lifecycle/scope-discovery/audit-barrage-config.yaml
+#
+# Each entry registers one CLI to fire as part of the audit barrage. The
+# orchestrator runs all configured entries in parallel against the
+# rendered audit prompt; per-model output is captured under
+# `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/`.
+#
+# Per-entry fields:
+#   name              — operator-visible identifier; used as the per-model
+#                       filename stem in the run dir and to filter via the
+#                       `--models` flag.
+#   binary            — path or PATH-resolvable name of the CLI to spawn.
+#   args_template     — whitespace-delimited argv template; MUST contain
+#                       the literal `{{prompt}}` placeholder, which the
+#                       spawn helper substitutes with the rendered audit
+#                       prompt as a single argv element.
+#   timeout_seconds   — wall-clock budget; on expiry the subprocess is
+#                       sent SIGTERM, then SIGKILL after a 5s grace.
+#
+# Default invocation patterns mirror the live-probed contracts captured
+# in docs/1.0/001-IN-PROGRESS/scope-discovery/audit-barrage-cli-notes.md.
+
+models:
+  - name: claude
+    binary: claude
+    args_template: "-p {{prompt}}"
+    timeout_seconds: 300
+  - name: codex
+    binary: codex
+    args_template: "exec {{prompt}}"
+    timeout_seconds: 300
+  - name: gemini
+    binary: gemini
+    args_template: "{{prompt}}"
+    timeout_seconds: 300
