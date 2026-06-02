@@ -223,6 +223,25 @@ describe('renderFixTaskBlock — non-bug variant (Phase 18 Task 1)', () => {
     expect(block.toLowerCase()).toMatch(/≥40 characters of substantive content|40 characters/i);
   });
 
+  // AUDIT-20260602-01: non-bug template's Step 3 should default to
+  // `Acknowledges ${id}` and explicitly name `Defers` / `Closes` as
+  // alternatives. Using `Closes` on a non-fix disposition arms the
+  // auto-flip parser with false `fixed-<sha>` proposals.
+  it('non-bug template defaults Step 3 trailer to `Acknowledges <id>` (AUDIT-20260602-01)', () => {
+    const block = renderFixTaskBlock(
+      finding({
+        findingId: 'AUDIT-20260601-91',
+        heading: 'A non-fix disposition',
+        surface: 'docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md',
+      }),
+      { taskNumber: '5.99', findingShape: 'non-bug' },
+    );
+    expect(block).toContain('Acknowledges AUDIT-20260601-91');
+    // Guidance names the alternatives + cites the audit
+    expect(block.toLowerCase()).toContain('defers');
+    expect(block).toContain('AUDIT-20260602-01');
+  });
+
   it('defaults to code-defect template when findingShape is omitted (backward-compat)', () => {
     const block = renderFixTaskBlock(finding(), { taskNumber: '13.7' });
     // No (non-bug) marker

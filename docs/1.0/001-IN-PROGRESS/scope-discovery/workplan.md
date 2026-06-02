@@ -1085,14 +1085,16 @@ Closes AUDIT-20260602-01. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Closes AUDIT-20260602-01` in subject.
+**Disposition (Step 1):** Established the **commit-trailer convention** (`Closes` / `Acknowledges` / `Defers`) the auto-flip parser distinguishes. Concrete actions: (a) added three regression-lock tests at `auto-flip-from-commit.test.ts` asserting `parseClosesAuditTrailers` ignores `Acknowledges <id>` and `Defers <id>` and still extracts `Closes <id>` even when sibling `Acknowledges` clauses appear; (b) changed the `(non-bug)` workplan template at `workplan-task-renderer.ts:152` to default Step 3's trailer to `Acknowledges <id>` (with prose naming `Closes`/`Defers` as alternatives + citing AUDIT-01); (c) added the convention table to `plugins/dw-lifecycle/skills/promote-findings/SKILL.md`; (d) updated Phase 20 Task 1 Step 6 to remove the speculative `Closes AUDIT-20260601-68` trailer (Phase 20 hasn't shipped a fix yet — the trailer would arm a false flip if AUDIT-68 is later re-opened). The parser itself was already correct (`closes` verb regex is exclusive); the gap was a convention-not-encoded that historical commits had violated.
+
+- [x] Step 1: write the disposition prose (≥40 chars, substantive).
+- [x] Step 2: apply the action named in Step 1 (regression tests + template + SKILL.md + Phase 20 Task 1 Step 6 edit).
+- [ ] Step 3: commit with `Closes AUDIT-20260602-01` in subject (the disposition IS a code change verifiable by test — the regression-lock tests in `auto-flip-from-commit.test.ts` — so `Closes` is the correct trailer here, not `Acknowledges`).
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (regression tests + template + SKILL.md edits are present).
 - [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
@@ -3783,7 +3785,7 @@ Both cases share the same root cause: shape inference from surface alone is unso
 - [ ] Step 3: confirm RED.
 - [ ] Step 4: implement.
 - [ ] Step 5: confirm GREEN; full plugin suite + tsc clean.
-- [ ] Step 6: commit with `Closes #392` (and `Closes AUDIT-20260601-68` if AUDIT-68 is re-opened to track the proper fix).
+- [ ] Step 6: commit with `Closes #392`. Per AUDIT-20260602-01: use `Closes AUDIT-20260601-68` ONLY if Phase 20 Task 1 actually re-opens AUDIT-68 AND ships the fix in the same commit. Otherwise omit the AUDIT trailer (or use `Acknowledges AUDIT-20260601-68` if the disposition references it). Using `Closes` on a non-fix or speculative-reopen disposition arms the auto-flip parser with false `fixed-<sha>` proposals.
 
 **Acceptance Criteria:**
 - [ ] Approach picked by operator + rationale documented in commit body.

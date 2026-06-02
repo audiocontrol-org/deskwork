@@ -109,6 +109,48 @@ describe('parseClosesAuditTrailers — subject + trailer extraction', () => {
     expect(ids).toEqual(['AUDIT-20260529-12']);
   });
 
+  // AUDIT-20260602-01 regression-lock: `Acknowledges` and `Defers` are
+  // the non-fix trailer convention. The flip parser MUST NOT match them
+  // — using `Closes` on an acknowledgment/deferral commit was the bug
+  // AUDIT-01 surfaced.
+  it("ignores `Acknowledges AUDIT-<id>` trailers (non-fix convention; AUDIT-20260602-01)", () => {
+    const ids = parseClosesAuditTrailers(
+      [
+        'docs(workplan): acknowledge AUDIT-81 disposition',
+        '',
+        'Acknowledges AUDIT-20260601-81.',
+        '',
+        'No code change; doc-only acknowledgement.',
+      ].join('\n'),
+    );
+    expect(ids).toEqual([]);
+  });
+
+  it("ignores `Defers AUDIT-<id>` trailers (non-fix convention; AUDIT-20260602-01)", () => {
+    const ids = parseClosesAuditTrailers(
+      [
+        'docs(workplan): defer AUDIT-82 to follow-up',
+        '',
+        'Defers AUDIT-20260601-82.',
+      ].join('\n'),
+    );
+    expect(ids).toEqual([]);
+  });
+
+  it("still matches `Closes` even when `Acknowledges` appears for a different id", () => {
+    // Mixed commit: one real fix + one acknowledgement. The parser
+    // should pick up the Closes id and skip the Acknowledges id.
+    const ids = parseClosesAuditTrailers(
+      [
+        'fix(foo): code change + adjacent acknowledgement',
+        '',
+        'Closes AUDIT-20260601-90.',
+        'Acknowledges AUDIT-20260601-91.',
+      ].join('\n'),
+    );
+    expect(ids).toEqual(['AUDIT-20260601-90']);
+  });
+
   it("preserves order of first occurrence across multi-line input", () => {
     const ids = parseClosesAuditTrailers(
       [

@@ -149,7 +149,7 @@ export function renderFixTaskBlock(
       '',
       `- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".`,
       `- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).`,
-      `- [ ] Step 3: commit with \`Closes ${id}\` in subject.`,
+      `- [ ] Step 3: commit with \`Acknowledges ${id}\` in subject (use \`Closes ${id}\` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use \`Acknowledges\`; for deferrals use \`Defers\`). Per AUDIT-20260602-01: \`apply-audit-flips\` parses \`Closes\` trailers as \`fixed-<sha>\` proposals — using \`Closes\` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.`,
       '',
       '**Acceptance Criteria:**',
       '',

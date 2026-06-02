@@ -104,6 +104,24 @@ Closes AUDIT-<YYYYMMDD>-<NN>. Surface: <Surface>.
 
 The `<test-file-path>` placeholder is filled in by the Step 1 implementer (the person writing the failing test decides where it lives; the renderer doesn't invent it).
 
+## Commit-trailer convention (AUDIT-20260602-01)
+
+Three verbs distinguish the disposition's intent for `apply-audit-flips`:
+
+| Trailer | Intent | `apply-audit-flips` behavior |
+|---|---|---|
+| `Closes AUDIT-<id>` | The commit fixes the bug; a failing test is now passing OR a code change verifiable by test landed. | Proposes `open → fixed-<sha>`. |
+| `Acknowledges AUDIT-<id>` | Doc-only acknowledgement: the disposition is a substantive note in the workplan / audit-log / journal, not a code fix. | Ignored — no flip proposal. |
+| `Defers AUDIT-<id>` | Deferral to a follow-up issue with substantive rationale (NOT "for now"; that's banned). | Ignored — no flip proposal. |
+
+**Why the distinction matters.** `apply-audit-flips` parses `Closes` trailers and proposes `fixed-<sha>` flips against the cited audit-log entries. If the entry is currently `acknowledged-…`, the proposal is filtered out (current ≠ `open`). But if the entry is later re-opened (e.g. the original disposition is overturned by a follow-up audit), the historical `Closes` trailer becomes a false `fixed-<sha>` candidate pointing at a commit that did not implement the fix. Using `Acknowledges` / `Defers` for non-fix dispositions avoids arming the auto-flipper with false candidates.
+
+**For non-bug template tasks**: the default Step 3 trailer is `Acknowledges`. The operator changes it to `Closes` if the disposition turned out to be a real code change (Task 5.116's `inferFindingShape` allowlist extension is an example), or to `Defers` if the disposition is a deferral.
+
+**For code-defect template tasks**: the default Step 3 trailer is `Closes` — the task is a TDD-shaped fix and the commit is the fix landing.
+
+Regression-locked at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-flip-from-commit.test.ts` (per the AUDIT-20260602-01 regression-lock tests added with the convention).
+
 ## Cross-references
 
 - **Discipline rule** — [`.claude/rules/agent-discipline.md`](../../../../.claude/rules/agent-discipline.md) § "Just for now is bullshit". The mechanical enforcement of *"agents relentlessly rationalize deferral as scope discipline when it's scope erosion."*
