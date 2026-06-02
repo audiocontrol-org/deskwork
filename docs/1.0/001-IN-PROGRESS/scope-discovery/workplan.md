@@ -784,6 +784,57 @@ Closes AUDIT-20260601-78. Surface: commit subject `fix(promote-findings): exclud
 - [x] The named action has landed in this branch (the `apply-audit-flips` invocation succeeded; AUDIT-78 itself stays as a documentation-only acknowledgement).
 - [x] Audit-log Status flipped to `acknowledged-non-bug-resolved-2026-06-01` via this commit.
 
+
+### Task 5.116 (fix-finding-AUDIT-20260602-05) (non-bug): AUDIT-20260602-05 — Surface classifier mis-shapes journal (`.md`) findings as co…
+
+Closes AUDIT-20260602-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.114 / 5.115 vs. 5.112 / 5.113.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Closes AUDIT-20260602-05` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 5.117 (fix-finding-AUDIT-20260602-06): AUDIT-20260602-06 — `--no-tailscale` deprecation warning fires unconditionally —…
+
+Closes AUDIT-20260602-06. Surface: `packages/studio/src/server.ts:157-172` (the `if (noTailscaleFlagSeen)` block). Severity: low.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-06` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 5.118 (fix-finding-AUDIT-20260602-07): AUDIT-20260602-07 — Shipped `agent-discipline.md` is internally inconsistent — e…
+
+Closes AUDIT-20260602-07. Surface: `.claude/rules/agent-discipline.md` — audit-barrage section ("third independent audit surface … the SDD two-reviewer cycle") vs. the deleted entry 2 ("Use /dw-lifecycle:review after every implementation step"). Severity: low.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-07` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5.110 (fix-finding-AUDIT-20260601-76): AUDIT-20260601-76 — Auto-promotion swept a positive `informational` "clean repor…
 
 Closes AUDIT-20260601-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/subcommands/promote-findings.ts:385-387` (auto-apply finding filter). Severity: high.
@@ -3759,3 +3810,36 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 - **`/dw-lifecycle:review` / `/dw-lifecycle:audit` callers in OTHER plugins** — if any. Scope-discovery only owns its own callers; downstream plugins (deskwork, deskwork-studio) coordinate their own retirements.
 - **`code-reviewer` sub-agent retirement** — Task 2's `agent-discipline.md` cleanup may surface this as a follow-up; the agent itself stays as long as it has callers outside scope-discovery.
 - **Migration of historical audit-log entries** — entries written by `/dw-lifecycle:review` stay as historical record; the lifecycle ownership transfer is forward-only.
+
+## Phase 21: `check-implement-hook-coverage` gate excludes merged-from-upstream commits
+
+The pre-push gate `check-implement-hook-coverage` (`plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts`) computes "unpushed commits" as `git rev-list ${tipRef}..HEAD`, where `tipRef` defaults to `origin/<current-branch>`. After merging `origin/main` into a feature branch, that range includes every commit inherited from `main` — none of which carry hook-run markers on the feature branch's marker log, because they were authored against main and already gated there.
+
+The result: a routine "sync feature branch with main" push is refused by the gate with dozens of "uncovered commits" the operator can't reasonably backfill (each was a separate commit on main, owned by a different feature branch). Live repro on 2026-06-02: merging `origin/main` (27 commits) into `feature/scope-discovery` produced 28 uncovered commits at push time, even though all 27 had passed the gate on their original branches. The merge commit itself was correctly backfilled by one `dw-lifecycle implement-hook` run; the 27 inherited commits remained refused.
+
+**Severity: medium** — blocks a routine workflow with no good cure path; agent-discipline rule forbids `--no-verify`, so the operator must either patch the gate temporarily or defer the push indefinitely.
+
+**Step 0 — working-code invariant.** Pre-fix, the gate correctly refuses commits authored on the feature branch that lack a hook-run marker. The fix MUST preserve that refusal — it only excludes commits that are already reachable from a designated upstream base ref (e.g. `origin/main`).
+
+- [ ] Step 1: write failing test exercising the bug. Fixture: a tmp git repo with `origin/main` containing N commits with no hook-run markers, a feature branch that merges `origin/main` and adds one feature-branch commit (with a marker). Assert: gate currently exits 1 listing all N+1 commits; after fix, gate exits 0 (the merged commits are excluded, the marker-backed feature commit is covered).
+- [ ] Step 2: confirm test fails against current code (verify the bug repros).
+- [ ] Step 3: implement the fix. Add an `--upstream-base-ref` flag (default `origin/main`) to `check-implement-hook-coverage`. Change the rev-list range from `${tipRef}..HEAD` to `${tipRef}..HEAD ^${upstreamBaseRef}` (i.e. exclude commits reachable from the upstream base). Honor an env-var override `DW_UPSTREAM_BASE_REF` so the pre-push hook can swap the default without code change. Document the flag + env var in the CLI usage block.
+- [ ] Step 4: confirm test passes.
+- [ ] Step 5: add a second test for the negative case — a feature-branch commit that is NOT reachable from `origin/main` and lacks a marker should still be flagged.
+- [ ] Step 6: confirm both tests pass (`npx vitest run plugins/dw-lifecycle/test/subcommands/check-implement-hook-coverage.test.ts`).
+- [ ] Step 7: update `.husky/pre-push` to pass `--upstream-base-ref origin/main` (or read from env) so the gate behaves correctly for merge-from-main pushes by default.
+- [ ] Step 8: commit with `Closes Phase 21` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `plugins/dw-lifecycle/test/subcommands/check-implement-hook-coverage.test.ts` (or similar) exercising the merge-from-upstream scenario (cited in Step 1).
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix).
+- [ ] Negative-case test confirms that feature-authored commits without markers are still refused.
+- [ ] `.husky/pre-push` updated to honor the upstream base.
+- [ ] Phase 21 documented in audit-log under a new AUDIT-<date>-NN entry (status: `fixed-<sha>`) referencing this task.
+
+### Phase 21 — Out of Scope
+
+- **A general "exclude-by-author" or "exclude-by-pattern" filter** — the upstream-base-ref mechanism is sufficient for the merge-from-main case; broader filtering is YAGNI until a second concrete case surfaces.
+- **Auto-detection of the upstream base** (e.g. parsing `git config branch.<name>.merge`) — the default `origin/main` covers the deskwork project; per-project override via env or flag handles non-default cases.
+- **Migration of the existing pre-push hook to use the new flag retroactively** — once shipped, all future merge-from-main pushes use the new default; no historical replay needed.

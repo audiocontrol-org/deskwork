@@ -2306,3 +2306,38 @@ Severity:   low
 Surface:    `DEVELOPMENT-NOTES.md` — "Plugin test suite: 2622 → 2626 (5 new test blocks; the +5 from AUDIT-68 attempt reverted)"
 
 The Quantitative line states `2622 → 2626`, a delta of **+4**, but parenthetically claims "**5** new test blocks." If the AUDIT-68 attempt's +5 was reverted (net 0 from that work), the net new blocks come from AUDIT-76/77; either way "5 new test blocks" with an end count of 2626 is off by one (5 net new from 2622 would be 2627). The numbers don't reconcile. This is a false-precision hygiene defect in a historical record — minor on its own, but the project rules explicitly call out fabricated/unverified metrics, and a reader can't tell whether 2626 is wrong, "5" is wrong, or a block count was double-counted. Fix: re-derive from `npx vitest` output and state the actual delta (e.g. "2622 → 2626, +4 net: +N from AUDIT-76/77, +5/−5 from the reverted AUDIT-68 attempt").
+
+## 2026-06-02 — audit-barrage lift (20260602T161440553Z-scope-discovery)
+
+### AUDIT-20260602-05 — Surface classifier mis-shapes journal (`.md`) findings as code-defects — minting unsatisfiable vitest criteria for `DEVELOPMENT-NOTES.md` fixes
+
+Finding-ID: AUDIT-20260602-05
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.114 / 5.115 vs. 5.112 / 5.113
+
+This diff adds four promote-findings tasks for AUDIT-20260602-01..04. The shape inference splits them inconsistently: Tasks 5.112 / 5.113 (Surface = `workplan.md`) are correctly rendered `(non-bug)` with disposition-prose steps, but Tasks 5.114 / 5.115 (Surface = `DEVELOPMENT-NOTES.md` — *also* a docs/markdown file) are rendered as full code-defect TDD tasks: *"Step 1: write failing test exercising the bug"* and acceptance criterion *"`npx vitest run <test-file-path>` exits 0."* AUDIT-04's actual defect is a journal arithmetic inconsistency (`2622 → 2626` vs "5 new test blocks") and AUDIT-03's is journal narrative — neither has any vitest contract. The `npx vitest run` criterion on 5.114/5.115 is therefore unsatisfiable by construction.
+
+This is the GH #392 / decompose-AUDIT-08 *shape* recurring, but on a **new and unfiled surface**: #392 concerns `.ts` surfaces whose fix is comment-only; here the surface is itself a non-source markdown file (`DEVELOPMENT-NOTES.md`) that the inference apparently doesn't carry in its non-bug allowlist the way it carries `workplan.md`. So `inferFindingShape` treats two sibling docs files in the *same diff* differently — `workplan.md` → non-bug, `DEVELOPMENT-NOTES.md` → code-defect. The concrete cost is two permanently-incompletable tasks (`[ ] Failing test exists at (to be filled in by Step 1 implementer)`) that will trip the `check-fix-task-tdd` commit gate or force a close-on-partial-criteria. The non-bug surface allowlist should recognize `DEVELOPMENT-NOTES.md` (and journal files generally) as non-source; failing that, both rows need the `(non-bug)` shape applied by hand before the next implement loop mints more of them.
+
+### AUDIT-20260602-06 — `--no-tailscale` deprecation warning fires unconditionally — emits false "you are exposed on the tailnet" text when `DESKWORK_STUDIO_NO_TAILSCALE=1` is also set
+
+Finding-ID: AUDIT-20260602-06
+Status:     open
+Severity:   low
+Surface:    `packages/studio/src/server.ts:157-172` (the `if (noTailscaleFlagSeen)` block)
+
+The flag-seen warning is gated only on `noTailscaleFlagSeen`, independent of the env-var result. When an operator passes BOTH `--no-tailscale` AND `DESKWORK_STUDIO_NO_TAILSCALE=1` (a plausible belt-and-suspenders invocation, or a legacy script that added the flag and a newer wrapper that added the env var), `noTailscale` correctly resolves to `true` (loopback-only IS active), yet the warning still prints: *"The studio auto-detects Tailscale and … will be reachable by every peer on your tailnet. If you passed --no-tailscale to keep it loopback-only, that no longer works: set DESKWORK_STUDIO_NO_TAILSCALE=1 …"*
+
+That text is factually wrong in this case — the studio is bound loopback-only, is NOT reachable on the tailnet, and the operator already did the thing the message tells them to do. On a security-relevant, no-auth surface the warning is the operator's primary signal about exposure, so a warning that claims exposure when there is none erodes its own trustworthiness (next time it's correct, it may be ignored). The fix is to suppress (or soften) the flag-seen warning when `noTailscale === true` — i.e., only warn that "loopback-only no longer works" when loopback-only is in fact NOT in effect.
+
+### AUDIT-20260602-07 — Shipped `agent-discipline.md` is internally inconsistent — entry 2 (the review discipline) is deleted while audit-barrage still names the review cycle as a live "third independent audit surface"
+
+Finding-ID: AUDIT-20260602-07
+Status:     open
+Severity:   low
+Surface:    `.claude/rules/agent-discipline.md` — audit-barrage section ("third independent audit surface … the SDD two-reviewer cycle") vs. the deleted entry 2 ("Use /dw-lifecycle:review after every implementation step")
+
+This diff deletes the `## Use /dw-lifecycle:review after every implementation step` rule outright (entry 2, confirmed removed) and in the *same* feature re-authors the audit-barrage entry down to a pointer whose surviving prose still reads: *"Audit-barrage is the **third independent audit surface** (alongside the in-band self-audit and the SDD two-reviewer cycle)."* The "SDD two-reviewer cycle" is `/dw-lifecycle:review`. So the shipped file simultaneously (a) removes the discipline mandating review, and (b) describes review as one of three active audit surfaces — a reader finds review cited as load-bearing but no rule establishing it.
+
+The decompose-agent-discipline PRD acknowledges this exact line as #387's responsibility ("the audit-barrage rule's 'three independent audit surfaces' framing, which names review as surface #2 of 3"), so the reconciliation is *tracked* — but #387 is a separate, not-yet-started feature, and this diff ships the inconsistency now rather than leaving the "three surfaces" count correct until #387 lands. Since the audit-barrage line was actively rewritten in this diff (not merely inherited), the least-surprising move is to update the count/framing here (e.g. "second independent audit surface alongside the in-band self-audit") so the file is internally consistent at ship time, leaving the skill-retirement mechanics to #387. Flagging as low because it's documentation and #387 owns the broader retirement.
