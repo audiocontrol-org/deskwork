@@ -2312,7 +2312,7 @@ The Quantitative line states `2622 → 2626`, a delta of **+4**, but parenthetic
 ### AUDIT-20260602-05 — Surface classifier mis-shapes journal (`.md`) findings as code-defects — minting unsatisfiable vitest criteria for `DEVELOPMENT-NOTES.md` fixes
 
 Finding-ID: AUDIT-20260602-05
-Status:     open
+Status:     fixed-a08b0dd64e04319310b7f149605cc2457e89a2c8
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Tasks 5.114 / 5.115 vs. 5.112 / 5.113
 
@@ -2323,7 +2323,7 @@ This is the GH #392 / decompose-AUDIT-08 *shape* recurring, but on a **new and u
 ### AUDIT-20260602-06 — `--no-tailscale` deprecation warning fires unconditionally — emits false "you are exposed on the tailnet" text when `DESKWORK_STUDIO_NO_TAILSCALE=1` is also set
 
 Finding-ID: AUDIT-20260602-06
-Status:     open
+Status:     fixed-16743e68e36d3767b4856cdcf9e88e7003a88279
 Severity:   low
 Surface:    `packages/studio/src/server.ts:157-172` (the `if (noTailscaleFlagSeen)` block)
 
@@ -2334,10 +2334,110 @@ That text is factually wrong in this case — the studio is bound loopback-only,
 ### AUDIT-20260602-07 — Shipped `agent-discipline.md` is internally inconsistent — entry 2 (the review discipline) is deleted while audit-barrage still names the review cycle as a live "third independent audit surface"
 
 Finding-ID: AUDIT-20260602-07
-Status:     open
+Status:     fixed-151e4a517cb38d1d4ae15aa5dd21dd29c4d3081f
 Severity:   low
 Surface:    `.claude/rules/agent-discipline.md` — audit-barrage section ("third independent audit surface … the SDD two-reviewer cycle") vs. the deleted entry 2 ("Use /dw-lifecycle:review after every implementation step")
 
 This diff deletes the `## Use /dw-lifecycle:review after every implementation step` rule outright (entry 2, confirmed removed) and in the *same* feature re-authors the audit-barrage entry down to a pointer whose surviving prose still reads: *"Audit-barrage is the **third independent audit surface** (alongside the in-band self-audit and the SDD two-reviewer cycle)."* The "SDD two-reviewer cycle" is `/dw-lifecycle:review`. So the shipped file simultaneously (a) removes the discipline mandating review, and (b) describes review as one of three active audit surfaces — a reader finds review cited as load-bearing but no rule establishing it.
 
 The decompose-agent-discipline PRD acknowledges this exact line as #387's responsibility ("the audit-barrage rule's 'three independent audit surfaces' framing, which names review as surface #2 of 3"), so the reconciliation is *tracked* — but #387 is a separate, not-yet-started feature, and this diff ships the inconsistency now rather than leaving the "three surfaces" count correct until #387 lands. Since the audit-barrage line was actively rewritten in this diff (not merely inherited), the least-surprising move is to update the count/framing here (e.g. "second independent audit surface alongside the in-band self-audit") so the file is internally consistent at ship time, leaving the skill-retirement mechanics to #387. Flagging as low because it's documentation and #387 owns the broader retirement.
+
+## 2026-06-02 — audit-barrage lift (20260602T165315931Z-scope-discovery)
+
+### AUDIT-20260602-08 — AUDIT-05 fix is incomplete within its own diff — Task 5.118 mints the identical unsatisfiable-vitest shape against `.claude/rules/agent-discipline.md`
+
+Finding-ID: AUDIT-20260602-08
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (new Task 5.118 block) + `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:80`
+
+AUDIT-05's stated defect is that `inferFindingShape` mis-shapes non-source markdown surfaces as code-defect TDD tasks, minting unsatisfiable `npx vitest run <test-file-path>` acceptance criteria. The fix (renderer.ts:80) allowlists exactly one filename — `development-notes.md`. But the *same promote-findings run captured in this diff* produced **Task 5.118** for AUDIT-07, whose Surface is `.claude/rules/agent-discipline.md` — another non-source markdown file whose fix is a pure prose edit ("update the count/framing here," per AUDIT-07's own body). Task 5.118 is rendered as a full code-defect task: `Step 1: write failing test`, AC `npx vitest run <test-file-path> exits 0`, and the placeholder `Failing test exists at (to be filled in by Step 1 implementer)`. That criterion is unsatisfiable by construction — exactly the failure mode AUDIT-05 names — and it ships in the very diff that purports to fix the shape inference.
+
+`agent-discipline.md` matches none of the allowlist patterns (audit-log/workplan/tooling-feedback/clones/development-notes/.dw-lifecycle/marker-files/commit-sha/process-prose), so it falls through to `code-defect`. The concrete cost is identical to AUDIT-05's: Task 5.118 will trip the `check-fix-task-tdd` commit gate or force a close-on-partial-criteria. AUDIT-05's own recommended fix was "recognize DEVELOPMENT-NOTES.md *(and journal files generally)* as non-source"; the implementation took the narrowest possible literal reading and left the general case open. A sound fix generalizes the rule — e.g. a pattern for `.claude/rules/*.md` (rule/doc files) or, better, treating any non-`.ts`/`.js`/`.tsx`/`.json` source-extension surface as non-bug — and adds a regression test asserting `inferFindingShape({surface: '.claude/rules/agent-discipline.md'})` → `'non-bug'`. Until then, Task 5.118 needs the `(non-bug)` shape applied by hand, the same as 5.114/5.115 received in this diff.
+
+---
+
+### AUDIT-20260602-09 — Per-filename allowlist guarantees recurrence — the structural default (`code-defect` for any unrecognized surface) is the root mis-assumption
+
+Finding-ID: AUDIT-20260602-09
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:68-92`
+
+The added line 80 grows an already-13-clause hardcoded allowlist by one more literal filename. The default-to-`code-defect` branch (line 91) means *every* surface the list doesn't enumerate is assumed TDD-able. That assumption is false for an open-ended set of non-source surfaces (rule docs, READMEs, SKILL.md, PRD prose, journal files), so each new finding-against-a-doc re-discovers the bug one filename at a time — claude-01 above is the second instance in two days (GH #392 was the first, against `.ts` comment-only fixes). The allowlist's per-file accretion is whack-a-mole: it can only ever catch surfaces that have *already* produced a broken task.
+
+The cheaper-to-maintain inversion is to make `non-bug` the inference for any surface that is not a recognized *source-code* extension (`.ts`/`.tsx`/`.js`/`.mjs`/`.cts`/etc.), and reserve the allowlist for the genuinely-ambiguous cases. That flips the failure mode from "silently mints an unsatisfiable task for every unanticipated doc surface" to "occasionally needs a code-defect override for a config/data file that genuinely has a test" — a strictly safer default for a renderer feeding a commit gate. Flagging low because the narrow fix is correct as far as it goes; this is the design observation that the chosen shape of the fix won't stop the next recurrence.
+
+---
+
+### AUDIT-20260602-10 — `non-bug` shape on Task 5.116 drops any acceptance criterion gating the real regression tests the fix actually added
+
+Finding-ID: AUDIT-20260602-10
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 5.116 acceptance criteria) vs. `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-task-renderer.test.ts:164-183`
+
+The binary Surface-based inference is lossy in the *opposite* direction here. Task 5.116 fixes AUDIT-05, whose Surface field is `workplan.md`, so it correctly renders `(non-bug)`. But the actual fix is genuine, testable code: the allowlist edit at renderer.ts:80 plus two new regression tests (`workplan-task-renderer.test.ts:170-183`). The `(non-bug)` shape's acceptance criteria are only "disposition prose ≥40 chars" and "the named action has landed" — **no criterion requires `npx vitest run` to pass.** So the very regression tests that lock in this fix are not gated by any acceptance criterion on the task that introduced them; if they regressed or were deleted, nothing in Task 5.116's ACs would catch it.
+
+This is the inverse of AUDIT-05: doc-surface-but-code-fix gets the test-free shape even though a TDD contract exists and was satisfied. The two-state (`code-defect` | `non-bug`) inference can't represent "non-source *surface*, but the fix is real testable code." A reasonable mitigation: when a non-bug disposition's action includes a source edit (detectable by the disposition prose naming a `.ts`/`.js` file, or simply by operator judgment), allow a hybrid AC that still asserts the suite passes. Low severity because the tests do exist and pass today; the gap is that the workplan wouldn't notice if they stopped.
+
+---
+
+I walked the diff's only executable change (the `development-notes.md` allowlist entry + its two tests) and verified its mechanism against the source. The audit-log additions (AUDIT-05/06/07) are faithful records. The workplan changes correctly reshape 5.114/5.115 to `(non-bug)` and correctly leave 5.117 (server.ts, a real code surface) as `code-defect`. The one substantive problem is that the narrow allowlist fix doesn't cover `.claude/rules/agent-discipline.md`, so this same diff ships Task 5.118 with the exact unsatisfiable-vitest shape AUDIT-05 set out to eliminate (claude-01) — that's the finding I'd prioritize.
+
+## 2026-06-02 — audit-barrage lift (20260602T165741683Z-scope-discovery)
+
+### AUDIT-20260602-11 — `--no-tailscale` + a loopback `--host` still fires the false exposure warning — the AUDIT-06 fix only closed the env-var path, not the `--host 127.0.0.1` path the warning itself recommends
+
+Finding-ID: AUDIT-20260602-11
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   medium
+Surface:    `packages/studio/src/server.ts:161-185` (the `if (noTailscaleFlagSeen)` block) vs. `packages/studio/src/server.ts:587-593` (bind resolution)
+
+The fix gates the false-exposure branch solely on `noTailscale` (line 167), which is computed *only* from `DESKWORK_STUDIO_NO_TAILSCALE` (line 153). But `noTailscale` is not the only loopback mechanism — `hostOverride` takes strict precedence in the actual bind resolution: `if (hostOverride !== null) bindAddresses = [hostOverride]` (line 587), evaluated *before* the `else if (noTailscale)` branch (line 589). So invoking `deskwork-studio --no-tailscale --host 127.0.0.1` binds loopback-only (`bindAddresses = ['127.0.0.1']`, never reachable on the tailnet), yet `noTailscale === false` (env unset), so the `else` branch at line 173 fires the full exposure text: *"will be reachable by every peer on your tailnet … set DESKWORK_STUDIO_NO_TAILSCALE=1 (or use --host 127.0.0.1) to restore loopback-only binding."*
+
+This is the exact bug AUDIT-06 set out to kill — a factually-wrong exposure claim on a no-auth surface — left incomplete *in the same diff*. It is arguably the more likely belt-and-suspenders invocation than the env-var one, because the warning message *itself* tells operators to "use --host 127.0.0.1" to get loopback-only; an operator who follows that advice while the deprecated flag is still in their launch script gets told, falsely, that they are exposed and instructed to do the thing they already did. The fix's gating condition should ask "is the resolved bind loopback-only?" not "is the env var set?" — i.e., also suppress (or soften) the exposure branch when `hostOverride` is a loopback address (`127.0.0.1` / `localhost` / `::1`). The cleanest shape is to compute the effective bind decision once and gate the warning on it, rather than re-deriving exposure from one of the three inputs that feed it.
+
+### AUDIT-20260602-12 — New test coverage omits the `--host`-loopback combination — the incomplete branch ships unguarded
+
+Finding-ID: AUDIT-20260602-12
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `packages/studio/test/cli-args.test.ts:117-142` (the two new AUDIT-06 cases)
+
+The two added tests cover exactly the env-var axis: `--no-tailscale` + `DESKWORK_STUDIO_NO_TAILSCALE=1` (suppressed) and `--no-tailscale` with `env: {}` (full warning). Neither exercises `--no-tailscale` combined with a loopback `--host` override, which is the uncovered false-warning path from claude-01. Because the negative-case test (line 135) asserts the warning *does* fire whenever the env var is absent, it actually locks in the buggy behavior for the `--host 127.0.0.1` case rather than catching it — a future correct fix that suppresses the warning for loopback `--host` would have to amend this test, but as written it gives false confidence that "warning fires ⇔ exposed" is correct. A regression test should assert that `parseCliArgs(['--no-tailscale', '--host', '127.0.0.1'], { env: {} })` does **not** emit `/will be reachable/i`, mirroring the env-var suppression case. Per the project UI/verification discipline, an assertion should trace to the operator-perceivable claim ("loopback-bound ⇒ no exposure text"), not to the proxy signal ("env var set ⇒ no exposure text").
+
+---
+
+I walked the diff's only executable change against the full `parseCliArgs` source and the downstream bind resolution. The env-var attribution in the new "redundant, can be removed" branch (line 170) is factually correct — `noTailscale` is true *iff* `DESKWORK_STUDIO_NO_TAILSCALE` is truthy (line 153), so naming that env var is accurate. The truthiness normalization and unrecognized-value warning (lines 149-160) are untouched and sound. The one substantive gap is that the fix conflates "loopback-only is in effect" with "the env var is set," missing the `--host`-loopback path that `hostOverride` precedence (line 587) actually controls and that the warning text itself advertises — so the same false-exposure shape AUDIT-06 targets survives for `--no-tailscale --host 127.0.0.1`. I'd prioritize claude-01.
+
+## 2026-06-02 — audit-barrage lift (20260602T170046457Z-scope-discovery)
+
+### AUDIT-20260602-13 — SKILL.md edit claims internal consistency but leaves two live `:review`/`:audit` references contradicting the retirement note it just added
+
+Finding-ID: AUDIT-20260602-13
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   low
+Surface:    `plugins/dw-lifecycle/skills/audit-barrage/SKILL.md:8` and `:18` vs. the newly-added retirement note at `:10`
+
+The diff rewrites SKILL.md:10 and appends a parenthetical whose explicit stated purpose is *"to keep the prose internally consistent with the deleted review-discipline rule"* — it asserts the SDD two-reviewer cycle (`/dw-lifecycle:review`) is being retired under #387 and "is no longer named." But two other references to that exact cycle survive **in the same file, untouched by the diff**:
+
+- Line 8 (the lift-step description): *"Findings get lifted into the canonical feature audit-log via the existing `/dw-lifecycle:audit` (or `:review`) closure workflow."*
+- Line 18 (the "On operator demand" trigger): *"Triggered explicitly by the operator during `/dw-lifecycle:audit`, `/dw-lifecycle:review`, `/dw-lifecycle:complete` walks…"*
+
+So the file now simultaneously says (a) review is retired and no longer named (line 10) and (b) review is a live closure mechanism and a live trigger (lines 8, 18). This is the *same* internal-inconsistency shape AUDIT-20260602-07 set out to eliminate, surviving in the very file the diff edited to claim consistency. It's distinct from AUDIT-07 (which targeted agent-discipline.md's "third surface" line) — this is the lift-step/trigger axis, not the audit-surface-count axis. Note that the line-8 lift reference is precisely what feature-scope Task 2 / #387 Step 2 ("confirm audit-barrage's lift step owns the full audit-log lifecycle") will rehome, so #387 owns the eventual fix — but a one-line softening here (drop the bare `:review` from the lift/trigger prose, or say "the audit-log closure workflow" without naming the retired verb) would make the edit deliver the consistency its own note claims. Low because it's documentation and #387 tracks the broader retirement.
+
+### AUDIT-20260602-14 — Allowlist adds `.claude/rules/` + `.claude/CLAUDE.md` but omits `.claude/agents/*.md`, the next prose surface the install-agent-prompts skill actively edits
+
+Finding-ID: AUDIT-20260602-14
+Status:     acknowledged-slush-pile-2026-06-02
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:84-85`
+
+This is a concrete adjacent instance of the structural critique already dispositioned in AUDIT-20260602-09 (`acknowledged-slush-pile`), surfaced here only because it's a *specific, already-existing* prose surface the new allowlist leaves uncovered — not a re-litigation of the slush-pile disposition. The diff adds `\.claude\/rules\//` and `\.claude\/claude\.md` (lines 84-85), but `.claude/agents/*.md` is also pure agent-discipline prose: the `/dw-lifecycle:install-agent-prompts` skill exists specifically to edit `.claude/agents/code-reviewer.md` and `.claude/agents/codebase-auditor.md`. A finding whose Surface is one of those files matches none of the eight non-bug clauses and falls through to `code-defect` at line 96 — re-minting the unsatisfiable `npx vitest run <test-file-path>` shape that AUDIT-05/07 were about. Since the diff was already widening the `.claude/` coverage, broadening line 84 to `/\.claude\/(?:rules|agents)\//` (or, per AUDIT-09's recommended inversion, defaulting non-source extensions to `non-bug`) would have closed this adjacent gap in the same edit rather than waiting for it to produce its own broken task.
+
+Two minor mechanical notes on the same lines: (1) line 84's `\.claude\/rules\//` is unanchored, unlike its siblings on lines 71-73/80/85 which use `(?:^|\/|`|\s)` — harmless here (`.claude/rules/` is specific enough that a leading-char false positive is implausible) but inconsistent with the established pattern in the function; (2) both new clauses are correct for the AUDIT-07 surface (verified: `.claude/rules/agent-discipline.md …` lowercased matches line 84, and `.claude/CLAUDE.md …` → lowercased `.claude/claude.md` matches line 85, consistent with the two added tests).
+
+---
+
+I walked the diff's only executable change (the two new `inferFindingShape` regex clauses at renderer.ts:84-85 plus their two tests) and confirmed both match their intended AUDIT-07 surfaces and don't over-match. The workplan Task 5.118 reshape to `non-bug` is faithful — its disposition prose accurately describes the code edit, and the claimed regression tests exist. The agent-discipline.md:19 edit correctly drops the "third" framing. The one substantive gap is that SKILL.md's edit asserts it achieves internal consistency while leaving lines 8 and 18 still naming `/dw-lifecycle:review` as a live closure/trigger mechanism — the same inconsistency shape, in the same file, that the edit's own note claims to resolve (claude-01). I'd prioritize claude-01.

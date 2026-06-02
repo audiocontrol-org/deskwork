@@ -1,4 +1,4 @@
-generated_at: 2026-06-01T05:29:17.290Z
+generated_at: 2026-06-02T17:08:50.408Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -430,8 +430,8 @@ clones:
   - id: d6093f110268
     lines: 10
     members:
-      - packages/studio/src/server.ts:384:393
-      - packages/studio/src/server.ts:393:402
+      - packages/studio/src/server.ts:448:457
+      - packages/studio/src/server.ts:457:466
     disposition: pending
     reason: null
   - id: 14579dae3bdf
@@ -1144,7 +1144,7 @@ clones:
     lines: 12
     members:
       - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:496:507
-      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:528:539
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:581:592
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:236:247
     disposition: pending
     reason: null
@@ -1173,7 +1173,7 @@ clones:
     lines: 10
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:122:131
-      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:147:111
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:148:111
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + run-loop summary + feature-root directory walk). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
   - id: 2fb54234f46e
@@ -1197,7 +1197,7 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:146:164
       - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:262:280
       - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:194:212
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:263:281
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:157:175
       - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
@@ -1279,17 +1279,10 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:88:96
     disposition: keep-with-reason
     reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) recurs across every subcommand by convention.
-  - id: 9f9c5b9009b8
-    lines: 10
-    members:
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:69:78
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:84:94
-    disposition: pending
-    reason: null
   - id: bef89978806b
     lines: 8
     members:
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:85:92
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:113:120
       - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:99:106
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:121
     disposition: pending
@@ -1297,10 +1290,17 @@ clones:
   - id: 373ba2a9115d
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:86:94
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:114:122
       - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:75:83
     disposition: pending
     reason: null
+  - id: 99a8dddf39e2
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:91:101
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:84:94
+    disposition: ignore-with-justification
+    reason: Generic argv parse-flags loop boilerplate shared across CLI subcommands; each subcommand has its own flag set, DRY would require a generic argv parser framework (overkill for the ~10-line pattern).
   - id: 90c51e757597
     lines: 9
     members:
@@ -1452,7 +1452,7 @@ clones:
     lines: 9
     members:
       - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:93:101
-      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:102:157
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:102:158
     disposition: pending
     reason: null
   - id: d7a6cf2d3473
@@ -1473,7 +1473,7 @@ clones:
     lines: 8
     members:
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:106:113
-      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:149:156
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:150:157
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:104:111
     disposition: pending
     reason: null

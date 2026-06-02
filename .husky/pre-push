@@ -31,7 +31,12 @@ set -eu
 # Catches --no-verify bypasses of the commit-msg gate.
 
 DW_CLI="npx tsx plugins/dw-lifecycle/src/cli.ts"
-$DW_CLI check-implement-hook-coverage
+# Phase 21 — exclude commits reachable from origin/main so merging
+# origin/main into a feature branch doesn't refuse the push on inherited
+# commits that were already gated upstream. Override via env:
+#   DW_UPSTREAM_BASE_REF=origin/release-x git push ...
+# Pass an empty string to opt out entirely (pre-Phase-21 behavior).
+$DW_CLI check-implement-hook-coverage --upstream-base-ref "${DW_UPSTREAM_BASE_REF:-origin/main}"
 gate_exit=$?
 
 if [ "$gate_exit" -ne 0 ]; then

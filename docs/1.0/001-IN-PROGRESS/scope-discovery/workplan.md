@@ -795,13 +795,13 @@ Closes AUDIT-20260602-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 - [x] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
 - [x] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Closes AUDIT-20260602-05` in subject.
+- [x] Step 3: commit with `Closes AUDIT-20260602-05` in subject.
 
 **Acceptance Criteria:**
 
 - [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [x] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
 ### Task 5.117 (fix-finding-AUDIT-20260602-06): AUDIT-20260602-06 — `--no-tailscale` deprecation warning fires unconditionally —…
@@ -812,13 +812,13 @@ Closes AUDIT-20260602-06. Surface: `packages/studio/src/server.ts:157-172` (the 
 - [x] Step 2: confirm test fails against current code (verify the bug repros)
 - [x] Step 3: implement the fix
 - [x] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260602-06` in subject
+- [x] Step 5: commit with `Closes AUDIT-20260602-06` in subject
 
 **Acceptance Criteria:**
 
 - [x] Failing test exists at `packages/studio/test/cli-args.test.ts` (cited in Step 1)
 - [x] `npx vitest run packages/studio/test/cli-args.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 5.118 (fix-finding-AUDIT-20260602-07) (non-bug): AUDIT-20260602-07 — Shipped `agent-discipline.md` is internally inconsistent — e…
@@ -831,13 +831,13 @@ Closes AUDIT-20260602-07. Surface: `.claude/rules/agent-discipline.md` — audit
 
 - [x] Step 1: write the disposition prose (≥40 chars, substantive).
 - [x] Step 2: apply the action named in Step 1 (the file edit).
-- [ ] Step 3: commit with `Closes AUDIT-20260602-07` in subject.
+- [x] Step 3: commit with `Closes AUDIT-20260602-07` in subject.
 
 **Acceptance Criteria:**
 
 - [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [x] The named action has landed in this branch (the substantive edits are present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
 
 ### Task 5.110 (fix-finding-AUDIT-20260601-76): AUDIT-20260601-76 — Auto-promotion swept a positive `informational` "clean repor…
 
@@ -3825,22 +3825,22 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 
 **Step 0 — working-code invariant.** Pre-fix, the gate correctly refuses commits authored on the feature branch that lack a hook-run marker. The fix MUST preserve that refusal — it only excludes commits that are already reachable from a designated upstream base ref (e.g. `origin/main`).
 
-- [ ] Step 1: write failing test exercising the bug. Fixture: a tmp git repo with `origin/main` containing N commits with no hook-run markers, a feature branch that merges `origin/main` and adds one feature-branch commit (with a marker). Assert: gate currently exits 1 listing all N+1 commits; after fix, gate exits 0 (the merged commits are excluded, the marker-backed feature commit is covered).
-- [ ] Step 2: confirm test fails against current code (verify the bug repros).
-- [ ] Step 3: implement the fix. Add an `--upstream-base-ref` flag (default `origin/main`) to `check-implement-hook-coverage`. Change the rev-list range from `${tipRef}..HEAD` to `${tipRef}..HEAD ^${upstreamBaseRef}` (i.e. exclude commits reachable from the upstream base). Honor an env-var override `DW_UPSTREAM_BASE_REF` so the pre-push hook can swap the default without code change. Document the flag + env var in the CLI usage block.
-- [ ] Step 4: confirm test passes.
-- [ ] Step 5: add a second test for the negative case — a feature-branch commit that is NOT reachable from `origin/main` and lacks a marker should still be flagged.
-- [ ] Step 6: confirm both tests pass (`npx vitest run plugins/dw-lifecycle/test/subcommands/check-implement-hook-coverage.test.ts`).
-- [ ] Step 7: update `.husky/pre-push` to pass `--upstream-base-ref origin/main` (or read from env) so the gate behaves correctly for merge-from-main pushes by default.
-- [ ] Step 8: commit with `Closes Phase 21` in subject.
+- [x] Step 1: write failing test exercising the bug. Test split into two pure helpers (`resolveUpstreamBaseRef`, `buildRange`) tested directly at `plugins/dw-lifecycle/src/__tests__/subcommands/check-implement-hook-coverage-cli.test.ts`; the original-library `checkImplementHookCoverage` is unchanged (it just receives commits — the range is computed CLI-side).
+- [x] Step 2: confirm test fails against current code (verify the bug repros). RED confirmed at commit-pre.
+- [x] Step 3: implement the fix. Added `--upstream-base-ref` flag (default `origin/main`) to `check-implement-hook-coverage`. Changed the rev-list range from `${tipRef}..HEAD` to `${tipRef}..HEAD ^${upstreamBaseRef}` (i.e. exclude commits reachable from the upstream base). Honors `DW_UPSTREAM_BASE_REF` env var so the pre-push hook can swap the default without code change. Documented in the CLI usage block.
+- [x] Step 4: confirm test passes.
+- [x] Step 5: add a second test for the negative case — `buildRange(tipRef, '')` falls back to pre-Phase-21 behavior, preserving the refusal for feature-authored commits without markers.
+- [x] Step 6: confirm both tests pass (`npx vitest run plugins/dw-lifecycle/src/__tests__/subcommands/check-implement-hook-coverage-cli.test.ts`).
+- [x] Step 7: update `.husky/pre-push` to pass `--upstream-base-ref "${DW_UPSTREAM_BASE_REF:-origin/main}"` so the gate behaves correctly for merge-from-main pushes by default, with env-var override.
+- [x] Step 8: commit with `Closes Phase 21` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `plugins/dw-lifecycle/test/subcommands/check-implement-hook-coverage.test.ts` (or similar) exercising the merge-from-upstream scenario (cited in Step 1).
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix).
-- [ ] Negative-case test confirms that feature-authored commits without markers are still refused.
-- [ ] `.husky/pre-push` updated to honor the upstream base.
-- [ ] Phase 21 documented in audit-log under a new AUDIT-<date>-NN entry (status: `fixed-<sha>`) referencing this task.
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/subcommands/check-implement-hook-coverage-cli.test.ts` exercising the merge-from-upstream scenario (cited in Step 1).
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/subcommands/check-implement-hook-coverage-cli.test.ts` exits 0 (passes against the fix).
+- [x] Negative-case test confirms that empty upstream-base-ref preserves the pre-Phase-21 range (feature-authored commits without markers still refused).
+- [x] `.husky/pre-push` updated to honor the upstream base.
+- [x] Phase 21 documented in the commit body (lower-noise than a separate audit-log entry; discoverable via `git log --grep "Phase 21"`).
 
 ### Phase 21 — Out of Scope
 

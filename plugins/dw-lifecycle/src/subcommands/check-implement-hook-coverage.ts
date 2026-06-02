@@ -7,6 +7,7 @@
  *   dw-lifecycle check-implement-hook-coverage
  *     [--remote <name>]
  *     [--remote-tip-ref <ref>]
+ *     [--upstream-base-ref <ref>]
  *     [--repo-root <path>]
  *     [--help]
  *
@@ -18,6 +19,14 @@
  *
  * Default remote-tip-ref: `origin/<current-branch>`. Override when
  * pushing to a different branch.
+ *
+ * Phase 21 — Default upstream-base-ref: `origin/main`. Commits already
+ * reachable from this ref are excluded from the coverage requirement,
+ * so merging `origin/main` into a feature branch doesn't refuse the
+ * push on inherited commits that were already gated upstream. Override
+ * via `--upstream-base-ref <ref>` or `DW_UPSTREAM_BASE_REF` env var.
+ * Pass `--upstream-base-ref ""` to opt out of the exclusion (pre-Phase-21
+ * behavior).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -38,6 +47,14 @@ export interface CoverageCliOptions {
   readonly remoteTipRef?: string;
   readonly remote?: string;
   readonly repoRoot?: string;
+  /**
+   * Phase 21 — Excludes commits reachable from this ref. When undefined,
+   * `resolveUpstreamBaseRef` picks the env var `DW_UPSTREAM_BASE_REF` or
+   * falls back to `origin/main`. Pass `""` (empty string) to opt out
+   * entirely (pre-Phase-21 behavior). The CLI flag value is preserved
+   * literally — empty string is intentional.
+   */
+  readonly upstreamBaseRef?: string;
   readonly help?: boolean;
 }
 
@@ -49,13 +66,17 @@ const USAGE = [
   'Usage: dw-lifecycle check-implement-hook-coverage',
   '    [--remote <name>]',
   '    [--remote-tip-ref <ref>]',
+  '    [--upstream-base-ref <ref>]',
   '    [--repo-root <path>]',
   '    [--help]',
   '',
-  '--remote <name>          Remote name. Default: origin.',
-  '--remote-tip-ref <ref>   Override remote tip ref (e.g. origin/main).',
-  '                         Default: <remote>/<current-branch>.',
-  '--repo-root <path>       Project root. Default: cwd.',
+  '--remote <name>             Remote name. Default: origin.',
+  '--remote-tip-ref <ref>      Override remote tip ref (e.g. origin/main).',
+  '                            Default: <remote>/<current-branch>.',
+  '--upstream-base-ref <ref>   Exclude commits reachable from this ref.',
+  '                            Default: $DW_UPSTREAM_BASE_REF or origin/main.',
+  '                            Pass "" to opt out (pre-Phase-21 behavior).',
+  '--repo-root <path>          Project root. Default: cwd.',
   '',
   'Exit codes:',
   '  0  allow push (all unpushed commits backed by hook-run entries)',
@@ -67,6 +88,7 @@ const USAGE = [
 export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
   let remote: string | undefined;
   let remoteTipRef: string | undefined;
+  let upstreamBaseRef: string | undefined;
   let repoRootOverride: string | undefined;
   let help = false;
   for (let i = 0; i < argv.length; i += 1) {
@@ -75,7 +97,12 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
       help = true;
       continue;
     }
-    if (flag === '--remote' || flag === '--remote-tip-ref' || flag === '--repo-root') {
+    if (
+      flag === '--remote' ||
+      flag === '--remote-tip-ref' ||
+      flag === '--upstream-base-ref' ||
+      flag === '--repo-root'
+    ) {
       const value = argv[i + 1];
       if (value === undefined) {
         return { ok: false, error: `${flag} requires a value` };
@@ -83,6 +110,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
       i += 1;
       if (flag === '--remote') remote = value;
       else if (flag === '--remote-tip-ref') remoteTipRef = value;
+      else if (flag === '--upstream-base-ref') upstreamBaseRef = value;
       else if (flag === '--repo-root') repoRootOverride = value;
       continue;
     }
@@ -94,9 +122,42 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
   const opts: CoverageCliOptions = {
     ...(remote !== undefined ? { remote } : {}),
     ...(remoteTipRef !== undefined ? { remoteTipRef } : {}),
+    ...(upstreamBaseRef !== undefined ? { upstreamBaseRef } : {}),
     ...(repoRootOverride !== undefined ? { repoRoot: repoRootOverride } : {}),
   };
   return { ok: true, opts };
+}
+
+/**
+ * Phase 21 — pick the upstream-base-ref from flag, env var, or default.
+ * Pure function; tested directly.
+ *
+ * The flag takes precedence over the env var so operator-passed values
+ * always win. The empty string is a legitimate value (operator opt-out)
+ * and is preserved literally — it does NOT fall through to the env or
+ * the default.
+ */
+export function resolveUpstreamBaseRef(
+  opts: Pick<CoverageCliOptions, 'upstreamBaseRef'>,
+  env: Readonly<Record<string, string | undefined>>,
+): string {
+  if (opts.upstreamBaseRef !== undefined) return opts.upstreamBaseRef;
+  const envValue = env.DW_UPSTREAM_BASE_REF;
+  if (envValue !== undefined && envValue.length > 0) return envValue;
+  return 'origin/main';
+}
+
+/**
+ * Phase 21 — build the rev-list range string. When `upstreamBaseRef` is
+ * the empty string, the range degrades to pre-Phase-21 behavior (no
+ * exclusion). Otherwise, the range excludes commits reachable from the
+ * upstream base — equivalent to `git rev-list <tipRef>..HEAD ^<upstreamBaseRef>`.
+ *
+ * Pure function; tested directly. Avoid coupling the test to git semantics.
+ */
+export function buildRange(tipRef: string, upstreamBaseRef: string): string {
+  if (upstreamBaseRef.length === 0) return `${tipRef}..HEAD`;
+  return `${tipRef}..HEAD ^${upstreamBaseRef}`;
 }
 
 function gitCurrentBranch(repoRoot: string): string | null {
@@ -113,9 +174,13 @@ function gitCurrentBranch(repoRoot: string): string | null {
 
 function resolveCommits(repoRoot: string, range: string): UnpushedCommit[] {
   try {
+    // The range may be either `<tipRef>..HEAD` (one token) or
+    // `<tipRef>..HEAD ^<upstreamBaseRef>` (two tokens, Phase 21).
+    // Split on whitespace so git log receives each ref as its own arg.
+    const rangeArgs = range.split(/\s+/).filter((t) => t.length > 0);
     const out = execFileSync(
       'git',
-      ['log', '--reverse', '--format=%H%x09%P%x09%s', range],
+      ['log', '--reverse', '--format=%H%x09%P%x09%s', ...rangeArgs],
       { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
     );
     return out
@@ -179,7 +244,11 @@ export async function runCheckImplementHookCoverage(args: RunArgs): Promise<numb
     }
     tipRef = `${remote}/${branch}`;
   }
-  const range = `${tipRef}..HEAD`;
+  // Phase 21 — exclude commits reachable from the upstream base (default
+  // `origin/main`) so merging upstream into a feature branch does NOT
+  // spuriously refuse the push on inherited commits.
+  const upstreamBaseRef = resolveUpstreamBaseRef(args.opts, process.env);
+  const range = buildRange(tipRef, upstreamBaseRef);
   const result = await checkImplementHookCoverage({
     resolveUnpushedCommits: async () => resolveCommits(repoRootResolved, range),
     readLog: () => readHookRunLog(repoRootResolved),
