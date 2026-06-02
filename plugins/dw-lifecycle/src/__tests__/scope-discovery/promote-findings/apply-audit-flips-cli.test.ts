@@ -250,15 +250,17 @@ describe('runApplyAuditFlips — dry-run + apply flows', () => {
     );
   });
 
-  it('handles a commit with no Closes-AUDIT references (no-op)', async () => {
+  it('handles a commit with no Closes-AUDIT references (no-op when dry-run)', async () => {
     const repoRoot = makeRepo('no-refs', OPEN_TWO_ENTRIES);
     const walker: CommitWalker = () => [
       { sha: 'docsonly', message: 'docs: README polish' },
     ];
     const stderr = new CaptureStream();
     const stdout = new CaptureStream();
+    // Dry-run: early-return with the "nothing to do" message. Apply mode
+    // falls through to the orphan-sweep step (covered by its own test).
     const exit = await runApplyAuditFlips({
-      opts: { featureSlug: 'demo', apply: true },
+      opts: { featureSlug: 'demo' },
       projectRoot: repoRoot,
       stdout: stdout as unknown as NodeJS.WriteStream,
       stderr: stderr as unknown as NodeJS.WriteStream,
@@ -557,5 +559,158 @@ describe('runApplyAuditFlips — dry-run + apply flows', () => {
     expect(checkedClosureLines).toBe(2);
     const uncheckedClosureLines = (wpAfter.match(/- \[ \] Audit-log Status flipped to `fixed-/g) ?? []).length;
     expect(uncheckedClosureLines).toBe(0);
+  });
+
+  // Orphan-sweep: when a workplan task block matches a finding whose
+  // audit-log Status is `acknowledged-*` / `verified-*` / `informational`
+  // (NOT `fixed-<sha>`), the task is SUPERSEDED — none of its TDD steps
+  // were walked because the finding was dispositioned via a different
+  // path (bulk-acknowledge, direct edit). Tick ALL boxes in the block
+  // and inject a one-line supersession annotation so the gate stops
+  // counting it as unchecked.
+  //
+  // This sweeps the historical orphan backlog (57 task blocks from the
+  // 2026-06-01 v0.31.2-on-PATH bulk-dispose) on a single --apply pass
+  // and prevents recurrence of the same shape going forward.
+  it('sweeps orphan task blocks when audit-log Status is `acknowledged-*` (the bulk-dispose backlog)', async () => {
+    const repoRoot = makeRepo('sweep-orphan', [
+      '# Audit Log',
+      '',
+      '### AUDIT-20260601-10 — historical pre-phase18',
+      '',
+      'Finding-ID: AUDIT-20260601-10',
+      'Status: acknowledged-historical-pre-phase18-2026-06-01',
+      'Severity: low',
+      '',
+      'Body.',
+      '',
+      '### AUDIT-20260601-11 — cosmetic convention',
+      '',
+      'Finding-ID: AUDIT-20260601-11',
+      'Status: acknowledged-cosmetic-convention-2026-06-01',
+      'Severity: low',
+      '',
+      'Body.',
+    ].join('\n'));
+    const featureDir = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');
+    // Workplan with orphan fix-task blocks — ALL boxes unchecked
+    // because the finding was bulk-acknowledged via a direct audit-log
+    // edit; no commit walked the workplan steps.
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '',
+        '## Phase 13: x',
+        '',
+        '### Task 13.10 (fix-finding-AUDIT-20260601-10): orphan A',
+        '',
+        '- [ ] Step 1: write failing test',
+        '- [ ] Step 2: confirm fails',
+        '- [ ] Step 3: implement',
+        '- [ ] Step 4: confirm passes',
+        '- [ ] Step 5: commit',
+        '',
+        '**Acceptance Criteria:**',
+        '',
+        '- [ ] Failing test exists',
+        '- [ ] vitest exits 0',
+        '- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step',
+        '',
+        '### Task 13.11 (fix-finding-AUDIT-20260601-11): orphan B',
+        '',
+        '- [ ] Step 1',
+        '- [ ] Step 2',
+        '- [ ] Step 3',
+        '- [ ] Step 4',
+        '- [ ] Step 5',
+        '',
+        '**Acceptance Criteria:**',
+        '',
+        '- [ ] Failing test',
+        '- [ ] vitest exits 0',
+        '- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    // No commits cite these findings; the only path to closure is the
+    // already-dispositioned sweep at --apply time.
+    const walker: CommitWalker = () => [];
+    const stdout = new CaptureStream();
+    const stderr = new CaptureStream();
+    const exit = await runApplyAuditFlips({
+      opts: { featureSlug: 'demo', apply: true },
+      projectRoot: repoRoot,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+      commitWalker: walker,
+    });
+    expect(exit).toBe(0);
+    const wpAfter = readFileSync(join(featureDir, 'workplan.md'), 'utf8');
+    // Both orphan blocks should now have ZERO `- [ ]` lines.
+    const remainingUnchecked = (wpAfter.match(/- \[ \]/g) ?? []).length;
+    expect(remainingUnchecked).toBe(0);
+    // Supersession annotation present for each orphan, naming the disposition.
+    expect(wpAfter).toMatch(/superseded.*acknowledged-historical-pre-phase18/i);
+    expect(wpAfter).toMatch(/superseded.*acknowledged-cosmetic-convention/i);
+  });
+
+  // Regression-lock: a `fixed-<sha>` task whose Steps 1-5 ARE checked
+  // (the existing-test contract) should NOT receive the supersession
+  // annotation. The annotation is for orphan blocks (no TDD work
+  // performed); `fixed-<sha>` blocks had real TDD walked.
+  it('does NOT inject supersession annotation when the task block is a real fix (Steps walked)', async () => {
+    const repoRoot = makeRepo('fixed-not-superseded', [
+      '# Audit Log',
+      '',
+      '### AUDIT-20260529-20 — real fix',
+      '',
+      'Finding-ID: AUDIT-20260529-20',
+      'Status: fixed-cafef00d',
+      'Severity: medium',
+      '',
+      'Body.',
+    ].join('\n'));
+    const featureDir = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', 'demo');
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '',
+        '## Phase 13',
+        '',
+        '### Task 13.20 (fix-finding-AUDIT-20260529-20): real fix',
+        '',
+        '- [x] Step 1: write failing test',
+        '- [x] Step 2: confirm fails',
+        '- [x] Step 3: implement',
+        '- [x] Step 4: confirm passes',
+        '- [x] Step 5: commit',
+        '',
+        '**Acceptance Criteria:**',
+        '',
+        '- [x] Failing test exists',
+        '- [x] vitest exits 0',
+        '- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    const walker: CommitWalker = () => [];
+    const stdout = new CaptureStream();
+    const stderr = new CaptureStream();
+    const exit = await runApplyAuditFlips({
+      opts: { featureSlug: 'demo', apply: true },
+      projectRoot: repoRoot,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+      commitWalker: walker,
+    });
+    expect(exit).toBe(0);
+    const wpAfter = readFileSync(join(featureDir, 'workplan.md'), 'utf8');
+    expect(wpAfter).not.toMatch(/superseded/i);
+    // Closure criterion was ticked.
+    expect(wpAfter).toContain('- [x] Audit-log Status flipped to `fixed-<sha>`');
   });
 });

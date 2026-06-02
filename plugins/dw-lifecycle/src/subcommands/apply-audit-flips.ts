@@ -187,10 +187,22 @@ function defaultCommitWalker(args: {
 }
 
 /**
- * Per AUDIT-20260530-14: for each `open → fixed-<sha>` flip, locate
- * the matching workplan fix-finding task (heading carries
- * `(fix-finding-<canonical-id>)`) and flip the closure-criterion
- * checkbox `- [ ] Audit-log Status flipped to \`fixed-` → `- [x]`.
+ * For each disposition flip (`fixed-<sha>` / `acknowledged-*` / `verified-*`
+ * / `informational`), locate the matching workplan fix-finding task
+ * (heading carries `(fix-finding-<canonical-id>)`) and reconcile its
+ * checkboxes with the audit-log Status:
+ *
+ * - **`fixed-<sha>` (per AUDIT-20260530-14)**: tick only the closure-criterion
+ *   line. The Steps 1-5 + other ACs were walked by the implementer; only
+ *   the closure-criterion was waiting on the audit-log flip.
+ *
+ * - **`acknowledged-*` / `verified-*` / `informational` (the orphan-sweep
+ *   path)**: the finding was dispositioned via a different path (bulk
+ *   acknowledge, direct audit-log edit) without anyone walking the
+ *   workplan task. The block is a SUPERSEDED orphan: tick all checkboxes
+ *   AND insert a one-line supersession annotation after the heading.
+ *   This sweeps the 2026-06-01 v0.31.2-on-PATH bulk-dispose backlog and
+ *   prevents recurrence going forward.
  *
  * Best-effort: the regex anchors on the canonical AUDIT-id, so both
  * the renderer-shape clean marker and the cross-model nested-paren
@@ -214,26 +226,38 @@ function tickClosureCriteria(
     );
     const headingMatch = headingRe.exec(updated);
     if (headingMatch === null || headingMatch.index === undefined) continue;
-    const taskBlockStart = headingMatch.index + headingMatch[0].length;
+    const headingEnd = headingMatch.index + headingMatch[0].length;
     // Find the end of this task block (next `### ` or `## ` heading,
     // or EOF).
-    const tail = updated.slice(taskBlockStart);
+    const tail = updated.slice(headingEnd);
     const nextHeadingRe = /\n(###\s|##\s)/m;
     const nextHeadingMatch = nextHeadingRe.exec(tail);
     const blockEnd =
       nextHeadingMatch !== null && nextHeadingMatch.index !== undefined
-        ? taskBlockStart + nextHeadingMatch.index
+        ? headingEnd + nextHeadingMatch.index
         : updated.length;
-    const block = updated.slice(taskBlockStart, blockEnd);
-    // Replace `- [ ] Audit-log Status flipped to \`fixed-` (with any
-    // trailing prose) → `- [x] ...`. Match only the FIRST occurrence
-    // inside the block.
-    const newBlock = block.replace(
-      /- \[ \](\s+Audit-log Status flipped to `fixed-)/,
-      '- [x]$1',
-    );
+    const block = updated.slice(headingEnd, blockEnd);
+
+    const isFixedFlip = flip.newStatus.startsWith('fixed-');
+    let newBlock: string;
+    if (isFixedFlip) {
+      // Tick only the closure-criterion line; Steps were walked.
+      newBlock = block.replace(
+        /- \[ \](\s+Audit-log Status flipped to `fixed-)/,
+        '- [x]$1',
+      );
+    } else {
+      // Orphan-sweep: tick ALL unchecked boxes in the block AND inject
+      // a one-line supersession annotation directly after the heading
+      // (idempotent — skip if the annotation is already there).
+      const annotationLine = `\n\n> Superseded by audit-log Status \`${flip.newStatus}\` — no TDD walk required.`;
+      const tickedBoxes = block.replace(/- \[ \]/g, '- [x]');
+      newBlock = block.includes('> Superseded by audit-log Status')
+        ? tickedBoxes
+        : `${annotationLine}${tickedBoxes}`;
+    }
     if (newBlock !== block) {
-      updated = updated.slice(0, taskBlockStart) + newBlock + updated.slice(blockEnd);
+      updated = updated.slice(0, headingEnd) + newBlock + updated.slice(blockEnd);
     }
   }
   return updated;
@@ -336,7 +360,11 @@ export async function runApplyAuditFlips(args: RunArgs): Promise<number> {
     return 2;
   }
   const proposals = proposeFlipsForCommits(commits);
-  if (proposals.length === 0) {
+  if (proposals.length === 0 && args.opts.apply !== true) {
+    // Dry-run with no proposals: nothing to report; bail out early.
+    // With --apply, fall through — the orphan-sweep step (below) can
+    // still tick workplan blocks against already-terminal audit-log
+    // entries even when no commit cites them.
     args.stderr.write(
       `apply-audit-flips: no Closes-AUDIT references in scanned commits; nothing to do.\n`,
     );
@@ -435,11 +463,48 @@ export async function runApplyAuditFlips(args: RunArgs): Promise<number> {
   // keeps the task looking unfinished forever. Catch up on every
   // --apply run.
   if (args.opts.apply === true) {
+    // Catch up the workplan for EVERY terminal disposition in the
+    // audit-log, not just the findings cited by recent commits.
+    //
+    // The pre-fix filter included only `alreadyDispositioned` entries
+    // (findings cited by `Closes <id>` commits whose status is
+    // already-terminal). That covered the "task walked + committed but
+    // audit-log not flipped" path, but missed orphan entries — findings
+    // dispositioned via bulk-acknowledge or direct audit-log edits,
+    // never cited by any commit (the 2026-06-01 v0.31.2-on-PATH 57-orphan
+    // backlog). Walk the whole audit-log to catch those too.
+    //
+    // Terminal statuses: `fixed-<sha>` (real fix), `acknowledged-*`
+    // (operator-judged closure), `verified-*` (post-release confirmation),
+    // `informational` (positive-signal observation).
+    // `tickClosureCriteria` distinguishes the two outcomes: `fixed-`
+    // ticks the closure-criterion only (Steps were walked);
+    // anything else marks the block superseded (orphan: tick all + annotate).
+    const isTerminal = (status: string): boolean =>
+      status.startsWith('fixed-') ||
+      status.startsWith('acknowledged-') ||
+      status.startsWith('verified-') ||
+      status === 'informational';
+    const allTerminalFromLog: readonly StatusFlip[] = auditLog.entries
+      .filter((e) => isTerminal(e.status))
+      .map((e) => ({ findingId: e.findingId, newStatus: e.status }));
+    // Dedupe: prefer `actionable` (just-applied flips with their final
+    // SHA) over log-walked entries (which may carry the same SHA but
+    // could differ in cross-model annotation).
+    const seenIds = new Set(
+      actionable.map(
+        (a) => /AUDIT-\d{8}-\d+/.exec(a.findingId)?.[0] ?? a.findingId,
+      ),
+    );
     const allFixed: readonly StatusFlip[] = [
       ...actionable,
-      ...alreadyDispositioned
-        .filter((e) => e.currentStatus.startsWith('fixed-'))
-        .map((e) => ({ findingId: e.findingId, newStatus: e.currentStatus })),
+      ...allTerminalFromLog.filter((e) => {
+        const canonical =
+          /AUDIT-\d{8}-\d+/.exec(e.findingId)?.[0] ?? e.findingId;
+        if (seenIds.has(canonical)) return false;
+        seenIds.add(canonical);
+        return true;
+      }),
     ];
     if (allFixed.length > 0) {
       const workplanPath = join(featureRoot, 'workplan.md');

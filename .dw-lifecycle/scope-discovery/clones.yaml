@@ -1,4 +1,4 @@
-generated_at: 2026-06-02T17:08:50.408Z
+generated_at: 2026-06-02T19:51:56.914Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1125,29 +1125,45 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:112:127
     disposition: ignore-with-justification
     reason: "Pre-existing clone of audit-barrage commit-parsing helpers; orthogonal to slush-remaining fix for #380"
+  - id: 0d16dcc374e0
+    lines: 20
+    members:
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:286:305
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:137:156
+    disposition: ignore-with-justification
+    reason: "CLI subcommand boilerplate: parseFlags loop and apply.ts orphan-sweep helpers; each subcommand owns its own flag set and audit-log walker scope, DRY would require a generic framework abstraction that obscures per-subcommand semantics."
   - id: f65e258cb71f
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:303:311
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:327:335
       - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:193:201
       - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:187:195
     disposition: keep-with-reason
     reason: CLI-entrypoint shape (USAGE + parseFlags + run-helper + feature-root walker) per established subcommand convention.
-  - id: e827d6cb8973
-    lines: 8
+  - id: 7d882bc319d3
+    lines: 10
     members:
-      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:489:496
-      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:229:236
-    disposition: pending
-    reason: null
-  - id: 192d55419363
-    lines: 12
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:369:378
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:281:290
+    disposition: ignore-with-justification
+    reason: "CLI subcommand boilerplate: parseFlags loop and apply.ts orphan-sweep helpers; each subcommand owns its own flag set and audit-log walker scope, DRY would require a generic framework abstraction that obscures per-subcommand semantics."
+  - id: 9e507a0b60cd
+    lines: 19
     members:
-      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:496:507
-      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:581:592
-      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:236:247
-    disposition: pending
-    reason: null
+      - plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:554:572
+      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:335:353
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:146:164
+      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:262:280
+      - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:263:281
+      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:157:175
+      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
+      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
+      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:578:596
+      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:229:247
+    disposition: ignore-with-justification
+    reason: "CLI subcommand boilerplate: parseFlags loop and apply.ts orphan-sweep helpers; each subcommand owns its own flag set and audit-log walker scope, DRY would require a generic framework abstraction that obscures per-subcommand semantics."
   - id: 69c3cc2125ab
     lines: 17
     members:
@@ -1188,22 +1204,6 @@ clones:
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:246:254
       - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:149:157
-    disposition: pending
-    reason: null
-  - id: b7e746a25294
-    lines: 19
-    members:
-      - plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:335:353
-      - plugins/dw-lifecycle/src/subcommands/check-barrage-dampener.ts:146:164
-      - plugins/dw-lifecycle/src/subcommands/check-barrage-tip.ts:262:280
-      - plugins/dw-lifecycle/src/subcommands/check-fix-task-tdd.ts:261:279
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts:263:281
-      - plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts:157:175
-      - plugins/dw-lifecycle/src/subcommands/check-open-findings.ts:178:196
-      - plugins/dw-lifecycle/src/subcommands/close-shipped-audit-findings.ts:311:329
-      - plugins/dw-lifecycle/src/subcommands/implement-hook.ts:578:596
-      - plugins/dw-lifecycle/src/subcommands/re-audit-fixed-findings.ts:314:332
-      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:229:247
     disposition: pending
     reason: null
   - id: 4295f8a2a16b
@@ -1533,6 +1533,13 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:97:120
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 02f1014a2eb1
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:581:592
+      - plugins/dw-lifecycle/src/subcommands/slush-remaining.ts:236:247
+    disposition: ignore-with-justification
+    reason: "CLI subcommand boilerplate: parseFlags loop and apply.ts orphan-sweep helpers; each subcommand owns its own flag set and audit-log walker scope, DRY would require a generic framework abstraction that obscures per-subcommand semantics."
   - id: 3fe264e943fc
     lines: 7
     members:
