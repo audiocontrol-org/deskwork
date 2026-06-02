@@ -94,6 +94,91 @@ git add docs/1.0/001-IN-PROGRESS/decompose-agent-discipline/workplan.md
 git commit -m "docs(decompose-agent-discipline): extend workplan with Phase 2 disposition tasks"
 ```
 
+
+### Task 6 (fix-finding-AUDIT-20260602-01): AUDIT-20260602-01 — `--no-tailscale` deprecation silently ignores loopback-only …
+
+Closes AUDIT-20260602-01. Surface: packages/studio/src/server.ts:128-152. Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-01` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 7 (fix-finding-AUDIT-20260602-02): AUDIT-20260602-02 — `DESKWORK_RESERVED_TOPLEVEL_KEYS` is a maintenance trap — gu…
+
+Closes AUDIT-20260602-02. Surface: packages/core/src/frontmatter.ts:74 + packages/core/test/frontmatter.test.ts:343-347. Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-02` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 8 (fix-finding-AUDIT-20260602-03): AUDIT-20260602-03 — `stringifyFrontmatter` now throws unconditionally — legacy r…
+
+Closes AUDIT-20260602-03. Surface: packages/core/src/frontmatter.ts:138 (stringifyFrontmatter), packages/core/src/frontmatter.ts:158 (updateFrontmatter). Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-03` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 9 (fix-finding-AUDIT-20260602-04): AUDIT-20260602-04 — Env-var truthiness parsing is case/format-narrow with no fee…
+
+Closes AUDIT-20260602-04. Surface: packages/studio/src/server.ts:153-154. Severity: low.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-04` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 10 (fix-finding-AUDIT-20260602-05): AUDIT-20260602-05 — Composed-discipline pointers under-name their second home; v…
+
+Closes AUDIT-20260602-05. Surface: .claude/rules/agent-discipline.md (entry 10 pointer) + repo-wide `--no-tailscale` references. Severity: low.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260602-05` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 5: File GitHub issues for Phase 2
 
 - [x] **Step 1: Invoked `/dw-lifecycle:issues`.** Filed parent **[#388](https://github.com/audiocontrol-org/deskwork/issues/388)**, Phase 1 **[#389](https://github.com/audiocontrol-org/deskwork/issues/389)**, Phase 2 **[#390](https://github.com/audiocontrol-org/deskwork/issues/390)**. The helper works at `## Phase N` granularity (not per-sub-phase); the 2a–2e sub-phase breakdown lives in this workplan under #390. (Phase 1 is already complete — evidence posted on #389, closure left to the operator.)
