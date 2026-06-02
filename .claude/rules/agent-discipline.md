@@ -14,25 +14,6 @@ When the work requires a design decision — a new UI surface, a redesign of an 
 - /frontend-design produces self-contained HTML+CSS mockup files (typically 2–3 directions), an updated `mockups/index.html` with a card per direction, and waits for the operator to pick before any implementation.
 - The directive applies to in-thread agent work AND to dispatch prompts: if delegating design work to a sub-agent, instruct them to use /frontend-design.
 
-## Use /dw-lifecycle:review after every implementation step
-
-After every implementation step — every commit that adds production code or modifies behavior — invoke **`/dw-lifecycle:review`** (in-tree at `plugins/dw-lifecycle/skills/review/SKILL.md`; if not loaded as a marketplace skill, follow the procedure manually). The skill dispatches parallel code reviewers (typically 2 — correctness/security + architecture/conventions) and returns categorized findings.
-
-**The implementer (you) is required to push back on any finding that's wrong or inappropriate.** Reviewers are not authoritative; their findings are testable claims. Apply the `superpowers:receiving-code-review` discipline: technical rigor, no performative agreement. When a finding is wrong, push back with code or measurements that disprove it. When a finding is right but the fix is wrong, propose the correct fix. The agent's job is not to apply every review comment — it's to integrate the *correct* findings.
-
-**Any fix that is NOT made immediately MUST have BOTH:** (a) a scoped task in the relevant workplan with the issue link, AND (b) a GitHub issue with the deferral rationale. *"Code comment + future-dispatch promise"* is not a disposition (per the existing `Just for now is bullshit` rule). The two-track recording — workplan + GitHub — is intentional redundancy: the workplan ties the deferral to the active feature's tracking; the GitHub issue makes it visible to anyone walking the open-issues list. A deferral with only one of the two is incomplete and must be promoted to both before moving on.
-
-**Why:** the v0.18.0 cycle proved the value: parallel reviewers caught 7 findings on the editor + scrapbook cut, 6 applied immediately, 1 deferred to [#245](https://github.com/audiocontrol-org/deskwork/issues/245) with both a workplan entry under T5 and a GitHub issue body that's specific enough for a future contributor to act on. The cycle compounds: every commit lands with verified findings or explicit deferrals, never with code-comment IOUs.
-
-**How to apply:**
-- After every commit that adds production code (new feature, bug fix, refactor): invoke `/dw-lifecycle:review`. The skill itself decides whether to dispatch one reviewer or several based on scope.
-- Pure-docs commits, vendored-asset commits, and version-bump commits don't need review.
-- Verify each finding before applying. Don't blanket-accept; don't blanket-reject.
-- If a finding requires deferral: create a GitHub issue (with reproduction, root cause, options, recommendation), update the relevant workplan with the issue link, and only then proceed.
-- The agent's response to reviewer findings is its own paper trail: report which findings were applied, which were pushed back on (with reasoning), which were deferred (with issue link). The operator reads this as the closure narrative.
-
-This rule is paired with the `/frontend-design` rule above. Together they bracket the implementation cycle: **design via /frontend-design → implement → review via /dw-lifecycle:review → integrate or defer**. Skipping either side breaks the loop the operator-validated v0.18 cycle codified.
-
 ## Audit findings: scope-don't-defer + TDD enforcement
 
 Phase 13 of scope-discovery operationalizes the anti-deferral discipline this rules file already calls for. The triad mechanizes the discipline so the agent cannot accidentally bypass it:
