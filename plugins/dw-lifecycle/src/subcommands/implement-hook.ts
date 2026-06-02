@@ -57,7 +57,10 @@ import {
   computeAuditedDiff,
   EMPTY_DIFF_CURE_MESSAGE,
 } from '../scope-discovery/promote-findings/audited-diff.js';
-import { checkAncestry } from '../scope-discovery/util/git-ancestry.js';
+import {
+  checkAncestry,
+  ancestryAsBarrageTip,
+} from '../scope-discovery/util/git-ancestry.js';
 
 export interface ImplementHookCliOptions {
   readonly featureSlug: string;
@@ -288,17 +291,17 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
   // operator's new work. Detect divergence by checking ancestry and
   // fall through to the HEAD~10 fallback when the marker is from
   // another timeline.
-  // Per AUDIT-20260602-45: implement-hook's safe direction on unknown
-  // is to DROP the marker tip and fall back to the HEAD~10 baseline.
-  // Walking a tip we can't verify could mean walking main's shipped
-  // commits as "new diff" (Friction-1's exact pathology). Only trust
-  // the marker when checkAncestry confirms `'ancestor'`. This is the
-  // inverse safety mapping from check-implement-hook-ran's call site.
+  // Per AUDIT-20260602-45/-47: implement-hook's collapse arrow is
+  // `ancestryAsBarrageTip` (in git-ancestry.ts) — extracted as a
+  // named pure function so its safety direction is independently
+  // tested. Walking an unverified tip means walking main's shipped
+  // commits as "new diff" (Friction-1's exact pathology); only trust
+  // `'ancestor'`, drop everything else.
   const ancestry =
     rawBarrageTip !== null
       ? checkAncestry({ repoRoot: repoRootResolved, tip: rawBarrageTip })
-      : 'unknown';
-  const lastBarrageTip = ancestry === 'ancestor' ? rawBarrageTip : null;
+      : ('unknown' as const);
+  const lastBarrageTip = ancestryAsBarrageTip(ancestry, rawBarrageTip);
   if (rawBarrageTip !== null && lastBarrageTip === null) {
     args.stderr.write(
       `implement-hook: barrage tip ${rawBarrageTip.slice(0, 8)} is not an ancestor of HEAD ` +

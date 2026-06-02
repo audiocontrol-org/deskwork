@@ -33,7 +33,10 @@ import {
   checkImplementHookRan,
   type CheckImplementHookRanResult,
 } from '../scope-discovery/promote-findings/check-implement-hook-ran.js';
-import { checkAncestry } from '../scope-discovery/util/git-ancestry.js';
+import {
+  checkAncestry,
+  ancestryAsGateBoolean,
+} from '../scope-discovery/util/git-ancestry.js';
 
 export interface CheckImplementHookRanCliOptions {
   readonly repoRoot?: string;
@@ -151,17 +154,15 @@ export async function runCheckImplementHookRan(args: RunArgs): Promise<number> {
       const log = await readHookRunLog(repoRootResolved);
       return log.length > 0;
     });
-  // Per AUDIT-20260602-45: the gate's safe direction on unknown is to
-  // REFUSE the commit. Map `'ancestor'` and `'unknown'` to `true` (the
-  // library interprets `true` as on-same-history → refuse-marker-stale);
-  // map `'not-ancestor'` to `false` (the library allows via diverged-history).
-  // This is the inverse safety mapping from implement-hook's call site.
+  // Per AUDIT-20260602-45/-47: the gate's collapse arrow is
+  // `ancestryAsGateBoolean` (in git-ancestry.ts) — extracted as a
+  // named pure function so its safety direction is independently
+  // tested. Do NOT re-derive the expression inline; AUDIT-47 named the
+  // collapse arrow as the integration point AUDIT-45's bug lived at.
   const isAncestorOfHeadFn =
     args.isAncestorOfHead ??
-    (async (tip: string) => {
-      const result = checkAncestry({ repoRoot: repoRootResolved, tip });
-      return result !== 'not-ancestor';
-    });
+    (async (tip: string) =>
+      ancestryAsGateBoolean(checkAncestry({ repoRoot: repoRootResolved, tip })));
   const result = await checkImplementHookRan({
     repoRoot: repoRootResolved,
     readMarker,

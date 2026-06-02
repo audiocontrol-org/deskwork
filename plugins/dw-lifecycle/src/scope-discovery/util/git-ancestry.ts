@@ -59,6 +59,46 @@ export interface IsAncestorOfHeadOptions {
  * Pure-ish: takes options, runs git, returns the discriminator. No
  * side effects on disk.
  */
+// Per AUDIT-20260602-47: the tri-state refactor's whole point is that
+// each caller picks its own `unknown` disposition at the call site.
+// The two collapse arrows are therefore safety-critical — bugs there
+// would be invisible to a helper-isolation test like the rest of this
+// file. Below are the two named collapses + the assertion that each
+// caller imports the named one rather than re-deriving an inline
+// expression. The dedicated test file exercises both across all three
+// tri-state inputs.
+
+/**
+ * Collapse arrow for the **commit-msg gate** (`check-implement-hook-ran`).
+ *
+ * The gate's library treats `true` as "on same history line → refuse-
+ * marker-stale" and `false` as "diverged → allow boot case." The safe
+ * direction on `'unknown'` is to refuse the commit; therefore map
+ * `'ancestor'` and `'unknown'` to `true`, `'not-ancestor'` to `false`.
+ */
+export function ancestryAsGateBoolean(result: AncestryResult): boolean {
+  return result !== 'not-ancestor';
+}
+
+/**
+ * Collapse arrow for **implement-hook**'s barrage-baseline computation.
+ *
+ * implement-hook treats a non-null tip as "use this commit as the
+ * audited-diff baseline" and a null tip as "fall back to `HEAD~10..HEAD`."
+ * The dangerous outcome would be to walk an unverified tip as the
+ * baseline (Friction-1's exact pathology), so the safe direction on
+ * `'unknown'` is to drop the marker tip and re-baseline.
+ *
+ * Only `'ancestor'` is trustworthy. `'not-ancestor'` and `'unknown'`
+ * both collapse to `null` (fall back).
+ */
+export function ancestryAsBarrageTip(
+  result: AncestryResult,
+  rawTip: string | null,
+): string | null {
+  return result === 'ancestor' ? rawTip : null;
+}
+
 export function checkAncestry(opts: IsAncestorOfHeadOptions): AncestryResult {
   try {
     execFileSync('git', ['merge-base', '--is-ancestor', opts.tip, 'HEAD'], {

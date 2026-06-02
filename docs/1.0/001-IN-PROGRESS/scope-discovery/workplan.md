@@ -2430,7 +2430,7 @@ Closes AUDIT-20260602-43. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
-### Task 5.121 (fix-finding-AUDIT-20260602-44) (non-bug): AUDIT-20260602-44 — Task 3 workplan rewrote the RED gate into a self-justifying …
+### Task 5.123 (fix-finding-AUDIT-20260602-44) (non-bug): AUDIT-20260602-44 — Task 3 workplan rewrote the RED gate into a self-justifying …
 
 Closes AUDIT-20260602-44. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 2 (~line 4119) + Task 3 (~line 4142) Step 2 notes.
 

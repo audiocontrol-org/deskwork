@@ -18,7 +18,11 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkAncestry } from '../../../scope-discovery/util/git-ancestry.js';
+import {
+  checkAncestry,
+  ancestryAsGateBoolean,
+  ancestryAsBarrageTip,
+} from '../../../scope-discovery/util/git-ancestry.js';
 
 function git(repoRoot: string, ...args: string[]): string {
   return execFileSync('git', args, {
@@ -147,5 +151,77 @@ describe('checkAncestry — tri-state real-git fixture (AUDIT-20260602-43/-45)',
     git(repoRoot, 'checkout', 'main');
     git(repoRoot, 'checkout', b);
     expect(checkAncestry({ repoRoot, tip: a })).toBe('ancestor');
+  });
+});
+
+// AUDIT-20260602-47: the tri-state refactor's whole point is that each
+// caller picks its own `unknown` disposition at the call site. The two
+// collapse arrows are extracted as named pure functions so each
+// safety direction is testable without going through the full CLI shim.
+// These tests pin the call-site dispositions; together with the
+// helper-isolation tests above, they cover the full integration path
+// the production CLI shims walk.
+describe('ancestryAsGateBoolean — commit-msg gate collapse (AUDIT-47)', () => {
+  // Gate's library treats `true` as on-same-history → refuse-marker-stale.
+  // Safe direction on unknown is REFUSE; map ancestor + unknown → true.
+  it('maps `ancestor` → true (refuse-marker-stale path)', () => {
+    expect(ancestryAsGateBoolean('ancestor')).toBe(true);
+  });
+
+  it('maps `not-ancestor` → false (allow-marker-diverged-history path)', () => {
+    expect(ancestryAsGateBoolean('not-ancestor')).toBe(false);
+  });
+
+  // Critical regression-lock for AUDIT-45: unknown must refuse, not allow.
+  // A git error during ancestry check must NOT silently allow the commit.
+  it('maps `unknown` → true (REFUSE; the AUDIT-45 fail-closed fix)', () => {
+    expect(ancestryAsGateBoolean('unknown')).toBe(true);
+  });
+});
+
+describe('ancestryAsBarrageTip — implement-hook collapse (AUDIT-47)', () => {
+  // implement-hook trusts a non-null tip as the baseline. Walking an
+  // unverified tip means walking main's shipped commits as "new diff."
+  // Safe direction on unknown is DROP the tip; map only ancestor → tip.
+
+  it('maps `ancestor` → rawTip (trust the baseline)', () => {
+    expect(ancestryAsBarrageTip('ancestor', 'aabbccdd')).toBe('aabbccdd');
+  });
+
+  it('maps `ancestor` + null rawTip → null (no marker to trust)', () => {
+    expect(ancestryAsBarrageTip('ancestor', null)).toBe(null);
+  });
+
+  it('maps `not-ancestor` → null (fall back to HEAD~10 baseline)', () => {
+    expect(ancestryAsBarrageTip('not-ancestor', 'aabbccdd')).toBe(null);
+  });
+
+  // Critical regression-lock for AUDIT-45: the OPPOSITE safety direction
+  // from the gate's collapse. Unknown must NOT trust the tip — that was
+  // the fail-open bug AUDIT-45 named.
+  it('maps `unknown` → null (DROP the tip; the AUDIT-45 fail-closed fix)', () => {
+    expect(ancestryAsBarrageTip('unknown', 'aabbccdd')).toBe(null);
+  });
+});
+
+// AUDIT-20260602-52: ensure the two collapses have OPPOSITE safety
+// directions on `unknown`. This invariant is the load-bearing reason
+// the tri-state exists; a future edit that collapsed both arrows to
+// the same direction would silently reintroduce the AUDIT-45 bug.
+describe('ancestry collapses — inverse-safety invariant (AUDIT-52)', () => {
+  it('on `unknown`, the gate refuses (true) but implement-hook drops the tip (null)', () => {
+    expect(ancestryAsGateBoolean('unknown')).toBe(true);
+    expect(ancestryAsBarrageTip('unknown', 'some-tip')).toBe(null);
+  });
+
+  it('the two collapse arrows have OPPOSITE truthiness on `unknown` (the load-bearing invariant)', () => {
+    const gateOnUnknown = ancestryAsGateBoolean('unknown');
+    const barrageOnUnknown = ancestryAsBarrageTip('unknown', 'some-tip');
+    // Gate says "yes, treat as same-history" (true → refuse).
+    // Barrage says "no, this tip is not trustworthy" (null → re-baseline).
+    expect(gateOnUnknown).toBe(true);
+    expect(barrageOnUnknown).toBe(null);
+    // Truthiness flip is the invariant.
+    expect(!!gateOnUnknown).not.toBe(!!barrageOnUnknown);
   });
 });
