@@ -71,3 +71,15 @@ The `regime_holdouts.meta.by_status` rollup splits the totals into `actively_enf
 Run scope-inventory once per feature, immediately after `/dw-lifecycle:setup` produces the PRD. The manifest the protocol writes is the single artifact the implementer consults for "what surfaces does this feature touch?" — answering that question by hand is the failure mode the protocol was built to prevent. Re-run scope-inventory when the PRD's scope changes substantially (new themes, new module-roots) so the manifest stays the source of truth.
 
 When the report shows a non-zero `candidate_count` or a non-empty `discovered_candidates:` section, that is the explicit signal that the catalog needs operator triage — DO NOT treat the run as "all clear" just because the registered-pattern findings are zero. The novel-shape candidates are the discovery-side output; ignoring them is the operator-trust failure mode this design exists to close.
+
+## Composed disciplines
+
+Composed from `.claude/rules/agent-discipline.md` (feature `decompose-agent-discipline`); the rules file now points here.
+
+### Log tooling-feedback as friction surfaces (don't batch at the end)
+
+For features exercising scope-discovery, log friction in `docs/<v>/001-IN-PROGRESS/<slug>/tooling-feedback.md` **the moment it surfaces** — one observable friction per entry, each with **Repro / Workaround used / Suggested fix** (the suggested fix names an operator-recognizable shape — often Light / Medium / Heavy options — not a vague "make it better"). Append-only: closed entries get a `Status` line + closing-commit SHA, never deleted. The cumulative log is the v1 ship-gate signal; a single end-of-feature "audit" teaches far less. When a friction entry needs architecture-level triage, promote it to a GH issue + acknowledge in the workplan (per "Just for now is bullshit").
+
+### Reading the report: inventory ≠ discovery (the single hard test)
+
+A green `scope-inventory` (or any `check-*` verb) is evidence of **no source-tree match against the catalog the project already registered** — NOT "no novel anti-patterns / adopter-gaps / deprecation candidates." Parse every report into three operator-visible categories: **registered-pattern matches** (inventory — catalog said to look, scanner found), **discovered candidates** (architectural-scale clusters the catalog doesn't cover, under `discovered_candidates:`), and **novel-shape candidates** (per-handler signals: `pending` status, `negative-space` / `coverage-gap` / `outlier` / `semantic` provenance). The hard test before saying "no findings": **read the stderr `categories:` line AND `synthesis.md`'s category-report section.** If `novel-shape-candidate > 0` OR `discovered-candidate > 0` OR `pendingMetaCount > 0`, the run is NOT all-clear — triage those candidates first. If you catch yourself writing "no anti-patterns found" without naming the category split, STOP — that's the failure mode (KeygroupSummary-shape regressions, [#315](https://github.com/audiocontrol-org/deskwork/issues/315)).

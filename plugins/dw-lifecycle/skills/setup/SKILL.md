@@ -34,6 +34,14 @@ The helper:
 
 5. Report: branch name, worktree path, docs directory, files scaffolded.
 
+## Composed disciplines
+
+These were composed from `.claude/rules/agent-discipline.md` (feature `decompose-agent-discipline`); the rules file now points here.
+
+- **Design-shaped features route through `/frontend-design` before implementation.** If the feature's PRD involves design decisions (new UI surfaces, affordances, visual language), note in the setup report that implementation should start with `/frontend-design` to produce mockups for operator pick. (Full discipline: implement skill § Composed disciplines.)
+- **Tooling-feedback log seed.** Setup copies the `tooling-feedback.md` starter template into the feature dir so the implementer can log friction surfaces the moment they appear (one observable friction per entry: Repro / Workaround / Suggested-fix). The cumulative log is the scope-discovery v1 ship-gate signal.
+- **Orchestrator → implementation handoff (exit step).** Setup is orchestrator-session infrastructure prep. Its closing report names the feature worktree path explicitly and states that implementation happens in a **separate session** opened against that worktree (`/dw-lifecycle:implement`), not in this session. The operator's framing: *"you are the orchestrator, not the implementer."*
+
 ## Error handling
 
 - **Branch already exists with no checked-out worktree.** Helper aborts: pick a different slug, remove the orphan branch (`git branch -D <name>`), or check the branch out in a worktree before re-running.

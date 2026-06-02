@@ -75,19 +75,36 @@ interface CliArgs {
    * in which case loopback only).
    */
   hostOverride: string | null;
-  /** When true, skip Tailscale auto-detection even if it's running. */
+  /**
+   * When true, skip Tailscale auto-detection even if it's running. Driven
+   * ONLY by the `DESKWORK_STUDIO_NO_TAILSCALE=1` env var (non-interactive
+   * escape hatch for smokes / CI). The `--no-tailscale` CLI flag is a
+   * deprecated no-op and does NOT set this — see parseCliArgs.
+   */
   noTailscale: boolean;
 }
 
 const DEFAULT_PORT = 47321;
 const LOOPBACK = '127.0.0.1';
 
-export function parseCliArgs(argv: string[]): CliArgs {
+/**
+ * Options for {@link parseCliArgs}. Injected so tests can drive the env-var
+ * escape hatch and capture the deprecation notice deterministically; both
+ * default to the live process.
+ */
+export interface ParseCliArgsOptions {
+  env?: Record<string, string | undefined>;
+  stderr?: (s: string) => void;
+}
+
+export function parseCliArgs(argv: string[], opts: ParseCliArgsOptions = {}): CliArgs {
+  const env = opts.env ?? process.env;
+  const stderr = opts.stderr ?? ((s: string) => process.stderr.write(s));
   let projectRoot = process.cwd();
   let port = DEFAULT_PORT;
   let portExplicit = false;
   let hostOverride: string | null = null;
-  let noTailscale = false;
+  let noTailscaleFlagSeen = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--project-root' || a === '-r') {
@@ -111,7 +128,11 @@ export function parseCliArgs(argv: string[]): CliArgs {
     } else if (a.startsWith('--host=')) {
       hostOverride = a.slice('--host='.length);
     } else if (a === '--no-tailscale') {
-      noTailscale = true;
+      // Deprecated no-op. The flag stranded operators who were off-keyboard
+      // (it forced loopback-only). The studio now ALWAYS auto-detects
+      // Tailscale; the only way to force loopback-only is the env-var escape
+      // hatch below, which is non-interactive by construction (smokes / CI).
+      noTailscaleFlagSeen = true;
     } else if (a === '--help' || a === '-h') {
       usage(null);
     } else {
@@ -120,6 +141,34 @@ export function parseCliArgs(argv: string[]): CliArgs {
   }
   if (!Number.isFinite(port) || port <= 0 || port > 65535) {
     usage(`invalid port: ${port}`);
+  }
+  // DESKWORK_STUDIO_NO_TAILSCALE truthiness — normalized (case-insensitive,
+  // trimmed) and tolerant of the common spellings. This is the ONLY way to
+  // force loopback-only on a no-auth server (AUDIT-20260602-01/-04), so a
+  // fat-fingered value must not silently fail open onto the tailnet.
+  const rawEnv = env.DESKWORK_STUDIO_NO_TAILSCALE;
+  const normEnv = rawEnv?.toLowerCase().trim();
+  const TRUTHY = new Set(['1', 'true', 'yes', 'on']);
+  const FALSY = new Set(['', '0', 'false', 'no', 'off']);
+  const noTailscale = normEnv !== undefined && TRUTHY.has(normEnv);
+  if (normEnv !== undefined && !TRUTHY.has(normEnv) && !FALSY.has(normEnv)) {
+    stderr(
+      `deskwork-studio: DESKWORK_STUDIO_NO_TAILSCALE is set to '${rawEnv}', which ` +
+        'is not a recognized truthy value (use 1/true/yes/on). Treating as unset — ' +
+        'the studio WILL auto-detect Tailscale and may be reachable on your tailnet.\n',
+    );
+  }
+  if (noTailscaleFlagSeen) {
+    // The flag is a no-op (it used to force loopback-only and stranded
+    // off-keyboard operators). Warn loudly that the protection it once gave is
+    // gone — the no-auth studio now binds to the tailnet by default.
+    stderr(
+      'deskwork-studio: --no-tailscale is deprecated and now a NO-OP. The studio ' +
+        'auto-detects Tailscale and (having no authentication) will be reachable ' +
+        'by every peer on your tailnet. If you passed --no-tailscale to keep it ' +
+        'loopback-only, that no longer works: set DESKWORK_STUDIO_NO_TAILSCALE=1 ' +
+        '(or use --host 127.0.0.1) to restore loopback-only binding.\n',
+    );
   }
   return {
     projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve(process.cwd(), projectRoot),
@@ -133,7 +182,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
 function usage(error: string | null): never {
   const out = error ? process.stderr : process.stdout;
   if (error) out.write(`error: ${error}\n\n`);
-  out.write('Usage: deskwork-studio [--project-root <path>] [--port <n>] [--host <addr>] [--no-tailscale]\n');
+  out.write('Usage: deskwork-studio [--project-root <path>] [--port <n>] [--host <addr>]\n');
   out.write('\n');
   out.write('Options:\n');
   out.write('  -r, --project-root <path>   project root containing .deskwork/config.json\n');
@@ -144,8 +193,10 @@ function usage(error: string | null): never {
   out.write('                              Use 0.0.0.0 to expose on every interface (LAN +\n');
   out.write('                              Tailscale + Wi-Fi). Studio has no auth; only do this\n');
   out.write('                              on trusted networks.\n');
-  out.write('      --no-tailscale          skip Tailscale auto-detection (loopback only)\n');
   out.write('  -h, --help                  show this message\n');
+  out.write('\n');
+  out.write('  (--no-tailscale is a deprecated no-op; for non-interactive loopback-only,\n');
+  out.write('   set DESKWORK_STUDIO_NO_TAILSCALE=1 in the environment instead.)\n');
   out.write('\n');
   out.write('Default networking policy: bind to 127.0.0.1 (loopback) AND, if Tailscale is\n');
   out.write('running on this machine, the local Tailscale interface(s). Tailscale peers can\n');
@@ -510,9 +561,9 @@ async function main(): Promise<void> {
   const app = createApp(ctx);
 
   // Networking policy:
-  //   --host <addr>          → bind ONLY to that address (operator override)
-  //   --no-tailscale         → loopback only
-  //   default                → loopback + auto-detected Tailscale (if running)
+  //   --host <addr>                   → bind ONLY to that address (operator override)
+  //   DESKWORK_STUDIO_NO_TAILSCALE=1  → loopback only (non-interactive escape hatch)
+  //   default                         → loopback + auto-detected Tailscale (if running)
   //
   // The studio is dev-only with no auth. Loopback is always safe.
   // Tailscale's tailnet is treated as a trusted network — peers on the
