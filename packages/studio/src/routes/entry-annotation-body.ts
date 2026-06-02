@@ -101,10 +101,18 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
         }
         attachments = arr;
       }
-      const replyTo =
-        typeof obj.replyTo === 'string' && obj.replyTo.length > 0
-          ? obj.replyTo
-          : undefined;
+      // AUDIT-20260602-04 — reject a malformed replyTo with 400
+      // instead of silently dropping it. The sibling `attachments`
+      // validation already enforces shape-rejection; replyTo follows
+      // the same contract so an operator's threaded reply can't be
+      // turned into a detached root comment by a client bug.
+      let replyTo: string | undefined;
+      if (obj.replyTo !== undefined) {
+        if (typeof obj.replyTo !== 'string' || obj.replyTo.length === 0) {
+          return err('comment.replyTo must be a non-empty string');
+        }
+        replyTo = obj.replyTo;
+      }
       const draft: AnnotationDraftFromBody = {
         type: 'comment',
         workflowId,
