@@ -20,64 +20,12 @@ Audit-barrage is the **third independent audit surface** (alongside the in-band 
 
 > See **`/dw-lifecycle:audit-barrage`** ([SKILL.md](../../plugins/dw-lifecycle/skills/audit-barrage/SKILL.md)) for when to run, the render+fire verb pair, triage steps, and override paths.
 
-## scope-discovery v1 — dogfood feedback via tooling-feedback.md
+## scope-discovery: tooling-feedback + reading reports
 
-For features that exercise scope-discovery (any feature whose `/dw-lifecycle:setup` invokes `/scope-inventory`), the implementation team logs friction surfaces in `docs/<v>/001-IN-PROGRESS/<slug>/tooling-feedback.md` as they go. The log is the v1 ship-gate signal in place of the original ~80% paper-test coverage gate (reframed by operator decision 2026-05-25 when Phase 10 measured 60.9%).
+Two disciplines, both composed into the `scope-inventory` skill body (`plugins/dw-lifecycle/skills/scope-inventory/SKILL.md` § Composed disciplines):
 
-The log mirrors the audiocontrol pilot's pattern (categories A/AM/CL/GATE/DSC/MISC; severity high/medium/low; Repro / Workaround used / Suggested fix per entry; append-only — closed entries get a `Status` line + closing-commit SHA but are never deleted). The starter template ships at `plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md`; `/dw-lifecycle:setup` copies it into the new feature's docs directory.
-
-**How to apply:**
-
-- File a TF entry the moment friction surfaces — don't batch them at feature-end. The cumulative set teaches more than a single "audit" pass would.
-- Each entry is **one observable friction** with Repro / Workaround / Suggested-fix — the suggested-fix names an operator-recognizable shape (often Light / Medium / Heavy options), not a vague "make it better."
-- When a friction entry needs explicit operator triage (architecture-level concern, recurring pattern across audit cycles, design decision), promote it to a GH issue with the deferral rationale + acknowledge in the workplan, per the existing "Just for now is bullshit" rule. *"Code comment + TF entry"* is not a disposition when the issue is architectural.
-- Closure: when the feature ships, the tooling-feedback.md's final TF entry summarizes what worked / what didn't / what needs follow-up. The deskwork team imports the closure into the scope-discovery feature's audit-log as `AUDIT-<date>-<NN>` entries — mirror of how we imported audiocontrol pilot TF-001..TF-016 into AUDIT-20260525-05..09.
-
-**Cross-references:**
-- Audit log: [`docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md`](../../docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md)
-- Dogfood handoff template (graphical-entries canary): [`docs/1.0/001-IN-PROGRESS/graphical-entries/dogfood-handoff.md`](../../docs/1.0/001-IN-PROGRESS/graphical-entries/dogfood-handoff.md)
-- Starter template (adopters): [`plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md`](../../plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md)
-
-## Inventory vs discovery — how to read scope-discovery reports
-
-A green `scope-inventory` (or `check-anti-patterns` / `check-adopters` / `check-editor-symmetry` / `check-deprecations`) run is NOT the same as "no novel anti-patterns / no novel adopter-gaps / no novel deprecation candidates." It is evidence of no source-tree match against the things ALREADY in the registered catalog. Treating the two as equivalent is the operator-trust failure mode the first dogfood-cycle finding ([#315](https://github.com/audiocontrol-org/deskwork/issues/315)) named — a component with ZERO canonical-primitive consumers + ≥14 utility-class hits passed every scanner and every audit because no catalog entry described its shape.
-
-Phase 11 Task 12 closed the gap via the hybrid option: the operator-facing entry-point keeps the name `scope-inventory` (it IS an inventory action); the manifest's per-finding `provenance` field + the `discovered_candidates:` section + the per-skill prose distinguish registered-pattern matches from novel candidates. The rule below is the operator-discipline cue that pairs with the code-side surfacing.
-
-### How to apply when READING a scope-discovery report
-
-When you (the agent or the operator) read a scope-manifest.yaml, a `scope-inventory` stderr summary, a `check-anti-patterns` output, or a `synthesis.md` digest, parse the finding shape into three operator-visible categories:
-
-1. **Registered-pattern matches (inventory).** Findings where `status_provenance.provenance_source ∈ {operator-authored, install-seed}` AND `source_status ∈ {blessed, cursed}`. The catalog said to look for these shapes; the scanner found them. Action: fix in-place, OR add the file to `exceptions:`, OR demote the catalog entry. A green count here is a green INVENTORY result.
-
-2. **Discovered candidates (architectural).** Entries under the manifest's `discovered_candidates:` section. Surfaced by the orchestrator-agent mediation layer (Phase 11 Task 3). Architectural-scale clusters of raw findings the catalog doesn't currently cover. Action: triage architecture-scale; let the orchestrator-agent translate to line-level catalog edits.
-
-3. **Novel-shape candidates (per-handler).** Findings whose `status_provenance.provenance_source ∈ {orchestrator-agent, llm-judge-proposed, promoted-from-candidate}`, OR whose `source_status: pending`, OR whose per-handler provenance is `negative-space` / `coverage-gap` / `outlier` / `semantic` / `discovered-candidate`. Per-handler novel-shape signals. Action: triage into the relevant catalog (status: `blessed` / `cursed` / `ignore`) via `/dw-lifecycle:implement`'s mediation flow.
-
-The `scope-inventory` stderr surfaces a one-line summary in this format:
-
-```
-scope-inventory: categories: registered-pattern=N, discovered-candidate=N, novel-shape-candidate=N
-```
-
-The `synthesis.md` evidence-trail file leads with a `## Inventory vs. discovery — finding categories` section that breaks the per-category counts down with the operator-action advisory + the per-bucket split. **Read both before treating a run as "all clear."**
-
-### Why this matters
-
-Reading a green discovery report as "no novel anti-patterns" is the failure mode that lets KeygroupSummary-shape regressions ship to release. The catalog ages out as the codebase evolves; the per-handler novel-shape signals + the architectural-scale `discovered_candidates:` are the mechanism that surfaces what the catalog doesn't yet know. Ignoring those signals on the grounds that the registered-pattern count is zero re-creates the operator-trust failure mode.
-
-### The single hard test
-
-When you finish a `scope-inventory` (or any check-* verb) run, before you tell the operator "no findings": **read the stderr `categories:` line AND look at `synthesis.md`'s category-report section.** If `novel-shape-candidate > 0` OR `discovered-candidate > 0` OR `pendingMetaCount > 0`, the run is NOT all-clear. The operator action is to triage those candidates BEFORE moving on.
-
-If you (the agent) catch yourself writing "no anti-patterns found" or "scope-inventory came back clean" without naming the category split, STOP — that's the failure mode this rule names. The categories distinguish registered-pattern matches from novel candidates; the report distinguishes them; your prose must distinguish them too.
-
-### Cross-references
-
-- Agent fleet split (inventory agents vs. discovery agents): [`plugins/dw-lifecycle/src/scope-discovery/discovery-agents/README.md`](../../plugins/dw-lifecycle/src/scope-discovery/discovery-agents/README.md)
-- Report rendering code: [`plugins/dw-lifecycle/src/scope-discovery/synthesis-report.ts`](../../plugins/dw-lifecycle/src/scope-discovery/synthesis-report.ts)
-- Phase 11 Task 12 (origin of this rule): [`docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md`](../../docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md) § Phase 11 Task 12.
-- KeygroupSummary canonical repro (the failure mode this rule prevents): [#315](https://github.com/audiocontrol-org/deskwork/issues/315).
+- **Tooling-feedback:** for scope-discovery features, log friction in `tooling-feedback.md` the moment it surfaces (one friction per entry: Repro / Workaround / Suggested-fix; append-only) — the cumulative log is the v1 ship-gate signal.
+- **Inventory ≠ discovery:** a green `scope-inventory` means "no match against the *registered* catalog," NOT "no novel anti-patterns." Before saying "no findings," read the stderr `categories:` line + `synthesis.md`; if `novel-shape-candidate`/`discovered-candidate`/`pendingMeta` > 0 it is NOT all-clear. Failure mode: KeygroupSummary regression, [#315](https://github.com/audiocontrol-org/deskwork/issues/315).
 
 ## Read documentation before quoting commands
 
