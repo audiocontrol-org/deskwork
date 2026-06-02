@@ -21,8 +21,10 @@
  *    tailnet peers will use. Strictly nice-to-have; the IP-based bind
  *    works without it.
  *
- * Operators can disable auto-detection entirely with `--no-tailscale`
- * (loopback only). They can also pass an explicit `--host` to override
+ * Operators can disable auto-detection entirely by setting
+ * `DESKWORK_STUDIO_NO_TAILSCALE=1` (loopback only — the non-interactive
+ * escape hatch for smokes / CI; the old `--no-tailscale` flag is a
+ * deprecated no-op). They can also pass an explicit `--host` to override
  * everything (Tailscale-aware logic kicks in only when `--host` was
  * NOT explicitly set).
  */

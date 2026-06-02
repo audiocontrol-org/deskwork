@@ -1,0 +1,302 @@
+/**
+ * Phase 16 Task 1 — check-barrage-tip library tests (TDD-first).
+ *
+ * Pre-Phase-16, /dw-lifecycle:implement Step 6's gate fused two concerns:
+ * "should new work be cross-model audited?" (always yes, per the third-
+ * audit-surface thesis) and "should nit findings be scoped vs slushed?"
+ * (context-dependent, the dampener's actual job). The fused gate skipped
+ * the whole hook when dampener engaged → 70-task burndowns ran with zero
+ * audit coverage (#383).
+ *
+ * Phase 16 splits the concerns. `check-barrage-tip` is the NEW-DIFF
+ * guard: the only legitimate skip condition. Per the operator's verbatim
+ * framing (2026-05-31): "Do work, audit barrage, if 0 HIGH and 0 MEDIUM
+ * findings on the NEW work, put new findings in slush. If there have
+ * been 2 consecutive audits on the new work with 0 HIGH findings, put
+ * new findings in slush."
+ *
+ * The barrage ALWAYS fires when there's new diff since the most-recent
+ * barrage's tip.sha (Task 2 writes that file at audit-barrage fire-time).
+ * No new diff → skip. New diff → fire + lift; dampener decides
+ * disposition (slush vs promote).
+ *
+ * This library is the diff-emptiness guard. Pure-fn with injected
+ * filesystem + git side-effects.
+ *
+ * Test invariants (RED pre-Task-3 implementation):
+ *   1. No prior runs → fail-safe to fire (hasNewDiff=true).
+ *   2. Latest tip matches HEAD → skip (hasNewDiff=false).
+ *   3. Latest tip at HEAD-N → fire with newCommitCount=N.
+ *   4. Missing tip.sha → fail-safe to fire.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { checkBarrageTip } from '../../../scope-discovery/promote-findings/check-barrage-tip.js';
+import { generateRunDirName } from '../../../scope-discovery/audit-barrage/run-artifacts.js';
+
+function makeStubs(opts: {
+  runDirs: string[];
+  tipShas: Record<string, string | null>;
+  newCommits: Record<string, number>;
+  diffFiles?: Record<string, string[]>;
+}) {
+  return {
+    listRunDirs: async () => opts.runDirs,
+    readTipSha: async (runDir: string) => opts.tipShas[runDir] ?? null,
+    gitRevListCount: async (range: string) => {
+      // range is "<tip>..HEAD" — extract the tip
+      const tip = range.split('..')[0] ?? '';
+      return opts.newCommits[tip] ?? 0;
+    },
+    listDiffFiles: opts.diffFiles
+      ? async (range: string) => {
+          const tip = range.split('..')[0] ?? '';
+          return opts.diffFiles?.[tip] ?? [];
+        }
+      : undefined,
+  };
+}
+
+describe('checkBarrageTip — Phase 16 Task 3 (new-diff guard)', () => {
+  it('fail-safe to fire when there are no prior barrage runs', async () => {
+    const stubs = makeStubs({ runDirs: [], tipShas: {}, newCommits: {} });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(true);
+    expect(result.lastTipSha).toBeNull();
+    expect(result.newCommitCount).toBe(0);
+    expect(result.reason.toLowerCase()).toMatch(/no prior barrage/);
+  });
+
+  it('skips when the latest run-dir tip.sha matches HEAD (no new diff)', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/2026-05-31-1200-feat'],
+      tipShas: { '/tmp/audit-runs/2026-05-31-1200-feat': 'abc123' },
+      newCommits: { abc123: 0 },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(false);
+    expect(result.lastTipSha).toBe('abc123');
+    expect(result.newCommitCount).toBe(0);
+    expect(result.reason.toLowerCase()).toMatch(/no new diff/);
+  });
+
+  it('fires when the latest tip.sha trails HEAD by N commits', async () => {
+    const stubs = makeStubs({
+      runDirs: [
+        '/tmp/audit-runs/2026-05-30-1200-feat',
+        '/tmp/audit-runs/2026-05-31-1200-feat',
+      ],
+      tipShas: {
+        '/tmp/audit-runs/2026-05-30-1200-feat': 'oldsha',
+        '/tmp/audit-runs/2026-05-31-1200-feat': 'def456',
+      },
+      newCommits: { def456: 3, oldsha: 99 /* ignored — older */ },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(true);
+    expect(result.lastTipSha).toBe('def456');
+    expect(result.newCommitCount).toBe(3);
+    expect(result.reason).toMatch(/3 (commit|new)/i);
+  });
+
+  it('fail-safe to fire when the latest run-dir is missing tip.sha', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/2026-05-31-1200-feat'],
+      tipShas: { '/tmp/audit-runs/2026-05-31-1200-feat': null },
+      newCommits: {},
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(true);
+    expect(result.lastTipSha).toBeNull();
+    expect(result.newCommitCount).toBe(0);
+    expect(result.reason.toLowerCase()).toMatch(/missing tip|no tip|tip\.sha/);
+  });
+
+  it('uses the MOST RECENT run-dir (last by lexical-sort) when multiple runs exist', async () => {
+    // Run-dirs are named by timestamp prefix; lexical sort = chronological
+    // sort. Most recent = last in the sorted list. The library MUST pick
+    // the last one (not the first or arbitrary order).
+    const stubs = makeStubs({
+      runDirs: [
+        '/tmp/audit-runs/2026-05-29-1200-feat',
+        '/tmp/audit-runs/2026-05-30-1200-feat',
+        '/tmp/audit-runs/2026-05-31-1200-feat',
+      ],
+      tipShas: {
+        '/tmp/audit-runs/2026-05-29-1200-feat': 'sha-29',
+        '/tmp/audit-runs/2026-05-30-1200-feat': 'sha-30',
+        '/tmp/audit-runs/2026-05-31-1200-feat': 'sha-31',
+      },
+      newCommits: { 'sha-29': 50, 'sha-30': 25, 'sha-31': 5 },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.lastTipSha).toBe('sha-31');
+    expect(result.newCommitCount).toBe(5);
+    expect(result.hasNewDiff).toBe(true);
+  });
+
+  // Phase 18 Task 6 — AUDIT-20260601-30 (claude-opus-01, HIGH):
+  // bookkeeping-commit filter. The barrage should NOT fire when the
+  // diff touches only audit-log.md / workplan.md / .dw-lifecycle/
+  // marker files. Without this filter, each bookkeeping commit triggers
+  // a barrage → meta-findings → more bookkeeping → ad infinitum
+  // (the literal "recursive fix-trap" claude-opus-01 named).
+  it('Phase 18 Task 6: SKIPS when diff is entirely bookkeeping files (audit-log + workplan only)', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/2026-06-01-prior'],
+      tipShas: { '/tmp/audit-runs/2026-06-01-prior': 'priorsha1234' },
+      newCommits: { priorsha1234: 2 },
+      diffFiles: {
+        priorsha1234: [
+          'docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md',
+          'docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md',
+        ],
+      },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(false);
+    expect(result.reason.toLowerCase()).toMatch(/bookkeeping/);
+  });
+
+  it('Phase 18 Task 6: SKIPS when diff is entirely .dw-lifecycle marker files', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/prior'],
+      tipShas: { '/tmp/audit-runs/prior': 'tip001' },
+      newCommits: { tip001: 1 },
+      diffFiles: {
+        tip001: [
+          '.dw-lifecycle/scope-discovery/last-hook-run.json',
+          '.dw-lifecycle/scope-discovery/hook-run-log.jsonl',
+        ],
+      },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(false);
+    expect(result.reason.toLowerCase()).toMatch(/bookkeeping/);
+  });
+
+  // Phase 18 Task 6 — REGRESSION LOCK (per Option D discipline).
+  // Working-code invariant: the barrage fires on every source-code
+  // change. The fix must NOT break that. ANY non-bookkeeping file in
+  // the diff → fire. This regression-lock pins the working invariant.
+  it('Phase 18 Task 6 REGRESSION: FIRES when diff touches any source file (working-code invariant)', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/prior'],
+      tipShas: { '/tmp/audit-runs/prior': 'srctip001' },
+      newCommits: { srctip001: 1 },
+      diffFiles: {
+        srctip001: ['plugins/dw-lifecycle/src/subcommands/audit-barrage.ts'],
+      },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(true);
+  });
+
+  it('Phase 18 Task 6 REGRESSION: FIRES on mixed diff (any source file → fire)', async () => {
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/prior'],
+      tipShas: { '/tmp/audit-runs/prior': 'mixedtip' },
+      newCommits: { mixedtip: 3 },
+      diffFiles: {
+        mixedtip: [
+          'docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md',
+          'plugins/dw-lifecycle/src/scope-discovery/promote-findings/some-source.ts',
+          '.dw-lifecycle/scope-discovery/last-hook-run.json',
+        ],
+      },
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    // Mixed → still fires (the source change deserves audit).
+    expect(result.hasNewDiff).toBe(true);
+  });
+
+  it('Phase 18 Task 6 backward-compat: when listDiffFiles is NOT injected, behavior is unchanged (fires on any diff)', async () => {
+    // Pre-Phase-18 callers don't supply listDiffFiles. The library must
+    // default to the existing behavior (fire iff newCommitCount > 0)
+    // without the bookkeeping filter being applied.
+    const stubs = makeStubs({
+      runDirs: ['/tmp/audit-runs/prior'],
+      tipShas: { '/tmp/audit-runs/prior': 'compatsha' },
+      newCommits: { compatsha: 1 },
+      // diffFiles intentionally omitted
+    });
+    const result = await checkBarrageTip({
+      auditRunsDir: '/tmp/audit-runs',
+      ...stubs,
+    });
+    expect(result.hasNewDiff).toBe(true);
+  });
+
+  // Phase 17 retro-fix — AUDIT-20260531-26 (claude-07): pin the
+  // lexical-sort assumption to the REAL `generateRunDirName` output
+  // (not hand-written literal strings). If the naming function ever
+  // changes to a non-lexically-monotonic format, this test fails.
+  //
+  // Per AUDIT-20260601-04 (claude-06): timestamps EXACTLY exercise
+  // the boundaries claimed — day, ms, minute, hour, and a real year
+  // boundary (2026 → 2027). Pre-fix the comment claimed "year
+  // boundary" for a same-year timestamp, which is the same comment-
+  // vs-code drift smell as AUDIT-15.
+  it('lexical-sort holds under the REAL generateRunDirName output across all boundary types', async () => {
+    const t1 = new Date('2026-05-29T23:59:59.999Z'); // pre-day
+    const t2 = new Date('2026-05-30T00:00:00.000Z'); // day boundary
+    const t3 = new Date('2026-05-30T00:00:00.001Z'); // ms boundary
+    const t4 = new Date('2026-05-30T00:01:00.000Z'); // minute boundary
+    const t5 = new Date('2026-05-30T01:00:00.000Z'); // hour boundary
+    const t6 = new Date('2026-12-31T23:59:59.999Z'); // pre-year
+    const t7 = new Date('2027-01-01T00:00:00.000Z'); // REAL year boundary
+    const names = [
+      generateRunDirName(t1, 'feat'),
+      generateRunDirName(t2, 'feat'),
+      generateRunDirName(t3, 'feat'),
+      generateRunDirName(t4, 'feat'),
+      generateRunDirName(t5, 'feat'),
+      generateRunDirName(t6, 'feat'),
+      generateRunDirName(t7, 'feat'),
+    ];
+    const sorted = [...names].sort();
+    // Verify lexical sort produces chronological order across all
+    // boundary types: day, ms, minute, hour, and the real year boundary.
+    expect(sorted).toEqual(names);
+    // Then verify the library picks the last (most-recent) when given
+    // the shuffled set.
+    const shuffled = [names[3]!, names[0]!, names[6]!, names[2]!, names[5]!, names[1]!, names[4]!];
+    const auditRunsDir = '/tmp/audit-runs';
+    const fullPaths = shuffled.map((n) => `${auditRunsDir}/${n}`);
+    const result = await checkBarrageTip({
+      auditRunsDir,
+      listRunDirs: async () => fullPaths,
+      readTipSha: async (path: string) => `tip-${path.split('/').pop()}`,
+      gitRevListCount: async () => 1,
+    });
+    // Latest = t7 (2027-01-01 — across the year boundary).
+    expect(result.lastTipSha).toBe(`tip-${names[6]}`);
+  });
+});

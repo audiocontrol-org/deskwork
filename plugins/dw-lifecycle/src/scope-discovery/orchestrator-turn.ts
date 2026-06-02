@@ -63,9 +63,14 @@ import { parseRegistry as parseAdopterManifestsRegistry } from './adopter-manife
 import { parseClonesYamlStrict } from './clones-yaml.parse.js';
 import { loadOverridePatterns } from './discovery-agents/pattern-handlers/loader.js';
 import { runOrchestratorTurn } from './orchestrator-loop/loop-turn.js';
-import { persistLoopState } from './orchestrator-loop/loop-state.js';
+import { loadLoopState, persistLoopState } from './orchestrator-loop/loop-state.js';
 import { loadLoopConfig } from './orchestrator-loop/loop-config.js';
-import type { TurnInput, TurnReport } from './orchestrator-loop/loop-types.js';
+import type {
+  LoopState,
+  TurnHistoryEntry,
+  TurnInput,
+  TurnReport,
+} from './orchestrator-loop/loop-types.js';
 import type { CatalogEntryView } from './recovery/detect-wrong-decisions.js';
 import type { DispatchFn } from './dispatch-wrapper.js';
 import type { AuditorInput, JudgeInput } from './llm/types.js';
@@ -99,6 +104,15 @@ export interface OrchestratorTurnCliArgs {
    * don't use the standard `docs/<v>/001-IN-PROGRESS/<slug>/` layout.
    */
   readonly allowMissingFeature?: boolean;
+  /**
+   * When true, force the `NOTE: only N/6 catalog files present (...)`
+   * decoration even when the catalog count hasn't changed since the
+   * prior turn (Phase 14 Task 1; AUDIT-20260529-12). Default false —
+   * the NOTE is suppressed on steady-state turns to keep the per-turn
+   * summary signal-dense. The WARNING (count === 0) is NOT subject to
+   * gating; it always fires.
+   */
+  readonly verbose?: boolean;
 }
 
 /**
@@ -423,6 +437,8 @@ function inspectCatalogPresence(repoRoot: string): CatalogPresence {
 function decorateSummaryWithCatalogPresence(
   summary: string,
   presence: CatalogPresence,
+  priorPresentCount: number | undefined,
+  verbose: boolean,
 ): string {
   if (presence.presentCount === 0) {
     return (
@@ -432,6 +448,17 @@ function decorateSummaryWithCatalogPresence(
     );
   }
   if (presence.presentCount < presence.totalCount) {
+    // Phase 14 Task 1 (AUDIT-20260529-12): suppress the NOTE on a
+    // steady-state turn — when the count is unchanged from the prior
+    // turn and the operator didn't ask for verbose. `priorPresentCount
+    // === undefined` covers first-turn + legacy state files without
+    // the field; both treat the NOTE as new signal.
+    const countChanged =
+      priorPresentCount === undefined ||
+      priorPresentCount !== presence.presentCount;
+    if (!countChanged && !verbose) {
+      return summary;
+    }
     const names = presence.presentNames.join(', ');
     return (
       `NOTE: only ${presence.presentCount}/${presence.totalCount} catalog ` +
@@ -601,12 +628,46 @@ export async function runOrchestratorTurnCli(
   // TF-006 — decorate the summary with catalog-presence so adopters
   // can distinguish "no findings + no catalog" from "happy steady-
   // state with full catalog." All-zeros was previously indistinguishable.
+  //
+  // Phase 14 Task 1 (AUDIT-20260529-12) — gate the NOTE behind a
+  // count-changed check. The prior turn's `catalogPresentCount` lives
+  // on `turnHistory[0]` when it exists; absent (first turn or legacy
+  // state file) is treated as "different from any current count" so
+  // the NOTE surfaces on first observation.
   const catalogPresence = inspectCatalogPresence(repoRoot);
+  let priorPresentCount: number | undefined;
+  try {
+    const priorLoopState = await loadLoopState(
+      repoRoot,
+      args.featureSlug,
+      args.runtimeDirOverride,
+    );
+    priorPresentCount = priorLoopState.turnHistory[0]?.catalogPresentCount;
+  } catch {
+    // Loop state read failure is non-fatal for the noise gate — treat as
+    // "no prior count," which causes the NOTE to fire (matches the
+    // pre-Phase-14 behavior). The library already loaded its own copy
+    // when running the turn; any real corruption would have surfaced there.
+    priorPresentCount = undefined;
+  }
   const decoratedSummary = decorateSummaryWithCatalogPresence(
     rawReport.summary,
     catalogPresence,
+    priorPresentCount,
+    args.verbose === true,
   );
-  const report: TurnReport = { ...rawReport, summary: decoratedSummary };
+  // Stamp the current catalog count onto the new history entry so the
+  // next turn can compare. The library returned nextLoopState with the
+  // new entry at index 0 but without our catalog field; reconstruct.
+  const stampedNextLoopState = stampCatalogPresentCount(
+    rawReport.nextLoopState,
+    catalogPresence.presentCount,
+  );
+  const report: TurnReport = {
+    ...rawReport,
+    summary: decoratedSummary,
+    nextLoopState: stampedNextLoopState,
+  };
 
   // Persist the new loop state. The library returns the state without
   // writing; the caller (this assembler) owns the write so a future
@@ -627,4 +688,17 @@ export async function runOrchestratorTurnCli(
   }
 
   return { exitCode: 0, report };
+}
+
+function stampCatalogPresentCount(
+  state: LoopState,
+  count: number,
+): LoopState {
+  const head = state.turnHistory[0];
+  if (head === undefined) return state;
+  const stampedHead: TurnHistoryEntry = { ...head, catalogPresentCount: count };
+  return {
+    ...state,
+    turnHistory: [stampedHead, ...state.turnHistory.slice(1)],
+  };
 }

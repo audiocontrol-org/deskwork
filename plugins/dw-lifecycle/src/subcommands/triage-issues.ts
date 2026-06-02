@@ -30,17 +30,7 @@ export type TriageIssuesCliOptions = ProposeCliOptions | ApplyCliOptions;
 
 const DEFAULT_LIMIT = 10;
 
-function parsePositiveInt(flag: string, raw: string | undefined): number {
-  if (raw === undefined) throw new Error(`${flag} requires a numeric value.`);
-  if (!/^\d+$/.test(raw)) {
-    throw new Error(`${flag} must be a positive integer (got '${raw}').`);
-  }
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0) {
-    throw new Error(`${flag} must be a positive integer (got '${raw}').`);
-  }
-  return n;
-}
+import { parsePositiveInt } from './lib/parse-flag-value.js';
 
 function parseProposeArgs(args: readonly string[]): ProposeCliOptions {
   let bucket: string | undefined;

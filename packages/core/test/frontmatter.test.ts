@@ -3,6 +3,7 @@ import {
   parseFrontmatter,
   stringifyFrontmatter,
   updateFrontmatter,
+  removeFrontmatterPaths,
   readFrontmatter,
   writeFrontmatter,
 } from '../src/frontmatter.ts';
@@ -305,5 +306,70 @@ describe('updateFrontmatter — round-trip preservation (Issue #37)', () => {
     expect(out).toContain('  - one\n');
     expect(out).toContain('  - two\n');
     expect(out).toMatch(/^---\ntitle: Post\ndatePublished: "2020-10-01"\ntags:\n  - one\n  - two\n/);
+  });
+});
+
+describe('namespaced-deskwork-metadata write guard', () => {
+  // agent-discipline rule (decompose-agent-discipline, entry 17): deskwork must
+  // namespace its metadata under `deskwork.*`; it must never write a reserved
+  // field (e.g. `id`) at the top level, which would claim the operator's global
+  // frontmatter keyspace (the v0.7.0 Issue #38 regression). The write helpers
+  // fail loud — no fallback — so the bad shape can't reach disk.
+
+  it('updateFrontmatter throws when a deskwork-reserved key is written at the top level', () => {
+    expect(() =>
+      updateFrontmatter('---\ntitle: x\n---\nbody', { id: 'b1d3-uuid' }),
+    ).toThrow(/deskwork\.id/);
+  });
+
+  it('updateFrontmatter accepts the namespaced form', () => {
+    const out = updateFrontmatter('---\ntitle: x\n---\nbody', {
+      deskwork: { id: 'b1d3-uuid' },
+    });
+    expect(out).toContain('deskwork:');
+    expect(out).toContain('id: b1d3-uuid');
+  });
+
+  it('stringifyFrontmatter throws when a deskwork-reserved key is at the top level', () => {
+    expect(() => stringifyFrontmatter({ id: 'b1d3-uuid' }, 'body')).toThrow(
+      /deskwork\.id/,
+    );
+  });
+
+  it('stringifyFrontmatter accepts the namespaced form', () => {
+    const out = stringifyFrontmatter({ deskwork: { id: 'b1d3-uuid' } }, 'body');
+    expect(out).toContain('deskwork:');
+  });
+
+  it('does not flag unrelated top-level keys', () => {
+    expect(() =>
+      stringifyFrontmatter({ title: 'x', slug: 'y', tags: ['a'] }, 'body'),
+    ).not.toThrow();
+  });
+
+  // AUDIT-20260602-03: the guard is PATCH-scoped on updateFrontmatter, not
+  // full-document-scoped. A legacy file that still carries a top-level `id:`
+  // (the exact shape legacy-top-level-id-migration exists to clean) must
+  // round-trip through updateFrontmatter without throwing, as long as the
+  // PATCH itself is namespaced. This locks the migration path: the rule writes
+  // `{deskwork:{id}}` (patch) then removeFrontmatterPaths(['id']) — it never
+  // passes the legacy top-level id back through stringifyFrontmatter.
+  // AUDIT-20260602-07: drive the FULL migration sequence the doctor rule runs
+  // (updateFrontmatter patch → removeFrontmatterPaths(['id'])), not just the
+  // first step — that's the parse→patch→remove→re-emit path AUDIT-03 named as
+  // the at-risk surface. Asserts the end state has NO top-level id, HAS the
+  // namespaced deskwork.id, and that no step throws.
+  it('full legacy migration sequence (patch + remove) does not throw and lands the namespaced shape', () => {
+    const legacy = '---\nid: 38410ae2-uuid\ntitle: Legacy\n---\nbody';
+    let out = '';
+    expect(() => {
+      const withDeskwork = updateFrontmatter(legacy, { deskwork: { id: '38410ae2-uuid' } });
+      out = removeFrontmatterPaths(withDeskwork, [['id']]);
+    }).not.toThrow();
+    const { data } = parseFrontmatter(out);
+    // Top-level id is gone; the binding now lives only under deskwork.id.
+    expect(data.id).toBeUndefined();
+    expect((data.deskwork as { id?: string } | undefined)?.id).toBe('38410ae2-uuid');
+    expect(data.title).toBe('Legacy');
   });
 });

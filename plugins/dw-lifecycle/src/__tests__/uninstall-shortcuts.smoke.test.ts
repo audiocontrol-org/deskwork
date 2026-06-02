@@ -41,13 +41,13 @@ describe('uninstall-shortcuts (smoke)', () => {
       // Sanity: install wrote the expected files.
       expect(existsSync(manifestPath(tmp))).toBe(true);
       const before = readdirSync(resolveCommandsDir(tmp));
-      expect(before.length).toBeGreaterThan(17); // 17 shims + .dotfile manifest
+      expect(before.length).toBeGreaterThan(19); // 19 shims + .dotfile manifest
 
       const result = runUninstallShortcuts({ home: tmp });
 
       expect(result.dryRun).toBe(false);
       expect(result.manifestRemoved).toBe(true);
-      expect(result.shimsRemoved.length).toBe(17);
+      expect(result.shimsRemoved.length).toBe(19);
       expect(result.missingShims.length).toBe(0);
       expect(existsSync(manifestPath(tmp))).toBe(false);
 
@@ -193,7 +193,7 @@ describe('uninstall-shortcuts (smoke)', () => {
       const result = runUninstallShortcuts({ home: tmp });
 
       expect(result.manifestRemoved).toBe(true);
-      expect(result.shimsRemoved.length).toBe(16);
+      expect(result.shimsRemoved.length).toBe(18);
       expect(result.missingShims.length).toBe(1);
       const firstMissing = result.missingShims[0];
       expect(firstMissing).toBeDefined();
@@ -233,7 +233,7 @@ describe('uninstall-shortcuts (smoke)', () => {
       const result = runUninstallShortcuts({ home: tmp, dryRun: true });
 
       expect(result.dryRun).toBe(true);
-      expect(result.shimsRemoved.length).toBe(17);
+      expect(result.shimsRemoved.length).toBe(19);
       // manifestRemoved means "actually deleted in this call" — false
       // on dry-run. The dry-run caller infers "would remove" from
       // dryRun: true + no errors thrown.

@@ -10,28 +10,67 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
 ## Steps
 
 1. Confirm slug and target version.
-2. Invoke `superpowers:subagent-driven-development` as the orchestration discipline. The skill walks the workplan, dispatching per-task subagents with full task context.
-3. For features touching existing code, dispatch `code-explorer` (from `feature-dev`) once at start to orient the agent. Skip if feature-dev not installed.
-4. For each task in the workplan:
+2. **Workplan-aware open-findings gate.** Before picking up the next task, run:
+
+   ```bash
+   dw-lifecycle check-open-findings --feature <slug>
+   ```
+
+   Exit 0 = proceed. Two flavors of exit 0:
+   - `no-open-findings` — the audit-log has zero `Status: open` entries.
+   - `open-findings-scoped-as-next` — open findings exist, AND the next N unchecked workplan tasks at positions `[0..N-1]` are the `(fix-finding-AUDIT-<id>)` tasks covering exactly those finding IDs. The loop is allowed because the open findings ARE the next work.
+
+   Exit 1 = refusal. Three modes, each with a specific cure rendered in the message:
+   - `non-fix-task-before-fix-tasks` — an unchecked task at a position before all open-finding fix-tasks is NOT tagged `(fix-finding-AUDIT-<id>)`. Cure: reorder the workplan so the fix-tasks come first.
+   - `coverage-mismatch (missing)` — one or more open findings have no scoped fix-task in positions `[0..N-1]`. Cure: run `dw-lifecycle promote-findings --feature <slug> --apply` to scope them.
+   - `coverage-mismatch (extra)` — scoped fix-tasks in positions `[0..N-1]` reference Finding-IDs that are not currently open. Cure: flip those audit-log entries to `fixed-<sha>`/`verified-<date>` OR remove the stale scoped tasks from the workplan.
+
+   Exit 2 = config error (feature root not found or argv error). Surface and pause.
+
+   Per Phase 13's anti-deferral discipline + the Phase 15 operator directive (*"audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path"*), open findings do NOT block task pickup when they're scoped as the next work; they DO block when they're unscoped or non-next. No `--ignore-open-findings` override flag — the workplan-aware semantic IS the cure, not an escape hatch.
+3. Invoke `superpowers:subagent-driven-development` as the orchestration discipline. The skill walks the workplan, dispatching per-task subagents with full task context.
+4. For features touching existing code, dispatch `code-explorer` (from `feature-dev`) once at start to orient the agent. Skip if feature-dev not installed.
+5. For each task in the workplan:
+   - **Re-run the open-findings gate before picking up the task** (see Step 2). Findings can accrue mid-session — a per-turn audit, a closed PR's verification re-audit, an in-band judge fire — and the gate's purpose is to refuse advance the moment any open finding exists. Skipping the re-check on follow-on tasks defeats the discipline.
    - If the task involves architecture decisions, dispatch `code-architect` (from `feature-dev`) to propose 2–3 approaches before coding. Skip if feature-dev not installed.
    - If the task introduces or modifies tested code, follow `superpowers:test-driven-development` (write failing test → minimal impl → pass → commit).
    - If a step is independent of others, consider `superpowers:dispatching-parallel-agents` to fan out.
    - Every sub-agent dispatched in this loop (implementer, reviewer, code-explorer, code-architect, etc.) MUST be routed through the dispatch wrapper — see "Dispatch-wrapper engagement" below.
    - When the task body is complete, mark its checkboxes and commit.
-5. Auto-invoke scope-widen between tasks (default behavior) unless `--no-scope-widen` was passed:
+6. **End-of-task audit-barrage hook.** After every task-completion commit, run:
+
+   ```bash
+   dw-lifecycle implement-hook --feature <slug>
+   ```
+
+   This single verb is the entire hook. It composes the new-diff guard (`check-barrage-tip`), prompt rendering (`audit-barrage-render`), parallel CLI fan-out (`audit-barrage`), finding extraction (`audit-barrage-lift`), dampener evaluation (`check-barrage-dampener`), and disposition (either `slush-remaining --apply` when the dampener is engaged or `promote-findings --auto` when it isn't), then writes a marker file the commit-msg gate verifies. Exit 0 = hook ran cleanly OR new-diff guard skipped; exit 1 = mid-flight failure; exit 2 = config error.
+
+   **The hook is mechanized with teeth (Phase 17).** The agent has no discretion at the firing decision:
+
+   - **Layer 1 — single verb (this step).** No bash composition to forget; one verb either runs or it doesn't.
+   - **Layer 2 — commit-msg gate (`check-implement-hook-ran`).** Refuses the next commit if `last-hook-run.json` doesn't show a run since the parent commit. Wired into the project's `commit-msg` hook chain. Cure message names the verb literally.
+   - **Layer 3 — pre-push gate (`check-implement-hook-coverage`).** Walks `<remote>/<branch>..HEAD`; refuses the push if any unpushed commit lacks a matching `hook-run-log.jsonl` entry. Catches `--no-verify` bypasses of Layer 2.
+
+   When `.dw-lifecycle/scope-discovery/` is absent in the project, all three layers silently allow (scope-discovery is opt-in).
+
+   **See the "Audit-barrage hook behavior reference" section below** for the disposition rules, operator-acknowledged trade-offs, failure-path policy, and per-task report shape. Step 6 itself is mechanically simple now; the semantic detail is documented separately.
+
+7. Auto-invoke scope-widen between tasks (default behavior) unless `--no-scope-widen` was passed:
    - Runs after the task-completion commit lands and BEFORE the next task starts.
    - When the completed task introduced NEW shapes / surfaces / primitives not enumerated in the project's existing `.dw-lifecycle/scope-discovery/scope-manifest.yaml`, invoke `dw-lifecycle scope-widen <slug> "<task brief as complaint>"` to expand the manifest. The "complaint" is the task title or workplan brief reframed as the unmet-coverage observation (e.g. `"new <NewPrimitive> surface introduced by Task N; scope-manifest needs the additional theme"`).
    - The widened scope-manifest is read by the next task's implementer brief so its dispatch sees the augmented scope context.
    - If `.dw-lifecycle/scope-discovery/` is not present in the project, the auto-invocation is silently skipped. No warning, no error — scope-discovery is opt-in per project.
-6. After each task, optionally run `/dw-lifecycle:review` or `/dw-lifecycle:audit` (does NOT block; operator chooses cadence).
+8. After each task, optionally run `/dw-lifecycle:review` or `/dw-lifecycle:audit` (does NOT block; operator chooses cadence).
    - They are synonyms. Both write findings into `audit-log.md` with stable IDs and explicit status transitions.
-7. Repeat from step 4 until all tasks done or operator pauses.
+9. Repeat from step 5 until all tasks done or operator pauses.
 
 ## Flags
 
 | Flag | Purpose |
 |---|---|
-| `--no-scope-widen` | Skip the Step 5 between-tasks auto-invocation of `scope-widen`. Use when the operator has already widened the manifest explicitly, or when the feature's tasks are all purely-additive against an already-comprehensive scope-manifest. |
+| `--no-scope-widen` | Skip the Step 7 between-tasks auto-invocation of `scope-widen`. Use when the operator has already widened the manifest explicitly, or when the feature's tasks are all purely-additive against an already-comprehensive scope-manifest. |
+
+There is **no `--skip-audit-barrage-hook` flag.** Per Phase 15's operator directive, the end-of-task audit-barrage hook (Step 6) is unconditional. The hook is silently skipped when `.dw-lifecycle/scope-discovery/` is absent in the project (scope-discovery is opt-in), but cannot be skipped via a flag when the project HAS opted in.
 
 ## When to use `--no-scope-widen`
 
@@ -40,6 +79,63 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
 - The implementation is short enough (one or two tasks) that running widen between every task is more noise than signal.
 
 Default = run scope-widen between tasks. Skipping is the exception, not the rule.
+
+## Audit-barrage hook behavior reference
+
+The detailed semantics of the `dw-lifecycle implement-hook` verb invoked in Step 6. Step 6 itself is mechanically simple; this section is the operator-facing reference.
+
+### Disposition rules
+
+The dampener engages via **either** of two rules:
+
+1. **N-quiet rule.** The last 2 consecutive barrages each surfaced 0 HIGH+ open findings.
+2. **Single-run rule** (added 2026-05-31). The most recent barrage surfaced 0 HIGH+ AND 0 MEDIUM open findings — a single clean run is signal enough.
+
+The dampener engaging means *"recent runs were quiet on real bugs — new findings (on this iteration's new diff) get slushed rather than promoted."* It does NOT mean *"the auditor has gone quiet on real bugs"* in a sense that would justify skipping audits on new work — that framing was the structural bug #383 closed.
+
+Per the operator's 2026-05-31 directive (baked into /dwi): *"Do work, audit barrage, if 0 HIGH and 0 MEDIUM findings on the NEW work, put new findings in slush. If there have been 2 consecutive audits on the new work with 0 HIGH findings, then put new findings in slush."* The two rules mechanize this exactly.
+
+When engaged, `slush-remaining --apply` flips MED/LOW/INFO `Status: open` findings in the most-recent barrage section to `acknowledged-slush-pile-<YYYY-MM-DD>` AND ticks the matching workplan fix-task blocks' checkboxes — so the workplan-aware gate (Step 2) sees zero open findings and the loop continues. The audit-log entries stay as historical record per the preservation rule. **HIGHs are NEVER slushed**: the severity filter is defense-in-depth (the dampener's invariant already prevents HIGHs from being in the most-recent section when engaged, but the filter ensures `--scope all` and any future legacy paths still preserve them).
+
+When the dampener is NOT engaged, `promote-findings --auto` scopes the findings as fix-tasks at the head of the workplan and the next iteration's gate sees them as the next-N work.
+
+### Operator-acknowledged trade-offs (2026-05-31 framing — these are CHOICES, not bugs)
+
+- **MEDIUM bugs slush under Rule B.** Sequence: barrage N is 0 HIGH+ (counter=1, no slush yet) → barrage N+1 lands 0 HIGH + 3 MEDIUMs. Rule B fires (2 consecutive 0-HIGH) → 3 real MEDIUMs go to slush even though they're real bugs. Same trade as the existing post-#380 severity filter (HIGHs only preserved); the operator explicitly accepts the cost.
+- **First-barrage slushing.** A clean feature start's first barrage that comes back 0 HIGH + 0 MEDIUM fires Rule A immediately. LOWs land in slush with no history. Consistent with the single-run-rule's explicit "no history required" semantic.
+- **Per-iteration barrage cost when dampened.** Pre-Phase-16, a dampened iteration was zero cost (skipped). Post-Phase-16, every iteration with new diff fires a barrage. Cost is on subscription-auth CLIs (no per-call billing); the autonomous-loop context means the operator isn't waiting. Cross-model audit coverage on new work is the third audit surface's whole reason for existing. The loop-stop is unchanged — workplan-exhaustion still stops the loop; the dampener was never the stop mechanism.
+
+### Failure-path policy (fail loud; do not pause the loop on findings)
+
+The `implement-hook` verb maps internal failures to one of three outcomes:
+
+- **Exit 0** — hook ran cleanly OR new-diff guard skipped. Marker written. The commit-msg gate will allow the next commit.
+- **Exit 1** — mid-flight failure. Marker NOT written. The commit-msg gate will refuse the next commit until the operator re-runs successfully.
+- **Exit 2** — config error (missing slug, feature root not found). Marker NOT written.
+
+Inside the chain, the per-step semantics are:
+
+- `check-barrage-tip` no-new-diff (exit 1) → write marker with disposition=`no-new-diff-skip`; exit 0.
+- `audit-barrage-render` non-zero → exit 1; the vars JSON is malformed or the template has unsubstituted markers. Fix and re-run.
+- `audit-barrage` exit 1 (every CLI failed) → write marker with disposition=`barrage-outage`; exit 0. The hook forward-progresses (per *"barrage was an outage, NOT a finding"*); the operator investigates.
+- `audit-barrage` exit 0 but partial spawn failures → proceed with healthy models (degraded barrage; cross-model agreement weaker but findings still emit).
+- `audit-barrage-lift` exit 0 with zero findings → proceed to Step 7 (scope-widen) without firing disposition (nothing to dispose).
+- `audit-barrage-lift` non-zero → exit 1; write to audit-log failed (drift/permissions/parser).
+- `slush-remaining --apply` non-zero → exit 1; flips failed.
+- `promote-findings --auto` non-zero → exit 1; scoping failed (per operator directive, findings are guardrails; failing to scope is structural).
+- `check-open-findings` non-zero post-disposition → exit 1; auto-scoping landed but gate still refuses (investigate).
+
+### Per-task report shape
+
+After every `implement-hook` invocation, the per-task report includes:
+
+- `new-diff` — commit count since last barrage (0 = skip case).
+- `barrage status` — e.g. `2/3 models healthy`.
+- `findings extracted` — total count.
+- `disposition` — `slushed: N` / `promoted: N` / `nothing-to-dispose` / `no-new-diff-skip`.
+- `gate result` — `allowed: open-findings-scoped-as-next` / `allowed: no-open-findings` / `refused: <mode>`.
+
+The verb writes `last-hook-run.json` after every legitimate exit (success + skip + outage) and appends to `hook-run-log.jsonl` so the pre-push gate can walk a multi-commit range.
 
 ## Dispatch-wrapper engagement
 
@@ -71,13 +167,15 @@ The wrapper is engaged via two Bash invocations bracketing every Agent-tool disp
 
    Stdout is the augmented prompt (original prompt + grammar instruction + optional refactor-context prelude). Stderr is a one-line summary (suppress with `--quiet`). Paste stdout into the Agent tool's `prompt` parameter. The verb resolves project overrides under `.dw-lifecycle/scope-discovery/*.yaml` against `--repo-root` (defaults to cwd).
 
-2. **After dispatch — validate the sub-agent's response.** Write the response to a temp file, then invoke:
+2. **After dispatch — validate the sub-agent's response.** Either write the response to a temp file, or pipe it via stdin using the `-` sentinel:
 
    ```bash
    dw-lifecycle validate-return --agent-type <type> --response-file <path>
+   # or, mirroring `gh issue create --body-file -`:
+   echo "$RESPONSE" | dw-lifecycle validate-return --agent-type <type> --response-file -
    ```
 
-   Stdout is a structured `ValidationResult` JSON: `{ valid, foundBlocks: {searched, included, excluded}, missingBlocks, parseError, forbiddenPhrases: [{phrase, file, line, reason}], refactorPreconditionViolations, skippedAudit, summary }`. Exit code: 0 if valid; 1 on validation failure. Pass `--json` to suppress the stderr summary in pipelines.
+   Stdout is a structured `ValidationResult` JSON: `{ valid, foundBlocks: {searched, included, excluded}, missingBlocks, parseError, forbiddenPhrases: [{phrase, file, line, reason}], refactorPreconditionViolations, skippedAudit, summary }`. Exit code: 0 if valid; 1 on validation failure; 2 on usage errors (missing flag, file not found, or empty stdin when `-` is passed). Pass `--json` to suppress the stderr summary in pipelines.
 
    On exit 1, the orchestrator rejects the response and re-dispatches with the same augmented prompt + a correction note quoting the violation surfaced in the JSON. After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
 
@@ -92,10 +190,12 @@ If `.dw-lifecycle/scope-discovery/` is not present in the project, the verbs sti
 When `.dw-lifecycle/scope-discovery/` is present in the project, this skill runs an orchestrator-loop per-turn audit/judge stack. Invoke the loop via Bash:
 
 ```bash
-dw-lifecycle orchestrator-turn --feature <slug> [--skip-judge] [--skip-auditor]
+dw-lifecycle orchestrator-turn --feature <slug> [--skip-judge] [--skip-auditor] [--verbose]
 ```
 
 The CLI verb assembles `TurnInput` from on-disk state (catalog entries, audit-log, fresh codebase-state metrics, discovery-agent findings) and calls the orchestrator-loop library. It emits a machine-readable `TurnReport` (JSON) to stdout and a one-line human summary to stderr. Pass `--json` to suppress the stderr summary.
+
+`--verbose` forces the `NOTE: only N/6 catalog files present (...)` summary decoration even when the catalog count is unchanged from the prior turn (Phase 14 Task 1 — AUDIT-20260529-12). Default behavior: emit the NOTE on the first turn or whenever the count changes (file added or removed); suppress on steady-state turns to keep the per-turn summary signal-dense. The `WARNING: no scope-discovery catalog files` line (count === 0) is NOT subject to gating; it always fires.
 
 Per-turn the loop composes the following libraries into a deterministic cycle:
 
@@ -140,11 +240,30 @@ Defaults at `DEFAULT_LOOP_CONFIG` in `orchestrator-loop/loop-config.ts`. Operato
 
 ## Error handling
 
+- **Workplan-aware gate refuses (`dw-lifecycle check-open-findings` exit 1).** STOP the skill. Surface the refusal message verbatim. The refusal mode determines the cure: `non-fix-task-before-fix-tasks` → reorder the workplan so fix-tasks occupy positions `[0..N-1]`; `coverage-mismatch (missing)` → run `dw-lifecycle promote-findings --feature <slug> --apply` to scope unscoped findings; `coverage-mismatch (extra)` → flip stale audit-log entries to `fixed-<sha>`/`verified-<date>` OR remove the stale scoped fix-tasks. The new semantic + the absence of an override flag (per Phase 13 rigidity stance + Phase 15 operator directive) are intentional: findings ARE the next work, not exceptions blocking it.
+- **Workplan-aware gate config error (`dw-lifecycle check-open-findings` exit 2).** Feature root not found OR an argv error. Surface the message; pause for operator action. Common causes: invalid slug, missing `docs/<v>/001-IN-PROGRESS/<slug>/` layout, missing `--feature` argument.
 - **feature-dev not installed.** Print one-line warning at start; agent dispatch steps that depend on it are skipped. Skill continues with single-agent fallback. Dispatch-wrapper engagement still applies to the remaining dispatches.
 - **Bug surfaces during a task.** Invoke `superpowers:systematic-debugging` before continuing the task. Don't push through with a known bug.
 - **Test failures during TDD.** Per the TDD discipline: failing test is expected before implementation. Failing tests AFTER implementation means the impl is wrong; iterate, don't bypass the test.
-- **Auto-invocation behavior (scope-widen).** When `.dw-lifecycle/scope-discovery/` is absent, the Step 5 auto-invocation is silently skipped. When present, `scope-widen` runs with default flags (dry-run is its default; `--apply` is passed when this skill invokes it because the merged manifest must be readable by the next task's implementer brief). The widen run's resulting `scope-manifest.yaml` path AND the additive-delta summary are passed into the next task's dispatched-agent context so the implementer sees the augmented scope before starting.
+- **Auto-invocation behavior (scope-widen).** When `.dw-lifecycle/scope-discovery/` is absent, the Step 7 auto-invocation is silently skipped. When present, `scope-widen` runs with default flags (dry-run is its default; `--apply` is passed when this skill invokes it because the merged manifest must be readable by the next task's implementer brief). The widen run's resulting `scope-manifest.yaml` path AND the additive-delta summary are passed into the next task's dispatched-agent context so the implementer sees the augmented scope before starting.
+- **End-of-task audit-barrage hook failures (Step 6).** Each stage of the five-CLI hook has a specific failure response. `audit-barrage-render` non-zero → stop loop, fix vars/template. `audit-barrage` all-models-failed (exit 1) → degraded path: proceed without lift; surface single-line warning. `audit-barrage-lift` non-zero with extracted findings → stop loop (audit-log write failed; drift/permissions/parser issue). `promote-findings --auto` non-zero → stop loop (per operator directive, findings are guardrails; failing to scope them is a structural failure). `check-open-findings` non-zero AFTER the auto-promote → stop loop (the gate refused despite the auto-scoping; investigate workplan + audit-log state). Failures that stop the loop surface the underlying error verbatim in the per-task report; the operator addresses them before the next `/dw-lifecycle:implement` invocation.
 - **`scope-widen` fails.** Surface the error in the next task's brief; the task still proceeds. The operator can re-run scope-widen manually (`/dw-lifecycle:scope-widen <slug> "<complaint>"`) after addressing the cause.
 - **`dw-lifecycle validate-return` exit 1.** The sub-agent's response was rejected by the dispatch grammar (missing block / forbidden phrase / skipped-audit signal / refactor-precondition violation). Re-dispatch with the same augmented prompt + a correction note that quotes the violation surfaced in the JSON. After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
 - **Orchestrator loop — judge dispatch fails.** `dw-lifecycle orchestrator-turn` exits non-zero when the in-band judge's wrapper call rejects. Surface the violation to the operator; the next turn re-runs the judge with the same input (recovery is operator-decided per the wrong-decision-recovery primitives at `recovery/`).
 - **Orchestrator loop — wrong-decision detected but reversal proposal needs operator review.** The reversal proposal lands in `TurnReport.reversalProposals`. Auto-apply when `controllerDecision.intensity` AND the recovery library's trust-calibration both support it; otherwise enqueue an escalation via `escalation/escalation-queue.ts#enqueueEscalation`. Escalations surface in the next turn's `escalationVisibility`.
+
+## Composed disciplines
+
+These were composed from `.claude/rules/agent-discipline.md` (feature `decompose-agent-discipline`); the rules file now points here.
+
+### Design tasks go through /frontend-design first (precondition)
+
+Before picking up any task involving a **design decision** — a new UI surface, a redesign, an affordance-placement decision, a visual-language choice, anything that asks *"what should this look like / how should this work"* — invoke **`/frontend-design`** first. It produces 2–3 opinionated mockups the operator picks from, turning implementation into a translation problem instead of an exploration problem. Skip it only when the design is fully determined upstream (the task names exact CSS/markup, or the operator named "use pattern X exactly"). When in doubt, run it. Applies to dispatch prompts too: instruct design-task sub-agents to use `/frontend-design`.
+
+### Sub-agent dispatch reports are action lists, not disclosures
+
+When a dispatched sub-agent's report flags an adjacent issue as *"out of scope but worth flagging,"* that is NOT a valid resting place. Treat every such flag as an action: fix it in-scope now (if small and related), or file a GitHub issue immediately so the operator can decide. *"Noted in the dispatch report"* is not a disposition — the operator may not read the report until a downstream user trips over the bug. Report which flags you fixed vs. filed (with the issue link) in your task summary.
+
+### This skill runs in the implementation session, not the orchestrator session
+
+`/dw-lifecycle:implement` runs in a **feature-worktree session** opened against `~/work/<project>-work/<slug>/`, distinct from the orchestrator session that ran define → setup → PRD-iterate/approve → issues in the main repo. The two-session split keeps orchestration context out of implementation context. The operator's framing: *"you are the orchestrator, not the implementer."* If you're in the orchestrator session about to run implement, hand off — open a fresh session against the worktree. (Operator override of this boundary is the operator's explicit call.)

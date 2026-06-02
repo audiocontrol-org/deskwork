@@ -73,6 +73,52 @@ describe('extractIssueFromEntry', () => {
       285,
     );
   });
+
+  // --- Phase 14 Task 2: Tracks-Issue field (#369) ---
+
+  it('Phase 14 (a): Tracks-Issue field wins over body Closes #N', () => {
+    // The walker should treat an explicit `Tracks-Issue: NNN` line as
+    // the canonical issue for the entry. Body fix-keyword text (which
+    // may be prose-cited as a code example, like AUDIT-20260529-09's
+    // reference to `Closes #50` inside test-fixture documentation) is
+    // ignored when the field is present.
+    const text = [
+      'Finding-ID: AUDIT-TEST-01',
+      'Status:     fixed-aaa1234',
+      'Tracks-Issue: 200',
+      '',
+      'Body mentions `Closes #100` as a code example, not as a fix claim.',
+    ].join('\n');
+    expect(__testing.extractIssueFromEntry(text)).toBe(200);
+  });
+
+  it('Phase 14 (b): no Tracks-Issue field → body scrape fallback (back-compat)', () => {
+    // Pre-Phase-14 audit-log entries lack the field. The walker falls
+    // back to the existing body-scrape behavior so adopters who haven't
+    // migrated their entries get the existing matching.
+    const text = [
+      'Finding-ID: AUDIT-TEST-02',
+      'Status:     fixed-bbb5678',
+      '',
+      'Closes #100',
+    ].join('\n');
+    expect(__testing.extractIssueFromEntry(text)).toBe(100);
+  });
+
+  it('Phase 14 (c): Tracks-Issue field suppresses prose-cited fixture text', () => {
+    // The case that actually motivated Phase 14 Task 2: AUDIT-20260529-09's
+    // body literally contains `Closes #50` as test-fixture prose. With the
+    // field set to a different (or non-existent) issue, the prose-cite is
+    // suppressed.
+    const text = [
+      'Finding-ID: AUDIT-TEST-03',
+      'Status:     fixed-ccc9012',
+      'Tracks-Issue: 366',
+      '',
+      'Rewrote the test comment to mention `Closes #50` as a code example.',
+    ].join('\n');
+    expect(__testing.extractIssueFromEntry(text)).toBe(366);
+  });
 });
 
 describe('walkAuditLogs', () => {

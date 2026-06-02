@@ -285,7 +285,7 @@ The explicit `/plugin install` re-fetches the payload at the current catalog ver
 /plugin install dw-lifecycle@deskwork
 ```
 
-**To pin to a stable release**, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`.
+**To pin to a stable release**, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#<tag>` (pick a tag from the [releases page](https://github.com/audiocontrol-org/deskwork/releases)).
 
 See the [root README § Getting updates](../../README.md#getting-updates) for the full update flow including filesystem layout, registry inspection, and the rationale for the two-step model.
 

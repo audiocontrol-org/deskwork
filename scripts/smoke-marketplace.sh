@@ -368,11 +368,10 @@ make_fixture_project "${FIXTURE_ROOT}"
 ok "fixture project at ${FIXTURE_ROOT}"
 
 STUDIO_LOG="${TMP}/studio.log"
-info "booting deskwork-studio (--no-tailscale --port ${SMOKE_PORT} --project-root ${FIXTURE_ROOT})"
+info "booting deskwork-studio (DESKWORK_STUDIO_NO_TAILSCALE=1 --port ${SMOKE_PORT} --project-root ${FIXTURE_ROOT})"
 (
   cd "${STUDIO_INSTALL}"
-  ./bin/deskwork-studio \
-    --no-tailscale \
+  DESKWORK_STUDIO_NO_TAILSCALE=1 ./bin/deskwork-studio \
     --port "${SMOKE_PORT}" \
     --project-root "${FIXTURE_ROOT}" \
     > "${STUDIO_LOG}" 2>&1

@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:31:38.761Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "version": 1,
+    "range": {
+      "start": 13352,
+      "end": 13391
+    },
+    "text": "30",
+    "category": "other",
+    "anchor": "Default staleness threshold in days: 30",
+    "id": "0935d651-46b6-4beb-b41a-3b9603021be9",
+    "createdAt": "2026-05-29T08:31:38.761Z"
+  }
+}

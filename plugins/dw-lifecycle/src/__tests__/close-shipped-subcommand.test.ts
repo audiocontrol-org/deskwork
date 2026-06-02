@@ -158,7 +158,11 @@ describe('runCloseShipped', () => {
     const repoState: RepoState = {
       tags: ['v1.0.0', 'v1.1.0'],
       commits: [
-        { sha: 'aaa1234', subject: 'feat: x (#42)', body: '' },
+        // Phase 13: parens / plain dropped from extraction. Both fixtures
+        // use explicit fix verbs so the test exercises the dry-run
+        // orchestration without depending on the deprecated permissive
+        // matching.
+        { sha: 'aaa1234', subject: 'feat: x', body: 'Resolves #42' },
         { sha: 'bbb5678', subject: 'fix: y', body: 'Closes #43' },
       ],
       revCounts: { 'v1.0.0..v1.1.0': 2, 'v1.1.0..v1.0.0': 0 },
@@ -201,7 +205,8 @@ describe('runCloseShipped', () => {
     const stdoutPromise = streamToString(stdout);
     const repoState: RepoState = {
       tags: ['v1.0.0', 'v1.1.0'],
-      commits: [{ sha: 'aaa1234', subject: 'fix: thing (#10)', body: '' }],
+      // Phase 13: parens dropped — switched fixture to use Closes verb.
+      commits: [{ sha: 'aaa1234', subject: 'fix: thing', body: 'Closes #10' }],
       revCounts: { 'v1.0.0..v1.1.0': 1, 'v1.1.0..v1.0.0': 0 },
     };
     const runGit = mockGit(repoState);
@@ -309,7 +314,8 @@ describe('runCloseShipped', () => {
     const stdoutPromise = streamToString(stdout);
     const repoState: RepoState = {
       tags: ['v1.0.0', 'v1.1.0'],
-      commits: [{ sha: 'aaa1234', subject: 'fix: closed-already (#77)', body: '' }],
+      // Phase 13: parens dropped — switched fixture to use Fixes verb.
+      commits: [{ sha: 'aaa1234', subject: 'fix: closed-already', body: 'Fixes #77' }],
       revCounts: { 'v1.0.0..v1.1.0': 1, 'v1.1.0..v1.0.0': 0 },
     };
     const runGit = mockGit(repoState);
@@ -348,7 +354,8 @@ describe('runCloseShipped', () => {
     const stdoutPromise = streamToString(stdout);
     const repoState: RepoState = {
       tags: ['v1.0.0', 'v1.1.0'],
-      commits: [{ sha: 'aaa1234', subject: 'fix: thing (#10)', body: '' }],
+      // Phase 13: parens dropped — switched fixture to use Closes verb.
+      commits: [{ sha: 'aaa1234', subject: 'fix: thing', body: 'Closes #10' }],
       revCounts: { 'v1.0.0..v1.1.0': 1, 'v1.1.0..v1.0.0': 0 },
     };
     const runGit = mockGit(repoState);

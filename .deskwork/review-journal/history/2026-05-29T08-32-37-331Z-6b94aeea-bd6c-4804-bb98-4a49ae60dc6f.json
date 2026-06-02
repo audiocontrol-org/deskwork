@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:32:37.331Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "version": 1,
+    "range": {
+      "start": 13434,
+      "end": 13489
+    },
+    "text": "3 is a good first start",
+    "category": "other",
+    "anchor": "Default --threshold-count: 3 (must satisfy ≥3 criteria)",
+    "id": "1ee8cb85-7e05-48c1-98a9-90f317af1519",
+    "createdAt": "2026-05-29T08:32:37.331Z"
+  }
+}

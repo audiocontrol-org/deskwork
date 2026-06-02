@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-29T08:33:26.319Z",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+    "version": 1,
+    "range": {
+      "start": 13583,
+      "end": 13589
+    },
+    "text": "use opt-in",
+    "category": "other",
+    "anchor": "opt-in",
+    "id": "32b2a198-24a1-4bab-b643-2f36d4e38c96",
+    "createdAt": "2026-05-29T08:33:26.319Z"
+  }
+}
