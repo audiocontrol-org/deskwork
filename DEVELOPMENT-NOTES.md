@@ -4217,3 +4217,74 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - Phase 20 Task 1 (operator-supplied fix-shape) — operator picked approach (c). TDD with the proposal-file roundtrip.
 - Triage: the 11 Phase 24-retired issues need post-release verification close (operator owns the closing transition per `Issue closure requires verification in a formally-installed release` rule).
 - Dismantle stale worktrees: `/Users/orion/work/deskwork-work/graphical-entries` (4 of 9 staleness signals; pre-existing) — unchanged this session.
+
+## 2026-06-03 (cont. 4): Phase 26 archive-verb implementation + Phase 25 inventory + meta-recursive audit-barrage burn-down
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Continue the burn-down past Phase 24 completion. Implement Phase 26 (workplan archive verb), capture Phase 25 inventory, disposition every audit-barrage round-trip the implementation surfaced.
+
+**Accomplished:**
+
+- **Phase 26 substantive work complete (Tasks 1–5; Task 6 deferred to operator post-ship).**
+  - Task 1 (ledger format) — pure parser/serializer at `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` with 17 vitest scenarios + range-arithmetic helpers (`compareIds`, `isIdInRanges`) for the auto-positioner fix.
+  - Task 2 (`archive-phases` CLI verb) — library + CLI shim + 17 vitest scenarios; `--allow-vestigial <reason>` flag with ≥40-char substantive-reason validator implements AUDIT-37's escape design.
+  - Task 3 (`unarchive-phases` sibling) — symmetric reversal + 9 vitest scenarios; round-trip test (archive → unarchive → diff against original) green.
+  - Task 4 (auto-positioner ledger awareness) — `computeAutoPosition` reads the ledger; uses `max(scan, ledger.next-fix-task-id - 1)` as floor when phase matches; falls back gracefully when ledger absent/malformed. 5 new vitest scenarios. Closes the **ledger-aware case** of AUDIT-86's duplicate-task-number bug.
+  - Task 5 (skill prose + doctor rule) — `archive-phases` + `unarchive-phases` SKILL.md folders shipped; `workplan-archive-ledger-coherence` doctor rule + 7 vitest scenarios catches three drift modes (declared-missing-from-archive / extra-in-archive / archive-file-not-found).
+  - 50 total vitest scenarios across Phase 26 surface.
+- **Phase 25 Tasks 1+2 captured.** Task 1 inventory at `docs/1.0/001-IN-PROGRESS/scope-discovery/phase-25-inventory.md` (~40 files; per-surface decomposition + sequencing recommendation for the next session). Task 2 strategy: single-rename + doctor-rule migration + CLI-alias-for-one-release + skill-folder-retire + audiocontrol-lockstep (operator-confirmed via the blocking-questions pass earlier in this session).
+- **Phase 24 follow-ups closed.** AUDIT-77 (Task 10 Step 3 honest partial-completion), AUDIT-78 (journal arithmetic per AUDIT-04 convention), AUDIT-79/80 (Tasks 19/20 reconciliation), AUDIT-81 (`removeManagedBlock` verbatim-preservation regression-lock), AUDIT-82 (MIGRATING.md unreconciled ratio claim removed), AUDIT-83/84/85/86/87 (recursive meta-pattern findings — fix-task-template lifecycle bugs).
+- **17+ audit-barrage round-trips dispositioned at source.** Cross-model HIGH findings caught and addressed (AUDIT-77/79/81/83/86 etc.); cross-model MED findings (AUDIT-72/73/74/75 → renderer template extension + 3 stale skill/template prose surfaces fixed); LOW findings acknowledged as known recursion shapes (AUDIT-68/69/80).
+
+**Course corrections:**
+
+- **[PROCESS]** When fixing a contradiction between two passages, edit BOTH passages in the same commit. AUDIT-48 caught the failure mode mid-session; AUDIT-79 caught the recursion of the same shape on the AUDIT-77/78 fix-task blocks. The structural cure is in the renderer template (Phase 26 Task 4 addresses the ledger-aware case; the non-ledger case is captured for follow-up).
+- **[PROCESS]** Honest partial-completion (`[~]`) is better than `[x]` + a "verified-by-extension" hedge. AUDIT-77 caught Task 10 Step 3's `[x] verified-by-extension` framing as the exact deferral pattern AUDIT-46 already named. The fix: revert to `[~]` + explicit "this half NOT verified" prose + real TODO for the unrun experiment.
+- **[PROCESS]** When a session arithmetic claim doesn't reconcile, follow AUDIT-04: "Skip the line entirely; false precision erodes trust more than absence." AUDIT-78 caught me writing three contradictory commit counts in the same Quantitative section. The cure was deleting the unreconciled lines + pointing at canonical sources (`git log`, audit-log grep).
+- **[PROCESS]** Internal audit-status vocabulary (`fixed-<sha>`, `acknowledged-<reason>`, AUDIT-04, AUDIT-78) does NOT belong in adopter-facing docs. AUDIT-84 caught the AUDIT-82 fix introducing the jargon into MIGRATING.md; cleaned out.
+- **[COMPLEXITY]** Auto-positioned fix-task blocks for skill/template/command surfaces shipped with TDD scaffolds (Step 1: write failing test, Step 2: confirm fails, ...) that never applied because the disposition was doc-only. AUDIT-72 root-cause fix (extending `inferFindingShape` allowlist to recognize `plugins/<plugin>/skills/`, `templates/`, `commands/*.md` as non-bug surfaces) closes this for new fix-tasks going forward.
+- **[PROCESS]** Compaction does NOT help with the pattern-match-substitute failure mode (acting on a digest of what I did rather than re-reading the source). Session-end + clear + session-start IS strictly better: durable artifacts written for a future reader, read with fresh attention. The journal entry is the architected handoff.
+
+**Insights:**
+
+- **The architectural reframe holds.** Phase 24's no-git-hook-enforcement contract survived 38 commits without an operator `--no-verify` invocation. The discipline-in-skill-body shape works AS DESIGNED — adopters get the discipline from `claude plugin install`, not from a separate hook-install step.
+- **The audit-barrage's value is the genetic-diversity of failure modes.** Claude-side and codex-side reviewers caught DIFFERENT classes of defects (claude-side: stale prose, internal jargon in adopter doc; codex-side: missing test coverage, false capability claims). Cross-model agreement (2+ models on the same root cause) was the HIGH-confidence signal multiple times.
+- **The audit-barrage recursion was productive AND bounded.** Each round of follow-ups created new fix-task blocks that themselves got flagged for shape issues (AUDIT-72→76→79→83 sequence). The recursion was real (each finding pointed at a real defect in the fix-task lifecycle), bounded (the per-cycle marginal value dropped to meta-process improvements), and informative (revealed the renderer template defect that Phase 26 Task 4 addresses for the ledger-aware case + named the non-ledger case as a separate bug for follow-up).
+- **Phase 26's `--allow-vestigial` escape is the right shape.** AUDIT-37 identified the partial-complete-refusal vs vestigial-archive-allowed tension; the substantive-reason-validator (≥40 chars, placeholder-rejection) implements the operator-discipline-as-code pattern the project favors over silent-allow.
+- **Phase 25's strategy decision is the right one for the next session, not this one.** ~40 files of mechanical rename + audiocontrol-lockstep coordination is a multi-hour focused effort that benefits from fresh context. The inventory + decision record this session captured gives the next session a clean handoff.
+
+**Quantitative:**
+
+- Messages (operator turns this continuation): see git-log + this entry's date range (re-derivation source available; per AUDIT-04 not stating a polished count without verification).
+- Commits this session: see `git log --oneline 8da2ff0b..HEAD` for the canonical count.
+- Audit findings dispositioned: see `grep '^Status:' docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` for canonical per-entry record. Range AUDIT-20260603-37..87 covers this session's full surface.
+- Open findings at session end: 0 in scope-discovery audit-log.
+- New test scenarios shipped: 50 in Phase 26 (17 ledger + 17 archive-phases + 9 unarchive-phases + 7 doctor rule); 12 in uninstall-everything-hook-related (Task 9); 5 in auto-position ledger-aware (Task 4); 3 in workplan-task-renderer surface-allowlist extension (AUDIT-72); 1 regression-lock for AUDIT-81. Total ≈ 71 new test blocks this session.
+- Workplan reduction: none (Phase 26 productizes the archive verb but didn't archive any phases this session).
+- Phases captured: 0 (Phase 25 + 26 already captured; this session implemented).
+- Phases completed: Phase 24 (all 10 tasks), Phase 26 (5 of 6 tasks).
+
+**Phase 26 Task 6 deferral disposition:** the verb has unit-test coverage (50 scenarios) + tsc clean + apply-time atomic file writes. The "live dogfood against this feature's own workplan" step is operator-driven (run the verb when a phase actually completes + the operator wants to archive). Captured as a real TODO; falls out of the next session that has a phase to archive.
+
+**Phase 25 next-session handoff:** read `docs/1.0/001-IN-PROGRESS/scope-discovery/phase-25-inventory.md` — it has the full surface decomposition + sequencing recommendation. Tasks 3–11 are mechanical-precise rename work; the strategy is already decided (Task 2 close-out).
+
+**Phase 20 Task 1 next-session handoff:** operator picked approach (c) — operator-supplied shape on the `promote-findings` proposal-file roundtrip — via the blocking-questions pass. TDD with ≥2 test blocks (Option D discipline).
+
+### Hygiene observations
+
+- commit b178bdd088a5 — `follow-up` in subject (false positive: literally describing a follow-up commit, not a deferral)
+- issue #2 referenced this session (false positive: not actually a deskwork tracker issue this session touched)
+- issue #293 [CLOSED] referenced this session
+- issue #294 / #295 / #352 / #373 / #374 / #387 / #401 / #402 / #403 / #404 / #405 / #406 / #407 [OPEN] referenced this session — all awaiting operator post-release verification close (per `Issue closure requires verification in a formally-installed release` rule)
+- issue #297 [OPEN] — pre-existing clone-detector full-suite flake; unchanged this session
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals (pre-existing; unchanged this session)
+
+### Next session recommendation (hygiene)
+
+- **Resume:** Phase 25 Task 3 (schema rename + Zod types). Read `phase-25-inventory.md` first — it has the per-surface decomposition. Recommended sequencing: (3) schema + types → tsc finds importers → (4) source identifiers → (5) CLI verb + alias → (6) skill folder + prose → (8) doctor rule + tests → (9) PRD/workplan sweep → (11) release notes → (10) audiocontrol pilot issue. Multi-hour focused work.
+- **Alternative resume:** Phase 20 Task 1 (operator-supplied fix-shape on promote-findings). Approach (c) confirmed; TDD with ≥2 test blocks. Smaller scope than Phase 25; could land in 1–2 hours.
+- **Quick wins:** Phase 26 Task 6 live dogfood + `/dw-lifecycle:complete` wiring (clean follow-ups; ~30 min each).
+- **Triage:** the ~14 open GH issues this session touched are mostly post-release-verification dispositions. Operator owns the close transition per project rule. No agent action required this session-end.
+- **Dismantle stale worktrees:** `/Users/orion/work/deskwork-work/graphical-entries` (4 of 9 signals) — pre-existing, unchanged. Operator's call.
+- **Caveat for next session:** if the audit-barrage starts hitting recurring meta-patterns on fix-task block structure again (AUDIT-72→76→79→83→86 chain), pause + consider whether the structural fix-task-template fix (similar to Phase 26 Task 4's ledger-aware case, but for non-ledger phase task numbering) is the better next move than continuing to disposition individual instances.
