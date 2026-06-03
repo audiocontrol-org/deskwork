@@ -31,21 +31,23 @@ note: archived 2026-06-03 via scripts/archive-phases-onetime.ts; Phase 26 produc
 - [x] `scope-summary [--surface <glob>]` — ported verbatim from audiocontrol pilot (`tools/scope-discovery/summary.ts`). 4-field summary line (`total | pending-touching | pending-intra | dispositioned-touching`), `--json` + `--verbose` + `--clones` override; default clones path generalized to `.dw-lifecycle/scope-discovery/clones.yaml`. 15 vitest scenarios cover the pure compute math, programmatic + CLI surfaces, gutted-stub teeth (all-zero counter must fail mixed-fixture assertion).
 
 
-### Task 24 (fix-finding-AUDIT-20260603-88) (non-bug): AUDIT-20260603-88 — Duplicate `Task 22` heading — the disposition task created f…
+### Task 24 (fix-finding-AUDIT-20260603-88) (non-bug): AUDIT-20260603-88 — Duplicate `Task 22` heading — the disposition task created for AUDIT-86 reintroduces the exact duplicate-task-number bug it is meant to dispose
+
+**Acknowledged in 9b9e100f.** Disposition: the orphaned `### Task 22 (AUDIT-86)` block (and its sibling `### Task 23 (AUDIT-87)` block AUDIT-90 names) were redundant scaffolding — AUDIT-86's audit-log Status was already `acknowledged-phase-26-task-4-addresses-ledger-case-...` and AUDIT-87's was `fixed-37666598`. The auto-positioner promoted unchecked fix-task blocks for findings whose disposition had already landed elsewhere. Removed both blocks from `workplan.md`; the audit-log entries remain the canonical record.
 
 Closes AUDIT-20260603-88. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new `### Task 22 (fix-finding-AUDIT-20260603-86)` (hunk `@@ -39,6 +39,40 @@`).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-88` in subject (use `Closes AUDIT-20260603-88` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: disposition prose written — orphaned scaffolding for already-addressed findings; remove the duplicate workplan task blocks; audit-log remains the canonical record per the audit-log preservation rule.
+- [x] Step 2: action applied — deleted `### Task 22 (fix-finding-AUDIT-20260603-86)` and `### Task 23 (fix-finding-AUDIT-20260603-87)` blocks from `workplan.md` in 9b9e100f.
+- [x] Step 3: committed with `Acknowledges AUDIT-20260603-88` in subject (per `apply-audit-flips` semantics: this is an acknowledgement of a non-bug doc-only disposition, NOT a code-change-fix verifiable by test; `Acknowledges` is correct).
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (orphaned blocks removed in 9b9e100f).
+- [x] Audit-log Status flipped open → `acknowledged-orphaned-scaffolding-removed-AUDIT-86-already-acknowledged-2026-06-03` in 9b9e100f.
 
 
 ### Task 25 (fix-finding-AUDIT-20260603-89): AUDIT-20260603-89 — `archive-phases` never scans moved fix-task headings — `arch…
@@ -70,19 +72,21 @@ Closes AUDIT-20260603-89 (claude-02 + claude-04 + claude-05 + codex-01 + codex-0
 
 ### Task 26 (fix-finding-AUDIT-20260603-90) (non-bug): AUDIT-20260603-90 — Task 23 (AUDIT-87) carries the impossible TDD-bug template f…
 
+**Acknowledged in 9b9e100f.** Disposition: AUDIT-87's audit-log Status is already `fixed-37666598`; the auto-positioner-emitted `### Task 23 (AUDIT-87)` block carried the impossible-bug-template scaffolding AUDIT-90 names. Removed the orphaned block; the audit-log entry remains the canonical record of how AUDIT-87 was addressed. Paired with the AUDIT-86 orphan removal in the same commit per AUDIT-88's disposition.
+
 Closes AUDIT-20260603-90. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 23 (fix-finding-AUDIT-20260603-87)` (hunk `@@ -39,6 +39,40 @@`).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-90` in subject (use `Closes AUDIT-20260603-90` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: disposition prose written — AUDIT-87 already addressed in `fixed-37666598`; orphaned task-23 scaffolding with impossible bug-template removed; audit-log preservation rule keeps the historical record intact.
+- [x] Step 2: action applied — deleted `### Task 23 (fix-finding-AUDIT-20260603-87)` block from `workplan.md` in 9b9e100f (paired with the AUDIT-86 orphan removal per AUDIT-88).
+- [x] Step 3: committed with `Acknowledges AUDIT-20260603-90` in subject; `Acknowledges` (not `Closes`) is correct because the disposition is a doc-only orphan-cleanup, not a code-change-fix verifiable by test.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (orphaned block removed in 9b9e100f).
+- [x] Audit-log Status flipped open → `acknowledged-orphaned-scaffolding-removed-AUDIT-87-already-fixed-37666598-2026-06-03` in 9b9e100f.
 
 
 ### Task 27 (fix-finding-AUDIT-20260603-91): AUDIT-20260603-91 — Doctor rule crashes on malformed ledgers instead of reportin…
