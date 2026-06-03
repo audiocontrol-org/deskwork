@@ -820,3 +820,38 @@ Surface:    `packages/cli/test/doctor.test.ts:523-565` (rewritten expectation: o
 The rewritten test documents a real behavior change: running the *scoped* fix `--fix=calendar-uuid-missing --yes` now emits both `calendar-uuid-missing: 1 applied` **and** `calendar-regenerated`, and a hand-written calendar row with no backing sidecar is reconciled away (`expect(reread.entries.find((e) => e.slug === 'flushable')).toBeUndefined()`, doctor.test.ts:560-564). Under the single-project-calendar model where the calendar is a derived projection of sidecars, dropping a sidecar-less row is arguably correct — but an operator who asked only to backfill a missing UUID and instead has a calendar row deleted has no explicit signal that a row was *removed*; they have to infer it from the presence of `calendar-regenerated` in stdout.
 
 This brushes against the project's "content databases preserve, they don't delete" discipline: the row is being removed because it has no SSOT backing, which is justifiable, but the deletion is a side effect of a narrowly-scoped fix and isn't called out. A light fix: have the regen repair report a count of rows reconciled-away (e.g. `calendar-regenerated: dropped 1 orphan row (no backing sidecar)`) so the removal is auditable in the CLI output, and ensure the Phase-39 migration notes mention that scoped calendar fixes can trigger a full SSOT reconciliation. This keeps the (correct) behavior while making it loud instead of silent.
+
+## 2026-06-03 — audit-barrage lift (20260603T084321043Z-deskwork-plugin)
+
+### AUDIT-20260603-32 — Journal's "0 open at session end" violates the project's own AUDIT-03 quantitative-reporting convention — omits the slush-pile that this same commit creates
+
+Finding-ID: AUDIT-20260603-32
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `DEVELOPMENT-NOTES.md` (Phase 39 entry, "Quantitative" → *"Audit findings: 5 (barrage on 39b) + 7 (39.0 barrage, folded into spec) — all dispositioned; 0 open at session end."*) vs. `docs/1.0/001-IN-PROGRESS/deskwork-plugin/audit-log.md` (the four new `AUDIT-20260603-28..31` blocks, all `Status: acknowledged-slush-pile-2026-06-03`)
+
+The same commit that writes *"0 open at session end"* in the journal also **appends four fresh findings to the audit-log** — AUDIT-20260603-28 (medium), -29 (medium), -30 (low), -31 (low) — every one marked `acknowledged-slush-pile-2026-06-03`, i.e. parked-but-unfixed. The hook-run-log line added in this same diff (`"disposition":"fired-and-slushed"` for run `20260603T045354853Z`) confirms a barrage fired this session and its output was slushed. The journal's "Audit findings" count (`5 + 7`) does not include these four, and the "0 open" headline omits them entirely. Counting the prior same-day slush entries already in the file (AUDIT-26 medium, -27 low), the 2026-06-03 slush-pile carries **at least 3 MEDIUM** real defects (notably AUDIT-28: doctor content-discovery silently blind to unbound files; AUDIT-29: `byPath` base flip with no regression pin).
+
+This is the precise failure mode the project's own `CLAUDE.md` AUDIT-03 convention was written to prevent: *"'0 open' alone is misleading when acknowledged-slush-pile findings include real unfixed defects (the dampener parks them; that's a process choice, not a resolution)."* The convention prescribes the honest form: `Open findings at session end: N (M acknowledged-slush-pile carrying unfixed defects: AUDIT-X, AUDIT-Y)`. The fix is to rewrite the Quantitative "Audit findings" line to report the slush-pile count + HIGH/MEDIUM breakdown (at minimum naming AUDIT-28/-29 as MEDIUM carried-forward defects), so a future reader can't mistake a parked-but-real defect for a resolved one.
+
+### AUDIT-20260603-33 — Internal version inconsistency: "39.0 — resync to lanes v0.34.0" (journal) vs. "39.0 (resync to lanes v0.35.0)" (README), committed together
+
+Finding-ID: AUDIT-20260603-33
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md` (bullet *"**39.0 — resync to lanes v0.34.0.**"*) vs. `docs/1.0/001-IN-PROGRESS/deskwork-plugin/README.md` (Phase-39 row *"39.0 (resync to lanes v0.35.0; superseded #394/#396 dropped)"*) — and the journal heading *"resync to v0.35.0"*
+
+Two docs written in the same commit disagree on which version the 39.0 resync targeted. The journal *heading* and the README both say **v0.35.0**; the journal *accomplished bullet* says **v0.34.0**. The surrounding narrative (`reset --hard origin/main` … then *"rebased the branch onto v0.35.0"* after #399's fix shipped) suggests the resync baseline was main's then-current state and the rebase later brought v0.35.0 — which would make "39.0 — resync to lanes v0.34.0" the defensible literal and the README's "39.0 (resync to lanes v0.35.0)" the conflation. Either way, a future reader auditing "what baseline did Phase 39 start from" gets two different numbers for the same task ID from two files committed atomically. Reconcile to one version (or split the bullet into "resync to v0.34.0 main → rebased onto v0.35.0") so the resync baseline is unambiguous.
+
+### AUDIT-20260603-34 — Known-degraded `feature-dev:code-architect` Write/Edit fix recorded as a journal IOU with a "when convenient" deferral and no tracking issue
+
+Finding-ID: AUDIT-20260603-34
+Status:     resolved-2026-06-03 — filed as [#400](https://github.com/audiocontrol-org/deskwork/issues/400); the "when convenient" IOU is replaced by that tracking issue per the disposition the finding prescribes.
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md` (Phase-39 entry, "Next session recommendation" → *"**Open thread:** the `feature-dev:code-architect` Write/Edit fix is local-only (reverts on a marketplace update) — lay down the durable project-owned agent + agent-discipline rule when convenient."*) and the matching note in the Accomplished section (*"durable options … still open"*)
+
+The entry records a real degraded state — a third-party plugin agent was hand-patched to grant Write/Edit, and that patch *"reverts on a marketplace update"* — but its only disposition is *"lay down the durable … rule **when convenient**."* Per `.claude/rules/agent-discipline.md` ("Just for now is bullshit… no will-fix-later deferrals"), every such concern must end in one of four dispositions: addressed now, **filed as a GitHub issue with link**, scoped into a verified downstream dispatch, or an explicit operator decision with acceptance criteria. A journal "open thread" + *"when convenient"* is none of these — it's the IOU-in-a-comment pattern relocated to the journal, and *"when convenient"* is exactly the deferral phrase the discipline names as defaulting to never. The fix is to file a GitHub issue for the durable project-owned-agent replacement and reference it here, replacing the *"when convenient"* hedge with the issue link.
+
+---
+
+I also checked, and found clean: the appended `hook-run-log.jsonl` line (well-formed JSON, `fired-and-slushed` is an existing enum value, consistent with prior lines); the README documentation-rot rule does **not** apply here (this is internal `docs/1.0/001-IN-PROGRESS/` feature tracking, where version-bound text is explicitly permitted, not adopter-facing); and the four audit-log blocks themselves are internally consistent and correctly anchored to real surfaces (I did not re-litigate their dispositions, per the audit-log-excerpt instruction). My three findings concentrate on the one place a docs-only commit can still mislead: the honesty of the session's self-reported audit accounting and two internal inconsistencies.
