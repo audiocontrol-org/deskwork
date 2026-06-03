@@ -4039,7 +4039,7 @@ The root cause is an off-by-one in whatever assigned the new numbers. The pre-di
 ### AUDIT-20260603-87 — MIGRATING.md still leaks dev-branch framing ("Phase 24 implementation … on this branch") into an adopter-facing doc
 
 Finding-ID: AUDIT-20260603-87
-Status:     fixed-pending-sha
+Status:     fixed-37666598
 Severity:   low
 Surface:    `MIGRATING.md:60` ("Issues defused" paragraph, hunk `@@ -57,7 +57,7 @@`)
 
