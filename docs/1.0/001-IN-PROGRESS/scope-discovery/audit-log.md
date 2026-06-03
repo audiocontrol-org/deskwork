@@ -3553,3 +3553,18 @@ Surface:    docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md — Task 5 comp
 ```
 
 The Task 5 block is marked complete with: `**Complete — SKILL.md Step 6 rewritten as Steps 6a–6e … Empirical verification deferred to Phase 24 Task 10 (live dogfood).**`, and Step 5 reads `[x] Step 5: Confirm tests pass — N/A per Step 1.` This is a verbatim repeat of the deferral shape AUDIT-20260603-44 already triaged on Task 4 — now manifest on Task 5, which IS the subject of this diff. The dispatch's hard constraint is explicit: *"If you spot a deferral phrase IN the diff, surface it as a finding"*; the project's own `agent-discipline.md` § "Just for now is bullshit" lists `deferred` among the strings to grep-and-refuse, permitting a forward-pointer **only** when the downstream task's plan has been read and verified to contain the deferred work. Phase 24 Task 10 is not in this diff, so a reviewer cannot confirm Task 10 (a) exists and (b) scopes empirical verification of the Step 6a–6e chain. The box is checked `[x] Complete` on the strength of an unverifiable cross-reference — the precise IOU-becomes-canon failure mode. Fix: quote Task 10's acceptance line that covers this verification, or drop "deferred" and cite Task 10's existing acceptance criteria.
+
+## 2026-06-03 — audit-barrage lift (20260603T191453476Z-scope-discovery)
+
+### AUDIT-20260603-47 — Step 9 offers `--allow-disposition-loss` as an escape, but the same step's error-handling note says "no escape flag exists" — direct internal contradiction
+
+Finding-ID: AUDIT-20260603-47 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     acknowledged-session-end-step9-contradiction-resolved-2026-06-03
+Severity:   high
+Surface:    `plugins/dw-lifecycle/skills/session-end/SKILL.md` — new Step 9 body vs. the "Closing-discipline refusal (Step 9)" error-handling bullet
+
+Step 9's disposition-survivor clause reads: *"STOP session-end on any `keep-with-reason` / `refactor` / `ignore-with-justification` → `pending` transition in `clones.yaml` **unless the operator passes `--allow-disposition-loss`** (the verb's existing flag)."* But the error-handling section added in the same hunk states: *"**Closing-discipline refusal (Step 9).** … Per Phase 24, **no `--no-verify` / no escape flag exists** — the cure path is fixing the underlying state, not bypassing the check."*
+
+These two sentences contradict each other inside one diff. One names a concrete escape flag for the first of the three checks; the other categorically asserts no escape exists. A reader following the error-handling guidance will tell the operator there is no bypass; a reader of Step 9 will reach for `--allow-disposition-loss`. Worse, the existence of the escape is itself in tension with the Phase 24 / `enforcement-lives-in-skills.md` principle the step cites (*"a `--no-verify` push by the maintainer is evidence the hook chain is broken… The fix is reshaping the chain, not normalizing the bypass"*). Fix: decide whether the disposition-survivor escape is permitted at session-end, then make both passages say the same thing — either document `--allow-disposition-loss` consistently (and reconcile it with the no-bypass principle) or drop it from Step 9.
+
+---

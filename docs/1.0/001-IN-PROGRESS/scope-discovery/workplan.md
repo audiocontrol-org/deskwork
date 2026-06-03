@@ -105,6 +105,24 @@ Acknowledges AUDIT-20260603-46 (claude-01 + claude-02 + claude-03 + claude-04 + 
 - [x] The named action has landed in this branch (Task 4 + Task 5 completion headers rewritten).
 - [x] Audit-log Status flipped to `acknowledged-deferral-replaced-with-task-10-citation-2026-06-03`.
 
+
+### Task 6 (fix-finding-AUDIT-20260603-47): AUDIT-20260603-47 — Step 9 offers `--allow-disposition-loss` as an escape, but t…
+
+Acknowledges AUDIT-20260603-47 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/skills/session-end/SKILL.md` — new Step 9 body vs. the "Closing-discipline refusal (Step 9)" error-handling bullet. Severity: high.
+
+**Shape reclassification:** the auto-positioner promoted this with the "bug" task shape (TDD steps). The surface is skill prose (non-source markdown); skill-prose self-contradictions aren't unit-testable per `testing.md`. Reclassifying to non-bug doc-fix shape.
+
+- [x] Step 0 (working-code invariant): `check-disposition-survivor` is a real CLI verb with a real `--allow-disposition-loss` flag that exists for the .husky-pre-commit-era use case. The flag's existence is correct working code; what's wrong is documenting it as an escape *inside* a skill body whose principle says "no escape." Invariant: the verb retains the flag for direct-invocation callers; the skill body does not exercise the flag.
+- [x] Step 1 (disposition): reconciled the contradiction by editing the disposition-survivor clause in Step 9 to STOP unconditionally at session-end. Added an inline note explaining the verb's `--allow-disposition-loss` flag is preserved for direct invocation (legacy hook-era use case) but the skill body does NOT pass it — per `enforcement-lives-in-skills.md` § "a `--no-verify` push by the maintainer is evidence the hook chain is broken." Cure path stays: reconcile the dispositions, then re-invoke session-end.
+- [x] Step 2: applied — `plugins/dw-lifecycle/skills/session-end/SKILL.md` Step 9 disposition-survivor clause rewritten.
+- [x] Step 3: committing with `Acknowledges AUDIT-20260603-47` in subject (skill-prose contradiction resolution; not a code change requiring a test).
+
+**Acceptance Criteria:**
+
+- [x] Disposition prose ≥40 chars (Step 0 + Step 1).
+- [x] The named action has landed in this branch (Step 9 disposition-survivor clause rewritten).
+- [x] Audit-log Status flipped to `acknowledged-session-end-step9-contradiction-resolved-2026-06-03`.
+
 ### Task 5: Validator + export commands
 
 - [x] `validate-scope-discovery` — runs all adversarial harnesses. Spawns `npx vitest run scope-discovery` from the dw-lifecycle workspace root; forwards stdout/stderr/exit-code verbatim. `--quiet` switches to the dot reporter. Exit codes mirror vitest (0 all-passed, 1 failure, 2 invalid args). 3 vitest scenarios cover the flag-parse contract; the spawn path is exercised in practice by every existing `npm test -- scope-discovery` run.

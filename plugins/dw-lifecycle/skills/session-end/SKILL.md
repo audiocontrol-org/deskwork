@@ -42,7 +42,7 @@ dw-lifecycle journal-append --file <entry.md>
    dw-lifecycle check-disposition-survivor --feature <slug>
    ```
 
-   STOP session-end on any `keep-with-reason` / `refactor` / `ignore-with-justification` → `pending` transition in `clones.yaml` unless the operator passes `--allow-disposition-loss` (the verb's existing flag). Surface the offending IDs verbatim.
+   STOP session-end on any `keep-with-reason` / `refactor` / `ignore-with-justification` → `pending` transition in `clones.yaml`. Surface the offending IDs verbatim. (The verb has a legacy `--allow-disposition-loss` flag from its .husky-era days, but the skill body does NOT use it at session-end — per `enforcement-lives-in-skills.md` § "a `--no-verify` push by the maintainer is evidence the hook chain is broken," the cure path is reconciling the dispositions, not bypassing the check.)
 
    Then scan the workplan's session-introduced diff for bare TBD / defer / follow-up / wontfix markers that didn't get scoped into an issue. The hygiene helper in Step 6 already enumerates these; re-surface as a STOP if any markers exist without a paired `#NNN` issue reference. The cure path: file the issue, paste the link inline, then re-run session-end.
 
