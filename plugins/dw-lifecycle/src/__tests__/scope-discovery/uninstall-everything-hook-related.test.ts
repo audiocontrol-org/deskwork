@@ -75,6 +75,38 @@ describe('removeManagedBlock — pure-fn', () => {
     ].join('\n');
     expect(removeManagedBlock(contents)).toBeNull();
   });
+
+  // AUDIT-20260603-81 regression-lock: removeManagedBlock must NOT
+  // collapse blank-line runs anywhere OUTSIDE the splice point. The
+  // operator-authored section can legitimately contain 3+ consecutive
+  // newlines as a visual separator; verbatim preservation requires
+  // leaving those runs intact.
+  it('preserves operator-authored 3+ newline runs OUTSIDE the splice point (AUDIT-81)', () => {
+    const operatorSection = [
+      '#!/usr/bin/env bash',
+      'operator_command_one',
+      '',
+      '',
+      '',
+      'operator_command_two',
+    ].join('\n');
+    const withBlock = [
+      operatorSection,
+      '',
+      HOOK_BEGIN_MARKER,
+      'managed',
+      HOOK_END_MARKER,
+      '',
+      'operator_command_three',
+    ].join('\n');
+    const result = removeManagedBlock(withBlock);
+    // The 3-newline run between operator_command_one and operator_command_two
+    // is operator-authored; preserve it verbatim.
+    expect(result).toContain('operator_command_one\n\n\n\noperator_command_two');
+    // The managed block is gone.
+    expect(result).not.toContain('managed');
+    expect(result).not.toContain(HOOK_BEGIN_MARKER);
+  });
 });
 
 describe('uninstallEverythingHookRelated — orchestrator', () => {

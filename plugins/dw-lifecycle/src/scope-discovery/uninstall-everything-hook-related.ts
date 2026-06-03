@@ -85,7 +85,12 @@ export function removeManagedBlock(contents: string): string | null {
   // Strip a leading newline from `after` if it immediately follows our
   // block (also a separator).
   const trimmedAfter = after.startsWith('\n') ? after.slice(1) : after;
-  return `${trimmedBefore}${trimmedAfter}`.replace(/\n{3,}/g, '\n\n');
+  // Per AUDIT-20260603-81: NO global blank-line collapse — that violated
+  // the "preserve operator content verbatim" contract by rewriting blank-
+  // line gaps elsewhere in the file. The splice-point trim above is the
+  // only normalization we do; runs of newlines in operator-authored
+  // sections are preserved.
+  return `${trimmedBefore}${trimmedAfter}`;
 }
 
 async function pathExists(path: string): Promise<boolean> {
