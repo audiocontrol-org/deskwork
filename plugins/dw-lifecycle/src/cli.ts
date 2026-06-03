@@ -25,6 +25,7 @@ import { disposeClone } from './subcommands/dispose-clone.js';
 import { installScopeDiscovery } from './subcommands/install-scope-discovery.js';
 import { migrateFromPilot } from './subcommands/migrate-from-pilot.js';
 import { uninstallEverythingHookRelatedCli } from './subcommands/uninstall-everything-hook-related.js';
+import { archivePhasesCli } from './subcommands/archive-phases.js';
 import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
 import { auditBarrage } from './subcommands/audit-barrage.js';
 import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
@@ -91,6 +92,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'install-scope-discovery': installScopeDiscovery,
   'migrate-from-pilot': migrateFromPilot,
   'uninstall-everything-hook-related': uninstallEverythingHookRelatedCli,
+  'archive-phases': archivePhasesCli,
   'orchestrator-turn': orchestratorTurn,
   'audit-barrage': auditBarrage,
   'audit-barrage-render': auditBarrageRender,

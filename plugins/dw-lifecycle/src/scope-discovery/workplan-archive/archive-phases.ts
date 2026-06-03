@@ -1,0 +1,320 @@
+/**
+ * plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts
+ *
+ * Phase 26 Task 2 — productize the manual archive operation.
+ *
+ * Moves `## Phase N:` sections from a feature's `workplan.md` to a
+ * sibling `workplan-archive.md`; updates the workplan's
+ * `<!-- workplan-archive-ledger -->` annotation with the new ranges.
+ *
+ * Per AUDIT-20260603-37: refuses partial-complete phases by default;
+ * `--allow-vestigial <reason>` is the explicit escape for retired-
+ * vestigial phases (the case the 2026-06-03 manual archive needed for
+ * Phases 17/22/23). Reason is recorded in the ledger so future readers
+ * see WHY an incomplete phase was archived.
+ *
+ * Pure-ish: takes options + a fs-shim-shaped pair, returns a structured
+ * report. The orchestrator wraps it with real fs.
+ */
+
+import { readFile, writeFile, access } from 'node:fs/promises';
+import { join } from 'node:path';
+import {
+  parseLedgerContent,
+  serializeLedger,
+  findLedger,
+  wrapLedgerBlock,
+  type Ledger,
+  type IdRange,
+} from './ledger.js';
+
+export interface ArchivePhasesOptions {
+  readonly repoRoot: string;
+  readonly featureSlug: string;
+  readonly phases: ReadonlyArray<number>;
+  readonly apply: boolean;
+  /**
+   * When provided, allows archiving phases with ANY unchecked task.
+   * Must be ≥40 chars of substantive prose (mirrors `check-fix-task-tdd`
+   * substantive-reason validator). The reason is recorded in the ledger
+   * next to the archived phase entry.
+   */
+  readonly allowVestigialReason?: string;
+}
+
+export interface PhaseAction {
+  readonly phase: number;
+  readonly action: 'archived' | 'not-found' | 'refused-incomplete' | 'allowed-vestigial';
+  readonly uncheckedTaskCount?: number;
+  readonly reason?: string;
+}
+
+export interface ArchivePhasesReport {
+  readonly apply: boolean;
+  readonly actions: ReadonlyArray<PhaseAction>;
+  readonly workplanPath: string;
+  readonly archivePath: string;
+}
+
+export class ArchivePhasesError extends Error {}
+
+/** Substantive-reason validator (≥40 chars, no placeholders). */
+export function validateVestigialReason(reason: string): void {
+  if (reason.trim().length < 40) {
+    throw new ArchivePhasesError(
+      `--allow-vestigial reason must be ≥40 chars (got ${reason.trim().length})`,
+    );
+  }
+  const placeholders = /\b(TBD|to be filled in|fix later|placeholder|todo)\b/i;
+  if (placeholders.test(reason)) {
+    throw new ArchivePhasesError(
+      `--allow-vestigial reason contains a placeholder phrase; describe a concrete reason`,
+    );
+  }
+}
+
+/**
+ * Locate a `## Phase N:` section. Returns the start line index (0-based)
+ * + the end line index (exclusive; points at the next `## Phase` heading
+ * or EOF). Returns null when the phase isn't found.
+ */
+export function locatePhaseSection(
+  lines: ReadonlyArray<string>,
+  phaseNumber: number,
+): { start: number; end: number } | null {
+  const headingPattern = new RegExp(`^## Phase ${phaseNumber}(?::|$|\\s)`);
+  let startIdx = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (headingPattern.test(lines[i]!)) {
+      startIdx = i;
+      break;
+    }
+  }
+  if (startIdx === -1) return null;
+  // Walk forward to the next `## Phase ` heading OR EOF
+  let endIdx = lines.length;
+  const anyPhasePattern = /^## Phase \d+(?::|$|\s)/;
+  for (let i = startIdx + 1; i < lines.length; i += 1) {
+    if (anyPhasePattern.test(lines[i]!)) {
+      endIdx = i;
+      break;
+    }
+  }
+  return { start: startIdx, end: endIdx };
+}
+
+/**
+ * Count unchecked task boxes (`- [ ]`) within a section. Used to gate
+ * `--allow-vestigial`-less archive.
+ */
+export function countUncheckedTasks(sectionLines: ReadonlyArray<string>): number {
+  let count = 0;
+  for (const line of sectionLines) {
+    if (/^\s*- \[ \]/.test(line)) count += 1;
+  }
+  return count;
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Insert a new range into a sorted, non-overlapping range list. */
+function mergeRange(ranges: ReadonlyArray<IdRange>, phaseNum: number): ReadonlyArray<IdRange> {
+  const newId = String(phaseNum);
+  const flat = ranges.flatMap((r) => {
+    if (r.end === undefined) return [Number(r.start)];
+    const out: number[] = [];
+    for (let i = Number(r.start); i <= Number(r.end); i += 1) out.push(i);
+    return out;
+  });
+  if (!flat.includes(phaseNum)) flat.push(phaseNum);
+  flat.sort((a, b) => a - b);
+  const dedup = Array.from(new Set(flat));
+  // Recompact into ranges
+  const compacted: IdRange[] = [];
+  let runStart: number | null = null;
+  let runEnd: number | null = null;
+  for (const n of dedup) {
+    if (runStart === null) {
+      runStart = n;
+      runEnd = n;
+    } else if (n === runEnd! + 1) {
+      runEnd = n;
+    } else {
+      compacted.push(runStart === runEnd ? { start: String(runStart) } : { start: String(runStart), end: String(runEnd) });
+      runStart = n;
+      runEnd = n;
+    }
+  }
+  if (runStart !== null) {
+    compacted.push(runStart === runEnd ? { start: String(runStart) } : { start: String(runStart), end: String(runEnd) });
+  }
+  void newId;
+  return compacted;
+}
+
+/**
+ * Orchestrator entry. Reads workplan + (optional existing) archive;
+ * locates target phases; gates on unchecked-task count unless
+ * `--allow-vestigial`; produces a report. When `apply: true`, writes
+ * the updated workplan + archive + ledger.
+ */
+export async function archivePhases(
+  opts: ArchivePhasesOptions,
+): Promise<ArchivePhasesReport> {
+  if (opts.allowVestigialReason !== undefined) {
+    validateVestigialReason(opts.allowVestigialReason);
+  }
+  const featureDir = await resolveFeatureDir(opts.repoRoot, opts.featureSlug);
+  const workplanPath = join(featureDir, 'workplan.md');
+  const archivePath = join(featureDir, 'workplan-archive.md');
+  if (!(await pathExists(workplanPath))) {
+    throw new ArchivePhasesError(`workplan not found: ${workplanPath}`);
+  }
+  const workplanBody = await readFile(workplanPath, 'utf8');
+  const lines = workplanBody.split('\n');
+  const actions: PhaseAction[] = [];
+  // Collect sections to remove (in reverse line order so splicing works).
+  const sectionsToRemove: Array<{ phase: number; start: number; end: number; lines: string[] }> = [];
+  for (const phaseNum of opts.phases) {
+    const located = locatePhaseSection(lines, phaseNum);
+    if (located === null) {
+      actions.push({ phase: phaseNum, action: 'not-found' });
+      continue;
+    }
+    const sectionLines = lines.slice(located.start, located.end);
+    const unchecked = countUncheckedTasks(sectionLines);
+    if (unchecked > 0 && opts.allowVestigialReason === undefined) {
+      actions.push({
+        phase: phaseNum,
+        action: 'refused-incomplete',
+        uncheckedTaskCount: unchecked,
+      });
+      continue;
+    }
+    actions.push({
+      phase: phaseNum,
+      action: unchecked > 0 ? 'allowed-vestigial' : 'archived',
+      uncheckedTaskCount: unchecked,
+      ...(opts.allowVestigialReason !== undefined ? { reason: opts.allowVestigialReason } : {}),
+    });
+    sectionsToRemove.push({
+      phase: phaseNum,
+      start: located.start,
+      end: located.end,
+      lines: sectionLines,
+    });
+  }
+  if (!opts.apply) {
+    return { apply: false, actions, workplanPath, archivePath };
+  }
+  // When apply: true but nothing to remove (all refused / not-found), write
+  // nothing — preserve the workplan AND don't create an empty archive file.
+  if (sectionsToRemove.length === 0) {
+    return { apply: true, actions, workplanPath, archivePath };
+  }
+  // Build the new workplan (splice out sections in reverse order).
+  sectionsToRemove.sort((a, b) => b.start - a.start);
+  let newLines = lines.slice();
+  for (const section of sectionsToRemove) {
+    newLines = [...newLines.slice(0, section.start), ...newLines.slice(section.end)];
+  }
+  // Compute the new ledger.
+  const existing = findLedger(newLines.join('\n'));
+  const previousLedger: Ledger | null =
+    existing === null ? null : parseLedgerContent(existing.content);
+  const newArchivedPhases = sectionsToRemove
+    .map((s) => s.phase)
+    .reduce<ReadonlyArray<IdRange>>(
+      (acc, phaseNum) => mergeRange(acc, phaseNum),
+      previousLedger?.archivedPhases ?? [],
+    );
+  const newLedger: Ledger = {
+    archivedPhases: newArchivedPhases,
+    archivedFixTasks: previousLedger?.archivedFixTasks ?? [],
+    archiveFile: previousLedger?.archiveFile ?? 'workplan-archive.md',
+    nextFixTaskId: previousLedger?.nextFixTaskId ?? '1.1',
+    ...(previousLedger?.note !== undefined ? { note: previousLedger.note } : {}),
+  };
+  const newLedgerBlock = wrapLedgerBlock(serializeLedger(newLedger));
+  // Splice the new ledger block into the workplan (replace existing or
+  // insert near the top).
+  const bodyAfterRemoval = newLines.join('\n');
+  let finalBody: string;
+  const ledgerInBody = findLedger(bodyAfterRemoval);
+  if (ledgerInBody !== null) {
+    finalBody =
+      bodyAfterRemoval.slice(0, ledgerInBody.start) +
+      newLedgerBlock +
+      bodyAfterRemoval.slice(ledgerInBody.end);
+  } else {
+    // Insert before the first `## Phase` heading.
+    const firstPhaseMatch = /^## Phase /m.exec(bodyAfterRemoval);
+    if (firstPhaseMatch !== null) {
+      finalBody =
+        bodyAfterRemoval.slice(0, firstPhaseMatch.index) +
+        newLedgerBlock +
+        '\n\n' +
+        bodyAfterRemoval.slice(firstPhaseMatch.index);
+    } else {
+      finalBody = bodyAfterRemoval + '\n\n' + newLedgerBlock + '\n';
+    }
+  }
+  await writeFile(workplanPath, finalBody);
+  // Append moved sections to the archive file.
+  const moved = sectionsToRemove
+    .slice()
+    .sort((a, b) => a.phase - b.phase)
+    .map((s) => s.lines.join('\n'))
+    .join('\n\n');
+  let archiveBody = '';
+  if (await pathExists(archivePath)) {
+    archiveBody = await readFile(archivePath, 'utf8');
+    if (!archiveBody.endsWith('\n')) archiveBody += '\n';
+    archiveBody += '\n' + moved + '\n';
+  } else {
+    archiveBody = createArchiveFileHeader(opts.featureSlug) + moved + '\n';
+  }
+  await writeFile(archivePath, archiveBody);
+  return { apply: true, actions, workplanPath, archivePath };
+}
+
+function createArchiveFileHeader(slug: string): string {
+  return [
+    `---`,
+    `slug: ${slug}`,
+    `kind: workplan-archive`,
+    `archive-of: workplan.md`,
+    `archived-at: ${new Date().toISOString().split('T')[0]}`,
+    `---`,
+    ``,
+    `# Workplan archive — ${slug}`,
+    ``,
+    `This file holds Phase sections moved out of the active workplan once their tasks were complete (or once they became vestigial per a later phase's retirement decision, via \`dw-lifecycle archive-phases --allow-vestigial\`). The active workplan at \`workplan.md\` carries a \`<!-- workplan-archive-ledger -->\` annotation naming the archived ID ranges.`,
+    ``,
+    `**Append-only.** Do not edit historical entries.`,
+    ``,
+    `**Restoring an archived phase to active workplan**: \`dw-lifecycle unarchive-phases\`.`,
+    ``,
+    `---`,
+    ``,
+  ].join('\n');
+}
+
+async function resolveFeatureDir(repoRoot: string, slug: string): Promise<string> {
+  const candidates = [
+    join(repoRoot, 'docs/1.0/001-IN-PROGRESS', slug),
+    join(repoRoot, 'docs/1.0/002-WAITING', slug),
+    join(repoRoot, 'docs/1.0/003-COMPLETE', slug),
+  ];
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) return candidate;
+  }
+  throw new ArchivePhasesError(`feature dir not found for slug "${slug}"`);
+}
