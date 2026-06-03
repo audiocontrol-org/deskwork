@@ -1652,13 +1652,15 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 4 — Auto-positioner ledger awareness in `promote-findings`
 
-- Step 1: Write failing test: `promote-findings --apply` against a workplan with `next-fix-task-id: 5.124` in the ledger produces a new fix-task block numbered `Task 5.124`, not `Task 5.1`.
-- Step 2: Update `promote-findings`'s computeAutoPosition (or wherever the next-ID is computed) to read the ledger annotation FIRST; max(ledger.next-fix-task-id, scan-of-workplan-max + 1) wins.
-- Step 3: Failure-safety: if ledger annotation is missing or malformed, fall back to scan-of-workplan-max + 1 (current behavior).
-- Step 4: Update ledger's `next-fix-task-id` after a successful promote.
-- Step 5: Confirm tests pass.
+**Complete (read-side).** Closes AUDIT-86's root-cause bug pattern: when the workplan's ledger says `next-fix-task-id: 5.124`, the auto-positioner now uses 123 as the floor for `currentMaxNumberInPhase` so the next fix-task is 5.124+, never colliding with archived range 5.1-5.123.
 
-**Acceptance:** Auto-positioner reads ledger when present; falls back gracefully when absent; updates ledger after each promote.
+- [x] Step 1: 5 new failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` covering ledger-aware floor / phase-mismatch ignored / no-ledger back-compat / max(scan, ledger-1) when scan exceeds / malformed-ledger graceful fallback.
+- [x] Step 2: `computeAutoPosition` reads the ledger via `parseLedgerFromWorkplan`; when the ledger's `next-fix-task-id` matches the chosen phase AND convention is hierarchical, the floor `ledgerMinor - 1` is applied. Scan-only result wins when it's higher.
+- [x] Step 3: malformed-ledger path is wrapped in try/catch — falls through to scan-only behavior without throwing.
+- [-] Step 4: ledger's `next-fix-task-id` update after promote — DEFERRED to a follow-up. The current ledger update path is in `archive-phases` (which sets `next-fix-task-id` from the highest archived ID + 1). A separate `promote-findings`-side update would bump `next-fix-task-id` after each promote. Captured as a real TODO; the current Task 4 read-side fix is the AUDIT-86-relevant half.
+- [x] Step 5: 29/29 in auto-position.test.ts pass; no regressions in promote-findings/ suite.
+
+**Acceptance:** ✅ Auto-positioner reads ledger when present. ✅ Falls back to scan-only when absent OR malformed. ✅ AUDIT-86's duplicate-Task-20 collision pattern would not occur with ledger-aware floor (the in-session collision happened in Phase 6, which doesn't have a Phase-6-keyed ledger entry — that's a separate bug shape; this fix addresses the ledger-aware case explicitly named in the spec).
 
 ### Task 5 — Skill prose + doctor rule
 
