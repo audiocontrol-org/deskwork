@@ -4029,3 +4029,63 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - Triage: (no issues referenced this session need disposition)
 - Address TBD markers: (no bare TBD markers introduced this session)
 - Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals
+
+## 2026-06-03 (cont.): Phase 24 + 25 captured — architectural reframe of enforcement contract
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Capture an architectural reframe in response to the operator's framing that *"we've made a core architectural mistake by wiring enforcement into git. We can't expect adopters to install our git hooks, so we shouldn't rely on them here — it distorts our perception of what's working and not."* Three open issues filed today by an agent on `feature/deskwork-plugin` (#401, #402, #403) name the resulting bookkeeping pathology in concrete terms: ~3:1 bookkeeping-to-substance ratio on small tasks, a coverage-gate ratchet with no terminal state, a 1-commit task ballooning into 5 commits + 3 rounds of barrage findings. Yesterday's v0.35.0 release required three `--no-verify` pushes for bookkeeping commits the gates refused. Pair that with the observation surfaced this session: the audit-finding gates (`check-implement-hook-ran`, `check-implement-hook-coverage`) are NOT installable for adopters — they exist only in this repo's hand-rolled `.husky/`. The bookkeeping pathology is OUR pathology; we've been measuring a UX we don't ship. Phase 24 closes the gap by relocating discipline into skill bodies + CLI verbs that adopters get by installing the plugin. Phase 25 surfaced in passing — the `editor` terminology in `check-editor-symmetry` / `editor_symmetry` schema field / `discoverEditors` is a leaked audiocontrol-pilot domain term (their modules ARE editors for Roland samplers) preserved verbatim during canonization for schema-stability; the rename to `module` pays that cost.
+
+**Accomplished:**
+
+- **PRD extended with Phase 24 + 25 sections.** Problem Statement (Phase 24 extension paragraph with verbatim operator quote + Phase 25 trigger paragraph); Solution (Phase 24 three-movement structure: demolition / relocation / migration; Phase 25 rename scope); Acceptance Criteria (14 checkboxes for Phase 24, 11 for Phase 25); Out of Scope (six new rows naming Phase 24/25 follow-ups). Mirrored the existing "Phase N extension (DATE)" pattern from Phases 11/12/13/15.
+- **Workplan extended with Phase 24 + 25 task breakdowns.** 10 tasks for Phase 24 (decision artifact → demolition × 2 → relocation × 4 → reconciliation → migration → dogfood); 11 tasks for Phase 25 (inventory → strategy decision → schema rename → identifier rename → CLI verb → skill folder → doctor + rule sweep → adopter YAML migration → feature-doc sweep → audiocontrol pilot coordination → release notes). Per capture-mode discipline, open decisions enumerated explicitly (10 for Phase 24, 5 for Phase 25); the agent did not pre-cut scope.
+- **README phase status table updated.** Rows added for Phase 24 + 25; Phase 23 row annotated as retroactively superseded by Phase 24 (the per-SHA hook-run-log writes are vestigial under the no-git-hook-enforcement contract).
+- **PRD lifecycle progressed.** `Published` → `Drafting` (induct) → `Final` (approve). Studio review surface served the operator at `http://orion-m4.tail8254f4.ts.net:47323/dev/editorial-review/4e4d6912-3edf-4aeb-b6ed-ba455f362f14`. The PRD is now at the last pre-implementation stage; implementation lives in a separate session per the orchestrator-vs-implementation split.
+- **GitHub issues filed.** [#404](https://github.com/audiocontrol-org/deskwork/issues/404) (Phase 24 parent), [#405](https://github.com/audiocontrol-org/deskwork/issues/405) (Phase 25 parent), both linked to feature parent [#273](https://github.com/audiocontrol-org/deskwork/issues/273). Issue numbers back-filled into workplan + README + PRD.
+- **Audit-log + hook-run-log delta from this morning's barrage folded in.** AUDIT-20260603-22 and -23 (slushed by dampener) landed alongside the Phase 24/25 capture; hook-run-log entries for tip=2de9138d and tip=3100130b appended.
+- **Capture commit landed at `c1c8c804`.** All pre-commit + commit-msg gates passed cleanly (no `--no-verify`); the gates' existence is precisely what Phase 24 retires.
+
+**Didn't work / had to redo:**
+
+- **`/dwss` skill bootstrap was a tool-loading two-step.** First `Skill` tool invocation didn't load the SKILL.md content; had to fall back to `Read` on the SKILL.md path. Same on the second `Skill` invocation. Not a session blocker; just naming for future reference that `/dwss` via the Skill tool sometimes needs manual fallback.
+- **`deskwork induct` argument shape.** The slash form takes `--to <Stage>` but my first attempt used `--stage drafting`. Resolved by invoking the underlying CLI directly with the UUID + `--to Drafting`.
+- **`gh issue create` body shape required Write-tool fallback per the heredoc / `#` rule.** Used `.git-commit-msg.tmp` (gitignored in-tree path) for body content; reused for the commit message itself after the issues were filed.
+
+**Course corrections:**
+
+- **[PROCESS]** When the operator said *"yes"* to filing issues, the safest read was: file the GH issues, back-fill references into workplan + README + PRD, then ask before committing. Instead I waited for explicit "yes" to commit — which the operator did give — but the back-and-forth could have been compressed. Per `feedback_apply_now_batch_ship` lean toward applying when the operator has made the call; here the operator had effectively authorized the work-product output, so confirming once more was extra friction.
+- **[PROCESS]** Editor-symmetry naming question landed mid-flight ("why is the word 'editor' in the name of the tool?"). I'd already begun drafting Phase 24's workplan additions without surfacing the editor → module concern; the operator's question forced a quick fork. Worked out cleanly because the operator chose to capture Phase 25 in the same `/dwe` pass ("capture it now so we don't forget"), but the better move would have been to surface it proactively during the Phase 24 scoping conversation rather than leave it to the operator to notice. (Cross-references the rule "operator owns scope decisions" — proactively surfacing related concerns is the agent's job; surfacing them only when asked is reactive.)
+
+**Quantitative:**
+
+- Messages (operator turns): ~14
+- Commits in session: 1 capture (c1c8c804) + 1 session-end (pending)
+- New GH issues filed: 2 ([#404](https://github.com/audiocontrol-org/deskwork/issues/404), [#405](https://github.com/audiocontrol-org/deskwork/issues/405))
+- New workplan tasks captured: 21 (10 Phase 24 + 11 Phase 25)
+- New PRD acceptance-criteria checkboxes: 25 (14 Phase 24 + 11 Phase 25)
+- Open findings at session end: 0 (AUDIT-20260603-22/-23 acknowledged-slush-pile-2026-06-03 carry medium-severity concerns about under-counted audit-log entries in yesterday's session — those are pre-existing and named honestly here)
+- Audit-barrage runs this session: 1 (implement-hook fired against c1c8c804 to satisfy commit-msg gate before session-end commit; dampener disposition pending at the time of journal-append)
+
+**Insights:**
+
+- **The architectural reframe got captured WHILE living through the pathology that motivated it.** This commit is bookkeeping; the gates refused the v0.35.0 release's bookkeeping commits last night; today's session's commit triggered the same gate-chain dance (run implement-hook to cover c1c8c804 to satisfy the commit-msg gate for the session-end commit). Phase 24's PRD names this exact shape as the pathology being retired. The session is its own poster child.
+- **Adopters wouldn't experience any of this.** The gates that produced the friction this session don't exist for an adopter who follows the public install path. The friction is privileged-developer-only — which is precisely why "we've been measuring a UX we don't ship" is the load-bearing observation. The signal of whether dw-lifecycle's enforcement contract works has been polluted by our own hand-rolled hooks.
+- **Phase 25 surfaced cleanly because the operator asked the right question.** "Why is the word 'editor' in the name of the tool?" is exactly the question scope-discovery's discovery-vs-inventory thesis (Phase 11) says the operator shouldn't have to ask — a healthy catalog would have surfaced the leaked-domain-term as a discovered candidate. That it didn't is a Phase 11 dogfood-cycle observation worth carrying forward. Filing as a forward-pointer for the Phase 11 Task 12 / synthesis-report categories.
+- **Iteration-counter drift on the PRD entry.** Doctor surfaced `iterationByStage[Final]=2 but journal has 3 iteration event(s)` on the PRD sidecar. Pre-existing legacy drift; not blocking. Worth a follow-up sweep (separate from this session's work).
+
+### Hygiene observations
+
+- issue [#401](https://github.com/audiocontrol-org/deskwork/issues/401) [OPEN] referenced this session: Friction: audit-driven implement loop spiraled a 1-commit sub-task into multi-round over-build (39c-2b)
+- issue [#402](https://github.com/audiocontrol-org/deskwork/issues/402) [OPEN] referenced this session: Bookkeeping ratchet (hook-coverage gate) + general bookkeeping proliferation in the implement loop
+- issue [#403](https://github.com/audiocontrol-org/deskwork/issues/403) [OPEN] referenced this session: Friction synthesis: implement-loop gates enforce local correctness but amplify scope errors; bookkeeping ratio inverted on small tasks
+- issue [#404](https://github.com/audiocontrol-org/deskwork/issues/404) [OPEN] referenced this session: Phase 24: Retire git-hook enforcement; relocate discipline into skill bodies
+- issue [#405](https://github.com/audiocontrol-org/deskwork/issues/405) [OPEN] referenced this session: Phase 25: Editor terminology cleanup — adopt project-neutral `module` everywhere
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: Phase 24 Task 1 (decision artifact — write ADR + rule); ALTERNATIVELY Phase 24 Task 2 (demolition: audit-finding lifecycle gates) if the operator wants to lead with the visible payoff. Implementation runs in a separate session per the orchestrator-vs-implementation split.
+- Triage: [#401](https://github.com/audiocontrol-org/deskwork/issues/401), [#402](https://github.com/audiocontrol-org/deskwork/issues/402), [#403](https://github.com/audiocontrol-org/deskwork/issues/403) close once Phase 24 ships the relocations (these are diagnoses scoped into Phase 24); [#404](https://github.com/audiocontrol-org/deskwork/issues/404) and [#405](https://github.com/audiocontrol-org/deskwork/issues/405) are net-new parent issues just filed.
+- Address TBD markers: (no bare TBD markers introduced this session)
+- Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals

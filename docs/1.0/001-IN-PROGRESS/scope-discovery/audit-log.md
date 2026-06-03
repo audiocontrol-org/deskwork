@@ -3215,3 +3215,49 @@ This is the closure-overclaim shape the project's verification rules name ("agen
 ---
 
 **Checked and clean:** the `hook-run-log.jsonl` append (the `0df6e0bc` fired-and-slushed entry + the `3100130b` no-new-diff-skip entry with `runDir:null`) is a fresh live instance of the already-slushed AUDIT-20260603-18 skip-path-doesn't-advance-tip shape — I confirmed it matches that finding's predicted artifact (the next fired barrage will re-walk `3100130b`) and did **not** re-file it, since the shape is unchanged from its triaged disposition. The journal's "Course corrections" and "Didn't work" sections are candid about the weasel/TDD-compression patterns and don't overclaim there. The README Phase 21/22 cells describe shipped v0.35.0 behavior backward-lookingly and don't rot. The audit-log blocks AUDIT-09 through -21 are internally well-formed and correctly anchored. My two findings are both documentation-accounting drift created by this commit — the audit-range undercount that drops the contradicting finding (-01) and the README "Complete"/multi-commit-verified overclaim against unchecked workplan criteria (-02) — not code defects, of which this diff contains none.
+
+## 2026-06-03 — audit-barrage lift (20260603T171135839Z-scope-discovery)
+
+### AUDIT-20260603-24 — Phase 24 ↔ Phase 25 are not "independent" — Phase 24 adds new `check-editor-symmetry` call sites that Phase 25's scope-time inventory cannot see
+
+Finding-ID: AUDIT-20260603-24
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` (Phase 24 "Relocation" bullet; Phase 25 extension "Independent of Phase 24") and `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Phase 24 Task 4 Step 2, Task 7 Step 1; Phase 25 Task 1).
+
+Both the PRD ("Independent of Phase 24; lean ship-after-24") and the workplan Phase 25 header ("Independent — Phase 25 can land before, after, or alongside Phase 24") assert the two phases are independent. They are not. Phase 24's Relocation movement explicitly *creates new references* to `check-editor-symmetry`: workplan Task 4 Step 2 wires it into `/dw-lifecycle:session-start`, and Task 7 Step 1 wires it into `/dw-lifecycle:review` as a fleet snapshot (PRD echoes both: "`check-editor-symmetry` composes into `/dw-lifecycle:session-start`" and "`check-editor-symmetry` runs as a fleet snapshot"). Phase 25 Task 1's inventory enumerates the rename surface, and the Phase 25 acceptance criteria freeze a *specific list* of identifiers ("All references to `editor`, `editors`, … `editor-symmetry-*` enumerated"). If Phase 24 lands first (the recommended order), it introduces skill-body call sites that did not exist when Phase 25's inventory list was drafted — so a Phase 25 inventory run against the scope-time list undercounts the live surface.
+
+This is the same KeygroupSummary / inventory-≠-discovery failure mode the project's own agent-discipline rule names: a frozen catalog read as complete when the codebase moved underneath it. The fix is to either (a) drop the "independent" framing and state explicitly that Phase 25 Task 1's grep must run *after* Phase 24 lands (and the acceptance-criteria identifier list is illustrative, not exhaustive), or (b) sequence Phase 25 strictly after Phase 24 with a re-inventory gate. As written, a future agent reading "independent" could run Phase 25 first or trust the scope-time list, and ship a rename that misses the call sites Phase 24 just added.
+
+### AUDIT-20260603-25 — Entry sidecar carries `currentStage: Final` while retaining `datePublished` — a contradictory current-state the induct-from-Published codepath did not reconcile
+
+Finding-ID: AUDIT-20260603-25
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `.deskwork/entries/4e4d6912-3edf-4aeb-b6ed-ba455f362f14.json` + the two `review-journal/history/` transitions in the same diff.
+
+The sidecar changes `currentStage` from `Published` to `Final` but keeps `"datePublished": "2026-05-26T00:00:00.000Z"`. The review-journal shows why: the entry was inducted `Published → Drafting` (16:50, reason "Review Phase 24 + 25 extensions") then `Drafting → Final` (17:00). Per `DESKWORK-STATE-MACHINE.md` the linear pipeline is `… → Final → Published`, and `datePublished` is the publish-event stamp. An entry whose `currentStage` is `Final` but which carries a `datePublished` is in a contradictory *current* state — it asserts both "not yet published (at Final)" and "published on 2026-05-26" simultaneously.
+
+I'm flagging it medium, not as a clear bug, because the project's preserve-history rule ("Content-management databases preserve, they don't delete") could justify retaining the publish date as a historical fact. But two things are unaddressed by the diff: (1) no codepath cleared or quarantined `datePublished` when the entry left `Published`, and (2) no doctor rule is cited that catches `currentStage !== 'Published' && datePublished != null`. If a studio surface or doctor rule reads `datePublished` as the signal for "this entry is published," this entry now mis-renders. The reasonable fix is a decision recorded in the spec: either the induct-out-of-Published transition moves `datePublished` into a historical field, or a doctor rule flags the inconsistent pair so re-publish overwrites it cleanly rather than silently keeping a stale stamp.
+
+### AUDIT-20260603-26 — PRD § Out of Scope still asserts "v1 ships pre-commit gates as the default," directly contradicting the Phase 24 zero-git-hook thesis added in the same diff
+
+Finding-ID: AUDIT-20260603-26
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` — § Out of Scope "CI integration for adopter projects" row ("v1 ships pre-commit gates as the default.") vs. the Phase 24 extension paragraph ("zero git-hook reliance, full discipline composed into skill bodies").
+
+This diff promotes the PRD entry to `currentStage: Final` (re-approved this commit) while leaving it internally contradictory: the newly-added Phase 24 extension argues the *core architectural mistake* was wiring enforcement into git and commits to "zero git-hook reliance," yet the unchanged Out of Scope row still states "v1 ships pre-commit gates as the default." Phase 24's own acceptance criteria acknowledge this ("PRD § Out of Scope row … reconciled to reflect the no-git-hook-enforcement contract"), so the reconciliation is captured as future work — but the document as committed-and-approved gives a reader two opposite answers to "does v1 ship git hooks?"
+
+This is low severity because it's flagged for reconciliation, not silently wrong. But a `Final`-stage PRD is the authoritative spec a future implementer reads; an internal contradiction in it is a trap regardless of whether a downstream task promises to fix it. A one-line edit now (annotate the Out of Scope row as "superseded by Phase 24; reconciliation tracked there") would remove the contradiction without waiting for Phase 24 to land.
+
+### AUDIT-20260603-27 — README Phase 23 cell edit added a "vestigial / retires in Phase 24" NOTE but left the unsubstantiated "multi-commit + bookkeeping shapes" verification claim that same-diff AUDIT-23 refutes
+
+Finding-ID: AUDIT-20260603-27
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` — Phase 23 status cell.
+
+AUDIT-20260603-23 (appended to `audit-log.md` *in this same commit*, slushed) flags that the Phase 23 cell's claim — "`git push` succeeds without `--no-verify` on multi-commit + bookkeeping shapes" — is not supported by the cited one-commit evidence. I am not re-litigating that slushed disposition. The new observation is about the *edit this diff made to that exact line*: it appended a NOTE ("retroactively superseded by Phase 24 … the per-SHA log writes that Phase 23 added are vestigial … Code retires as part of Phase 24 Task 2") without correcting the overclaim it sits beside. The cell now asserts three things that don't cohere: Phase 23 is "Complete," was "Live-verified … on multi-commit + bookkeeping shapes," AND is "vestigial" code being deleted unverified-against-its-acceptance-criteria.
+
+When a diff edits the precise line a finding names, that's the moment to resolve the finding, not to layer a second annotation on top of it. The compounding matters because the README is the canonical phase-status surface (more authoritative to a future reader than a slushed audit entry). A reasonable fix in this same class of edit: when adding the retirement NOTE, also strike "on multi-commit + bookkeeping shapes" or downgrade "Complete" to "Implemented; superseded before multi-commit repro was completed" — so the cell stops asserting a verification its own audit-log entry, committed alongside it, contradicts.
