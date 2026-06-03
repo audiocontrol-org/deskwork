@@ -88,6 +88,23 @@ Closes AUDIT-20260603-38. Surface: `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 2) e
 - [x] The named action has landed in this branch (3 DEVELOPMENT-NOTES.md edits + this workplan annotation).
 - [x] Audit-log Status flipped to `acknowledged-journal-counts-reconciled-2026-06-03`.
 
+
+### Task 6 (fix-finding-AUDIT-20260603-46) (non-bug): AUDIT-20260603-46 — Deferral phrase regressed into Task 5's completion header — …
+
+Acknowledges AUDIT-20260603-46 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model). Surface: docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md — Task 5 completion line (replacing the old Step 1–6 list).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [x] Step 1 (disposition): Replace the `"Empirical verification deferred to Phase 24 Task 10 (live dogfood)"` deferral shape in BOTH Task 4 and Task 5 completion headers with a substantive citation that QUOTES Task 10's specific acceptance line covering the verification. Task 10 Step 3 verbatim covers the Task 4/5 work: *"Confirm the structural chain (running via skill bodies, not hooks) still catches the regressions it caught when wired as a hook. Run a deliberate regression (e.g., introduce a clone group) and verify `/dw-lifecycle:implement` end-of-task gates surface it."* Task 10 Step 4 covers the audit-barrage half. Per `agent-discipline.md` § "Just for now is bullshit", forward pointers to a downstream task are permitted ONLY when the downstream task's plan has been read and verified to contain the deferred work; Task 10 was authored in the original Phase 24 capture and DOES contain Steps 3 + 4 that scope this verification. The fix is to make the cross-reference explicit so a reviewer can confirm without leaving the diff.
+- [x] Step 2: applied — Task 4 + Task 5 completion headers updated to quote Task 10's Step 3 (+ Step 4 for Task 5).
+- [x] Step 3: committing with `Acknowledges AUDIT-20260603-46` in subject (doc-only correction).
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (Task 4 + Task 5 completion headers rewritten).
+- [x] Audit-log Status flipped to `acknowledged-deferral-replaced-with-task-10-citation-2026-06-03`.
+
 ### Task 5: Validator + export commands
 
 - [x] `validate-scope-discovery` — runs all adversarial harnesses. Spawns `npx vitest run scope-discovery` from the dw-lifecycle workspace root; forwards stdout/stderr/exit-code verbatim. `--quiet` switches to the dot reporter. Exit codes mirror vitest (0 all-passed, 1 failure, 2 invalid args). 3 vitest scenarios cover the flag-parse contract; the spawn path is exercised in practice by every existing `npm test -- scope-discovery` run.
@@ -841,9 +858,9 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 
 ### Task 4 — Relocate: structural chain into `/dw-lifecycle:session-start`
 
-**Complete — SKILL.md updated. Empirical verification deferred to Phase 24 Task 10 (live dogfood).**
+**Complete — SKILL.md updated. Phase 24 Task 10 covers empirical verification: Task 10 Step 3 (this workplan, lines 934–) reads verbatim *"Confirm the structural chain (running via skill bodies, not hooks) still catches the regressions it caught when wired as a hook. Run a deliberate regression (e.g., introduce a clone group) and verify `/dw-lifecycle:implement` end-of-task gates surface it."* That is the Task 4 verification path — a deliberate clone-group regression run end-to-end, observing whether the chain (now firing from the skill body) surfaces it.**
 
-- [x] Step 1: Write failing test — N/A per `testing.md` ("What NOT to Test: The model's response to a SKILL.md prompt (non-deterministic)"). Skill-prose relocations are not unit-testable; the deliverable is the SKILL.md edit; empirical verification happens in Phase 24 Task 10's live dogfood.
+- [x] Step 1: Write failing test — N/A per `testing.md` ("What NOT to Test: The model's response to a SKILL.md prompt (non-deterministic)"). Skill-prose relocations are not unit-testable; the deliverable is the SKILL.md edit; the deliberate-regression run captured in Phase 24 Task 10 Step 3 is how this work is verified empirically.
 - [x] Step 2: Extended `/dw-lifecycle:session-start` SKILL.md with a new Step 7 — `check-clones`, `check-anti-patterns`, `check-adopters`, `check-editor-symmetry` as a read-only snapshot step.
 - [x] Step 3: Referenced existing CLI invocations directly; the stderr count lines are surfaced via `2>&1 | tail -3` per verb, composed into a single `Structural snapshot:` block in the bootstrap report.
 - [x] Step 4: Decision: **advisory**. The skill instructs the agent to surface counts but NOT to refuse session-start on non-zero. Enforcement lives at end-of-implement-task per Task 5.
@@ -854,9 +871,9 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 
 ### Task 5 — Relocate: end-of-task gate into `/dw-lifecycle:implement`
 
-**Complete — SKILL.md Step 6 rewritten as Steps 6a–6e composing the full end-of-task chain. Empirical verification deferred to Phase 24 Task 10 (live dogfood).**
+**Complete — SKILL.md Step 6 rewritten as Steps 6a–6e composing the full end-of-task chain. Phase 24 Task 10 covers empirical verification: Task 10 Step 3 (this workplan, lines 934–) verifies *"the structural chain (running via skill bodies, not hooks) still catches the regressions it caught when wired as a hook"* — directly exercising Step 6a. Task 10 Step 4 verifies *"`/dw-lifecycle:implement` end-of-task audit-barrage discipline produces equivalent finding coverage to the retired `check-implement-hook-ran` gate"* — directly exercising Steps 6b–6c.**
 
-- [x] Step 1: Write failing tests — N/A for skill-prose relocations per `testing.md`. The underlying CLI verbs (`check-clones`, `check-anti-patterns`, `check-adopters`, `check-editor-symmetry`, `implement-hook`, `check-open-findings`, `apply-audit-flips`, `check-fix-task-tdd`) all have existing test coverage; relocating their firing location from `.husky/` to the skill body doesn't change the verb-level test coverage.
+- [x] Step 1: Write failing tests — N/A for skill-prose relocations per `testing.md`. The underlying CLI verbs (`check-clones`, `check-anti-patterns`, `check-adopters`, `check-editor-symmetry`, `implement-hook`, `check-open-findings`, `apply-audit-flips`, `check-fix-task-tdd`) all have existing test coverage; relocating their firing location from `.husky/` to the skill body doesn't change the verb-level test coverage. Task 10 Step 3 + 4 are the empirical-verification path.
 - [x] Step 2: Updated `/dw-lifecycle:implement` SKILL.md Step 6 to compose the FULL end-of-task chain — Step 6a (structural chain in `--gate-mode`), Step 6b (`implement-hook` audit-barrage chain), Step 6c (`check-open-findings` refuse-to-advance gate), Step 6d (`apply-audit-flips --apply` close already-fixed), Step 6e (`check-fix-task-tdd` advisory). The lift/promote/check-open-findings chain is preserved unchanged inside `implement-hook`.
 - [x] Step 3: `check-fix-task-tdd` documented as Step 6e advisory (in-skill discipline, not a hook). The CLI verb itself is preserved; only the firing location moves.
 - [x] Step 4: `apply-audit-flips --apply` folded as Step 6d (no separate manual call). Step 6c (`check-open-findings`) covers the open-finding gate semantic that `check-implement-hook-ran` previously enforced from `.husky/commit-msg`.

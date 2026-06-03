@@ -3457,3 +3457,99 @@ Surface:    `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 2) entry — "Accomplished"
 The same journal entry reports three different finding counts for the same work. The Accomplished bullet says "10 findings" while citing the range `22..36` (which is 15 IDs: 22–36). The Quantitative line says "10" but then enumerates **12** addressed IDs (24, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36) *plus* 22/23 partial *plus* 25. None of "10 / 12 / 15" reconcile. This is exactly the failure mode the project's own `CLAUDE.md` AUDIT-04 convention names: *"re-derive the numbers … verify the arithmetic … skip the line entirely if the arithmetic isn't reconciled — false precision erodes trust more than absence."* The same entry also calls the 16 archived phases "16 **completed** phases" while 17/22/23 are vestigial-not-completed (the README archive note states the more careful "completed work … or vestigial" framing).
 
 Low severity because it is journal bookkeeping, not code — but the entry is the permanent record a future reader will trust for "what got dispositioned this session," and the headline count understates the actual addressed set by two. Fix: re-derive from the audit-log entries actually committed and state one reconciled number, or drop the count and list the IDs only.
+
+## 2026-06-03 — audit-barrage lift (20260603T190136975Z-scope-discovery)
+
+### AUDIT-20260603-39 — Auto-positioned fix-finding tasks are numbered "Task 6"/"Task 7" — ignoring the ledger's `next-fix-task-id: 5.124` and colliding with Phase 26's own "Task 6"
+
+Finding-ID: AUDIT-20260603-39
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` inserted blocks at the `@@ -54,6 +54,40 @@` hunk — `### Task 6 (fix-finding-AUDIT-20260603-37)` and `### Task 7 (fix-finding-AUDIT-20260603-38)`
+
+The two `promote-findings`-generated disposition tasks for AUDIT-37/-38 were numbered **Task 6** and **Task 7**. But the active workplan's own ledger (cited verbatim in this same session's journal) declares `next-fix-task-id: 5.124` with `archived-fix-tasks: 5.1-5.123`. The fix-task ID scheme is `5.x`; the next allocation should have been `Task 5.124`/`Task 5.125`. Instead the auto-positioner scanned the local section max (`Task 5`) and produced `6`/`7`. This is the *exact* defect Phase 26 Task 4 ("Auto-positioner ledger awareness") productizes a fix for — now manifest in the live workplan, demonstrating that the ledger annotation does nothing until Phase 26 ships, contradicting the journal's claim that the ledger "so the auto-positioner doesn't collide on future promotes."
+
+Worse, `Task 6` now **collides** with Phase 26's existing `### Task 6 — Live dogfood verification` (visible later in this same diff at the `@@ -1100,15 +1136,16 @@` hunk). The workplan now contains two distinct "Task 6" blocks. Any tooling that references a task by number, any operator grepping for "Task 6", and the next promote run all inherit ambiguity. A reasonable fix: re-number these two blocks to `Task 5.124`/`Task 5.125` per the ledger (the operation Phase 26 Task 4 will automate), or at minimum to non-colliding values, before this lands.
+
+### AUDIT-20260603-40 — Fix-finding blocks inserted *before* "Task 5" — document order inverts numeric order and lands Phase-26 dispositions inside the Phase 8 task list
+
+Finding-ID: AUDIT-20260603-40
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — inserted Task 6/Task 7 blocks sit between `uninstall-scope-discovery-hooks` and `### Task 5: Validator + export commands`
+
+In document order the diff now reads: `migrate-from-pilot [x]` → `uninstall-scope-discovery-hooks [x]` → **Task 6 (fix-finding)** → **Task 7 (fix-finding)** → `### Task 5: Validator + export commands`. The auto-positioner anchored the new blocks *immediately before* Task 5, so a reader scanning top-to-bottom encounters Task 6, Task 7, then Task 5 — numeric order inverted. The surrounding tasks (`migrate-from-pilot`, `uninstall-scope-discovery-hooks`, `Task 5: Validator + export commands`) are scope-discovery CLI tooling (Phase 8 region), yet the dispositions concern AUDIT-37 (a *Phase 26* spec contradiction) and AUDIT-38 (a journal-bookkeeping correction). Neither belongs adjacent to the Phase 8 validator task.
+
+This compounds finding-01: the wrong anchor is *why* the numbers came out `6`/`7`. The fix is the same — give the auto-positioner the correct insertion point (and the ledger-aware ID), so disposition tasks append in numeric order rather than wedging in before a lower-numbered sibling.
+
+### AUDIT-20260603-41 — Task 7's title says `Closes AUDIT-20260603-38` but its Step 3 says commit with `Acknowledges` — and the actual commit uses neither trailer, so `apply-audit-flips` can't auto-flip it
+
+Finding-ID: AUDIT-20260603-41
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 7 block ("Closes AUDIT-20260603-38" header vs. "committing with `Acknowledges AUDIT-20260603-38` in subject") and the audited commit subject
+
+The Task 7 block opens with `Closes AUDIT-20260603-38` but its Step 3 reads *"committing with `Acknowledges AUDIT-20260603-38` in subject"*. Task 6's block is internally consistent (`Acknowledges` in both places); Task 7 contradicts itself. The journal records that `dw-lifecycle apply-audit-flips` *"reads `Closes AUDIT-X` commit trailers and flips audit-log entries."* The single commit in the audited range is `docs(scope-discovery): AUDIT-37 + AUDIT-38 — archive-phases vestigial escape + journal counts reconciled` — it carries **neither** a `Closes AUDIT-38` nor an `Acknowledges AUDIT-38` trailer. So `apply-audit-flips` would not have auto-flipped these; the statuses in `audit-log.md` were hand-set (`acknowledged-...-2026-06-03`). The header/step mismatch plus the missing trailer means the auto-flip path is silently bypassed for both findings, and a future `apply-audit-flips` dry-run will report these as un-flipped-by-trailer. Reconcile Task 7's header verb with its step, and if auto-flip is intended, the commit must carry the matching trailer.
+
+### AUDIT-20260603-42 — Free-form `acknowledged-<custom>-<date>` status strings risk being treated as open-class by `promote-findings`/`check-open-findings`
+
+Finding-ID: AUDIT-20260603-42
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-37 (`Status: acknowledged-allow-vestigial-flag-added-2026-06-03`) and AUDIT-38 (`Status: acknowledged-journal-counts-reconciled-2026-06-03`)
+
+Both new findings use bespoke status strings invented for this commit. Prior triaged entries used a small recognized vocabulary — `open`, `fixed-<sha>`, `acknowledged-slush-pile-<date>`. AUDIT-33 (status `fixed-6e8d1d81` in the prior excerpt) established the concrete cost: *"`/dw-lifecycle:promote-findings` walks `Status: open`-class entries… a future run that sees [it] still slushed will re-propose work the PRD and workplan already incorporate, generating duplicate scoping."* If `promote-findings`/`check-open-findings` classify status by an allow-list of known-closed values (rather than "anything not literally `open`"), these two ad-hoc strings may be bucketed as open-class and re-promoted on the next run — re-generating the very Task 6/Task 7 blocks just landed. Conversely, if the new doctor rule `workplan-archive-ledger-coherence` or any audit-log validator enforces a status enum, these free-form values may fail validation. The safe shape is the one AUDIT-33 asked for: a recognized closed/resolved status with a one-line resolution note, not a new per-finding string. This needs verification against the actual status-class matcher in `promote-findings`/`check-open-findings` before relying on "0 open."
+
+### AUDIT-20260603-43 — Phase 26 Task 6 Step 2 (vestigial-allowed dogfood) may have no live target — all known vestigial phases (17/22/23) were already manually archived this session
+
+Finding-ID: AUDIT-20260603-43
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 26 Task 6 Step 2 (`@@ -1100,15 +1136,16 @@`)
+
+The newly added Step 2 says: run `archive-phases … --allow-vestigial` *"against a real retired phase (e.g., one of Phases 17/22/23 if it hasn't already been manually archived; otherwise a future-retired phase)."* But this same session's journal (edited in this diff) records that Phases 17/22/23 were **already** moved to `workplan-archive.md` by the manual operation. So the parenthetical's first branch is already foreclosed, and the fallback — *"a future-retired phase"* — has no concrete referent: there is no currently-live vestigial phase to exercise the `--allow-vestigial` path against. The acceptance criterion *"Round-trip preserves content for both paths"* therefore cannot be satisfied on this branch's own workplan without first manufacturing a vestigial phase. This mirrors AUDIT-37's original concern (the dogfood couldn't reproduce the manual op) but for the *vestigial* path specifically: the escape hatch was added, yet the dogfood target it needs was consumed by the manual archive. The fix is to name a concrete, still-live target (or to roundtrip one of 17/22/23 *out* of the archive and back via `unarchive-phases` → `archive-phases --allow-vestigial`), rather than leaving "otherwise a future-retired phase" as an unbound placeholder.
+
+---
+
+I checked the DEVELOPMENT-NOTES count reconciliation (12 + 2 + 1 = 15 over range 22..36 — now internally consistent, AUDIT-38 genuinely addressed), the AUDIT-37 `--allow-vestigial` spec edits across prd.md + workplan.md Task 2/Task 6/acceptance (the spec text is mutually consistent and the ≥40-char-reason requirement is uniformly stated), and the hook-run-log.jsonl append (well-formed JSON; `runDir`/`tip` match the audit-log header `20260603T185249284Z` / `465ccac9`). The five findings above are the concrete ones; the strongest signal is finding-01/02 — the auto-positioner produced ledger-ignoring, order-inverted, colliding task numbers, which is the live manifestation of the exact defect Phase 26 Task 4 is meant to fix.
+
+## 2026-06-03 — audit-barrage lift (20260603T190549797Z-scope-discovery)
+
+### AUDIT-20260603-44 — Deferral phrase committed into the workplan — "Empirical verification deferred to Phase 24 Task 10" — with no in-diff proof Task 10 contains that work
+
+Finding-ID: AUDIT-20260603-44 (claude-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 4 header (`**Complete — … Empirical verification deferred to Phase 24 Task 10 (live dogfood).**`) + Step 1 + Step 5
+
+The Task 4 completion block introduces the literal phrase *"Empirical verification deferred to Phase 24 Task 10 (live dogfood)"* and repeats the deferral in Step 1 (*"empirical verification happens in Phase 24 Task 10's live dogfood"*) and Step 5 (*"N/A per Step 1"*). This is exactly the string class the project's own `agent-discipline.md` § "Just for now is bullshit" tells the agent to grep its diffs for and refuse (`deferred`, `until F`, `TODO`), and the audit dispatch's own hard constraint forbids deferral phrases in the work product.
+
+The rule permits a deferral *only* when it points at a downstream task whose plan you have **read and verified** contains the deferred work. This diff marks Task 4 `[x] Complete` on the strength of "Phase 24 Task 10 will verify it," but Task 10 is not in the diff, so a reviewer cannot confirm Task 10 (a) exists and (b) actually scopes empirical verification of the session-start structural snapshot. If Task 10 does not enumerate this verification, the SKILL.md edit ships unverified behind a checked box — the precise IOU-becomes-canon failure mode the rule names. A reasonable fix: either quote the Task 10 acceptance line that covers this (so the cross-reference is auditable), or drop the word "deferred" and state the verification step is part of Task 10's existing acceptance criteria with a citation.
+
+### AUDIT-20260603-45 — Snapshot report template labels (`holdouts`, `symmetry-deltas`) don't map transparently to the four verbs, and Step 7 never specifies which stderr line is the count
+
+Finding-ID: AUDIT-20260603-45 (claude-02 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/session-start/SKILL.md` Step 7 — the four `… 2>&1 | tail -3` invocations and the render line `Structural snapshot: clones=N anti-patterns=N holdouts=N symmetry-deltas=N`
+
+Step 7 instructs the agent to run four verbs and "surface the count line from stderr," then render `clones=N anti-patterns=N holdouts=N symmetry-deltas=N`. Two problems make this under-specified as a contract:
+
+1. **Verb→field mapping is non-obvious.** `check-clones`→`clones` and `check-anti-patterns`→`anti-patterns` are transparent, but `check-adopters`→`holdouts` and `check-editor-symmetry`→`symmetry-deltas` require the agent to already know each verb's domain vocabulary. Nothing in Step 7 states that `check-adopters` reports "holdouts" or that `check-editor-symmetry` reports "symmetry-deltas." An agent reading only this skill cannot reliably fill the template, and a future rename of any verb's stderr label silently breaks the render with no test (Task 4 Step 1 was waived as non-testable).
+
+2. **`tail -3` ≠ "the count line."** The instruction captures the last three stderr lines but never says which of them carries the integer N. If a verb prints a multi-line summary, the agent is left to guess. The result is a snapshot whose numbers are produced by an unspecified extraction step.
+
+Because the snapshot is advisory, a wrong or empty N degrades silently into the bootstrap report with no signal that it's wrong. Fix: have Step 7 name, per verb, the exact stderr token to read (or point at a single helper that emits the four counts in a stable `key=value` form), so the render is deterministic rather than relying on the agent inferring the mapping.
+
+## 2026-06-03 — audit-barrage lift (20260603T190926867Z-scope-discovery)
+
+### AUDIT-20260603-46 — Deferral phrase regressed into Task 5's completion header — same `"deferred to Phase 24 Task 10"` shape AUDIT-44 flagged on Task 4, now on the diff's actual subject task
+
+Finding-ID: AUDIT-20260603-46 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     acknowledged-deferral-replaced-with-task-10-citation-2026-06-03
+Severity:   high
+Surface:    docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md — Task 5 completion line (replacing the old Step 1–6 list)
+
+```
+
+The Task 5 block is marked complete with: `**Complete — SKILL.md Step 6 rewritten as Steps 6a–6e … Empirical verification deferred to Phase 24 Task 10 (live dogfood).**`, and Step 5 reads `[x] Step 5: Confirm tests pass — N/A per Step 1.` This is a verbatim repeat of the deferral shape AUDIT-20260603-44 already triaged on Task 4 — now manifest on Task 5, which IS the subject of this diff. The dispatch's hard constraint is explicit: *"If you spot a deferral phrase IN the diff, surface it as a finding"*; the project's own `agent-discipline.md` § "Just for now is bullshit" lists `deferred` among the strings to grep-and-refuse, permitting a forward-pointer **only** when the downstream task's plan has been read and verified to contain the deferred work. Phase 24 Task 10 is not in this diff, so a reviewer cannot confirm Task 10 (a) exists and (b) scopes empirical verification of the Step 6a–6e chain. The box is checked `[x] Complete` on the strength of an unverifiable cross-reference — the precise IOU-becomes-canon failure mode. Fix: quote Task 10's acceptance line that covers this verification, or drop "deferred" and cite Task 10's existing acceptance criteria.
