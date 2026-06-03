@@ -57,6 +57,8 @@ note: archived 2026-06-03 via scripts/archive-phases-onetime.ts; Phase 26 produc
 
 ### Task 6 (fix-finding-AUDIT-20260603-37) (non-bug): AUDIT-20260603-37 — Phase 26's "refuse partial-complete phases" contract contrad…
 
+> Superseded by audit-log Status `acknowledged-allow-vestigial-flag-added-2026-06-03` — no TDD walk required.
+
 Acknowledges AUDIT-20260603-37 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 26 Task 2 Step 6 + Phase 26 acceptance ("refuses partial-complete phases"); `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` Phase 26 extension ("refuse archiving phases with ANY unchecked task"); `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan-archive.md` header + Phases 13/17/22/23.
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
@@ -73,6 +75,8 @@ Acknowledges AUDIT-20260603-37 (claude-01 + claude-02 + claude-03 + claude-05 + 
 
 
 ### Task 7 (fix-finding-AUDIT-20260603-38) (non-bug): AUDIT-20260603-38 — DEVELOPMENT-NOTES finding-count arithmetic is internally inc…
+
+> Superseded by audit-log Status `acknowledged-journal-counts-reconciled-2026-06-03` — no TDD walk required.
 
 Closes AUDIT-20260603-38. Surface: `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 2) entry — "Accomplished" ("AUDIT-finding triage (10 findings). Reviewed AUDIT-20260603-22..36") and "Quantitative" ("Audit findings dispositioned at source: 10 (AUDIT-20260603-24/26/27/28/29/30/31/32/33/34/35/36 — addressed; AUDIT-22/23 partially; AUDIT-25 filed as deskwork issue)").
 
@@ -91,6 +95,8 @@ Closes AUDIT-20260603-38. Surface: `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 2) e
 
 ### Task 6 (fix-finding-AUDIT-20260603-46) (non-bug): AUDIT-20260603-46 — Deferral phrase regressed into Task 5's completion header — …
 
+> Superseded by audit-log Status `acknowledged-deferral-replaced-with-task-10-citation-2026-06-03` — no TDD walk required.
+
 Acknowledges AUDIT-20260603-46 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model). Surface: docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md — Task 5 completion line (replacing the old Step 1–6 list).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
@@ -107,6 +113,8 @@ Acknowledges AUDIT-20260603-46 (claude-01 + claude-02 + claude-03 + claude-04 + 
 
 
 ### Task 6 (fix-finding-AUDIT-20260603-47): AUDIT-20260603-47 — Step 9 offers `--allow-disposition-loss` as an escape, but t…
+
+> Superseded by audit-log Status `acknowledged-session-end-step9-contradiction-resolved-2026-06-03` — no TDD walk required.
 
 Acknowledges AUDIT-20260603-47 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/skills/session-end/SKILL.md` — new Step 9 body vs. the "Closing-discipline refusal (Step 9)" error-handling bullet. Severity: high.
 
@@ -126,6 +134,8 @@ Acknowledges AUDIT-20260603-47 (claude-01 + claude-02 + claude-03 + claude-04 + 
 
 ### Task 7 (fix-finding-AUDIT-20260603-48) (non-bug): AUDIT-20260603-48 — AUDIT-47 fix edited only Step 9's body — the "Closing-discip…
 
+> Superseded by audit-log Status `acknowledged-error-handling-bullet-reconciled-2026-06-03` — no TDD walk required.
+
 Acknowledges AUDIT-20260603-48. Surface: `plugins/dw-lifecycle/skills/session-end/SKILL.md` — Step 9 disposition-survivor clause (changed in diff) vs. the "Closing-discipline refusal (Step 9)" error-handling bullet (NOT in diff).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
@@ -143,6 +153,8 @@ Acknowledges AUDIT-20260603-48. Surface: `plugins/dw-lifecycle/skills/session-en
 
 ### Task 8 (fix-finding-AUDIT-20260603-49) (non-bug): AUDIT-20260603-49 — Workplan Step 3 claims the commit carries an `Acknowledges A…
 
+> Superseded by audit-log Status `acknowledged-step-3-trailer-location-corrected-2026-06-03` — no TDD walk required.
+
 Acknowledges AUDIT-20260603-49 (claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 6 block, Step 3 (`committing with `Acknowledges AUDIT-20260603-47` in subject`) vs. the audited commit subject.
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
@@ -159,6 +171,8 @@ Acknowledges AUDIT-20260603-49 (claude-02 + claude-03 + claude-04 + codex-01 + c
 
 
 ### Task 7 (fix-finding-AUDIT-20260603-50) (non-bug): AUDIT-20260603-50 — AUDIT-49's "fix" replaces a wrong claim with another wrong c…
+
+> Superseded by audit-log Status `acknowledged-template-rewritten-fix-task-block-corrected-2026-06-03` — no TDD walk required.
 
 Acknowledges AUDIT-20260603-50. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 6 Step 3 (the `+- [x] Step 3: committed (\`f679a201\`)…` line) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-flip-from-commit.ts:43` and `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:15,84,362,413`.
 
@@ -194,6 +208,8 @@ Closes AUDIT-20260603-51. Surface: `plugins/dw-lifecycle/src/scope-discovery/pro
 
 
 ### Task 9 (fix-finding-AUDIT-20260603-52) (non-bug): AUDIT-20260603-52 — This diff cements a false capability claim into the durable …
+
+> Superseded by audit-log Status `acknowledged-paraphrase-corrected-in-AUDIT-49-entry-2026-06-03` — no TDD walk required.
 
 Acknowledges AUDIT-20260603-52. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — the AUDIT-20260603-49 entry body added in this diff (*"the journal records that `dw-lifecycle apply-audit-flips` reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers and flips audit-log entries"*).
 
@@ -999,14 +1015,13 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 
 ### Task 7 — Relocate: Step 0 + structural chain into `/dw-lifecycle:review`
 
-- Step 1: Write failing tests for new review-skill discipline:
-  - Step 0 `check-refactor-preconditions` invoked on review trigger;
-  - structural chain run as PR-readiness gate;
-  - `check-editor-symmetry` invoked as fleet snapshot.
-- Step 2: Update `/dw-lifecycle:review` SKILL.md to compose the above.
-- Step 3: REVERSE the Phase 20 Task 2 retirement decision for `/dw-lifecycle:review`: this skill becomes the *primary* enforcement surface, not deprecated.
-- Step 4: Confirm tests pass.
-- Step 5: Commit.
+**Complete — SKILL.md Step 3 expanded into Steps 3a–3c composing Step 0 + structural chain + fleet symmetry; explicit "Primary enforcement surface (Phase 24)" section added reversing the Phase 20 Task 2 retirement decision. Empirical verification: Task 10 Step 3 (deliberate clone-group regression) exercises Step 3b's structural chain; Task 10's reviewer-driven PR-readiness run exercises Steps 3a + 3c via the operator's own review pass.**
+
+- [x] Step 1: Write failing tests — N/A for skill-prose relocations per `testing.md`. The CLI verbs invoked (`check-refactor-preconditions`, `check-clones`, `check-anti-patterns`, `check-adopters`, `check-editor-symmetry`) all retain their existing test coverage; relocating their firing location to the skill body doesn't change the verb-level coverage.
+- [x] Step 2: Updated `/dw-lifecycle:review` SKILL.md — Step 3 rewritten into Steps 3a (check-refactor-preconditions when the change touches a refactor), 3b (full structural chain), 3c (fleet-symmetry snapshot).
+- [x] Step 3: REVERSED the Phase 20 Task 2 retirement decision via a new "Primary enforcement surface (Phase 24)" section at the bottom of the SKILL.md citing the ADR + rule.
+- [x] Step 4: Confirm tests pass — N/A per Step 1.
+- [x] Step 5: Commit.
 
 **Acceptance:** Review skill invocation runs Step 0 + structural chain + fleet symmetry. The skill is documented as the primary enforcement surface.
 

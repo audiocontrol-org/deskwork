@@ -3615,7 +3615,7 @@ So the corrective rationale is false on its own terms: whether the `Acknowledges
 ### AUDIT-20260603-51 — Root cause of AUDIT-49 left unfixed: the generator `workplan-task-renderer.ts:152` still emits `Acknowledges … in subject`, so the defect regenerates on every promote-findings run
 
 Finding-ID: AUDIT-20260603-51
-Status:     fixed-pending-sha
+Status:     fixed-f9b939e8
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:152` (not in the diff) vs. the workplan Step 3 hand-edit that IS in the diff
 
@@ -3648,3 +3648,42 @@ Confirming the positive signal so the operator can weigh it against the negative
 ---
 
 **Summary for triage:** AUDIT-48 is genuinely resolved. AUDIT-49 is not — its corrective rationale (`apply-audit-flips` "finds" the body `Acknowledges` trailer) is factually false (the walker parses `Closes` only), the claim is internally self-contradictory, the generator that produces the defect is untouched so it will recur, and the false capability claim is now cemented into the audit-log. The strongest signal is the cross-check that the codebase's *own* note (`workplan-task-renderer.ts:152`) already documents the correct behavior the AUDIT-49 hand-edit contradicts.
+
+## 2026-06-03 — audit-barrage lift (20260603T193220124Z-scope-discovery)
+
+### AUDIT-20260603-54 — Asymmetric fix — the code-defect template Step 5 still says "`Closes ${id}` in subject," reproducing the exact "location-specific" framing the AUDIT-50/51 fix was filed to remove
+
+Finding-ID: AUDIT-20260603-54 (claude-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:193` (NOT in the diff) vs. the changed line 152 (in the diff) and `auto-flip-from-commit.ts:13`
+
+The AUDIT-50/51 fix changed the **non-bug** Step 3 from "`Acknowledges ${id}` in subject" to "an `Acknowledges ${id}` trailer in the commit message," on the stated logic that *subject-vs-body location is immaterial to `apply-audit-flips`* (it matches the verb "anywhere in subject or body," per `auto-flip-from-commit.ts:13`). That same `renderFixTaskBlock` function emits the **code-defect** template, whose Step 5 (line 193) still reads `commit with \`Closes ${id}\` in subject`. The renderer now teaches two different placement conventions for two trailer verbs the tool treats identically.
+
+This is precisely the recurring partial-fix shape AUDIT-51 itself named ("each occurrence gets hand-patched … the template that mints them is never addressed, so the defect recurs"). The fix touched one of two parallel "in subject" template lines in the same function. Either "in subject" is the intended convention (in which case the non-bug change diverged from it and from `SKILL.md:96`/`:119`, which still document "`Closes … in subject`"), or location is genuinely immaterial (in which case line 193 should also drop "in subject"). The diff resolves neither — it leaves the function internally inconsistent and the code-defect path un-tested for the same property the two new non-bug tests now assert. A reasonable fix: make both lines say "trailer in the commit message" (or both prescribe subject), and extend the new tests at `workplan-task-renderer.test.ts` to cover the code-defect template's Step 5 the same way they cover the non-bug Step 3.
+
+---
+
+### AUDIT-20260603-55 — New negative-assertion test regex cannot match the documented offending phrase — it gives false confidence against the "trailer-walker finds it" regression
+
+Finding-ID: AUDIT-20260603-55 (claude-02 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-task-renderer.test.ts:282`
+
+The test added for AUDIT-50/51 asserts `expect(lower).not.toMatch(/trailer[- ]walker (finds|will find|locates)/)` and the preceding comment claims it guards against *"the false 'trailer-walker finds it' justification."* But the actual phrasing the hand-edit used (quoted in AUDIT-50's own body) is **"trailer-walker (apply-audit-flips and successors) finds it"** — the parenthetical sits between "walker" and "finds." The regex requires `trailer-walker ` to be immediately followed by `finds|will find|locates`, so it does **not** match that phrase. If a future regression reintroduced exactly that wording into the generator, this assertion would still pass.
+
+The other assertions in the same test (must contain `audit-trail`, `apply-audit-flips`, `closes`) do meaningfully constrain the contract, so the test is not worthless — but the one assertion specifically named after the AUDIT-50 defect is the one that can't catch it. Fix: loosen to `/trailer[- ]walker\b.*\b(finds|will find|locates|reads)\b/` (with the `.*` spanning the parenthetical) or assert the absence of the literal substring `"finds it"` in proximity to `"trailer-walker"`, so the regex matches the documented form it claims to forbid.
+
+---
+
+### AUDIT-20260603-56 — AUDIT-52's own entry re-embeds the false-capability string verbatim into the durable audit-log — the exact propagation risk the finding names
+
+Finding-ID: AUDIT-20260603-56
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — AUDIT-20260603-52 entry (Surface line + body, both in the diff)
+
+AUDIT-52's thesis is that capturing the false paraphrase *"`apply-audit-flips` reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers"* into `audit-log.md` "propagates it into a second canonical surface, where a future reader (or a future 'successor' tool author who treats the audit-log as a spec) will design against a capability that doesn't exist." The AUDIT-52 entry then reproduces that exact false string **twice** — once in its `Surface:` line and once in its body — as the quoted-wrong claim. A grep of the durable audit-log for `reads .* Acknowledges AUDIT` still returns these hits; only the surrounding prose marks them as erroneous.
+
+Quote-to-correct is defensible and the AUDIT-49 entry body itself was genuinely fixed (the false sentence was removed there). This is informational, not a defect: the safer pattern, by AUDIT-52's own argument, is to paraphrase the quoted-wrong claim (e.g. *"a paraphrase that incorrectly attributed `Acknowledges`-trailer parsing to `apply-audit-flips`"*) rather than reproduce the literal false string in a surface a tool author might scrape. Worth weighing only if the audit-log is ever consumed mechanically.

@@ -13,11 +13,32 @@ Run the `audiocontrol` three-track audit/review protocol on recent changes. The 
 2. Classify the change before review:
    - High-risk changes: design-system work, capability-bound behavior changes, migrations, architectural refactors, or anything UI-touching.
    - Routine changes: narrow bug fixes or mechanical edits with constrained blast radius.
-3. Auto-invoke the clone detector (default behavior) unless `--no-clone-check` was passed:
-   - Runs `dw-lifecycle check-clones --gate-mode` against the changed surface (the same scope the reviewers will see in Tracks 2 + 3).
-   - NEW clone groups (groups not already disposed in `.dw-lifecycle/scope-discovery/clones.yaml`) are surfaced in the final review report alongside the dispatched reviewers' findings.
-   - The clone-detector findings are routed to the audit log the same way reviewer findings are (see Step 9); each NEW clone group becomes its own `Finding-ID` so future review passes don't re-report it.
-   - If `.dw-lifecycle/scope-discovery/` is not present in the project, the auto-invocation is silently skipped. No warning, no error.
+3. Auto-invoke the full PR-readiness gate (default behavior) unless `--no-clone-check` was passed. Per the Phase 24 no-git-hook-enforcement ADR (`docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md`), this skill is the PRIMARY enforcement surface for PR-readiness — the principle that retired the `.husky/` hook chain relocates that discipline here.
+
+   **Step 3a — Step 0 refactor-preconditions check.** When the change touches a refactor (any commit in scope mentions `refactor`/`extraction`/`clones.yaml`/`canonical_side`/`tests_proof`):
+
+   ```bash
+   dw-lifecycle check-refactor-preconditions --feature <slug> --gate-mode
+   ```
+
+   Surface any failures in the final review report; reviewers in Tracks 2 + 3 should see precondition failures as context.
+
+   **Step 3b — Structural chain (the full PR-readiness gate).** Run sequentially:
+
+   ```bash
+   dw-lifecycle check-clones --gate-mode
+   dw-lifecycle check-anti-patterns --feature <slug> --gate-mode
+   dw-lifecycle check-adopters --feature <slug> --gate-mode
+   dw-lifecycle check-editor-symmetry --feature <slug>
+   ```
+
+   Any non-zero exit surfaces in the final review report; treat each as a PR-blocker until explicitly dispositioned (the operator may accept a finding with a documented reason; the auto-flip-friendly path is to file a fix-task via `promote-findings` or scope the finding directly into the workplan).
+
+   **Step 3c — Fleet-symmetry snapshot.** `check-editor-symmetry` from Step 3b doubles as the fleet snapshot (cross-module canonical-primitive adoption matrix). When the change touches a known canonical-primitive surface, the symmetry-delta count goes into the report verbatim.
+
+   NEW clone groups, anti-pattern hits, adopter holdouts, and symmetry deltas are routed to the audit log the same way reviewer findings are (see Step 9); each becomes its own `Finding-ID` so future review passes don't re-report it.
+
+   If `.dw-lifecycle/scope-discovery/` is not present in the project, all four invocations silently skip (scope-discovery is opt-in per project). The reviewer tracks still run; the report omits the structural-chain summary.
 4. Run Track 1 yourself before dispatching reviewers: re-run the load-bearing verification gate in your own environment. Treat the implementer's reported output as a claim, not evidence.
    - For UI-touching changes, this includes the relevant browser/probe/Playwright or smoke verification, not just unit tests.
    - Record the exact commands or probes run and the concrete result so the review has evidence, not paraphrase.
@@ -83,7 +104,11 @@ Run the `audiocontrol` three-track audit/review protocol on recent changes. The 
 - The change is purely additive (new file, new test, new doc) with no risk of clone-introduction against existing code.
 - The clone detector has already produced a NEW clone-groups report earlier in the same session and re-running it would only duplicate findings.
 
-Default = run the detector. Skipping is the exception.
+Default = run the detector. Skipping is the exception. The flag is named `--no-clone-check` for back-compat with pre-Phase-24 callers; under the new architecture it suppresses the full Step 3 chain (Step 0 refactor-preconditions + structural chain + fleet symmetry), not just the clone detector. Use sparingly — the entire point of `/dw-lifecycle:review` post-Phase-24 is that this skill IS the PR-readiness enforcement surface.
+
+## Primary enforcement surface (Phase 24)
+
+`/dw-lifecycle:review` is the primary enforcement surface for PR-readiness. Per `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` (ADR) + `.claude/rules/enforcement-lives-in-skills.md` (rule), the discipline that lived in `.husky/pre-push` is now invoked from this skill body. The Phase 20 Task 2 "retire `/dw-lifecycle:review` + `/dw-lifecycle:audit` in favor of audit-barrage" decision REVERSES under Phase 24 — `audit-barrage` remains the cross-model audit surface invoked from `/dw-lifecycle:implement` end-of-task; `/dw-lifecycle:review` is the operator-driven PR-readiness pass that composes the structural chain + Step 0 + the three-track reviewer protocol on top of the audit-log discipline.
 
 ## Error handling
 
