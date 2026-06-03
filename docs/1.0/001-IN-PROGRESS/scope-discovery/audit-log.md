@@ -3904,7 +3904,7 @@ This matters because `install-scope-discovery` copies these templates into adopt
 ### AUDIT-20260603-76 — Tasks 16/17/18 reproduce the exact "fixed-finding with an open, wrong-shaped task" contradiction that AUDIT-72 named — within the same commit that claims to fix it
 
 Finding-ID: AUDIT-20260603-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-3fb376f1
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 16/17/18 (diff hunks `@@ -226,15 +226,33 @@` and `@@ -259,39 +297,76 @@`) vs. `audit-log.md` AUDIT-73/74/75 (`Status: fixed-b178bdd0`)
 
