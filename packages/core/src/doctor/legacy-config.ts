@@ -10,10 +10,11 @@
  * This module is that tolerated read surface. It parses the on-disk
  * `.deskwork/config.json` directly and extracts just the fields the
  * migration needs (`sites.<id>.{contentDir, calendarPath, host}`),
- * WITHOUT going through `parseConfig` — `parseConfig` REQUIRES a
- * non-empty `sites` block, so it would throw on a post-migration config
- * (the one the migration itself wrote when it dropped `sites`). The
- * migration must read both shapes:
+ * WITHOUT going through `parseConfig`. `parseConfig` strips the legacy
+ * fields the migration consumes (it surfaces only the typed `SiteConfig`
+ * subset and, post-migration, tolerates an absent `sites` by normalizing
+ * it to `{}` — AUDIT-20260603-11), so the migration reads the raw JSON
+ * directly to see the legacy block verbatim. It must read both shapes:
  *
  *   - pre-migration  (`sites` present)  → returns the legacy sites map.
  *   - post-migration (`sites` absent)   → returns an EMPTY map, the
@@ -164,11 +165,13 @@ export function readLegacySites(projectRoot: string): LegacySites {
  * Returns `true` when the file was rewritten (a key was dropped),
  * `false` when there was nothing to drop.
  *
- * Note: the resulting config no longer satisfies `parseConfig` (which
- * still requires `sites` in 39b). That is the expected pre-1.0
- * decisive-cutover state per the spec — 39c relaxes `parseConfig` to
- * the shrunken shape. Until then, post-migration config reads go
- * through `readLegacySites` (this module), not `readConfig`.
+ * Note: `parseConfig` tolerates the resulting `sites`-less config
+ * (AUDIT-20260603-11 — an absent/empty `sites` normalizes to `{}`), so a
+ * migrated project still loads through `readConfig` and every
+ * config-reading command keeps working between 39b and 39c. 39c removes
+ * the `sites` field from the schema entirely; until then the migration's
+ * own `sites` reads go through `readLegacySites` (this module), which
+ * does not depend on the live schema's shape.
  */
 export function dropSitesBlock(projectRoot: string): boolean {
   const path = configPath(projectRoot);

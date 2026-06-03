@@ -116,6 +116,34 @@ describe('sites-to-lanes-migration doctor rule', () => {
     expect(afterDocs.artifactPath).toBe('docs/getting-started/index.md');
   });
 
+  it('assigns each migrated entry to its owning site lane (AUDIT-20260603-12)', async () => {
+    const uBlog = '11111111-1111-4111-8111-111111111111';
+    const uDocs = '22222222-2222-4222-8222-222222222222';
+
+    await mkdir(join(root, 'src', 'content', 'blog', 'hello-post'), { recursive: true });
+    await writeFile(join(root, 'src', 'content', 'blog', 'hello-post', 'index.md'), '# Hello');
+    await mkdir(join(root, 'docs', 'getting-started'), { recursive: true });
+    await writeFile(join(root, 'docs', 'getting-started', 'index.md'), '# Start');
+
+    await writeSidecar(root, entry(uBlog, 'hello-post'));
+    await writeSidecar(root, entry(uDocs, 'getting-started'));
+
+    const config = readConfig(root);
+    await runRepair(
+      { projectRoot: root, config, ruleIds: ['sites-to-lanes-migration'] },
+      yesInteraction,
+    );
+
+    // The migration created lanes `blog` + `docs` (id = site slug). Each
+    // entry must carry the `lane` of the site whose contentDir its
+    // artifact resolved under — NOT be left lane-less (which `entry-lane-
+    // missing` would then flag as an error in the same run).
+    const afterBlog = await readSidecar(root, uBlog);
+    expect(afterBlog.lane).toBe('blog');
+    const afterDocs = await readSidecar(root, uDocs);
+    expect(afterDocs.lane).toBe('docs');
+  });
+
   it('reports the pre-migration shape in audit (sites present)', async () => {
     const config = readConfig(root);
     const report = await runRepair(

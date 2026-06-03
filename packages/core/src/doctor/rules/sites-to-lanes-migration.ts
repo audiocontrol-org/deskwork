@@ -48,6 +48,7 @@ import {
   backfillFromLegacySites,
   detectAmbiguousBackfills,
   type AmbiguousBackfill,
+  type LaneBase,
 } from '../sites-migration-backfill.ts';
 import { readAllSidecars } from '../../sidecar/read-all.ts';
 import type {
@@ -77,22 +78,33 @@ function isLeadSite(ctx: DoctorContext): boolean {
 }
 
 /**
- * Collect the legacy contentDirs (one per legacy site) — the base dirs
- * the backfiller searches. Returns an empty array when there are no
- * legacy sites (post-migration).
+ * Collect the legacy bases (one per legacy site) — each site's contentDir
+ * paired with the lane id it migrates to (the site slug). These are the
+ * bases the backfiller searches; the lane id lets it stamp the migrated
+ * entry's `lane` (AUDIT-20260603-12). Returns an empty array when there
+ * are no legacy sites (post-migration).
  */
-function legacyContentDirs(sites: ReadonlyMap<string, LegacySite>): string[] {
-  return [...sites.values()].map((s) => s.contentDir);
+function legacyLaneBases(sites: ReadonlyMap<string, LegacySite>): LaneBase[] {
+  return [...sites.entries()].map(([slug, s]) => ({
+    laneId: slug,
+    contentDir: s.contentDir,
+  }));
 }
 
-/** Whether any artifact-bearing entry still lacks `artifactPath`. */
+/**
+ * Whether any artifact-bearing entry still lacks `artifactPath`.
+ *
+ * Does NOT swallow read errors (AUDIT-20260603-14). A corrupt sidecar
+ * makes `readAllSidecars` throw; previously this was caught and turned
+ * into `false`, so `audit()` silently under-reported ("nothing missing")
+ * on the exact on-disk state that `apply()` rejects — an audit/apply
+ * asymmetry the project's "no swallowed exceptions" rule names as a bug
+ * factory. The throw now propagates to `audit()`, which converts it into
+ * an `error` finding (so audit and apply agree on corrupt input, and the
+ * run still completes — AUDIT-20260603-13).
+ */
 async function anyEntryMissingArtifactPath(projectRoot: string): Promise<boolean> {
-  let entries;
-  try {
-    entries = await readAllSidecars(projectRoot);
-  } catch {
-    return false;
-  }
+  const entries = await readAllSidecars(projectRoot);
   return entries.some(
     (e) => e.artifactPath === undefined || e.artifactPath === '',
   );
@@ -114,6 +126,56 @@ function laneFromSite(slug: string, site: LegacySite): LaneConfig {
   return lane;
 }
 
+/**
+ * Collect the migration's detection + ambiguity findings. Extracted from
+ * `audit()` so the latter can wrap it in a single try/catch that converts
+ * any read throw into an `error` finding (AUDIT-20260603-13/-14) without
+ * the detection logic itself growing a defensive nest. May throw —
+ * `audit()` is its only caller and handles the throw.
+ */
+async function collectFindings(ctx: DoctorContext): Promise<Finding[]> {
+  const { sites } = readLegacySites(ctx.projectRoot);
+  const sitesPresent = sites.size > 0;
+  const missingArtifactPath = await anyEntryMissingArtifactPath(ctx.projectRoot);
+
+  const findings: Finding[] = [];
+
+  if (sitesPresent || missingArtifactPath) {
+    const slugs = [...sites.keys()];
+    findings.push({
+      ruleId: RULE_ID,
+      site: ctx.site,
+      severity: 'warning',
+      message:
+        `Project uses the legacy "sites" model` +
+        (sitesPresent ? ` (${slugs.length} site(s): ${slugs.join(', ')})` : '') +
+        (missingArtifactPath ? ' and has entries missing artifactPath' : '') +
+        `. --fix migrates each site to a lane (host + scaffoldDefaults), ` +
+        `backfills each unambiguous entry's artifactPath, and drops the ` +
+        `sites block. Slug-collision entries (resolving to >1 file) are ` +
+        `refused and reported as migration-ambiguous.`,
+      details: {
+        siteSlugs: slugs,
+        sitesPresent,
+        missingArtifactPath,
+      },
+    });
+  }
+
+  // Surface ambiguity collisions as their own findings BEFORE any fix
+  // runs (AUDIT-20260602-03). These are report-only — the migration
+  // refuses to stamp them.
+  const bases = legacyLaneBases(sites);
+  if (bases.length > 0) {
+    const ambiguous = await detectAmbiguousBackfills(ctx.projectRoot, bases);
+    for (const amb of ambiguous) {
+      findings.push(ambiguousFinding(ctx.site, amb));
+    }
+  }
+
+  return findings;
+}
+
 const rule: DoctorRule = {
   id: RULE_ID,
   label: 'Migrate legacy sites to lanes (Phase 39 sites→lanes retirement)',
@@ -121,46 +183,33 @@ const rule: DoctorRule = {
   async audit(ctx: DoctorContext): Promise<Finding[]> {
     if (!isLeadSite(ctx)) return [];
 
-    const { sites } = readLegacySites(ctx.projectRoot);
-    const sitesPresent = sites.size > 0;
-    const missingArtifactPath = await anyEntryMissingArtifactPath(ctx.projectRoot);
-
-    const findings: Finding[] = [];
-
-    if (sitesPresent || missingArtifactPath) {
-      const slugs = [...sites.keys()];
-      findings.push({
-        ruleId: RULE_ID,
-        site: ctx.site,
-        severity: 'warning',
-        message:
-          `Project uses the legacy "sites" model` +
-          (sitesPresent ? ` (${slugs.length} site(s): ${slugs.join(', ')})` : '') +
-          (missingArtifactPath ? ' and has entries missing artifactPath' : '') +
-          `. --fix migrates each site to a lane (host + scaffoldDefaults), ` +
-          `backfills each unambiguous entry's artifactPath, and drops the ` +
-          `sites block. Slug-collision entries (resolving to >1 file) are ` +
-          `refused and reported as migration-ambiguous.`,
-        details: {
-          siteSlugs: slugs,
-          sitesPresent,
-          missingArtifactPath,
+    // The migration's reads can throw on a broken-but-present config (a
+    // legacy site missing `contentDir` — `readLegacySites`) or a corrupt
+    // sidecar (`readAllSidecars` via `anyEntryMissingArtifactPath` /
+    // `detectAmbiguousBackfills`). An uncaught throw here aborts the WHOLE
+    // doctor run, denying the operator every other rule's output
+    // (AUDIT-20260603-13). The runner does not guard `rule.audit()`, so
+    // the rule guards itself: any throw becomes an `error`-severity
+    // finding naming the problem, and the run continues. This also keeps
+    // audit and apply consistent on corrupt sidecars (AUDIT-20260603-14):
+    // both surface the corruption loudly rather than audit silently
+    // reporting clean while apply throws.
+    try {
+      return await collectFindings(ctx);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      return [
+        {
+          ruleId: RULE_ID,
+          site: ctx.site,
+          severity: 'error',
+          message:
+            `sites-to-lanes migration could not inspect the project: ${reason}. ` +
+            `Repair the offending config or sidecar and re-run doctor.`,
+          details: { error: reason },
         },
-      });
+      ];
     }
-
-    // Surface ambiguity collisions as their own findings BEFORE any fix
-    // runs (AUDIT-20260602-03). These are report-only — the migration
-    // refuses to stamp them.
-    const baseDirs = legacyContentDirs(sites);
-    if (baseDirs.length > 0) {
-      const ambiguous = await detectAmbiguousBackfills(ctx.projectRoot, baseDirs);
-      for (const amb of ambiguous) {
-        findings.push(ambiguousFinding(ctx.site, amb));
-      }
-    }
-
-    return findings;
   },
 
   async plan(_ctx: DoctorContext, finding: Finding): Promise<RepairPlan> {
@@ -203,7 +252,42 @@ const rule: DoctorRule = {
 
     try {
       const { sites } = readLegacySites(ctx.projectRoot);
-      const baseDirs = legacyContentDirs(sites);
+      const bases = legacyLaneBases(sites);
+
+      // No legacy sites to migrate, but the detection still fired — that
+      // means it fired on `missingArtifactPath` alone (AUDIT-20260603-15).
+      // Every repair action keys off legacy sites: lane creation iterates
+      // `sites`, and the backfiller only searches each legacy
+      // `site.contentDir`. With no bases there is nothing this migration
+      // can stamp, so claiming `applied: true` would advertise a
+      // successful fix for a run that changed nothing and did not converge
+      // (the next audit re-fires the same finding). Report honestly: the
+      // entries need the lane-native back-fill, not the sites→lanes path.
+      if (bases.length === 0) {
+        const stillMissing = await anyEntryMissingArtifactPath(ctx.projectRoot);
+        if (stillMissing) {
+          return {
+            finding: plan.finding,
+            applied: false,
+            message:
+              'sites-to-lanes: no legacy sites to migrate, but entries still ' +
+              'lack artifactPath. This migration only back-fills from legacy ' +
+              'site contentDirs, of which there are none — it cannot stamp ' +
+              'these entries. Back-fill via the lane-native path ' +
+              '(`migrateLaneMembership` / `/deskwork:lane move`) instead.',
+            skipReason: 'prerequisite-missing',
+          };
+        }
+        // No sites AND nothing missing → genuinely nothing to do.
+        return {
+          finding: plan.finding,
+          applied: false,
+          message:
+            'sites-to-lanes: no legacy sites and no entries missing ' +
+            'artifactPath — nothing to migrate.',
+          skipReason: 'no-action-needed',
+        };
+      }
 
       // Step 1 — lanes from sites (idempotent: skip an existing lane file).
       const lanesCreated: string[] = [];
@@ -242,7 +326,7 @@ const rule: DoctorRule = {
       }
 
       // Step 2 — backfill unambiguous entry artifactPaths (ambiguity-halt).
-      const backfill = await backfillFromLegacySites(ctx.projectRoot, baseDirs);
+      const backfill = await backfillFromLegacySites(ctx.projectRoot, bases);
 
       // Step 3 — drop the sites block from the config.
       const dropped = dropSitesBlock(ctx.projectRoot);

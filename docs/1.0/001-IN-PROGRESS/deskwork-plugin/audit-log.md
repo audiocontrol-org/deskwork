@@ -547,3 +547,68 @@ Neither is a correctness bug *today* (no caller is flipped yet), but both are tr
 ---
 
 I walked the actual code in the diff (the new `resolve-artifact.ts` helper, the `lanes/types.ts` schema additions, both test files) and verified the load-bearing claims against the repo: `Entry.artifactPath` is `.min(1).optional()` with `..`/absolute refinements (entry.ts:260-277); the existing resolver uses a truthy guard while the repair gate explicitly checks `!== ''` (validate.ts:215/:385); the `Drafting` heuristic resolves to `docs/<slug>/index.md`, so the test's negative assertion is sound. I did **not** re-report the `scaffoldDefaults` `z.record(enum, …)` partial-by-construction/unknown-key behavior — sibling AUDIT-20260603-07 already verified it at runtime and type level against Zod 3.25.76, and I confirmed the schema move (`ArtifactKindSchema` relocated above `LaneConfigSchema`) is internally consistent. My three findings cluster on one root: the new resolver's empty-string handling diverges from the codebase's established convention, and that divergence is set to bite when 39d swaps callers onto a now-public helper whose contract is documented to change.
+
+## 2026-06-03 — audit-barrage lift (20260603T021048829Z-deskwork-plugin)
+
+### AUDIT-20260603-11 — AUDIT-BARRAGE-claude-01 — 39b's migration drops `sites` from config, but the loader still *requires* `sites`; a release cut between 39b and 39c bricks every config-reading command on a migrated project
+
+Finding-ID: AUDIT-20260603-11
+Status:     fixed-2026-06-03 (39.1: parseConfig tolerates absent/empty sites + regression-lock)
+Severity:   high
+Surface:    `packages/core/src/doctor/legacy-config.ts:160-194` (`dropSitesBlock`) + `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:~230` (step 3) + workplan 39c (`[ ]`, unshipped)
+
+`dropSitesBlock` rewrites `.deskwork/config.json` with `sites` and `defaultSite` removed (legacy-config.ts:180-191), and the migration rule invokes it as the terminal `apply` step. The module's own docblock admits the consequence: *"the resulting config no longer satisfies `parseConfig` (which still requires `sites` in 39b)"* (legacy-config.ts:155-159). `runner.ts:selectSites` reads `Object.keys(opts.config.sites)` and the whole doctor run is built on `readConfig` succeeding — as are `install`, `studio`, `ingest`, and every other command. So once `doctor --fix` runs this migration, the *next* `readConfig` on the project throws a Zod error, and **no deskwork command can run** until 39c relaxes the loader.
+
+This is the concrete code manifestation of the spec-level concern that was parked as `acknowledged-slush-pile` (AUDIT-20260603-02). It was a hypothetical against the spec when slushed; it is now executable code that performs a destructive, non-recoverable-by-deskwork mutation. The workplan marks 39b `[x]` and 39c `[ ]` — if a release is cut at this boundary (the project ships frequently, and 39a+39b are both landed), an adopter who runs `doctor --fix` permanently bricks their config relative to the shipped loader. The mitigation is a hard release-sequencing constraint that nothing in the code or workplan enforces: **39b must not reach a release tag without 39c**. Either gate the release (the migration must not be reachable in a build whose `parseConfig` still requires `sites`), or have 39b's `dropSitesBlock` leave the config loader-parseable (e.g. relax `parseConfig` to tolerate absent `sites` as part of 39b rather than 39c). Surfacing it here because the slushed entry carries no recorded substantive reason and the underlying shape is now live code, not spec text.
+
+---
+
+### AUDIT-20260603-12 — AUDIT-BARRAGE-claude-02 — migration creates per-site lanes and backfills `artifactPath` but never assigns `entry.lane`; the only existing back-fill collapses entries onto a `default` lane the migration didn't create, so post-migration entries are orphaned
+
+Finding-ID: AUDIT-20260603-12
+Status:     fixed-2026-06-03 (39.2: migration stamps entry.lane via LaneBase threading)
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:apply()` (lanes-from-sites + backfill, no `entry.lane` write) vs. `packages/core/src/doctor/rules/entry-lane-missing.ts:83-106` + `runner.ts:56-58` (rule ordering)
+
+The migration creates one lane per legacy site (`laneFromSite`, id = slug) and stamps each entry's `artifactPath`, but it never sets the entry's `lane` field. `entry-lane-missing` runs immediately after `sites-to-lanes-migration` in the registry (runner.ts:56 then :58) and emits an `error`-severity finding for **every** sidecar lacking `lane` (entry-lane-missing.ts:83-84). So a `--fix=all` run reports "migrated N sites to lanes" and, in the same breath, "all N entries are missing their lane field" — the migration's logical purpose (rehome each site's entries onto that site's lane) is left half-done.
+
+Worse, the documented repair for `entry-lane-missing` is `migrateLaneMembership`, which the rule's own docblock says *"writes `lane: "default"` on every sidecar"* (entry-lane-missing.ts:22-26) — collapsing every entry onto a single `default` lane that the sites→lanes migration never created (it created `blog`/`docs`). An operator who follows the surfaced repair lands entries on a lane with no config file, which then trips `lane-config-missing-template` or the lane resolver. The migration has the information to do this correctly (it knows each entry's source contentDir → owning site → lane id) but doesn't use it. Either assign `entry.lane = <owning-site-slug>` during the backfill step (the entry's resolved candidate already came from exactly one site's contentDir in the unambiguous case), or explicitly record in the workplan/spec that entry-lane assignment is out of 39b scope and name which later task owns it — right now it is silently neither.
+
+---
+
+### AUDIT-20260603-13 — AUDIT-BARRAGE-claude-03 — `readLegacySites` throws from `audit()` on a broken or `contentDir`-less site, and the runner doesn't guard `rule.audit()`, so one malformed site aborts the *entire* doctor run
+
+Finding-ID: AUDIT-20260603-13
+Status:     fixed-2026-06-03 (39.3: migration audit() self-guards malformed site)
+Severity:   medium
+Surface:    `packages/core/src/doctor/legacy-config.ts:106-153` (`readLegacySites` throw paths) + `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:audit()` + `packages/core/src/doctor/runner.ts:198,227`
+
+`readLegacySites` throws on a present-but-broken config: invalid JSON (legacy-config.ts:125-130), non-object root (:133-137), a site whose value isn't an object (:144-148), or a site missing a non-empty `contentDir` (:150-156). The migration rule calls `readLegacySites` directly inside `audit()` with no guard. The runner calls `rule.audit(ctx)` bare — `runAudit` at runner.ts:198 and `runRepair` at runner.ts:227 — with no per-rule try/catch. So a single malformed legacy site (e.g. a `sites.blog` block someone hand-edited to drop `contentDir`) makes `readLegacySites` throw, which propagates out of `audit()` and **aborts the whole `doctor --check` / `doctor --fix` run**, including every unrelated rule (`orphan-frontmatter-id`, `duplicate-id`, `slug-collision`, …).
+
+Contrast `entry-lane-missing.ts:72-80`, which deliberately wraps its read in try/catch precisely so a read failure degrades to an empty finding list rather than killing the run. "Surface broken config loudly" is a reasonable goal, but the right surface is an `error`-severity *finding* (which doctor renders and exits non-zero on), not an uncaught exception that denies the operator every other rule's output. Catch the throw inside `audit()` and convert it to a finding (`severity: 'error'`, message naming the bad site + the parse reason), so the rest of doctor still runs.
+
+---
+
+### AUDIT-20260603-14 — AUDIT-BARRAGE-claude-04 — `anyEntryMissingArtifactPath` swallows all read errors with a bare `catch { return false }`, so audit silently under-reports on a corrupt sidecar while `apply` throws on the same input
+
+Finding-ID: AUDIT-20260603-14
+Status:     fixed-2026-06-03 (39.4: removed swallow; corrupt-sidecar throw propagates like apply)
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/sites-to-lanes-migration.ts` (`anyEntryMissingArtifactPath`, the `catch { return false }`) vs. `packages/core/src/doctor/sites-migration-backfill.ts:planBackfills` (`readAllSidecars`, unguarded)
+
+`anyEntryMissingArtifactPath` wraps `readAllSidecars` in `try { … } catch { return false; }` with no ENOENT discrimination and no explanatory comment. `readAllSidecars` (unlike the `readAllSidecarsPartitioned` reader `entry-lane-missing` uses) throws on any malformed sidecar. So if one sidecar is corrupt, `audit()` silently concludes "no entries are missing `artifactPath`" and suppresses the detection finding — the project's "no fallbacks / no swallowed exceptions" rule names exactly this shape as a bug factory, and the sibling `readLegacySites` in the very same migration deliberately throws on broken input (legacy-config.ts:125), so the two readers in one feature disagree on how to treat corruption.
+
+The disagreement is worse across phases of the same migration: `apply()` calls `backfillFromLegacySites` → `planBackfills` → `readAllSidecars` (sites-migration-backfill.ts) with **no** guard, so the same corrupt sidecar that `audit()` swallowed will make `apply()` throw (caught by the outer `try/catch` → `applied: false, 'migration failed'`). Audit says "nothing to migrate," apply says "migration failed" — on identical on-disk state. Make the read consistent: either both use the partitioned reader and report malformed sidecars as findings, or both throw; do not have audit swallow what apply rejects.
+
+---
+
+### AUDIT-20260603-15 — AUDIT-BARRAGE-claude-05 — detection trigger `missingArtifactPath` is decoupled from the backfiller's capability: with no legacy sites there are no base dirs to search, so `apply` returns `applied: true` having stamped nothing
+
+Finding-ID: AUDIT-20260603-15
+Status:     fixed-2026-06-03 (39.5: apply reports applied:false/skipReason on no-op)
+Severity:   low
+Surface:    `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:audit()` (`sitesPresent || missingArtifactPath`) + `apply()` (backfill with empty `baseDirs`)
+
+The detection finding fires on `sitesPresent || missingArtifactPath`, but every repair action keys off legacy sites: lane creation iterates `sites`, and the backfiller's `enumerateCandidates` (sites-migration-backfill.ts) only searches each legacy `site.contentDir`. When the rule fires because `missingArtifactPath` is true but `sites` is empty, `baseDirs` is `[]`, so `enumerateCandidates` returns `[]` for every entry, nothing is stamped, and `apply` still returns `applied: true` ("0 lane(s) created, 0 backfilled, sites … absent"). The entries remain unstamped, so a subsequent audit re-fires the same finding — `applied: true` is reported for a run that changed nothing and did not converge.
+
+Through the normal runner this exact state is partly masked because `selectSites` returns `[]` for an empty `config.sites` and the rule is then never invoked (runner.ts:143, :195/:224) — but it is directly reachable in the migration's own test harness and in any partial-migration state, and the `apply` return value claiming success while doing nothing is misleading regardless of reachability. Tighten the apply contract: when `baseDirs` is empty but entries still lack `artifactPath`, return a non-success result (or a `report-only` directing the operator to the lane-native back-fill) rather than `applied: true`, so "applied" never means "I detected a problem I had no means to fix."

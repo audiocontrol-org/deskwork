@@ -82,26 +82,46 @@ function contentDirAbs(projectRoot: string, contentDir: string): string {
 }
 
 /**
+ * One legacy content base the backfiller searches, paired with the lane
+ * id the migration assigns to entries resolving under it. `laneId` is the
+ * legacy site slug (= the lane id `laneFromSite` creates). Threading the
+ * lane id through the search lets the backfiller stamp BOTH `artifactPath`
+ * AND `lane` on an unambiguously-resolved entry (AUDIT-20260603-12), so a
+ * migrated entry is not left lane-less for `entry-lane-missing` to flag.
+ */
+export interface LaneBase {
+  readonly laneId: string;
+  readonly contentDir: string;
+}
+
+/** One on-disk candidate: its project-relative path + owning lane id. */
+interface Candidate {
+  readonly path: string;
+  readonly laneId: string;
+}
+
+/**
  * Enumerate EVERY on-disk candidate for an entry's slug+stage across all
- * legacy content base dirs. Returns project-relative paths (the form
- * stored on the sidecar), de-duplicated and in stable order.
+ * legacy content bases. Returns project-relative paths (the form stored on
+ * the sidecar) paired with the owning lane id, de-duplicated by path and
+ * in stable order.
  */
 async function enumerateCandidates(
   projectRoot: string,
-  baseDirs: readonly string[],
+  bases: readonly LaneBase[],
   entry: Entry,
-): Promise<string[]> {
+): Promise<Candidate[]> {
   const leaf = stageRelativeLeaf(entry.slug, entry.currentStage);
   if (leaf === null) return [];
   const seen = new Set<string>();
-  const out: string[] = [];
-  for (const base of baseDirs) {
-    const abs = join(contentDirAbs(projectRoot, base), leaf);
+  const out: Candidate[] = [];
+  for (const base of bases) {
+    const abs = join(contentDirAbs(projectRoot, base.contentDir), leaf);
     if (!(await fileExists(abs))) continue;
     const rel = relative(projectRoot, abs);
     if (seen.has(rel)) continue;
     seen.add(rel);
-    out.push(rel);
+    out.push({ path: rel, laneId: base.laneId });
   }
   return out;
 }
@@ -125,22 +145,26 @@ export interface BackfillResult {
 }
 
 /**
- * Backfill `artifactPath` on every entry that lacks it, enumerating
- * candidates across all `baseDirs` (the legacy site contentDirs). Exactly
- * one candidate → stamp. More than one → refuse + record on `ambiguous`.
- * Zero candidates → skip silently (nothing to stamp from; not an error
- * here — a separate doctor rule owns missing-artifact reporting).
+ * Backfill `artifactPath` (and the owning `lane`) on every entry that
+ * lacks `artifactPath`, enumerating candidates across all `bases` (each
+ * legacy site's contentDir paired with the lane id it migrates to).
+ * Exactly one candidate → stamp `artifactPath` + `lane`. More than one →
+ * refuse + record on `ambiguous`. Zero candidates → skip silently (nothing
+ * to stamp from; a separate doctor rule owns missing-artifact reporting).
  *
  * Idempotent: entries that already carry a non-empty `artifactPath` are
  * skipped, so a second run stamps nothing and reports no ambiguity.
  *
  * @param projectRoot absolute project root
- * @param baseDirs    every legacy `site.contentDir` (relative or absolute)
+ * @param bases       every legacy site as `{ laneId, contentDir }`
  */
-/** A single entry the plan would stamp: exactly one candidate resolved. */
+/** A single entry the plan would stamp: exactly one candidate resolved.
+ *  `laneId` is the owning legacy site's slug — stamped onto `entry.lane`
+ *  alongside `artifactPath` (AUDIT-20260603-12). */
 interface PlannedStamp {
   readonly entry: Entry;
   readonly path: string;
+  readonly laneId: string;
 }
 
 /** The shared backfill plan — what would be stamped + what is ambiguous.
@@ -149,39 +173,45 @@ interface PlannedStamp {
  *  (audit) derive from this, so audit and apply agree by construction. */
 async function planBackfills(
   projectRoot: string,
-  baseDirs: readonly string[],
+  bases: readonly LaneBase[],
 ): Promise<{ toStamp: PlannedStamp[]; ambiguous: AmbiguousBackfill[] }> {
   const entries = await readAllSidecars(projectRoot);
   const toStamp: PlannedStamp[] = [];
   const ambiguous: AmbiguousBackfill[] = [];
   for (const entry of entries) {
     if (entry.artifactPath !== undefined && entry.artifactPath !== '') continue;
-    const candidates = await enumerateCandidates(projectRoot, baseDirs, entry);
+    const candidates = await enumerateCandidates(projectRoot, bases, entry);
     if (candidates.length === 0) continue;
     if (candidates.length > 1) {
       ambiguous.push({
         entryUuid: entry.uuid,
         slug: entry.slug,
         stage: entry.currentStage,
-        candidates,
+        candidates: candidates.map((c) => c.path),
       });
       continue;
     }
-    toStamp.push({ entry, path: candidates[0] });
+    toStamp.push({ entry, path: candidates[0].path, laneId: candidates[0].laneId });
   }
   return { toStamp, ambiguous };
 }
 
 export async function backfillFromLegacySites(
   projectRoot: string,
-  baseDirs: readonly string[],
+  bases: readonly LaneBase[],
 ): Promise<BackfillResult> {
-  const { toStamp, ambiguous } = await planBackfills(projectRoot, baseDirs);
+  const { toStamp, ambiguous } = await planBackfills(projectRoot, bases);
   const stamped: string[] = [];
-  for (const { entry, path } of toStamp) {
+  for (const { entry, path, laneId } of toStamp) {
     const updated: Entry = {
       ...entry,
       artifactPath: path,
+      // Assign the entry to the lane the migration created for its owning
+      // site (AUDIT-20260603-12). Without this, the migrated entry stays
+      // lane-less and `entry-lane-missing` flags it as an error in the
+      // very same `--fix=all` run. Only set when the entry has no lane;
+      // an entry already on a lane keeps its membership.
+      ...(entry.lane === undefined ? { lane: laneId } : {}),
       updatedAt: new Date().toISOString(),
     };
     await writeSidecar(projectRoot, updated);
@@ -199,7 +229,7 @@ export async function backfillFromLegacySites(
  */
 export async function detectAmbiguousBackfills(
   projectRoot: string,
-  baseDirs: readonly string[],
+  bases: readonly LaneBase[],
 ): Promise<AmbiguousBackfill[]> {
   // The sidecars dir may not exist yet; treat absence as "no entries".
   try {
@@ -207,6 +237,6 @@ export async function detectAmbiguousBackfills(
   } catch {
     return [];
   }
-  const { ambiguous } = await planBackfills(projectRoot, baseDirs);
+  const { ambiguous } = await planBackfills(projectRoot, bases);
   return ambiguous;
 }

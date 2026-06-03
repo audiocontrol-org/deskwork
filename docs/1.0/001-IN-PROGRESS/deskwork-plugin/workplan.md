@@ -1946,3 +1946,91 @@ Tasks (TDD-shaped; map to spec § Scope a–e):
 - [ ] **39e — Adopter migration walkthrough + docs.** MIGRATING.md entry; verify the `doctor --fix` cutover end-to-end against a real multi-site fixture; update DESKWORK-STATE-MACHINE.md / THESIS.md / CLAUDE.md where they reference `sites`.
 
 **Verification gate:** a real `doctor --fix` migration walk against a multi-site fixture (one lane per site×pipeline, host preserved, every entry's `artifactPath` stamped, `sites` block gone), green workspace tests, and a fresh `/deskwork:install` writing the lane shape.
+
+
+### Task 39.1 (fix-finding-AUDIT-20260603-11): AUDIT-20260603-11 — AUDIT-BARRAGE-claude-01 — 39b's migration drops `sites` from…
+
+Closes AUDIT-20260603-11. Surface: `packages/core/src/doctor/legacy-config.ts:160-194` (`dropSitesBlock`) + `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:~230` (step 3) + workplan 39c (`[ ]`, unshipped). Severity: high.
+
+- [x] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
+- [x] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
+- [x] Step 5: commit with `Closes AUDIT-20260603-11` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.2 (fix-finding-AUDIT-20260603-12): AUDIT-20260603-12 — AUDIT-BARRAGE-claude-02 — migration creates per-site lanes a…
+
+Closes AUDIT-20260603-12. Surface: `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:apply()` (lanes-from-sites + backfill, no `entry.lane` write) vs. `packages/core/src/doctor/rules/entry-lane-missing.ts:83-106` + `runner.ts:56-58` (rule ordering). Severity: medium.
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-12` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.3 (fix-finding-AUDIT-20260603-13): AUDIT-20260603-13 — AUDIT-BARRAGE-claude-03 — `readLegacySites` throws from `aud…
+
+Closes AUDIT-20260603-13. Surface: `packages/core/src/doctor/legacy-config.ts:106-153` (`readLegacySites` throw paths) + `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:audit()` + `packages/core/src/doctor/runner.ts:198,227`. Severity: medium.
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-13` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.4 (fix-finding-AUDIT-20260603-14): AUDIT-20260603-14 — AUDIT-BARRAGE-claude-04 — `anyEntryMissingArtifactPath` swal…
+
+Closes AUDIT-20260603-14. Surface: `packages/core/src/doctor/rules/sites-to-lanes-migration.ts` (`anyEntryMissingArtifactPath`, the `catch { return false }`) vs. `packages/core/src/doctor/sites-migration-backfill.ts:planBackfills` (`readAllSidecars`, unguarded). Severity: medium.
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-14` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.5 (fix-finding-AUDIT-20260603-15): AUDIT-20260603-15 — AUDIT-BARRAGE-claude-05 — detection trigger `missingArtifact…
+
+Closes AUDIT-20260603-15. Surface: `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:audit()` (`sitesPresent || missingArtifactPath`) + `apply()` (backfill with empty `baseDirs`). Severity: low.
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-15` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
