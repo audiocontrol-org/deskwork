@@ -3433,3 +3433,27 @@ Surface:    `DEVELOPMENT-NOTES.md:4074-4075`, `docs/1.0/001-IN-PROGRESS/scope-di
 The diff adds process notes that push unresolved work out of the current unit: the Phase 11 dogfood observation is recorded as a forward pointer, the PRD iteration-counter drift is called out as a separate sweep, and Phase 25 sub-issue splitting is postponed to the implementation session. The audit prompt’s hard constraint says to surface deferral wording in the diff because this project treats that shape as a recurring bug source.
 
 This is low severity because these are planning and hygiene notes, not shipped code. Still, the wording creates an easy escape hatch for work that should either be scoped into the current workplan with a clear owner/acceptance shape or explicitly dispositioned as out of scope with rationale.
+
+## 2026-06-03 — audit-barrage lift (20260603T185249284Z-scope-discovery)
+
+### AUDIT-20260603-37 — Phase 26's "refuse partial-complete phases" contract contradicts the very archive operation it productizes
+
+Finding-ID: AUDIT-20260603-37 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-allow-vestigial-flag-added-2026-06-03
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 26 Task 2 Step 6 + Phase 26 acceptance ("refuses partial-complete phases"); `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` Phase 26 extension ("refuse archiving phases with ANY unchecked task"); `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan-archive.md` header + Phases 13/17/22/23
+
+Phase 26 Task 2 Step 6 and the Phase 26 acceptance criteria both state the `archive-phases` verb "Refuses archiving a phase with ANY unchecked task." The PRD extension repeats it: *"The verbs refuse archiving phases with ANY unchecked task."* But the manual operation this verb is meant to productize archived **incomplete** phases. In `workplan-archive.md`, Phase 17 has every Task 1–8 step `[ ]`; Phase 22 carries unchecked Steps (Task 1 Step 5, Task 2 Step 2/5, Task 3 Step 2/6); Phase 23 has unchecked Task 1 Step 6 + acceptance criteria; Phase 13 Task 1's acceptance block is entirely `[ ]`. The archive-file header explicitly sanctions this: sections move *"once their tasks were complete (**or once they became vestigial** per a later phase's retirement decision)."* So the header and the verb contract directly disagree: vestigial-but-incomplete phases (17/22/23, retired by Phase 24) have unchecked tasks by construction, yet they were archived.
+
+The concrete failure: Phase 26 Task 6 ("Live dogfood verification") runs `archive-phases --apply` against *this feature's own workplan* and round-trips a live phase. Against a vestigial phase that still carries `[ ]` steps, the verb as specified will refuse — the dogfood cannot reproduce the manual operation. Fix: either add an explicit `--vestigial`/`--allow-unchecked` escape with a documented reason (mirroring how the manual op was justified), or reconcile the header so it stops claiming vestigial-incomplete archiving is supported. The contradiction should be resolved before Task 2 is implemented, since the acceptance criterion as written would make the dogfood fail against the workplan it ships with.
+
+### AUDIT-20260603-38 — DEVELOPMENT-NOTES finding-count arithmetic is internally inconsistent (10 vs 12 listed vs 15 in the cited range)
+
+Finding-ID: AUDIT-20260603-38
+Status:     acknowledged-journal-counts-reconciled-2026-06-03
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 2) entry — "Accomplished" ("AUDIT-finding triage (10 findings). Reviewed AUDIT-20260603-22..36") and "Quantitative" ("Audit findings dispositioned at source: 10 (AUDIT-20260603-24/26/27/28/29/30/31/32/33/34/35/36 — addressed; AUDIT-22/23 partially; AUDIT-25 filed as deskwork issue)")
+
+The same journal entry reports three different finding counts for the same work. The Accomplished bullet says "10 findings" while citing the range `22..36` (which is 15 IDs: 22–36). The Quantitative line says "10" but then enumerates **12** addressed IDs (24, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36) *plus* 22/23 partial *plus* 25. None of "10 / 12 / 15" reconcile. This is exactly the failure mode the project's own `CLAUDE.md` AUDIT-04 convention names: *"re-derive the numbers … verify the arithmetic … skip the line entirely if the arithmetic isn't reconciled — false precision erodes trust more than absence."* The same entry also calls the 16 archived phases "16 **completed** phases" while 17/22/23 are vestigial-not-completed (the README archive note states the more careful "completed work … or vestigial" framing).
+
+Low severity because it is journal bookkeeping, not code — but the entry is the permanent record a future reader will trust for "what got dispositioned this session," and the headline count understates the actual addressed set by two. Fix: re-derive from the audit-log entries actually committed and state one reconciled number, or drop the count and list the IDs only.

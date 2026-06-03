@@ -54,6 +54,40 @@ note: archived 2026-06-03 via scripts/archive-phases-onetime.ts; Phase 26 produc
 - [x] `migrate-from-pilot` (audiocontrol-specific in NAME ONLY — works for any project mirroring the canonical pilot layout) — landed for [#291](https://github.com/audiocontrol-org/deskwork/issues/291). Verb reads the pilot's `tools/scope-discovery/` + `docs/scope-discovery/`; copies CONFIG verbatim into `.dw-lifecycle/scope-discovery/`; diffs CODE per-file against the plugin defaults and categorizes each as identical / pilot-ahead (contribute-back) / pilot-behind (sync from plugin) / diverges (customize-override). Default dry-run; `--apply` materializes CONFIG copies; `--force` overwrites divergent targets; `--report-out <path>` writes markdown report to disk. 38 vitest scenarios.
 - [x] `uninstall-scope-discovery-hooks` — landed Phase 8 Task 5 (commit `b71fb8b`). Drift-checks each managed file via sha256; refuses on drift unless `--force-uninstall`; strips managed block from merged installs. 20 vitest scenarios.
 
+
+### Task 6 (fix-finding-AUDIT-20260603-37) (non-bug): AUDIT-20260603-37 — Phase 26's "refuse partial-complete phases" contract contrad…
+
+Acknowledges AUDIT-20260603-37 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 26 Task 2 Step 6 + Phase 26 acceptance ("refuses partial-complete phases"); `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` Phase 26 extension ("refuse archiving phases with ANY unchecked task"); `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan-archive.md` header + Phases 13/17/22/23.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [x] Step 1 (disposition): the `archive-phases` verb spec gains an explicit `--allow-vestigial <reason>` escape (≥40-char substantive-reason requirement, mirroring `check-fix-task-tdd`'s substantive-reason validator) for retired-vestigial phases. Default behavior preserves the partial-complete-refusal (catches accidental over-archive); the flag mechanizes the case the manual 2026-06-03 archive operation needed for Phases 17/22/23 — phases retired under Phase 24's no-git-hook-enforcement decision whose unchecked steps are not actionable. The ledger records the reason next to the phase entry so future readers see WHY an incomplete phase was archived. The workplan-archive.md header's "completed work OR vestigial per a later phase's retirement decision" framing is preserved verbatim; the verb's contract is now consistent with that framing.
+- [x] Step 2: applied — Phase 26 Task 2 (Steps 1-2, Step 5, Step 6, acceptance) + Phase 26 Task 6 (dogfood Steps 1-4 + acceptance) + Phase 26 acceptance-criteria block in workplan.md + Phase 26 extension paragraph + Phase 26 acceptance-criteria bullet in prd.md all updated.
+- [x] Step 3: committing with `Acknowledges AUDIT-20260603-37` in subject (doc-only spec change; the verb itself isn't written yet — Phase 26 Task 2 work).
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch.
+- [x] Audit-log Status flipped to `acknowledged-allow-vestigial-flag-added-2026-06-03`.
+
+
+### Task 7 (fix-finding-AUDIT-20260603-38) (non-bug): AUDIT-20260603-38 — DEVELOPMENT-NOTES finding-count arithmetic is internally inc…
+
+Closes AUDIT-20260603-38. Surface: `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 2) entry — "Accomplished" ("AUDIT-finding triage (10 findings). Reviewed AUDIT-20260603-22..36") and "Quantitative" ("Audit findings dispositioned at source: 10 (AUDIT-20260603-24/26/27/28/29/30/31/32/33/34/35/36 — addressed; AUDIT-22/23 partially; AUDIT-25 filed as deskwork issue)").
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [x] Step 1 (disposition): re-derive finding counts from the audit-log entries actually committed in this session and state one reconciled number. The journal's three contradictory counts ("10 findings" / 12 IDs listed / 15 IDs in cited range) all referred to the same range AUDIT-20260603-22..36. Correct decomposition: 12 fully addressed at source (24, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36) + 2 partial (22, 23) + 1 filed as deskwork issue (25) = 15 total. Also reframed "16 completed phases" → "16 phases (13 completed + 3 vestigial-not-completed)" since Phases 17/22/23 are vestigial under Phase 24's retirement, not completed.
+- [x] Step 2: applied — both the "Accomplished" AUDIT-finding-triage bullet and the "Quantitative" finding-counts line in DEVELOPMENT-NOTES.md updated; the manual-workplan-archive bullet also reframed to distinguish completed-vs-vestigial; the CLI-tooling-discoverability bullet's "all 10 closures" updated to "all 12 fully-addressed closures".
+- [x] Step 3: committing with `Acknowledges AUDIT-20260603-38` in subject (doc-only correction to journal entry).
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (3 DEVELOPMENT-NOTES.md edits + this workplan annotation).
+- [x] Audit-log Status flipped to `acknowledged-journal-counts-reconciled-2026-06-03`.
+
 ### Task 5: Validator + export commands
 
 - [x] `validate-scope-discovery` — runs all adversarial harnesses. Spawns `npx vitest run scope-discovery` from the dw-lifecycle workspace root; forwards stdout/stderr/exit-code verbatim. `--quiet` switches to the dot reporter. Exit codes mirror vitest (0 all-passed, 1 failure, 2 invalid args). 3 vitest scenarios cover the flag-parse contract; the spawn path is exercised in practice by every existing `npm test -- scope-discovery` run.
@@ -767,10 +801,12 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 
 ### Task 1 — Architectural decision record + rule
 
-- Step 1: Write the ADR at `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` capturing principle, retirement list, relocation map, new contract, breaking-change implications.
-- Step 2: Write the rule at `.claude/rules/enforcement-lives-in-skills.md` capturing the *what to do next session* form: how-to-apply, anti-patterns to refuse, pre-implementation gate.
-- Step 3: Cross-link from `.claude/rules/agent-discipline.md` and `CLAUDE.md`; evaluate cross-link from `THESIS.md` (does this rise to a Consequence?).
-- Step 4: Commit the artifact + rule together.
+**Complete — shipped in `465ccac9`.**
+
+- [x] Step 1: Write the ADR at `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` capturing principle, retirement list, relocation map, new contract, breaking-change implications.
+- [x] Step 2: Write the rule at `.claude/rules/enforcement-lives-in-skills.md` capturing the *what to do next session* form: how-to-apply, anti-patterns to refuse, pre-implementation gate.
+- [x] Step 3: Cross-link from `.claude/rules/agent-discipline.md` and `CLAUDE.md`; THESIS.md cross-link evaluated and declined (principle is enforcement-wiring layer, derived from the existing public-channel rule which itself isn't a THESIS Consequence).
+- [x] Step 4: Commit the artifact + rule together. *(465ccac9 — bundles ADR + rule + agent-discipline cross-link + CLAUDE.md cross-link in one commit)*
 
 **Acceptance:** Both files committed and cross-referenced. The principle reads as a generalization of the public-channel rule, not as ad-hoc per-gate policy.
 
@@ -1058,15 +1094,15 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 
 ### Task 2 — `dw-lifecycle archive-phases` CLI verb
 
-- Step 1: Write failing tests: invoking against a fixture workplan with Phase X-Y all-checked moves those sections to a sibling archive file.
-- Step 2: Implement `plugins/dw-lifecycle/src/subcommands/archive-phases.ts`. Flags: `--feature <slug>` (required), `--phases <range>`, `--fix-tasks <range>`, `--dry-run` (default), `--apply`.
+- Step 1: Write failing tests: (a) invoking against a fixture workplan with Phase X-Y all-checked moves those sections to a sibling archive file; (b) invoking against an incomplete phase WITHOUT `--allow-vestigial` refuses and surfaces the offending unchecked tasks; (c) invoking against an incomplete phase WITH `--allow-vestigial "reason ≥40 chars"` archives the phase and records the reason in the ledger entry.
+- Step 2: Implement `plugins/dw-lifecycle/src/subcommands/archive-phases.ts`. Flags: `--feature <slug>` (required), `--phases <range>`, `--fix-tasks <range>`, `--dry-run` (default), `--apply`, `--allow-vestigial <reason>` (escape hatch with substantive-reason requirement).
 - Step 3: Section identification: walk workplan by `## Phase N:` headers; collect line ranges per phase.
 - Step 4: Move semantics: cut from workplan.md, append to archive file (create with frontmatter if missing), preserve content verbatim.
-- Step 5: Ledger update: merge new archived phases + fix-task IDs into existing ledger; recompute `next-fix-task-id` as max(union) + 1.
-- Step 6: Refuse archiving a phase with ANY unchecked task. Surface the offending tasks and exit non-zero.
+- Step 5: Ledger update: merge new archived phases + fix-task IDs into existing ledger; recompute `next-fix-task-id` as max(union) + 1. When `--allow-vestigial <reason>` is supplied, record the reason next to the phase entry in the ledger (e.g., `archived-phases-vestigial: 17 (Phase 24 retired the hook-coverage gate), 22 (Phase 24 retired marker boot-case guard)`) so future readers see WHY an incomplete phase was archived.
+- Step 6: Refuse archiving a phase with ANY unchecked task UNLESS `--allow-vestigial <reason>` is passed AND the reason is ≥40 chars of substantive prose (mirroring the `check-fix-task-tdd` substantive-reason validator). Without the flag, surface the offending tasks and exit non-zero. With the flag, archive the phase and surface the operator's reason in the report.
 - Step 7: Confirm tests pass.
 
-**Acceptance:** Dry-run prints planned moves without writing. `--apply` does the moves + ledger update atomically. Refuses partial-complete phases.
+**Acceptance:** Dry-run prints planned moves without writing. `--apply` does the moves + ledger update atomically. Refuses partial-complete phases by default; `--allow-vestigial <reason>` is the explicit escape for retired-or-vestigial phases (the case the manual 2026-06-03 archive operation needed for Phases 17/22/23 — vestigial under Phase 24's retirement decision). Per AUDIT-20260603-37: this preserves the partial-complete-as-default-refusal that catches accidental over-archive, while mechanizing the vestigial-allowed path the workplan-archive header already sanctions ("once their tasks were complete OR once they became vestigial per a later phase's retirement decision").
 
 ### Task 3 — `dw-lifecycle unarchive-phases` sibling verb
 
@@ -1100,15 +1136,16 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 ### Task 6 — Live dogfood verification
 
 - Step 1: Run `dw-lifecycle archive-phases --feature scope-discovery --phases <any future complete phase> --apply` after Phase 24 ships and its tasks are marked complete. Verify the auto-positioner picks up the ledger update on the next promote-findings run.
-- Step 2: Roundtrip test on a live phase: archive, unarchive, archive again. Confirm no content drift.
-- Step 3: Journal entry recording the dogfood result.
+- Step 2: Run `dw-lifecycle archive-phases --feature scope-discovery --phases <vestigial-retired phase> --allow-vestigial "<≥40-char substantive reason>" --apply` to exercise the vestigial-allowed escape against a real retired phase (e.g., one of Phases 17/22/23 if it hasn't already been manually archived; otherwise a future-retired phase). Verify the ledger records the reason alongside the phase entry.
+- Step 3: Roundtrip test on a live phase: archive, unarchive, archive again. Confirm no content drift. Roundtrip the vestigial-allowed case too: archive with `--allow-vestigial`, unarchive, archive again with the same reason — confirm ledger reason is preserved.
+- Step 4: Journal entry recording the dogfood result, including both the all-checked path and the vestigial-allowed path.
 
-**Acceptance:** Verb works against this feature's live workplan. Round-trip preserves content.
+**Acceptance:** Verb works against this feature's live workplan for both all-checked and vestigial-allowed phases. Round-trip preserves content for both paths.
 
 **Acceptance Criteria (Phase 26):**
 
 - [ ] Ledger format spec + parser + serializer + round-trip tests.
-- [ ] `dw-lifecycle archive-phases` CLI verb shipped; refuses partial-complete phases.
+- [ ] `dw-lifecycle archive-phases` CLI verb shipped; refuses partial-complete phases by default; `--allow-vestigial <reason>` escape (with ≥40-char substantive-reason requirement) is the explicit path for retired-vestigial phases per AUDIT-20260603-37 + the workplan-archive header's "completed OR vestigial" framing.
 - [ ] `dw-lifecycle unarchive-phases` sibling verb shipped.
 - [ ] `promote-findings` auto-positioner reads ledger; falls back gracefully when absent.
 - [ ] `/dw-lifecycle:archive-phases` + `/dw-lifecycle:unarchive-phases` SKILL.md files.
