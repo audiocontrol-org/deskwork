@@ -3380,7 +3380,7 @@ Fix guidance:
 ### AUDIT-20260603-32 — Journal "Open findings at session end: 0" undercounts the slush pile its own commit creates (2 medium findings omitted)
 
 Finding-ID: AUDIT-20260603-32
-Status:     acknowledged-slush-pile-2026-06-03
+Status:     fixed-6e8d1d81
 Severity:   medium
 Surface:    `DEVELOPMENT-NOTES.md` "Quantitative" block (the new 2026-06-03 cont. entry) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-20260603-24..-27 — both added in the same commit.
 
@@ -3391,7 +3391,7 @@ The root cause is visible in the same entry: *"dampener disposition pending at t
 ### AUDIT-20260603-33 — AUDIT-20260603-24 is stamped `acknowledged-slush-pile` (parked) while its fix is applied in the same commit — incoherent disposition
 
 Finding-ID: AUDIT-20260603-33
-Status:     acknowledged-slush-pile-2026-06-03
+Status:     fixed-6e8d1d81
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-20260603-24 (`Status: acknowledged-slush-pile-2026-06-03`) vs. `prd.md` line ~79 and `workplan.md` line ~4429 — both edited in the same commit.
 
@@ -3402,7 +3402,7 @@ A finding cannot honestly be both *fixed in this commit* and *parked as slush*. 
 ### AUDIT-20260603-34 — Journal commits accounting numbers it states are stale-by-construction, with no follow-up to reconcile
 
 Finding-ID: AUDIT-20260603-34
-Status:     acknowledged-slush-pile-2026-06-03
+Status:     fixed-6e8d1d81
 Severity:   low
 Surface:    `DEVELOPMENT-NOTES.md` 2026-06-03 (cont.) entry — "Audit-barrage runs this session: 1 … dampener disposition **pending at the time of journal-append**" and "Open findings at session end: 0".
 
@@ -3415,7 +3415,7 @@ I checked the `prd.md`/`workplan.md` correction text itself (the AUDIT-24 fix is
 ### AUDIT-20260603-35 — Deprecated alias path conflicts with the grep-zero acceptance criteria
 
 Finding-ID: AUDIT-20260603-35
-Status:     acknowledged-slush-pile-2026-06-03
+Status:     fixed-6e8d1d81
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4471-4476`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4480-4484`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4528-4530`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4537-4538`
 
@@ -3426,7 +3426,7 @@ This makes one sanctioned implementation path fail the phase’s own acceptance 
 ### AUDIT-20260603-36 — Newly added notes include postponed-work wording that violates the audit prompt’s discipline rule
 
 Finding-ID: AUDIT-20260603-36
-Status:     acknowledged-slush-pile-2026-06-03
+Status:     fixed-6e8d1d81
 Severity:   low
 Surface:    `DEVELOPMENT-NOTES.md:4074-4075`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4541`
 
