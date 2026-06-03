@@ -165,49 +165,6 @@ export interface PickFallbackBaselineOptions {
  *
  * Pure function over the DI bag.
  */
-// Phase 23 Task 1: enumerate every commit SHA reachable in a git
-// revision range (e.g., `lastBarrageTip..HEAD`). Used by `implement-hook`
-// to append a per-SHA log entry for every commit its barrage walked,
-// rather than recording only the tip-at-run-time and leaving earlier
-// commits uncovered by the pre-push gate.
-//
-// Pure-ish: takes options, runs git, returns the SHA list. Returns
-// empty on git error (the caller decides what to do — typically falls
-// back to logging just the HEAD entry).
-
-export interface EnumerateCommitsInRangeOptions {
-  readonly repoRoot: string;
-  /** Revision range, e.g., `'aaa..bbb'` or `'HEAD~3..HEAD'`. */
-  readonly range: string;
-}
-
-/**
- * Run `git rev-list <range>` and return the SHAs (in newest-first
- * order — `git rev-list`'s default). Empty array on any git error
- * (bad range, not-a-repo, spawn failure).
- *
- * Used by the per-SHA log-write path. The caller iterates the result
- * and writes one log entry per SHA, all sharing disposition + timestamp
- * + runDir.
- */
-export function enumerateCommitsInRange(
-  opts: EnumerateCommitsInRangeOptions,
-): readonly string[] {
-  try {
-    const out = execFileSync('git', ['rev-list', opts.range], {
-      cwd: opts.repoRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return out
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-  } catch {
-    return [];
-  }
-}
-
 export function pickFallbackBaseline(
   deps: PickFallbackBaselineDeps,
   opts: PickFallbackBaselineOptions = {},

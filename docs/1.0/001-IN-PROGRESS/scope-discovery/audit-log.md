@@ -3687,3 +3687,51 @@ Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — AUDIT-20
 AUDIT-52's thesis is that capturing the false paraphrase *"`apply-audit-flips` reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers"* into `audit-log.md` "propagates it into a second canonical surface, where a future reader (or a future 'successor' tool author who treats the audit-log as a spec) will design against a capability that doesn't exist." The AUDIT-52 entry then reproduces that exact false string **twice** — once in its `Surface:` line and once in its body — as the quoted-wrong claim. A grep of the durable audit-log for `reads .* Acknowledges AUDIT` still returns these hits; only the surrounding prose marks them as erroneous.
 
 Quote-to-correct is defensible and the AUDIT-49 entry body itself was genuinely fixed (the false sentence was removed there). This is informational, not a defect: the safer pattern, by AUDIT-52's own argument, is to paraphrase the quoted-wrong claim (e.g. *"a paraphrase that incorrectly attributed `Acknowledges`-trailer parsing to `apply-audit-flips`"*) rather than reproduce the literal false string in a surface a tool author might scrape. Worth weighing only if the audit-log is ever consumed mechanically.
+
+## 2026-06-03 — audit-barrage lift (20260603T193734377Z-scope-discovery)
+
+### AUDIT-20260603-57 — `--no-clone-check` flag now silently suppresses the entire PR-readiness chain while its name still promises only clone-detection skip
+
+Finding-ID: AUDIT-20260603-57 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/review/SKILL.md:107` (the "Skipping is the exception" paragraph) + Step 3 chain at `:16-41`
+
+The diff repurposes `--no-clone-check` so that it now suppresses "the full Step 3 chain (Step 0 refactor-preconditions + structural chain + fleet symmetry), not just the clone detector." The flag name describes one of five checks but now gates all of them. This is a footgun cemented directly into the skill contract: an operator (or scripted caller) who learned `--no-clone-check` as "skip clone detection" — its literal, pre-Phase-24 meaning, still documented at `SKILL.md` and in the `/dw-lifecycle:review` skill-list description ("auto-runs check-clones unless --no-clone-check") — will now silently disable `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions`, and the fleet-symmetry snapshot as well. The loss of enforcement is exactly the kind the name actively conceals.
+
+The diff acknowledges the drift in prose ("named `--no-clone-check` for back-compat … it suppresses the full Step 3 chain"), but acknowledging a footgun in a parenthetical is not the same as removing it. A reasonable fix: introduce a distinct flag (`--no-readiness-gate` or `--skip-structural-chain`) for the new whole-chain suppression and either retire `--no-clone-check` or scope it back to clones only; if back-compat truly forces the broad behavior, the skip clause must lead with a bold warning that this flag disables the entire PR-readiness gate, not just clones — and the `/dw-lifecycle:review` skill-list description must be updated in the same change, since it still says the flag only governs `check-clones`.
+
+### AUDIT-20260603-58 — Workplan Task 7 marked `[x] Complete` with verification delegated to a different task (Task 10) whose state isn't confirmable from the diff
+
+Finding-ID: AUDIT-20260603-58
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:1018-1026` (Task 7 completion block)
+
+Task 7 is rewritten from an unchecked TODO list to all-`[x]` with the completion claim: "Empirical verification: Task 10 Step 3 (deliberate clone-group regression) exercises Step 3b's structural chain; Task 10's reviewer-driven PR-readiness run exercises Steps 3a + 3c via the operator's own review pass." The verification that justifies marking Task 7 complete is sourced entirely from another task (Task 10), and the diff gives no evidence that Task 10 has actually run — the cited "deliberate clone-group regression" and "reviewer-driven PR-readiness run" are described as the proof but not shown. Marking Step 1/Step 4 as "N/A per `testing.md`" is consistent with the project's skill-prose convention and not a problem; the concern is narrower: a completion checkbox whose only verification is a forward reference to a sibling task's not-yet-evidenced run.
+
+If Task 10 has demonstrably executed those steps, cite the concrete artifact (the audit-log Finding-ID the regression produced, or the commit/run that exercised the chain) so the completion claim is falsifiable. If Task 10 hasn't run yet, the "Complete" marking on Task 7 is premature — the skill body changed, but the claim that the new Step 3a/3b/3c actually fire correctly is asserted, not shown.
+
+## 2026-06-03 — audit-barrage lift (20260603T194345756Z-scope-discovery)
+
+### AUDIT-20260603-59 — Phase 22 archive header says blanket "RETIRED" but the README row enumerates survivors — a dead-code-cleanup hazard between two canonical surfaces
+
+Finding-ID: AUDIT-20260603-59 (claude-01 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan-archive.md:3326` (Phase 22 header) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` row 22
+
+The workplan-archive.md Phase 22 header leads with the bold blanket claim **"RETIRED in Phase 24 (2026-06-03)."** Its body then scopes the retirement narrowly ("the `last-hook-run.json` marker logic + boot-case guards … are vestigial"). But the README row 22 — the other canonical surface this same commit edits — is explicit that *most* of Phase 22 survives: "Friction (2) and (3) are general-purpose `implement-hook` improvements that survive; Friction (1) retires with the marker. … AUDIT-41/42/43/44 (`git-ancestry` helper) and AUDIT-45/46/47/48/52 (tri-state collapse arrows) all survive as general infrastructure."
+
+A maintainer reading only the archive's bold "Phase 22: RETIRED" header — exactly the skim path a future dead-code sweep would take — could delete the h3-heading auto-positioner (Friction 3), the `git-ancestry` helper, and the tri-state arrows, all of which the README says survive. The archive header should mirror the README's survivor list (e.g. "RETIRED-IN-PART: marker logic + Friction (1) boot-case guard retire; Friction (2)/(3), `git-ancestry` helper, tri-state arrows survive as general infrastructure"). This is the documentation-drift-between-canonical-surfaces failure the project's own rules name; the commit edited both surfaces but left them disagreeing on scope.
+
+### AUDIT-20260603-60 — Phase 20 Task 2 marks `[x] GH #387 closed` while Task 8 Step 3 in the SAME commit defers all issue closure to the operator — and #387 isn't in the closure queue
+
+Finding-ID: AUDIT-20260603-60 (claude-02 + claude-04 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 20 Task 2 acceptance block (`- [x] GH #387 — closed as reframed-by-Phase-24`) vs. Task 8 Step 3 (`- [-] Step 3: GH issue closure DEFERRED to operator post-release`)
+
+Within this one commit two statements contradict. Task 8 Step 3 invokes `agent-discipline.md` § "Issue closure requires verification in a formally-installed release" — "the agent posts evidence; the operator … makes the closing transition" — and explicitly defers closure to the operator's release-verification queue. Yet the reframed Phase 20 Task 2 acceptance checkbox is marked `[x]` with "GH #387 — closed as reframed-by-Phase-24 (not retired; elevated)." Either #387 is closed (which the agent is not permitted to do per the very rule Task 8 cites) or it isn't (and the `[x]` is a false completion claim).
+
+Compounding it: Task 8 Step 3's operator-closure disposition list is `#293 / #294 / #295 / #352 / #373 / #374` — **#387 is absent**. So #387 is claimed-closed by Task 2 but is not tracked in the operator's closure queue, meaning if the Task 2 `[x]` is wrong (it almost certainly is, since closure is the operator's call) the omission means no surface will catch the un-closed issue at release time. Fix: change the Task 2 acceptance line from `[x] closed` to evidence-posted-pending-operator-closure, and add #387 to Task 8 Step 3's queue with the "reframed/elevated, close on verification" disposition.

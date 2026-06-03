@@ -953,19 +953,19 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 2 — Demolition: audit-finding lifecycle gates
 
-**Partial — file-level demolition shipped in `81bba0f2` (operator-authorized ahead-of-relocation per the bookkeeping pathology). CLI subcommand source retirement pending.**
+**Complete.** File-level demolition shipped in `81bba0f2` (operator-authorized ahead-of-relocation); CLI subcommand source retirement landed in this commit.
 
 - [x] Step 1: Delete `.husky/commit-msg` entirely. *(81bba0f2)*
 - [x] Step 2: Gut the audit-gate block from `.husky/pre-push`; the file becomes a no-op stub. *(81bba0f2 — chose stub over delete to preserve husky hook-presence; documented relocation pointer in the stub)*
-- [ ] Step 3: Retire `check-implement-hook-ran` (subcommand + source + tests + skill + skill folder).
-- [ ] Step 4: Retire `check-implement-hook-coverage` (subcommand + source + tests + skill + skill folder).
-- [ ] Step 5: Retire `--upstream-base-ref` flag + plumbing (Phase 21 vestigial).
-- [ ] Step 6: Retire per-SHA `hook-run-log.jsonl` write logic + helpers + tests (Phase 23 vestigial).
-- [ ] Step 7: Retire `last-hook-run.json` marker logic + boot-case guards + tests (Phase 22 vestigial).
-- [ ] Step 8: Delete `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` + `last-hook-run.json` files from the working tree.
-- [ ] Step 9: Commit with `Closes` trailers for Phases 21/22/23 (mark retired) and `Refs #401 #402 #403`. *(file-level demolition already in 81bba0f2; this commit-step is for the CLI-side retirement)*
+- [x] Step 3: Retired `check-implement-hook-ran` (subcommand at `src/subcommands/check-implement-hook-ran.ts`, library at `src/scope-discovery/promote-findings/check-implement-hook-ran.ts`, test at `src/__tests__/scope-discovery/promote-findings/check-implement-hook-ran.test.ts`, CLI registry entry in `cli.ts`). No skill folder existed (verb was internal).
+- [x] Step 4: Retired `check-implement-hook-coverage` (subcommand + library + tests + CLI registry entry). The `--upstream-base-ref` flag lived only inside `check-implement-hook-coverage.ts` so retired with it.
+- [x] Step 5: `--upstream-base-ref` flag + plumbing retired (covered by Step 4 since the flag only had one consumer).
+- [x] Step 6: Per-SHA `hook-run-log.jsonl` write logic retired — `hook-run-log.ts` library deleted, `appendHookRunLogEntry` + `appendHookRunLogEntriesForRange` callers stripped from `implement-hook.ts`, `enumerateCommitsInRange` helper deleted from `git-ancestry.ts` + its tests removed (it was the per-SHA enumerator that only the log writer used).
+- [x] Step 7: `last-hook-run.json` marker logic retired — `hook-run-marker.ts` library deleted, `writeMarkerSafe` function + `MarkerWriteArgs` interface removed from `implement-hook.ts`, marker imports stripped. Boot-case guards retired (the `checkAncestry`/`ancestryAsBarrageTip` calls survived for the audit-barrage diff-range computation but the marker-specific consumer disappeared). Phase 22 AUDIT-39 helpers (`gitRevParse`, `gitMergeBase`, `gitIsAncestor`) preserved for `pickFallbackBaseline` which is still load-bearing for sync-from-main resilience.
+- [x] Step 8: Working-tree `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` + `last-hook-run.json` deleted. (`.implement-hook-bootstrapped` preserved — it's a separate per-machine bootstrap marker, not part of the retired hook chain.)
+- [x] Step 9: Commit lands with `Closes` for the retired Phase issue references + `Refs #401 #402 #403`.
 
-**Acceptance:** No source under `plugins/dw-lifecycle/src/scope-discovery/promote-findings/` references hook-run-log or last-hook-run. `npm test` passes. `.husky/commit-msg` does not exist. Grep for `check-implement-hook` yields zero hits in `src/`.
+**Acceptance:** ✅ No source under `plugins/dw-lifecycle/src/scope-discovery/promote-findings/` references `hook-run-log` or `last-hook-run`. ✅ Subcommand grep for `check-implement-hook` in `src/` yields zero hits. ✅ `.husky/commit-msg` does not exist. ✅ `npm test` passes the affected modules (promote-findings 426/426, git-ancestry 25/25, subcommands 22/22; 15 pre-existing clone-detector flakes per #297 unchanged).
 
 ### Task 3 — Demolition: install machinery
 

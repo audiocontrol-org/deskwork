@@ -23,7 +23,6 @@ import {
   ancestryAsGateBoolean,
   ancestryAsBarrageTip,
   pickFallbackBaseline,
-  enumerateCommitsInRange,
   type PickFallbackBaselineDeps,
 } from '../../../scope-discovery/util/git-ancestry.js';
 
@@ -347,78 +346,3 @@ describe('ancestry collapses — inverse-safety invariant (AUDIT-52)', () => {
   });
 });
 
-describe('enumerateCommitsInRange — real-git fixture (Phase 23 Task 1)', () => {
-  it('returns every SHA in a 3-commit range (newest-first)', () => {
-    const { repoRoot, a, b, c } = makeRepoWithDivergence('enumerate-3');
-    // HEAD is on `diverged`; switch to main so we can walk a..c.
-    git(repoRoot, 'checkout', 'main');
-    git(repoRoot, 'checkout', c);
-    const shas = enumerateCommitsInRange({ repoRoot, range: `${a}..${c}` });
-    // `git rev-list` is newest-first by default: [c, b].
-    // `a` itself is NOT included (a..b is exclusive on the left).
-    expect(shas).toEqual([c, b]);
-  });
-
-  it('returns a single SHA for an A..B range where B is A\'s direct child', () => {
-    const { repoRoot, a, b } = makeRepoWithDivergence('enumerate-1');
-    git(repoRoot, 'checkout', 'main');
-    git(repoRoot, 'checkout', b);
-    const shas = enumerateCommitsInRange({ repoRoot, range: `${a}..${b}` });
-    expect(shas).toEqual([b]);
-  });
-
-  it('returns empty for an empty range (A..A)', () => {
-    const { repoRoot, a } = makeRepoWithDivergence('enumerate-empty');
-    const shas = enumerateCommitsInRange({ repoRoot, range: `${a}..${a}` });
-    expect(shas).toEqual([]);
-  });
-
-  it('returns empty on a bad range (git error)', () => {
-    const { repoRoot } = makeRepoWithDivergence('enumerate-bad-range');
-    const shas = enumerateCommitsInRange({
-      repoRoot,
-      range: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef..HEAD',
-    });
-    expect(shas).toEqual([]);
-  });
-
-  it('returns empty when repoRoot is not a git repository (spawn fail)', () => {
-    const nonGitRoot = join(workDir, 'no-git-enumerate');
-    mkdirSync(nonGitRoot, { recursive: true });
-    const shas = enumerateCommitsInRange({
-      repoRoot: nonGitRoot,
-      range: 'HEAD~1..HEAD',
-    });
-    expect(shas).toEqual([]);
-  });
-
-  // Phase 23 load-bearing test: a 3-commit batch (the v0.35.0 release
-  // shape that required `--no-verify`). One implement-hook invocation
-  // should produce 3 log entries, one per SHA — not just one for HEAD.
-  it('returns 3 SHAs for a 3-commit batch (the v0.35.0 release shape)', () => {
-    const repoRoot = join(workDir, 'enumerate-batch');
-    mkdirSync(repoRoot, { recursive: true });
-    git(repoRoot, 'init', '--initial-branch=main');
-    writeFileSync(join(repoRoot, 'a.txt'), 'a');
-    git(repoRoot, 'add', 'a.txt');
-    git(repoRoot, 'commit', '-m', 'baseline');
-    const baseline = git(repoRoot, 'rev-parse', 'HEAD');
-    writeFileSync(join(repoRoot, 'b.txt'), 'b');
-    git(repoRoot, 'add', 'b.txt');
-    git(repoRoot, 'commit', '-m', 'fix 1');
-    const fix1 = git(repoRoot, 'rev-parse', 'HEAD');
-    writeFileSync(join(repoRoot, 'c.txt'), 'c');
-    git(repoRoot, 'add', 'c.txt');
-    git(repoRoot, 'commit', '-m', 'fix 2');
-    const fix2 = git(repoRoot, 'rev-parse', 'HEAD');
-    writeFileSync(join(repoRoot, 'd.txt'), 'd');
-    git(repoRoot, 'add', 'd.txt');
-    git(repoRoot, 'commit', '-m', 'fix 3');
-    const fix3 = git(repoRoot, 'rev-parse', 'HEAD');
-    const shas = enumerateCommitsInRange({
-      repoRoot,
-      range: `${baseline}..${fix3}`,
-    });
-    expect(shas).toEqual([fix3, fix2, fix1]);
-  });
-});

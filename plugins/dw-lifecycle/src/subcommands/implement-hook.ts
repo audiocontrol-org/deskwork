@@ -36,21 +36,12 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { repoRoot } from '../repo.js';
 import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
 import { checkBarrageDampener } from '../scope-discovery/promote-findings/check-barrage-dampener.js';
-import {
-  writeHookRunMarker,
-  type HookDisposition,
-  type HookRunMarker,
-} from '../scope-discovery/promote-findings/hook-run-marker.js';
-import {
-  appendHookRunLogEntry,
-  appendHookRunLogEntriesForRange,
-} from '../scope-discovery/promote-findings/hook-run-log.js';
 import {
   parseLiftFindingsCount,
   parseSlushCounts,
@@ -66,7 +57,6 @@ import {
   checkAncestry,
   ancestryAsBarrageTip,
   pickFallbackBaseline,
-  enumerateCommitsInRange,
 } from '../scope-discovery/util/git-ancestry.js';
 
 export interface ImplementHookCliOptions {
@@ -284,40 +274,11 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
   }
   args.stderr.write(tipCheck.stderr);
   if (tipCheck.status === 1) {
-    // No new diff → write marker and exit. Phase 23 Task 2: also
-    // densify the log with per-SHA entries for every bookkeeping
-    // commit since the last barrage tip, so the pre-push gate doesn't
-    // refuse them. The prior tip comes from readLatestBarrageTip;
-    // when null (first-ever run), we fall back to single-entry.
-    const head = gitRevParseHead(repoRootResolved);
-    if (head === null) {
-      args.stderr.write('implement-hook: git rev-parse HEAD failed; marker not written.\n');
-      return 1;
-    }
-    const rawPriorTip = await readLatestBarrageTip(repoRootResolved);
-    // Same ancestry safety as the main path: only trust the prior tip
-    // when it's still reachable from HEAD. A diverged tip would
-    // enumerate the wrong history.
-    const ancestry =
-      rawPriorTip !== null
-        ? checkAncestry({ repoRoot: repoRootResolved, tip: rawPriorTip })
-        : ('unknown' as const);
-    const priorTip = ancestryAsBarrageTip(ancestry, rawPriorTip);
-    const wrote = await writeMarkerSafe({
-      repoRoot: repoRootResolved,
-      tip: head,
-      priorTip,
-      runDir: null,
-      disposition: 'no-new-diff-skip',
-      findingsCount: 0,
-      promotedCount: 0,
-      slushedCount: 0,
-      stderr: args.stderr,
-    });
-    if (!wrote) {
-      args.stderr.write('implement-hook: marker/log persistence failed on no-new-diff path; exit 1.\n');
-      return 1;
-    }
+    // No new diff → skip the barrage. Phase 24 retired the
+    // commit-msg + pre-push gates that this branch used to satisfy
+    // with a marker write; under the no-git-hook-enforcement contract
+    // no marker is needed — check-barrage-tip already reads audit-runs/
+    // directly to know the prior tip on the next invocation.
     args.stderr.write('implement-hook: no new diff since last barrage; skip without firing.\n');
     return 0;
   }
@@ -501,25 +462,10 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
   if (fireResult.status === 1) {
     // All models failed (spawn errors / zero bytes). The hook
     // forward-progresses per SKILL.md "barrage was an outage, NOT a
-    // finding." Write marker with disposition=barrage-outage so the
-    // gate still sees the verb ran.
-    const wrote = await writeMarkerSafe({
-      repoRoot: repoRootResolved,
-      tip: head,
-      priorTip: lastBarrageTip,
-      runDir: runDir.length > 0 ? runDir : null,
-      disposition: 'barrage-outage',
-      findingsCount: 0,
-      promotedCount: 0,
-      slushedCount: 0,
-      stderr: args.stderr,
-    });
-    if (!wrote) {
-      args.stderr.write('implement-hook: marker/log persistence failed on outage path; exit 1.\n');
-      return 1;
-    }
+    // finding." Phase 24: no marker is written — the retired
+    // commit-msg gate that consumed the marker is gone.
     args.stderr.write(
-      'implement-hook: audit-barrage all-models-failed (outage); marker written, hook complete.\n',
+      'implement-hook: audit-barrage all-models-failed (outage); hook complete.\n',
     );
     return 0;
   }
@@ -559,7 +505,7 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
   args.stderr.write(`implement-hook: dampener result — ${dampener.reason}\n`);
 
   // Step 6: disposition branch.
-  let disposition: HookDisposition;
+  let disposition: 'fired-and-slushed' | 'fired-and-promoted';
   let findingsCount = findingsCountFromLift;
   let promotedCount = 0;
   let slushedCount = 0;
@@ -630,124 +576,11 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
     return 1;
   }
 
-  // Step 8: marker.
-  const wrote = await writeMarkerSafe({
-    repoRoot: repoRootResolved,
-    tip: head,
-    priorTip: lastBarrageTip,
-    runDir,
-    disposition,
-    findingsCount,
-    promotedCount,
-    slushedCount,
-    stderr: args.stderr,
-  });
-  if (!wrote) {
-    args.stderr.write('implement-hook: marker/log persistence failed on happy path; exit 1.\n');
-    return 1;
-  }
+  // Phase 24: no marker write on the happy path either.
   args.stderr.write(
     `implement-hook: complete (disposition=${disposition}, findings=${findingsCount}, promoted=${promotedCount}, slushed=${slushedCount}).\n`,
   );
   return 0;
-}
-
-interface MarkerWriteArgs {
-  readonly repoRoot: string;
-  readonly tip: string;
-  /**
-   * Phase 23 Task 1: the prior barrage tip (i.e., the SHA the previous
-   * hook run audited up through), or `null` when there's no prior tip
-   * (first-ever run, or marker was diverged-away). When non-null, the
-   * marker write also appends one log entry per SHA in `priorTip..tip`
-   * so the pre-push gate's per-SHA coverage check is satisfied for
-   * every commit this hook actually covered — not just the head.
-   * When null, falls back to the pre-Phase-23 single-entry behavior.
-   */
-  readonly priorTip: string | null;
-  readonly runDir: string | null;
-  readonly disposition: HookDisposition;
-  readonly findingsCount: number;
-  readonly promotedCount: number;
-  readonly slushedCount: number;
-  readonly stderr: NodeJS.WriteStream | NodeJS.WritableStream;
-}
-
-/**
- * Per AUDIT-20260531-18: marker write failure or log append failure
- * MUST surface as a non-zero outcome. A successful-looking exit-0
- * without persisted state silently bypasses the Phase 17 teeth — the
- * commit-msg gate refuses the next commit while the CLI reported
- * success. Both writes are persistence the gates depend on; either
- * failing is a hook failure, not a warning.
- *
- * Returns true on success; false (with stderr error) on failure.
- * Callers MUST map false to exit code 1.
- */
-async function writeMarkerSafe(args: MarkerWriteArgs): Promise<boolean> {
-  const marker: HookRunMarker = {
-    tip: args.tip,
-    timestamp: new Date().toISOString(),
-    runDir: args.runDir,
-    disposition: args.disposition,
-    findingsCount: args.findingsCount,
-    promotedCount: args.promotedCount,
-    slushedCount: args.slushedCount,
-  };
-  // Ensure parent dirs exist (the gate's read accepts missing dirs as
-  // null; the write must create them on first use).
-  await mkdir(join(args.repoRoot, '.dw-lifecycle', 'scope-discovery'), { recursive: true });
-  try {
-    await writeHookRunMarker({ repoRoot: args.repoRoot, marker });
-  } catch (err) {
-    args.stderr.write(`implement-hook: marker write FAILED: ${(err as Error).message}\n`);
-    return false;
-  }
-  // Also append to the per-run history log used by the pre-push gate
-  // (Phase 17 Task 5). The single marker tracks "latest run"; the log
-  // tracks every run by tip, which is what the pre-push gate needs to
-  // walk a multi-commit range. Log append failure is ALSO fatal — the
-  // pre-push gate relies on it.
-  //
-  // Phase 23 Task 1: when `priorTip` is known, enumerate the range
-  // `priorTip..tip` and write one log entry per SHA. This densifies
-  // the log so the pre-push gate's per-SHA coverage check is satisfied
-  // for every commit the barrage actually walked — not just HEAD.
-  // The pre-Phase-23 single-entry behavior is preserved when priorTip
-  // is null (first-ever run, marker diverged-away, or enumeration
-  // returned empty for any reason).
-  try {
-    const tipsToLog =
-      args.priorTip !== null
-        ? enumerateCommitsInRange({
-            repoRoot: args.repoRoot,
-            range: `${args.priorTip}..${args.tip}`,
-          })
-        : [];
-    if (tipsToLog.length > 0) {
-      // Append per-SHA entries covering the audited range. All share
-      // disposition / timestamp / runDir; only `tip` varies.
-      await appendHookRunLogEntriesForRange(args.repoRoot, tipsToLog, {
-        timestamp: marker.timestamp,
-        disposition: marker.disposition,
-        runDir: marker.runDir,
-      });
-    } else {
-      // Fallback: single entry with the head tip (pre-Phase-23 behavior).
-      // Used when priorTip is null OR when enumeration returned empty
-      // (bad range / git error / truly empty range).
-      await appendHookRunLogEntry(args.repoRoot, {
-        tip: marker.tip,
-        timestamp: marker.timestamp,
-        disposition: marker.disposition,
-        runDir: marker.runDir,
-      });
-    }
-  } catch (err) {
-    args.stderr.write(`implement-hook: hook-run-log append FAILED: ${(err as Error).message}\n`);
-    return false;
-  }
-  return true;
 }
 
 async function readLatestBarrageTip(repoRoot: string): Promise<string | null> {
