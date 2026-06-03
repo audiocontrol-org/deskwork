@@ -3917,7 +3917,7 @@ A reader running `/dw-lifecycle:pickup` sees three in-flight fix tasks for work 
 ### AUDIT-20260603-77 — Task 10 Step 3 marked complete while its actual acceptance test was never run — substituted with "verified-by-extension" plus explicit deferral language
 
 Finding-ID: AUDIT-20260603-77 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-f966d6ee
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 10 Step 3 (hunk `@@ -1233,26 +1250,31 @@`) + `DEVELOPMENT-NOTES.md` Phase 24 Task 10 measurements block
 
@@ -3928,7 +3928,7 @@ This is the load-bearing claim of the entire Phase 24 reframe: the whole archite
 ### AUDIT-20260603-78 — Journal quantitative section counts do not reconcile — violates the project's AUDIT-04 re-derive-and-verify convention
 
 Finding-ID: AUDIT-20260603-78
-Status:     fixed-pending-sha
+Status:     fixed-f966d6ee
 Severity:   medium
 Surface:    `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 3) "Quantitative" + "Phase 24 Task 10 measurements" blocks
 
