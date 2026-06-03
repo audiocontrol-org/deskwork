@@ -2968,6 +2968,8 @@ Run the new semantic against this feature's own loop before shipping.
 
 ## Phase 17: Audit-barrage mechanization — single verb + commit-msg gate + pre-push gate
 
+**RETIRED in Phase 24 (2026-06-03).** Layers 2 + 3 (commit-msg gate `check-implement-hook-ran` + pre-push gate `check-implement-hook-coverage`) are vestigial under the no-git-hook-enforcement contract. Layer 1 (the single CLI verb `dw-lifecycle implement-hook`) is preserved — it composes the audit-barrage chain that `/dw-lifecycle:implement` invokes from the skill body. See `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` § "What gets retired" for the full retirement scope.
+
 **Motivating case** (this session, 2026-05-31): the /dwi loop that implemented Phase 16 (which closed #383's audit-coverage hole) itself shipped 2 task-completion commits — c9849b6 (Phase 16 substantive work) and dde415a (docs closure) — WITHOUT invoking the audit-barrage hook. The Step 6 bash composition in SKILL.md is a sequence of 5 CLI calls; the agent skipped them entirely. Phase 16's gate is correct (always-fire on new diff), but Phase 16 doesn't enforce that the agent invokes the gate. Discretion remained, and discretion was abused on the very implementation of the phase that was supposed to remove discretion.
 
 **Root cause:** the Step 6 hook is documented as prose + bash composition. The agent's compliance is a matter of reading the SKILL.md and choosing to invoke the steps. That's policy, not mechanization. The operator's directive (2026-05-31, verbatim):
@@ -3286,6 +3288,8 @@ GH #386 from the graphical-entries team: `audit-barrage` spawn-time failures wit
 
 ## Phase 21: `check-implement-hook-coverage` gate excludes merged-from-upstream commits
 
+**RETIRED in Phase 24 (2026-06-03).** The entire `check-implement-hook-coverage` pre-push gate is retired under the no-git-hook-enforcement contract. The `--upstream-base-ref` flag this phase added is vestigial — no caller remains. See `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` § "What gets retired" for the full retirement scope.
+
 The pre-push gate `check-implement-hook-coverage` (`plugins/dw-lifecycle/src/subcommands/check-implement-hook-coverage.ts`) computes "unpushed commits" as `git rev-list ${tipRef}..HEAD`, where `tipRef` defaults to `origin/<current-branch>`. After merging `origin/main` into a feature branch, that range includes every commit inherited from `main` — none of which carry hook-run markers on the feature branch's marker log, because they were authored against main and already gated there.
 
 The result: a routine "sync feature branch with main" push is refused by the gate with dozens of "uncovered commits" the operator can't reasonably backfill (each was a separate commit on main, owned by a different feature branch). Live repro on 2026-06-02: merging `origin/main` (27 commits) into `feature/scope-discovery` produced 28 uncovered commits at push time, even though all 27 had passed the gate on their original branches. The merge commit itself was correctly backfilled by one `dw-lifecycle implement-hook` run; the 27 inherited commits remained refused.
@@ -3318,6 +3322,8 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 - **Migration of the existing pre-push hook to use the new flag retroactively** — once shipped, all future merge-from-main pushes use the new default; no historical replay needed.
 
 ## Phase 22: `implement-hook` survives sync-from-main ([#399](https://github.com/audiocontrol-org/deskwork/issues/399))
+
+**RETIRED in Phase 24 (2026-06-03).** The `last-hook-run.json` marker logic + boot-case guards this phase added are vestigial under the no-git-hook-enforcement contract — the marker existed to satisfy the now-retired commit-msg gate. See `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` § "What gets retired".
 
 `/dw-lifecycle:implement` and its `implement-hook` chain break in three compounding ways immediately after a `git reset --hard origin/main` operation on a feature branch (the canonical "sync to main, drop superseded in-flight work" pattern; cf. feature/deskwork-plugin Phase 39 Task 39.0 discovery). The bug surface spans the marker layer, the diff-range computation, and the auto-position anchor — each independent, each addressable, all three required for the loop to survive the routine sync. The PR for these fixes goes from `feature/scope-discovery` → `main`; once on `main`, the next sync-from-main on `feature/deskwork-plugin` carries the fix.
 
@@ -3392,6 +3398,8 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 - **A general "marker sanity" doctor rule** — useful but separate. The runtime guard inside the gates is sufficient for the immediate symptom; a doctor rule that surfaces stale-marker shapes proactively is a follow-up if recurrence is observed.
 
 ## Phase 23: `hook-run-log` per-commit coverage — close the gate gap that required `--no-verify` in the v0.35.0 release
+
+**RETIRED in Phase 24 (2026-06-03).** The per-SHA `hook-run-log.jsonl` write logic this phase added is vestigial under the no-git-hook-enforcement contract — the pre-push gate it served is retired. The `enumerateCommitsInRange` helper + `appendHookRunLogEntriesForRange` writer + `MarkerWriteArgs.priorTip` wiring are dead code as of Phase 24's CLI demolition. See `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` § "What gets retired".
 
 The pre-push gate `check-implement-hook-coverage` evaluates coverage **per unpushed commit**: for each SHA in `<remote>/<branch>..HEAD`, the gate demands a `hook-run-log.jsonl` entry whose `tip` field equals that SHA. The audit-barrage hook records coverage **by tip-at-run-time**: when `implement-hook` runs, it writes one log entry with `tip: <current-HEAD-sha>` regardless of how many commits its barrage range walked.
 

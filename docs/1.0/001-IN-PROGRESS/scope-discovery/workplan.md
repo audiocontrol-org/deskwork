@@ -669,6 +669,8 @@ Confirm the three CLIs are installed + authenticated on the operator's machine. 
 
 ## Phase 15: Workplan-aware implement-loop gate + audit-barrage hook + audit-log lift
 
+**RETIRED in Phase 24 (2026-06-03).** The workplan-aware gate semantic + the implement-loop end-of-task hook this phase shipped are PRESERVED in their library form (`check-open-findings`, `implement-hook`, `audit-barrage-lift`, `promote-findings --auto`) — the verbs still exist and `/dw-lifecycle:implement` Step 6b–6c invokes them from the skill body. What's RETIRED is the git-hook wiring half of Phase 15: the commit-msg gate (`check-implement-hook-ran`) + pre-push gate (`check-implement-hook-coverage`) that this phase put with-teeth into `.husky/`. The teeth move into the skill body's instruction to the agent under the no-git-hook-enforcement ADR (`docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md`). The "always-fire" semantic is preserved; only the firing location moves.
+
 Parent issue: [#373](https://github.com/audiocontrol-org/deskwork/issues/373)
 
 Trigger: v0.28.0 dogfood + operator framing 2026-05-29 — Phase 13's implement-loop gate (Task 2) is too strict. It refuses on ANY `Status: open` audit-log finding, which creates a structural chicken-and-egg: the fixes for those findings can't be worked through `/dw-lifecycle:implement` because the loop refuses to start with them open. Per operator verbatim:
@@ -901,24 +903,26 @@ Both cases share the same root cause: shape inference from surface alone is unso
 - [ ] ≥2 test blocks per HIGH-severity Option D discipline (even though severity is medium, the historical recursion-engine motivation justifies the regression-lock).
 - [ ] GH #392 closed after verification in a release.
 
-### Task 2: Retire `/dw-lifecycle:review` + `/dw-lifecycle:audit` ([#387](https://github.com/audiocontrol-org/deskwork/issues/387))
+### Task 2: Elevate `/dw-lifecycle:review` to primary enforcement surface (Phase 24 reversal)
 
-GH #387 captures an architectural decision: the audit-barrage hook (Phase 16/17) has subsumed the three-track review protocol. The operator's verbatim framing: *"the review skill is no longer hooked into the iterate cycle — superseded by the audit barrage hook. Review is no longer operationally enforced, so we shouldn't put anything in there. In fact, we should consider retiring review and audit in favor of audit barrage."*
+**Reframed by Phase 24 (2026-06-03).** The original framing ("retire `/dw-lifecycle:review` + `/dw-lifecycle:audit` in favor of audit-barrage") is REVERSED. Under the no-git-hook-enforcement contract, `/dw-lifecycle:review` becomes the *primary* PR-readiness enforcement surface — it composes the structural chain + Step 0 refactor-preconditions + the three-track reviewer protocol on top of the existing audit-log discipline. `audit-barrage` stays as the cross-model audit surface invoked from `/dw-lifecycle:implement` end-of-task. The two surfaces are complementary, not substitutable: barrage is a continuous in-loop audit; review is an operator-driven PR-readiness pass.
 
-This is multi-skill architectural work that touches scope-discovery's review surface (audit-barrage is one of three audit surfaces per `agent-discipline.md`; retiring review reduces it to two: in-band self-audit + audit-barrage). The scope-discovery feature owns the audit-log lifecycle that review/audit currently drives; that ownership transfers fully to audit-barrage's lift step.
+Per the Phase 24 ADR § "Where the discipline relocates": *"REVERSE the Phase 20 Task 2 retirement decision: `/dw-lifecycle:review` becomes the primary enforcement surface, not deprecated."*
 
-**Severity: medium** (no current operational impact; review skill is dead-but-listed).
+GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "three audit surfaces" reduction — gets reframed: the structural chain that lived in `.husky/pre-commit` collapses into `/dw-lifecycle:review` (PR pass) + `/dw-lifecycle:implement` (end-of-task), so there's a net REDUCTION in surface count (no separate `.husky/` enforcement chain), but `/dw-lifecycle:review` is the surface that absorbs the load, not the verb being retired.
 
-- [ ] Step 1: surface inventory (per #387 body) — confirm every caller of `/dw-lifecycle:review`, `/dw-lifecycle:audit`, and their CLI surfaces.
-- [ ] Step 2: confirm audit-barrage's lift step owns the full audit-log lifecycle (creation + status flips + closure triad) — if not, identify the gap.
-- [ ] Step 3: decide whether to delete the two skills outright, alias them to audit-barrage, or split (review → delete; audit → audit-barrage alias).
-- [ ] Step 4: remove the skills + rehome every cross-reference (including `agent-discipline.md` "three audit surfaces" framing).
-- [ ] Step 5: commit with `Closes #387` in subject.
+**Severity: medium** (originally "no operational impact"; under Phase 24 the skill is operationally critical).
+
+- [x] Step 1: surface inventory closed in Phase 24 Task 7 — `/dw-lifecycle:review` callers identified; SKILL.md updated to be the primary surface.
+- [x] Step 2: audit-barrage's lift step owns the in-loop audit-log lifecycle; `/dw-lifecycle:review` owns the PR-readiness lifecycle (Step 0 + structural chain + reviewer tracks + audit-log writes). Both write to the same audit-log; no conflict.
+- [x] Step 3: decision — REVERSE the retirement (per Phase 24 Task 7 Step 3).
+- [x] Step 4: cross-references updated — `agent-discipline.md` § "Audit-barrage" already names two surfaces (the SDD third was retired separately); no further sweep needed.
+- [x] Step 5: commit lives at Phase 24 Task 7 (`0e5c9e2f`).
 
 **Acceptance Criteria:**
-- [ ] Zero dangling references to `/dw-lifecycle:review` or `/dw-lifecycle:audit` in skills, CLAUDE.md, agent-discipline.md, or other docs.
-- [ ] `agent-discipline.md` "three audit surfaces" framing updated to two surfaces (or whatever the final count is).
-- [ ] GH #387 closed after verification.
+- [x] `/dw-lifecycle:review` is documented as the primary enforcement surface (review/SKILL.md "Primary enforcement surface (Phase 24)" section).
+- [x] `agent-discipline.md` "audit surfaces" framing reflects the new architecture (audit-barrage + in-band self-audit; SDD retired separately).
+- [x] GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — closed as reframed-by-Phase-24 (not retired; elevated).
 
 ### Phase 20 — Out of Scope
 
@@ -1027,13 +1031,15 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 
 ### Task 8 — Workplan + phase reconciliation
 
-- Step 1: Update workplan.md headers for Phases 15, 17 (partially), 21, 22, 23 to mark retirement explicitly with a note: *"Code retired in Phase 24; the phase's original deliverables are vestigial under the new no-git-hook-enforcement contract."*
-- Step 2: Update README phase status table to reflect retirement annotations alongside the original "Shipped" status (history preserved; new state surfaced).
-- Step 3: Close GitHub issues per the disposition list: [#293](https://github.com/audiocontrol-org/deskwork/issues/293) / [#294](https://github.com/audiocontrol-org/deskwork/issues/294) / [#295](https://github.com/audiocontrol-org/deskwork/issues/295) (install-hook friction — won't-fix), [#352](https://github.com/audiocontrol-org/deskwork/issues/352) (skip docs-only — won't-fix), [#373](https://github.com/audiocontrol-org/deskwork/issues/373) / [#374](https://github.com/audiocontrol-org/deskwork/issues/374) (Phase 15 redesigns — won't-fix or rescope).
-- Step 4: Reframe Phase 20 Task 2 in workplan.md: instead of "retire `/dw-lifecycle:review`", read "elevate `/dw-lifecycle:review` to primary enforcement surface (Phase 24)."
-- Step 5: Commit.
+**Complete (branch-side); GH closure deferred to operator post-release per project rule.**
 
-**Acceptance:** Phases retired by Phase 24 are annotated in both workplan and README. No GitHub issue remains open whose root cause is the now-deleted machinery.
+- [x] Step 1: workplan-archive.md headers for Phases 17, 21, 22, 23 marked RETIRED in Phase 24; workplan.md Phase 15 header marked RETIRED-with-library-form-preserved.
+- [x] Step 2: README phase status table — Phases 15, 17, 21, 22, 23 status cells annotated with the Phase 24 retirement note; library-form preservation noted where applicable.
+- [-] Step 3: GH issue closure DEFERRED to operator post-release. Per `agent-discipline.md` § "Issue closure requires verification in a formally-installed release," the agent posts evidence; the operator (or issue author) makes the closing transition. The disposition list ([#293](https://github.com/audiocontrol-org/deskwork/issues/293) / [#294](https://github.com/audiocontrol-org/deskwork/issues/294) / [#295](https://github.com/audiocontrol-org/deskwork/issues/295) / [#352](https://github.com/audiocontrol-org/deskwork/issues/352) / [#373](https://github.com/audiocontrol-org/deskwork/issues/373) / [#374](https://github.com/audiocontrol-org/deskwork/issues/374)) is the operator's queue for the release-verification pass — they're flagged in this workplan + the README as Phase-24-retired so the closing transition is straightforward when the release ships.
+- [x] Step 4: Phase 20 Task 2 reframed in workplan.md — instead of "retire `/dw-lifecycle:review`", now reads "elevate `/dw-lifecycle:review` to primary enforcement surface (Phase 24)." Original retirement framing preserved as struck-through-by-reframe with the Phase 24 ADR citation.
+- [x] Step 5: Commit.
+
+**Acceptance:** Phases retired by Phase 24 are annotated in both workplan and README. The GH issue queue for closure is curated and ready for operator action at release time (issue closure is not the agent's call per project rule).
 
 ### Task 9 — Adopter migration
 
