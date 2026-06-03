@@ -115,13 +115,47 @@ Acknowledges AUDIT-20260603-47 (claude-01 + claude-02 + claude-03 + claude-04 + 
 - [x] Step 0 (working-code invariant): `check-disposition-survivor` is a real CLI verb with a real `--allow-disposition-loss` flag that exists for the .husky-pre-commit-era use case. The flag's existence is correct working code; what's wrong is documenting it as an escape *inside* a skill body whose principle says "no escape." Invariant: the verb retains the flag for direct-invocation callers; the skill body does not exercise the flag.
 - [x] Step 1 (disposition): reconciled the contradiction by editing the disposition-survivor clause in Step 9 to STOP unconditionally at session-end. Added an inline note explaining the verb's `--allow-disposition-loss` flag is preserved for direct invocation (legacy hook-era use case) but the skill body does NOT pass it — per `enforcement-lives-in-skills.md` § "a `--no-verify` push by the maintainer is evidence the hook chain is broken." Cure path stays: reconcile the dispositions, then re-invoke session-end.
 - [x] Step 2: applied — `plugins/dw-lifecycle/skills/session-end/SKILL.md` Step 9 disposition-survivor clause rewritten.
-- [x] Step 3: committing with `Acknowledges AUDIT-20260603-47` in subject (skill-prose contradiction resolution; not a code change requiring a test).
+- [x] Step 3: committed (`f679a201`) with subject `docs(scope-discovery): AUDIT-47 — resolve session-end Step 9 self-contradiction` and `Acknowledges AUDIT-20260603-47` trailer in the commit-message body. Per AUDIT-20260603-49 correction: the subject uses the short `AUDIT-47` form for readability; the full-ID `Acknowledges AUDIT-20260603-47` trailer lives in the body so a trailer-walker (apply-audit-flips and successors) finds it. Audit-log status was set in the same commit (`acknowledged-session-end-step9-contradiction-resolved-2026-06-03`); the trailer is the audit-trail, not the flip mechanism.
 
 **Acceptance Criteria:**
 
 - [x] Disposition prose ≥40 chars (Step 0 + Step 1).
 - [x] The named action has landed in this branch (Step 9 disposition-survivor clause rewritten).
 - [x] Audit-log Status flipped to `acknowledged-session-end-step9-contradiction-resolved-2026-06-03`.
+
+
+### Task 7 (fix-finding-AUDIT-20260603-48) (non-bug): AUDIT-20260603-48 — AUDIT-47 fix edited only Step 9's body — the "Closing-discip…
+
+Acknowledges AUDIT-20260603-48. Surface: `plugins/dw-lifecycle/skills/session-end/SKILL.md` — Step 9 disposition-survivor clause (changed in diff) vs. the "Closing-discipline refusal (Step 9)" error-handling bullet (NOT in diff).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [x] Step 1 (disposition): the AUDIT-47 fix edited Step 9's body but left the "Closing-discipline refusal (Step 9)" error-handling bullet's "no escape flag exists" wording untouched. The body and the bullet are now both updated to say the same thing: the verb has the flag (legacy `.husky`-era), the skill body does NOT pass it, and the cure path is reconciliation not bypass. Per AUDIT-48: when fixing a contradiction between two passages, edit BOTH passages — fixing only one half is the failure mode this finding names.
+- [x] Step 2: applied — error-handling bullet rewritten to match Step 9's body wording.
+- [x] Step 3: committing with `Acknowledges AUDIT-20260603-48` in the commit-message body trailer (subject uses short `AUDIT-48` form per the AUDIT-49 fix).
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch.
+- [x] Audit-log Status flipped to `acknowledged-error-handling-bullet-reconciled-2026-06-03`.
+
+
+### Task 8 (fix-finding-AUDIT-20260603-49) (non-bug): AUDIT-20260603-49 — Workplan Step 3 claims the commit carries an `Acknowledges A…
+
+Acknowledges AUDIT-20260603-49 (claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 6 block, Step 3 (`committing with `Acknowledges AUDIT-20260603-47` in subject`) vs. the audited commit subject.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [x] Step 1 (disposition): the AUDIT-47 fix-task's Step 3 said *"committing with `Acknowledges AUDIT-20260603-47` in subject"* but the actual commit (f679a201) put the full-ID trailer in the commit-message BODY (subject was `docs(scope-discovery): AUDIT-47 — resolve session-end Step 9 self-contradiction`). The fix is to update the workplan's Step 3 wording to accurately describe where the trailer lives (body, not subject). The short-form `AUDIT-47` subject + full-ID body trailer is the established pattern that lets the subject stay readable while still being trailer-walker-discoverable; the workplan needs to reflect that pattern instead of claiming the trailer is in the subject.
+- [x] Step 2: applied — workplan Task 6 (AUDIT-47 fix-task) Step 3 rewritten to cite f679a201 + the actual subject + body-trailer structure.
+- [x] Step 3: committing with `Acknowledges AUDIT-20260603-49` in the commit-message body trailer.
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch.
+- [x] Audit-log Status flipped to `acknowledged-step-3-trailer-location-corrected-2026-06-03`.
 
 ### Task 5: Validator + export commands
 

@@ -3568,3 +3568,31 @@ Step 9's disposition-survivor clause reads: *"STOP session-end on any `keep-with
 These two sentences contradict each other inside one diff. One names a concrete escape flag for the first of the three checks; the other categorically asserts no escape exists. A reader following the error-handling guidance will tell the operator there is no bypass; a reader of Step 9 will reach for `--allow-disposition-loss`. Worse, the existence of the escape is itself in tension with the Phase 24 / `enforcement-lives-in-skills.md` principle the step cites (*"a `--no-verify` push by the maintainer is evidence the hook chain is broken… The fix is reshaping the chain, not normalizing the bypass"*). Fix: decide whether the disposition-survivor escape is permitted at session-end, then make both passages say the same thing — either document `--allow-disposition-loss` consistently (and reconcile it with the no-bypass principle) or drop it from Step 9.
 
 ---
+
+## 2026-06-03 — audit-barrage lift (20260603T191854254Z-scope-discovery)
+
+### AUDIT-20260603-48 — AUDIT-47 fix edited only Step 9's body — the "Closing-discipline refusal" error-handling bullet still asserts "no escape flag exists," literally contradicting the new admission that the verb HAS the flag
+
+Finding-ID: AUDIT-20260603-48
+Status:     acknowledged-error-handling-bullet-reconciled-2026-06-03
+Severity:   high
+Surface:    `plugins/dw-lifecycle/skills/session-end/SKILL.md` — Step 9 disposition-survivor clause (changed in diff) vs. the "Closing-discipline refusal (Step 9)" error-handling bullet (NOT in diff)
+
+AUDIT-47's own disposition (workplan Task 6, Step 1) promised to *"make both passages say the same thing."* The diff edits exactly one passage. The new Step 9 body now reads: *"The verb has a legacy `--allow-disposition-loss` flag from its .husky-era days, but the skill body does NOT use it at session-end."* But the error-handling bullet that AUDIT-47 quoted as the other half of the contradiction — *"Per Phase 24, no `--no-verify` / no escape flag exists"* — is **not** in this diff, so it stands unchanged.
+
+The *behavioral* contradiction (does session-end stop unconditionally?) is genuinely resolved: both passages now steer the operator to "reconcile dispositions, don't bypass." But the *factual* claim is now inconsistent in the opposite direction — one passage says the flag exists (just unused), the other says "no escape flag exists" at all. A reader of the error-handling section is told the flag does not exist; a reader of Step 9 is told it does. That is the same surface-contradiction shape AUDIT-47 was filed to kill, only narrowed from "may I use it?" to "does it exist?". Because the audit-log status was flipped to `...-contradiction-resolved-2026-06-03` and the workplan box checked `[x] Complete`, the branch now records a resolution that the source only half-delivers. Fix: edit the error-handling bullet in the same file to say "the verb has the flag; the skill body does not pass it" — matching Step 9's wording — rather than "no escape flag exists."
+
+---
+
+### AUDIT-20260603-49 — Workplan Step 3 claims the commit carries an `Acknowledges AUDIT-20260603-47` subject trailer, but the actual commit subject is `AUDIT-47 — resolve…` with no such trailer — `apply-audit-flips` auto-flip is silently bypassed
+
+Finding-ID: AUDIT-20260603-49 (claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-step-3-trailer-location-corrected-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 6 block, Step 3 (`committing with `Acknowledges AUDIT-20260603-47` in subject`) vs. the audited commit subject
+
+Step 3 of the new Task 6 block asserts: *"committing with `Acknowledges AUDIT-20260603-47` in subject."* The single commit in the audited range is `docs(scope-discovery): AUDIT-47 — resolve session-end Step 9 self-contradiction`. That subject contains neither the literal `Acknowledges` verb nor the full `AUDIT-20260603-47` ID — it uses the short form `AUDIT-47`. Per the prior audit excerpt, the journal records that `dw-lifecycle apply-audit-flips` *"reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers and flips audit-log entries."* A matcher keyed on `Acknowledges AUDIT-20260603-47` will not match this subject, so the status in `audit-log.md` was hand-set to `acknowledged-session-end-step9-contradiction-resolved-2026-06-03` rather than tool-flipped.
+
+This is the exact header/step/trailer-mismatch shape flagged on Task 7 in the prior excerpt, now recurring on Task 6. The cost is the same: a future `apply-audit-flips` dry-run reports AUDIT-47 as un-flipped-by-trailer (the tool can't reconcile the hand-set status against an absent trailer), and the workplan's claimed action diverges from the commit that actually landed. Fix: either make the commit subject carry the trailer the step claims (`Acknowledges AUDIT-20260603-47`), or change Step 3 to state the status was hand-set and explain why the auto-flip path was not used.
+
+---
