@@ -774,3 +774,49 @@ A light-touch fix: have the `lane move` CLI result/emit explicitly note "metadat
 ---
 
 I walked the rest of the diff — `collectScaffoldDefaults` argv parsing (two-token and `=`-token forms, malformed/duplicate/empty/unknown-kind rejection paths all look correct, including dirs containing `=`), the `assertSafeContentDir`→`assertSafeScaffoldDir` rename (boundary check preserved per scaffold dir), the journal `LaneCreateEvent` back-compat (`.passthrough()` + optional `contentDir`/`scaffoldDefaults`/`host`), the studio `normalizeScaffoldDefaults` undefined-dropping, the XSS escaping path for the new scaffold-defaults cell, and the large test-fixture migration — and found those clean. My three findings concentrate on the scalar→map semantic gap (the update replace + studio single-kind editor), the un-updated operator-facing SKILL.md, and the under-surfaced move behavior reversal.
+
+## 2026-06-03 — audit-barrage lift (20260603T045354853Z-deskwork-plugin)
+
+### AUDIT-20260603-28 — Doctor content-discovery is now gated on lane `scaffoldDefaults` dirs — content roots not represented by a lane (or adjacent to a bound sidecar) are invisible to orphan/duplicate/legacy-id detection
+
+Finding-ID: AUDIT-20260603-28
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `packages/core/src/content-index.ts:286-380` (`collectLaneScaffoldDirs` / `collectSidecarArtifactDirs` / `buildContentIndexFromSidecars`) + `packages/core/src/doctor/runner.ts:127-139` (`buildContext`) + `packages/core/test/doctor/orphan-frontmatter-id.test.ts:31-46` (fixture now must add a lane)
+
+Pre-39c the doctor walked each site's `contentDir` unconditionally to DISCOVER files, so any markdown under the content root — bound or not — was visible to the "walk the content tree" rules (orphan-frontmatter-id, duplicate-id, legacy-top-level-id). The new `buildContentIndexFromSidecars` discovers roots only from (a) directories of entries that already carry an `artifactPath` and (b) lane `scaffoldDefaults` directories (`collectSidecarArtifactDirs`, content-index.ts:340-360). The orphan test's own fixture change is the tell: it now has to seed a `default` lane with `scaffoldDefaults: { markdown: 'docs' }` (orphan-frontmatter-id.test.ts:31-46) *just so the orphan files are discoverable at all*. That means a not-yet-bound file (orphan / duplicate-id collision / legacy top-level id) sitting in a directory that is neither a lane scaffold root nor the directory of an already-bound entry is now **silently undetectable** — the exact files these rules exist to catch.
+
+This compounds with `bootstrapDefaultLaneIfMissing` deriving its single lane from only the *default* site's `contentDir` (bootstrap.ts:120-135): a fresh install of a multi-site config produces one lane covering one content root, leaving every non-default site's content root dark to discovery. The migration path (`sites-to-lanes-migration`) creates lanes from all sites, so upgrades are covered — but fresh multi-site installs and any partially-migrated project are not. A reasonable fix: have discovery also fall back to walking the *parent* of every discovered root, or have `install` surface "lanes created" coverage so the operator can see which content roots are now lane-backed; minimally, add a doctor finding when a `sites` block names a contentDir that no lane's `scaffoldDefaults` covers, so the coverage gap is loud rather than silent.
+
+### AUDIT-20260603-29 — `ctx.index.byPath` key base silently flipped from contentDir-relative to projectRoot-relative for every doctor rule; only `duplicate-id` is visibly reconciled and no test pins the base
+
+Finding-ID: AUDIT-20260603-29
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `packages/core/src/content-index.ts:290-301` (docblock declaring projectRoot-relative `byPath`) + `packages/core/src/doctor/rules/duplicate-id.ts:64-71` (`join(ctx.projectRoot, relPath)`) + `packages/core/src/doctor/runner.ts:131` (`buildContentIndexFromSidecars`)
+
+`buildContentIndex` produced `byPath` keys via `relative(contentDir, abs)`; `buildContentIndexFromSidecars` produces them via `relative(projectRoot, abs)` (content-index.ts:374, `bindFilesToIndex(..., projectRoot, ...)`). The runner now feeds the latter to *every* rule's `ctx.index`. `duplicate-id` was correctly updated to reconstruct absolutes with `join(ctx.projectRoot, relPath)` and even documents the change (duplicate-id.ts:56-63). The risk is that this is a string→string contract change: any other rule that still does `join(contentDir, relPath)` against the new projectRoot-relative key gets a wrong absolute path with **no compile error and no runtime throw** — it just resolves to a non-existent file and silently under- or mis-reports. The diff contains no inventory, grep, or regression test demonstrating that `duplicate-id` is the *only* `byPath`/`byId` consumer that needed reconciliation.
+
+The 39d note says `file-presence`/`frontmatter-sidecar`/`missing-artifact-path` now resolve via `resolveStoredArtifactPath` (not the index), which narrows the blast radius — but that's an assertion, not evidence in this diff. A cheap, durable fix: add a unit test on `buildContentIndexFromSidecars` asserting a known `byPath` key equals the entry's `artifactPath` verbatim (project-root-relative), and a one-line grep-audit note in the workplan enumerating every `ctx.index.byPath`/`byId` reader confirmed updated. Without that pin, the next rule author who reaches for `ctx.index.byPath` has no signal about which base it carries.
+
+### AUDIT-20260603-30 — `includeArchived` is inconsistent across the new lane consumers — archived lanes drive doctor discovery but not the host imprint or boot banner
+
+Finding-ID: AUDIT-20260603-30
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/src/content-index.ts:312` (`listLaneConfigs(projectRoot, { includeArchived: true })`) vs. `packages/studio/src/pages/help.ts:60` (`listLaneConfigs(ctx.projectRoot)`) vs. `packages/studio/src/server.ts:730` (`listLaneConfigs(projectRoot)`)
+
+This diff introduces three new `listLaneConfigs` call sites and they disagree on archived-lane inclusion. `collectLaneScaffoldDirs` passes `{ includeArchived: true }` (content-index.ts:312), so an **archived** lane's `scaffoldDefaults` directory still becomes a doctor discovery root — meaning the doctor walks (and can report findings against) content rooted in a lane the operator has explicitly retired. Meanwhile `collectLaneHosts` (help.ts) and the server banner (server.ts) both omit the flag, so archived lanes are correctly excluded there.
+
+Either choice is defensible in isolation, but the inconsistency is a smell: if archived means "retired," its content root probably shouldn't generate fresh orphan/duplicate findings; if archived content must still be validated, the imprint/banner exclusion is the outlier. The likely-correct default is to exclude archived lanes from discovery (matching the other two consumers), and if archived-content validation is genuinely wanted, make that an explicit, documented decision rather than an unremarked `true` buried in a helper. At minimum the three call sites should share one rationale comment so the divergence is intentional rather than incidental.
+
+### AUDIT-20260603-31 — `--fix=calendar-uuid-missing` now silently drops sidecar-less calendar rows via an SSOT regen, with no operator-facing signal that rows were removed
+
+Finding-ID: AUDIT-20260603-31
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/cli/test/doctor.test.ts:523-565` (rewritten expectation: orphan row dropped) — underlying behavior at the calendar-uuid-missing repair + the entry-centric SSOT regen (not in the diff)
+
+The rewritten test documents a real behavior change: running the *scoped* fix `--fix=calendar-uuid-missing --yes` now emits both `calendar-uuid-missing: 1 applied` **and** `calendar-regenerated`, and a hand-written calendar row with no backing sidecar is reconciled away (`expect(reread.entries.find((e) => e.slug === 'flushable')).toBeUndefined()`, doctor.test.ts:560-564). Under the single-project-calendar model where the calendar is a derived projection of sidecars, dropping a sidecar-less row is arguably correct — but an operator who asked only to backfill a missing UUID and instead has a calendar row deleted has no explicit signal that a row was *removed*; they have to infer it from the presence of `calendar-regenerated` in stdout.
+
+This brushes against the project's "content databases preserve, they don't delete" discipline: the row is being removed because it has no SSOT backing, which is justifiable, but the deletion is a side effect of a narrowly-scoped fix and isn't called out. A light fix: have the regen repair report a count of rows reconciled-away (e.g. `calendar-regenerated: dropped 1 orphan row (no backing sidecar)`) so the removal is auditable in the CLI output, and ensure the Phase-39 migration notes mention that scoped calendar fixes can trigger a full SSOT reconciliation. This keeps the (correct) behavior while making it loud instead of silent.
