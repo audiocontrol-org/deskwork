@@ -2748,7 +2748,7 @@ Because the message is a `const`, making it accurate requires turning it into a 
 ### AUDIT-20260602-39 — Swallowed `maxBuffer`/git errors make a >50MB legitimate diff indistinguishable from an empty tree → refusal with an actively wrong cure
 
 Finding-ID: AUDIT-20260602-39
-Status:     fixed-pending-commit
+Status:     acknowledged-partial-fix-81875d74-range-bounded-pending-maxbuffer-classification-2026-06-03
 Severity:   low
 Surface:    `implement-hook.ts:163-176` (`gitDiffCached`) and `:179-188` (`gitDiffWorktree`) — both `catch { return ''; }` with `maxBuffer: 50 * 1024 * 1024`
 
@@ -2934,3 +2934,53 @@ This is informational, not a correctness defect — slushing is a legitimate ope
 ---
 
 What I checked and found clean: the version bump is fully consistent at `0.35.0` across all eleven manifests — `marketplace.json` (metadata + 3 plugin `ref`s + 3 plugin `version`s), root `package.json`, `packages/{core,cli,studio}`, and both `.claude-plugin/plugin.json` + `package.json` for all three plugins, including the internal `@deskwork/core`/`@deskwork/cli`/`@deskwork/studio` dependency pins — no drift between a plugin shell version and its package dependency. The `hook-run-log.jsonl` appends are factual records (`fired-and-slushed` for `7cdf1896`, `no-new-diff-skip` with `runDir:null` for `b1e22e6a`) and internally consistent. The workplan checkbox flips (Task 5.121/5.122 audit-log-status criteria → `[x]`) match the audit-log status flips they describe. My one substantive finding is the closure-vs-test-coverage inconsistency (-01); the rest of the diff is mechanical and correct.
+
+## 2026-06-03 — audit-barrage lift (20260603T000615746Z-scope-discovery)
+
+### AUDIT-20260603-01 — Divergence-notice in `implement-hook` is dead code — the marker tip is silently dropped in the exact post-reset scenario Phase 22 Task 3 targets
+
+Finding-ID: AUDIT-20260603-01
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` (the `trustedTip` / `fallbackBaseline` / `lastBarrageTip` block, ~lines 332-360 of the new code, the `if (rawBarrageTip !== null && lastBarrageTip === null)` notice)
+
+Phase 22 Task 3's stated mirror-in-implement-hook intent is: "when `readLatestBarrageTip` returns a tip that's not an ancestor of HEAD, fall back to `HEAD~10..HEAD` … emits a non-fatal stderr notice." The notice condition as written is `if (rawBarrageTip !== null && lastBarrageTip === null)`. But `lastBarrageTip = trustedTip ?? pickFallbackBaseline(...)`, and in the diverged case `trustedTip` is `null` (via `ancestryAsBarrageTip('not-ancestor', tip)` → `null`), so `fallbackBaseline = pickFallbackBaseline(...)` — which returns a non-null SHA (the merge-base or `HEAD~10`) in every normal repo. Therefore `lastBarrageTip !== null` and the `if` is **false**: no notice fires.
+
+The result is that the canonical Friction-1 flow (`git reset --hard origin/main`, marker tip now points at a commit no longer reachable from HEAD) silently drops the marker tip and re-baselines with **zero operator-visible signal** — the opposite of the "non-fatal stderr notice" the task promised. The notice only fires in the degenerate sub-case where `pickFallbackBaseline` *also* returns `null` (no `origin/main` resolution AND no `HEAD~10`), which is the one case where the message's "Falling back to HEAD~10 baseline" text is itself wrong (the range then literally becomes `HEAD~10..HEAD`, but for any other path the chosen baseline is the merge-base, not HEAD~10). The condition should be `rawBarrageTip !== null && trustedTip === null` (i.e. "the marker tip was dropped due to non-ancestry"), independent of whether `pickFallbackBaseline` produced a SHA, and the message should name the actual baseline used rather than hardcoding `HEAD~10`.
+
+### AUDIT-20260603-02 — `pickFallbackBaseline` hardcodes `origin/main` and ignores `DW_UPSTREAM_BASE_REF` / `--upstream-base-ref` — the AUDIT-39 bounding silently degrades on non-`main` adopter repos
+
+Finding-ID: AUDIT-20260603-02
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts` (`pickFallbackBaseline`, `const upstream = opts.upstreamRef ?? 'origin/main'`) + its only call site `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` (the `pickFallbackBaseline({ resolveMergeBase: (ref) => gitMergeBase(repoRootResolved, ref, 'HEAD'), ... })` call, which passes no `opts`)
+
+Phase 21 introduced `DW_UPSTREAM_BASE_REF` + `--upstream-base-ref` (default `origin/main`) precisely so adopters whose default branch is `master`/`trunk`/`develop` aren't broken by a hardcoded `origin/main` (see `check-implement-hook-coverage.ts` `resolveUpstreamBaseRef`). Phase 22's new `pickFallbackBaseline` re-hardcodes `origin/main` as its default upstream **and the implement-hook call site passes no `opts`**, so the env var / flag plumbing Phase 21 added is not threaded through. On a non-`main` adopter repo, `gitMergeBase(repo, 'origin/main', 'HEAD')` fails to resolve → `resolveMergeBase` returns `null` → `pickFallbackBaseline` degrades to `relHead` (HEAD~10).
+
+That degradation re-arms the exact failure AUDIT-39's bounding was built to prevent: on a feature branch that recently merged its upstream, `HEAD~10` lands on the upstream's side of the merge, the diff balloons past `execFileSync`'s `maxBuffer`, and `gitDiff` swallows it (see AUDIT-BARRAGE-claude-03). Because `dw-lifecycle` is a distributed plugin wired into adopter repos via `install-scope-discovery-hooks`, this isn't hypothetical. A reasonable fix: have implement-hook resolve the upstream base from `DW_UPSTREAM_BASE_REF` (mirroring `resolveUpstreamBaseRef`) and pass it as `pickFallbackBaseline(..., { upstreamRef })`, so the Phase-21 contract holds across both gates that depend on the upstream base.
+
+### AUDIT-20260603-03 — Commit `pickFallbackBaseline bounds post-merge audited-diff range (AUDIT-20260602-39)` does not address AUDIT-39's stated defect — the `maxBuffer` swallow remains unchanged
+
+Finding-ID: AUDIT-20260603-03
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` (`gitDiffCached` ~lines 165-176 and `gitDiffWorktree` ~lines 179-188, both `catch { return ''; }` with `maxBuffer: 50 * 1024 * 1024`) vs. the top-of-range commit subject `fix(implement-hook): pickFallbackBaseline bounds post-merge audited-diff range (AUDIT-20260602-39)`
+
+AUDIT-20260602-39's body (recorded in this same audit-log, `Status: fixed-pending-commit`) names a specific defect: `execFileSync` throws `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` on a >50 MB diff, the helpers `catch { return ''; }`, and `computeAuditedDiff` then treats the legitimate-but-large diff as `empty` and refuses with an actively-wrong cure ("no novel work to audit"). Its recommended fix is explicit: "A `catch (e)` that re-throws (or returns a sentinel) on `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` while still tolerating 'not a git repo'."
+
+The commit that claims AUDIT-39 (`pickFallbackBaseline ...`) does something different: it **bounds the fallback range** so the `HEAD~10` window is less likely to span a huge post-merge diff. That mitigates one *trigger* of the overflow but does not address the *swallow itself* — `gitDiff`, `gitDiffCached`, and `gitDiffWorktree` in this very diff still blanket-`catch` into `''`, so a single large legitimate commit inside even a bounded range (a generated file, a vendored bundle, a big refactor) still overflows, is swallowed, and produces the backwards "empty diff" refusal AUDIT-39 describes. This is the closure-vs-coverage inconsistency shape AUDIT-52 named: a finding marked `fixed`/`fixed-pending-commit` while the defect's named mechanism is untouched. Either keep AUDIT-39 open until the maxBuffer-specific error classification lands, or split it so the bounding change doesn't carry an `AUDIT-39` trailer it doesn't satisfy.
+
+### AUDIT-20260603-04 — Workplan reintroduces task-number collisions: three `### Task 5.112`, two `### Task 5.113`, two `### Task 5.114` — a broader, unaddressed instance of AUDIT-48
+
+Finding-ID: AUDIT-20260603-04
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 5.112 (fix-finding-AUDIT-20260601-78)`, `### Task 5.112 (fix-finding-AUDIT-20260601-81)`, `### Task 5.112 (fix-finding-AUDIT-20260602-01)`; `### Task 5.113 (fix-finding-AUDIT-20260601-82)` + `### Task 5.113 (fix-finding-AUDIT-20260602-02)`; `### Task 5.114 (fix-finding-AUDIT-20260601-83)` + `### Task 5.114 (fix-finding-AUDIT-20260602-03)`
+
+AUDIT-20260602-48 flagged a single duplicate `Task 5.121`, which this diff resolved (AUDIT-45/46/44 are now renumbered 5.121/5.122/5.123). But the same collision shape is present and **unaddressed** at a different number range: this workplan contains **three** distinct `### Task 5.112` headings, **two** `### Task 5.113`, and **two** `### Task 5.114`. The collision arose because two separate barrage runs (the `AUDIT-20260601-78/81/82/83` cluster and the `AUDIT-20260602-01/02/03` cluster) each independently allocated numbers starting at 5.112.
+
+As AUDIT-48 established, task numbers are cross-surface identifiers — commit subjects and gates reference `Task <N>` and `fix-finding-AUDIT-…`. A reference to "Task 5.112" is now three-way ambiguous, and a numbering-driven walk could check off or skip the wrong block. The heading regex in `apply-audit-flips.ts` `tickClosureCriteria` anchors on the unique `(fix-finding-<canonical-id>)`, so the orphan-sweep itself disambiguates — but any human or tooling reference to the bare task number does not. The fix is the same AUDIT-48 prescribed: renumber the colliding tasks to unique integers (the `AUDIT-20260602-01/02/03` cluster to the next free numbers above the AUDIT-44/45/46 block). This is cheap now and compounds as the workplan grows.
+
+---
+
+I checked and found clean: the tri-state `checkAncestry` exit-code mapping (0→ancestor, 1→not-ancestor, >1/spawn-fail→unknown) and its two collapse arrows (`ancestryAsGateBoolean` refuses on unknown, `ancestryAsBarrageTip` drops the tip on unknown — the inverse-safety invariant is correct and well-tested); the `pickFallbackBaseline` closer-to-HEAD selection logic and tie-break; the `computeAuditedDiff` short-circuit ordering; the `--upstream-base-ref` flag/env precedence and `buildRange` `^base` exclusion; the `inferFindingShape` allowlist additions (`development-notes.md`, `.claude/rules/`, `.claude/CLAUDE.md`) and their regression tests; and the informational auto-flip path in `promote-findings.ts`. My four findings are new surface the prior 53 dispositioned entries did not capture: a dead divergence-notice conditional (-01), the Phase-21 upstream-base plumbing not threaded into Phase-22's fallback (-02), the AUDIT-39 closure claim not matching its named mechanism (-03), and a fresh task-number-collision cluster (-04). Issues already on record and slush-piled (the `catch{return ''}` swallow as AUDIT-39's own body, the `<lastBarrageTip>` cure placeholder AUDIT-38, the header-only comment overclaim AUDIT-35, the untracked-files gap AUDIT-36, the `--host 127.0.0.1` false-warning AUDIT-11, the unguarded regression-lock `if` AUDIT-80, the `IsAncestorOfHeadOptions` stale name AUDIT-51) I did not re-report.

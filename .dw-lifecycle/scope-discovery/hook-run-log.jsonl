@@ -717,3 +717,4 @@
 {"tip":"7cdf1896accb2e183a4c2fa83fc3701d6c1fbf3e","timestamp":"2026-06-02T23:30:37.689Z","disposition":"fired-and-slushed","runDir":"/Users/orion/work/deskwork-work/scope-discovery/.dw-lifecycle/scope-discovery/audit-runs/20260602T232824373Z-scope-discovery"}
 {"tip":"b1e22e6a3e04a433b5e816ffe5249066195a8a40","timestamp":"2026-06-02T23:45:28.757Z","disposition":"no-new-diff-skip","runDir":null}
 {"tip":"064de8481cb99d63b0a5c01b125774762da01944","timestamp":"2026-06-02T23:49:11.489Z","disposition":"fired-and-slushed","runDir":"/Users/orion/work/deskwork-work/scope-discovery/.dw-lifecycle/scope-discovery/audit-runs/20260602T234715812Z-scope-discovery"}
+{"tip":"81875d74da138f7417af6a593c10a71f6448f243","timestamp":"2026-06-03T00:10:30.827Z","disposition":"fired-and-slushed","runDir":"/Users/orion/work/deskwork-work/scope-discovery/.dw-lifecycle/scope-discovery/audit-runs/20260603T000615746Z-scope-discovery"}
