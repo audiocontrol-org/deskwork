@@ -32,8 +32,12 @@ export { detectArtifactKind } from './detection.ts';
 // when the lane declares no default for the requested kind.
 export {
   composeAddArtifactPath,
+  composeRelativePath,
   layoutToContentRelativePath,
   parseScaffoldLayout,
+  defaultLayoutForKind,
+  legalLayoutsForKind,
+  isLayoutLegalForKind,
   DEFAULT_SCAFFOLD_LAYOUT,
   SCAFFOLD_LAYOUTS,
   type ScaffoldLayout,

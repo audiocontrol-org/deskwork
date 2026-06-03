@@ -2043,23 +2043,93 @@ Closes AUDIT-20260603-15. Surface: `packages/core/src/doctor/rules/sites-to-lane
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
+
+### Task 39.9 (fix-finding-AUDIT-20260603-42) (non-bug): AUDIT-20260603-42 — Decision #17 introduces a new required `--artifact-path` CLI…
+
+Closes AUDIT-20260603-42. Surface: spec `docs/superpowers/specs/2026-06-02-sites-to-lanes-retirement-design.md` § "39c-2b design amendment" Decision #17 + AUDIT-39 table (`image | — | — | not templatable`) vs. `workplan.md` Task 39.6 acceptance criteria + `packages/cli/src/commands/add.ts:158-194` (no `--artifact-path` flag).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [x] Step 1: The `--artifact-path` flag is added to `add` as part of the AUDIT-39 fix (same commit): for `--kind image` it is required (exit 2 if absent), `--layout` is rejected, and the path is stamped verbatim; for templatable kinds it is rejected (path is composed). Help text updated. Tests cover present / absent-fails / rejected-for-non-image. So the flag the spec's Decision #17 requires lands in lockstep with making `image` not-templatable — closing the under-mapping this finding names.
+- [x] Step 2: applied — `--artifact-path` parsing + validation in `packages/cli/src/commands/add.ts`, tested in `packages/cli/test/add-lane-stage-integration.test.ts`.
+- [x] Step 3: commit with `Closes AUDIT-20260603-42` in subject (a real code change verifiable by test — the flag + its tests landed).
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (the `--artifact-path` flag + tests are present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 39.10 (fix-finding-AUDIT-20260603-43): AUDIT-20260603-43 — AUDIT-38's "canonical consumer roster" names `rename-slug` a…
+
+Closes AUDIT-20260603-43. Surface: spec § "CLI-verb resolution migration" (4th bullet: *"`rename-slug`: a slug→path verb…"*) vs. § "AUDIT-38 — canonical consumer roster" (CLI command files (10) — `rename-slug` absent; Core modules (2): `rename-slug.ts`). Severity: medium.
+
+DOC-ONLY (no test; mis-shaped as a bug task by auto-promotion). Disposition: the canonical roster in the spec now states `rename-slug` has NO CLI command — it is a core helper invoked by the studio route handler, listed only under "Core modules". Committed with `Acknowledges AUDIT-20260603-43` (no code change → no `Closes`).
+
+- [x] Step 1: disposition is a spec-prose clarification, not a code fix (no test applicable)
+- [x] Step 2: n/a — doc-only
+- [x] Step 3: applied — roster prose updated in the spec amendment (AUDIT-43 subsection + roster bullet)
+- [x] Step 4: n/a
+- [x] Step 5: commit with `Acknowledges AUDIT-20260603-43` in subject
+
+**Acceptance Criteria:**
+
+- [x] Spec roster states rename-slug is core-only (no CLI command)
+- [x] Audit-log Status flipped to `acknowledged`/`resolved` via the close-shipped-audit-findings step
+
+
+### Task 39.11 (fix-finding-AUDIT-20260603-44): AUDIT-20260603-44 — Per-kind default layout + "`--layout` still overrides" lets …
+
+Closes AUDIT-20260603-44. Surface: spec § "AUDIT-39 (HIGH)" table + bullets (*"The default layout is per-kind … `--layout` still overrides"*) vs. `packages/core/src/lanes/types.ts:93-94` (`single-file-html` — *"a loose `.html` file (not inside an html-mockup directory)"*). Severity: medium.
+
+- [x] Step 1: write failing test (illegal `(kind, layout)` combo, e.g. single-file-html + index, must be rejected)
+- [x] Step 2: confirm test fails against current code (no per-kind layout constraint existed)
+- [x] Step 3: implement the fix (`LEGAL_LAYOUTS_BY_KIND` + `isLayoutLegalForKind`; reject out-of-set pre-write with exit 2)
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-44` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `packages/core/test/scaffold-path.test.ts` (cited in Step 1)
+- [x] `npx vitest run packages/core/test/scaffold-path.test.ts` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.12 (fix-finding-AUDIT-20260603-45): AUDIT-20260603-45 — Decisions log keeps #12 ("global `index` default") un-supers…
+
+Closes AUDIT-20260603-45. Surface: spec § Decisions log rows #12 and #16 (both present, #12 not struck) + `packages/core/src/lanes/scaffold-path.ts:44-49` (`DEFAULT_SCAFFOLD_LAYOUT` docblock cites *"design Decision #12"*). Severity: low.
+
+DOC/COMMENT-ONLY (no test). Disposition: Decision #12 marked SUPERSEDED-by-#16 in the spec decisions log; the `DEFAULT_SCAFFOLD_LAYOUT` docblock in `scaffold-path.ts` now cites #16 + reflects the per-kind default (landed in the AUDIT-39 code commit). Committed with `Acknowledges AUDIT-20260603-45`.
+
+- [x] Step 1: disposition is a decisions-log supersession + a code-comment citation update (no behavioral test applicable)
+- [x] Step 2: confirm #12 read as operative before the edit
+- [x] Step 3: applied — #12 struck/superseded in spec; `scaffold-path.ts` docblock cites #16
+- [x] Step 4: n/a
+- [x] Step 5: commit with `Acknowledges AUDIT-20260603-45` in subject
+
+**Acceptance Criteria:**
+
+- [x] Decision #12 shows superseded-by-#16; code comment cites #16
+- [x] Audit-log Status flipped to `acknowledged`/`resolved` via the close-shipped-audit-findings step
+
 ### Task 39.6 (fix-finding-AUDIT-20260603-39): AUDIT-20260603-39 — `layoutToContentRelativePath` hardcodes the `.md` extension,…
 
 Closes AUDIT-20260603-39. Surface: `packages/core/src/lanes/scaffold-path.ts:52-64` (`layoutToContentRelativePath`) + `:83-105` (`composeAddArtifactPath`) + `packages/cli/test/add-lane-stage-integration.test.ts:178-180`. Severity: high.
 
-- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
-- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
-- [ ] Step 5: commit with `Closes AUDIT-20260603-39` in subject
+- [x] Step 0: working-code invariant — markdown `add` produces `<slug>/index.md`; the fix must preserve that while making non-markdown kinds kind-correct.
+- [x] Step 1: write failing test exercising the bug (kind-aware extension: html-mockup → index.html)
+- [x] Step 1b: regression-lock test pinning markdown's `<slug>/index.md` shape (would fail if the fix broke markdown)
+- [x] Step 2: confirm test(s) fail against pre-fix code (markdown shape held; html-mockup asserted index.md → bug repro)
+- [x] Step 3: implement the fix (kind-derived extension + per-kind legal layouts in `composeRelativePath`)
+- [x] Step 4: confirm all tests pass (bug-repro green; markdown regression-lock green)
+- [x] Step 5: commit with `Closes AUDIT-20260603-39` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `packages/core/test/scaffold-path.test.ts` (cited in Step 1)
+- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline (29 test blocks)
+- [x] `npx vitest run packages/core/test/scaffold-path.test.ts` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -2067,16 +2137,16 @@ Closes AUDIT-20260603-39. Surface: `packages/core/src/lanes/scaffold-path.ts:52-
 
 Closes AUDIT-20260603-40. Surface: `packages/core/src/lanes/scaffold-path.ts:29` (`import { join } from 'node:path'`) + `:104` (`return join(directory, relativePath)`). Severity: medium.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-40` in subject
+- [x] Step 1: write failing test (assert forward-slash separators in the composed artifactPath)
+- [x] Step 2: confirm test fails against current code (node:path.join would diverge on Windows)
+- [x] Step 3: implement the fix (compose with `node:path/posix.join`)
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-40` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `packages/core/test/scaffold-path.test.ts` (cited in Step 1)
+- [x] `npx vitest run packages/core/test/scaffold-path.test.ts` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -2084,14 +2154,14 @@ Closes AUDIT-20260603-40. Surface: `packages/core/src/lanes/scaffold-path.ts:29`
 
 Closes AUDIT-20260603-41. Surface: `packages/cli/src/commands/add.ts:155-167` (compose + stamp) vs. `packages/core/src/scaffold.ts:27` (`import { resolveSite, resolveBlogFilePath } from './paths.ts'`) — still present after the refactor. Severity: medium.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-41` in subject
+- [x] Step 1: write a test pinning the seam — `add` writes calendar+sidecar only, creates NO content file (so the stamp can't diverge from a file add never writes)
+- [x] Step 2: confirm the trace — `add.ts` → `createFreshEntrySidecar` → `writeSidecar`; no `scaffoldBlogPost`/`writeFileSync`/`mkdir` in the add path
+- [x] Step 3: implement (regression-lock test asserting no content file on disk after add)
+- [x] Step 4: confirm test passes; migrating the file-creating verb (`scaffoldBlogPost`) to read `entry.artifactPath` is sub-task (a), out of this fix's scope
+- [x] Step 5: commit with `Closes AUDIT-20260603-41` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `packages/cli/test/add-lane-stage-integration.test.ts` (cited in Step 1)
+- [x] `npx vitest run packages/cli/test/add-lane-stage-integration.test.ts` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step

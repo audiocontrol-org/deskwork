@@ -7,6 +7,7 @@
  *                [--lane <lane-id>] [--stage <stage>]
  *                [--kind markdown|html-mockup|single-file-html|image]
  *                [--layout index|readme|flat]
+ *                [--artifact-path <path>]
  *                <title> [description]
  *
  * Writes the calendar atomically. Emits a JSON result on stdout:
@@ -36,8 +37,9 @@ import {
   loadLaneConfig,
   composeAddArtifactPath,
   parseScaffoldLayout,
+  isLayoutLegalForKind,
+  legalLayoutsForKind,
   SCAFFOLD_LAYOUTS,
-  DEFAULT_SCAFFOLD_LAYOUT,
 } from '@deskwork/core/lanes';
 import {
   ArtifactKindSchema,
@@ -61,6 +63,7 @@ export async function run(argv: string[]): Promise<void> {
     'stage',
     'kind',
     'layout',
+    'artifact-path',
   ] as const;
   const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 
@@ -73,6 +76,7 @@ export async function run(argv: string[]): Promise<void> {
         '[--lane <lane-id>] [--stage <stage>] ' +
         '[--kind markdown|html-mockup|single-file-html|image] ' +
         '[--layout index|readme|flat] ' +
+        '[--artifact-path <path>] ' +
         '<title> [description]',
       2,
     );
@@ -124,20 +128,68 @@ export async function run(argv: string[]): Promise<void> {
     flags,
   );
 
-  // Validate --layout BEFORE any disk mutation (same pre-write contract
-  // as --type / --source / --stage / --kind). When omitted, the global
-  // default `index` reproduces the legacy `{slug}/index.md` shape.
-  let layout: ScaffoldLayout = DEFAULT_SCAFFOLD_LAYOUT;
-  if (flags['layout'] !== undefined) {
-    const parsedLayout = parseScaffoldLayout(flags['layout']);
-    if (parsedLayout === undefined) {
+  // Resolve the artifactPath SOURCE BEFORE any disk mutation (same
+  // pre-write contract as --type / --source / --stage / --kind). Two
+  // mutually-exclusive sources:
+  //
+  //   - `image` kind: NOT templatable (AUDIT-42). Requires an explicit
+  //     `--artifact-path <path>`, stamped verbatim. `--layout` is
+  //     rejected (an image has no layout shape).
+  //   - templatable kinds (markdown / html-mockup / single-file-html):
+  //     compose from scaffoldDefaults[kind] + per-kind layout + slug.
+  //     `--artifact-path` is rejected (the path is composed, not given).
+  //
+  // `--layout`, when supplied for a templatable kind, must be both a
+  // legal value AND legal for that kind (AUDIT-44). When omitted, the
+  // per-kind default fires inside composeAddArtifactPath.
+  const artifactPathFlag = flags['artifact-path'];
+  let layout: ScaffoldLayout | undefined;
+
+  if (artifactKind === 'image') {
+    if (flags['layout'] !== undefined) {
       fail(
-        `Invalid --layout "${flags['layout']}". `
-          + `Must be one of: ${SCAFFOLD_LAYOUTS.join(', ')}.`,
+        `--layout is not valid with --kind image: an image is a binary `
+          + `with no layout shape. Pass --artifact-path <path> instead.`,
         2,
       );
     }
-    layout = parsedLayout;
+    if (artifactPathFlag === undefined) {
+      fail(
+        `--kind image requires --artifact-path <path>: an image is not `
+          + `templatable (no body to scaffold), so deskwork cannot compose `
+          + `a path. Pass the path to the image file explicitly.`,
+        2,
+      );
+    }
+  } else {
+    if (artifactPathFlag !== undefined) {
+      fail(
+        `--artifact-path is only valid with --kind image. For kind `
+          + `"${artifactKind}", the path is composed from the lane's `
+          + `scaffoldDefaults plus --layout; pass --layout instead.`,
+        2,
+      );
+    }
+    if (flags['layout'] !== undefined) {
+      const parsedLayout = parseScaffoldLayout(flags['layout']);
+      if (parsedLayout === undefined) {
+        fail(
+          `Invalid --layout "${flags['layout']}". `
+            + `Must be one of: ${SCAFFOLD_LAYOUTS.join(', ')}.`,
+          2,
+        );
+      }
+      if (!isLayoutLegalForKind(artifactKind, parsedLayout)) {
+        const legal = legalLayoutsForKind(artifactKind).join(', ') || '(none)';
+        fail(
+          `--layout "${parsedLayout}" is not legal for --kind `
+            + `"${artifactKind}". Legal layouts for "${artifactKind}": `
+            + `${legal}.`,
+          2,
+        );
+      }
+      layout = parsedLayout;
+    }
   }
 
   const calendar = readCalendar(calendarPath);
@@ -155,17 +207,31 @@ export async function run(argv: string[]): Promise<void> {
     fail(err instanceof Error ? err.message : String(err));
   }
 
-  // Phase 39c-2b (sub-task b): compose the new entry's authoritative
-  // `artifactPath` from the lane's add-time `scaffoldDefaults[kind]`
-  // (directory) + the requested layout + the slug. Done BEFORE
-  // `writeCalendar` so a lane that declares no default for this kind
-  // fails loudly with NO disk mutation (calendar.md + sidecar both
-  // skipped) — same pre-write contract as the flag validations above.
+  // Phase 39c-2b (sub-task b): determine the new entry's authoritative
+  // `artifactPath`. For `image` the operator supplied it verbatim via
+  // `--artifact-path` (validated above). For templatable kinds, compose
+  // it kind-aware from the lane's `scaffoldDefaults[kind]` (directory) +
+  // the per-kind/explicit layout + the slug. Done BEFORE `writeCalendar`
+  // so a lane that declares no default for this kind fails loudly with
+  // NO disk mutation (calendar.md + sidecar both skipped) — same
+  // pre-write contract as the flag validations above.
   let artifactPath: string;
-  try {
-    artifactPath = composeAddArtifactPath(lane, artifactKind, entry.slug, layout);
-  } catch (err) {
-    fail(err instanceof Error ? err.message : String(err));
+  if (artifactKind === 'image') {
+    if (artifactPathFlag === undefined) {
+      fail('--kind image requires --artifact-path (programmer error)', 2);
+    }
+    artifactPath = artifactPathFlag;
+  } else {
+    try {
+      artifactPath = composeAddArtifactPath(
+        lane,
+        artifactKind,
+        entry.slug,
+        layout,
+      );
+    } catch (err) {
+      fail(err instanceof Error ? err.message : String(err));
+    }
   }
 
   writeCalendar(calendarPath, calendar);

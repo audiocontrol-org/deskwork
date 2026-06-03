@@ -948,3 +948,59 @@ The diff doesn't include the file-creating caller, so I can't confirm the diverg
 ---
 
 I also checked and found clean: the pre-write ordering (`composeAddArtifactPath` is called inside its own try/catch *before* `writeCalendar`, add.ts:158-167, so a missing-default lane aborts with no disk mutation — the integration test at lines 360-393 verifies calendar.md stays untouched); the loud-error path (names lane id + kind + the real `lane update --scaffold-default` remediation command, which exists per `lane.ts:11,185`); the `--layout` flag validation (rejects out-of-set values pre-write with exit 2, mirroring `--kind`/`--source`); and the single-source-of-truth refactor (`scaffold.ts` correctly re-exports `ScaffoldLayout` and imports the mapping helper rather than duplicating it). My three findings concentrate on the kind-blindness of the composer, separator portability, and the unverified seam between the new stamp and the old file-creating path.
+
+## 2026-06-03 — audit-barrage lift (20260603T095847400Z-deskwork-plugin)
+
+### AUDIT-20260603-42 — Decision #17 introduces a new required `--artifact-path` CLI flag for `image` kind, but no promoted task scopes adding it — and the AUDIT-39 fix breaks `add --kind image` the moment it lands without it
+
+Finding-ID: AUDIT-20260603-42
+Status:     open
+Severity:   high
+Surface:    spec `docs/superpowers/specs/2026-06-02-sites-to-lanes-retirement-design.md` § "39c-2b design amendment" Decision #17 + AUDIT-39 table (`image | — | — | not templatable`) vs. `workplan.md` Task 39.6 acceptance criteria + `packages/cli/src/commands/add.ts:158-194` (no `--artifact-path` flag)
+
+Decision #17 says *"`add --kind image` requires an explicit `--artifact-path <path>`; absent → fail loudly."* This is a **brand-new CLI flag** — I verified `add.ts` has no such flag today (the only path source is `composeAddArtifactPath(lane, artifactKind, entry.slug, layout)` at `add.ts:166`, which currently produces `<slug>/index.md` for *every* kind including image). Task 39.6 is the only promoted task covering AUDIT-39, and its Step list / acceptance criteria mention only "kind-aware layout mapping" and "assert `index.html` for html-mockup" — nothing about adding, validating, help-texting, or testing a `--artifact-path` flag.
+
+This is the exact under-mapping failure mode that made 39c-2 STOP, recurring: the moment the AUDIT-39 fix makes `image` "not templatable," the image branch has **no path source at all** unless `--artifact-path` lands in the same change. A fix that removes the (wrong) `<slug>/index.md` composition for image without simultaneously adding the flag leaves `add --kind image` with no way to produce an `artifactPath` — a regression worse than the bug. The flag is integral to the fix, not optional polish. The fix: add an explicit Step + acceptance-criterion to Task 39.6 for the `--artifact-path` flag (parse, validate, fail-loud-when-absent-for-image, help text, test), so "implement the fix" doesn't silently swallow a new required CLI surface.
+
+---
+
+### AUDIT-20260603-43 — AUDIT-38's "canonical consumer roster" names `rename-slug` as a distinct verb in the three-bucket prose but files it only as a core module — there is no `rename-slug` CLI command, so the roster the amendment published to *end* the count drift still can't locate the verb's call site
+
+Finding-ID: AUDIT-20260603-43
+Status:     resolved-2026-06-03 — spec roster clarified: rename-slug has no CLI command (core helper only). Doc-only; acknowledged in this commit.
+Severity:   medium
+Surface:    spec § "CLI-verb resolution migration" (4th bullet: *"`rename-slug`: a slug→path verb…"*) vs. § "AUDIT-38 — canonical consumer roster" (CLI command files (10) — `rename-slug` absent; Core modules (2): `rename-slug.ts`)
+
+The three-bucket classification lists `rename-slug` as a peer **verb** with its own resolution pattern (4th bullet, alongside `add`, the existing-entry verbs, and `ingest`). But the "canonical consumer roster" — the artifact AUDIT-38 published *specifically to end the 11-vs-10 count drift* — lists `rename-slug` only under **Core modules** (`rename-slug.ts`), and the 10 CLI command files do **not** include it. I confirmed there is no `rename-slug` command file under `packages/cli/src/commands/` (grep for `rename-slug|renameSlug` returns no CLI matches; only the core `packages/core/src/rename-slug.ts` exists).
+
+So the roster has the same shape of gap it claims to fix: an implementer working "migrate the `rename-slug` verb's resolution" against the roster finds a core module but no CLI entry point, and the AUDIT-36 amendment's new behavior (detect-layout-from-`artifactPath` → recompose → move → rewrite) has no enumerated *task* and no CLI call site in the roster. Either `rename-slug` is core-only (then the prose should not list it as a CLI **verb** peer and should say "invoked by core helper, no CLI command") or there is a CLI surface the roster omits. As written, the roster's completion check ("zero `resolveBlogPostDir` references remain") is verifiable, but the *which-files-to-touch* enumeration that AUDIT-38 promised is still one entry ambiguous.
+
+---
+
+### AUDIT-20260603-44 — Per-kind default layout + "`--layout` still overrides" lets `single-file-html --layout index` produce a directory-shaped path that contradicts the kind's documented "loose `.html` file" contract — legal layouts per kind are unconstrained
+
+Finding-ID: AUDIT-20260603-44
+Status:     open
+Severity:   medium
+Surface:    spec § "AUDIT-39 (HIGH)" table + bullets (*"The default layout is per-kind … `--layout` still overrides"*) vs. `packages/core/src/lanes/types.ts:93-94` (`single-file-html` — *"a loose `.html` file (not inside an html-mockup directory)"*)
+
+The amendment defines a per-kind default layout (single-file-html → `flat` → `<slug>.html`) but explicitly preserves *"`--layout` still overrides."* It places **no constraint on which layouts are legal for which kind**. Passing `add --kind single-file-html --layout index` therefore composes `<slug>/index.html` — a *directory containing index.html*, which is byte-for-byte the html-mockup shape and directly contradicts single-file-html's docblock ("a loose `.html` file, **not inside an html-mockup directory**"). Conversely `--kind html-mockup --layout flat` yields a loose `<slug>.html`, contradicting html-mockup's "a directory containing index.html."
+
+This is the same class of bug AUDIT-39 itself names — a kind stamped with an on-disk shape its contract forbids — except reintroduced through the override axis rather than the markdown-hardcode axis. The amendment moved the extension to be kind-derived but left the filename *pattern* (`index`/`readme`/`flat`) fully orthogonal to the kind. The fix: specify the legal layout set per kind (markdown: all three; html-mockup: `index`/`readme` only; single-file-html: `flat` only; image: none) and reject out-of-set `(kind, layout)` combinations pre-write with exit 2, mirroring how `parseScaffoldLayout` (`scaffold-path.ts:112-117`) already rejects unknown layout *values*. Otherwise the "kind-aware composition" still allows a self-contradicting artifactPath.
+
+---
+
+### AUDIT-20260603-45 — Decisions log keeps #12 ("global `index` default") un-superseded alongside #16 ("per-kind default"), and `scaffold-path.ts:47` still cites #12 — a reader of either the log or the code comment gets the pre-amendment rule
+
+Finding-ID: AUDIT-20260603-45
+Status:     resolved-2026-06-03 — Decision #12 marked superseded-by-#16 in the spec; scaffold-path.ts docblock cites #16. Doc/comment-only; acknowledged in this commit.
+Severity:   low
+Surface:    spec § Decisions log rows #12 and #16 (both present, #12 not struck) + `packages/core/src/lanes/scaffold-path.ts:44-49` (`DEFAULT_SCAFFOLD_LAYOUT` docblock cites *"design Decision #12"*)
+
+Decision #16 ("Default layout is per-kind … refining the earlier global-`index` default") is added without striking or annotating Decision #12 ("Default layout = `index` (`<slug>/index.md`)"). Both rows now coexist in the log as standalone decisions; #16's rationale references #12 in prose but the #12 row itself still reads as the operative global rule. The drift compounds in code: `scaffold-path.ts:44-49` documents `DEFAULT_SCAFFOLD_LAYOUT = 'index'` and cites *"design Decision #12"* as its authority — a citation that is now only correct for `markdown`, and stale for html-mockup/single-file-html/image once the AUDIT-39 fix lands.
+
+This is documentation-consistency rather than a logic bug, but it's the rot-vector the project's spec-is-canonical rules exist to catch: the next reader who lands on Decision #12 or the `DEFAULT_SCAFFOLD_LAYOUT` comment implements the global default and never sees #16. Fix: mark Decision #12 as superseded-by-#16 in the log (the project's decisions-log convention should show supersession, not silent coexistence), and update the `scaffold-path.ts:47` comment to cite #16 when Task 39.6 touches that file — same-commit, per the state-machine/design-standards "update the spec citation in lockstep" discipline.
+
+---
+
+I also checked and found clean: the three new workplan tasks (39.6/39.7/39.8) correctly apply the Option-D discipline — only 39.6 (HIGH) carries the Step 0 working-code-invariant + Step 1b regression-lock pair, while the two mediums get the single bug-repro test, consistent with "HIGH+ findings get a regression-lock test"; the `hook-run-log.jsonl` appends are well-formed JSON with valid enum dispositions (`no-new-diff-skip`, `fired-and-slushed`, `fired-and-promoted`); the AUDIT-37 inline scoping edit (the "byte-for-byte identical" claim is now correctly narrowed to *"adopters who left `blogFilenameTemplate` at its default"* with a ⚠️ pointer to the migration mapping table) properly resolves the prior finding; and the AUDIT-40 amendment's `node:path/posix.join` prescription is a real, correct API. My findings concentrate on the one unscoped new CLI surface (`--artifact-path`), the residual roster ambiguity around `rename-slug`, the unconstrained kind×layout override matrix, and a stale decision-citation pair.

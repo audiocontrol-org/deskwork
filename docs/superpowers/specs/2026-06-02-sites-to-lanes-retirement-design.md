@@ -119,16 +119,17 @@ The audit-barrage on the 39c-2b design pass + sub-task (b) commit surfaced six g
 
 The Option-1 model composed the relative path from `layout` alone, hardcoding `.md`. But `ArtifactKind` is `markdown | html-mockup | single-file-html | image`, and a non-markdown kind stamped with a `.md` `artifactPath` is wrong at the authoritative source. The composer is now **`(kind, layout, slug) → relativePath`**:
 
-| kind | extension | default layout | shape (at default layout) |
-|---|---|---|---|
-| `markdown` | `.md` | `index` | `<slug>/index.md` |
-| `html-mockup` | `.html` | `index` | `<slug>/index.html` (a directory containing `index.html`) |
-| `single-file-html` | `.html` | `flat` | `<slug>.html` (a loose file) |
-| `image` | — | — | **not templatable** |
+| kind | extension | **legal layouts** | default layout | shape (at default) |
+|---|---|---|---|---|
+| `markdown` | `.md` | `index`, `readme`, `flat` | `index` | `<slug>/index.md` |
+| `html-mockup` | `.html` | `index` only | `index` | `<slug>/index.html` (a directory containing `index.html`) |
+| `single-file-html` | `.html` | `flat` only | `flat` | `<slug>.html` (a loose file) |
+| `image` | — | none | — | **not templatable** |
 
 - The **extension is derived from the kind**; `layout` selects the filename pattern (`index` → `<slug>/index.<ext>`, `readme` → `<slug>/README.<ext>`, `flat` → `<slug>.<ext>`).
-- The **default layout is per-kind** (markdown/html-mockup → `index`; single-file-html → `flat`), refining the earlier "global `index` default." `--layout` still overrides. For `markdown` this preserves the zero-change default (`<slug>/index.md`).
-- **`image` is not templatable** (binary; there is no body to scaffold). `add --kind image` requires an explicit `--artifact-path <path>`; absent → **fail loudly** (consistent with the no-fallbacks rule and Decision #13). The `--layout` flag does not apply to `image`.
+- **Legal layouts are constrained per kind (AUDIT-44).** A kind only accepts the layouts whose shape matches its on-disk contract: `html-mockup` is "a directory containing `index.html`," so only `index`; `single-file-html` is "a loose `.html` file," so only `flat`. An out-of-set `(kind, --layout)` combination (e.g. `--kind single-file-html --layout index`) is **rejected pre-write with exit 2**, the same shape as `parseScaffoldLayout` rejecting an unknown layout value. This stops the override axis from re-introducing the very shape-mismatch AUDIT-39 names.
+- The **default layout is per-kind** (markdown/html-mockup → `index`; single-file-html → `flat`), refining (superseding) the earlier global-`index` default. For `markdown` this preserves the zero-change default (`<slug>/index.md`).
+- **`image` is not templatable** (binary; there is no body to scaffold). `add --kind image` takes no layout and requires an explicit **`--artifact-path <path>`** flag (a NEW flag — its addition is part of the AUDIT-39 fix task, AUDIT-42); absent → **fail loudly** (no-fallbacks rule + Decision #13). `add` stamps that path verbatim.
 - The sub-task (b) integration test that asserted `…/index.md` for `--kind html-mockup` **locked the bug in**; it must assert `…/index.html`.
 
 ### AUDIT-40 (medium) — compose with forward slashes, not `node:path.join`
@@ -161,9 +162,21 @@ Moved to the create-verb bucket (above). A shortform draft is a NEW file in the 
 The "11 callers" count was imprecise. The authoritative roster of `resolveSite`/`siteConfig`/slug-template consumers to migrate before the terminal deletion:
 
 - **CLI command files (10):** `add`, `ingest`, `publish`, `block`, `cancel`, `approve` (longform + shortform call sites), `distribute`, `induct`, `shortform-start`, `iterate` (longform + shortform call sites). (12 `resolveSite` call sites across these 10 files.)
-- **Core modules (2):** `packages/core/src/scaffold.ts` (`resolveSite` + `resolveBlogFilePath`), `packages/core/src/rename-slug.ts` (`resolveBlogPostDir` + slug-template).
+- **Core modules (2):** `packages/core/src/scaffold.ts` (`resolveSite` + `resolveBlogFilePath`), `packages/core/src/rename-slug.ts` (`resolveBlogPostDir` + slug-template). **`rename-slug` has NO CLI command** (AUDIT-43) — it is a core helper invoked by the studio route handler; its migration touches `rename-slug.ts`, not a `commands/` file. The earlier prose calling it a "verb peer" means *resolution-pattern peer*, not *CLI command*.
 
 The terminal-deletion step's completion check is: zero `resolveSite`/`siteConfig`/`resolveContentDir`/`resolveBlogFilePath`/`resolveBlogPostDir`/`resolveEntryFilePath`/`resolveShortformFilePath` references remain outside the 39b migration reader.
+
+### AUDIT-42 (HIGH) — the new `--artifact-path` flag is part of the AUDIT-39 fix task, not a separate change
+
+Making `image` "not templatable" removes its (wrong) path source; the `--artifact-path` flag is what replaces it, so the two must land together or `add --kind image` has no way to produce a path. The AUDIT-39 fix task (workplan 39.6) explicitly scopes adding the flag: parse `--artifact-path`, validate (required for `image`, ignored/rejected for templatable kinds), help text, and tests for both the present and absent-fails-loud cases.
+
+### AUDIT-44 (medium) — legal layouts are constrained per kind
+
+Folded into the AUDIT-39 table above: each kind declares its legal layout set, and an out-of-set `(kind, --layout)` combination is rejected pre-write (exit 2). This closes the override-axis re-introduction of the shape-mismatch bug.
+
+### AUDIT-45 (low) — Decision #12 superseded by #16; code citation updated in lockstep
+
+Decision #12 (global `index` default) is **superseded by Decision #16** (per-kind default) — annotated in the log below. The `DEFAULT_SCAFFOLD_LAYOUT` docblock in `scaffold-path.ts` that cited #12 is updated to cite #16 as part of the AUDIT-39 fix (same commit that makes composition kind-aware), per the spec-citation-in-lockstep discipline.
 
 ## Decisions log
 
@@ -180,7 +193,7 @@ The terminal-deletion step's completion check is: zero `resolveSite`/`siteConfig
 | 9 | Migration = `doctor --fix` clean cutover | Pre-1.0 decisive cutover; adopters run doctor once. |
 | 10 | Drop the in-flight `#394` search-all-sites fix | Wrong layer; superseded by entry-owns-path resolution. |
 | 11 | `add`-time destination = `scaffoldDefaults[K]` dir + separate layout (Option 1) | Smallest change; preserves all 3 layouts; default `index` = today's behavior (zero-change cutover). Operator 2026-06-03. |
-| 12 | Default layout = `index` (`<slug>/index.md`) | Least surprise — matches the current `{slug}/index.md` template default. |
+| 12 | ~~Default layout = `index` (`<slug>/index.md`)~~ **SUPERSEDED by #16** (per-kind default) | Least surprise for markdown; but a single global default is wrong for non-markdown kinds — see AUDIT-39/45. |
 | 13 | Missing `scaffoldDefaults[K]` fails loudly (no silent fallback) | Per the no-fallbacks rule; an undefined scaffold dir is an actionable error, not a guess. |
 | 14 | CLI verbs on existing entries resolve via `entry.artifactPath` only | Extends 39d's flip to the verb path; eliminates the last slug+stage search before `sites` can be deleted. |
 | 15 | Path composition is kind-aware (extension from kind; layout selects filename pattern) | AUDIT-39: a non-markdown kind stamped with `.md` is wrong at the authoritative source. |
