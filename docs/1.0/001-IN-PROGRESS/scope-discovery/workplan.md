@@ -1640,13 +1640,15 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 3 — `dw-lifecycle unarchive-phases` sibling verb
 
-- Step 1: Write failing tests: invoking against an archive file with Phase X moves the section back to active workplan + removes Phase X from the ledger range.
-- Step 2: Implement `plugins/dw-lifecycle/src/subcommands/unarchive-phases.ts`. Flags symmetric to archive-phases.
-- Step 3: Reinsert at correct workplan position (numeric phase order; insert before the next-higher live phase).
-- Step 4: Ledger update: remove unarchived phases from `archived-phases` range; do NOT decrement `next-fix-task-id` (IDs are forever-allocated even after unarchive).
-- Step 5: Confirm tests pass.
+**Complete.** Library + CLI shim + 9 vitest scenarios shipped.
 
-**Acceptance:** Symmetric to archive-phases. Reversibility verified by round-trip test (archive → unarchive → diff against original).
+- [x] Step 1: failing tests authored covering happy path + round-trip + insertion-order + not-found.
+- [x] Step 2: implemented `plugins/dw-lifecycle/src/subcommands/unarchive-phases.ts` + library at `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/unarchive-phases.ts`. Flags symmetric to archive-phases (`--feature`, `--phases`, `--repo-root`, `--apply`).
+- [x] Step 3: `findInsertionLine` pure-fn locates the correct numeric position; section reinserted before the first `## Phase M:` with M > target.
+- [x] Step 4: ledger update via `removeFromRanges` (splits/merges as needed); `next-fix-task-id` preserved per spec (IDs are forever-allocated). `archivedFixTasks` + `archiveFile` + `note` all preserved.
+- [x] Step 5: 9/9 unarchive tests pass; 43/43 total in workplan-archive/ suite.
+
+**Acceptance:** ✅ Symmetric to archive-phases. ✅ Round-trip test (`archive 1,2 → unarchive 1,2 → final state has all phases in numeric order + ledger empty`) passes.
 
 ### Task 4 — Auto-positioner ledger awareness in `promote-findings`
 
