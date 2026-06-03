@@ -3858,7 +3858,7 @@ This is active operator-facing prose, not historical notes. An operator followin
 ### AUDIT-20260603-72 — Workplan Tasks 9–14 are fully unchecked while the same commit marks their findings `fixed`/`acknowledged` — internal contradiction within the audited range
 
 Finding-ID: AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-b178bdd0
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:228-332` (Tasks 9–14) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:3790-3854` (AUDIT-66…71)
 
@@ -3869,7 +3869,7 @@ This is precisely the canonical-surface drift the project repeatedly names (cf. 
 ### AUDIT-20260603-73 — Doctor `SKILL.md` rule-count claim ("eight") is not reconciled in the diff that removed two rule rows — AUDIT-71's required count update appears unmade despite `fixed-db630841`
 
 Finding-ID: AUDIT-20260603-73 (claude-03 + codex-03; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-b178bdd0
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/skills/doctor/SKILL.md` (single hunk `@@ -39,9 +39,7 @@`) vs. AUDIT-20260603-71 requirement "update the rule count/table to match"
 
@@ -3880,7 +3880,7 @@ If the count text still reads "eight" while the table now lists fewer rules, the
 ### AUDIT-20260603-74 — `migrate-from-pilot` still routes operators to retired commands
 
 Finding-ID: AUDIT-20260603-74
-Status:     fixed-pending-sha
+Status:     fixed-b178bdd0
 Severity:   high
 Surface:    `plugins/dw-lifecycle/skills/migrate-from-pilot/SKILL.md:71-75` (missing from this diff, but should be)
 
@@ -3891,7 +3891,7 @@ This is not a re-litigation of AUDIT-67; it is an unhandled instance of the exac
 ### AUDIT-20260603-75 — Scope-discovery template README still installs a retired hook manifest contract
 
 Finding-ID: AUDIT-20260603-75
-Status:     fixed-pending-sha
+Status:     fixed-b178bdd0
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/templates/scope-discovery/README.md:21-30` (missing from this diff, but should be)
 
