@@ -4264,3 +4264,282 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
 - **Backfilling missing log entries on existing branches** — historical hook-run-log entries stay as-is. The fix is forward-only; existing branches with already-pushed commits aren't re-evaluated by the gate (the gate walks unpushed commits).
 - **A doctor rule that surfaces hook-run-log gaps proactively** — useful but separate. The runtime fix here addresses the root cause; a doctor rule that warns when the log has gaps could be a Phase 24 follow-up if recurrence is observed after Phase 23 lands.
 - **Squashing the v0.35.0 bypass commits** — the bypass shipped, the release is verified by an adopter, and the Phase 23 fix prevents recurrence going forward. No history rewrite needed.
+
+## Phase 24: Retire git-hook enforcement; relocate discipline into skill bodies ([#404](https://github.com/audiocontrol-org/deskwork/issues/404))
+
+**Architectural principle.** Enforcement lives in surfaces an adopter installs and runs — skills (`session-start`, `implement`, `session-end`, `review`, `complete`) and CLI verbs. Git hooks are NOT in the contract. A discipline that can only fire from `.husky/` does not exist for an adopter who follows the public install path. Wiring discipline into git hooks distorts our perception of what's working: we experience the gates via hand-rolled `.husky/` files; an adopter experiences nothing. This principle generalizes the existing rule *"Use the deskwork plugin only through the publicly-advertised distribution channel"* to enforcement specifically.
+
+**Trigger.** Three open GitHub issues filed 2026-06-03 by an agent driving `feature/deskwork-plugin` ([#401](https://github.com/audiocontrol-org/deskwork/issues/401), [#402](https://github.com/audiocontrol-org/deskwork/issues/402), [#403](https://github.com/audiocontrol-org/deskwork/issues/403)) indict the audit-finding lifecycle gates for ~3:1 bookkeeping ratio, a coverage ratchet with no terminal state, and a five-touches-per-finding load — all amplified by gates firing on docs-only / bookkeeping-only commits. Yesterday's v0.35.0 release required three `--no-verify` pushes for bookkeeping commits the gates refused (commits `f823d960`, `fb87fd43`, `50731723`). The audit-finding gates (`check-implement-hook-ran`, `check-implement-hook-coverage`) are not installable by adopters — they exist only in this repo's hand-rolled `.husky/`. Adopters get zero audit-barrage discipline by default; we have zero dogfood signal for whether the discipline works through the public path. The structural pre-commit chain (`check-clones`, `check-anti-patterns`, `check-adopters`, `check-disposition-survivor`, `check-editor-symmetry`) IS plugin-installable via `install-scope-discovery-hooks`, but the install requires an adopter to know about husky and run the install verb separately. Same architectural problem, smaller volume. Phase 24 fixes both: zero git-hook reliance, full discipline composed into skill bodies + CLI verbs adopters get by installing the plugin.
+
+**Scope shape.** Demolition + relocation must land together. Shipping "no gates" without the skill-body discipline replacing them leaves the project unenforced for a release window. Phase 24 is one phase; sub-tasks land in dependency order (decision artifact → demolition → relocation → reconciliation → dogfood).
+
+### Task 1 — Architectural decision record + rule
+
+- Step 1: Write the ADR at `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` capturing principle, retirement list, relocation map, new contract, breaking-change implications.
+- Step 2: Write the rule at `.claude/rules/enforcement-lives-in-skills.md` capturing the *what to do next session* form: how-to-apply, anti-patterns to refuse, pre-implementation gate.
+- Step 3: Cross-link from `.claude/rules/agent-discipline.md` and `CLAUDE.md`; evaluate cross-link from `THESIS.md` (does this rise to a Consequence?).
+- Step 4: Commit the artifact + rule together.
+
+**Acceptance:** Both files committed and cross-referenced. The principle reads as a generalization of the public-channel rule, not as ad-hoc per-gate policy.
+
+### Task 2 — Demolition: audit-finding lifecycle gates
+
+- Step 1: Delete `.husky/commit-msg` entirely.
+- Step 2: Gut the audit-gate block from `.husky/pre-push`; the file becomes a no-op stub OR retires entirely (operator decides at scope time).
+- Step 3: Retire `check-implement-hook-ran` (subcommand + source + tests + skill + skill folder).
+- Step 4: Retire `check-implement-hook-coverage` (subcommand + source + tests + skill + skill folder).
+- Step 5: Retire `--upstream-base-ref` flag + plumbing (Phase 21 vestigial).
+- Step 6: Retire per-SHA `hook-run-log.jsonl` write logic + helpers + tests (Phase 23 vestigial).
+- Step 7: Retire `last-hook-run.json` marker logic + boot-case guards + tests (Phase 22 vestigial).
+- Step 8: Delete `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` + `last-hook-run.json` files from the working tree.
+- Step 9: Commit with `Closes` trailers for Phases 21/22/23 (mark retired) and `Refs #401 #402 #403`.
+
+**Acceptance:** No source under `plugins/dw-lifecycle/src/scope-discovery/promote-findings/` references hook-run-log or last-hook-run. `npm test` passes. `.husky/commit-msg` does not exist. Grep for `check-implement-hook` yields zero hits in `src/`.
+
+### Task 3 — Demolition: install machinery
+
+- Step 1: Retire `install-scope-discovery-hooks` (subcommand + source + tests + skill + skill folder + helper).
+- Step 2: Retire `uninstall-scope-discovery-hooks` (subcommand + source + tests + skill + skill folder + helper).
+- Step 3: Retire `hooks-installed.json` machinery + reader logic.
+- Step 4: Audit `install-agent-prompts` against the new architecture; retire if redundant once Step 0 discipline lives in `/dw-lifecycle:review` skill body, otherwise reshape.
+- Step 5: Gut the structural-chain block from `.husky/pre-commit`; structural chain moves entirely into skills (Task 4–7). The hook file retires entirely OR stays as a no-op stub (operator decides).
+- Step 6: Commit with `Closes` trailers for [#293](https://github.com/audiocontrol-org/deskwork/issues/293), [#294](https://github.com/audiocontrol-org/deskwork/issues/294), [#295](https://github.com/audiocontrol-org/deskwork/issues/295).
+
+**Acceptance:** No skill at `plugins/dw-lifecycle/skills/install-scope-discovery-hooks/`. No subcommand registration for the install/uninstall verbs. Audit-trail commit names the four issues retired.
+
+### Task 4 — Relocate: structural chain into `/dw-lifecycle:session-start`
+
+- Step 1: Write failing test: invoking session-start in a fixture project with NEW clone groups produces a snapshot block citing the count + names.
+- Step 2: Extend `/dw-lifecycle:session-start` SKILL.md to invoke `check-clones`, `check-anti-patterns`, `check-adopters`, `check-editor-symmetry` as a read-only snapshot step.
+- Step 3: Wire the snapshot helper OR reference existing CLI invocations; ensure stderr summary is captured in the session-start bootstrap report.
+- Step 4: Decide: enforce (refuse to start session) or advisory (report and continue)? Lean advisory at session-start; enforcement lives at end-of-implement-task.
+- Step 5: Confirm tests pass.
+- Step 6: Commit.
+
+**Acceptance:** A session-start invocation surfaces structural-chain counts as a snapshot. The agent driving the session sees the numbers without needing a separate command.
+
+### Task 5 — Relocate: end-of-task gate into `/dw-lifecycle:implement`
+
+- Step 1: Write failing tests for the new implement skill behavior:
+  - end-of-task surfaces a NEW clone-group and refuses to advance until dispositioned;
+  - end-of-task surfaces an unhandled audit finding (HIGH severity) and refuses to advance;
+  - end-of-task fix-task closure detects missing TDD shape (test-file citation) and refuses commit-completion.
+- Step 2: Update `/dw-lifecycle:implement` SKILL.md to compose the structural chain + audit-barrage + apply-audit-flips + (advisory) `check-fix-task-tdd` at task boundaries.
+- Step 3: Move `check-fix-task-tdd` logic from theoretical-commit-msg-gate to in-skill fix-task promotion + closure step; the gate becomes a skill-body discipline, not a separate hook.
+- Step 4: Fold `apply-audit-flips` invocation into the after-task step (no separate manual call).
+- Step 5: Confirm tests pass.
+- Step 6: Commit.
+
+**Acceptance:** A simulated end-of-task in a fixture project produces: structural-chain output, barrage findings (if any), fix-task discipline check. No separate hooks are invoked. The skill body is the gate.
+
+### Task 6 — Relocate: closing checks into `/dw-lifecycle:session-end`
+
+- Step 1: Write failing tests for the new session-end discipline:
+  - `check-disposition-survivor` is invoked and refuses session-end on regressed dispositions;
+  - no-bare-TBDs discipline refuses session-end on bare TBD markers;
+  - no-open-findings-without-disposition discipline refuses session-end on findings still in `Status: open` without operator-driven scoping into the workplan.
+- Step 2: Update `/dw-lifecycle:session-end` SKILL.md.
+- Step 3: Confirm tests pass.
+- Step 4: Commit.
+
+**Acceptance:** Session-end surfaces all three classes of issue when they exist; passes cleanly otherwise.
+
+### Task 7 — Relocate: Step 0 + structural chain into `/dw-lifecycle:review`
+
+- Step 1: Write failing tests for new review-skill discipline:
+  - Step 0 `check-refactor-preconditions` invoked on review trigger;
+  - structural chain run as PR-readiness gate;
+  - `check-editor-symmetry` invoked as fleet snapshot.
+- Step 2: Update `/dw-lifecycle:review` SKILL.md to compose the above.
+- Step 3: REVERSE the Phase 20 Task 2 retirement decision for `/dw-lifecycle:review`: this skill becomes the *primary* enforcement surface, not deprecated.
+- Step 4: Confirm tests pass.
+- Step 5: Commit.
+
+**Acceptance:** Review skill invocation runs Step 0 + structural chain + fleet symmetry. The skill is documented as the primary enforcement surface.
+
+### Task 8 — Workplan + phase reconciliation
+
+- Step 1: Update workplan.md headers for Phases 15, 17 (partially), 21, 22, 23 to mark retirement explicitly with a note: *"Code retired in Phase 24; the phase's original deliverables are vestigial under the new no-git-hook-enforcement contract."*
+- Step 2: Update README phase status table to reflect retirement annotations alongside the original "Shipped" status (history preserved; new state surfaced).
+- Step 3: Close GitHub issues per the disposition list: [#293](https://github.com/audiocontrol-org/deskwork/issues/293) / [#294](https://github.com/audiocontrol-org/deskwork/issues/294) / [#295](https://github.com/audiocontrol-org/deskwork/issues/295) (install-hook friction — won't-fix), [#352](https://github.com/audiocontrol-org/deskwork/issues/352) (skip docs-only — won't-fix), [#373](https://github.com/audiocontrol-org/deskwork/issues/373) / [#374](https://github.com/audiocontrol-org/deskwork/issues/374) (Phase 15 redesigns — won't-fix or rescope).
+- Step 4: Reframe Phase 20 Task 2 in workplan.md: instead of "retire `/dw-lifecycle:review`", read "elevate `/dw-lifecycle:review` to primary enforcement surface (Phase 24)."
+- Step 5: Commit.
+
+**Acceptance:** Phases retired by Phase 24 are annotated in both workplan and README. No GitHub issue remains open whose root cause is the now-deleted machinery.
+
+### Task 9 — Adopter migration
+
+- Step 1: Decide migration path: ship a one-shot `dw-lifecycle uninstall-everything-hook-related` verb that removes managed blocks from `.husky/`, deletes `hooks-installed.json`, and surfaces a report — OR document a manual sweep. (Lean: ship the verb; the migration is mechanical and one-shot.)
+- Step 2: If verb: implement, test, ship as part of Phase 24's release.
+- Step 3: Write release-notes entry naming this as a breaking change; cite the relocation map; cite the principle.
+- Step 4: Update plugin README and `MIGRATING.md` (or create one) capturing the upgrade path.
+- Step 5: Commit.
+
+**Acceptance:** An adopter who installed `install-scope-discovery-hooks` in v0.35.0 has a documented path to remove the installed hooks and pick up the new skill-body discipline on the version bump.
+
+### Task 10 — Live dogfood verification
+
+- Step 1: Pick a real implementation task on a feature branch (this branch's own Phase 24 tasks count) and run it end-to-end using the new shape with NO `.husky/` enforcement active.
+- Step 2: Measure: bookkeeping touches per finding (target: <2:1 ratio, down from ~3:1); count of `--no-verify` invocations needed (target: zero); count of `git reset` invocations needed (target: zero).
+- Step 3: Confirm the structural chain (running via skill bodies, not hooks) still catches the regressions it caught when wired as a hook. Run a deliberate regression (e.g., introduce a clone group) and verify `/dw-lifecycle:implement` end-of-task gates surface it.
+- Step 4: Confirm `/dw-lifecycle:implement` end-of-task audit-barrage discipline produces equivalent finding coverage to the retired `check-implement-hook-ran` gate.
+- Step 5: Write a journal entry documenting the measurements.
+- Step 6: Commit.
+
+**Acceptance:** Dogfood entry in `DEVELOPMENT-NOTES.md` records the measurements + cite the issues defused ([#401](https://github.com/audiocontrol-org/deskwork/issues/401), [#402](https://github.com/audiocontrol-org/deskwork/issues/402), [#403](https://github.com/audiocontrol-org/deskwork/issues/403)).
+
+**Acceptance Criteria (Phase 24):**
+
+- [ ] ADR + rule files committed and cross-referenced.
+- [ ] All git-hook enforcement removed from this repo (`.husky/commit-msg` gone; structural + audit-gate blocks removed from pre-commit + pre-push).
+- [ ] Retired subcommands/skills/tests/source enumerated in commit messages (audit-trail in git log).
+- [ ] Each relocation has a passing test exercising the new skill-body behavior.
+- [ ] Live dogfood verification documents the bookkeeping ratio reduction.
+- [ ] Workplan + README reflect Phase 15/17/21/22/23 retirements consistently.
+- [ ] Release notes capture the breaking change.
+- [ ] No GitHub issue remains open whose root cause is now-deleted machinery.
+- [ ] Adopter migration path is documented (verb or doc-only per operator decision).
+
+**Open decisions (operator drives at scoping time, per "Capture mode vs scope mode" discipline):**
+
+1. **Single phase or split into demolition + relocation?** Lean single — they must ship together to avoid an unenforced release window.
+2. **Decision artifact form: ADR + rule + both?** Lean both — spec captures *why*, rule captures *what to do next session*.
+3. **`check-fix-task-tdd` + `check-refactor-preconditions` — fully retire or relocate as in-skill advisory?** Lean relocate; they encode real discipline. Risk: the discipline-in-skill might still produce fresh bookkeeping load — needs dogfood verification.
+4. **Migration: ship a `uninstall-everything-hook-related` verb or doc only?** Lean verb; the migration is mechanical and one-shot.
+5. **Structural chain at end-of-implement-task: enforce or advisory?** Lean enforce; the pathology was the *audit-finding* chain, not the structural one. Enforcement on the structural chain is what motivated the chain in the first place.
+6. **`apply-audit-flips` invocation timing — fold into implement end-of-task or standalone verb?** Lean fold; reduces touches.
+7. **Where do `last-hook-run.json` + `hook-run-log.jsonl` files go?** Delete vs gitignore + leave. Lean delete; they're vestigial artifacts the doctor rule wouldn't recognize as valid going forward.
+8. **GitHub issue numbers for Phase 24 parent + per-task sub-issues** — TBD by `/dwe` filing step.
+9. **`.husky/pre-commit` + `.husky/pre-push` stub vs delete** — does the file stay as a no-op stub for documentation, or retire entirely? Lean delete; husky setup itself can retire if nothing else uses it.
+10. **Workplan placement** — Phase 24 chronological after 23 (matches existing pattern, this is captured here) vs at the top of the file due to load-bearing nature. Lean chronological; the README's status table surfaces the priority.
+
+### Phase 24 — Out of Scope
+
+- **Designing a NEW positive enforcement contract for the broader plugin ecosystem** (other plugins' gates, deskwork's own gates). Phase 24 retires this plugin's git-hook enforcement; whether the principle extends to other plugins is a separate conversation.
+- **CI-based enforcement** (GitHub Actions checks). Adopters can wire CLI verbs into their own CI; we don't ship that wiring as part of Phase 24.
+- **The audit-finding lifecycle UX itself** ([#392](https://github.com/audiocontrol-org/deskwork/issues/392) TDD task shape for non-code findings, [#401](https://github.com/audiocontrol-org/deskwork/issues/401) over-build circuit-breaker, [#403](https://github.com/audiocontrol-org/deskwork/issues/403)'s #2 collapse-finding-lifecycle proposal). Those issues survive Phase 24; the discipline-in-skill-body shape may surface them as still-open after the relocation.
+- **Reconsidering whether `/dw-lifecycle:doctor` should grow more enforcement.** Orthogonal; survives.
+- **Renaming `editor-symmetry` terminology.** Captured separately as Phase 25 below; Phase 25 must NOT block Phase 24.
+- **Audiocontrol pilot migration.** Pilot doesn't have the audit-finding hooks; nothing to migrate. The structural chain in the pilot is the operator's call to leave or upgrade.
+
+## Phase 25: Editor terminology cleanup — adopt project-neutral `module` everywhere ([#405](https://github.com/audiocontrol-org/deskwork/issues/405))
+
+**Trigger.** The audiocontrol pilot builds editor applications for Roland samplers — S-330 editor, S-550 editor, etc. Each editor lives under `modules/<slug>-editor/`. In that domain, "editor symmetry" literally meant *"is the S-330 editor module using the same canonical primitives as the S-550 editor module?"* When the protocol was canonized into `dw-lifecycle`, the term came along but lost its domain meaning. The comment at `plugins/dw-lifecycle/src/scope-discovery/util/editors.ts:11-21` is explicit: *"The term 'editor' is preserved verbatim across the scope-discovery layer ... because renaming would invalidate the Phase 3 schema and types already at destination."* Adopter-facing surfaces (skill prose, CLI verb names, schema fields, doctor rules) all say `editor` and force every non-audiocontrol reader to mentally translate to `module`. This is exactly the leaked-domain-terminology pathology that the scope-discovery project exists to surface. Phase 25 pays the schema-stability cost.
+
+**Relationship to Phase 24.** Independent — Phase 25 can land before, after, or alongside Phase 24. Captured here so we don't forget. Lean: ship after Phase 24 to avoid mixing the architectural reframe with mechanical renames in commit history.
+
+### Task 1 — Inventory
+
+- Step 1: Grep every reference to `editor`, `editors`, `Editor`, `EDITOR`, `editor_symmetry`, `editorSymmetry`, `editorsTargetedByGlob`, `discoverEditors`, `editorForPath`, `editor-symmetry-*` across plugin source, schema, skills, tests, docs, rule files.
+- Step 2: Categorize each hit: schema field (breaking) / source identifier (mechanical) / file name / CLI verb name / skill prose / test fixture / doc reference / etymology paragraph (preserve as historical comment).
+- Step 3: Capture the inventory in a working scratch document at `docs/1.0/001-IN-PROGRESS/scope-discovery/phase-25-rename-inventory.md`.
+
+**Acceptance:** Inventory categorized; total hit count + per-category counts surfaced.
+
+### Task 2 — Breaking-change strategy decision
+
+- Step 1: Decide: single-rename + doctor-rule migration, OR dual-name period with deprecation warning, OR dual-name forever.
+- Step 2: Document the decision in the Phase 25 ADR / decision-record fragment.
+- Step 3: If single-rename: confirm doctor rule is the chosen migration vehicle; if dual-name: confirm whether old name retires in a future phase or stays indefinitely.
+
+**Acceptance:** Decision recorded with rationale.
+
+### Task 3 — Schema rename + Zod types
+
+- Step 1: Write failing tests reading/writing the new field name `module_symmetry`.
+- Step 2: Rename `editor_symmetry:` → `module_symmetry:` in the adopter-manifests YAML schema + Zod types.
+- Step 3: Rename `regime_holdouts.editor_symmetry` → `regime_holdouts.module_symmetry`.
+- Step 4: Update `RegimeHoldoutSource` type + every consumer.
+- Step 5: Confirm tests pass; `tsc` clean.
+
+**Acceptance:** Schema reads `module_symmetry` end-to-end. Old name reads only via the migration codepath (if alias retained) or not at all (if hard-renamed).
+
+### Task 4 — Source identifier rename
+
+- Step 1: Rename source files: `editor-symmetry-matrix.ts` → `module-symmetry-matrix.ts`, `editor-symmetry-report.ts` → `module-symmetry-report.ts`, `check-editor-symmetry.ts` → `check-module-symmetry.ts`, `util/editors.ts` → `util/modules.ts`.
+- Step 2: Rename function + type identifiers: `discoverEditors` → `discoverModules`, `editorsTargetedByGlob` → `modulesTargetedByGlob`, `editorForPath` → `moduleForPath`, `SymmetryMatrix.editors` → `SymmetryMatrix.modules`, etc.
+- Step 3: Update every import.
+- Step 4: Preserve the etymology paragraph as a historical comment in `util/modules.ts` (operator decides at scope time whether to keep or erase).
+- Step 5: Confirm tests pass; `tsc` clean.
+
+**Acceptance:** Grep for `editor` outside the etymology comment in `util/modules.ts` yields zero hits in scope-discovery source.
+
+### Task 5 — CLI verb rename
+
+- Step 1: Decide whether to ship `check-editor-symmetry` as a deprecated alias OR hard-rename.
+- Step 2: Rename CLI subcommand registration to `check-module-symmetry`.
+- Step 3: If alias: implement deprecation-warning path that stderr-prints the new name + a removal-version pointer.
+- Step 4: Update CLI tests.
+
+**Acceptance:** `dw-lifecycle check-module-symmetry` works end-to-end. Alias (if shipped) surfaces deprecation warning.
+
+### Task 6 — Skill prose + skill folder rename
+
+- Step 1: Rename `plugins/dw-lifecycle/skills/check-editor-symmetry/` → `plugins/dw-lifecycle/skills/check-module-symmetry/`.
+- Step 2: Update SKILL.md content: name field in frontmatter, every verb-name reference, every body paragraph.
+- Step 3: Decide whether the old skill folder retires entirely or stays as a deprecated stub pointing at the new name.
+
+**Acceptance:** Skill picker shows `check-module-symmetry`. Old skill (if kept as stub) clearly directs to the new name.
+
+### Task 7 — Doctor rules + agent-discipline + design-standards sweep
+
+- Step 1: Update doctor rule messages that reference `editor-symmetry` / `editor_symmetry`.
+- Step 2: Update `.claude/rules/agent-discipline.md` references.
+- Step 3: Update any other `.claude/rules/*.md` that mention editor-symmetry.
+
+**Acceptance:** Grep for `editor-symmetry` or `editor_symmetry` in `.claude/rules/` returns zero hits.
+
+### Task 8 — Doctor-rule migration for adopter YAML
+
+- Step 1: Write a doctor rule `legacy-editor-symmetry-field-rename` that detects the legacy `editor_symmetry:` field in adopter YAML and rewrites it to `module_symmetry:` under `--fix`.
+- Step 2: Test the migration end-to-end against a fixture project with the old field name.
+- Step 3: Document the migration in the rename release notes.
+- Step 4: Confirm tests pass.
+
+**Acceptance:** `dw-lifecycle doctor --fix` rewrites legacy YAML cleanly. Existing adopter configs migrate without manual edit.
+
+### Task 9 — PRD + workplan + feature-doc sweep
+
+- Step 1: Update every reference to "editor-symmetry" / "editor_symmetry" / "editor symmetry" in the scope-discovery feature docs (PRD, workplan, README, audit-log, design-spec where applicable).
+- Step 2: Update other in-progress feature docs that mention editor-symmetry.
+- Step 3: Update `THESIS.md` / `DESKWORK-STATE-MACHINE.md` / `DESIGN-STANDARDS.md` if any mention the term (none expected; verify).
+
+**Acceptance:** No remaining `editor-symmetry` references in scope-discovery feature docs except in historical context (audit-log entries, journal entries).
+
+### Task 10 — Audiocontrol pilot coordination
+
+- Step 1: Decide: does the audiocontrol pilot also rename, or keep the legacy field via deprecation alias?
+- Step 2: If pilot renames: coordinate with the pilot's branch — open an issue on the pilot's tracker or coordinate via the operator.
+- Step 3: If pilot keeps legacy: confirm the alias path works on the pilot's existing YAML.
+
+**Acceptance:** Pilot decision documented. Migration path validated against the pilot's actual YAML.
+
+### Task 11 — Release notes
+
+- Step 1: Write a release-notes entry capturing the rename, the alias (if any), and the doctor-rule migration.
+- Step 2: Cite the etymology + the cost paid (adopter-facing clarity).
+
+**Acceptance:** Release notes name the breaking change explicitly.
+
+**Acceptance Criteria (Phase 25):**
+
+- [ ] All `editor` references in the scope-discovery layer renamed to `module` (except etymology comment in `util/modules.ts` if preserved by operator decision).
+- [ ] Adopter YAMLs migrate cleanly via doctor rule (or via alias-with-deprecation if that's the chosen strategy).
+- [ ] No grep hit for `editor` in scope-discovery code outside the etymology paragraph.
+- [ ] All tests pass; `tsc` clean.
+- [ ] Release notes capture the rename.
+- [ ] Audiocontrol pilot coordination decision documented.
+
+**Open decisions (operator drives at scoping time):**
+
+1. **Single rename or alias-with-deprecation period?** Lean single + doctor-rule migration; the alias path adds complexity without much benefit when the migration is one-shot.
+2. **Keep `check-editor-symmetry` CLI verb as deprecated alias or hard-rename?** Lean alias for one release cycle; CLI verbs are part of the adopter muscle memory.
+3. **Audiocontrol pilot: rename in lockstep or keep legacy with alias?** Operator decides; depends on audiocontrol team's bandwidth.
+4. **Historical etymology paragraph: preserve in `util/modules.ts` as comment, or full erasure?** Lean preserve; the etymology explains a decision that survives in adopters' git history.
+5. **GitHub issue number for Phase 25 parent + per-task sub-issues** — TBD by `/dwe` filing step.
+
+### Phase 25 — Out of Scope
+
+- **Other domain-leak terminology cleanups** (if any exist in scope-discovery or other plugins). Handle as separate phases.
+- **Renaming `audiocontrol pilot` references** in non-scope-discovery files. The phrase is correctly historical context.
+- **Schema versioning infrastructure for future renames.** If Phase 25 motivates a per-schema version field, that's a separate phase.
