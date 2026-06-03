@@ -3261,3 +3261,175 @@ Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` — Phase 23 st
 AUDIT-20260603-23 (appended to `audit-log.md` *in this same commit*, slushed) flags that the Phase 23 cell's claim — "`git push` succeeds without `--no-verify` on multi-commit + bookkeeping shapes" — is not supported by the cited one-commit evidence. I am not re-litigating that slushed disposition. The new observation is about the *edit this diff made to that exact line*: it appended a NOTE ("retroactively superseded by Phase 24 … the per-SHA log writes that Phase 23 added are vestigial … Code retires as part of Phase 24 Task 2") without correcting the overclaim it sits beside. The cell now asserts three things that don't cohere: Phase 23 is "Complete," was "Live-verified … on multi-commit + bookkeeping shapes," AND is "vestigial" code being deleted unverified-against-its-acceptance-criteria.
 
 When a diff edits the precise line a finding names, that's the moment to resolve the finding, not to layer a second annotation on top of it. The compounding matters because the README is the canonical phase-status surface (more authoritative to a future reader than a slushed audit entry). A reasonable fix in this same class of edit: when adding the retirement NOTE, also strike "on multi-commit + bookkeeping shapes" or downgrade "Complete" to "Implemented; superseded before multi-commit repro was completed" — so the cell stops asserting a verification its own audit-log entry, committed alongside it, contradicts.
+
+## 2026-06-03 — Phase 24/25 PRD + workplan audit
+
+### AUDIT-20260603-28 — Phase 24 relocates audit-barrage but omits the lift/promote/open-findings chain that turns findings into enforceable work
+
+Finding-ID: AUDIT-20260603-28
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` Phase 24 Relocation + Phase 24 acceptance; `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 24 Task 5
+
+Phase 24 says Phase 13's audit-finding lifecycle "ships unchanged in CONCEPT" and only changes where the gates fire from. But the actual Phase 24 relocation text only folds `apply-audit-flips` into `/dw-lifecycle:implement`; it does not name `audit-barrage-lift`, `promote-findings --auto`, or `check-open-findings`, which are the Phase 15 chain that converts raw barrage output into audit-log entries, scopes those entries as workplan tasks, and then gates the next pickup.
+
+The inconsistency shows up inside the new text itself: the Phase 24 acceptance criterion for `/dw-lifecycle:implement` requires an "end-of-task open-HIGH-finding refusal," and the workplan's Task 5 Step 1 asks for that failing test. But Task 5 Step 2 composes "structural chain + audit-barrage + apply-audit-flips + (advisory) `check-fix-task-tdd`" and never says how the barrage findings become `Status: open`, how they get promoted into the workplan, or which gate refuses advancement. `apply-audit-flips` closes already-fixed findings; it does not lift new model output or scope new work.
+
+Evidence:
+
+- PRD Phase 24 Relocation lists structural-chain relocation, session-end checks, review Step 0, `check-fix-task-tdd`, and `apply-audit-flips`, but not `audit-barrage-lift`, `promote-findings`, or `check-open-findings`.
+- PRD Phase 24 acceptance requires `/dw-lifecycle:implement` to verify "end-of-task open-HIGH-finding refusal."
+- Workplan Phase 24 Task 5 Step 1 requires a HIGH-finding refusal test.
+- Workplan Phase 24 Task 5 Step 2 omits the lift/promote/open-findings chain.
+- Existing PRD Phase 15 context explicitly names the missing chain: `audit-barrage --output-run-dir` -> `audit-barrage-lift --apply` -> `promote-findings --apply` -> `check-open-findings`.
+
+Expected vs actual:
+
+- Expected: Phase 24 preserves the Phase 13/15 finding lifecycle concept by relocating the full end-of-task chain into the skill body.
+- Actual: Phase 24 relocates only raw barrage firing plus `apply-audit-flips`, leaving the high-finding refusal acceptance criterion without a defined mechanism.
+
+Fix guidance:
+
+- Amend Phase 24 PRD/workplan Task 5 to name the full chain, likely `audit-barrage-render` -> `audit-barrage --output-run-dir` -> `audit-barrage-lift --apply` -> `promote-findings --auto` -> `check-open-findings`, plus `apply-audit-flips` at the correct point for already-fixed findings.
+- Make the HIGH-finding refusal test assert the actual gate result, not just the presence of raw model output.
+
+### AUDIT-20260603-29 — Phase 24 says demolition and relocation must land together, but the workplan commits demolition before replacement gates exist
+
+Finding-ID: AUDIT-20260603-29
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 24 scope shape and Tasks 2-7
+
+The Phase 24 scope statement is explicit: "Demolition + relocation must land together. Shipping 'no gates' without the skill-body discipline replacing them leaves the project unenforced for a release window." The task order then instructs the implementer to commit demolition in Task 2, commit install-machinery demolition in Task 3, and only afterward implement the replacement skill-body enforcement in Tasks 4-7.
+
+This creates the exact gap the scope statement says must not exist. Even if the branch is not released until Phase 24 completes, the workplan's commit-by-commit path removes `.husky/commit-msg`, pre-push audit gates, pre-commit structural gates, hook install machinery, marker logic, and log logic before session-start/implement/session-end/review have replacement discipline. A future agent following the workplan mechanically can produce a branch state where the old enforcement is gone and the new enforcement is not yet present.
+
+Evidence:
+
+- Phase 24 scope shape says demolition and relocation must land together.
+- Task 2 Step 9 says to commit audit-finding gate demolition.
+- Task 3 Step 6 says to commit install-machinery and structural-chain hook demolition.
+- Tasks 4-7, which add the replacement skill-body enforcement surfaces, come later.
+
+Expected vs actual:
+
+- Expected: the workplan either relocates first, or batches demolition + relocation into a single integration commit / no-release gate so there is no intermediate "no gates" state.
+- Actual: the workplan orders and commits demolition before the replacement gates.
+
+Fix guidance:
+
+- Reorder Phase 24 so replacement skill-body behavior lands first behind existing hooks, then remove hook enforcement after equivalent coverage exists; OR explicitly mark Tasks 2-7 as one atomic integration batch that cannot be committed/pushed/released piecemeal.
+- Add an acceptance check that no intermediate commit on the Phase 24 branch has both old hooks removed and replacement skill-body checks absent.
+
+### AUDIT-20260603-30 — Phase 25's feature-doc sweep tells implementers to rewrite audit-log terminology, conflicting with audit-log preservation rules
+
+Finding-ID: AUDIT-20260603-30
+Status:     open
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 25 Task 9; `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` operating rules
+
+Phase 25 Task 9 says to "Update every reference to `editor-symmetry` / `editor_symmetry` / `editor symmetry` in the scope-discovery feature docs (PRD, workplan, README, audit-log, design-spec where applicable)." That instruction includes the feature audit log. The audit log's own operating rules say it is the source of truth, findings are never deleted, and entries are updated in place under stable IDs. Bulk-renaming historical finding bodies risks corrupting the evidence trail: an old finding that originally cited `check-editor-symmetry` or `editor_symmetry` should continue to describe the historical surface it audited.
+
+The acceptance criterion partially softens this by allowing historical context, but the step itself is broader and easier for an implementer to follow literally. Given this repo's recurring audit-log accounting failures, the safe rule should be explicit: do not rewrite historical finding bodies for terminology cleanup; only update prospective docs and add resolution notes when a finding's current disposition changes.
+
+Evidence:
+
+- Workplan Phase 25 Task 9 Step 1 explicitly lists `audit-log` in the feature-doc sweep.
+- Workplan Phase 25 Task 9 acceptance allows historical context but does not state that historical audit-log finding bodies must be preserved.
+- The audit-log header says the log is the source of truth and findings are never deleted; status transitions happen under stable IDs.
+
+Expected vs actual:
+
+- Expected: Phase 25 distinguishes mutable product docs from historical audit evidence and preserves the latter except for explicit status/resolution notes.
+- Actual: the workplan's first instruction can be read as a bulk rewrite of audit-log historical terminology.
+
+Fix guidance:
+
+- Amend Task 9 to exclude historical audit-log finding bodies from bulk rename. Suggested shape: "Do not rewrite historical audit-log entries; update only current docs, prospective references, and add resolution notes under stable IDs if needed."
+- Keep the acceptance criterion's "historical context" carve-out, but make it operational rather than parenthetical.
+
+### AUDIT-20260603-31 — Phase 24 issue-accounting text has stale or mismatched counts
+
+Finding-ID: AUDIT-20260603-31
+Status:     open
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 24 Task 3, Task 8, Open decisions
+
+The Phase 24 workplan has several issue-accounting mismatches that will confuse closure:
+
+- Task 3 Step 6 names three issues (`#293`, `#294`, `#295`), while Task 3 acceptance says the audit-trail commit names "the four issues retired."
+- Task 8 Step 3 names six issues to close (`#293`, `#294`, `#295`, `#352`, `#373`, `#374`), while Task 3 scopes only the install-hook subset.
+- Open decision 8 still says "GitHub issue numbers for Phase 24 parent + per-task sub-issues — TBD by `/dwe` filing step," even though parent issue `#404` is already filed and linked in the Phase 24 header.
+- Phase 25 has the same stale parent-issue wording even though `#405` is already filed and linked.
+
+This is low severity because it is documentation bookkeeping, not a functional design flaw. But Phase 24's reconciliation task depends on clean issue disposition, and stale counts tend to become either missed closures or duplicate comments.
+
+Expected vs actual:
+
+- Expected: the task-level issue disposition list, acceptance text, and open-decision list agree on which issues are parent issues, which are per-task follow-ups, and how many items are retired.
+- Actual: the section mixes filed parent issues with TBD per-task issues and has a three-vs-four issue count mismatch.
+
+Fix guidance:
+
+- Replace "parent + per-task sub-issues TBD" with "per-task sub-issues TBD; parent is #404/#405" in the relevant open-decision lists.
+- Fix Task 3's "four issues" wording or name the fourth issue explicitly.
+- Decide whether `#352`, `#373`, and `#374` close in Task 8 only, and keep Task 3 scoped to the three install-hook frictions.
+
+## 2026-06-03 — audit-barrage lift (20260603T173433056Z-scope-discovery)
+
+### AUDIT-20260603-32 — Journal "Open findings at session end: 0" undercounts the slush pile its own commit creates (2 medium findings omitted)
+
+Finding-ID: AUDIT-20260603-32
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `DEVELOPMENT-NOTES.md` "Quantitative" block (the new 2026-06-03 cont. entry) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-20260603-24..-27 — both added in the same commit.
+
+The journal's Quantitative line reads: *"Open findings at session end: 0 (AUDIT-20260603-22/-23 acknowledged-slush-pile-2026-06-03 carry medium-severity concerns…)."* But this exact commit appends four more findings to `audit-log.md` — AUDIT-20260603-**24** (medium), **-25** (medium), **-26** (low), **-27** (low) — all stamped `acknowledged-slush-pile-2026-06-03`. So the 2026-06-03 slush pile actually carries at least six entries (−22, −23, −24, −25, −26, −27) with **four** medium findings, not the two the journal names. The headline "0 open" plus a slush-pile callout that omits −24/−25 is precisely the misleading shape the project's own CLAUDE.md AUDIT-03 convention forbids: *"'0 open' alone is misleading… ALSO report the slush-pile count and HIGH/MEDIUM severity breakdown of slushed entries."*
+
+The root cause is visible in the same entry: *"dampener disposition pending at the time of journal-append."* The journal was written before −24..−27 were dispositioned, then those findings were appended to `audit-log.md` in the same commit without the Quantitative line being re-derived. A future reader auditing closure trusts "0 open / 2 slushed medium" and silently misses −24 (a real design-coupling correction) and −25 (the `datePublished`/`Final` state-machine contradiction). Fix: re-derive the slush count from the audit-log content actually committed — "Open findings: 0; acknowledged-slush-pile-2026-06-03 = 6 (4 medium: −22, −23, −24, −25; 2 low: −26, −27)."
+
+### AUDIT-20260603-33 — AUDIT-20260603-24 is stamped `acknowledged-slush-pile` (parked) while its fix is applied in the same commit — incoherent disposition
+
+Finding-ID: AUDIT-20260603-33
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-20260603-24 (`Status: acknowledged-slush-pile-2026-06-03`) vs. `prd.md` line ~79 and `workplan.md` line ~4429 — both edited in the same commit.
+
+AUDIT-24's body argues Phase 25 is not independent of Phase 24 and must re-inventory after Phase 24 lands. The same commit acts on it: the PRD now reads *"Phase 25 MUST ship after Phase 24 (correction per AUDIT-20260603-24)"* and the workplan's "Relationship to Phase 24" section is rewritten *"(corrected per AUDIT-20260603-24)."* The fix shipped — yet the audit-log entry is filed as `acknowledged-slush-pile` (the dampener's "parked, unresolved" status), not `closed`/`resolved`.
+
+A finding cannot honestly be both *fixed in this commit* and *parked as slush*. The incoherence has a concrete cost given this repo's audit-log accounting history: `/dw-lifecycle:promote-findings` walks `Status: open`-class entries and scopes them into the workplan; a future run that sees −24 still slushed will re-propose work the PRD and workplan already incorporate, generating duplicate scoping. Because the audit-log's own rule is "status transitions happen in place under stable IDs," the correct shape is to transition −24 to a closed/resolved status with a one-line resolution note citing the PRD+workplan edits that landed alongside it — not to leave the slush label asserting the correction is still pending.
+
+### AUDIT-20260603-34 — Journal commits accounting numbers it states are stale-by-construction, with no follow-up to reconcile
+
+Finding-ID: AUDIT-20260603-34
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md` 2026-06-03 (cont.) entry — "Audit-barrage runs this session: 1 … dampener disposition **pending at the time of journal-append**" and "Open findings at session end: 0".
+
+The journal explicitly flags that it is recording barrage accounting *before* the dampener has dispositioned the run, then commits that accounting as final without any in-entry note that the numbers are provisional or a pointer to where they'll be reconciled. This is a process trap independent of finding-01's specific undercount: any session that appends the journal before its own barrage settles will bake a stale count into the permanent record, and the "(cont.)" capture pattern used here makes that ordering routine rather than exceptional. The honest move when disposition is genuinely pending is to either (a) hold the Quantitative findings line until the barrage settles, or (b) write it as a range/provisional value with an explicit "reconcile in next entry" marker. Committing "0 open" with a parenthetical admission that the disposition was still pending presents a settled number the author already knew was unsettled.
+
+---
+
+I checked the `prd.md`/`workplan.md` correction text itself (the AUDIT-24 fix is internally consistent and the cross-references resolve), the single `hook-run-log.jsonl` append (well-formed JSON, `runDir`/`tip` match the audit-log header `20260603T171135839Z` / `c1c8c804`), and the four folded audit findings for internal anchoring (they correctly describe the prior commit `c1c8c804`'s surfaces, which is expected for a barrage-lag append). The remaining findings are documentation-accounting drift, not code defects — this diff contains no executable code. I did **not** re-file AUDIT-26 (PRD Out-of-Scope contradiction) or AUDIT-27 (README Phase 23 cell) since those surfaces aren't touched in this diff and their slush dispositions stand.
+
+### AUDIT-20260603-35 — Deprecated alias path conflicts with the grep-zero acceptance criteria
+
+Finding-ID: AUDIT-20260603-35
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4471-4476`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4480-4484`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4528-4530`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4537-4538`
+
+Task 5 explicitly permits shipping `check-editor-symmetry` as a deprecated alias, and Task 6 permits keeping the old skill folder as a deprecated stub. Those choices require old-name literals in command registration, tests, help text, or skill prose. The Phase 25 acceptance criteria then require all `editor` references in the scope-discovery layer to be renamed and require no grep hit for `editor` in scope-discovery code outside the etymology paragraph.
+
+This makes one sanctioned implementation path fail the phase’s own acceptance criteria. A reasonable fix is to either make hard-rename the only accepted path, or add explicit carve-outs for deprecated alias/stub surfaces with bounded tests and removal metadata.
+
+### AUDIT-20260603-36 — Newly added notes include postponed-work wording that violates the audit prompt’s discipline rule
+
+Finding-ID: AUDIT-20260603-36
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md:4074-4075`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4541`
+
+The diff adds process notes that push unresolved work out of the current unit: the Phase 11 dogfood observation is recorded as a forward pointer, the PRD iteration-counter drift is called out as a separate sweep, and Phase 25 sub-issue splitting is postponed to the implementation session. The audit prompt’s hard constraint says to surface deferral wording in the diff because this project treats that shape as a recurring bug source.
+
+This is low severity because these are planning and hygiene notes, not shipped code. Still, the wording creates an easy escape hatch for work that should either be scoped into the current workplan with a clear owner/acceptance shape or explicitly dispositioned as out of scope with rationale.

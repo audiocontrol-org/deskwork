@@ -4271,7 +4271,9 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
 
 **Trigger.** Three open GitHub issues filed 2026-06-03 by an agent driving `feature/deskwork-plugin` ([#401](https://github.com/audiocontrol-org/deskwork/issues/401), [#402](https://github.com/audiocontrol-org/deskwork/issues/402), [#403](https://github.com/audiocontrol-org/deskwork/issues/403)) indict the audit-finding lifecycle gates for ~3:1 bookkeeping ratio, a coverage ratchet with no terminal state, and a five-touches-per-finding load — all amplified by gates firing on docs-only / bookkeeping-only commits. Yesterday's v0.35.0 release required three `--no-verify` pushes for bookkeeping commits the gates refused (commits `f823d960`, `fb87fd43`, `50731723`). The audit-finding gates (`check-implement-hook-ran`, `check-implement-hook-coverage`) are not installable by adopters — they exist only in this repo's hand-rolled `.husky/`. Adopters get zero audit-barrage discipline by default; we have zero dogfood signal for whether the discipline works through the public path. The structural pre-commit chain (`check-clones`, `check-anti-patterns`, `check-adopters`, `check-disposition-survivor`, `check-editor-symmetry`) IS plugin-installable via `install-scope-discovery-hooks`, but the install requires an adopter to know about husky and run the install verb separately. Same architectural problem, smaller volume. Phase 24 fixes both: zero git-hook reliance, full discipline composed into skill bodies + CLI verbs adopters get by installing the plugin.
 
-**Scope shape.** Demolition + relocation must land together. Shipping "no gates" without the skill-body discipline replacing them leaves the project unenforced for a release window. Phase 24 is one phase; sub-tasks land in dependency order (decision artifact → demolition → relocation → reconciliation → dogfood).
+**Scope shape.** Demolition + relocation must land together. Shipping "no gates" without the skill-body discipline replacing them leaves the project unenforced for a release window. Phase 24 is one phase; sub-tasks land in dependency order (decision artifact → relocation → demolition → reconciliation → dogfood).
+
+**Task ordering correction (AUDIT-20260603-29).** Tasks 2, 3 (demolition) and Tasks 4–7 (relocation) constitute **ONE ATOMIC INTEGRATION BATCH** that cannot be committed / pushed / released piecemeal. The dependency-ordered narrative above (decision → demolition → relocation) describes the logical scope structure, NOT the commit order. Implementation lands **Tasks 4–7 first** (relocation behind existing hooks, so the skill bodies pick up discipline before the hooks disappear), then **Tasks 2–3** (demolition once the relocated discipline is verified equivalent). No intermediate commit on the Phase 24 branch may exist where (a) the old hooks are removed AND (b) the new skill-body discipline is not yet present. The reconciliation in Task 8 includes verifying this: a check that walks the Phase 24 commit range and refuses any commit whose state has both old-gates-absent + new-gates-absent.
 
 ### Task 1 — Architectural decision record + rule
 
@@ -4324,9 +4326,9 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
   - end-of-task surfaces a NEW clone-group and refuses to advance until dispositioned;
   - end-of-task surfaces an unhandled audit finding (HIGH severity) and refuses to advance;
   - end-of-task fix-task closure detects missing TDD shape (test-file citation) and refuses commit-completion.
-- Step 2: Update `/dw-lifecycle:implement` SKILL.md to compose the structural chain + audit-barrage + apply-audit-flips + (advisory) `check-fix-task-tdd` at task boundaries.
+- Step 2: Update `/dw-lifecycle:implement` SKILL.md to compose the FULL end-of-task chain at task boundaries (per AUDIT-20260603-28 correction): structural chain (check-clones / check-anti-patterns / check-adopters / check-editor-symmetry) → `audit-barrage --output-run-dir` → `audit-barrage-lift --apply` → `promote-findings --auto` → `check-open-findings` (refuse-to-advance gate) → `apply-audit-flips` (close already-fixed) → `check-fix-task-tdd` (advisory, in-skill). The lift/promote/check-open-findings chain is the Phase 15 machinery that turns raw barrage output into workplan-tracked open findings; without it, the HIGH-finding-refusal acceptance criterion has no mechanism. Phase 24 preserves the Phase 13 + 15 finding lifecycle UNCHANGED in concept; only the firing location moves from `.husky/commit-msg` to the skill body.
 - Step 3: Move `check-fix-task-tdd` logic from theoretical-commit-msg-gate to in-skill fix-task promotion + closure step; the gate becomes a skill-body discipline, not a separate hook.
-- Step 4: Fold `apply-audit-flips` invocation into the after-task step (no separate manual call).
+- Step 4: Fold `apply-audit-flips` invocation into the after-task step (no separate manual call). Confirm the lift/promote/check-open-findings chain from Step 2 covers the open-finding gate semantic that `check-implement-hook-ran` previously enforced from `.husky/commit-msg`.
 - Step 5: Confirm tests pass.
 - Step 6: Commit.
 
@@ -4409,7 +4411,7 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
 5. **Structural chain at end-of-implement-task: enforce or advisory?** Lean enforce; the pathology was the *audit-finding* chain, not the structural one. Enforcement on the structural chain is what motivated the chain in the first place.
 6. **`apply-audit-flips` invocation timing — fold into implement end-of-task or standalone verb?** Lean fold; reduces touches.
 7. **Where do `last-hook-run.json` + `hook-run-log.jsonl` files go?** Delete vs gitignore + leave. Lean delete; they're vestigial artifacts the doctor rule wouldn't recognize as valid going forward.
-8. **GitHub issue numbers for Phase 24 parent + per-task sub-issues** — TBD by `/dwe` filing step.
+8. **Per-task sub-issues** — TBD at implementation time. Parent issue is #404 (filed 2026-06-03; back-referenced in workplan + README + PRD). Per-task sub-issues split decision deferred until the implementation session opens — depends on whether tasks land as one PR or split.
 9. **`.husky/pre-commit` + `.husky/pre-push` stub vs delete** — does the file stay as a no-op stub for documentation, or retire entirely? Lean delete; husky setup itself can retire if nothing else uses it.
 10. **Workplan placement** — Phase 24 chronological after 23 (matches existing pattern, this is captured here) vs at the top of the file due to load-bearing nature. Lean chronological; the README's status table surfaces the priority.
 
@@ -4500,11 +4502,11 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
 
 ### Task 9 — PRD + workplan + feature-doc sweep
 
-- Step 1: Update every reference to "editor-symmetry" / "editor_symmetry" / "editor symmetry" in the scope-discovery feature docs (PRD, workplan, README, audit-log, design-spec where applicable).
-- Step 2: Update other in-progress feature docs that mention editor-symmetry.
+- Step 1: Update every reference to "editor-symmetry" / "editor_symmetry" / "editor symmetry" in **mutable product docs** — the scope-discovery PRD, workplan, README, and design-spec where applicable. **Exclude `audit-log.md` from the sweep** (per AUDIT-20260603-30): historical finding bodies are governed by the audit-log preservation rule (entries are never edited; IDs are stable; bodies describe the historical surface they audited). Audit-log entries that originally cited `check-editor-symmetry` or `editor_symmetry` continue to describe the historical surface they referenced. Only status / resolution notes change on existing entries.
+- Step 2: Update other in-progress feature docs that mention editor-symmetry. Same audit-log preservation rule applies to other features' audit-logs.
 - Step 3: Update `THESIS.md` / `DESKWORK-STATE-MACHINE.md` / `DESIGN-STANDARDS.md` if any mention the term (none expected; verify).
 
-**Acceptance:** No remaining `editor-symmetry` references in scope-discovery feature docs except in historical context (audit-log entries, journal entries).
+**Acceptance:** No remaining `editor-symmetry` references in scope-discovery feature docs **except** in historical context (audit-log entries, journal entries, DEVELOPMENT-NOTES.md prior session entries) — those are preserved verbatim per the audit-log preservation rule.
 
 ### Task 10 — Audiocontrol pilot coordination
 
@@ -4536,7 +4538,7 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
 2. **Keep `check-editor-symmetry` CLI verb as deprecated alias or hard-rename?** Lean alias for one release cycle; CLI verbs are part of the adopter muscle memory.
 3. **Audiocontrol pilot: rename in lockstep or keep legacy with alias?** Operator decides; depends on audiocontrol team's bandwidth.
 4. **Historical etymology paragraph: preserve in `util/modules.ts` as comment, or full erasure?** Lean preserve; the etymology explains a decision that survives in adopters' git history.
-5. **GitHub issue number for Phase 25 parent + per-task sub-issues** — TBD by `/dwe` filing step.
+5. **Per-task sub-issues** — TBD at implementation time. Parent issue is #405 (filed 2026-06-03; back-referenced in workplan + README + PRD). Per-task sub-issues split decision deferred until the implementation session opens.
 
 ### Phase 25 — Out of Scope
 

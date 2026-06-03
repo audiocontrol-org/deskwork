@@ -1,39 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# >>> dw-lifecycle scope-discovery hook >>>
-# This block is managed by `dw-lifecycle install-scope-discovery-hooks`.
-# Do not hand-edit; use `dw-lifecycle uninstall-scope-discovery-hooks`
-# to remove, then re-run install if you need to regenerate.
+# pre-commit — no-op stub.
 #
-# Phase 10 dogfood: the hook template hard-codes `dw-lifecycle` as the
-# binary name, but this worktree ships scope-discovery subcommands not
-# yet present in the published binary (v0.22.2). Until #294 lands a fix
-# in the hook template, this dogfood install invokes the in-tree CLI via
-# `npx tsx`. Tracked at:
-#   https://github.com/audiocontrol-org/deskwork/issues/294
+# The scope-discovery gate chain that lived here (detect-clones,
+# check-anti-patterns, check-adopters, check-disposition-survivor,
+# check-editor-symmetry) was retired as part of Phase 24 (no-git-hook-
+# enforcement contract). The discipline relocates into skill bodies —
+# /dw-lifecycle:session-start, /dw-lifecycle:implement, /dw-lifecycle:review.
+#
+# Adopters get the discipline by installing the plugin, not by wiring
+# git hooks.
 
-DW_CLI="npx tsx plugins/dw-lifecycle/src/cli.ts"
-
-set +e
-dw_lifecycle_gate_failures=0
-
-$DW_CLI detect-clones --gate-mode || dw_lifecycle_gate_failures=$((dw_lifecycle_gate_failures + 1))
-$DW_CLI check-anti-patterns --gate-mode || dw_lifecycle_gate_failures=$((dw_lifecycle_gate_failures + 1))
-$DW_CLI check-adopters --gate-mode || dw_lifecycle_gate_failures=$((dw_lifecycle_gate_failures + 1))
-$DW_CLI check-disposition-survivor || dw_lifecycle_gate_failures=$((dw_lifecycle_gate_failures + 1))
-
-if [ -f .dw-lifecycle/scope-discovery/adopter-manifests.yaml ]; then
-  # Phase 10 dogfood workaround: check-editor-symmetry doesn't accept
-  # --gate-mode. Tracked at #295. Invoked informationally; the trailing
-  # `|| true` keeps gate-failure logic future-proof when #295 lands.
-  $DW_CLI check-editor-symmetry || true
-fi
-
-set -e
-
-if [ "$dw_lifecycle_gate_failures" -gt 0 ]; then
-  echo "scope-discovery: $dw_lifecycle_gate_failures gate(s) failed; commit aborted." >&2
-  exit 1
-fi
-# <<< dw-lifecycle scope-discovery hook <<<
+exit 0
