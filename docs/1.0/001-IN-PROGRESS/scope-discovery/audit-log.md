@@ -3969,7 +3969,7 @@ This may be defensible (a doc that contained a defect was edited, so "fixed" is 
 ### AUDIT-20260603-81 — Global newline-collapse regex rewrites operator content outside the managed block, contradicting the "preserved verbatim" contract
 
 Finding-ID: AUDIT-20260603-81 (claude-01 + claude-02 + claude-04 + codex-03 + codex-04; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-2e962b59
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/uninstall-everything-hook-related.ts:117` (the `return` line of `removeManagedBlock`)
 
@@ -3980,7 +3980,7 @@ The local boundary cleanup (`trimmedBefore` / `trimmedAfter` stripping a single 
 ### AUDIT-20260603-82 — Unreconciled "1.2:1 / down from ~3:1" bookkeeping-ratio claim — scrubbed from the journal per AUDIT-78 — is restated as fact in the adopter-facing MIGRATING.md
 
 Finding-ID: AUDIT-20260603-82 (claude-03 + codex-01 + codex-02; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-2e962b59
 Severity:   high
 Surface:    `MIGRATING.md:60` ("Issues defused" paragraph) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 20 (AUDIT-78 disposition) + Task 10 acceptance line
 
