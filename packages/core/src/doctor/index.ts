@@ -36,3 +36,19 @@ export {
   type LaneMigrationResult,
   type LaneMigrationOptions,
 } from './lane-migration.ts';
+
+export { default as sitesToLanesMigrationRule } from './rules/sites-to-lanes-migration.ts';
+
+export {
+  backfillFromLegacySites,
+  detectAmbiguousBackfills,
+  type AmbiguousBackfill,
+  type BackfillResult,
+} from './sites-migration-backfill.ts';
+
+export {
+  readLegacySites,
+  dropSitesBlock,
+  type LegacySite,
+  type LegacySites,
+} from './legacy-config.ts';

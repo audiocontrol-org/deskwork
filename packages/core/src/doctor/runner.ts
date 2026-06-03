@@ -23,6 +23,7 @@ import calendarUuidMissing from './rules/calendar-uuid-missing.ts';
 import legacyTopLevelIdMigration from './rules/legacy-top-level-id-migration.ts';
 import legacyStageArtifactPath from './rules/legacy-stage-artifact-path.ts';
 import laneConfigMissingTemplate from './rules/lane-config-missing-template.ts';
+import sitesToLanesMigration from './rules/sites-to-lanes-migration.ts';
 import entryLaneMissing from './rules/entry-lane-missing.ts';
 import entryAnchorShape from './rules/entry-anchor-shape.ts';
 import entryAddressReasonMissing from './rules/entry-address-reason-missing.ts';
@@ -52,6 +53,7 @@ export const RULES: ReadonlyArray<DoctorRule> = [
   calendarUuidMissing,
   legacyTopLevelIdMigration,
   legacyStageArtifactPath,
+  sitesToLanesMigration,
   laneConfigMissingTemplate,
   entryLaneMissing,
   entryAnchorShape,

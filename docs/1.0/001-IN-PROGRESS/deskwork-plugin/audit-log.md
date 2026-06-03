@@ -495,3 +495,55 @@ Severity:   informational
 Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/39-sites-to-lanes-blueprint.md` §3/§4 (39a Zod recipe)
 
 I checked the blueprint's recommended lane-schema recipe — `z.record(ArtifactKindSchema, z.string().min(1)).optional()` with the parenthetical claim *"partial by construction … unknown keys are rejected because the key schema is the enum"* — directly against the repo (Zod 3.25.76, `packages/core/node_modules/zod`). At **runtime** a single-kind map (`{ markdown: 'src/blog' }`) parses and an unknown key is rejected; at the **type level**, a `tsc --noEmit --strict` probe confirmed the inferred type is partial (`{ markdown: 'x' }` is assignable; a control `Record<allKinds,string>` correctly rejected the same partial literal). So the recipe satisfies both the spec's `Partial<Record<artifactKind,string>>` intent (AUDIT-20260602-04's fix) and the unknown-key rejection — I would have flagged it as a re-encoding of AUDIT-04 had the inference come back non-partial, but it did not. One cosmetic note only: the symbol is `ArtifactKindEnum` in `packages/core/src/schema/entry.ts:180`, not `ArtifactKindSchema` as the blueprint writes it — a rename for the implementer to reconcile, not a defect. I also confirmed the `fired-and-slushed` hook-log disposition is internally consistent with the three slushed audit-log entries (unlike the 39.0 marker-honesty problem, this enum value matches the recorded action).
+
+## 2026-06-03 — audit-barrage lift (20260603T015144330Z-deskwork-plugin)
+
+### AUDIT-20260603-08 — resolveStoredArtifactPath treats empty-string artifactPath as present, diverging from the codebase's truthy / `!== ''` handling and resolving to the bare project root
+
+Finding-ID: AUDIT-20260603-08
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `packages/core/src/entry/resolve-artifact.ts:37-43` vs. `packages/core/src/doctor/validate.ts:215` and `:385`
+
+The new helper guards the absent case with strict `=== undefined`:
+
+```ts
+if (sidecar.artifactPath === undefined) {
+  return null;
+}
+return join(projectRoot, sidecar.artifactPath);
+```
+
+The rest of the codebase treats an empty `artifactPath` as *absent*, not present, in three other places: the existing resolver uses a truthy check — `if (entry.artifactPath)` (validate.ts:215) — so `''` falls through to the heuristic; and the repair gate explicitly writes `entry.artifactPath !== undefined && entry.artifactPath !== ''` (validate.ts:385), proving the authors consider `''` a real runtime value at this exact layer. The new helper, by contrast, treats `''` as a *valid stored path* and returns `join(projectRoot, '')` — which normalizes to the **bare project root**, not `null`, not a throw.
+
+Whether `''` is reachable: the Zod schema does enforce `.min(1)` on `artifactPath` (entry.ts:260-262), so a freshly-parsed sidecar can't carry it. But (a) `resolveStoredArtifactPath` is a **public export** (added to `packages/core/src/index.ts`) typed `(sidecar: Entry, …)`, and `Entry.artifactPath` is `string | undefined`, so any caller can pass `{ …sidecar, artifactPath: '' }` and TypeScript accepts it; and (b) the schema's own docblock (entry.ts:255-259) explicitly warns that "a sidecar written by a non-deskwork process could still slip past if the schema is bypassed," which is precisely why the move-layer boundary check is kept as defense-in-depth. The new resolver carries none of that defense. When 39d flips callers onto this helper (per the file's own docblock), an empty-string path silently resolves to `projectRoot` — a path that exists — defeating the `file-presence` "is the artifact missing?" logic. Fix: guard `if (!sidecar.artifactPath)` (or `=== undefined || === ''`) so `''` returns `null`, matching validate.ts:215/:385.
+
+---
+
+### AUDIT-20260603-09 — A public export is shipped now whose own docblock says its return contract will flip from null to throw in 39d
+
+Finding-ID: AUDIT-20260603-09
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/src/entry/resolve-artifact.ts:13-17,30-42` + `packages/core/src/index.ts:20`
+
+`resolveStoredArtifactPath` is added to the package barrel (`index.ts:20 — export * from './entry/resolve-artifact.ts'`), making it part of `@deskwork/core`'s public surface at the 0.35.0 bump. Its docblock documents that the *same symbol* is slated to change its observable contract in a later phase: "39d ... makes a missing `artifactPath` THROW. This helper deliberately returns `null` (not a throw) for the absent case — throwing is 39d's job." So the function is published returning `string | null` in this release and is explicitly planned to switch to throw-on-absent in 39d.
+
+Any consumer (another `@deskwork/*` package, or an adopter importing core) that binds to the documented `null`-on-absent behavior in 0.35.x will break when 39d flips it. Exporting a helper whose author-documented contract is already scheduled to change is an avoidable semver trap. Two cleaner options: keep the 39a helper module-internal (don't add it to the barrel until 39d settles the final contract), or give the throwing variant a *distinct name* in 39d rather than mutating this one's contract — so a 0.35 caller's expectations stay valid. The current shape publishes an API designed to break.
+
+---
+
+### AUDIT-20260603-10 — Two parallel artifact resolvers now coexist with mismatched absent-path semantics, making 39d's planned caller-swap a silent behavior change unless reconciled
+
+Finding-ID: AUDIT-20260603-10
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/src/entry/resolve-artifact.ts:37-42` and `packages/core/src/doctor/validate.ts:204-219`
+
+The stored-path branch of `resolveStoredArtifactPath` (`join(projectRoot, sidecar.artifactPath)`) duplicates the stored-path branch of the pre-existing `resolveArtifactPath` (validate.ts:215-216, `join(projectRoot, entry.artifactPath)`). The file's docblock states 39d "flips the existing resolvers to stored-path-only" — i.e. the intent is for the new helper to *replace* `resolveArtifactPath`'s first branch. But the two are not drop-in equivalent: `resolveArtifactPath` uses a truthy guard and the new helper uses `=== undefined` (see AUDIT-BARRAGE-claude-01), so a mechanical swap in 39d changes empty-string behavior. Separately, the docblock's claim that the new helper "coexists with the existing `?? heuristic` resolution in `doctor/validate.ts`" is inaccurate — validate.ts:214-218 uses an `if (entry.artifactPath) { … } return heuristic` form, not a `??` expression; the `?? heuristic` description doesn't match the surface it points at.
+
+Neither is a correctness bug *today* (no caller is flipped yet), but both are traps the 39d implementer will step into: a "just delete `resolveArtifactPath` and call the new one" change will (a) silently alter `''` handling and (b) be guided by a docblock that mis-describes the code it's replacing. Reconcile the empty-string semantics first (per claude-01), and correct the `?? heuristic` phrasing to match the actual `if/return` shape, so the 39d swap is a true no-op on the absent/empty path.
+
+---
+
+I walked the actual code in the diff (the new `resolve-artifact.ts` helper, the `lanes/types.ts` schema additions, both test files) and verified the load-bearing claims against the repo: `Entry.artifactPath` is `.min(1).optional()` with `..`/absolute refinements (entry.ts:260-277); the existing resolver uses a truthy guard while the repair gate explicitly checks `!== ''` (validate.ts:215/:385); the `Drafting` heuristic resolves to `docs/<slug>/index.md`, so the test's negative assertion is sound. I did **not** re-report the `scaffoldDefaults` `z.record(enum, …)` partial-by-construction/unknown-key behavior — sibling AUDIT-20260603-07 already verified it at runtime and type level against Zod 3.25.76, and I confirmed the schema move (`ArtifactKindSchema` relocated above `LaneConfigSchema`) is internally consistent. My three findings cluster on one root: the new resolver's empty-string handling diverges from the codebase's established convention, and that divergence is set to bite when 39d swaps callers onto a now-public helper whose contract is documented to change.
