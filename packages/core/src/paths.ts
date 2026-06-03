@@ -60,13 +60,25 @@ function siteConfig(config: DeskworkConfig, site: string | null | undefined): Si
   return config.sites[slug];
 }
 
-/** Absolute path to the site's editorial calendar file. */
+/**
+ * Absolute path to the project's editorial calendar file.
+ *
+ * Phase 39c (sites→lanes retirement) — the calendar is a single,
+ * project-level derived projection from sidecars (spec §"Calendar"). The
+ * legacy per-site `calendarPath` is retired; there is one calendar at
+ * `.deskwork/calendar.md`. The `config`/`site` parameters are retained so
+ * call sites (and the CLI-verb resolution path, scoped to 39c-2b) need
+ * not change in lockstep — the de-parameterization is internal. Both are
+ * intentionally ignored. Closes #234 (divergence), #357 (read-side
+ * validator), #223 (regen flip-flop) per spec §"Inherited calendar-surface
+ * cluster".
+ */
 export function resolveCalendarPath(
   projectRoot: string,
-  config: DeskworkConfig,
-  site?: string | null,
+  _config: DeskworkConfig,
+  _site?: string | null,
 ): string {
-  return join(projectRoot, siteConfig(config, site).calendarPath);
+  return join(projectRoot, '.deskwork', 'calendar.md');
 }
 
 /** Absolute path to the site's channels file, or undefined when the site declares none. */
@@ -90,39 +102,11 @@ export function resolveContentDir(
   return join(projectRoot, siteConfig(config, site).contentDir);
 }
 
-/**
- * Bare public hostname for the site (no protocol). Returns `undefined` for
- * collections that aren't published as a website (no `host` configured).
- * Callers needing a non-undefined value for display should fall back to the
- * site slug; callers needing a real URL should throw if undefined.
- */
-export function resolveSiteHost(
-  config: DeskworkConfig,
-  site?: string | null,
-): string | undefined {
-  return siteConfig(config, site).host;
-}
-
-/**
- * Canonical public base URL for the site, with trailing slash. Throws when
- * the collection has no `host` configured (i.e. is not published as a
- * website) — callers that need a URL must guarantee the collection is a
- * website-rendered one before calling.
- */
-export function resolveSiteBaseUrl(
-  config: DeskworkConfig,
-  site?: string | null,
-): string {
-  const host = resolveSiteHost(config, site);
-  if (host === undefined) {
-    const slug = site ?? config.defaultSite;
-    throw new Error(
-      `Cannot resolve a base URL for collection "${slug}": no "host" is configured. ` +
-        `Add a "host" field to .deskwork/config.json if this collection is published as a website.`,
-    );
-  }
-  return `https://${host}/`;
-}
+// Phase 39c (sites→lanes retirement): `resolveSiteHost` and
+// `resolveSiteBaseUrl` are removed. They had ZERO production call sites
+// (the only `host` reads were two studio files reading `lane.host`
+// directly). Per spec §18 they were effectively dead. Host now lives on
+// the lane (`lane.host`); studio reads it from lane configs.
 
 const DEFAULT_BLOG_FILENAME_TEMPLATE = '{slug}/index.md';
 

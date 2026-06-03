@@ -82,8 +82,9 @@ describe('content tree — public-URL hover hint (Phase 19d)', () => {
       ],
       distributions: [],
     };
-    mkdirSync(join(root, 'docs'), { recursive: true });
-    writeCalendar(join(root, cfg.sites.wc.calendarPath), cal);
+    // Phase 39c: single project calendar at `.deskwork/calendar.md`.
+    mkdirSync(join(root, '.deskwork'), { recursive: true });
+    writeCalendar(join(root, '.deskwork', 'calendar.md'), cal);
 
     // Filesystem layout: directory name differs from slug; index.md
     // carries the matching frontmatter id so the binding works.
@@ -122,8 +123,9 @@ describe('content tree — public-URL hover hint (Phase 19d)', () => {
       ],
       distributions: [],
     };
-    mkdirSync(join(root, 'docs'), { recursive: true });
-    writeCalendar(join(root, cfg.sites.wc.calendarPath), cal);
+    // Phase 39c: single project calendar at `.deskwork/calendar.md`.
+    mkdirSync(join(root, '.deskwork'), { recursive: true });
+    writeCalendar(join(root, '.deskwork', 'calendar.md'), cal);
 
     const fileDir = join(root, 'src/content/projects/flat-post');
     mkdirSync(fileDir, { recursive: true });

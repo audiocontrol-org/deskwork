@@ -41,6 +41,9 @@ function makeEntry(stage: Entry['currentStage']): Entry {
     source: 'manual',
     currentStage: stage,
     iterationByStage: { Drafting: 0 },
+    // Phase 39c (sites→lanes retirement): resolution reads stored
+    // artifactPath only; the fixture seeds docs/hello-world/index.md.
+    artifactPath: 'docs/hello-world/index.md',
     createdAt: '2026-04-30T10:00:00.000Z',
     updatedAt: '2026-04-30T10:00:00.000Z',
   };

@@ -722,3 +722,55 @@ Surface:    `packages/core/src/doctor/validate.ts:337-356` (`validateMissingArti
 Pre-39d, this rule only reported an entry when the slug+stage heuristic *resolved to a file that existed on disk* (`if (!(await fileExists(heuristic))) continue;`) — i.e. a genuinely backfillable case. The new body removes that gate entirely: it reports any entry that lacks `artifactPath` and isn't off-pipeline (`isOffPipelineStage` guard only). That broadening is intentional for migration, but it also means a freshly-created entry that legitimately has no on-disk artifact yet (e.g. an `Ideas`/`Drafting` entry whose file hasn't been authored) now produces a `missing-artifact-path` finding on every `--check`, where before it was silent.
 
 Whether this is noise or a true gap depends entirely on whether the creation paths (`/deskwork:add`, ingest) stamp `artifactPath` at creation time — which the diff doesn't show. If they do, the rule is fine; if any creation path leaves `artifactPath` unset until the file is written, every new entry will flag until migrated, and the operator's only documented remedy (Finding 03) won't help a brand-new entry. Recommend verifying the create-side stamps `artifactPath` (and adding a fixture for "new entry, file not yet written" to pin the intended behavior), so this rule's broadened trigger doesn't turn the normal authoring flow into a doctor finding.
+
+## 2026-06-03 — audit-barrage lift (20260603T035609986Z-deskwork-plugin)
+
+### AUDIT-20260603-25 — `lane update --scaffold-default` replaces the entire `scaffoldDefaults` map, and the studio edit-form only surfaces the `markdown` kind — editing a multi-kind lane silently drops the others
+
+Finding-ID: AUDIT-20260603-25
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `packages/core/src/lanes/operations/update.ts:104-119` (whole-map replace) + `packages/studio/src/pages/lanes/edit-form.ts:81-95` (markdown-only field) + `plugins/deskwork-studio/public/src/lanes/lanes-page.ts:217-227` (`buildUpdateCommand`)
+
+This diff promotes the lane's location field from a scalar (`contentDir: string`) to a map (`scaffoldDefaults: Partial<Record<ArtifactKind, string>>`), and the CLI create path explicitly supports multiple kinds (test `accepts repeated --scaffold-default for multiple artifact kinds`, `list-show-create.test.ts:206-220`, producing `{ markdown, image }`). But `updateLane` replaces the **whole** map: `...(opts.scaffoldDefaults !== undefined && { scaffoldDefaults: opts.scaffoldDefaults })` overwrites the key on the `...existing` spread (update.ts:111-117). With a scalar this was natural; with a map it is destructive-merge.
+
+The studio surfaces make this reachable and silent. The edit-form renders only a single `scaffoldMarkdown` input (`edit-form.ts:84-95`); `buildUpdateCommand` emits `--scaffold-default "markdown=<dir>"` (lanes-page.ts:220-226). So an operator editing the markdown dir of a lane that carries `{ markdown: 'docs', image: 'imgs' }` produces an update whose result is `{ markdown: 'newdocs' }` — `image` is dropped with no warning, no diff, no surfacing of the field that was about to be erased. The edit-form can't even *display* the `image` value, so the operator has no way to know it existed.
+
+A reasonable fix: make `updateLane` merge scaffold-default kinds (patch only the supplied keys, preserve the rest) rather than replace the whole map — or, if replace is intended, have the studio edit-form round-trip *every* kind the lane currently carries (render one input per existing kind) so a copy-build update reproduces them. Either way, the CLI's whole-map-replace contract should be documented as a deliberate choice with an explicit "clears unspecified kinds" warning in the `--scaffold-default` help, since the only multi-kind producer (CLI create) and the only GUI editor (studio) now disagree on map semantics.
+
+---
+
+### AUDIT-20260603-26 — `deskwork:lane` SKILL.md is wholesale stale — still documents `--content-dir`, "binds a content directory", and "moves artifact + scrapbook on disk", all retired by this diff
+
+Finding-ID: AUDIT-20260603-26
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/deskwork/skills/lane/SKILL.md:3,8,19,23,30-31,35,44-45,49,61,70` (not in the diff — should be)
+
+This diff retires `contentDir` from the lane (`types.ts`), replaces the `--content-dir` flag with `--scaffold-default <kind>=<dir>` (`lane.ts`), and converts `lane move` to a metadata-only operation that does NOT relocate the artifact or scrapbook (`move.ts`). The operator-facing SKILL.md that documents this verb was not updated and now contradicts the implementation at nearly every line I checked:
+
+- Description + body: *"Lanes bind a content directory to a pipeline template"* (lines 3, 8) — the central claim the diff dissolves (`types.ts:117` docblock: "A lane carries NO location of its own").
+- Synopsis block: `create … --content-dir <path>` and `update … [--content-dir <path>]` (lines 30-31, 44-45) — the flag no longer exists; the CLI now refuses unknown flags and the studio emits `--scaffold-default`.
+- `move` docs: *"relocate an entry into another lane (moves artifact + scrapbook on disk)"* (line 23) and *"relocates the artifact + scrapbook on disk"* (line 49) — directly contradicts move.ts:25-37 ("the move is a METADATA change only … both stay exactly where they are").
+- Error-handling section still documents the retired *"target artifact already exists"* refusal (line 70), which move.ts deleted along with the relocation/collision logic.
+
+Per the project's documentation-drift discipline and the state-machine rule ("if the implementation changed, did the spec?"), the SKILL.md is an adopter contract and is now actively misleading — an operator copying the documented `--content-dir` command gets an unknown-flag refusal. The fix is to update SKILL.md in the same change that retires the flag: swap `--content-dir` → `--scaffold-default`, rewrite the move semantics to metadata-only, and drop the two now-impossible move refusals.
+
+---
+
+### AUDIT-20260603-27 — `lane move` silently changed from a file-relocating operation to metadata-only, with no migration note or operator-facing surfacing of the behavior change
+
+Finding-ID: AUDIT-20260603-27
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/src/lanes/operations/move.ts:25-37,177-184` + `packages/core/src/schema/journal-events.ts:167-175` (lane-move docblock)
+
+Before this diff, `deskwork lane move` physically relocated the artifact and scrapbook into the target lane's contentDir; after it, the move only rewrites the sidecar's `lane`/`currentStage` and leaves all files in place (move.ts:25-37). The journal `lane-move` event now emits `fromArtifactPath === toArtifactPath` (move.ts:211-214, 229-232). This is the intended Phase-39 model ("a lane spans whatever directories its entries live in"), and the code/tests are internally consistent — but it is a meaningful semantic reversal for any operator whose mental model (and the still-shipped SKILL.md, finding -02) says move reorganizes files on disk.
+
+The concern is discoverability of the behavior change, not correctness. An operator on an existing project who runs `lane move` expecting their markdown to land under a different directory will instead find it untouched, with only a metadata flip — and nothing in the CLI output signals that the file stayed put. The journal event echoes the same path twice, which to a reader of historical journals (where old `lane-move` events recorded genuinely *different* from/to paths) is ambiguous without the schema docblock context.
+
+A light-touch fix: have the `lane move` CLI result/emit explicitly note "metadata-only; artifact not relocated (lane carries no contentDir)" so the operator isn't left inferring it, and ensure the migration/upgrade notes for Phase 39 call out that `lane move` no longer touches the filesystem. This is informational-adjacent but worth a one-line operator signal given the prior behavior was the headline feature of the verb.
+
+---
+
+I walked the rest of the diff — `collectScaffoldDefaults` argv parsing (two-token and `=`-token forms, malformed/duplicate/empty/unknown-kind rejection paths all look correct, including dirs containing `=`), the `assertSafeContentDir`→`assertSafeScaffoldDir` rename (boundary check preserved per scaffold dir), the journal `LaneCreateEvent` back-compat (`.passthrough()` + optional `contentDir`/`scaffoldDefaults`/`host`), the studio `normalizeScaffoldDefaults` undefined-dropping, the XSS escaping path for the new scaffold-defaults cell, and the large test-fixture migration — and found those clean. My three findings concentrate on the scalar→map semantic gap (the update replace + studio single-kind editor), the un-updated operator-facing SKILL.md, and the under-surfaced move behavior reversal.

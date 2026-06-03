@@ -28,6 +28,8 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { parseConfig, configPath } from '@deskwork/core/config';
 import { renderEmptyCalendar } from '@deskwork/core/calendar';
+import { resolveCalendarPath } from '@deskwork/core/paths';
+import { bootstrapDefaultLaneIfMissing } from '@deskwork/core/lanes';
 import {
   detectExistingPipeline,
   printExistingPipelineWarning,
@@ -118,20 +120,67 @@ export async function run(argv: string[]): Promise<void> {
   const createdCalendars: string[] = [];
   const preservedCalendars: string[] = [];
 
-  for (const [slug, site] of Object.entries(config.sites)) {
-    const absPath = join(projectRoot, site.calendarPath);
-    if (existsSync(absPath)) {
-      preservedCalendars.push(`${slug}: ${site.calendarPath}`);
-      continue;
-    }
-    mkdirSync(dirname(absPath), { recursive: true });
-    writeFileSync(absPath, renderEmptyCalendar(), 'utf-8');
-    createdCalendars.push(`${slug}: ${site.calendarPath}`);
+  // Phase 39c (sites→lanes retirement): the calendar is a SINGLE
+  // project-level file at `.deskwork/calendar.md` (resolved via
+  // `resolveCalendarPath`, which is now site-independent). Seed it once,
+  // idempotently. Any legacy per-site `calendarPath` is still seeded
+  // below for back-compat with the (tolerated) `sites` block, but the
+  // project calendar is the one the doctor + verbs read.
+  // The `.deskwork/entries/` directory is the entry-centric-schema
+  // marker (#149): its presence — even empty — tells the doctor the
+  // project is on the post-redesign schema and must NOT be routed
+  // through the legacy calendar migration. A fresh install is natively
+  // entry-centric, so seed the (empty) dir alongside the calendar.
+  mkdirSync(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
+
+  const projectCalendarPath = resolveCalendarPath(projectRoot, config);
+  if (existsSync(projectCalendarPath)) {
+    preservedCalendars.push(`project: .deskwork/calendar.md`);
+  } else {
+    mkdirSync(dirname(projectCalendarPath), { recursive: true });
+    writeFileSync(projectCalendarPath, renderEmptyCalendar(), 'utf-8');
+    createdCalendars.push(`project: .deskwork/calendar.md`);
+  }
+
+  // Phase 39c (sites→lanes retirement): per-site `calendarPath` is
+  // RETIRED — install no longer seeds a calendar at each legacy site's
+  // configured path. There is one calendar, the project calendar above.
+  // The `sites` block stays tolerated (the CLI-verb resolution family
+  // still reads it until 39c-2b), but its `calendarPath` no longer
+  // steers any write.
+
+  // Phase 39c scope item 6: write a working default lane so the project
+  // is lane-based from first install. `bootstrapDefaultLaneIfMissing`
+  // derives the lane's `scaffoldDefaults.markdown` from the legacy
+  // default site's contentDir (when a `sites` block is present) and is a
+  // no-op when `.deskwork/lanes/default.json` already exists. When no
+  // legacy site exists it is a no-op (`no-config` / missing default site)
+  // — a sites-less project is expected to carry its own lane configs.
+  let defaultLaneWritten: string | undefined;
+  try {
+    const result = await bootstrapDefaultLaneIfMissing(projectRoot);
+    if (result.created) defaultLaneWritten = result.path;
+  } catch (err) {
+    // A malformed config / missing default site surfaces here. Install
+    // already wrote a valid config above, so this only fires for a
+    // config that declares `defaultSite` without a matching `sites`
+    // entry — an operator-fixable bug worth surfacing, not swallowing.
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(
+      `Default-lane bootstrap failed: ${reason}. The config was written; ` +
+        `re-run after repairing the lane/site mismatch.`,
+    );
+    process.exit(1);
   }
 
   console.log(`Wrote config: ${writtenConfigPath}`);
-  console.log(`Sites configured: ${Object.keys(config.sites).join(', ')}`);
-  console.log(`Default site: ${config.defaultSite}`);
+  if (Object.keys(config.sites).length > 0) {
+    console.log(`Sites configured: ${Object.keys(config.sites).join(', ')}`);
+    console.log(`Default site: ${config.defaultSite}`);
+  }
+  if (defaultLaneWritten !== undefined) {
+    console.log(`Created default lane: ${defaultLaneWritten}`);
+  }
   if (createdCalendars.length > 0) {
     console.log(`Created calendars:`);
     for (const c of createdCalendars) console.log(`  - ${c}`);

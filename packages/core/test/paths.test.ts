@@ -14,8 +14,6 @@ import {
   resolveCalendarPath,
   resolveChannelsPath,
   resolveContentDir,
-  resolveSiteHost,
-  resolveSiteBaseUrl,
 } from '../src/paths.ts';
 import type { ContentIndex } from '../src/content-index.ts';
 import type { DeskworkConfig } from '../src/config.ts';
@@ -72,23 +70,27 @@ describe('resolveSite', () => {
   });
 });
 
-describe('resolveCalendarPath', () => {
-  it('joins project root with the site calendar path', () => {
+describe('resolveCalendarPath (Phase 39c — single project calendar)', () => {
+  // Per the sites→lanes retirement spec §"Calendar", the calendar is a
+  // single project-level file at `.deskwork/calendar.md`. The `site`
+  // parameter is retained on the signature (so CLI-verb call sites need
+  // not change in lockstep) but ignored.
+  it('returns the single project calendar regardless of site argument', () => {
     expect(
       resolveCalendarPath('/tmp/project', multiSite, 'audiocontrol'),
-    ).toBe('/tmp/project/docs/editorial-calendar-audiocontrol.md');
+    ).toBe('/tmp/project/.deskwork/calendar.md');
   });
 
-  it('defaults to the defaultSite when site is not passed', () => {
+  it('returns the same path when site is omitted', () => {
     expect(resolveCalendarPath('/tmp/project', singleSite)).toBe(
       '/tmp/project/.deskwork/calendar.md',
     );
   });
 
-  it('throws for an unknown site', () => {
-    expect(() =>
-      resolveCalendarPath('/tmp/project', multiSite, 'nope'),
-    ).toThrow(/nope/);
+  it('ignores a site that is not in config (no longer throws)', () => {
+    expect(resolveCalendarPath('/tmp/project', multiSite, 'nope')).toBe(
+      '/tmp/project/.deskwork/calendar.md',
+    );
   });
 });
 
@@ -114,26 +116,9 @@ describe('resolveContentDir', () => {
   });
 });
 
-describe('resolveSiteHost', () => {
-  it('returns the configured host for a site', () => {
-    expect(resolveSiteHost(multiSite, 'audiocontrol')).toBe('audiocontrol.org');
-    expect(resolveSiteHost(multiSite, 'editorialcontrol')).toBe(
-      'editorialcontrol.org',
-    );
-  });
-
-  it('defaults to the defaultSite', () => {
-    expect(resolveSiteHost(singleSite)).toBe('example.com');
-  });
-});
-
-describe('resolveSiteBaseUrl', () => {
-  it('builds a canonical https URL with trailing slash', () => {
-    expect(resolveSiteBaseUrl(multiSite, 'audiocontrol')).toBe(
-      'https://audiocontrol.org/',
-    );
-  });
-});
+// Phase 39c (sites→lanes retirement): `resolveSiteHost` /
+// `resolveSiteBaseUrl` were removed (zero production call sites). Host now
+// lives on the lane (`lane.host`). Their tests are retired with them.
 
 describe('findEntryFile (Phase 19c)', () => {
   // findEntryFile precedence:

@@ -32,10 +32,12 @@
  */
 
 import { readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import type { DeskworkConfig } from './config.ts';
 import { resolveContentDir } from './paths.ts';
 import { readFrontmatter } from './frontmatter.ts';
+import { readAllSidecarsPartitioned } from './sidecar/read-all.ts';
+import { listLaneConfigs, loadLaneConfig } from './lanes/loader.ts';
 
 /** A markdown file whose frontmatter `id:` couldn't be used as an index key. */
 export interface InvalidIndexEntry {
@@ -212,6 +214,38 @@ function readIdFromFrontmatter(absPath: string): IdLookup {
 }
 
 /**
+ * Bind each file's frontmatter UUID into the `byId` / `byPath` maps,
+ * recording parse failures on `invalid`. Shared by both index builders
+ * (`buildContentIndex`'s contentDir walk + `buildContentIndexFromSidecars`'s
+ * sidecar-driven discovery). `baseDir` is the root the stored `byPath` key
+ * is made relative to. First-encountered wins for `byId` on duplicate ids
+ * (callers pass a deterministically-ordered `files` so "first" is stable);
+ * `byPath` records every path so a later caller can still resolve uuid by
+ * path even for the colliding entry.
+ */
+function bindFilesToIndex(
+  files: readonly string[],
+  baseDir: string,
+  byId: Map<string, string>,
+  byPath: Map<string, string>,
+  invalid: InvalidIndexEntry[],
+): void {
+  for (const abs of files) {
+    const lookup = readIdFromFrontmatter(abs);
+    if (lookup.kind === 'absent') continue;
+    if (lookup.kind === 'invalid') {
+      invalid.push({ absolutePath: abs, reason: lookup.reason });
+      continue;
+    }
+    const rel = relative(baseDir, abs);
+    if (!byId.has(lookup.id)) {
+      byId.set(lookup.id, abs);
+    }
+    byPath.set(rel, lookup.id);
+  }
+}
+
+/**
  * Build a content index for one site. Walks `<contentDir>/`, parses
  * every markdown file's frontmatter, and binds `id ↔ path` where the
  * frontmatter declares a valid UUID.
@@ -237,24 +271,114 @@ export function buildContentIndex(
     return { byId, byPath, invalid };
   }
 
-  for (const abs of files) {
-    const lookup = readIdFromFrontmatter(abs);
-    if (lookup.kind === 'absent') continue;
-    if (lookup.kind === 'invalid') {
-      invalid.push({ absolutePath: abs, reason: lookup.reason });
+  bindFilesToIndex(files, contentDir, byId, byPath, invalid);
+
+  return { byId, byPath, invalid };
+}
+
+/**
+ * Build a content index driven by the sidecar set (Phase 39c — sites→lanes
+ * retirement, scope item 7).
+ *
+ * Where `buildContentIndex` walks a site's `contentDir` to DISCOVER files,
+ * this builder discovers the content roots from the sidecars themselves:
+ * the sidecar is the source of truth (Phase 30), and `entry.artifactPath`
+ * points at each entry's on-disk file. We collect the directory of every
+ * entry's resolved artifact, walk each unique directory for markdown files,
+ * and bind `id ↔ path` exactly as `buildContentIndex` does — but WITHOUT a
+ * configured `site` / `contentDir` axis. This lets the doctor (and any other
+ * project-scoped consumer) build a content index for a project whose
+ * `config.sites` has been migrated away.
+ *
+ * `byPath` keys are PROJECT-ROOT-relative (matching `entry.artifactPath`'s
+ * own base — `resolveStoredArtifactPath` joins it against `projectRoot`), so
+ * callers reconstruct absolute paths with `join(projectRoot, relPath)`. This
+ * differs from `buildContentIndex`, whose `byPath` keys are contentDir-
+ * relative.
+ *
+ * Entries without an `artifactPath` contribute no discovery root (their
+ * location is unknown until `doctor --fix` backfills it). A directory that
+ * doesn't exist on disk yet is silently skipped (the walk tolerates ENOENT).
+ */
+/**
+ * Collect the lane `scaffoldDefaults` directories (absolute). These are
+ * the lanes' add-time content roots — where new files land. Including
+ * them in the discovery set lets the sidecar-driven index also find
+ * content that has no sidecar yet (orphan files, duplicate-id collisions,
+ * legacy top-level-id files), which the doctor rules that walk "the
+ * content tree" depend on. A lane that declares no `scaffoldDefaults`
+ * contributes nothing. Malformed lane files are skipped (loadLaneConfig
+ * throws — other doctor rules surface those).
+ */
+function collectLaneScaffoldDirs(projectRoot: string): string[] {
+  const roots = new Set<string>();
+  for (const laneId of listLaneConfigs(projectRoot, { includeArchived: true })) {
+    let lane;
+    try {
+      lane = loadLaneConfig(laneId, projectRoot);
+    } catch {
       continue;
     }
-    const rel = relative(contentDir, abs);
-    // First-encountered wins for byId on duplicates. Sorted walk above
-    // gives deterministic "first" — same fixture tree always picks the
-    // same file. byPath records every path so a later fs-walk-driven
-    // caller can still resolve uuid by path even when the duplicate
-    // is the colliding entry.
-    if (!byId.has(lookup.id)) {
-      byId.set(lookup.id, abs);
+    const scaffold = lane.scaffoldDefaults;
+    if (scaffold === undefined) continue;
+    for (const dir of Object.values(scaffold)) {
+      if (typeof dir === 'string' && dir.length > 0) {
+        roots.add(join(projectRoot, dir));
+      }
     }
-    byPath.set(rel, lookup.id);
   }
+  return [...roots];
+}
+
+/**
+ * The discovery roots for the sidecar-driven content index (Phase 39c):
+ * the union of (a) every entry's resolved artifact DIRECTORY and (b)
+ * every lane's `scaffoldDefaults` directory. (a) finds bound content;
+ * (b) finds not-yet-bound content (orphans / duplicates / legacy ids)
+ * sitting in a lane's add-time content root. Returns absolute paths,
+ * de-duplicated and sorted for deterministic walks.
+ */
+export async function collectSidecarArtifactDirs(
+  projectRoot: string,
+): Promise<string[]> {
+  // Use the PARTITIONED reader: a corrupt sidecar must NOT abort index
+  // construction. The doctor builds this index at the start of every run
+  // (`runner.ts` `buildContext`); a throwing reader here would crash the
+  // whole audit before any rule executes — including the rules whose job
+  // is to surface the corruption gracefully (sites-to-lanes-migration's
+  // AUDIT-20260603-14 error-finding path). Malformed sidecars contribute
+  // no discovery root; the rules report them.
+  const { entries } = await readAllSidecarsPartitioned(projectRoot);
+  const roots = new Set<string>();
+  for (const entry of entries) {
+    if (entry.artifactPath === undefined || entry.artifactPath === '') continue;
+    const absArtifact = join(projectRoot, entry.artifactPath);
+    roots.add(dirname(absArtifact));
+  }
+  for (const dir of collectLaneScaffoldDirs(projectRoot)) {
+    roots.add(dir);
+  }
+  return [...roots].sort();
+}
+
+export async function buildContentIndexFromSidecars(
+  projectRoot: string,
+): Promise<ContentIndex> {
+  const roots = await collectSidecarArtifactDirs(projectRoot);
+
+  const byId = new Map<string, string>();
+  const byPath = new Map<string, string>();
+  const invalid: InvalidIndexEntry[] = [];
+
+  const files = new Set<string>();
+  for (const root of roots) {
+    for (const abs of collectMarkdownFiles(root)) {
+      files.add(abs);
+    }
+  }
+  // Deterministic order: sort so byId's first-wins on a duplicate id is
+  // stable across runs (mirrors buildContentIndex's sorted walk).
+  bindFilesToIndex([...files].sort(), projectRoot, byId, byPath, invalid);
 
   return { byId, byPath, invalid };
 }

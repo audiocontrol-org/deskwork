@@ -67,8 +67,12 @@ function seedEntry(
     planEntry(calendar, slugOf(title), ['kw']);
   }
   const entry = calendar.entries[0];
-  mkdirSync(join(root, 'docs'), { recursive: true });
-  writeCalendar(join(root, cfg.sites.a.calendarPath), calendar);
+  // Phase 39c (sites→lanes retirement): the review handlers read the
+  // single project calendar at `.deskwork/calendar.md` (via
+  // `resolveCalendarPath`, now site-independent). Seed it there, not the
+  // legacy per-site `calendarPath`.
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
+  writeCalendar(join(root, '.deskwork', 'calendar.md'), calendar);
   if (entry.id === undefined) throw new Error('entry has no id');
   return { calendar, slug: entry.slug, entryId: entry.id };
 }

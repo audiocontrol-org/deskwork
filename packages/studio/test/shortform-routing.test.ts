@@ -44,8 +44,9 @@ function makeConfig(): DeskworkConfig {
 }
 
 function seedCalendar(root: string, rows: string[]): void {
-  const calPath = join(root, 'docs/cal-a.md');
-  mkdirSync(join(root, 'docs'), { recursive: true });
+  // Phase 39c (sites→lanes retirement): single project calendar.
+  const calPath = join(root, '.deskwork', 'calendar.md');
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
   const calendar = [
     '# Editorial Calendar',
     '',

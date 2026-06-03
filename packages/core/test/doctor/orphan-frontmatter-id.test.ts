@@ -28,6 +28,22 @@ async function setupFixture(): Promise<{ root: string; config: DeskworkConfig }>
   const root = await mkdtemp(join(tmpdir(), 'dw-orphan-fmid-'));
   await mkdir(join(root, '.deskwork', 'entries'), { recursive: true });
   await mkdir(join(root, 'docs'), { recursive: true });
+  // Phase 39c (sites→lanes retirement): the doctor's content discovery is
+  // sidecar-driven AND walks each lane's `scaffoldDefaults` directory (so
+  // not-yet-bound files — orphans — sitting in a lane's content root are
+  // still found). Seed a `default` lane whose markdown scaffold root is
+  // `docs` so the orphan files under `docs/<slug>/index.md` are
+  // discovered without requiring a sidecar per file.
+  await mkdir(join(root, '.deskwork', 'lanes'), { recursive: true });
+  await writeFile(
+    join(root, '.deskwork', 'lanes', 'default.json'),
+    JSON.stringify({
+      id: 'default',
+      name: 'Default',
+      pipelineTemplate: 'editorial',
+      scaffoldDefaults: { markdown: 'docs' },
+    }),
+  );
   const config: DeskworkConfig = {
     version: 1,
     sites: {

@@ -33,7 +33,11 @@ function isStale(
   workflow: DraftWorkflowItem,
   ctx: DoctorContext,
 ): boolean {
-  if (workflow.site !== ctx.site) return false;
+  // Phase 39c (sites→lanes retirement): the doctor runs a single
+  // project pass and reconciles every workflow against the single
+  // project calendar. The legacy per-site filter (`workflow.site !==
+  // ctx.site`) is retired — `ctx.site` is now the `PROJECT_SCOPE`
+  // sentinel, never a real site slug.
   if (workflow.state === 'applied' || workflow.state === 'cancelled') {
     return false;
   }

@@ -335,6 +335,14 @@ function resolveDefaultSite(value: unknown, siteSlugs: string[]): string {
       `Invalid deskwork config: "defaultSite" must be a string, got ${describe(value)}.`,
     );
   }
+  // Phase 39c (sites→lanes retirement): an explicit empty-string
+  // `defaultSite` with no configured sites is the round-trippable
+  // post-migration shape. `parseConfig` normalizes an absent/empty
+  // `sites` to `{}` and `defaultSite` to `''`, and re-writes that to
+  // disk (the install path does exactly this). Re-reading it must NOT
+  // throw — `''` with no sites means "no default site to resolve",
+  // identical to the absent case above (AUDIT-20260603-11 tolerance).
+  if (value === '' && siteSlugs.length === 0) return '';
   if (!siteSlugs.includes(value)) {
     throw new Error(
       `Invalid deskwork config: defaultSite "${value}" is not a configured site. ` +

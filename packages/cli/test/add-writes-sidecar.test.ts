@@ -83,7 +83,11 @@ function uuidFromAddOutput(stdout: string): string {
   // `deskwork add` emits a JSON blob with slug/title/etc. but not the
   // UUID directly — read it from calendar.md by slug.
   const parsed = JSON.parse(stdout) as { slug: string };
-  const calendarRaw = readFileSync(join(project, 'docs', 'calendar.md'), 'utf-8');
+  // Phase 39c (sites→lanes retirement): single project calendar.
+  const calendarRaw = readFileSync(
+    join(project, '.deskwork', 'calendar.md'),
+    'utf-8',
+  );
   const m = calendarRaw.match(
     new RegExp(`\\| ([0-9a-f-]{36}) \\| ${parsed.slug.replace(/[\/.]/g, '\\$&')} \\|`),
   );

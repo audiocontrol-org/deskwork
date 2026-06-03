@@ -64,17 +64,15 @@ const AMBIGUOUS_RULE_ID = 'migration-ambiguous';
 const MIGRATION_PIPELINE_TEMPLATE = 'editorial';
 
 /**
- * The migration is whole-project. The runner invokes a rule once per
- * configured site; this guard restricts the rule's real work to the
- * lead site so it fires exactly once per `runRepair` invocation. When
- * `config.sites` is empty (post-migration), `ctx.site` will not match
- * any key — but then `readLegacySites` returns an empty map and the
- * rule no-ops anyway, so the guard simply admits the first pass.
+ * The migration is whole-project. Phase 39c collapsed the runner's
+ * per-site loop into a single project pass (`runner.ts` `PROJECT_SCOPE`),
+ * so this rule now fires exactly once per run regardless. The guard is
+ * retained as a constant `true` (its source of truth is the on-disk
+ * config via `readLegacySites`, not `ctx.config`, so idempotency is
+ * unaffected).
  */
-function isLeadSite(ctx: DoctorContext): boolean {
-  const keys = Object.keys(ctx.config.sites);
-  if (keys.length === 0) return true;
-  return ctx.site === keys[0];
+function isLeadSite(_ctx: DoctorContext): boolean {
+  return true;
 }
 
 /**

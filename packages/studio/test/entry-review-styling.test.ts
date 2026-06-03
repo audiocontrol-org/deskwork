@@ -46,6 +46,9 @@ function makeEntry(stage: Entry['currentStage'], overrides: Partial<Entry> = {})
     source: 'manual',
     currentStage: stage,
     iterationByStage: { Drafting: 1 },
+    // Phase 39c: stored-path-only resolution; fixture seeds
+    // docs/hello-world/index.md.
+    artifactPath: 'docs/hello-world/index.md',
     createdAt: '2026-04-30T10:00:00.000Z',
     updatedAt: '2026-04-30T10:00:00.000Z',
     ...overrides,

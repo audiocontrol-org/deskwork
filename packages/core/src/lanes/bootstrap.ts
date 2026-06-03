@@ -99,13 +99,25 @@ export async function bootstrapDefaultLaneIfMissing(
     return { created: false, reason: 'no-config', path: targetPath };
   }
   // readConfig validates the config against its Zod schema before
-  // returning, so `defaultSite` and `sites` are guaranteed present and
-  // typed. The schema contract lives in `packages/core/src/config.ts`;
-  // if it ever loosens, the `site` check below must widen accordingly.
+  // returning. Phase 39c (sites→lanes retirement): `sites`/`defaultSite`
+  // are TOLERATED-as-absent. Two cases:
+  //
+  //   - Legacy site present (migration window): derive the default
+  //     lane's `scaffoldDefaults.markdown` from the default site's
+  //     contentDir, preserving operator intent.
+  //   - No default site (sites-less, post-migration shape): write a
+  //     default lane with NO `scaffoldDefaults`. A scaffold default is
+  //     optional convenience metadata, not identity — a lane is fully
+  //     valid without it. This is the path a freshly installed
+  //     sites-less project takes.
+  //
+  // A PRESENT `defaultSite` that names a NON-existent site is still a
+  // genuine config bug and throws below.
   const config = readConfig(projectRoot);
   const defaultSiteId = config.defaultSite;
-  const site = config.sites[defaultSiteId];
-  if (!site) {
+  const hasDefaultSite = defaultSiteId !== '';
+  const site = hasDefaultSite ? config.sites[defaultSiteId] : undefined;
+  if (hasDefaultSite && site === undefined) {
     throw new Error(
       `bootstrapDefaultLaneIfMissing: config at ${cfgPath} declares `
       + `defaultSite="${defaultSiteId}" but no matching site under "sites". `
@@ -120,7 +132,7 @@ export async function bootstrapDefaultLaneIfMissing(
     id: 'default',
     name: 'Default',
     pipelineTemplate: 'editorial',
-    scaffoldDefaults: { markdown: site.contentDir },
+    ...(site !== undefined ? { scaffoldDefaults: { markdown: site.contentDir } } : {}),
   };
 
   // Defensive: round-trip through the schema before writing, so the
@@ -147,16 +159,21 @@ export async function bootstrapDefaultLaneIfMissing(
     await appendJournalEvent(projectRoot, {
       kind: 'lane-migration',
       at: new Date().toISOString(),
-      migration: 'default-lane-from-legacy-site',
-      source: `sites.${defaultSiteId}`,
+      migration: site !== undefined
+        ? 'default-lane-from-legacy-site'
+        : 'default-lane-sites-less',
+      source: hasDefaultSite ? `sites.${defaultSiteId}` : 'config(no-sites)',
       target: 'lanes.default',
       // New events emit `scaffoldDefaults` (Phase 39); the legacy
       // `contentDir` detail key is gone from new writes. Old on-disk
       // events that carry `contentDir` still parse — the event's
       // `details` is a free-form `z.record(z.string(), z.unknown())`.
+      // A sites-less default lane carries no scaffoldDefaults.
       details: {
-        legacySiteId: defaultSiteId,
-        scaffoldDefaults: { markdown: site.contentDir },
+        ...(hasDefaultSite ? { legacySiteId: defaultSiteId } : {}),
+        ...(site !== undefined
+          ? { scaffoldDefaults: { markdown: site.contentDir } }
+          : {}),
         pipelineTemplate: 'editorial',
       },
     });

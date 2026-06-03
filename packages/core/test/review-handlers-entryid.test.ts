@@ -61,10 +61,12 @@ function entry(overrides: Partial<CalendarEntry>): CalendarEntry {
 
 const ENTRY_ID = 'abababab-abab-4abc-8abc-abababababab';
 
-function seedCalendar(root: string, cfg: DeskworkConfig, e: CalendarEntry) {
+function seedCalendar(root: string, _cfg: DeskworkConfig, e: CalendarEntry) {
   const cal: EditorialCalendar = { entries: [e], distributions: [] };
-  const calendarPath = join(root, cfg.sites.a.calendarPath);
-  mkdirSync(join(root, 'docs'), { recursive: true });
+  // Phase 39c (sites→lanes retirement): the handlers read the single
+  // project calendar at `.deskwork/calendar.md`.
+  const calendarPath = join(root, '.deskwork', 'calendar.md');
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
   writeCalendar(calendarPath, cal);
 }
 
@@ -246,10 +248,11 @@ function wcConfig(): DeskworkConfig {
   };
 }
 
-function seedWcCalendar(root: string, cfg: DeskworkConfig, e: CalendarEntry) {
+function seedWcCalendar(root: string, _cfg: DeskworkConfig, e: CalendarEntry) {
   const cal: EditorialCalendar = { entries: [e], distributions: [] };
-  const calendarPath = join(root, cfg.sites.wc.calendarPath);
-  mkdirSync(join(root, 'docs'), { recursive: true });
+  // Phase 39c (sites→lanes retirement): single project calendar.
+  const calendarPath = join(root, '.deskwork', 'calendar.md');
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
   writeCalendar(calendarPath, cal);
 }
 
