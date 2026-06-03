@@ -22,6 +22,8 @@ import {
   checkAncestry,
   ancestryAsGateBoolean,
   ancestryAsBarrageTip,
+  pickFallbackBaseline,
+  type PickFallbackBaselineDeps,
 } from '../../../scope-discovery/util/git-ancestry.js';
 
 function git(repoRoot: string, ...args: string[]): string {
@@ -201,6 +203,124 @@ describe('ancestryAsBarrageTip — implement-hook collapse (AUDIT-47)', () => {
   // the fail-open bug AUDIT-45 named.
   it('maps `unknown` → null (DROP the tip; the AUDIT-45 fail-closed fix)', () => {
     expect(ancestryAsBarrageTip('unknown', 'aabbccdd')).toBe(null);
+  });
+});
+
+// AUDIT-20260602-39: the `HEAD~10..HEAD` fallback for the audited-diff
+// helper blew up on post-merge-from-main feature branches — HEAD~10
+// crossed the merge boundary, the diff exceeded execFileSync's maxBuffer,
+// gitDiff silently returned ''. Tests the fallback-picker that
+// constrains the baseline to whichever of `merge-base HEAD origin/main`
+// and `HEAD~10` is closer to HEAD.
+function makeBaselineDeps(opts: {
+  mergeBase?: string | null;
+  relHead?: string | null;
+  ancestors?: ReadonlyArray<[string, string]>;
+}): PickFallbackBaselineDeps {
+  const ancestorPairs = new Set(
+    (opts.ancestors ?? []).map(([a, b]) => `${a}|${b}`),
+  );
+  return {
+    resolveMergeBase: () => opts.mergeBase ?? null,
+    resolveRelativeHead: () => opts.relHead ?? null,
+    isAncestorOf: (tip, descendant) => ancestorPairs.has(`${tip}|${descendant}`),
+  };
+}
+
+describe('pickFallbackBaseline — bounded post-merge baseline (AUDIT-39)', () => {
+  it('returns relHead when mergeBase is its ancestor (relHead is closer to HEAD)', () => {
+    // mergeBase ← relHead ← HEAD chain.
+    const result = pickFallbackBaseline(
+      makeBaselineDeps({
+        mergeBase: 'mb',
+        relHead: 'h10',
+        ancestors: [['mb', 'h10']],
+      }),
+    );
+    expect(result).toBe('h10');
+  });
+
+  it('returns mergeBase when relHead is its ancestor (mergeBase is closer to HEAD)', () => {
+    // Long-lived branch case: HEAD~10 is on the OTHER side of the merge.
+    // relHead ← mergeBase ← HEAD; mergeBase is closer.
+    const result = pickFallbackBaseline(
+      makeBaselineDeps({
+        mergeBase: 'mb',
+        relHead: 'h10',
+        ancestors: [['h10', 'mb']],
+      }),
+    );
+    expect(result).toBe('mb');
+  });
+
+  it('prefers mergeBase on tie (neither ancestor of the other)', () => {
+    const result = pickFallbackBaseline(
+      makeBaselineDeps({
+        mergeBase: 'mb',
+        relHead: 'h10',
+        ancestors: [], // neither is an ancestor of the other
+      }),
+    );
+    expect(result).toBe('mb');
+  });
+
+  it('returns mergeBase when relHead is unavailable (shallow / fresh repo)', () => {
+    const result = pickFallbackBaseline(
+      makeBaselineDeps({ mergeBase: 'mb', relHead: null }),
+    );
+    expect(result).toBe('mb');
+  });
+
+  it('returns relHead when mergeBase is unavailable (no upstream ref)', () => {
+    const result = pickFallbackBaseline(
+      makeBaselineDeps({ mergeBase: null, relHead: 'h10' }),
+    );
+    expect(result).toBe('h10');
+  });
+
+  it('returns null when neither resolves (caller must handle)', () => {
+    const result = pickFallbackBaseline(
+      makeBaselineDeps({ mergeBase: null, relHead: null }),
+    );
+    expect(result).toBe(null);
+  });
+
+  it('respects custom upstreamRef and maxLookback options', () => {
+    let observedUpstream = '';
+    let observedLookback = -1;
+    const result = pickFallbackBaseline(
+      {
+        resolveMergeBase: (ref) => {
+          observedUpstream = ref;
+          return 'mb';
+        },
+        resolveRelativeHead: (n) => {
+          observedLookback = n;
+          return 'h5';
+        },
+        isAncestorOf: () => false,
+      },
+      { upstreamRef: 'origin/release-x', maxLookback: 5 },
+    );
+    expect(observedUpstream).toBe('origin/release-x');
+    expect(observedLookback).toBe(5);
+    expect(result).toBe('mb'); // tie-break to mergeBase
+  });
+
+  // Live repro from the 2026-06-02 v0.35.0 release attempt: feature
+  // branch merged origin/main; HEAD~10 landed on the main side; the
+  // bounded helper should pick the merge-base instead.
+  it('post-merge-from-main scenario: picks mergeBase (the branch-point), not HEAD~10', () => {
+    // Topology: HEAD~10 lives on main's side of the merge; mergeBase
+    // is the actual divergence point (closer to HEAD than HEAD~10).
+    const result = pickFallbackBaseline(
+      makeBaselineDeps({
+        mergeBase: 'branch-point',
+        relHead: 'main-side',
+        ancestors: [['main-side', 'branch-point']],
+      }),
+    );
+    expect(result).toBe('branch-point');
   });
 });
 

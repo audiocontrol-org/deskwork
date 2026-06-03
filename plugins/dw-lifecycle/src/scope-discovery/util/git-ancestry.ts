@@ -114,3 +114,76 @@ export function checkAncestry(opts: IsAncestorOfHeadOptions): AncestryResult {
     return 'unknown';
   }
 }
+
+// Per AUDIT-20260602-39: the audited-diff fallback (`HEAD~10..HEAD`)
+// blows up on feature branches that recently merged origin/main. The
+// merge commit + 9 main-side commits sit between HEAD and HEAD~10, so
+// the diff balloons (945k insertions in the live repro) and overflows
+// `execFileSync`'s maxBuffer cap — `gitDiff` silently swallows it and
+// returns `''`. The audited-diff helper then falls through to "empty"
+// and refuses to fire, even though the operator's feature work IS the
+// last few commits.
+//
+// Fix: pick the closer-to-HEAD of `merge-base HEAD origin/main` and
+// `HEAD~10`. The merge-base lands at the point this branch diverged
+// from main; HEAD~10 caps how far back we go on a long-lived branch
+// without a recent main-merge. Whichever is more recent (i.e., an
+// ancestor of the other when both are ancestors of HEAD) wins.
+
+export interface PickFallbackBaselineDeps {
+  /** Returns the merge-base SHA of HEAD with the named ref, or `null` if unknowable. */
+  readonly resolveMergeBase: (ref: string) => string | null;
+  /** Returns the SHA at HEAD~`n`, or `null` if the offset doesn't exist (shallow repo, fresh history). */
+  readonly resolveRelativeHead: (n: number) => string | null;
+  /**
+   * Returns true iff `tip` is an ancestor of `descendant`. Used to
+   * decide which of two candidate baselines is closer to HEAD.
+   */
+  readonly isAncestorOf: (tip: string, descendant: string) => boolean;
+}
+
+export interface PickFallbackBaselineOptions {
+  /** The upstream ref to compare against. Default: `'origin/main'`. */
+  readonly upstreamRef?: string;
+  /** Maximum lookback depth on the local branch. Default: 10. */
+  readonly maxLookback?: number;
+}
+
+/**
+ * Pick the closer-to-HEAD baseline for the audited-diff fallback.
+ *
+ * Algorithm:
+ *   1. Resolve `merge-base HEAD origin/main` and `HEAD~maxLookback`.
+ *   2. If both resolve, return whichever is an ancestor of the other
+ *      (the descendant is closer to HEAD). If neither is an ancestor
+ *      of the other, prefer the merge-base (the semantically-meaningful
+ *      branch-point).
+ *   3. If only one resolves, return it.
+ *   4. If neither resolves, return `null` (caller falls back to a
+ *      string like `'HEAD~10'` — git will error or produce empty, and
+ *      the audited-diff helper will refuse via the unknown-state path).
+ *
+ * Pure function over the DI bag.
+ */
+export function pickFallbackBaseline(
+  deps: PickFallbackBaselineDeps,
+  opts: PickFallbackBaselineOptions = {},
+): string | null {
+  const upstream = opts.upstreamRef ?? 'origin/main';
+  const lookback = opts.maxLookback ?? 10;
+  const mergeBase = deps.resolveMergeBase(upstream);
+  const relHead = deps.resolveRelativeHead(lookback);
+  if (mergeBase !== null && relHead !== null) {
+    // Both candidates resolved. Pick whichever is closer to HEAD:
+    //   - If mergeBase is an ancestor of relHead → relHead is closer.
+    //   - If relHead is an ancestor of mergeBase → mergeBase is closer.
+    //   - Else: prefer mergeBase (semantically meaningful branch-point;
+    //     ties go to the upstream-anchored ref).
+    if (deps.isAncestorOf(mergeBase, relHead)) return relHead;
+    if (deps.isAncestorOf(relHead, mergeBase)) return mergeBase;
+    return mergeBase;
+  }
+  if (mergeBase !== null) return mergeBase;
+  if (relHead !== null) return relHead;
+  return null;
+}

@@ -2748,7 +2748,7 @@ Because the message is a `const`, making it accurate requires turning it into a 
 ### AUDIT-20260602-39 — Swallowed `maxBuffer`/git errors make a >50MB legitimate diff indistinguishable from an empty tree → refusal with an actively wrong cure
 
 Finding-ID: AUDIT-20260602-39
-Status:     acknowledged-slush-pile-2026-06-02
+Status:     fixed-pending-commit
 Severity:   low
 Surface:    `implement-hook.ts:163-176` (`gitDiffCached`) and `:179-188` (`gitDiffWorktree`) — both `catch { return ''; }` with `maxBuffer: 50 * 1024 * 1024`
 

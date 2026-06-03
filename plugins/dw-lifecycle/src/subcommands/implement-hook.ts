@@ -60,6 +60,7 @@ import {
 import {
   checkAncestry,
   ancestryAsBarrageTip,
+  pickFallbackBaseline,
 } from '../scope-discovery/util/git-ancestry.js';
 
 export interface ImplementHookCliOptions {
@@ -284,6 +285,42 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
     return 1;
   }
   const rawBarrageTip = await readLatestBarrageTip(repoRootResolved);
+  // Phase 22 AUDIT-39 helpers: shell git commands used by pickFallbackBaseline.
+  function gitMergeBase(repo: string, a: string, b: string): string | null {
+    try {
+      const out = execFileSync('git', ['merge-base', a, b], {
+        cwd: repo,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+      return out.length > 0 ? out : null;
+    } catch {
+      return null;
+    }
+  }
+  function gitRevParse(repo: string, rev: string): string | null {
+    try {
+      const out = execFileSync('git', ['rev-parse', rev], {
+        cwd: repo,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+      return out.length > 0 ? out : null;
+    } catch {
+      return null;
+    }
+  }
+  function gitIsAncestor(repo: string, tip: string, descendant: string): boolean {
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', tip, descendant], {
+        cwd: repo,
+        stdio: ['ignore', 'ignore', 'ignore'],
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
   // Phase 22 Task 3 (#399 Friction 1): when the marker came back via
   // `git reset --hard origin/main` from a tracked main-side blob, its
   // tip points at a commit no longer reachable from HEAD. Walking
@@ -301,7 +338,23 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
     rawBarrageTip !== null
       ? checkAncestry({ repoRoot: repoRootResolved, tip: rawBarrageTip })
       : ('unknown' as const);
-  const lastBarrageTip = ancestryAsBarrageTip(ancestry, rawBarrageTip);
+  const trustedTip = ancestryAsBarrageTip(ancestry, rawBarrageTip);
+  // Per AUDIT-20260602-39: when no trusted marker tip is available
+  // (boot case, diverged history, or initial run), the pre-AUDIT-39
+  // fallback `HEAD~10..HEAD` overshot on post-merge-from-main branches
+  // (HEAD~10 landed on main's side of the merge → diff blew past
+  // execFileSync's maxBuffer cap → gitDiff swallowed it and the
+  // audited-diff helper refused on empty). Pick the closer-to-HEAD of
+  // `merge-base HEAD origin/main` and `HEAD~10` so the diff stays bounded.
+  const fallbackBaseline =
+    trustedTip ??
+    pickFallbackBaseline({
+      resolveMergeBase: (ref) => gitMergeBase(repoRootResolved, ref, 'HEAD'),
+      resolveRelativeHead: (n) => gitRevParse(repoRootResolved, `HEAD~${n}`),
+      isAncestorOf: (tip, descendant) =>
+        gitIsAncestor(repoRootResolved, tip, descendant),
+    });
+  const lastBarrageTip = fallbackBaseline;
   if (rawBarrageTip !== null && lastBarrageTip === null) {
     args.stderr.write(
       `implement-hook: barrage tip ${rawBarrageTip.slice(0, 8)} is not an ancestor of HEAD ` +
@@ -309,6 +362,10 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
         `Falling back to HEAD~10 baseline per Phase 22 Task 3 (#399 Friction 1).\n`,
     );
   }
+  // `lastBarrageTip === null` here means pickFallbackBaseline also
+  // returned null (no upstream, no HEAD~10). Use the literal `HEAD~10`
+  // ref as a last-ditch — git will error or produce empty, and the
+  // audited-diff helper will refuse via the unknown-state path.
   const range = lastBarrageTip !== null ? `${lastBarrageTip}..${head}` : `HEAD~10..${head}`;
   // Phase 22 Task 2 (#399 Friction 2): the commit-range diff can be
   // empty in the immediate post-`git reset --hard origin/main` state
