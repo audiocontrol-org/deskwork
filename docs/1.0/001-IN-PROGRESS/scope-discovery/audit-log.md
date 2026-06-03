@@ -3993,7 +3993,7 @@ Compounding this: AUDIT-77 (`fixed-f966d6ee`) established that the core Phase 24
 ### AUDIT-20260603-83 — Fixed-finding / all-unchecked-task contradiction regresses AGAIN for Tasks 19/20 — inside the range that resolves AUDIT-79 about this exact shape
 
 Finding-ID: AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-9f9f640c
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -46,6 +46,43 @@`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-81/82 (`Status: fixed-2e962b59`)
 
@@ -4004,7 +4004,7 @@ This is the fourth recurrence of the shape the audit-log keeps flagging (AUDIT-5
 ### AUDIT-20260603-84 — AUDIT-82's MIGRATING.md rewrite leaks internal audit scaffolding into an adopter-facing doc and retains the unverified claims it was meant to remove
 
 Finding-ID: AUDIT-20260603-84 (claude-03 + codex-02; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-9f9f640c
 Severity:   medium
 Surface:    `MIGRATING.md:60` ("Issues defused" paragraph)
 
@@ -4015,7 +4015,7 @@ Two substantive claims also survive that AUDIT-77/82 flagged: (1) the text still
 ### AUDIT-20260603-85 — Option D test-count not met — single added test is the bug-repro; no regression-lock pins the splice-point cleanup the fix touches
 
 Finding-ID: AUDIT-20260603-85
-Status:     fixed-pending-sha
+Status:     fixed-9f9f640c
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/uninstall-everything-hook-related.test.ts:78-108` vs. `workplan.md` Task 19 Acceptance ("test block count for this finding is ≥2 per Option D discipline")
 
