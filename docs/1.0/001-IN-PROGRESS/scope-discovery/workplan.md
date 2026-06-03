@@ -72,6 +72,8 @@ Closes AUDIT-20260603-92. Surface: `plugins/dw-lifecycle/src/scope-discovery/wor
 
 ### Task 29 (fix-finding-AUDIT-20260603-93) (non-bug): AUDIT-20260603-93 — Task 25 (AUDIT-89) disposition state is internally inconsistent: audit-log `Status: open` + unchecked acceptance with a `<test-file-path>` placeholder, despite the fix being committed (55e15b84) and tests claimed green
 
+> Superseded by audit-log Status `acknowledged-template-residue-cleaned-2026-06-03` — no TDD walk required.
+
 Closes AUDIT-20260603-93 (claude-02 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260603-89 entry, `Status: open`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 25 acceptance block.
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.

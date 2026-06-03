@@ -4102,7 +4102,7 @@ Doctor rules should surface actionable state, not crash the whole scan on a docu
 ### AUDIT-20260603-92 — `archivePhases` gains a new uncaught-throw path on malformed/cross-phase ledger ranges — the exact class AUDIT-91 just hardened against, but in the opposite direction
 
 Finding-ID: AUDIT-20260603-92
-Status:     open
+Status:     fixed-208afa91bbba53854beb82b4a4cc02eb92050eb7
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` (private helper, ~line 250-280) called from `mergeFixTaskIds` (~line 290-300); reached from `archive-phases.ts:276-292`
 
@@ -4139,7 +4139,7 @@ The `<test-file-path>` placeholder was never filled in even though Step 1's acce
 ### AUDIT-20260603-94 — `scanFixTaskIds` indiscriminately captures every `### Task N` heading into `archived-fix-tasks` — the field's "fix-task" semantics are not enforced
 
 Finding-ID: AUDIT-20260603-94 (claude-03 + codex-01; cross-model)
-Status:     open
+Status:     fixed-208afa91bbba53854beb82b4a4cc02eb92050eb7
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:130-145` (`scanFixTaskIds`, regex `/^### Task (\d+)(?::|\s|\(|$)/`)
 
