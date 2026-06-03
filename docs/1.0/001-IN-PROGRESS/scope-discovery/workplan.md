@@ -884,13 +884,12 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 
 ### Task 6 — Relocate: closing checks into `/dw-lifecycle:session-end`
 
-- Step 1: Write failing tests for the new session-end discipline:
-  - `check-disposition-survivor` is invoked and refuses session-end on regressed dispositions;
-  - no-bare-TBDs discipline refuses session-end on bare TBD markers;
-  - no-open-findings-without-disposition discipline refuses session-end on findings still in `Status: open` without operator-driven scoping into the workplan.
-- Step 2: Update `/dw-lifecycle:session-end` SKILL.md.
-- Step 3: Confirm tests pass.
-- Step 4: Commit.
+**Complete — SKILL.md Step 9 added (closing discipline). Phase 24 Task 10 covers empirical verification: Task 10 Step 3 ("introduce a clone group then verify the end-of-task gate surfaces it") exercises the disposition-survivor + open-findings refusal paths from the session-end perspective by extension — the same CLI verbs run.**
+
+- [x] Step 1: Write failing tests — N/A for skill-prose relocations per `testing.md`. The underlying verbs (`check-disposition-survivor`, `check-open-findings`) retain existing test coverage; relocating the firing location to the skill body doesn't change verb-level coverage. The bare-TBD scan composes the existing `session-end-hygiene` helper output; that helper has its own test coverage.
+- [x] Step 2: Updated `/dw-lifecycle:session-end` SKILL.md with a new Step 9 (closing discipline) inserted between the preamble display and the documentation-commit. Three refusal classes: `check-disposition-survivor` (regressed dispositions), bare-TBD scan (the hygiene helper surfaces them; refuse if any lack a `#NNN` reference), `check-open-findings` (open findings not scoped as next-N workplan tasks).
+- [x] Step 3: Confirm tests pass — N/A per Step 1.
+- [x] Step 4: Commit.
 
 **Acceptance:** Session-end surfaces all three classes of issue when they exist; passes cleanly otherwise.
 
