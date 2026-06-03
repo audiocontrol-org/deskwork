@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import {
   readHookRunLog,
   appendHookRunLogEntry,
+  appendHookRunLogEntriesForRange,
   hookRunLogPathFor,
   type HookRunLogEntry,
 } from '../../../scope-discovery/promote-findings/hook-run-log.js';
@@ -173,5 +174,119 @@ describe('hook-run-log — Phase 17 Task 5', () => {
       runDir: null,
     } as unknown as HookRunLogEntry;
     await expect(appendHookRunLogEntry(tmp, bogus)).rejects.toThrow();
+  });
+});
+
+// Phase 23 Task 1: per-SHA log writes covering an entire barrage range.
+// Pre-Phase-23, the hook wrote one entry with `tip: <HEAD>` regardless
+// of how many commits its barrage walked. The pre-push gate then refused
+// earlier commits in the batch with `--no-verify` as the only escape.
+// `appendHookRunLogEntriesForRange` densifies the log so each SHA in
+// the audited range gets its own entry.
+describe('appendHookRunLogEntriesForRange — Phase 23 Task 1', () => {
+  let tmp: string;
+
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'hook-run-log-range-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  it('writes one entry per SHA, all sharing disposition + timestamp + runDir', async () => {
+    const tips = [
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      'cccccccccccccccccccccccccccccccccccccccc',
+    ];
+    await appendHookRunLogEntriesForRange(tmp, tips, {
+      timestamp: '2026-06-02T22:00:00.000Z',
+      disposition: 'fired-and-slushed',
+      runDir: '/runs/barrage-1',
+    });
+    const entries = await readHookRunLog(tmp);
+    expect(entries.length).toBe(3);
+    expect(entries.map((e) => e.tip)).toEqual(tips);
+    // Shared fields per the contract: all three carry the same disposition,
+    // timestamp, runDir (only `tip` differs).
+    for (const e of entries) {
+      expect(e.disposition).toBe('fired-and-slushed');
+      expect(e.timestamp).toBe('2026-06-02T22:00:00.000Z');
+      expect(e.runDir).toBe('/runs/barrage-1');
+    }
+  });
+
+  it('is a no-op on empty tips array', async () => {
+    await appendHookRunLogEntriesForRange(tmp, [], {
+      timestamp: '2026-06-02T22:00:00.000Z',
+      disposition: 'no-new-diff-skip',
+      runDir: null,
+    });
+    const entries = await readHookRunLog(tmp);
+    expect(entries).toEqual([]);
+  });
+
+  it('appends without clobbering pre-existing entries', async () => {
+    await appendHookRunLogEntry(tmp, {
+      tip: '1111111111111111111111111111111111111111',
+      timestamp: '2026-06-02T20:00:00.000Z',
+      disposition: 'fired-and-promoted',
+      runDir: null,
+    });
+    await appendHookRunLogEntriesForRange(
+      tmp,
+      [
+        '2222222222222222222222222222222222222222',
+        '3333333333333333333333333333333333333333',
+      ],
+      {
+        timestamp: '2026-06-02T21:00:00.000Z',
+        disposition: 'fired-and-slushed',
+        runDir: null,
+      },
+    );
+    const entries = await readHookRunLog(tmp);
+    expect(entries.length).toBe(3);
+    expect(entries[0]?.tip).toBe('1111111111111111111111111111111111111111');
+    expect(entries[1]?.tip).toBe('2222222222222222222222222222222222222222');
+    expect(entries[2]?.tip).toBe('3333333333333333333333333333333333333333');
+  });
+
+  // The v0.35.0 release shape: a 3-commit batch followed by one
+  // implement-hook invocation. The gate would refuse 2 of the 3 if
+  // only the head logged.
+  it('Phase 23 load-bearing: 3-commit batch → 3 log entries (the v0.35.0 shape)', async () => {
+    const releaseShape = [
+      'f823d960556e000000000000000000000000fffe', // AUDIT-47/48/52 fix
+      'fb87fd43c59a000000000000000000000000ffff', // audit-flip docs
+      '507317230aad00000000000000000000000ffff0', // chore: release
+    ];
+    await appendHookRunLogEntriesForRange(tmp, releaseShape, {
+      timestamp: '2026-06-02T22:30:00.000Z',
+      disposition: 'fired-and-slushed',
+      runDir: '/runs/release-barrage',
+    });
+    const entries = await readHookRunLog(tmp);
+    const tips = entries.map((e) => e.tip);
+    // Each of the three commits the v0.35.0 release tried to push
+    // (and was refused for) is now in the log.
+    expect(tips).toContain('f823d960556e000000000000000000000000fffe');
+    expect(tips).toContain('fb87fd43c59a000000000000000000000000ffff');
+    expect(tips).toContain('507317230aad00000000000000000000000ffff0');
+  });
+
+  it('propagates schema validation: invalid base entry rejects', async () => {
+    await expect(
+      appendHookRunLogEntriesForRange(
+        tmp,
+        ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+        {
+          timestamp: 'not-a-date',
+          disposition: 'fired-and-promoted',
+          runDir: null,
+        },
+      ),
+    ).rejects.toThrow();
   });
 });

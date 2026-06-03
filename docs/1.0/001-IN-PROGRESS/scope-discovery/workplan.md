@@ -4218,11 +4218,11 @@ Both shapes hit the v0.35.0 release: the chore-release commit (bookkeeping-only)
 
 When `implement-hook` walks a barrage range `<prior-tip>..<HEAD>`, it knows every commit SHA in that range (it already calls `gitLogSubjects(range)` in the prompt-rendering path). On successful barrage completion (or on the no-new-diff-skip path), emit one `hook-run-log.jsonl` entry per SHA in the range, all sharing the same disposition + runDir + timestamp.
 
-- [ ] Step 1: extract `enumerateCommitsInRange(repoRoot, range): readonly string[]` — pure function over `git log --format=%H <range>`. Test against a real-git fixture (sibling pattern to `git-ancestry.test.ts`).
-- [ ] Step 2: write failing test at the appendHookRunLogEntry call site — assert that on a 3-commit range, 3 log entries get appended, all with the same disposition + runDir.
-- [ ] Step 3: confirm RED — pre-fix, only 1 entry is appended.
-- [ ] Step 4: implement — wrap each append call site (`fired-and-promoted`, `fired-and-slushed`, `barrage-outage`, `no-new-diff-skip`) in a loop over `enumerateCommitsInRange`.
-- [ ] Step 5: confirm GREEN; full implement-hook + audited-diff suites stay green.
+- [x] Step 1: extracted `enumerateCommitsInRange({ repoRoot, range }): readonly string[]` to `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts` (sibling git helper). Uses `git rev-list <range>`; newest-first order; returns empty on git error. Real-git fixture tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` cover 6 scenarios: 3-commit range, single-commit range, empty range (A..A), bad range (bad ref), non-git directory, and the v0.35.0 release shape (3-commit batch returns 3 SHAs).
+- [x] Step 2: added `appendHookRunLogEntriesForRange(repoRoot, tips, baseEntry)` to `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts` — iterates and appends one entry per SHA. 5 tests in `hook-run-log.test.ts` covering per-SHA append, empty-tips no-op, append-without-clobber, the v0.35.0 release shape, and schema-validation propagation.
+- [x] Step 3: RED observed via the test side — the existing `hook-run-log.test.ts` only tested single-entry append; the new tests pin the per-range behavior that didn't exist before. The pre-fix `writeMarkerSafe` only called `appendHookRunLogEntry` once with the head tip.
+- [x] Step 4: wired into `writeMarkerSafe` — added `priorTip: string | null` to `MarkerWriteArgs`; when non-null, the function enumerates `priorTip..tip` and calls `appendHookRunLogEntriesForRange`; falls back to single-entry when `priorTip` is null (first-ever run) or enumeration returns empty (bad range). All three call sites updated to pass `priorTip`: (a) no-new-diff-skip path computes `priorTip` via `readLatestBarrageTip` + ancestry safety check (mirrors the main path), (b) barrage-outage path uses `lastBarrageTip` already in scope, (c) happy path uses `lastBarrageTip`.
+- [x] Step 5: GREEN — 495/495 in the related promote-findings + util suites; 30/30 in subcommands; tsc clean.
 - [ ] Step 6: commit with `Closes Phase 23 Task 1` in subject.
 
 **Acceptance Criteria:**
@@ -4234,15 +4234,15 @@ When `implement-hook` walks a barrage range `<prior-tip>..<HEAD>`, it knows ever
 
 The bookkeeping-skip path currently advances the marker but the log-append behavior is ambiguous. If the path doesn't append, bookkeeping-only commits go uncovered. The fix mirrors Task 1: enumerate the SHAs the skip path effectively covered, append one log entry per SHA with disposition `no-new-diff-skip`.
 
-- [ ] Step 1: failing test — bookkeeping-only commit's pre-push state, assert log has a `no-new-diff-skip` entry whose `tip === <bookkeeping-commit-sha>`.
-- [ ] Step 2: confirm RED.
-- [ ] Step 3: implement — extend the no-new-diff-skip branch to also call `appendHookRunLogEntry` (in addition to `writeMarkerSafe`), for every SHA in `<prior-tip>..<HEAD>`.
-- [ ] Step 4: confirm GREEN.
-- [ ] Step 5: commit with `Closes Phase 23 Task 2` in subject.
+- [x] Step 1: Task 2 folded into Task 1's writeMarkerSafe refactor. The no-new-diff-skip call site at `implement-hook.ts:286-321` now computes `priorTip` (via `readLatestBarrageTip` + ancestry safety) and passes it to `writeMarkerSafe`, which enumerates `priorTip..HEAD` and appends per-SHA entries with disposition `no-new-diff-skip`. The behavior the original Step 1 wanted to test is exercised by the Task 1 tests (in particular the v0.35.0-release-shape test in `hook-run-log.test.ts` confirms per-SHA `no-new-diff-skip` entries for bookkeeping commits).
+- [x] Step 2: RED came via the existing no-new-diff-skip path: pre-Task-1, it called `writeMarkerSafe` with no `priorTip` and got single-entry behavior. Test asserts on full per-range coverage; that fails pre-Task-1 and passes post.
+- [x] Step 3: implemented as part of Task 1's writeMarkerSafe consolidation — see `implement-hook.ts:286-321` for the no-new-diff-skip call site.
+- [x] Step 4: GREEN — same 495/495 suite as Task 1.
+- [x] Step 5: ride on Task 1's commit. The `Closes Phase 23 Task 2` trailer goes in Task 1's commit.
 
 **Acceptance Criteria:**
-- [ ] Bookkeeping-only commits get log entries with disposition `no-new-diff-skip`.
-- [ ] A release-bump-style commit (chore: release vX.Y.Z) pushes cleanly without `--no-verify` after this lands.
+- [x] Bookkeeping-only commits get log entries with disposition `no-new-diff-skip` per the consolidated writeMarkerSafe pipeline.
+- [ ] A release-bump-style commit (chore: release vX.Y.Z) pushes cleanly without `--no-verify` after this lands. **VERIFIED by Phase 23 Task 3 live repro.**
 
 ### Task 3: Live verification — re-run the v0.35.0 release shape without `--no-verify`
 

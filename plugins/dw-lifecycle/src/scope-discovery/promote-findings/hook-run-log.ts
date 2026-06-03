@@ -115,6 +115,36 @@ export async function appendHookRunLogEntry(
 }
 
 /**
+ * Phase 23 Task 1: append one log entry per SHA in a list of commits,
+ * all sharing the same disposition / timestamp / runDir. The caller
+ * supplies the SHA list (typically from `enumerateCommitsInRange`) and
+ * a base entry whose `tip` field is overridden per-SHA.
+ *
+ * Why: the audit-barrage hook walks a range `<prior-tip>..<HEAD>` and
+ * audits every commit in that range. The pre-push gate then checks
+ * each unpushed SHA for a log entry. Pre-Phase-23, the hook wrote only
+ * a single entry with `tip: <HEAD-at-run-time>` — earlier commits in
+ * the range had no entry and the gate refused them with `--no-verify`
+ * as the only escape. This helper densifies the log so the existing
+ * per-SHA gate semantic is satisfied by a single hook invocation that
+ * covered a multi-commit range. See workplan Phase 23.
+ *
+ * Sequential appends: each call goes through `appendHookRunLogEntry`,
+ * which uses `O_APPEND` (atomic per entry; no torn writes). The
+ * sentinel-write side-effect runs on the FIRST append; subsequent
+ * appends in the loop are no-ops on the sentinel.
+ */
+export async function appendHookRunLogEntriesForRange(
+  repoRoot: string,
+  tips: ReadonlyArray<string>,
+  baseEntry: Omit<HookRunLogEntry, 'tip'>,
+): Promise<void> {
+  for (const tip of tips) {
+    await appendHookRunLogEntry(repoRoot, { ...baseEntry, tip });
+  }
+}
+
+/**
  * Returns true when the project has been bootstrapped. Per AUDIT-
  * 20260601-06: the pre-push gate uses this to distinguish boot from
  * post-bootstrap-log-deletion.
