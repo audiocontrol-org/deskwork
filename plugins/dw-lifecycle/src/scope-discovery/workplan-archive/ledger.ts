@@ -258,27 +258,37 @@ export function incrementId(id: string): string {
  * yields `['5.1','5.2','5.3']`. Singletons (no `end`) yield the start verbatim.
  * Multi-component IDs (`5.1-5.3`) expand on the LAST component only — the
  * `<phase>` prefix is preserved; the `<fix-task>` integer iterates from start
- * to end inclusive. Cross-phase ranges (e.g. `5.10-6.3`) are not expanded
- * sensibly here — callers should split such inputs at parse time.
+ * to end inclusive.
+ *
+ * Per AUDIT-20260603-92: this function is reached from `mergeFixTaskIds` with
+ * `existing` ranges sourced from a previous ledger parsed off disk. The
+ * `parseRange` parser admits any `start-end` pair, including operator-edited
+ * cross-phase shapes (`5.10-6.3`), mismatched-dotted-length shapes (`5.1-5`),
+ * and non-numeric endpoints. Throwing on those would abort `archivePhases`
+ * mid-operation. Instead this function falls back to a singleton-pair
+ * representation: cross-phase / odd ranges contribute the start AND end IDs
+ * verbatim (no iteration of the middle), so a malformed input is preserved
+ * in the merged output instead of crashing the call chain. The doctor rule
+ * `workplan-archive-ledger-coherence` is the operator-facing surface for
+ * notifying about the malformed input.
  */
 function expandRange(range: IdRange): string[] {
   if (range.end === undefined) return [range.start];
   const startParts = range.start.split('.');
   const endParts = range.end.split('.');
   if (startParts.length !== endParts.length) {
-    throw new Error(`range endpoints differ in dotted length: "${range.start}-${range.end}"`);
+    return [range.start, range.end];
   }
-  // Confirm prefix components match; only the last component iterates.
   for (let i = 0; i < startParts.length - 1; i += 1) {
     if (startParts[i] !== endParts[i]) {
-      throw new Error(`range endpoints span phase boundaries: "${range.start}-${range.end}"`);
+      return [range.start, range.end];
     }
   }
   const prefix = startParts.slice(0, -1);
   const startLast = Number(startParts[startParts.length - 1]);
   const endLast = Number(endParts[endParts.length - 1]);
   if (!Number.isFinite(startLast) || !Number.isFinite(endLast)) {
-    throw new Error(`non-numeric range endpoints: "${range.start}-${range.end}"`);
+    return [range.start, range.end];
   }
   const out: string[] = [];
   for (let i = startLast; i <= endLast; i += 1) {
@@ -315,8 +325,17 @@ export function mergeFixTaskIds(
   let runEnd: string = dedup[0]!;
   for (let i = 1; i < dedup.length; i += 1) {
     const id = dedup[i]!;
-    const expectedNext = incrementId(runEnd);
-    if (id === expectedNext) {
+    // Per AUDIT-20260603-92: `incrementId` throws on non-numeric IDs (e.g.
+    // operator-edited `5.x`). Treat the throw as "not contiguous" so the
+    // malformed ID becomes its own singleton in the output instead of
+    // crashing the caller. Doctor-rule surfaces the malformed-ledger.
+    let expectedNext: string | null;
+    try {
+      expectedNext = incrementId(runEnd);
+    } catch {
+      expectedNext = null;
+    }
+    if (expectedNext !== null && id === expectedNext) {
       runEnd = id;
     } else {
       compacted.push(runStart === runEnd ? { start: runStart } : { start: runStart, end: runEnd });

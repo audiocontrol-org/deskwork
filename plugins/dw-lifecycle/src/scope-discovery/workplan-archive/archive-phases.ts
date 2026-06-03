@@ -131,6 +131,19 @@ export function countUncheckedTasks(sectionLines: ReadonlyArray<string>): number
  * space). Headings that do not begin with an integer task number (e.g.
  * `### Task X.Y` already in dotted form) are not matched here — the
  * auto-positioner emits integers and this scanner mirrors that contract.
+ *
+ * **Shared-namespace contract (AUDIT-20260603-94).** The regex matches
+ * BOTH implementation tasks (`### Task 1: Setup`) AND fix-finding tasks
+ * (`### Task 22 (fix-finding-AUDIT-20260603-86)`). This is intentional:
+ * `promote-findings`'s auto-positioner numbers fix-tasks by scanning the
+ * workplan's max integer task number under the target phase + 1, which
+ * inherently shares the integer namespace with impl tasks. If
+ * `scanFixTaskIds` excluded impl tasks, archiving Phase N would record
+ * the fix-tasks but not the impl-tasks, and the next promote into Phase N
+ * could emit a colliding integer matching an archived impl-task. The
+ * field name `archived-fix-tasks` is a misnomer in the strict sense, but
+ * the collision-avoidance semantic requires capturing every `### Task N`
+ * heading the auto-positioner would later have to avoid.
  */
 export function scanFixTaskIds(
   sectionLines: ReadonlyArray<string>,

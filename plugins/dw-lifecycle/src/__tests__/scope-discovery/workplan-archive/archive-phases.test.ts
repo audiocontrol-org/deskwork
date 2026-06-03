@@ -7,6 +7,7 @@ import {
   locatePhaseSection,
   countUncheckedTasks,
   validateVestigialReason,
+  scanFixTaskIds,
   ArchivePhasesError,
 } from '../../../scope-discovery/workplan-archive/archive-phases.js';
 
@@ -72,6 +73,43 @@ describe('validateVestigialReason', () => {
     expect(() =>
       validateVestigialReason('TBD; will figure this out later, plenty of words here so ≥40 chars'),
     ).toThrow(/placeholder/);
+  });
+});
+
+describe('scanFixTaskIds — shared-namespace contract (AUDIT-94)', () => {
+  it('captures both impl tasks and fix-finding tasks (shared per-phase integer namespace)', () => {
+    const sectionLines = [
+      '## Phase 5: Mixed phase',
+      '### Task 1: Setup something',
+      '- [x] step',
+      '### Task 2: Implement feature',
+      '- [x] step',
+      '### Task 19 (fix-finding-AUDIT-20260603-77): bug-fix block',
+      '- [x] step',
+      '### Task 22 (fix-finding-AUDIT-20260603-86) (non-bug): disposition block',
+      '- [x] step',
+    ];
+    const ids = scanFixTaskIds(sectionLines, 5);
+    // Per the documented contract: BOTH impl tasks and fix-finding tasks
+    // are captured because the auto-positioner numbers them in a shared
+    // integer namespace.
+    expect(ids).toContain('5.1');  // impl task
+    expect(ids).toContain('5.2');  // impl task
+    expect(ids).toContain('5.19'); // fix-finding task
+    expect(ids).toContain('5.22'); // non-bug disposition fix-task
+    expect(ids).toHaveLength(4);
+  });
+
+  it('ignores non-Task headings (### Task headings only)', () => {
+    const sectionLines = [
+      '## Phase 5',
+      '### Subsection: not a task',
+      '### Task A: non-integer task number',
+      '#### Task 99: wrong heading depth',
+      '- [x] not a heading',
+    ];
+    const ids = scanFixTaskIds(sectionLines, 5);
+    expect(ids).toEqual([]);
   });
 });
 

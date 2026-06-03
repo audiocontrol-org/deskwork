@@ -267,6 +267,29 @@ describe('mergeFixTaskIds (AUDIT-89)', () => {
   it('returns empty list when both inputs are empty', () => {
     expect(mergeFixTaskIds([], [])).toEqual([]);
   });
+
+  it('AUDIT-92: tolerates cross-phase existing ranges without throwing — preserves endpoints', () => {
+    // Operator-edited ledger had `5.10-6.3` (cross-phase). Pre-fix this
+    // threw `range endpoints span phase boundaries` and aborted the
+    // archive. Post-fix: cross-phase ranges fall back to endpoint-only
+    // representation, so the malformed input is preserved without crash.
+    const merged = mergeFixTaskIds([{ start: '5.10', end: '6.3' }], ['7.1']);
+    // Endpoints 5.10 and 6.3 must survive in some form; new ID 7.1 also.
+    const ids = merged.flatMap((r) => (r.end === undefined ? [r.start] : [r.start, r.end]));
+    expect(ids).toContain('5.10');
+    expect(ids).toContain('6.3');
+    expect(ids).toContain('7.1');
+  });
+
+  it('AUDIT-92: tolerates mismatched-dotted-length ranges (5.1-5 fallback)', () => {
+    // `5.1-5` is a mismatched dotted-length (3 components vs 1). Pre-fix
+    // threw; post-fix preserves endpoints.
+    expect(() => mergeFixTaskIds([{ start: '5.1', end: '5' }], [])).not.toThrow();
+  });
+
+  it('AUDIT-92: tolerates non-numeric endpoints (5.x-5.y fallback)', () => {
+    expect(() => mergeFixTaskIds([{ start: '5.x', end: '5.y' }], [])).not.toThrow();
+  });
 });
 
 describe('findMaxId (AUDIT-89)', () => {

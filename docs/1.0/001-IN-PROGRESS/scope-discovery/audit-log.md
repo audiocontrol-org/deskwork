@@ -4067,7 +4067,7 @@ Compounding: the new Task 22/Task 23 blocks are inserted near the top of the wor
 ### AUDIT-20260603-89 — `archive-phases` never scans moved fix-task headings — `archived-fix-tasks` and `next-fix-task-id` are never computed, so the AUDIT-86 read-side fix has no write-side that maintains the field it depends on
 
 Finding-ID: AUDIT-20260603-89 (claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-55e15b84dce66df356798ffbdd76695f9a97286c
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:258-272` (`newLedger` construction in `archivePhases`)
 
@@ -4096,3 +4096,57 @@ Surface:    `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/workplan-arch
 `workplan-archive-ledger-coherence` calls `parseLedgerFromWorkplan(workplanBody)` without a `try/catch`. The parser intentionally throws for malformed ledger content, so one malformed ledger aborts the entire doctor rule instead of yielding a finding or continuing to other features. That is especially brittle because the new auto-positioner explicitly treats malformed ledgers as a graceful fallback case.
 
 Doctor rules should surface actionable state, not crash the whole scan on a document annotation error. A reasonable fix is to catch parser errors, emit a warning finding naming the affected feature and parse error, then continue walking the remaining feature directories.
+
+## 2026-06-03 — audit-barrage lift (20260603T224841482Z-scope-discovery)
+
+### AUDIT-20260603-92 — `archivePhases` gains a new uncaught-throw path on malformed/cross-phase ledger ranges — the exact class AUDIT-91 just hardened against, but in the opposite direction
+
+Finding-ID: AUDIT-20260603-92
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` (private helper, ~line 250-280) called from `mergeFixTaskIds` (~line 290-300); reached from `archive-phases.ts:276-292`
+
+`mergeFixTaskIds` expands every range in its `existing` argument via `expandRange`:
+
+```ts
+for (const r of existing) {
+  for (const id of expandRange(r)) flat.push(id);
+}
+```
+
+`expandRange` `throw`s on three malformed-but-parseable inputs: cross-phase endpoints (`5.10-6.3` → "range endpoints span phase boundaries"), mismatched dotted length (`5.1-5` → "range endpoints differ in dotted length"), and non-numeric endpoints. The `existing` list is `previousLedger?.archivedFixTasks`, which comes straight from `parseLedgerFromWorkplan` — i.e. whatever a human (or a legacy pre-this-code ledger) wrote into `archived-fix-tasks`. The parser accepts `5.10-6.3` as a well-formed `IdRange`; nothing rejects it at parse time. So a hand-edited or legacy ledger with a single cross-phase range makes `archivePhases` throw mid-operation and abort.
+
+This is notable because the *sibling* finding in this very diff (AUDIT-91, `workplan-archive-ledger-coherence.ts:114-130`) wraps `parseLedgerFromWorkplan` in `try/catch` precisely so "a malformed ledger in one feature must NOT abort." The archive path takes the opposite posture: it introduces a *new* hard-crash path on the same malformed-ledger class. Worse, if the workplan/archive file writes happen before this ledger computation (not visible in the diff), a throw here leaves the workplan partially migrated — sections moved out but the ledger never updated. The tests never exercise this: every `mergeFixTaskIds`/`archivePhases` test starts `existing` with a same-phase range (`5.1-5.10`), so the throw paths are uncovered. Fix: have `expandRange` (or `mergeFixTaskIds`) tolerate cross-phase/odd ranges by splitting them rather than throwing, and add a test that archives with a pre-existing cross-phase `archived-fix-tasks` range.
+
+### AUDIT-20260603-93 — Task 25 (AUDIT-89) disposition state is internally inconsistent: audit-log `Status: open` + unchecked acceptance with a `<test-file-path>` placeholder, despite the fix being committed (55e15b84) and tests claimed green
+
+Finding-ID: AUDIT-20260603-93 (claude-02 + codex-02; cross-model)
+Status:     acknowledged-template-residue-cleaned-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260603-89 entry, `Status: open`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 25 acceptance block
+
+The diff adds the AUDIT-89 audit-log entry with `Status: open`, but the same workplan Task 25 marks Step 5 `[x] commit with Closes AUDIT-20260603-89 ... in subject` and Step 4 `[x] all tests green — archive-phases.test.ts 20/20, ledger.test.ts 30/30, full plugin suite 2659/2659`, and commit `55e15b84` ("Closes AUDIT-...-89") is already in the branch history. So the fix has landed while the canonical audit-log Status still reads `open` — the recurring audit-log/workplan drift this feature keeps flagging.
+
+Compounding it, two Task 25 acceptance criteria remain unchecked AND carry template residue:
+
+```
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+```
+
+The `<test-file-path>` placeholder was never filled in even though Step 1's acceptance lines above it were resolved to concrete paths (`archive-phases.test.ts:246-289`), and the "tests pass" box is unchecked while Step 4 prose asserts 20/20 + 2659/2659. Either the verification genuinely ran (then check the box and fill the path) or it didn't (then the `[x]` step claims overstate). Per the project's own substantive-reason discipline, a shipped `<test-file-path>` placeholder is the exact non-substantive residue the workplan template is supposed to reject. Fix: flip the audit-log Status to `fixed-55e15b84`, fill the acceptance path, and reconcile the checkboxes with the actual verification state.
+
+### AUDIT-20260603-94 — `scanFixTaskIds` indiscriminately captures every `### Task N` heading into `archived-fix-tasks` — the field's "fix-task" semantics are not enforced
+
+Finding-ID: AUDIT-20260603-94 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:130-145` (`scanFixTaskIds`, regex `/^### Task (\d+)(?::|\s|\(|$)/`)
+
+`scanFixTaskIds` matches *any* `### Task <int>` heading in a moved phase section and folds it into the ledger's `archived-fix-tasks`. The field name and AUDIT-89's own framing ("scan each moved section for **fix-task** headings") imply only fix-finding tasks (`### Task N (fix-finding-AUDIT-...)`) should be recorded, but the regex also captures plain implementation tasks like `### Task 1: Setup`. This is defensible *if* the convention is that impl-tasks and fix-tasks share one integer sequence per phase (the live workplan does interleave them — Task 2/3/6 impl, Task 19/20/21 fix), in which case capturing all of them is correct for collision-avoidance. But that contract is nowhere asserted: nothing in the scanner, the ledger schema, or a test pins "the integer namespace is shared, therefore over-capture is intended."
+
+The risk is silent: if any adopter phase ever numbers fix-tasks in a separate namespace from impl-tasks, `next-fix-task-id` will jump past impl-task numbers and the auto-positioner's floor will be wrong in a direction no test catches (every test uses headings that are unambiguously fix-tasks or generic `### Task N`). Fix: either tighten the regex to match the fix-task heading shape the auto-positioner actually emits (`### Task N (fix-finding-...)`), or add a one-line code comment + a test asserting that plain impl-task headings are intentionally captured because the per-phase integer namespace is shared.
+
+---
+
+I verified the AUDIT-91 doctor-rule `try/catch` + `continue` is correct and its two new tests genuinely exercise the per-feature isolation (malformed feature doesn't suppress the sibling's finding). I checked `incrementId`/`findMaxId`/`mergeFixTaskIds` arithmetic against the three new `archive-phases` scenarios and the "never-shrink" floor logic — the happy paths and the regression-lock (content-free passthrough) are sound. The strongest signal is **claude-01**: this diff adds a hard-crash path for malformed ledger ranges in the same commit family that hardened a different surface against exactly that, and the throw is untested.
