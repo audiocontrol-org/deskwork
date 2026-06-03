@@ -4288,3 +4288,67 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - **Triage:** the ~14 open GH issues this session touched are mostly post-release-verification dispositions. Operator owns the close transition per project rule. No agent action required this session-end.
 - **Dismantle stale worktrees:** `/Users/orion/work/deskwork-work/graphical-entries` (4 of 9 signals) — pre-existing, unchanged. Operator's call.
 - **Caveat for next session:** if the audit-barrage starts hitting recurring meta-patterns on fix-task block structure again (AUDIT-72→76→79→83→86 chain), pause + consider whether the structural fix-task-template fix (similar to Phase 26 Task 4's ledger-aware case, but for non-ledger phase task numbering) is the better next move than continuing to disposition individual instances.
+
+## 2026-06-03 (cont. 5): Phase 25 Task 3 + audit-driven Phase 26 hardening
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Per `/dwi burn down workplan to exhaustion or session fatigue`, drive Phase 25 Task 3 (schema rename `editor_symmetry` → `module_symmetry`) and walk whatever audit-barrage findings the post-task barrage surfaces, until either the workplan exhausts or the session reaches fatigue.
+
+**Accomplished:**
+
+- **Phase 25 Task 3 shipped via typescript-pro dispatch.** Hard-rename of the wire-format `editor_symmetry` → `module_symmetry` across schema (`scope-manifest.yaml.schema.json` field + nested `by_source` + description prose), types (`ManifestRegimeHoldouts.editor_symmetry`, `ManifestRegimeHoldoutMeta.by_source.editor_symmetry`), discovery-agents (`RegimeHoldoutSource` union literal `'editor-symmetry'` → `'module-symmetry'`, `editor_symmetry_holdout_count` → `module_symmetry_holdout_count`), and the `SymmetryMatrix.editors` → `SymmetryMatrix.modules` public field. Every consumer + 5 test files updated to track the rename. 16 files; commit `922e2a8c`. File renames + identifier renames + CLI verb + skill folder remain (Tasks 4–11). Dispatch wrapper engagement honored: `wrap-prompt` → typescript-pro Agent dispatch → `validate-return` → independent vitest + tsc verification by the orchestrator session (2641 / 2641 pass).
+- **clones.yaml baseline refreshed.** Phase 24/26's recent demolitions had left 14 NEW intentional parallel-domain clones (archive/unarchive sibling verbs, uninstall-everything-hook-related / unarchive-phases plumbing, doctor-rules sharing CLI footer parsing) that the implement-loop Step 6a structural chain firing for the first time on this branch refused. `refresh-clones-baseline` carried forward 258 prior curated dispositions and re-baselined; commit `67fdfbc7`.
+- **4 audit-barrage findings closed (round 1).** AUDIT-88 + AUDIT-90 acknowledged via deletion of orphaned fix-task scaffolding for AUDIT-86 / AUDIT-87 (commits `9b9e100f` + `62cfdd8d`); AUDIT-91 (MED, doctor rule crashes on malformed ledger) fixed via `try/catch` in `workplan-archive-ledger-coherence` with cross-feature regression-lock test (commit `d2e74086`); AUDIT-89 (HIGH, archive-phases doesn't scan moved fix-task headings) fixed via new `scanFixTaskIds` helper + 3 new `ledger.ts` helpers (`incrementId`, `findMaxId`, `mergeFixTaskIds`) + Option D test discipline (commit `55e15b84`; +18 net new test blocks across `archive-phases.test.ts` + `ledger.test.ts`).
+- **3 audit-barrage findings closed (round 2).** AUDIT-92 (MED) fixed via `expandRange` and `mergeFixTaskIds` tolerance fallbacks for cross-phase / mismatched-dotted / non-numeric ranges, preventing `archivePhases` from crashing on malformed prior-ledger ranges (the exact class AUDIT-91 hardened, in the opposite direction). AUDIT-94 (HIGH) closed via shared-namespace contract documentation + 2 tests pinning the `### Task <integer>` over-capture-by-design behavior. AUDIT-93 (MED) acknowledged via Task 25 acceptance template residue cleanup. Commit `208afa91`; +5 net new test blocks (3 AUDIT-92 + 2 AUDIT-94). Final apply-audit-flips bookkeeping in `6f4f89e5`.
+- **Session totals:** 8 commits; +23 net new vitest scenarios (2641 → 2664 across 205 test files); tsc clean; full audit-log Status field at zero open findings.
+
+**Course corrections:**
+
+- **[PROCESS]** Step 6a structural chain refused on 14 pre-existing NEW clones from Phase 24/26 demolitions (no commits between the prior session-end and this session). The clones were intentional parallel-domain shapes matching the 258 already-curated dispositions' justification class. The cure: `refresh-clones-baseline` (documented per AUDIT-20260525-07's resolution) carries forward curated dispositions and accepts current state as the new baseline. The structural chain firing for the first time on pre-existing state was the predictable seam between the prior session's last commit and the post-Phase-24 enforcement contract.
+- **[PROCESS]** AUDIT-93 IS the recurring meta-pattern the prior session's caveat warned about. The auto-positioner-emitted fix-task block template residue (`<test-file-path>` + `<sha>` placeholders) that survives the substantive-completion edit because the Edit-tool old_string only matched the first 2 of the original 4 acceptance lines. The cure here was AUDIT-93's individual disposition; the structural cure (renderer-side template change to avoid emitting placeholders at all, or completion-edit safety to catch residues) remains a separate ticket. Per the caveat, this is the point at which to consider "structural fix vs more dispositioning" — operator-decision next session.
+- **[PROCESS]** The audit-barrage's recursive nature surfaced findings ABOUT the just-shipped AUDIT-89 work (AUDIT-92 / AUDIT-94 both target code the orchestrator just shipped). The cycle is real and bounded — each round closes 3-4 findings; the dampener was not engaged this session (most recent run had 1 HIGH + 1 MED, so not "0 HIGH + 0 MED"). One more round of barrage might engage the single-run rule, but the session-fatigue assessment chose to land instead.
+
+**Insights:**
+
+- **The dispatch wrapper paid for itself on Task 3.** The 16-file rename's dispatch-prompt + augmentation + validate-return path took longer to set up than the typescript-pro dispatch itself took to execute — but the typescript-pro agent fanned out the rename in one pass against the dispatch-augmented brief (cross-phase boundary explicit, file/identifier renames explicitly OUT-OF-SCOPE, etc.), and the orchestrator verified independently. The substitute (orchestrator doing 100+ Edit calls myself) would have been slower AND more error-prone.
+- **`refresh-clones-baseline` is the right shape for "pre-existing state, gate firing for the first time."** The verb's documented purpose (per AUDIT-20260525-07) is exactly the case the structural chain firing on prior-session state surfaces. No `--no-verify` bypass needed; no per-clone batch-disposition required (the existing 258 dispositions already establish the precedent for parallel-domain symmetry). The clones.yaml carry-forward semantic preserves operator curation.
+- **The "shared integer namespace across impl-tasks + fix-finding tasks" contract (AUDIT-94) was undocumented in scanFixTaskIds even though it's intentional.** That undocumented-contract failure mode is itself a structural pattern: each new helper added to support an audit-finding fix may introduce its own undocumented-contract findings if the JSDoc doesn't explicitly name the design tradeoff. The cheap mitigation: when adding a helper that makes a contract-laden decision (over-capture, fallback-on-error, conservative-shrink, etc.), the function-doc comment names the decision + back-references the audit-finding that motivated it. Three of this session's helpers (expandRange, mergeFixTaskIds, scanFixTaskIds) now carry such cross-references.
+- **The audit-barrage findings cycle is bounded but the dampener didn't engage this session.** Two consecutive runs surfaced 4 + 3 findings respectively (both rounds had 1+ HIGH). The dampener engaging would require a 0-HIGH + 0-MED run OR two consecutive 0-HIGH runs. The single-run rule needs both severities clean, which neither round achieved. Next session may or may not see continued recursion depending on whether Phase 25 Task 4's renames surface fresh findings.
+
+**Quantitative:**
+
+- Commits this session: 8 (`git log --oneline 0fe000d1..HEAD`).
+- Tests this session: 2641 → 2664 (+23 net new test blocks; +3 AUDIT-92 ledger + +2 AUDIT-94 scan + 13 AUDIT-89-helper ledger unit tests + 5 AUDIT-89 archive-phases + 2 AUDIT-91 doctor-rule). Re-derived from `archive-phases.test.ts` 22 / `ledger.test.ts` 33 / `workplan-archive-ledger-coherence.test.ts` 9 (was 7) totals; full plugin suite 2664/2664 from inside `plugins/dw-lifecycle/`.
+- Audit findings dispositioned: 7 (AUDIT-88/89/90/91/92/93/94 — 4 from the first post-Task-3 barrage + 3 from the post-AUDIT-89 recursion barrage).
+- Open findings at session end: 0 (per `dw-lifecycle check-open-findings` exit 0 / zero open-findings branch).
+- Workplan reduction: net +6 task blocks added by promote-findings (Tasks 24/25/26/27 + 28/29/30 across the two barrages), net -2 deleted (orphaned Task 22 + Task 23 per AUDIT-88/90 cleanup). All 8 promoted fix-tasks are completed and checkbox-marked.
+- Phase progress: Phase 25 Task 3 (1 of 11 tasks shipped); Phase 26 follow-up hardening (4 audit-finding fixes layered on top of prior session's Tasks 1–5 substantive work).
+- Sub-agent dispatches: 1 (typescript-pro for Phase 25 Task 3 rename). Independent verification by orchestrator.
+
+**Phase 25 next-session handoff:** Task 4 (file renames + function identifier renames — `editor-symmetry-matrix.ts` → `module-symmetry-matrix.ts`, `discoverEditors` → `discoverModules`, etc.). Read `phase-25-inventory.md` for the per-surface decomposition. The sequencing from the inventory's Sequencing section: (4) source identifiers → (5) CLI verb + alias → (6) skill folder + prose → (7) doctor + rules sweep → (8) doctor-rule migration → (9) PRD/workplan sweep → (10) audiocontrol pilot lockstep → (11) release notes. Multi-hour focused work; Task 4 alone is ~30 files of file/identifier renames + every importer fix.
+
+**Phase 26 next-session handoff:** Tasks 1–5 + 4 audit-finding fixes are in. Task 6 live dogfood + `/dw-lifecycle:complete` wiring remain. Quick wins; ~30 min each.
+
+**Structural-fix consideration (per prior session's caveat):** AUDIT-93 surfaced the recurring meta-pattern (auto-positioner-emitted fix-task template residue + workplan/audit-log Status timing drift). The structural cure would be:
+- Renderer-side: promote-findings should NOT emit `<placeholder>` tokens that survive completion edits.
+- OR completion-side: the orchestrator's completion-edit pattern should grep for `<placeholder>` residue and refuse the commit if any survive.
+- OR doctor-rule: a new rule that scans active workplan tasks for `<placeholder>` strings and surfaces as findings.
+
+The decision (structural cure vs per-instance disposition) is an operator call. Captured here so next session has the context.
+
+### Hygiene observations
+
+- issue #404 [OPEN] referenced this session: Phase 24: Retire git-hook enforcement; relocate discipline into skill bodies
+- issue #405 [OPEN] referenced this session: Phase 25: Editor terminology cleanup — adopt project-neutral `module` everywhere
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- **Resume:** Phase 25 Task 4 (file renames + function identifier renames). Read `phase-25-inventory.md` § "Source — primary" + "Source — secondary (importers)". File renames: `editor-symmetry-matrix.ts` → `module-symmetry-matrix.ts`, `editor-symmetry-report.ts` → `module-symmetry-report.ts`, `check-editor-symmetry.ts` → `check-module-symmetry.ts`, `util/editors.ts` → `util/modules.ts`. Identifier renames: `discoverEditors` → `discoverModules`, `editorsTargetedByGlob` → `modulesTargetedByGlob`, `editorForPath` → `moduleForPath`. The wire-format rename (Task 3) is committed at `922e2a8c`; tsc will surface every dangling import on the file rename pass. Multi-hour focused work.
+- **Alternative resume:** Phase 26 Task 6 live dogfood + `/dw-lifecycle:complete` wiring — quick wins (~30 min each).
+- **Triage:** #404 (Phase 24 — awaiting post-release verification close per the project's `Issue closure requires verification in a formally-installed release` rule); #405 (Phase 25 parent — opens after Phase 25 Tasks 4–11 land).
+- **Address TBD markers:** none introduced this session.
+- **Dismantle stale worktrees:** `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 signals; pre-existing from prior sessions; unchanged this session. Operator's call.
+- **Caveat for next session:** Phase 25 Task 4's file renames will likely surface fresh audit-barrage findings (the file/identifier rename surface is broad). If the dampener engages (single-run: 0 HIGH + 0 MED OR two consecutive 0-HIGH), the loop dispositions LOWs into slush automatically. If it doesn't, the per-finding cycle continues — at which point consider the structural cure (renderer template fix) per the "Structural-fix consideration" section above.
+
