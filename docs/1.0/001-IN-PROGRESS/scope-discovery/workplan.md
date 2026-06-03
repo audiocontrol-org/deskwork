@@ -112,6 +112,40 @@ Acknowledges AUDIT-20260603-46 (claude-01 + claude-02 + claude-03 + claude-04 + 
 - [x] Audit-log Status flipped to `acknowledged-deferral-replaced-with-task-10-citation-2026-06-03`.
 
 
+
+### Task 19 (fix-finding-AUDIT-20260603-79) (non-bug): AUDIT-20260603-79 — Same fixed-finding-with-open-unchecked-task contradiction re…
+
+Closes AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -206,6 +206,40 @@`) vs. `audit-log.md` AUDIT-77/78 (`Status: fixed-f966d6ee`).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` in subject (use `Closes AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 20 (fix-finding-AUDIT-20260603-80) (non-bug): AUDIT-20260603-80 — Doc-only dispositions for AUDIT-77/78 are recorded as `fixed…
+
+Closes AUDIT-20260603-80. Surface: `audit-log.md` AUDIT-77/78 `Status: fixed-f966d6ee` vs. `workplan.md` Task 19/20 Step 3 trailer guidance (hunk `@@ -206,6 +206,40 @@`).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-80` in subject (use `Closes AUDIT-20260603-80` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
 ### Task 6 (fix-finding-AUDIT-20260603-47): AUDIT-20260603-47 — Step 9 offers `--allow-disposition-loss` as an escape, but t…
 
 > Superseded by audit-log Status `acknowledged-session-end-step9-contradiction-resolved-2026-06-03` — no TDD walk required.
@@ -209,36 +243,32 @@ Closes AUDIT-20260603-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-
 
 ### Task 19 (fix-finding-AUDIT-20260603-77) (non-bug): AUDIT-20260603-77 — Task 10 Step 3 marked complete while its actual acceptance t…
 
-Closes AUDIT-20260603-77 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02 + codex-03; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 10 Step 3 (hunk `@@ -1233,26 +1250,31 @@`) + `DEVELOPMENT-NOTES.md` Phase 24 Task 10 measurements block.
+**Complete in f966d6ee.** Step 3 in Task 10 was rewritten to `[~]` partial-completion with honest "audit-barrage half verified; clone-detector-in-Step-6a-integration half NOT verified" framing. Journal entry updated to match.
 
-**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
-
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-77 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` in subject (use `Closes AUDIT-20260603-77 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: disposition prose written (the `[~]` rewrite + the captured-as-TODO clone-detector experiment).
+- [x] Step 2: applied in f966d6ee.
+- [x] Step 3: committed with `Closes AUDIT-20260603-77` trailer in f966d6ee.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (Task 10 Step 3 rewritten + journal arithmetic removed + Phase 24 acceptance criteria flips honest).
+- [x] Audit-log Status flipped to `fixed-f966d6ee` via apply-audit-flips.
 
 
 ### Task 20 (fix-finding-AUDIT-20260603-78) (non-bug): AUDIT-20260603-78 — Journal quantitative section counts do not reconcile — viola…
 
-Closes AUDIT-20260603-78. Surface: `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 3) "Quantitative" + "Phase 24 Task 10 measurements" blocks.
+**Complete in f966d6ee.** Per the project's CLAUDE.md AUDIT-04 convention ("Skip the line entirely if the arithmetic isn't reconciled — false precision erodes trust more than absence"), the unreconciled count lines in the Quantitative + Phase 24 Task 10 measurements blocks were removed + replaced with pointers to canonical sources (`git log` + audit-log grep).
 
-**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
-
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-78` in subject (use `Closes AUDIT-20260603-78` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: disposition prose written (the journal-cleanup framing per AUDIT-04 convention).
+- [x] Step 2: applied in f966d6ee.
+- [x] Step 3: committed with `Closes AUDIT-20260603-78` trailer in f966d6ee.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (unreconciled count lines removed; canonical-source pointers in their place).
+- [x] Audit-log Status flipped to `fixed-f966d6ee` via apply-audit-flips.
 
 ### Task 8 (fix-finding-AUDIT-20260603-51): AUDIT-20260603-51 — Root cause of AUDIT-49 left unfixed: the generator `workplan…
 

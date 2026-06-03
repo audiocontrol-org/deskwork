@@ -3939,3 +3939,27 @@ Several counts in the journal contradict their own enumerations, which the proje
 - **Single-model findings:** Task 10 Step 4 says "5 single-model MED/LOW findings" but lists 8 IDs (38/51/52/66/67/68/69/71).
 
 The convention says: *"If the arithmetic isn't reconciled … skip the line entirely; false precision erodes trust more than absence."* As written, three separate headline numbers (20, 13, 5) are contradicted by their own parenthetical enumerations in the same paragraphs. Fix: re-derive each count from the actual source (`git log` for commits, the audit-log for dispositions), make the headline match the enumeration, or drop the headline number.
+
+## 2026-06-03 — audit-barrage lift (20260603T205127054Z-scope-discovery)
+
+### AUDIT-20260603-79 — Same fixed-finding-with-open-unchecked-task contradiction recurs for Tasks 19/20 — the exact shape AUDIT-72/76 named, regressed again in the commit that closes them
+
+Finding-ID: AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-pending-sha
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -206,6 +206,40 @@`) vs. `audit-log.md` AUDIT-77/78 (`Status: fixed-f966d6ee`)
+
+This diff resolves AUDIT-76 (which named the "fixed finding + all-unchecked task" drift for Tasks 16/17/18) and then commits the identical defect for AUDIT-77/78. Tasks 19 and 20 are added with **every** checkbox unchecked — `[ ] Step 1: write the disposition prose`, `[ ] Step 2: apply the action`, `[ ] Step 3: commit`, and all three Acceptance Criteria boxes including `[ ] Audit-log Status flipped to fixed-<sha>`. Yet both AUDIT-77 and AUDIT-78 are written into the audit-log in this same diff carrying `Status: fixed-f966d6ee`. So the SSOT says "resolved" while the workplan presents two not-yet-started TDD/disposition tasks for that same resolved work.
+
+This is the third recurrence of the shape (AUDIT-59 → AUDIT-72 → AUDIT-76 → now), and it regressed inside the very commit range that claims to fix the prior instance — the test for "surface a new instance only if the shape regressed" is met. A reader running `/dw-lifecycle:pickup` sees two in-flight fix tasks for work the audit-log calls done. Fix: reconcile Tasks 19/20 the same way Tasks 9/10/13/14 were reconciled (flip the boxes / mark complete with `f966d6ee`), or remove them as promote-findings scaffolds superseded by the already-landed disposition.
+
+### AUDIT-20260603-80 — Doc-only dispositions for AUDIT-77/78 are recorded as `fixed-<sha>` while the Task 19/20 templates explicitly steer non-bug dispositions to `Acknowledges`/`acknowledged-<reason>`
+
+Finding-ID: AUDIT-20260603-80
+Status:     acknowledged-closes-is-correct-for-substantive-doc-fixes-not-only-acknowledgements-2026-06-03
+Severity:   low
+Surface:    `audit-log.md` AUDIT-77/78 `Status: fixed-f966d6ee` vs. `workplan.md` Task 19/20 Step 3 trailer guidance (hunk `@@ -206,6 +206,40 @@`)
+
+Tasks 19 and 20 are both tagged `(non-bug)` and their Step 3 prose is explicit: "commit with `Acknowledges AUDIT-…`" and "use `Closes` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges` … Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened." The dispositions here are doc-only (scrubbing journal numbers; downgrading a checkbox) — exactly the non-bug shape the template warns about. Yet the audit-log records both as `fixed-f966d6ee` (the `Closes`/`fixed-<sha>` form), not `acknowledged-<reason>`.
+
+This may be defensible (a doc that contained a defect was edited, so "fixed" is arguably literal), but it directly contradicts the task templates the same commit authored, and per AUDIT-20260602-01 it arms exactly the "false flip on re-open" hazard the template cites. At minimum the inconsistency between the recorded status and the task's own disposition guidance should be resolved so the two don't contradict. Fix: either record these as `acknowledged-<reason>` consistent with the non-bug template, or amend the Task 19/20 Step 3 guidance to state that corrective doc-edits legitimately use `fixed-<sha>` — don't ship both stances in one commit.
