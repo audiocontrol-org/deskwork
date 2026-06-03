@@ -3911,3 +3911,31 @@ Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 16/17/1
 AUDIT-72's whole point was: don't leave unchecked, bug-shaped TDD tasks in the workplan for findings the audit-log already marks `fixed`. This diff resolves AUDIT-72 — and then commits the identical defect for AUDIT-73/74/75. Tasks 16 (AUDIT-73), 17 (AUDIT-74), and 18 (AUDIT-75) are added with **every** checkbox unchecked, including "Step 1: write failing test", "Step 3: implement the fix", and "Audit-log Status flipped to `fixed-<sha>`". Yet all three findings already carry `Status: fixed-b178bdd0` in the audit-log. Compare the treatment of Tasks 9/10/13/14 in this same diff, whose "Audit-log Status flipped to `fixed-<sha>`" boxes ARE flipped to `[x]`. The asymmetry is internal to one commit range: four findings are fixed, four of their tasks get reconciled, three do not.
 
 A reader running `/dw-lifecycle:pickup` sees three in-flight fix tasks for work the audit-log calls done — the precise drift AUDIT-72 (and AUDIT-59 before it) called out. Fix: reconcile Tasks 16/17/18 the same way Tasks 9/10/13/14 were reconciled in this diff — flip their status boxes / mark complete with the `b178bdd0` SHA — or remove them as promote-findings scaffolds superseded by the already-landed fix.
+
+## 2026-06-03 — audit-barrage lift (20260603T204515331Z-scope-discovery)
+
+### AUDIT-20260603-77 — Task 10 Step 3 marked complete while its actual acceptance test was never run — substituted with "verified-by-extension" plus explicit deferral language
+
+Finding-ID: AUDIT-20260603-77 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-pending-sha
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 10 Step 3 (hunk `@@ -1233,26 +1250,31 @@`) + `DEVELOPMENT-NOTES.md` Phase 24 Task 10 measurements block
+
+Task 10 Step 3 is checked `[x]` but its body admits the step's stated acceptance was not performed. The original Step 3 read: *"Confirm the structural chain (running via skill bodies, not hooks) still catches the regressions it caught when wired as a hook. Run a deliberate regression (e.g., introduce a clone group) and verify `/dw-lifecycle:implement` end-of-task gates surface it."* The rewritten Step 3 says: *"A deliberate clone-group regression test … was NOT run this session … captured here as 'verified-by-extension' via the AUDIT-72 round-trip but not formally executed,"* and the journal restates this as *"Deliberate clone-group test deferred to a later session"* and *"would be a useful follow-up dispatch."*
+
+This is the load-bearing claim of the entire Phase 24 reframe: the whole architectural bet is *"enforcement relocated from `.husky/` to skill bodies still catches the regressions the hooks caught."* The AUDIT-72 renderer-template round-trip exercises a *prose/template* regression, not the *structural clone-group gate* the step names — they are different firing paths, so "verified-by-extension" is not the same test. Marking the step `[x]` while the only test that proves the core thesis went unrun (and is explicitly deferred) is the precise "fixed claim outruns the actual work" pattern `ui-verification.md` and the "Just for now is bullshit" rule guard against. Fix: either run the deliberate clone-group regression against `/dw-lifecycle:implement`'s end-of-task gate and record the before/after, or un-check Step 3 and the dependent Phase 24 acceptance line ("Confirm the structural chain … still catches the regressions") and scope the test as an open workplan task rather than a deferred-and-checked one.
+
+### AUDIT-20260603-78 — Journal quantitative section counts do not reconcile — violates the project's AUDIT-04 re-derive-and-verify convention
+
+Finding-ID: AUDIT-20260603-78
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 3) "Quantitative" + "Phase 24 Task 10 measurements" blocks
+
+Several counts in the journal contradict their own enumerations, which the project's quantitative-reporting convention (CLAUDE.md, AUDIT-20260602-04) explicitly requires be re-derived and verified:
+
+- **Commits:** "Commits: 20 total" in Quantitative, but Task 10 Step 2 and the bookkeeping-ratio line say "10 substantive + 12 follow-up commits across 20 total" — 10 + 12 = 22, not 20. The 1.2:1 ratio is derived from these unreconciled numbers.
+- **Dispositioned findings:** "Audit findings dispositioned: 13" followed by an enumeration of 18 IDs (37/38/46/47/48/49/50/51/52/66/67/70/71/72/73/74/75/76), then a sub-tally "16 fully addressed … AUDIT-68/69 acknowledged … AUDIT-38/52 informational" (16+2+2 = 20, and 68/69 don't appear in the first list at all).
+- **Single-model findings:** Task 10 Step 4 says "5 single-model MED/LOW findings" but lists 8 IDs (38/51/52/66/67/68/69/71).
+
+The convention says: *"If the arithmetic isn't reconciled … skip the line entirely; false precision erodes trust more than absence."* As written, three separate headline numbers (20, 13, 5) are contradicted by their own parenthetical enumerations in the same paragraphs. Fix: re-derive each count from the actual source (`git log` for commits, the audit-log for dispositions), make the headline match the enumeration, or drop the headline number.

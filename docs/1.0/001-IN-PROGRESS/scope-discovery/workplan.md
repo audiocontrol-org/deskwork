@@ -206,6 +206,40 @@ Closes AUDIT-20260603-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-
 - [x] The named action has landed in this branch (Tasks 16/17/18 reconciled in this commit).
 - [x] Audit-log Status flipped to `fixed-pending-sha` → will resolve to actual commit SHA after this commit lands.
 
+
+### Task 19 (fix-finding-AUDIT-20260603-77) (non-bug): AUDIT-20260603-77 — Task 10 Step 3 marked complete while its actual acceptance t…
+
+Closes AUDIT-20260603-77 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02 + codex-03; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 10 Step 3 (hunk `@@ -1233,26 +1250,31 @@`) + `DEVELOPMENT-NOTES.md` Phase 24 Task 10 measurements block.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-77 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` in subject (use `Closes AUDIT-20260603-77 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 20 (fix-finding-AUDIT-20260603-78) (non-bug): AUDIT-20260603-78 — Journal quantitative section counts do not reconcile — viola…
+
+Closes AUDIT-20260603-78. Surface: `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 3) "Quantitative" + "Phase 24 Task 10 measurements" blocks.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-78` in subject (use `Closes AUDIT-20260603-78` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
 ### Task 8 (fix-finding-AUDIT-20260603-51): AUDIT-20260603-51 — Root cause of AUDIT-49 left unfixed: the generator `workplan…
 
 Closes AUDIT-20260603-51. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:152` (not in the diff) vs. the workplan Step 3 hand-edit that IS in the diff. Severity: medium.
@@ -1257,7 +1291,7 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
   - **Bookkeeping ratio: ~1.2:1** (10 substantive + 12 follow-up commits across 20 total). Target was <2:1, down from #403's measured ~3:1 baseline. **Achieved.**
   - **`--no-verify` invocations: 0** (target: 0). Down from v0.35.0's 3.
   - **`git reset` invocations: 0** (target: 0).
-- [x] Step 3: Structural-chain regression-catch confirmed via the AUDIT-72 path: a renderer-template change introduced new shapes; the audit-barrage caught it on the next iteration as expected. The non-bug allowlist extension landed via TDD (3 new failing-test blocks went RED then GREEN). A deliberate clone-group regression test (introduce-clone-group-then-verify-end-of-task-gate-surfaces-it) was NOT run this session because the substantive work was pure deletion (no clone-group risk surface). That data point would be a useful follow-up dispatch — captured here as "verified-by-extension" via the AUDIT-72 round-trip but not formally executed.
+- [~] Step 3: PARTIALLY verified. The audit-barrage-catches-substantive-defects half IS verified (AUDIT-72 round-trip: renderer-template change caught + dispositioned via TDD; 8 cross-model HIGH findings caught across the session). The clone-detector-catches-new-clone half is NOT empirically verified — the deliberate "introduce-clone-group, observe `check-clones --gate-mode` exits 1 in Step 6a, then revert" experiment was NOT performed this session. The verb-level test coverage (`clone-detector.baseline.test.ts`) exercises the NEW-clone-detection contract directly + green this session; the *integration* into Step 6a's invocation is what remains untested empirically. Per AUDIT-20260603-77 (HIGH cross-model, 6 attributions): correcting the original `[x]`-with-"verified-by-extension"-rationale to an honest `[~]` partial-completion + a real TODO. Pending: a follow-up dispatch that physically introduces a clone, observes the end-of-task chain refusal, then reverts.
 - [x] Step 4: Audit-barrage discipline coverage verified equivalent: 8 cross-model HIGH findings caught + dispositioned (AUDIT-37/46/47/48/50/70/74/76) + 5 single-model MED/LOW findings (AUDIT-38/51/52/66/67/68/69/71). The retired `check-implement-hook-ran` gate would have caught NONE of these — it only checked that the marker file existed, not whether the work was correct. The barrage caught the substantive defects in the diff; the marker check would have rubber-stamped them.
 - [x] Step 5: Journal entry written + appended to DEVELOPMENT-NOTES.md.
 - [x] Step 6: Commit (this commit).
