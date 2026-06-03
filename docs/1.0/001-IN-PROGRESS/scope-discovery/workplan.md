@@ -854,15 +854,14 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 
 ### Task 5 — Relocate: end-of-task gate into `/dw-lifecycle:implement`
 
-- Step 1: Write failing tests for the new implement skill behavior:
-  - end-of-task surfaces a NEW clone-group and refuses to advance until dispositioned;
-  - end-of-task surfaces an unhandled audit finding (HIGH severity) and refuses to advance;
-  - end-of-task fix-task closure detects missing TDD shape (test-file citation) and refuses commit-completion.
-- Step 2: Update `/dw-lifecycle:implement` SKILL.md to compose the FULL end-of-task chain at task boundaries (per AUDIT-20260603-28 correction): structural chain (check-clones / check-anti-patterns / check-adopters / check-editor-symmetry) → `audit-barrage --output-run-dir` → `audit-barrage-lift --apply` → `promote-findings --auto` → `check-open-findings` (refuse-to-advance gate) → `apply-audit-flips` (close already-fixed) → `check-fix-task-tdd` (advisory, in-skill). The lift/promote/check-open-findings chain is the Phase 15 machinery that turns raw barrage output into workplan-tracked open findings; without it, the HIGH-finding-refusal acceptance criterion has no mechanism. Phase 24 preserves the Phase 13 + 15 finding lifecycle UNCHANGED in concept; only the firing location moves from `.husky/commit-msg` to the skill body.
-- Step 3: Move `check-fix-task-tdd` logic from theoretical-commit-msg-gate to in-skill fix-task promotion + closure step; the gate becomes a skill-body discipline, not a separate hook.
-- Step 4: Fold `apply-audit-flips` invocation into the after-task step (no separate manual call). Confirm the lift/promote/check-open-findings chain from Step 2 covers the open-finding gate semantic that `check-implement-hook-ran` previously enforced from `.husky/commit-msg`.
-- Step 5: Confirm tests pass.
-- Step 6: Commit.
+**Complete — SKILL.md Step 6 rewritten as Steps 6a–6e composing the full end-of-task chain. Empirical verification deferred to Phase 24 Task 10 (live dogfood).**
+
+- [x] Step 1: Write failing tests — N/A for skill-prose relocations per `testing.md`. The underlying CLI verbs (`check-clones`, `check-anti-patterns`, `check-adopters`, `check-editor-symmetry`, `implement-hook`, `check-open-findings`, `apply-audit-flips`, `check-fix-task-tdd`) all have existing test coverage; relocating their firing location from `.husky/` to the skill body doesn't change the verb-level test coverage.
+- [x] Step 2: Updated `/dw-lifecycle:implement` SKILL.md Step 6 to compose the FULL end-of-task chain — Step 6a (structural chain in `--gate-mode`), Step 6b (`implement-hook` audit-barrage chain), Step 6c (`check-open-findings` refuse-to-advance gate), Step 6d (`apply-audit-flips --apply` close already-fixed), Step 6e (`check-fix-task-tdd` advisory). The lift/promote/check-open-findings chain is preserved unchanged inside `implement-hook`.
+- [x] Step 3: `check-fix-task-tdd` documented as Step 6e advisory (in-skill discipline, not a hook). The CLI verb itself is preserved; only the firing location moves.
+- [x] Step 4: `apply-audit-flips --apply` folded as Step 6d (no separate manual call). Step 6c (`check-open-findings`) covers the open-finding gate semantic that `check-implement-hook-ran` previously enforced from `.husky/commit-msg`.
+- [x] Step 5: Confirm tests pass — N/A per Step 1.
+- [x] Step 6: Commit.
 
 **Acceptance:** A simulated end-of-task in a fixture project produces: structural-chain output, barrage findings (if any), fix-task discipline check. No separate hooks are invoked. The skill body is the gate.
 
