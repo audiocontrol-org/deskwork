@@ -4197,3 +4197,70 @@ The result: a routine "sync feature branch with main" push is refused by the gat
 - **Force-untrack `hook-run-log.jsonl`** — the operator explicitly chose to track that file (per `ac90d329`'s commit message: "backfill hook-run-log for 696 pre-policy commits" was deliberate). The marker is per-session state and shouldn't be tracked; the log is durable history and should. The fix targets the marker only.
 - **Migration of in-progress feature branches' broken markers** — operators on stuck branches re-run `dw-lifecycle implement-hook` once after the fix lands; the next marker write reflects the post-fix shape. No bulk-rewrite tooling needed.
 - **A general "marker sanity" doctor rule** — useful but separate. The runtime guard inside the gates is sufficient for the immediate symptom; a doctor rule that surfaces stale-marker shapes proactively is a follow-up if recurrence is observed.
+
+## Phase 23: `hook-run-log` per-commit coverage — close the gate gap that required `--no-verify` in the v0.35.0 release
+
+The pre-push gate `check-implement-hook-coverage` evaluates coverage **per unpushed commit**: for each SHA in `<remote>/<branch>..HEAD`, the gate demands a `hook-run-log.jsonl` entry whose `tip` field equals that SHA. The audit-barrage hook records coverage **by tip-at-run-time**: when `implement-hook` runs, it writes one log entry with `tip: <current-HEAD-sha>` regardless of how many commits its barrage range walked.
+
+These two models don't compose. Two concrete shapes the gap surfaces:
+
+1. **Multi-commit batch.** Operator commits A, then B, then runs `implement-hook` once. The hook walks the range `<prior-tip>..B` (which covers BOTH A and B), but writes a single log entry with `tip: B`. The pre-push gate then refuses commit A because no entry has `tip === A`.
+
+2. **Bookkeeping-skip path.** `check-barrage-tip` detects an all-bookkeeping commit (audit-log / workplan / `.dw-lifecycle/`) and exits early with disposition `no-new-diff-skip`. The marker advances to HEAD, but if the log doesn't also append a per-SHA entry for that commit, the pre-push gate flags it as uncovered.
+
+Both shapes hit the v0.35.0 release: the chore-release commit (bookkeeping-only) and several intermediate audit-flip + AUDIT-fix commits (multi-commit batches) all had to be pushed with `--no-verify`, defeating exactly the gate Phase 17 Task 5 set out to mechanize. The bypass shape is identical to the merge-from-main bypass this morning before Phase 21 landed — same gap surfacing at different commit shapes.
+
+**Severity: medium** (gates that demand bypass for routine workflows erode their own discipline; the `--no-verify` carve-out is the failure mode this Phase fills).
+
+**Step 0 — working-code invariant.** The pre-push gate's per-SHA coverage check is correct policy — it's the defense against `--no-verify` bypasses of the commit-msg gate (catching the case where a malicious or careless operator skips the hook between commits). The fix MUST preserve that defense: an unaudited commit must still be flagged. The change is on the WRITE side — `implement-hook` should emit per-SHA log entries for every commit its barrage actually covered, not just the HEAD-at-run-time.
+
+### Task 1: `implement-hook` writes per-SHA log entries for the audited range
+
+When `implement-hook` walks a barrage range `<prior-tip>..<HEAD>`, it knows every commit SHA in that range (it already calls `gitLogSubjects(range)` in the prompt-rendering path). On successful barrage completion (or on the no-new-diff-skip path), emit one `hook-run-log.jsonl` entry per SHA in the range, all sharing the same disposition + runDir + timestamp.
+
+- [ ] Step 1: extract `enumerateCommitsInRange(repoRoot, range): readonly string[]` — pure function over `git log --format=%H <range>`. Test against a real-git fixture (sibling pattern to `git-ancestry.test.ts`).
+- [ ] Step 2: write failing test at the appendHookRunLogEntry call site — assert that on a 3-commit range, 3 log entries get appended, all with the same disposition + runDir.
+- [ ] Step 3: confirm RED — pre-fix, only 1 entry is appended.
+- [ ] Step 4: implement — wrap each append call site (`fired-and-promoted`, `fired-and-slushed`, `barrage-outage`, `no-new-diff-skip`) in a loop over `enumerateCommitsInRange`.
+- [ ] Step 5: confirm GREEN; full implement-hook + audited-diff suites stay green.
+- [ ] Step 6: commit with `Closes Phase 23 Task 1` in subject.
+
+**Acceptance Criteria:**
+- [ ] `enumerateCommitsInRange` exists with real-git test coverage (≥4 scenarios: 1-commit range, 3-commit range, empty range, bad range).
+- [ ] Per-SHA append verified in a test that drives the full `runImplementHook` with a 3-commit synthetic range.
+- [ ] Pre-push gate exit 0 for a synthetic 3-commit batch where a single `implement-hook` invocation followed all 3 commits (the live repro this Phase exists to fix).
+
+### Task 2: `check-barrage-tip` bookkeeping-skip path appends per-SHA log entries
+
+The bookkeeping-skip path currently advances the marker but the log-append behavior is ambiguous. If the path doesn't append, bookkeeping-only commits go uncovered. The fix mirrors Task 1: enumerate the SHAs the skip path effectively covered, append one log entry per SHA with disposition `no-new-diff-skip`.
+
+- [ ] Step 1: failing test — bookkeeping-only commit's pre-push state, assert log has a `no-new-diff-skip` entry whose `tip === <bookkeeping-commit-sha>`.
+- [ ] Step 2: confirm RED.
+- [ ] Step 3: implement — extend the no-new-diff-skip branch to also call `appendHookRunLogEntry` (in addition to `writeMarkerSafe`), for every SHA in `<prior-tip>..<HEAD>`.
+- [ ] Step 4: confirm GREEN.
+- [ ] Step 5: commit with `Closes Phase 23 Task 2` in subject.
+
+**Acceptance Criteria:**
+- [ ] Bookkeeping-only commits get log entries with disposition `no-new-diff-skip`.
+- [ ] A release-bump-style commit (chore: release vX.Y.Z) pushes cleanly without `--no-verify` after this lands.
+
+### Task 3: Live verification — re-run the v0.35.0 release shape without `--no-verify`
+
+Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi-commit batch + bookkeeping commit) and confirm `git push` succeeds via the natural gate path, no bypass.
+
+- [ ] Step 1: scripted repro — create a feature branch with 3 fix commits (real diff each), 1 audit-flip docs commit, 1 chore-release commit. Run `implement-hook` once after the 3 fix commits and once after the chore-release commit.
+- [ ] Step 2: attempt `git push`. Pre-fix, gate refuses N commits. Post-fix, exit 0.
+- [ ] Step 3: document in the implement-hook SKILL.md the "one hook run covers its range, not just the tip" semantic so operators don't expect 1:1 hook:commit.
+- [ ] Step 4: commit with `Closes Phase 23 Task 3` in subject.
+
+**Acceptance Criteria:**
+- [ ] Live repro on a synthetic branch succeeds without `--no-verify`.
+- [ ] SKILL.md documents the per-SHA log-write semantic.
+- [ ] Operator-facing docs name the gap that Phase 23 closed (so future agents/operators trust the gate).
+
+### Phase 23 — Out of Scope
+
+- **Re-write the gate to accept "covered by a later tip"** (the range-aware gate option B from the v0.35.0 session diagnosis). The write-side fix is cleaner — it preserves the existing gate semantic, doesn't require a schema change on the log entry, and is symmetric to how `apply-audit-flips` already enumerates commits in a range.
+- **Backfilling missing log entries on existing branches** — historical hook-run-log entries stay as-is. The fix is forward-only; existing branches with already-pushed commits aren't re-evaluated by the gate (the gate walks unpushed commits).
+- **A doctor rule that surfaces hook-run-log gaps proactively** — useful but separate. The runtime fix here addresses the root cause; a doctor rule that warns when the log has gaps could be a Phase 24 follow-up if recurrence is observed after Phase 23 lands.
+- **Squashing the v0.35.0 bypass commits** — the bypass shipped, the release is verified by an adopter, and the Phase 23 fix prevents recurrence going forward. No history rewrite needed.
