@@ -841,12 +841,14 @@ This is multi-skill architectural work that touches scope-discovery's review sur
 
 ### Task 4 — Relocate: structural chain into `/dw-lifecycle:session-start`
 
-- Step 1: Write failing test: invoking session-start in a fixture project with NEW clone groups produces a snapshot block citing the count + names.
-- Step 2: Extend `/dw-lifecycle:session-start` SKILL.md to invoke `check-clones`, `check-anti-patterns`, `check-adopters`, `check-editor-symmetry` as a read-only snapshot step.
-- Step 3: Wire the snapshot helper OR reference existing CLI invocations; ensure stderr summary is captured in the session-start bootstrap report.
-- Step 4: Decide: enforce (refuse to start session) or advisory (report and continue)? Lean advisory at session-start; enforcement lives at end-of-implement-task.
-- Step 5: Confirm tests pass.
-- Step 6: Commit.
+**Complete — SKILL.md updated. Empirical verification deferred to Phase 24 Task 10 (live dogfood).**
+
+- [x] Step 1: Write failing test — N/A per `testing.md` ("What NOT to Test: The model's response to a SKILL.md prompt (non-deterministic)"). Skill-prose relocations are not unit-testable; the deliverable is the SKILL.md edit; empirical verification happens in Phase 24 Task 10's live dogfood.
+- [x] Step 2: Extended `/dw-lifecycle:session-start` SKILL.md with a new Step 7 — `check-clones`, `check-anti-patterns`, `check-adopters`, `check-editor-symmetry` as a read-only snapshot step.
+- [x] Step 3: Referenced existing CLI invocations directly; the stderr count lines are surfaced via `2>&1 | tail -3` per verb, composed into a single `Structural snapshot:` block in the bootstrap report.
+- [x] Step 4: Decision: **advisory**. The skill instructs the agent to surface counts but NOT to refuse session-start on non-zero. Enforcement lives at end-of-implement-task per Task 5.
+- [x] Step 5: Confirm tests pass — N/A per Step 1.
+- [x] Step 6: Commit.
 
 **Acceptance:** A session-start invocation surfaces structural-chain counts as a snapshot. The agent driving the session sees the numbers without needing a separate command.
 
