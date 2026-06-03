@@ -3790,7 +3790,7 @@ Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-
 ### AUDIT-20260603-66 — Orphaned canonical template `agent-step-0-fragment.md` survives the retirement of both its readers
 
 Finding-ID: AUDIT-20260603-66
-Status:     fixed-pending-sha
+Status:     fixed-db630841
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/templates/scope-discovery/agent-step-0-fragment.md` (not in diff — should be) vs. the two deleted readers
 
@@ -3801,7 +3801,7 @@ This is the same dead-content shape as AUDIT-20260603-62 (the orphaned backfill 
 ### AUDIT-20260603-67 — Reciprocal skill cross-references to the three retired verbs are not updated in this commit
 
 Finding-ID: AUDIT-20260603-67 (claude-02 + codex-03; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-db630841
 Severity:   medium
 Surface:    sibling skill bodies that point at the deleted verbs — e.g. `plugins/dw-lifecycle/skills/install-scope-discovery/SKILL.md`, `plugins/dw-lifecycle/skills/complete/SKILL.md` (neither in this diff)
 
@@ -3834,7 +3834,7 @@ This isn't a correctness bug, but it means the most consequential deletion in St
 ### AUDIT-20260603-70 — Retired slash commands still ship and point at deleted skill folders
 
 Finding-ID: AUDIT-20260603-70
-Status:     fixed-pending-sha
+Status:     fixed-db630841
 Severity:   high
 Surface:    `plugins/dw-lifecycle/commands/install-agent-prompts.md:1-5`, `plugins/dw-lifecycle/commands/install-scope-discovery-hooks.md:1-5`, `plugins/dw-lifecycle/commands/uninstall-scope-discovery-hooks.md:1-5`, `plugins/dw-lifecycle/src/__tests__/shortcuts.test.ts:88-98`
 
@@ -3845,7 +3845,7 @@ The shortcuts test makes this worse by keeping the retired command names in `MET
 ### AUDIT-20260603-71 — Doctor skill documents deleted rules and repair commands as live
 
 Finding-ID: AUDIT-20260603-71
-Status:     fixed-pending-sha
+Status:     fixed-db630841
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/skills/doctor/SKILL.md:31-44`, `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/index.ts:26-35`
 
