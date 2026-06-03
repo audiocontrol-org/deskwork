@@ -3784,3 +3784,71 @@ Severity:   informational
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:64,87-88`
 
 `workplan-task-renderer.ts:87-88` classify any audit-finding whose surface matches `/last-hook-run\.json/` or `/hook-run-log\.jsonl/` as a `'non-bug'` (config/marker artifact), with the rationale comment at lines 63-64 naming those exact files. With both artifacts retired and removed from the tree, no future finding will ever cite those surfaces, so these branches are dead. This is harmless (the regexes simply never match) and arguably defensible to keep for back-compat with historical audit-log entries that reference the old paths — but it's residue worth a deliberate keep/drop decision rather than silent survival. No fix required; flagging so the operator can decide whether to prune alongside the rest of the retirement.
+
+## 2026-06-03 — audit-barrage lift (20260603T201034135Z-scope-discovery)
+
+### AUDIT-20260603-66 — Orphaned canonical template `agent-step-0-fragment.md` survives the retirement of both its readers
+
+Finding-ID: AUDIT-20260603-66
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/templates/scope-discovery/agent-step-0-fragment.md` (not in diff — should be) vs. the two deleted readers
+
+This commit deletes the only two files that read the Step 0 fragment template. `install-agent-prompts.ts` resolved it as `FRAGMENT_PATH = join(__dirname, '..', '..', 'templates', 'scope-discovery', 'agent-step-0-fragment.md')`, and the `agent-prompt-mirror-drift.ts` doctor rule resolved the same path as `CANONICAL_FRAGMENT_PATH`. Both are removed in this diff. Workplan Step 4 states the Step 0 discipline was *relocated* into `/dw-lifecycle:review` SKILL.md "as Step 3a (`dw-lifecycle check-refactor-preconditions --gate-mode`)" — i.e. as inline skill prose that invokes a verb, **not** by reading this template. So nothing in the source tree reads `agent-step-0-fragment.md` any longer.
+
+This is the same dead-content shape as AUDIT-20260603-62 (the orphaned backfill script), but on the canonical *content* file rather than a one-time script — arguably more hazardous because a future maintainer grepping for "Step 0 fragment" will find a pristine-looking template and conclude the install-agent-prompts mechanism is still live, exactly the conclusion this whole phase is trying to retire. The retirement commit that removed both readers should `git rm plugins/dw-lifecycle/templates/scope-discovery/agent-step-0-fragment.md` (and prune the now-empty `templates/scope-discovery/` dir if the fragment was its only occupant). If the relocated `/dw-lifecycle:review` Step 3a is meant to draw its canonical wording from this file, that linkage is missing and should be made explicit instead — but the diff shows no such reader, so deletion is the consistent action.
+
+### AUDIT-20260603-67 — Reciprocal skill cross-references to the three retired verbs are not updated in this commit
+
+Finding-ID: AUDIT-20260603-67 (claude-02 + codex-03; cross-model)
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    sibling skill bodies that point at the deleted verbs — e.g. `plugins/dw-lifecycle/skills/install-scope-discovery/SKILL.md`, `plugins/dw-lifecycle/skills/complete/SKILL.md` (neither in this diff)
+
+The deleted `install-agent-prompts/SKILL.md` "When to use" section read: *"Run once during onboarding after `/dw-lifecycle:install-scope-discovery` and ideally before `/dw-lifecycle:install-scope-discovery-hooks`."* That reciprocity is strong evidence the surviving `install-scope-discovery` SKILL.md (not deleted, not touched here) carries a forward pointer to the now-retired hooks/agent-prompts install steps — and similarly the deleted `uninstall` SKILL.md cross-named both install verbs, implying an onboarding doc chain that this commit half-dismantles. The diff removes the three skill folders but updates none of the sibling skills, READMEs, or onboarding prose that route operators *into* them.
+
+Per the project's own `enforcement-lives-in-skills.md` rule, "the skill body *is* the contract adopters get" — a surviving skill that tells an operator to run `/dw-lifecycle:install-scope-discovery-hooks` as their next onboarding step now points at a command that no longer exists, which is an adopter-facing dead end. This is the documentation-drift-between-canonical-surfaces failure the project names repeatedly (cf. AUDIT-20260603-59). Fix: grep the plugin's skill bodies + READMEs for `install-scope-discovery-hooks`, `install-agent-prompts`, and `uninstall-scope-discovery-hooks`, and update or remove each onboarding reference in the same retirement commit. The diff gives no evidence this sweep was done.
+
+### AUDIT-20260603-68 — Build-integrity: the diff removes all *visible* importers of the deleted modules' exports, but the audited slice can't prove no others remain
+
+Finding-ID: AUDIT-20260603-68
+Status:     acknowledged-tsc-clean-confirms-no-dangling-importers-2026-06-03
+Severity:   low
+Surface:    deleted exports in `install-scope-discovery-hooks.ts` / `install-agent-prompts.ts` / `husky-bootstrap.ts`
+
+`install-scope-discovery-hooks.ts` exported a cluster of symbols reused beyond its own command: `readExistingManifest`, `mergeFileRecords`, `filterRecordsUnderTarget`, `HookFileRecord`, `HooksManifest`, `HOOK_BEGIN_MARKER`/`HOOK_END_MARKER`. `install-agent-prompts.ts` exported `STEP_0_BEGIN_MARKER`/`STEP_0_END_MARKER`/`TARGET_AGENTS`/`isAgentFilePath`. `husky-bootstrap.ts` exported `detectMissingHuskyDispatcher` and friends. Within this diff, every importer of these symbols (`uninstall-scope-discovery-hooks.ts`, `hooks-installed-missing.ts`, `agent-prompt-mirror-drift.ts`, the test files) is deleted in lockstep, which is the correct shape. But the audited slice is the demolition itself — it cannot demonstrate that no surviving file outside the slice still imports any of these now-gone symbols (e.g. a shared manifest reader, an `install-scope-discovery` library that reused `readExistingManifest`, or a doctor-rule sibling referencing the markers).
+
+This is a verification gap rather than a confirmed defect: a single `grep -r` for each exported identifier across `plugins/dw-lifecycle/src/` (excluding the deleted paths) would confirm zero dangling importers and that `tsc`/`vitest` still compile. The project's testing rule requires `npm --workspace @deskwork/<pkg> test` green before shipping; the commit message should cite that the full workspace build passed post-deletion so the "no remaining reader logic (verified via grep)" claim in workplan Step 3 extends to *importers of exports*, not just the artifact paths it currently scopes.
+
+### AUDIT-20260603-69 — `install-agent-prompts` retirement is attributed only to the Phase 24 parent, with no dedicated issue in the audit-trail line
+
+Finding-ID: AUDIT-20260603-69
+Status:     acknowledged-step-4-tracked-under-phase-24-parent-by-design-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 3 Step 6 + Acceptance block
+
+Step 6 now reads "Commit lands with `Refs #293 #294 #295`" and the Acceptance line claims "✅ Audit-trail commit names the three issues retired (#293/#294/#295 + Phase 24 parent #404)." But Task 3 retires *four* surfaces: install-hooks (Step 1), uninstall-hooks (Step 2), the `hooks-installed.json` machinery (Step 3), **and** `install-agent-prompts` (Step 4). The three numbered issues map to the first three (the original acceptance text before this edit said "names the four issues retired" against a four-step Step 1–4 list). The `install-agent-prompts` retirement — a substantive removal of a subcommand + library + doctor rule + tests — is folded under the parent #404 only, with no issue of its own in the `Refs` trailer.
+
+This isn't a correctness bug, but it means the most consequential deletion in Step 4 (the one that required the Phase 24 Task 7 relocation rationale to justify it) has the weakest audit trail of the four. If an operator later searches issues for "why was install-agent-prompts removed," they land on a 400-comment parent rather than a scoped record. Worth either filing/citing a discrete issue for the agent-prompts retirement or making the Acceptance line explicit that Step 4's retirement is intentionally tracked only under #404 with the Task-7 relocation as its written justification — so the asymmetry is a documented choice, not an omission.
+
+### AUDIT-20260603-70 — Retired slash commands still ship and point at deleted skill folders
+
+Finding-ID: AUDIT-20260603-70
+Status:     fixed-pending-sha
+Severity:   high
+Surface:    `plugins/dw-lifecycle/commands/install-agent-prompts.md:1-5`, `plugins/dw-lifecycle/commands/install-scope-discovery-hooks.md:1-5`, `plugins/dw-lifecycle/commands/uninstall-scope-discovery-hooks.md:1-5`, `plugins/dw-lifecycle/src/__tests__/shortcuts.test.ts:88-98`
+
+The diff deletes all three skill folders and CLI handlers, but the plugin still ships command files for those same verbs. Each command tells the runtime to invoke a skill whose `SKILL.md` was deleted in this diff, so `/dw-lifecycle:install-agent-prompts`, `/dw-lifecycle:install-scope-discovery-hooks`, and `/dw-lifecycle:uninstall-scope-discovery-hooks` remain advertised as runnable plugin surfaces but resolve to missing procedures.
+
+The shortcuts test makes this worse by keeping the retired command names in `META_COMMANDS` at lines 88, 90, and 98, so the test suite treats these stale command files as expected on-disk artifacts instead of catching them. Fix: delete the three `commands/*.md` files and remove the retired names from the shortcut/meta-command expectations, or replace them with explicit migration/error commands if the plugin must keep a compatibility surface.
+
+### AUDIT-20260603-71 — Doctor skill documents deleted rules and repair commands as live
+
+Finding-ID: AUDIT-20260603-71
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/doctor/SKILL.md:31-44`, `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/index.ts:26-35`
+
+`doctor/SKILL.md` still says the helper runs “eight” scope-discovery rules and lists `agent-prompt-mirror-drift` plus `hooks-installed-missing` with repair hints that call `/dw-lifecycle:install-agent-prompts`, `/dw-lifecycle:install-scope-discovery-hooks`, and `/dw-lifecycle:uninstall-scope-discovery-hooks`. This diff deletes both rule implementations and removes them from `SCOPE_DISCOVERY_DOCTOR_RULES`; the exported rule array now contains neither deleted rule.
+
+This is active operator-facing prose, not historical notes. An operator following `/dw-lifecycle:doctor` will expect findings and repair paths that cannot occur or run. Fix: update the rule count/table to match `doctor-rules/index.ts` and remove the deleted rule rows and retired repair commands.

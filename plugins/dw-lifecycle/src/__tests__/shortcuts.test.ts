@@ -85,9 +85,7 @@ const META_COMMANDS = [
   'check-refactor-preconditions',
   'detect-clones',
   'dispose-clone',
-  'install-agent-prompts',
   'install-scope-discovery',
-  'install-scope-discovery-hooks',
   'migrate-from-pilot',
   'refresh-clones-baseline',
   'scope-export',
@@ -95,7 +93,6 @@ const META_COMMANDS = [
   'scope-summary',
   'scope-widen',
   'tooling-feedback-import',
-  'uninstall-scope-discovery-hooks',
   'validate-scope-discovery',
 ] as const;
 
