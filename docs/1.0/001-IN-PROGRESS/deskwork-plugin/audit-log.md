@@ -406,3 +406,42 @@ So the ownership of #223/#234/#357 has silently moved from the merged-but-didn't
 ---
 
 **Summary for triage:** The single most important signal is **-01** — this barrage had no code to audit; the work is two staged docs files. Of the doc-level findings, **-03** (migration backfills via the broken heuristic) and **-04** (`Record` vs `Partial<Record>`) are the two I'd fix in the spec *before* 39a/39b start, since the implementer will otherwise faithfully encode both. **-02** and **-05** are tracking-integrity issues (uncommitted "done" work; stale deferral pointer) that cost trust later but don't block design.
+
+## 2026-06-03 — audit-barrage lift (20260603T004551115Z-deskwork-plugin)
+
+### AUDIT-20260603-01 — Migration step 1 cannot derive a per-`artifactKind` `scaffoldDefaults` map from a single legacy `site.contentDir`
+
+Finding-ID: AUDIT-20260603-01
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/superpowers/specs/2026-06-02-sites-to-lanes-retirement-design.md` §"Migration" step 1 ("`scaffoldDefaults` derived from `site.contentDir`") + decision #7 + workplan.md Task 39b
+
+The spec types `scaffoldDefaults?: Partial<Record<artifactKind, string>>` (a *per-kind* map) and decision #7 anchors it on the "site-content vs PRD/workplan dir" example where different kinds resolve to different directories. But a legacy `site` carries exactly **one** `contentDir`. Migration step 1 says "`scaffoldDefaults` derived from `site.contentDir`" without specifying *which* `artifactKind` the single directory maps to. An implementer of 39b has no defined rule: do they stamp `{ post: site.contentDir }`? `{ <every kind>: site.contentDir }`? Leave it empty and require the operator to fill it? Each choice has different downstream behavior at `/deskwork:add` time (where `scaffoldDefaults[kind]` chooses the scaffold destination), and the wrong default silently drops new non-`post` artifacts into the legacy content dir.
+
+This is distinct from the already-folded AUDIT-20260602-03 (which covers *entry* `artifactPath` backfill collision) — this is about *lane* `scaffoldDefaults` derivation, a different migration output. 39b's TDD acceptance ("multi-site + multi-filesystem fixture; idempotent re-run; slug-collision refuse-and-report") does not name a `scaffoldDefaults`-derivation assertion at all. The spec should state the kind-assignment rule (e.g. "map the lane's primary `artifactKind` to `site.contentDir`; leave other kinds unset") and 39b should add an acceptance asserting the derived map shape, so the implementer doesn't invent a per-kind default that mis-routes future scaffolds.
+
+### AUDIT-20260603-02 — Strict lane schema (39a/39c) and the tolerant legacy-`sites` read (39b) are not reconciled — the doctor migration must load a config the post-migration schema rejects
+
+Finding-ID: AUDIT-20260603-02
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/superpowers/specs/2026-06-02-sites-to-lanes-retirement-design.md` §"Config schema change" + §"Migration" step 4 ("Tolerated reads") + §"Surface impacts" (config schema + loader) vs. workplan.md Tasks 39a (`.strict()` rejection) / 39b (migration) / 39c (remove `sites` from schema + loader)
+
+The spec creates a bootstrapping ordering hazard it doesn't resolve. 39a mandates a lane Zod schema with `.strict()` "reject only unknown keys," and 39c says "Remove `SiteConfig`/`sites` from the schema + loader." Once `sites` is removed from the config schema, loading a *pre-migration* config (which still has a top-level `sites` block) through that loader fails validation on the unknown `sites` key. But the doctor migration (39b) is exactly the code that must **load that legacy config to migrate it** — `--fix` reads `config.sites`, builds lanes, then drops `sites`. So the migration depends on parsing a shape the post-39c schema is engineered to reject.
+
+The spec gestures at this ("the migration-time tolerant reader is the only path that still parses a legacy `sites` block") but never reconciles it with 39a's strict schema: it doesn't say whether the loader has a two-pass mode (tolerant pre-validate → migrate → strict re-validate), whether the doctor bypasses the main loader entirely with a separate lenient parser, or how a config that fails the strict loader is even surfaced to the doctor rather than crashing every other config-reading command (`install`, `studio`, `ingest`) on a pre-migration project. This is a real cross-cutting gap an implementer hits the moment they wire 39b on top of 39c's strict loader. The spec should specify the dual-parse path and 39b/39c acceptance should pin it (e.g. "loading a legacy `sites` config via the strict loader raises a doctor-actionable error, never an unhandled Zod throw; the migration's tolerant parser is the only `sites` reader").
+
+### AUDIT-20260603-03 — `apply-audit-flips` orphan-sweep annotation is stale-on-status-change — keys idempotency on the annotation prefix, not the recorded status
+
+Finding-ID: AUDIT-20260603-03
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts` (the orphan-sweep `else` branch, the `block.includes('> Superseded by audit-log Status')` idempotency guard)
+
+The orphan-sweep injects `\n\n> Superseded by audit-log Status \`${flip.newStatus}\` — no TDD walk required.` and guards re-injection with `block.includes('> Superseded by audit-log Status')`. The guard matches the annotation *prefix*, not the embedded status string. So if a finding's terminal status changes between two `--apply` runs — e.g. a `acknowledged-slush-pile-2026-06-02` finding is later re-audited and flipped to `verified-<date>` (the `re-audit-fixed-findings` flow is a live verb in this repo) — the second sweep sees the existing annotation, takes the `tickedBoxes`-only branch, and **never updates the status in the annotation**. The workplan task then permanently advertises the *first* terminal status as the reason it was superseded, contradicting the current audit-log Status the operator reads.
+
+This is distinct from the already-slushed AUDIT-20260602-30 (fabricated TDD signal on all-unchecked blocks), -32 (partial-walk blocks getting a false "no TDD walk required"), and -33 (duplicate-heading half-sweep): none of those address a status *transition* between runs. The cost is low (a misleading provenance line in workplan prose, not a gate failure), but it's a silent drift on the exact tracking surface this feature is trying to keep honest. Fix: key the idempotency check on the full `> Superseded by audit-log Status \`${flip.newStatus}\`` string, or strip any existing supersession annotation before re-injecting, so a status change rewrites the line.
+
+---
+
+**What I checked and found already-covered (not re-reported):** the `--no-tailscale` two-branch warning and its `--host 127.0.0.1` gap (AUDIT-06/11/12); the tri-state `checkAncestry` collapse arrows and inverse-safety invariant (AUDIT-41/45/46/47/52); `pickFallbackBaseline` selection logic including the post-merge `branch-point` test (AUDIT-39/02); `computeAuditedDiff` / `runGitDiff` maxBuffer classification and the `ok:true` swallow of generic git errors (AUDIT-03/05/06/35/39); the `EMPTY_DIFF_CURE_MESSAGE` placeholder and duplicated 50 MB constant (AUDIT-38/07/08); the divergence-notice dead code and unthreaded `DW_UPSTREAM_BASE_REF` (AUDIT-01/02); `inferFindingShape` allowlist whack-a-mole + `.claude/agents` gap (AUDIT-09/14); the informational auto-flip `!alreadyScoped` residue (AUDIT-79); and the deskwork-plugin spec's `Partial<Record>` typing + backfill collision + stale `#301` deferral pointer (AUDIT-20260602-03/04/05). The version bump to 0.35.0 is internally consistent across all eleven manifests. My three findings are the migration `scaffoldDefaults` derivation gap, the strict-schema-vs-tolerant-read bootstrapping gap, and the orphan-sweep stale-annotation bug — none captured by the prior dispositioned set.
