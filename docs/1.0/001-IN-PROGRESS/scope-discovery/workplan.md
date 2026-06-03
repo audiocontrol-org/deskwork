@@ -33,6 +33,8 @@ note: archived 2026-06-03 via scripts/archive-phases-onetime.ts; Phase 26 produc
 
 ### Task 24 (fix-finding-AUDIT-20260603-88) (non-bug): AUDIT-20260603-88 — Duplicate `Task 22` heading — the disposition task created for AUDIT-86 reintroduces the exact duplicate-task-number bug it is meant to dispose
 
+> Superseded by audit-log Status `acknowledged-orphaned-scaffolding-removed-AUDIT-86-already-acknowledged-2026-06-03` — no TDD walk required.
+
 **Acknowledged in 9b9e100f.** Disposition: the orphaned `### Task 22 (AUDIT-86)` block (and its sibling `### Task 23 (AUDIT-87)` block AUDIT-90 names) were redundant scaffolding — AUDIT-86's audit-log Status was already `acknowledged-phase-26-task-4-addresses-ledger-case-...` and AUDIT-87's was `fixed-37666598`. The auto-positioner promoted unchecked fix-task blocks for findings whose disposition had already landed elsewhere. Removed both blocks from `workplan.md`; the audit-log entries remain the canonical record.
 
 Closes AUDIT-20260603-88. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new `### Task 22 (fix-finding-AUDIT-20260603-86)` (hunk `@@ -39,6 +39,40 @@`).
@@ -50,27 +52,29 @@ Closes AUDIT-20260603-88. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 - [x] Audit-log Status flipped open → `acknowledged-orphaned-scaffolding-removed-AUDIT-86-already-acknowledged-2026-06-03` in 9b9e100f.
 
 
-### Task 25 (fix-finding-AUDIT-20260603-89): AUDIT-20260603-89 — `archive-phases` never scans moved fix-task headings — `arch…
+### Task 25 (fix-finding-AUDIT-20260603-89): AUDIT-20260603-89 — `archive-phases` never scans moved fix-task headings — `archived-fix-tasks` and `next-fix-task-id` are never computed, so the AUDIT-86 read-side fix has no write-side that maintains the field it depends on
 
 Closes AUDIT-20260603-89 (claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:258-272` (`newLedger` construction in `archivePhases`). Severity: high.
 
-- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
-- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
-- [ ] Step 5: commit with `Closes AUDIT-20260603-89 (claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)` in subject
+- [x] Step 0: working-code invariant — when archiving a content-free phase (e.g. Phase 4 has no `### Task N` fix-task headings), `archivedFixTasks` and `nextFixTaskId` from the previous ledger pass through unchanged. The existing test `preserves an existing ledger when merging new ranges` (archive-phases.test.ts:214-244) pins this. The fix must NOT break the content-free passthrough.
+- [x] Step 1: bug-repro test at `archive-phases.test.ts:246-289` (`AUDIT-89: archives fix-task headings into archivedFixTasks + advances nextFixTaskId`) — archive Phase 5 with `### Task 11`, `### Task 12`, `### Task 13` headings; assert ledger reflects `archived-fix-tasks: 5.1-5.13` and `next-fix-task-id: 5.14`. Cross-phase bug-repro at `archive-phases.test.ts:325-365` (`AUDIT-89: cross-phase merge — archiving Phase 11 with fix-tasks Task 1-3 yields disjoint range + max-based next-id`) covers the dotted-cross-phase case.
+- [x] Step 1b: regression-lock test at `archive-phases.test.ts:291-323` (`AUDIT-89 regression-lock: archiving a fix-task-free phase preserves prior ledger fix-task fields unchanged`) — explicit Option D pinning of the Step 0 invariant.
+- [x] Step 2: confirmed tests fail pre-fix (bug-repro reports `archived-fix-tasks: 5.1-5.10` instead of `5.1-5.13`); regression-lock passes pre-fix.
+- [x] Step 3: implemented in `archive-phases.ts` (new `scanFixTaskIds` helper extracts `### Task N` headings as dotted `<phaseNum>.<taskInt>` IDs; `archivePhases` computes `newArchivedFixTasks` via `mergeFixTaskIds` + advances `nextFixTaskId` via `findMaxId` + `incrementId`; conservative "never shrink" floor against the prior `nextFixTaskId`). New helpers added to `ledger.ts` (`incrementId`, `findMaxId`, `mergeFixTaskIds`) with their own unit-test coverage in `ledger.test.ts` (13 new tests).
+- [x] Step 4: all tests green — `archive-phases.test.ts` 20/20, `ledger.test.ts` 30/30, full plugin suite 2659/2659.
+- [x] Step 5: commit with `Closes AUDIT-20260603-89 (claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts:246-289` (bug-repro) and `archive-phases.test.ts:325-365` (cross-phase bug-repro).
+- [x] Regression-lock test exists at `archive-phases.test.ts:291-323`; test block count for this finding is 3 (2 bug-repro + 1 regression-lock) — ≥2 per Option D discipline.
 - [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 26 (fix-finding-AUDIT-20260603-90) (non-bug): AUDIT-20260603-90 — Task 23 (AUDIT-87) carries the impossible TDD-bug template f…
+
+> Superseded by audit-log Status `acknowledged-orphaned-scaffolding-removed-AUDIT-87-already-fixed-37666598-2026-06-03` — no TDD walk required.
 
 **Acknowledged in 9b9e100f.** Disposition: AUDIT-87's audit-log Status is already `fixed-37666598`; the auto-positioner-emitted `### Task 23 (AUDIT-87)` block carried the impossible-bug-template scaffolding AUDIT-90 names. Removed the orphaned block; the audit-log entry remains the canonical record of how AUDIT-87 was addressed. Paired with the AUDIT-86 orphan removal in the same commit per AUDIT-88's disposition.
 
@@ -138,7 +142,7 @@ Closes AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-mod
 
 - [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
 ### Task 21 (fix-finding-AUDIT-20260603-84): AUDIT-20260603-84 — AUDIT-82's MIGRATING.md rewrite leaks internal audit scaffol…
@@ -155,7 +159,7 @@ Closes AUDIT-20260603-84 (claude-03 + codex-02; cross-model). Surface: `MIGRATIN
 
 - [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
 - [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 22 (fix-finding-AUDIT-20260603-85) (non-bug): AUDIT-20260603-85 — Option D test-count not met — single added test is the bug-r…
@@ -172,7 +176,7 @@ Closes AUDIT-20260603-85. Surface: `plugins/dw-lifecycle/src/__tests__/scope-dis
 
 - [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 ### Task 19 (fix-finding-AUDIT-20260603-81): AUDIT-20260603-81 — Global newline-collapse regex rewrites operator content outs…
 
@@ -289,24 +293,26 @@ Closes AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-
 
 - [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
 ### Task 20 (fix-finding-AUDIT-20260603-80) (non-bug): AUDIT-20260603-80 — Doc-only dispositions for AUDIT-77/78 are recorded as `fixed…
+
+> Superseded by audit-log Status `acknowledged-closes-is-correct-for-substantive-doc-fixes-not-only-acknowledgements-2026-06-03` — no TDD walk required.
 
 Closes AUDIT-20260603-80. Surface: `audit-log.md` AUDIT-77/78 `Status: fixed-f966d6ee` vs. `workplan.md` Task 19/20 Step 3 trailer guidance (hunk `@@ -206,6 +206,40 @@`).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-80` in subject (use `Closes AUDIT-20260603-80` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [x] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [x] Step 3: commit with `Acknowledges AUDIT-20260603-80` in subject (use `Closes AUDIT-20260603-80` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 ### Task 6 (fix-finding-AUDIT-20260603-47): AUDIT-20260603-47 — Step 9 offers `--allow-disposition-loss` as an escape, but t…
 

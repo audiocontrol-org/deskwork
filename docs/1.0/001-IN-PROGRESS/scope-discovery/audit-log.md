@@ -4089,7 +4089,7 @@ Worse, the audit-log entry added in this very diff records AUDIT-87 as `Status: 
 ### AUDIT-20260603-91 — Doctor rule crashes on malformed ledgers instead of reporting or skipping
 
 Finding-ID: AUDIT-20260603-91
-Status:     open
+Status:     fixed-d2e74086724b5b418f0a78b09ec4ffdc38b38c40
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.ts:109-110`
 

@@ -24,6 +24,10 @@ import {
   serializeLedger,
   findLedger,
   wrapLedgerBlock,
+  mergeFixTaskIds,
+  findMaxId,
+  incrementId,
+  compareIds,
   type Ledger,
   type IdRange,
 } from './ledger.js';
@@ -113,6 +117,33 @@ export function countUncheckedTasks(sectionLines: ReadonlyArray<string>): number
     if (/^\s*- \[ \]/.test(line)) count += 1;
   }
   return count;
+}
+
+/**
+ * Extract fix-task heading IDs from a phase section. Per AUDIT-20260603-89:
+ * archive-phases must scan moved sections for `### Task N` headings and
+ * synthesize their dotted-decimal `<phaseNum>.<taskInt>` form so they can
+ * be merged into the ledger's `archived-fix-tasks` field.
+ *
+ * The heading shape matched is `### Task <integer>` followed by optional
+ * `:`, ` (`, or whitespace. Examples that match: `### Task 1: Foo`,
+ * `### Task 22 (fix-finding-AUDIT-20260603-86)`, `### Task 5 ` (trailing
+ * space). Headings that do not begin with an integer task number (e.g.
+ * `### Task X.Y` already in dotted form) are not matched here — the
+ * auto-positioner emits integers and this scanner mirrors that contract.
+ */
+export function scanFixTaskIds(
+  sectionLines: ReadonlyArray<string>,
+  phaseNum: number,
+): string[] {
+  const out: string[] = [];
+  const re = /^### Task (\d+)(?::|\s|\(|$)/;
+  for (const line of sectionLines) {
+    const m = re.exec(line);
+    if (m === null) continue;
+    out.push(`${phaseNum}.${m[1]}`);
+  }
+  return out;
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -235,11 +266,31 @@ export async function archivePhases(
       (acc, phaseNum) => mergeRange(acc, phaseNum),
       previousLedger?.archivedPhases ?? [],
     );
+  // Per AUDIT-20260603-89: scan each moved section for `### Task N` fix-task
+  // headings and synthesize dotted `<phase>.<task>` IDs; merge them into
+  // archivedFixTasks; advance nextFixTaskId so the auto-positioner's floor
+  // honors the just-archived IDs.
+  const movedFixTaskIds: string[] = [];
+  for (const section of sectionsToRemove) {
+    for (const id of scanFixTaskIds(section.lines, section.phase)) {
+      movedFixTaskIds.push(id);
+    }
+  }
+  const newArchivedFixTasks = mergeFixTaskIds(
+    previousLedger?.archivedFixTasks ?? [],
+    movedFixTaskIds,
+  );
+  const computedMax = findMaxId(newArchivedFixTasks);
+  const previousNext = previousLedger?.nextFixTaskId ?? '1.1';
+  const computedNext = computedMax === null ? previousNext : incrementId(computedMax);
+  // Conservative: never shrink nextFixTaskId. If the prior value was already
+  // larger than max(union)+1 (e.g. operator manually advanced it), preserve it.
+  const newNextFixTaskId = compareIds(computedNext, previousNext) > 0 ? computedNext : previousNext;
   const newLedger: Ledger = {
     archivedPhases: newArchivedPhases,
-    archivedFixTasks: previousLedger?.archivedFixTasks ?? [],
+    archivedFixTasks: newArchivedFixTasks,
     archiveFile: previousLedger?.archiveFile ?? 'workplan-archive.md',
-    nextFixTaskId: previousLedger?.nextFixTaskId ?? '1.1',
+    nextFixTaskId: newNextFixTaskId,
     ...(previousLedger?.note !== undefined ? { note: previousLedger.note } : {}),
   };
   const newLedgerBlock = wrapLedgerBlock(serializeLedger(newLedger));

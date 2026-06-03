@@ -7,6 +7,9 @@ import {
   wrapLedgerBlock,
   compareIds,
   isIdInRanges,
+  incrementId,
+  mergeFixTaskIds,
+  findMaxId,
   type Ledger,
 } from '../../../scope-discovery/workplan-archive/ledger.js';
 
@@ -203,5 +206,88 @@ describe('compareIds + isIdInRanges — auto-positioner support (AUDIT-86 fix)',
   it('isIdInRanges handles singleton ranges', () => {
     expect(isIdInRanges('5.5', [{ start: '5.5' }])).toBe(true);
     expect(isIdInRanges('5.6', [{ start: '5.5' }])).toBe(false);
+  });
+});
+
+describe('incrementId (AUDIT-89)', () => {
+  it('increments dotted-decimal IDs on the last component', () => {
+    expect(incrementId('5.10')).toBe('5.11');
+    expect(incrementId('11.3')).toBe('11.4');
+    expect(incrementId('1.1')).toBe('1.2');
+  });
+
+  it('increments integer-only IDs', () => {
+    expect(incrementId('7')).toBe('8');
+    expect(incrementId('0')).toBe('1');
+  });
+
+  it('throws on non-numeric last component', () => {
+    expect(() => incrementId('5.x')).toThrow(/non-numeric/);
+  });
+});
+
+describe('mergeFixTaskIds (AUDIT-89)', () => {
+  it('compacts contiguous-within-phase IDs into ranges', () => {
+    const merged = mergeFixTaskIds([], ['5.1', '5.2', '5.3']);
+    expect(merged).toEqual([{ start: '5.1', end: '5.3' }]);
+  });
+
+  it('preserves cross-phase boundaries (5.3, 6.1 stay separate)', () => {
+    const merged = mergeFixTaskIds([], ['5.3', '6.1']);
+    expect(merged).toEqual([{ start: '5.3' }, { start: '6.1' }]);
+  });
+
+  it('folds new IDs into an existing range list', () => {
+    const merged = mergeFixTaskIds(
+      [{ start: '5.1', end: '5.10' }],
+      ['5.11', '5.12'],
+    );
+    expect(merged).toEqual([{ start: '5.1', end: '5.12' }]);
+  });
+
+  it('produces disjoint ranges when adding a different phase', () => {
+    const merged = mergeFixTaskIds(
+      [{ start: '5.1', end: '5.10' }],
+      ['11.1', '11.2', '11.3'],
+    );
+    expect(merged).toEqual([
+      { start: '5.1', end: '5.10' },
+      { start: '11.1', end: '11.3' },
+    ]);
+  });
+
+  it('dedupes when an existing ID is in the new-id list (idempotency)', () => {
+    const merged = mergeFixTaskIds(
+      [{ start: '5.5' }],
+      ['5.5', '5.6'],
+    );
+    expect(merged).toEqual([{ start: '5.5', end: '5.6' }]);
+  });
+
+  it('returns empty list when both inputs are empty', () => {
+    expect(mergeFixTaskIds([], [])).toEqual([]);
+  });
+});
+
+describe('findMaxId (AUDIT-89)', () => {
+  it('finds the largest dotted ID across closed ranges', () => {
+    const ranges = [
+      { start: '5.1', end: '5.10' },
+      { start: '11.1', end: '11.3' },
+    ];
+    expect(findMaxId(ranges)).toBe('11.3');
+  });
+
+  it('returns null on an empty range list', () => {
+    expect(findMaxId([])).toBeNull();
+  });
+
+  it('handles singleton ranges', () => {
+    expect(findMaxId([{ start: '7.5' }])).toBe('7.5');
+  });
+
+  it('uses compareIds (numeric, not lexical)', () => {
+    // Lexically "11.3" < "5.10" (1 < 5); numerically 11.3 > 5.10.
+    expect(findMaxId([{ start: '5.10' }, { start: '11.3' }])).toBe('11.3');
   });
 });

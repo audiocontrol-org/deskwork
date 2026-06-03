@@ -236,3 +236,108 @@ export function isIdInRanges(id: string, ranges: ReadonlyArray<IdRange>): boolea
   }
   return false;
 }
+
+/**
+ * Increment a dotted-decimal ID by 1 on its last component.
+ * `5.10` → `5.11`; `11.3` → `11.4`; `7` → `8`. Throws on non-numeric components.
+ * Used by `archive-phases` to compute the next-fix-task-id after merging
+ * newly-archived IDs into the ledger.
+ */
+export function incrementId(id: string): string {
+  const parts = id.split('.');
+  if (parts.length === 0) throw new Error(`empty id: "${id}"`);
+  const lastRaw = parts[parts.length - 1];
+  if (lastRaw === undefined) throw new Error(`empty last component in "${id}"`);
+  const last = Number(lastRaw);
+  if (!Number.isFinite(last)) throw new Error(`non-numeric last component in "${id}"`);
+  return [...parts.slice(0, -1), String(last + 1)].join('.');
+}
+
+/**
+ * Expand a range list into individual ID strings. `[{start:'5.1',end:'5.3'}]`
+ * yields `['5.1','5.2','5.3']`. Singletons (no `end`) yield the start verbatim.
+ * Multi-component IDs (`5.1-5.3`) expand on the LAST component only — the
+ * `<phase>` prefix is preserved; the `<fix-task>` integer iterates from start
+ * to end inclusive. Cross-phase ranges (e.g. `5.10-6.3`) are not expanded
+ * sensibly here — callers should split such inputs at parse time.
+ */
+function expandRange(range: IdRange): string[] {
+  if (range.end === undefined) return [range.start];
+  const startParts = range.start.split('.');
+  const endParts = range.end.split('.');
+  if (startParts.length !== endParts.length) {
+    throw new Error(`range endpoints differ in dotted length: "${range.start}-${range.end}"`);
+  }
+  // Confirm prefix components match; only the last component iterates.
+  for (let i = 0; i < startParts.length - 1; i += 1) {
+    if (startParts[i] !== endParts[i]) {
+      throw new Error(`range endpoints span phase boundaries: "${range.start}-${range.end}"`);
+    }
+  }
+  const prefix = startParts.slice(0, -1);
+  const startLast = Number(startParts[startParts.length - 1]);
+  const endLast = Number(endParts[endParts.length - 1]);
+  if (!Number.isFinite(startLast) || !Number.isFinite(endLast)) {
+    throw new Error(`non-numeric range endpoints: "${range.start}-${range.end}"`);
+  }
+  const out: string[] = [];
+  for (let i = startLast; i <= endLast; i += 1) {
+    out.push([...prefix, String(i)].join('.'));
+  }
+  return out;
+}
+
+/**
+ * Merge an existing range list with a collection of new dotted-decimal IDs,
+ * recompacting contiguous-within-same-phase IDs into ranges. Used by
+ * `archive-phases` to fold newly-archived fix-task IDs (synthesized from
+ * `### Task N` headings under `## Phase M`) into the ledger's archived-fix-tasks
+ * field.
+ *
+ * Compaction rule: two IDs are contiguous when they share an identical
+ * dotted prefix AND their last-components differ by exactly 1. `5.3, 5.4`
+ * compact to `5.3-5.4`; `5.3, 6.1` stay separate.
+ */
+export function mergeFixTaskIds(
+  existing: ReadonlyArray<IdRange>,
+  newIds: ReadonlyArray<string>,
+): ReadonlyArray<IdRange> {
+  const flat: string[] = [];
+  for (const r of existing) {
+    for (const id of expandRange(r)) flat.push(id);
+  }
+  for (const id of newIds) flat.push(id);
+  const dedup = Array.from(new Set(flat));
+  dedup.sort(compareIds);
+  if (dedup.length === 0) return [];
+  const compacted: IdRange[] = [];
+  let runStart: string = dedup[0]!;
+  let runEnd: string = dedup[0]!;
+  for (let i = 1; i < dedup.length; i += 1) {
+    const id = dedup[i]!;
+    const expectedNext = incrementId(runEnd);
+    if (id === expectedNext) {
+      runEnd = id;
+    } else {
+      compacted.push(runStart === runEnd ? { start: runStart } : { start: runStart, end: runEnd });
+      runStart = id;
+      runEnd = id;
+    }
+  }
+  compacted.push(runStart === runEnd ? { start: runStart } : { start: runStart, end: runEnd });
+  return compacted;
+}
+
+/**
+ * Find the largest ID across a range list using `compareIds` semantics.
+ * Returns null when the list is empty. Singleton ranges contribute their
+ * `start`; closed ranges contribute their `end`.
+ */
+export function findMaxId(ranges: ReadonlyArray<IdRange>): string | null {
+  let max: string | null = null;
+  for (const r of ranges) {
+    const candidate = r.end ?? r.start;
+    if (max === null || compareIds(candidate, max) > 0) max = candidate;
+  }
+  return max;
+}
