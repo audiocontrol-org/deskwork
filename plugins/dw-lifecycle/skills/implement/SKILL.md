@@ -146,9 +146,9 @@ The `implement-hook` verb maps internal failures to one of three outcomes:
 
 Inside the chain, the per-step semantics are:
 
-- `check-barrage-tip` no-new-diff (exit 1) → write marker with disposition=`no-new-diff-skip`; exit 0.
+- `check-barrage-tip` no-new-diff (exit 1) → verb exits 0 with stderr `no new diff since last barrage; skip without firing.`
 - `audit-barrage-render` non-zero → exit 1; the vars JSON is malformed or the template has unsubstituted markers. Fix and re-run.
-- `audit-barrage` exit 1 (every CLI failed) → write marker with disposition=`barrage-outage`; exit 0. The hook forward-progresses (per *"barrage was an outage, NOT a finding"*); the operator investigates.
+- `audit-barrage` exit 1 (every CLI failed) → verb exits 0 with stderr `audit-barrage all-models-failed (outage); hook complete.` The hook forward-progresses (per *"barrage was an outage, NOT a finding"*); the operator investigates.
 - `audit-barrage` exit 0 but partial spawn failures → proceed with healthy models (degraded barrage; cross-model agreement weaker but findings still emit).
 - `audit-barrage-lift` exit 0 with zero findings → proceed to Step 7 (scope-widen) without firing disposition (nothing to dispose).
 - `audit-barrage-lift` non-zero → exit 1; write to audit-log failed (drift/permissions/parser).
@@ -158,17 +158,15 @@ Inside the chain, the per-step semantics are:
 
 ### Per-task report shape
 
-After every `implement-hook` invocation, the per-task report includes:
+After every `implement-hook` invocation, the per-task report includes (stderr only, no persisted artifact):
 
 - `new-diff` — commit count since last barrage (0 = skip case).
-- `barrage status` — e.g. `2/3 models healthy`.
-- `findings extracted` — total count.
-- `disposition` — `slushed: N` / `promoted: N` / `nothing-to-dispose` / `no-new-diff-skip`.
-- `gate result` — `allowed: open-findings-scoped-as-next` / `allowed: no-open-findings` / `refused: <mode>`.
+- `barrage status` — e.g. `2/3 models healthy` (printed by the barrage verb).
+- `dampener result` — `Dampened: ...` or `Not dampened: ...` (printed by `check-barrage-dampener`).
+- `disposition` — `fired-and-slushed`, `fired-and-promoted`, or the verb exits early with `no new diff` or `outage` text.
+- `findings`/`promoted`/`slushed` counts.
 
-The verb writes `last-hook-run.json` after every legitimate exit (success + skip + outage) and appends to `hook-run-log.jsonl` so the pre-push gate can walk a multi-commit range.
-
-**Phase 23: per-SHA log writes.** A single `implement-hook` invocation walks the range `<prior-tip>..<HEAD>` and the audit-barrage covers every commit in that range. Pre-Phase-23, the verb appended only ONE log entry with `tip: <HEAD-at-run-time>`, so the pre-push gate (which requires per-SHA coverage) refused earlier commits in a multi-commit batch — the operator's only escape was `--no-verify`. Post-Phase-23, the verb appends ONE entry per SHA in the audited range, all sharing disposition + timestamp + runDir. Mental model: one hook run covers its range, not just the tip. This applies to all dispositions including `no-new-diff-skip` (bookkeeping commits get per-SHA `no-new-diff-skip` entries). Implementation: `enumerateCommitsInRange` in `scope-discovery/util/git-ancestry.ts` + `appendHookRunLogEntriesForRange` in `scope-discovery/promote-findings/hook-run-log.ts`.
+When the barrage fires, the run directory at `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/` is the durable record (INDEX.md + per-model output + tip.sha). Per Phase 24's no-git-hook-enforcement contract, the verb no longer writes `last-hook-run.json` or appends to `hook-run-log.jsonl` — those artifacts existed only to satisfy the retired commit-msg + pre-push gates. No-new-diff-skip and barrage-outage outcomes consequently leave only stderr text behind (an operator-acknowledged trade-off per the dampener slush logic that already accepts MED/LOW losses).
 
 ## Dispatch-wrapper engagement
 
