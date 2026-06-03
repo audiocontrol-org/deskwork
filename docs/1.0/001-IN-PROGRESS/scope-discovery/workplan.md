@@ -2338,81 +2338,6 @@ Closes AUDIT-20260601-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 
 
-### Task 5.121 (fix-finding-AUDIT-20260602-45): AUDIT-20260602-45 — Fail-closed helper is fail-closed for the gate but fail-OPEN…
-
-Closes AUDIT-20260602-45. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:60-67` (error → `return true`) consumed at `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:289-291` AND `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts` (the `allow-marker-diverged-history` branch). Severity: high.
-
-- [x] Step 0: working-code invariant — pre-AUDIT-41, the helper returned `boolean` with `catch { return false; }`; the value was unused (Phase 17 only compared `marker.tip === HEAD`). AUDIT-41's fix made the boolean carry safety semantics, but `true` then meant opposite things at each call site (gate: refuse; implement-hook: trust). The fix MUST distinguish the two call sites by forcing each to handle the error case explicitly.
-- [x] Step 1: refactored to tri-state — `AncestryResult = 'ancestor' | 'not-ancestor' | 'unknown'`. RED observed on the test side: the existing `git-ancestry.test.ts` assertions returned `.toBe(true)` / `.toBe(false)`; after the type change, they had to be rewritten to `.toBe('ancestor')` / `.toBe('not-ancestor')` / `.toBe('unknown')`. The boolean-shape tests failed verbatim against the new return type — that's the RED gate.
-- [x] Step 1b: regression-lock — exit-0 ancestor case still returns `'ancestor'`, exit-1 case still returns `'not-ancestor'`. Test block count: 8 (well above ≥2 per Option D).
-- [x] Step 2: RED confirmed (the type change makes the old assertions fail).
-- [x] Step 3: implemented — `git-ancestry.ts` returns the tri-state. Each call site adapts: `check-implement-hook-ran` maps `'ancestor'` and `'unknown'` to `true` (refuse-stale path), `'not-ancestor'` to `false` (allow-diverged path). `implement-hook` accepts ONLY `'ancestor'` as a trustworthy tip; `'not-ancestor'` and `'unknown'` both fall back to the `HEAD~10` baseline. Each call site has an inline comment explaining its safety direction.
-- [x] Step 4: 18/18 tests pass (8 git-ancestry + 10 check-implement-hook-ran). tsc clean.
-- [ ] Step 5: commit with `Closes AUDIT-20260602-45` in subject.
-
-**Acceptance Criteria:**
-
-- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exercising the tri-state semantic
-- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is 8 (≥2 per Option D discipline)
-- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exits 0
-- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
-
-
-### Task 5.122 (fix-finding-AUDIT-20260602-46): AUDIT-20260602-46 — Shared-helper doc comment documents only the gate's interpre…
-
-Closes AUDIT-20260602-46. Surface: `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:1-49` (file-level doc comment). Severity: medium.
-
-- [x] Step 1: addressed alongside AUDIT-45 (the doc comment was rewritten as part of the tri-state refactor; the new comment documents both callers' opposite safety dispositions explicitly + uses the tri-state shape that makes the doc reflect the type).
-- [x] Step 2: RED was observable as a consequence — the boolean-era doc couldn't have referred to "the tri-state result" because the type was a boolean. The doc rewrite is a type-change consequence.
-- [x] Step 3: doc rewritten; both per-caller dispositions named explicitly.
-- [x] Step 4: visual diff confirms the doc now names both callers + their `unknown` policies.
-- [ ] Step 5: commit with `Closes AUDIT-20260602-46` in subject (paired with AUDIT-45 since they share the same fix).
-
-**Acceptance Criteria:**
-
-- [x] The file-level doc comment names both consumers + their `unknown`-state dispositions
-- [x] `npx vitest run` exits 0 (the doc change rides on AUDIT-45's test suite)
-- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
-
-### Task 5.118 (fix-finding-AUDIT-20260602-41): AUDIT-20260602-41 — `defaultIsAncestorOfHead` comment claims a fail-closed safet…
-
-Closes AUDIT-20260602-41. Surface: `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts` (`defaultIsAncestorOfHead`, the comment block + `catch { return false; }`) ↔ `plugins/dw-lifecycle/src/scope-discovery/promote-findings/check-implement-hook-ran.ts` (new branch: `const onSameHistory = await args.isAncestorOfHead(marker.tip); if (!onSameHistory) { return { kind: 'allow-marker-diverged-history', ... } }`). Severity: high.
-
-- [x] Step 0: working-code invariant — pre-Phase-22, `isAncestorOfHead`'s return value was unused (Phase 17 only compared marker.tip === HEAD). The Phase 22 Task 3 diverged-history branch made `false` mean "allow the commit." A bare-`catch → false` then silently allowed git errors. The fix MUST preserve the legitimate "tip is not an ancestor" case (`exit 1` → return `false` → allow boot case) while distinguishing it from "git errored" (`exit > 1` OR spawn failed → unknown → return `true` → refuse).
-- [x] Step 1: failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` — real-git fixture with mkdtemp + git init + a tip ref that doesn't exist. Pre-fix returned `false` (would silently allow); fix returns `true` (refuses).
-- [x] Step 1b: regression-lock test at the same file — exit-0 ancestor case still returns `true` (Option D invariant). Test block count for this finding: 8 (well above the ≥2 threshold).
-- [x] Step 2: RED confirmed against pre-fix bare-`catch` semantics.
-- [x] Step 3: extracted shared `isAncestorOfHead` to `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts` with fail-closed semantic: map error `.status === 1` → false; anything else → true. Removed the duplicated helpers from both CLI shims (`check-implement-hook-ran.ts` and `implement-hook.ts`) and pointed both at the shared util. This addresses AUDIT-41 (safety) AND AUDIT-42 (DRY) AND AUDIT-43 (coverage) in one cohesive change.
-- [x] Step 4: GREEN — 8/8 git-ancestry.test.ts + 10/10 check-implement-hook-ran.test.ts (unchanged behavior under the DI stub) + tsc clean.
-- [ ] Step 5: commit with `Closes AUDIT-20260602-41` in subject.
-
-**Acceptance Criteria:**
-
-- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` (cited in Step 1)
-- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is 8 (≥2 per Option D discipline)
-- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/util/git-ancestry.test.ts` exits 0 (passes against the fix)
-- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
-
-
-### Task 5.119 (fix-finding-AUDIT-20260602-42) (non-bug): AUDIT-20260602-42 — Duplicated 13-line `isAncestorOfHead` helper dispositioned w…
-
-Closes AUDIT-20260602-42. Surface: `.dw-lifecycle/scope-discovery/clones.yaml` (clone group `700e9d4b0f18` — now dropped from the baseline). The helpers themselves were at `plugins/dw-lifecycle/src/subcommands/check-implement-hook-ran.ts` and `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` — now consolidated to a single helper in `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts`.
-
-**Shape**: non-bug. The audit's substantive complaint was that the "deferred to a follow-up" disposition reason was deferral phrasing rather than a substantive justification — exactly the discipline AUDIT-20260601-78 / -81 / -82 / -83 cluster has flagged before.
-
-**Disposition (Step 1):** Replaced the deferral with a real fix: extracted the helper into `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts` as part of AUDIT-41's resolution. Both CLI shims now import the shared helper. `check-clones --refresh-baseline` confirms clone group `700e9d4b0f18` dropped (-1 net; 0 new). The "deferred" reason in clones.yaml is moot because the dispositioned clone no longer exists.
-
-- [x] Step 1: write the disposition prose (≥40 chars, substantive). Done — the substantive action is the DRY extraction.
-- [x] Step 2: apply the action — extracted to `git-ancestry.ts`; deleted the duplicated helpers; `check-clones --refresh-baseline` confirms the clone group is dropped.
-- [ ] Step 3: commit with `Closes AUDIT-20260602-42` in subject (paired with AUDIT-41 since they share the same fix).
-
-**Acceptance Criteria:**
-
-- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [x] The named action has landed in this branch (helpers consolidated; clone group dropped from baseline).
-- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step.
-
-
 ### Task 5.120 (fix-finding-AUDIT-20260602-43): AUDIT-20260602-43 — The real default ancestry helper (`defaultIsAncestorOfHead`)…
 
 Closes AUDIT-20260602-43. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/check-implement-hook-ran.test.ts` (all four Phase 22 Task 3 tests inject `isAncestorOfHead: async () => opts.isAncestorOfHead ?? true`) vs. the untested production helper. Severity: medium.
@@ -4286,26 +4211,30 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
 
 ### Task 2 — Demolition: audit-finding lifecycle gates
 
-- Step 1: Delete `.husky/commit-msg` entirely.
-- Step 2: Gut the audit-gate block from `.husky/pre-push`; the file becomes a no-op stub OR retires entirely (operator decides at scope time).
-- Step 3: Retire `check-implement-hook-ran` (subcommand + source + tests + skill + skill folder).
-- Step 4: Retire `check-implement-hook-coverage` (subcommand + source + tests + skill + skill folder).
-- Step 5: Retire `--upstream-base-ref` flag + plumbing (Phase 21 vestigial).
-- Step 6: Retire per-SHA `hook-run-log.jsonl` write logic + helpers + tests (Phase 23 vestigial).
-- Step 7: Retire `last-hook-run.json` marker logic + boot-case guards + tests (Phase 22 vestigial).
-- Step 8: Delete `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` + `last-hook-run.json` files from the working tree.
-- Step 9: Commit with `Closes` trailers for Phases 21/22/23 (mark retired) and `Refs #401 #402 #403`.
+**Partial — file-level demolition shipped in `81bba0f2` (operator-authorized ahead-of-relocation per the bookkeeping pathology). CLI subcommand source retirement pending.**
+
+- [x] Step 1: Delete `.husky/commit-msg` entirely. *(81bba0f2)*
+- [x] Step 2: Gut the audit-gate block from `.husky/pre-push`; the file becomes a no-op stub. *(81bba0f2 — chose stub over delete to preserve husky hook-presence; documented relocation pointer in the stub)*
+- [ ] Step 3: Retire `check-implement-hook-ran` (subcommand + source + tests + skill + skill folder).
+- [ ] Step 4: Retire `check-implement-hook-coverage` (subcommand + source + tests + skill + skill folder).
+- [ ] Step 5: Retire `--upstream-base-ref` flag + plumbing (Phase 21 vestigial).
+- [ ] Step 6: Retire per-SHA `hook-run-log.jsonl` write logic + helpers + tests (Phase 23 vestigial).
+- [ ] Step 7: Retire `last-hook-run.json` marker logic + boot-case guards + tests (Phase 22 vestigial).
+- [ ] Step 8: Delete `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` + `last-hook-run.json` files from the working tree.
+- [ ] Step 9: Commit with `Closes` trailers for Phases 21/22/23 (mark retired) and `Refs #401 #402 #403`. *(file-level demolition already in 81bba0f2; this commit-step is for the CLI-side retirement)*
 
 **Acceptance:** No source under `plugins/dw-lifecycle/src/scope-discovery/promote-findings/` references hook-run-log or last-hook-run. `npm test` passes. `.husky/commit-msg` does not exist. Grep for `check-implement-hook` yields zero hits in `src/`.
 
 ### Task 3 — Demolition: install machinery
 
-- Step 1: Retire `install-scope-discovery-hooks` (subcommand + source + tests + skill + skill folder + helper).
-- Step 2: Retire `uninstall-scope-discovery-hooks` (subcommand + source + tests + skill + skill folder + helper).
-- Step 3: Retire `hooks-installed.json` machinery + reader logic.
-- Step 4: Audit `install-agent-prompts` against the new architecture; retire if redundant once Step 0 discipline lives in `/dw-lifecycle:review` skill body, otherwise reshape.
-- Step 5: Gut the structural-chain block from `.husky/pre-commit`; structural chain moves entirely into skills (Task 4–7). The hook file retires entirely OR stays as a no-op stub (operator decides).
-- Step 6: Commit with `Closes` trailers for [#293](https://github.com/audiocontrol-org/deskwork/issues/293), [#294](https://github.com/audiocontrol-org/deskwork/issues/294), [#295](https://github.com/audiocontrol-org/deskwork/issues/295).
+**Partial — `.husky/pre-commit` structural-chain block removed in `81bba0f2`. CLI subcommand source retirement pending.**
+
+- [ ] Step 1: Retire `install-scope-discovery-hooks` (subcommand + source + tests + skill + skill folder + helper).
+- [ ] Step 2: Retire `uninstall-scope-discovery-hooks` (subcommand + source + tests + skill + skill folder + helper).
+- [ ] Step 3: Retire `hooks-installed.json` machinery + reader logic.
+- [ ] Step 4: Audit `install-agent-prompts` against the new architecture; retire if redundant once Step 0 discipline lives in `/dw-lifecycle:review` skill body, otherwise reshape.
+- [x] Step 5: Gut the structural-chain block from `.husky/pre-commit`; structural chain moves entirely into skills (Task 4–7). *(81bba0f2 — chose stub over delete; documented relocation pointer)*
+- [ ] Step 6: Commit with `Closes` trailers for [#293](https://github.com/audiocontrol-org/deskwork/issues/293), [#294](https://github.com/audiocontrol-org/deskwork/issues/294), [#295](https://github.com/audiocontrol-org/deskwork/issues/295). *(file-level demolition already in 81bba0f2; this commit-step is for the CLI-side retirement)*
 
 **Acceptance:** No skill at `plugins/dw-lifecycle/skills/install-scope-discovery-hooks/`. No subcommand registration for the install/uninstall verbs. Audit-trail commit names the four issues retired.
 
