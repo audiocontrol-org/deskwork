@@ -16,8 +16,9 @@
  *     `null` (not a throw) for the absent case — throwing is 39d's job.
  */
 
-import { join } from 'node:path';
-import type { Entry } from '@/schema/entry.ts';
+import { existsSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+import type { Entry } from '../schema/entry.ts';
 
 /**
  * Resolve an entry's on-disk artifact path from its STORED `artifactPath`
@@ -40,4 +41,36 @@ export function resolveStoredArtifactPath(
     return null;
   }
   return join(projectRoot, sidecar.artifactPath);
+}
+
+/**
+ * Read-side refinement of an already-resolved STORED artifact path to the
+ * canonical "document under review" file (Issue #222 / T1).
+ *
+ * Both the core iterate verb and the studio entry-resolver address the
+ * same document, so this refinement is shared (it was duplicated in
+ * `iterate.ts` and `entry-resolver.ts` until Phase 39d factored it here).
+ *
+ *   - For a legacy `<dir>/scrapbook/<file>.md` shape, the doc dir is the
+ *     parent of `scrapbook/`; otherwise it is the artifact's own dir.
+ *   - Prefer `<docDir>/index.md` IFF it exists on disk (the index.md-
+ *     canonical case). Otherwise read the artifact path itself — supports
+ *     shared-directory layouts (multiple entries per directory, each
+ *     addressed by its own filename, e.g. prd.md / workplan.md / README.md).
+ *
+ * This refines a path the caller already resolved from the stored
+ * `artifactPath`; it is NOT a guess for an absent path. The caller is
+ * responsible for the throw-on-absent contract before calling this.
+ *
+ * @param absArtifact absolute artifact path (from `resolveStoredArtifactPath`)
+ * @returns the absolute canonical document path to read/write
+ */
+export function refineToIndexDoc(absArtifact: string): string {
+  const dir =
+    basename(dirname(absArtifact)) === 'scrapbook'
+      ? dirname(dirname(absArtifact))
+      : dirname(absArtifact);
+  const indexPath = join(dir, 'index.md');
+  if (existsSync(indexPath)) return indexPath;
+  return absArtifact;
 }

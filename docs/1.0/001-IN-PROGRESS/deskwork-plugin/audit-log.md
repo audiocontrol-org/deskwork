@@ -612,3 +612,49 @@ Surface:    `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:audit()`
 The detection finding fires on `sitesPresent || missingArtifactPath`, but every repair action keys off legacy sites: lane creation iterates `sites`, and the backfiller's `enumerateCandidates` (sites-migration-backfill.ts) only searches each legacy `site.contentDir`. When the rule fires because `missingArtifactPath` is true but `sites` is empty, `baseDirs` is `[]`, so `enumerateCandidates` returns `[]` for every entry, nothing is stamped, and `apply` still returns `applied: true` ("0 lane(s) created, 0 backfilled, sites … absent"). The entries remain unstamped, so a subsequent audit re-fires the same finding — `applied: true` is reported for a run that changed nothing and did not converge.
 
 Through the normal runner this exact state is partly masked because `selectSites` returns `[]` for an empty `config.sites` and the rule is then never invoked (runner.ts:143, :195/:224) — but it is directly reachable in the migration's own test harness and in any partial-migration state, and the `apply` return value claiming success while doing nothing is misleading regardless of reachability. Tighten the apply contract: when `baseDirs` is empty but entries still lack `artifactPath`, return a non-success result (or a `report-only` directing the operator to the lane-native back-fill) rather than `applied: true`, so "applied" never means "I detected a problem I had no means to fix."
+
+## 2026-06-03 — audit-barrage lift (20260603T023346406Z-deskwork-plugin)
+
+### AUDIT-20260603-16 — Lane assignment is coupled to artifactPath backfill — entries that already carry `artifactPath` but no `lane` are never rehomed
+
+Finding-ID: AUDIT-20260603-16
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `packages/core/src/doctor/sites-migration-backfill.ts:177-181` (`planBackfills` skip) + `:208-225` (`backfillFromLegacySites` stamp loop)
+
+The -12 fix assigns `entry.lane` only inside the backfill loop, which `planBackfills` gates on *missing* `artifactPath`: `if (entry.artifactPath !== undefined && entry.artifactPath !== '') continue;` (sites-migration-backfill.ts:177). Any entry that already has a non-empty `artifactPath` never reaches `toStamp`, so `backfillFromLegacySites` never writes a sidecar for it, so its `lane` is never set (sites-migration-backfill.ts:208-225). The migration's stated purpose per the -12 finding — *"rehome each site's entries onto that site's lane"* — is therefore only half-done: it rehomes the subset of entries that happen to be missing `artifactPath`.
+
+This is not a contrived state for the *actual* migration this feature exists for. A project adopting `sites→lanes` is, by definition, a project that predates lanes; entries created before the lane field existed commonly already carry `artifactPath` (e.g. stamped at ingest) but have no `lane`. Those exact entries are the ones the migration silently leaves lane-less, and `entry-lane-missing` (which runs immediately after, runner.ts:56→58 per the -12 finding) will flag every one of them as an `error` in the same `--fix=all` run — reproducing the precise symptom -12 was filed to eliminate, for a realistic subset. A fix would decouple lane-assignment from the artifactPath-backfill gate: stamp `lane` for any lane-less entry that resolves unambiguously to a single site's contentDir, regardless of whether `artifactPath` is already present. The migration already knows the owning site for such an entry (`enumerateCandidates` would resolve it) — it's only the early `continue` that skips the work.
+
+### AUDIT-20260603-17 — `parseConfig` tolerance is narrower than its docblock claims — `defaultSite` present with `sites` absent still throws
+
+Finding-ID: AUDIT-20260603-17
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/src/config.ts:321-329` (`resolveDefaultSite`) + docblock `:12-17`
+
+The new docblock asserts (config.ts:12-17): *"An absent/empty `sites` normalizes to `{}` and `defaultSite` to `''`."* But the empty-string return for `defaultSite` lives **inside** the `value === undefined || value === null` branch (config.ts:319-326): `if (siteSlugs.length === 0) return '';`. If a config has `sites` absent but `defaultSite` *present* (a string), `resolveDefaultSite` skips that branch entirely and falls through to the value-present validation, which throws `defaultSite "X" is not a configured site` because `siteSlugs` is empty. So the loader is tolerant of the sites-absent shape **only when `defaultSite` is also absent** — a narrower contract than the docblock's blanket *"sites is tolerated as absent or empty."*
+
+In practice `dropSitesBlock` removes both keys atomically, so the tool's own migration never produces this shape. But an operator hand-editing `.deskwork/config.json` to delete the `sites:` block while leaving a `defaultSite:` line lands exactly here and gets the same brick -11 was meant to prevent. There is no test for `{version:1, defaultSite:'blog'}` (sites absent, defaultSite present) — `parse-config-tolerant-sites.test.ts` only covers `defaultSite` absent. Either widen the tolerance (a present-but-orphaned `defaultSite` with no sites → normalize to `''` rather than throw) or tighten the docblock to say the tolerance requires `defaultSite` to be absent too; and add the missing-coverage test either way.
+
+### AUDIT-20260603-18 — Malformed-site / corrupt-sidecar tests assert against regexes the generic error wrapper satisfies unconditionally — they don't pin the cause
+
+Finding-ID: AUDIT-20260603-18
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/test/doctor/sites-migration-malformed-site.test.ts:78-79` (`/contentDir|could not read|migration/i`) + `:124-125` (`/sidecar|invalid|read|could not/i`)
+
+`audit()` converts any caught throw into a single fixed-template finding: `sites-to-lanes migration could not inspect the project: ${reason}...` (sites-to-lanes-migration.ts in the `catch`). Both regression tests then assert the message matches a regex — but the wrapper text *always* contains the words "migration" and "could not", so both regexes pass on the wrapper alone, independent of `${reason}`. The -13 test's `/contentDir|could not read|migration/i` matches via "migration"; the -14 test's `/sidecar|invalid|read|could not/i` matches via "could not". Neither alternative that names the *actual* cause (`contentDir`, `sidecar`, `invalid`) is load-bearing.
+
+The consequence is the tests verify only that *some* error finding was produced, not that it was produced *for the intended reason*. If a future refactor made `readLegacySites` stop throwing on missing `contentDir` (so the rule errored for an unrelated reason, or produced a non-error finding that still mentioned "migration"), the -13 test could stay green while the bug it guards regressed. Per the project's "tests that don't test the contract they claim" concern, anchor each assertion on the cause-specific substring the wrapper interpolates from `${reason}` — e.g. assert the message contains `contentDir` (the -13 case) and `33333333-...`/`sidecar`/JSON-parse text (the -14 case) — not a token the template emits unconditionally.
+
+### AUDIT-20260603-19 — The `apply()` no-base branch (-15) guards a state the production runner cannot reach; its test constructs an in-memory/disk config mismatch
+
+Finding-ID: AUDIT-20260603-19
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:258-289` (no-base `apply` branch) + `packages/core/test/doctor/sites-migration-noop-honesty.test.ts:60-90`
+
+The -15 fix is correct as a defensive contract, but worth flagging for how the operator reads its "fixed" claim. For `apply()` to run, audit must have fired the finding, which requires the rule to have run, which requires `selectSites` to have returned a site — which requires the *in-memory* `config.sites` (from `readConfig`) to be non-empty. `legacyLaneBases` is built from `readLegacySites`, which reads the *same* `.deskwork/config.json`. The two readers cannot disagree on the same file, so `bases.length === 0` while the rule is running is unreachable through the normal runner (as the original -15 finding already noted). The new test forces the state only by passing `validConfig()` (in-memory sites = `blog`) while writing `{version:1}` to disk (sites-migration-noop-honesty.test.ts:51-90) — a divergence that cannot occur in production now that `readConfig` reads the same file the rule does.
+
+No change requested — the guard is harmless belt-and-suspenders and the honest `applied: false` is the right contract. But the regression test pins behavior for an impossible-in-production input, so it would not catch a regression in the *reachable* path (it has none). If the operator wants -15 to carry real protective value, the test that matters is the one already covered elsewhere (a genuinely-empty config short-circuits before the rule via `selectSites`), not this in-memory/disk-mismatch construction.

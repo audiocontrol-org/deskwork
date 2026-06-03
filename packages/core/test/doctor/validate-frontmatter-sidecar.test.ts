@@ -6,7 +6,7 @@ import { validateAll } from '@/doctor/validate';
 
 const NOW = '2026-04-30T12:00:00.000Z';
 
-function entryJson(uuid: string, slug: string, stage: string): string {
+function entryJson(uuid: string, slug: string, stage: string, artifactPath?: string): string {
   return JSON.stringify({
     uuid,
     slug,
@@ -15,6 +15,10 @@ function entryJson(uuid: string, slug: string, stage: string): string {
     source: '',
     currentStage: stage,
     iterationByStage: {},
+    // Phase 39d: resolution reads the stored artifactPath ONLY (no
+    // slug+stage heuristic). Fixtures that exercise frontmatter-sidecar
+    // resolution must stamp the path the migration would have backfilled.
+    ...(artifactPath !== undefined && { artifactPath }),
     createdAt: NOW,
     updatedAt: NOW,
   });
@@ -55,7 +59,7 @@ describe('validateAll - frontmatter-sidecar', () => {
     const slug = 'mismatch';
     await writeFile(
       join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
-      entryJson(uuid, slug, 'Drafting'),
+      entryJson(uuid, slug, 'Drafting', `docs/${slug}/index.md`),
     );
     await writeFile(
       join(projectRoot, '.deskwork', 'calendar.md'),
@@ -84,7 +88,7 @@ body
     const slug = 'agreed';
     await writeFile(
       join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
-      entryJson(uuid, slug, 'Drafting'),
+      entryJson(uuid, slug, 'Drafting', `docs/${slug}/index.md`),
     );
     await writeFile(
       join(projectRoot, '.deskwork', 'calendar.md'),
@@ -112,7 +116,7 @@ body
     const slug = 'missing-artifact';
     await writeFile(
       join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
-      entryJson(uuid, slug, 'Drafting'),
+      entryJson(uuid, slug, 'Drafting', `docs/${slug}/index.md`),
     );
     await writeFile(
       join(projectRoot, '.deskwork', 'calendar.md'),
@@ -129,7 +133,7 @@ body
     const slug = 'ideas-mismatch';
     await writeFile(
       join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
-      entryJson(uuid, slug, 'Ideas'),
+      entryJson(uuid, slug, 'Ideas', `docs/${slug}/scrapbook/idea.md`),
     );
     await writeFile(
       join(projectRoot, '.deskwork', 'calendar.md'),

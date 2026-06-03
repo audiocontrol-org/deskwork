@@ -1,10 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
-import { getContentDir } from '../config.ts';
+import { refineToIndexDoc, resolveStoredArtifactPath } from '../entry/resolve-artifact.ts';
 import { resolveEntryStrictTemplate } from '../lanes/resolve.ts';
 import {
   assertStageInTemplate,
@@ -34,31 +32,31 @@ interface IterateResult {
  * Option B + hybrid refinement, longform + outline iterate target a
  * single canonical file regardless of stage.
  *
- * Resolution order (T1 + non-index.md fallback):
- *   1. If the sidecar carries `artifactPath`:
- *      a. Prefer `<dirname(artifactPath)>/index.md` IF that file exists
- *         (T1's index.md-canonical case).
- *      b. Otherwise fall back to `artifactPath` itself. Supports
- *         shared-directory layouts (multiple entries per directory,
- *         each addressed by its own filename).
- *   2. No artifactPath: try `<contentDir>/<slug>/index.md` (legacy
- *      shape, pre-#140 entries the doctor migration hasn't processed).
+ * Resolution (Phase 39d — sites→lanes retirement; STORED PATH ONLY):
+ *   The sidecar's `artifactPath` is authoritative. There is NO
+ *   `<contentDir>/<slug>/index.md` fallback — per the spec §"Resolution"
+ *   and the project's "no fallbacks — throw" rule, an entry without a
+ *   stored path resolves to a descriptive THROW pointing the operator at
+ *   `deskwork doctor --fix` (the migration backfiller, 39b, owns
+ *   stamping it). Guessing a phantom path is exactly the location-as-key
+ *   disease this retirement removes.
+ *
+ *   Given a stored path, this still prefers `<dirname>/index.md` when it
+ *   exists on disk (T1's index.md-canonical case) and otherwise reads the
+ *   stored path itself (shared-directory layouts, e.g. deskwork's own
+ *   prd.md / workplan.md / README.md sharing a directory). That is a
+ *   read-side refinement OF a stored path, not a guess for an absent one.
  */
 function resolveIndexPath(projectRoot: string, sidecar: Entry): string {
-  if (sidecar.artifactPath) {
-    const absArtifact = join(projectRoot, sidecar.artifactPath);
-    // Strip the scrapbook segment for legacy `<dir>/scrapbook/<file>.md`
-    // shapes; otherwise dirname(absArtifact) IS the doc dir.
-    const dir =
-      basename(dirname(absArtifact)) === 'scrapbook'
-        ? dirname(dirname(absArtifact))
-        : dirname(absArtifact);
-    const indexPath = join(dir, 'index.md');
-    if (existsSync(indexPath)) return indexPath;
-    return absArtifact;
+  const absArtifact = resolveStoredArtifactPath(sidecar, projectRoot);
+  if (absArtifact === null) {
+    throw new Error(
+      `Cannot iterate entry ${sidecar.uuid} (slug "${sidecar.slug}"): the sidecar has no ` +
+        `artifactPath. Resolution reads the stored path only — there is no slug+stage ` +
+        `fallback. Run \`deskwork doctor --fix\` to backfill artifactPath, then retry.`,
+    );
   }
-  const contentDir = getContentDir(projectRoot);
-  return join(contentDir, sidecar.slug, 'index.md');
+  return refineToIndexDoc(absArtifact);
 }
 
 /**
