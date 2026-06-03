@@ -86,6 +86,15 @@ export function inferFindingShape(finding: OpenFinding): FindingShape {
   if (/\.dw-lifecycle\//.test(surface)) return 'non-bug';
   if (/last-hook-run\.json/.test(surface)) return 'non-bug';
   if (/hook-run-log\.jsonl/.test(surface)) return 'non-bug';
+  // Plugin skill bodies, templates, and slash-command shim files are
+  // doc prose, not source code. Per AUDIT-20260603-72: without these
+  // entries the renderer mints unsatisfiable vitest acceptance criteria
+  // for skill/template/command findings (the same shape AUDIT-20260602-05
+  // closed for DEVELOPMENT-NOTES.md and AUDIT-20260602-07 closed for
+  // .claude/rules/*.md).
+  if (/plugins\/[^/]+\/skills\//.test(surface)) return 'non-bug';
+  if (/plugins\/[^/]+\/templates\//.test(surface)) return 'non-bug';
+  if (/plugins\/[^/]+\/commands\/[^/]+\.md/.test(surface)) return 'non-bug';
   // Commit-history findings — "commit <sha>" or "subject" framings
   if (/\bcommit\b.*\b[0-9a-f]{7,40}\b/i.test(surface)) return 'non-bug';
   // Process findings explicitly naming "missing surface" or "no surface"

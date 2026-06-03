@@ -199,6 +199,34 @@ describe('inferFindingShape — Phase 18 Task 1 (AUDIT-02)', () => {
       inferFindingShape(finding({ surface: '.claude/CLAUDE.md line 99' })),
     ).toBe('non-bug');
   });
+
+  // AUDIT-20260603-72: plugin skill bodies / templates / slash-command shims
+  // are doc prose, not source code. Findings against them have no failing-test
+  // path; the renderer auto-positioner was minting unsatisfiable vitest ACs
+  // for skill+template+command findings before this allowlist entry landed.
+  it('infers non-bug for plugins/<plugin>/skills/<name>/SKILL.md surface (AUDIT-20260603-72)', () => {
+    expect(
+      inferFindingShape(
+        finding({ surface: 'plugins/dw-lifecycle/skills/install-scope-discovery/SKILL.md:46' }),
+      ),
+    ).toBe('non-bug');
+  });
+
+  it('infers non-bug for plugins/<plugin>/templates/** surface', () => {
+    expect(
+      inferFindingShape(
+        finding({ surface: 'plugins/dw-lifecycle/templates/scope-discovery/README.md:21-30' }),
+      ),
+    ).toBe('non-bug');
+  });
+
+  it('infers non-bug for plugins/<plugin>/commands/<name>.md slash-command shim', () => {
+    expect(
+      inferFindingShape(
+        finding({ surface: 'plugins/dw-lifecycle/commands/install-scope-discovery-hooks.md:1-5' }),
+      ),
+    ).toBe('non-bug');
+  });
 });
 
 describe('renderFixTaskBlock — non-bug variant (Phase 18 Task 1)', () => {

@@ -3852,3 +3852,49 @@ Surface:    `plugins/dw-lifecycle/skills/doctor/SKILL.md:31-44`, `plugins/dw-lif
 `doctor/SKILL.md` still says the helper runs “eight” scope-discovery rules and lists `agent-prompt-mirror-drift` plus `hooks-installed-missing` with repair hints that call `/dw-lifecycle:install-agent-prompts`, `/dw-lifecycle:install-scope-discovery-hooks`, and `/dw-lifecycle:uninstall-scope-discovery-hooks`. This diff deletes both rule implementations and removes them from `SCOPE_DISCOVERY_DOCTOR_RULES`; the exported rule array now contains neither deleted rule.
 
 This is active operator-facing prose, not historical notes. An operator following `/dw-lifecycle:doctor` will expect findings and repair paths that cannot occur or run. Fix: update the rule count/table to match `doctor-rules/index.ts` and remove the deleted rule rows and retired repair commands.
+
+## 2026-06-03 — audit-barrage lift (20260603T201656729Z-scope-discovery)
+
+### AUDIT-20260603-72 — Workplan Tasks 9–14 are fully unchecked while the same commit marks their findings `fixed`/`acknowledged` — internal contradiction within the audited range
+
+Finding-ID: AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-model)
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:228-332` (Tasks 9–14) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:3790-3854` (AUDIT-66…71)
+
+The audited range adds the six findings to the audit-log with terminal statuses (`fixed-db630841` for 66/67/70/71, `acknowledged-…` for 68/69) AND adds Tasks 9–14 to the workplan with **every** checkbox unchecked — including "Step 1: write failing test", "Step 3: implement the fix", "Step 5: commit with `Closes …`", and "Audit-log Status flipped to `fixed-<sha>`". So one commit range simultaneously asserts "these are resolved" (audit-log SSOT) and "here are open, not-yet-started TDD tasks to resolve them" (workplan). A reader running `/dw-lifecycle:pickup` against this workplan will see six in-flight fix tasks for work the audit-log already calls done.
+
+This is precisely the canonical-surface drift the project repeatedly names (cf. AUDIT-20260603-59, the doctor-rule philosophy, the quantitative-reporting conventions). The two surfaces must agree: if the findings are fixed in db630841, Tasks 9–14 should be checked off (or never created), with their "flipped to fixed-<sha>" acceptance line satisfied. As-is, the workplan's open-findings/uncompleted-task signal contradicts the audit-log's closure signal. Fix: reconcile — either mark Tasks 9–14 complete with the db630841 SHA recorded, or, if these were promote-findings proposals superseded by the already-landed fix, remove them rather than leaving unchecked TDD scaffolds for completed work.
+
+### AUDIT-20260603-73 — Doctor `SKILL.md` rule-count claim ("eight") is not reconciled in the diff that removed two rule rows — AUDIT-71's required count update appears unmade despite `fixed-db630841`
+
+Finding-ID: AUDIT-20260603-73 (claude-03 + codex-03; cross-model)
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/doctor/SKILL.md` (single hunk `@@ -39,9 +39,7 @@`) vs. AUDIT-20260603-71 requirement "update the rule count/table to match"
+
+AUDIT-71's fix has two explicit parts: (a) remove the deleted rule rows from the table, and (b) "update the rule count… `doctor/SKILL.md` still says the helper runs 'eight' scope-discovery rules." The diff under audit shows only **one** hunk for `doctor/SKILL.md` — the removal of the `agent-prompt-mirror-drift` and `hooks-installed-missing` table rows at the line-39 region. The "eight" count claim the finding locates at SKILL.md:31 is *above* the shown hunk and is not touched (a change there would surface as a second hunk; none appears). So part (b) of the required fix is not visible in the range that marks AUDIT-71 `fixed-db630841`.
+
+If the count text still reads "eight" while the table now lists fewer rules, the operator-facing prose is internally inconsistent and the finding is only partially resolved despite its `fixed` status. This is the same "fixed claim outruns the actual edit" pattern the project's verification rules guard against. Fix: confirm SKILL.md's rule-count number was decremented to match the surviving rows; if it wasn't, the count update still needs to land and AUDIT-71's `fixed-db630841` is premature.
+
+### AUDIT-20260603-74 — `migrate-from-pilot` still routes operators to retired commands
+
+Finding-ID: AUDIT-20260603-74
+Status:     fixed-pending-sha
+Severity:   high
+Surface:    `plugins/dw-lifecycle/skills/migrate-from-pilot/SKILL.md:71-75` (missing from this diff, but should be)
+
+The diff fixes one AUDIT-67 surface by updating `install-scope-discovery/SKILL.md`, but the adopter-facing migration skill still says to “Wire the hooks + agent prompts” and tells operators to run `/dw-lifecycle:install-scope-discovery-hooks` and `/dw-lifecycle:install-agent-prompts` at line 75. Those command files and skill folders are deleted in this same audited range, so a pilot adopter following the migration procedure is sent directly to missing plugin surfaces.
+
+This is not a re-litigation of AUDIT-67; it is an unhandled instance of the exact grep sweep that AUDIT-67 required across skill bodies and READMEs. Fix by rewriting the post-migration step to match the Phase 24 no-git-hook-enforcement contract, probably mirroring the new `install-scope-discovery` prose: registries are migrated, enforcement lives in the lifecycle skills, and the retired install verbs are no longer part of onboarding.
+
+### AUDIT-20260603-75 — Scope-discovery template README still installs a retired hook manifest contract
+
+Finding-ID: AUDIT-20260603-75
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/templates/scope-discovery/README.md:21-30` (missing from this diff, but should be)
+
+The project-side scope-discovery template still documents `hooks-installed.json` as a shipped file with “Provenance for `install-scope-discovery-hooks` (do not hand-edit)” at line 30. The audited diff removes the install/uninstall hook command surfaces and resolves AUDIT-70, but this template remains an adopter-facing artifact that preserves the retired installer’s data model as if it still exists.
+
+This matters because `install-scope-discovery` copies these templates into adopting projects; stale template prose becomes durable local documentation. Fix by removing the `hooks-installed.json` row, and if the file is no longer emitted anywhere, ensure the template payload and installer tests no longer expect it.

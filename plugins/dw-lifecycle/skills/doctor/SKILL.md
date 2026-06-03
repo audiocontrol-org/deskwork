@@ -30,7 +30,7 @@ The helper also runs the scope-discovery rules (next section).
 
 ## Scope-discovery rules
 
-When the project has opted into scope-discovery (`.dw-lifecycle/scope-discovery/` present), the doctor extends its rule list with eight scope-discovery-specific checks. Each fires independently; the operator triages top-to-bottom in the grouped output. Full rule bodies live under `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/<rule-id>.ts` — the per-rule TypeScript file is the source of truth for the exact heuristic + repair-hint text.
+When the project has opted into scope-discovery (`.dw-lifecycle/scope-discovery/` present), the doctor extends its rule list with the scope-discovery-specific checks below. Each fires independently; the operator triages top-to-bottom in the grouped output. Full rule bodies live under `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/<rule-id>.ts` — the per-rule TypeScript file is the source of truth for the exact heuristic + repair-hint text.
 
 | Rule ID | What it checks | Repair hint (summary) |
 |---|---|---|
