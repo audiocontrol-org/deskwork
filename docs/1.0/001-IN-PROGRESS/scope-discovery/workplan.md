@@ -4527,7 +4527,7 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
 
 - [ ] All `editor` references in the scope-discovery layer renamed to `module` (except etymology comment in `util/modules.ts` if preserved by operator decision).
 - [ ] Adopter YAMLs migrate cleanly via doctor rule (or via alias-with-deprecation if that's the chosen strategy).
-- [ ] No grep hit for `editor` in scope-discovery code outside the etymology paragraph.
+- [ ] No grep hit for `editor` in scope-discovery code outside (a) the etymology paragraph and (b) any deprecated-alias surface explicitly shipped per Task 5 / Task 6 decisions. Alias surfaces (deprecated CLI verb wrapper + deprecated skill folder stub, if shipped) require bounded tests asserting the alias dispatches to the new name AND a documented removal-version pointer in code comments + release notes. The grep-zero criterion applies AFTER the alias surfaces are subtracted (per AUDIT-20260603-35 correction; the original criterion contradicted the Task 5/6 deprecated-alias permission).
 - [ ] All tests pass; `tsc` clean.
 - [ ] Release notes capture the rename.
 - [ ] Audiocontrol pilot coordination decision documented.
@@ -4538,7 +4538,7 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
 2. **Keep `check-editor-symmetry` CLI verb as deprecated alias or hard-rename?** Lean alias for one release cycle; CLI verbs are part of the adopter muscle memory.
 3. **Audiocontrol pilot: rename in lockstep or keep legacy with alias?** Operator decides; depends on audiocontrol team's bandwidth.
 4. **Historical etymology paragraph: preserve in `util/modules.ts` as comment, or full erasure?** Lean preserve; the etymology explains a decision that survives in adopters' git history.
-5. **Per-task sub-issues** — TBD at implementation time. Parent issue is #405 (filed 2026-06-03; back-referenced in workplan + README + PRD). Per-task sub-issues split decision deferred until the implementation session opens.
+5. **Per-task sub-issues — NO sub-issues planned.** Phase 25 ships as a single coherent rename batch under parent #405; PRs land at operator discretion without pre-allocated per-task sub-issues. If splitting becomes necessary during implementation (e.g., the audiocontrol pilot coordination Task 10 turns into a separate coordination thread), issues are filed reactively at that time. (Substantive disposition substituted per AUDIT-20260603-36; the prior "deferred until the implementation session opens" wording was the deferral pattern the project's "Just for now is bullshit" rule forbids.)
 
 ### Phase 25 — Out of Scope
 

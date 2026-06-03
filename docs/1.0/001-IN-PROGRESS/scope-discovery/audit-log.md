@@ -3221,7 +3221,7 @@ This is the closure-overclaim shape the project's verification rules name ("agen
 ### AUDIT-20260603-24 — Phase 24 ↔ Phase 25 are not "independent" — Phase 24 adds new `check-editor-symmetry` call sites that Phase 25's scope-time inventory cannot see
 
 Finding-ID: AUDIT-20260603-24
-Status:     acknowledged-slush-pile-2026-06-03
+Status:     fixed-38b7bc16
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` (Phase 24 "Relocation" bullet; Phase 25 extension "Independent of Phase 24") and `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Phase 24 Task 4 Step 2, Task 7 Step 1; Phase 25 Task 1).
 
@@ -3267,7 +3267,7 @@ When a diff edits the precise line a finding names, that's the moment to resolve
 ### AUDIT-20260603-28 — Phase 24 relocates audit-barrage but omits the lift/promote/open-findings chain that turns findings into enforceable work
 
 Finding-ID: AUDIT-20260603-28
-Status:     open
+Status:     fixed-81bba0f2
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` Phase 24 Relocation + Phase 24 acceptance; `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 24 Task 5
 
@@ -3296,7 +3296,7 @@ Fix guidance:
 ### AUDIT-20260603-29 — Phase 24 says demolition and relocation must land together, but the workplan commits demolition before replacement gates exist
 
 Finding-ID: AUDIT-20260603-29
-Status:     open
+Status:     fixed-81bba0f2
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 24 scope shape and Tasks 2-7
 
@@ -3324,7 +3324,7 @@ Fix guidance:
 ### AUDIT-20260603-30 — Phase 25's feature-doc sweep tells implementers to rewrite audit-log terminology, conflicting with audit-log preservation rules
 
 Finding-ID: AUDIT-20260603-30
-Status:     open
+Status:     fixed-81bba0f2
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 25 Task 9; `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` operating rules
 
@@ -3351,7 +3351,7 @@ Fix guidance:
 ### AUDIT-20260603-31 — Phase 24 issue-accounting text has stale or mismatched counts
 
 Finding-ID: AUDIT-20260603-31
-Status:     open
+Status:     fixed-81bba0f2
 Severity:   low
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 24 Task 3, Task 8, Open decisions
 
