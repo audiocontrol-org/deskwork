@@ -30,6 +30,77 @@ note: archived 2026-06-03 via scripts/archive-phases-onetime.ts; Phase 26 produc
 - [x] `scope-widen "<complaint>"` — landed (closes [#292](https://github.com/audiocontrol-org/deskwork/issues/292)). Library API + thin subcommand shim + 15 vitest scenarios. Required positional complaint + `--slug`; optional `--manifest`, `--prd-path`, `--apply`, `--evidence-trail`, `--module-root`, `--quiet`. Default behavior is dry-run (prints delta to stderr, exits 0 without modifying the manifest). Complaint injection strategy: appended as `## Operator complaint (scope-widen)` section to a per-run augmented PRD; the PRD-themed pattern hunter tokenizes the complaint alongside the PRD body so operator words become themed keywords without bespoke parsing. Evidence trail under `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/widen-runs/<stamp>-<runId>/`. Delta computation is purely additive; theme keys strip the `<term> (N occurrences)` suffix so occurrence-count shifts don't false-positive as additions. `--apply` merges the delta into the manifest; `generated_by` (e.g., `curated`) is preserved. Smarter complaint parsing (noun phrases, identifiers, additional grep patterns) is deferred to Phase 11's orchestrator-agent work; v1 is plumbing.
 - [x] `scope-summary [--surface <glob>]` — ported verbatim from audiocontrol pilot (`tools/scope-discovery/summary.ts`). 4-field summary line (`total | pending-touching | pending-intra | dispositioned-touching`), `--json` + `--verbose` + `--clones` override; default clones path generalized to `.dw-lifecycle/scope-discovery/clones.yaml`. 15 vitest scenarios cover the pure compute math, programmatic + CLI surfaces, gutted-stub teeth (all-zero counter must fail mixed-fixture assertion).
 
+
+### Task 24 (fix-finding-AUDIT-20260603-88) (non-bug): AUDIT-20260603-88 — Duplicate `Task 22` heading — the disposition task created f…
+
+Closes AUDIT-20260603-88. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new `### Task 22 (fix-finding-AUDIT-20260603-86)` (hunk `@@ -39,6 +39,40 @@`).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-88` in subject (use `Closes AUDIT-20260603-88` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 25 (fix-finding-AUDIT-20260603-89): AUDIT-20260603-89 — `archive-phases` never scans moved fix-task headings — `arch…
+
+Closes AUDIT-20260603-89 (claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:258-272` (`newLedger` construction in `archivePhases`). Severity: high.
+
+- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
+- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
+- [ ] Step 5: commit with `Closes AUDIT-20260603-89 (claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 26 (fix-finding-AUDIT-20260603-90) (non-bug): AUDIT-20260603-90 — Task 23 (AUDIT-87) carries the impossible TDD-bug template f…
+
+Closes AUDIT-20260603-90. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 23 (fix-finding-AUDIT-20260603-87)` (hunk `@@ -39,6 +39,40 @@`).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-90` in subject (use `Closes AUDIT-20260603-90` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 27 (fix-finding-AUDIT-20260603-91): AUDIT-20260603-91 — Doctor rule crashes on malformed ledgers instead of reportin…
+
+Closes AUDIT-20260603-91. Surface: `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.ts:109-110`. Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260603-91` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 2: Check-* gate commands
 
 - [x] `check-clones [--gate-mode]` — subcommand originally registered as `detect-clones` in Phase 1; renamed to `check-clones` in the Phase 6 verb-naming pass with `detect-clones` preserved as a forever-back-compat alias (both names dispatch to the same handler, so adopter pre-commit hooks installed by pre-rename versions of `install-scope-discovery-hooks` continue to work without modification). Library API renamed `detectClones` → `checkClones`; new hook chains emit `check-clones --gate-mode`; deprecation-hint surfaced in CLI `--help` listing. `--gate-mode` flag landed as a no-op-for-symmetry (check-clones already exits 1 on NEW groups by default — the hook contract). New skill at `plugins/dw-lifecycle/skills/check-clones/SKILL.md` is the canonical procedure; `plugins/dw-lifecycle/skills/detect-clones/SKILL.md` is a thin redirector pointing at the canonical skill. 3 new vitest scenarios — 2 gate-mode-flag-no-op + 1 alias-symmetry (both names produce identical exit codes on the same fixture).
@@ -39,39 +110,6 @@ note: archived 2026-06-03 via scripts/archive-phases-onetime.ts; Phase 26 produc
 - [x] `check-editor-symmetry [--write]` — landed in Phase 4 with `--write` flag honored; default writes to `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/editor-symmetry.md`.
 - [x] `check-refactor-preconditions [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag landed (default informational; flag flips to hook-friendly exit 1 on precondition failures).
 
-
-### Task 22 (fix-finding-AUDIT-20260603-86) (non-bug): AUDIT-20260603-86 — Duplicate `Task 20` heading — two distinct tasks now share t…
-
-Closes AUDIT-20260603-86 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 20 (fix-finding-AUDIT-20260603-83)` (hunk `@@ -47,35 +47,50 @@`) vs. `### Task 20 (fix-finding-AUDIT-20260603-82)` (hunk `@@ -83,6 +98,40 @@`).
-
-**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
-
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-86 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)` in subject (use `Closes AUDIT-20260603-86 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
-
-**Acceptance Criteria:**
-
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
-
-
-### Task 23 (fix-finding-AUDIT-20260603-87): AUDIT-20260603-87 — MIGRATING.md still leaks dev-branch framing ("Phase 24 imple…
-
-Closes AUDIT-20260603-87. Surface: `MIGRATING.md:60` ("Issues defused" paragraph, hunk `@@ -57,7 +57,7 @@`). Severity: low.
-
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-87` in subject
-
-**Acceptance Criteria:**
-
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 3: Disposition + baseline commands
 

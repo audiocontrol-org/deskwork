@@ -4050,3 +4050,49 @@ This is the residual tail of the exact problem AUDIT-84 named — internal scaff
 ---
 
 I checked the test-file change (a comment relabel only — bug-repro vs regression-lock; correct and matches the AUDIT-85 disposition), the audit-log additions (well-formed, statuses consistent), and the MIGRATING.md de-jargoning (the worst offender removed). The strong signals are the **duplicate `Task 20`** (off-by-one numbering, claude-01) and the **fifth recurrence of the fixed-vs-unchecked shape** (claude-02) — both are structural defects committed by the very diff that claims to resolve the prior instance.
+
+## 2026-06-03 — audit-barrage lift (20260603T222750928Z-scope-discovery)
+
+### AUDIT-20260603-88 — Duplicate `Task 22` heading — the disposition task created for AUDIT-86 reintroduces the exact duplicate-task-number bug it is meant to dispose
+
+Finding-ID: AUDIT-20260603-88
+Status:     acknowledged-orphaned-scaffolding-removed-AUDIT-86-already-acknowledged-2026-06-03
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new `### Task 22 (fix-finding-AUDIT-20260603-86)` (hunk `@@ -39,6 +39,40 @@`)
+
+The diff adds `### Task 22 (fix-finding-AUDIT-20260603-86) (non-bug)` to the workplan. But AUDIT-86 — restated verbatim in this same diff's audit-log addition — documents that the workplan already contains `Task 22 (AUDIT-85)` (the prior off-by-one assigned the three findings 20/21/22 instead of 21/22/23). So after this diff the workplan now has **two headings numbered `### Task 22`**: the pre-existing AUDIT-85 task and the new AUDIT-86 disposition task. The very task whose job is to *disposition the duplicate-number finding* commits a fresh instance of the duplicate-number defect. This is now the sixth recurrence of the family the audit-log keeps flagging (AUDIT-59→72→76→79→83→86), and it regressed inside the commit that claims to acknowledge AUDIT-86.
+
+Compounding: the new Task 22/Task 23 blocks are inserted near the top of the workplan (between the archived-phase note at line ~39 and `### Task 3: Disposition + baseline commands`), so they are wildly out of numeric order rather than appended after the highest existing task. Any tooling that keys a finding to a task number (`/dw-lifecycle:pickup`, `promote-findings` re-runs, the ledger's `next-fix-task-id` contract) now has an ambiguous `Task 22`. Fix: renumber the two new tasks to the next monotonic free integers (counting the already-present Task 22 (AUDIT-85)), and place them in numeric order. The auto-positioner that produced these integer-keyed numbers is the non-hierarchical case Phase 26 Task 4 explicitly does *not* cover — see AUDIT-BARRAGE-claude-02.
+
+### AUDIT-20260603-89 — `archive-phases` never scans moved fix-task headings — `archived-fix-tasks` and `next-fix-task-id` are never computed, so the AUDIT-86 read-side fix has no write-side that maintains the field it depends on
+
+Finding-ID: AUDIT-20260603-89 (claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:258-272` (`newLedger` construction in `archivePhases`)
+
+The entire AUDIT-86 protection chain is: `archive-phases` records the highest archived fix-task ID in the ledger's `next-fix-task-id` → the auto-positioner reads that field as a floor (Phase 26 Task 4). But `archivePhases` never computes either ledger field. When it builds the updated ledger it does `archivedFixTasks: previousLedger?.archivedFixTasks ?? []` and `nextFixTaskId: previousLedger?.nextFixTaskId ?? '1.1'` — it only *preserves* the prior values (or defaults to `1.1`). It never walks the moved `## Phase N:` section for `### Task N.M` headings, so archiving a phase that contains fix-tasks 5.1–5.123 records **none** of them in `archived-fix-tasks` and leaves `next-fix-task-id` untouched. Task 2 Step 5's own acceptance text says "recompute `next-fix-task-id` as max(union) + 1," yet the step is marked `[x]` and the implementation does not do this.
+
+This means the read-side floor the Task 4 fix relies on is fed by a field the write-side never populates. Combined with Task 4 Step 4 being explicitly deferred ("ledger's `next-fix-task-id` update after promote — DEFERRED"), there is **no code path** that ever advances `next-fix-task-id` from archived fix-tasks. The end-to-end AUDIT-86 guard is therefore inert for the realistic case: archive a phase full of fix-tasks, then promote a new finding into that phase — the auto-positioner reads a stale/default ledger and can still collide. The test suite masks this: `preserves an existing ledger when merging new ranges` (archive-phases.test.ts:225-262) only archives a *content-free* Phase 4 and asserts the prior `archived-fix-tasks: 5.1-5.10` / `next-fix-task-id: 5.11` are passed through unchanged — there is no test that archives a section containing `### Task` headings and asserts the ledger's fix-task fields update. Fix: scan each moved section for fix-task headings, merge them into `archivedFixTasks`, and set `next-fix-task-id` to `max(union)+1`; add a test that archives a fix-task-bearing phase and asserts both fields advance.
+
+### AUDIT-20260603-90 — Task 23 (AUDIT-87) carries the impossible TDD-bug template for a doc-only finding that is already `fixed-37666598`
+
+Finding-ID: AUDIT-20260603-90
+Status:     acknowledged-orphaned-scaffolding-removed-AUDIT-87-already-fixed-37666598-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 23 (fix-finding-AUDIT-20260603-87)` (hunk `@@ -39,6 +39,40 @@`)
+
+Task 23 is rendered with the **bug** task template: "Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)" … "Step 2: confirm test fails against current code." But AUDIT-87's Surface is `MIGRATING.md:60` — a prose paragraph in an adopter doc. There is no vitest that can "anchor at" a Markdown line and "fail against current code"; the finding is a wording/jargon issue, not a behavior the code can be made to violate. This is exactly the non-bug-surface misclassification the journal says Phase 24's AUDIT-72 allowlist extension was supposed to close (`inferFindingShape` should recognize doc surfaces as non-bug). Task 22 (AUDIT-86) correctly got the `(non-bug)` template in the same hunk; Task 23 did not — so the classifier is inconsistent within a single promote run.
+
+Worse, the audit-log entry added in this very diff records AUDIT-87 as `Status: fixed-37666598`, and `MIGRATING.md:60` was rewritten by this diff to drop "Phase 24 … on this branch." So Task 23 presents already-completed, already-fixed work as a not-started task with an unsatisfiable acceptance criterion (`Failing test exists at (to be filled in by Step 1 implementer)` — a literal placeholder the project's own substantive-reason discipline rejects). Fix: either delete Task 23 as superseded scaffolding (the fix already landed in 37666598), or convert it to the non-bug disposition template and mark it complete with that SHA.
+
+### AUDIT-20260603-91 — Doctor rule crashes on malformed ledgers instead of reporting or skipping
+
+Finding-ID: AUDIT-20260603-91
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.ts:109-110`
+
+`workplan-archive-ledger-coherence` calls `parseLedgerFromWorkplan(workplanBody)` without a `try/catch`. The parser intentionally throws for malformed ledger content, so one malformed ledger aborts the entire doctor rule instead of yielding a finding or continuing to other features. That is especially brittle because the new auto-positioner explicitly treats malformed ledgers as a graceful fallback case.
+
+Doctor rules should surface actionable state, not crash the whole scan on a document annotation error. A reasonable fix is to catch parser errors, emit a warning finding naming the affected feature and parse error, then continue walking the remaining feature directories.
