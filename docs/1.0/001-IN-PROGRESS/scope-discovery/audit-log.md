@@ -2748,7 +2748,7 @@ Because the message is a `const`, making it accurate requires turning it into a 
 ### AUDIT-20260602-39 — Swallowed `maxBuffer`/git errors make a >50MB legitimate diff indistinguishable from an empty tree → refusal with an actively wrong cure
 
 Finding-ID: AUDIT-20260602-39
-Status:     acknowledged-partial-fix-81875d74-range-bounded-pending-maxbuffer-classification-2026-06-03
+Status:     fixed-f6b70b67
 Severity:   low
 Surface:    `implement-hook.ts:163-176` (`gitDiffCached`) and `:179-188` (`gitDiffWorktree`) — both `catch { return ''; }` with `maxBuffer: 50 * 1024 * 1024`
 
@@ -2962,7 +2962,7 @@ That degradation re-arms the exact failure AUDIT-39's bounding was built to prev
 ### AUDIT-20260603-03 — Commit `pickFallbackBaseline bounds post-merge audited-diff range (AUDIT-20260602-39)` does not address AUDIT-39's stated defect — the `maxBuffer` swallow remains unchanged
 
 Finding-ID: AUDIT-20260603-03
-Status:     acknowledged-slush-pile-2026-06-03
+Status:     fixed-f6b70b67
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` (`gitDiffCached` ~lines 165-176 and `gitDiffWorktree` ~lines 179-188, both `catch { return ''; }` with `maxBuffer: 50 * 1024 * 1024`) vs. the top-of-range commit subject `fix(implement-hook): pickFallbackBaseline bounds post-merge audited-diff range (AUDIT-20260602-39)`
 
@@ -2984,3 +2984,59 @@ As AUDIT-48 established, task numbers are cross-surface identifiers — commit s
 ---
 
 I checked and found clean: the tri-state `checkAncestry` exit-code mapping (0→ancestor, 1→not-ancestor, >1/spawn-fail→unknown) and its two collapse arrows (`ancestryAsGateBoolean` refuses on unknown, `ancestryAsBarrageTip` drops the tip on unknown — the inverse-safety invariant is correct and well-tested); the `pickFallbackBaseline` closer-to-HEAD selection logic and tie-break; the `computeAuditedDiff` short-circuit ordering; the `--upstream-base-ref` flag/env precedence and `buildRange` `^base` exclusion; the `inferFindingShape` allowlist additions (`development-notes.md`, `.claude/rules/`, `.claude/CLAUDE.md`) and their regression tests; and the informational auto-flip path in `promote-findings.ts`. My four findings are new surface the prior 53 dispositioned entries did not capture: a dead divergence-notice conditional (-01), the Phase-21 upstream-base plumbing not threaded into Phase-22's fallback (-02), the AUDIT-39 closure claim not matching its named mechanism (-03), and a fresh task-number-collision cluster (-04). Issues already on record and slush-piled (the `catch{return ''}` swallow as AUDIT-39's own body, the `<lastBarrageTip>` cure placeholder AUDIT-38, the header-only comment overclaim AUDIT-35, the untracked-files gap AUDIT-36, the `--host 127.0.0.1` false-warning AUDIT-11, the unguarded regression-lock `if` AUDIT-80, the `IsAncestorOfHeadOptions` stale name AUDIT-51) I did not re-report.
+
+## 2026-06-03 — audit-barrage lift (20260603T002818476Z-scope-discovery)
+
+### AUDIT-20260603-05 — Test file's own docstring promises a "real-fs integration smoke" that the file does not contain; the new `runGitDiff` production wrapper has zero coverage
+
+Finding-ID: AUDIT-20260603-05
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/subcommands/implement-hook-maxbuffer.test.ts:1-16` (header docstring) + `:84-119` (the only "integration" test); the untested production surface is `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` `runGitDiff` (the new `try { return {ok:true, diff: execFileSync(...)} } catch (err) { if (isMaxBufferError(err)) ...; return {ok:true, diff:''} }`).
+
+The new test file's header comment states verbatim: *"Plus a real-fs integration smoke that exercises the full implement-hook diff pipeline with a tiny repo at a sub-50MB diff (the small case still works after the wrapping refactor…)."* No such test exists in the file. Every test in the file calls `isMaxBufferError(...)` directly; the one test labeled *"real-process integration"* (`:99-118`) triggers an `execFileSync` overflow and then asserts `isMaxBufferError(caught)` — it never calls `runGitDiff`, `gitDiff`, `gitDiffCached`, or `gitDiffWorktree`. The "full implement-hook diff pipeline with a tiny repo" smoke the docstring promises is absent. That is a false claim sitting in code, the exact fabrication shape the project's verification rules name.
+
+The substantive consequence: `runGitDiff` — the new wrapper that is the actual production seam introduced by this diff — has **no test**. Its branch logic (`isMaxBufferError(err)` → `{ok:false, kind:'too-large'}` vs. the `else return {ok:true, diff:''}` that silently swallows every *non*-maxBuffer git error into an empty success) is precisely the decision point AUDIT-39 was about, and it is unexercised. The well-tested `isMaxBufferError` classifier is the *input* to that decision; the decision itself is untested. This is the same gap the file's own comment cites from AUDIT-43 (*"the suite is green while the production default behind the DI seam is unexercised"*) — and then reintroduces. A reasonable fix: either write the promised real-git smoke (a tmp repo, a staged change, assert `runGitDiff(repo, ['diff','--cached'])` returns `{ok:true, diff:<nonempty>}`; an invalid ref, assert `{ok:true, diff:''}`), or correct the docstring to scope what the file actually verifies (classifier only).
+
+---
+
+### AUDIT-20260603-06 — `runGitDiff` labels a caught non-maxBuffer git error as `{ ok: true, diff: '' }` — conflating "no changes" with "git threw" reintroduces the other half of AUDIT-39's complaint
+
+Finding-ID: AUDIT-20260603-06
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` — `runGitDiff` catch block: `catch (err) { if (isMaxBufferError(err)) return { ok: false, kind: 'too-large' }; return { ok: true, diff: '' }; }`
+
+AUDIT-39's body named two conflations in the pre-fix `catch { return ''; }`: (a) maxBuffer overflow vs. empty tree, and (b) "not a git repo" / "bad ref" vs. empty tree. This fix resolves (a) by surfacing `too-large`, but (b) is untouched and is now arguably *more* misleading: a genuine git failure (bad ref, not-a-repo, spawn-fail-that-isn't-ENOENT) is caught and returned as `{ ok: true, diff: '' }` — the `ok: true` discriminant asserts the diff call *succeeded* when in fact git threw. `computeAuditedDiff` then treats that errored layer as a legitimately-empty layer and falls through to the next one (or to `source: 'empty'`), so a malformed range silently degrades to the staged/worktree diff or to the empty-diff refusal, with no signal that git actually errored.
+
+In the normal flow this is masked because Task 3's mirror picks a valid fallback baseline before building the range — but the wrapper is a shared primitive (three call sites) and `gitDiffRange` can still be handed a ref that fails to resolve (a deleted upstream, a detached state, a stale `origin/main` on a non-`main` adopter repo — see the sibling AUDIT-20260603-02). A cleaner shape is a third variant `{ ok: false, kind: 'git-error' }` so the caller can distinguish "git succeeded, no changes" from "git threw something we chose to tolerate." Folding a thrown error into `ok: true` is a deliberate lie in a discriminated union whose entire purpose is to stop lying about failure modes.
+
+---
+
+### AUDIT-20260603-07 — The `50 MB` cap is a magic number duplicated across three surfaces (const, cure template, test assertion) with no single source of truth
+
+Finding-ID: AUDIT-20260603-07
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` `const DIFF_MAX_BUFFER = 50 * 1024 * 1024;` + `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audited-diff.ts` `TOO_LARGE_DIFF_CURE_MESSAGE_TEMPLATE` (the literal `'the {LAYER} diff exceeded the 50 MB stdio'`) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/audited-diff.test.ts:267` (`expect(cure).toContain('50 MB')`).
+
+The 50 MB ceiling now lives as the authoritative value in `DIFF_MAX_BUFFER` (implement-hook.ts) but is re-stated as a hardcoded `"50 MB"` string in the cure template (a *different* file, audited-diff.ts) and pinned a third time by the test assertion `toContain('50 MB')`. The two are not connected: bumping `DIFF_MAX_BUFFER` to, say, 100 MB to accommodate a large legitimate diff (which the cure message itself suggests as a "cure option") leaves the cure text claiming "50 MB" and silently passes nothing — until the `toContain('50 MB')` test *fails* on a value that is now correct in the const but stale in the message. The operator following the cure's own advice to raise the cap would produce a self-contradicting message and a red test.
+
+This is the magic-number-without-single-source-of-truth pattern. A reasonable fix: derive the human-readable size from the const (e.g. compute `${DIFF_MAX_BUFFER / (1024*1024)} MB` and inject it into the template alongside `{LAYER}`), so the cap is asserted in exactly one place and the message + test track it automatically.
+
+---
+
+### AUDIT-20260603-08 — Too-large cure message hardcodes a file path + names the three `gitDiff*` helpers as carrying the cap — but this very refactor moved the cap into `runGitDiff`/`DIFF_MAX_BUFFER`, making the pointer stale on landing
+
+Finding-ID: AUDIT-20260603-08
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audited-diff.ts` — `TOO_LARGE_DIFF_CURE_MESSAGE_TEMPLATE`, the lines *"The cap is at `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` (gitDiff / gitDiffCached / gitDiffWorktree helpers)."*
+
+The cure text directs the operator to a specific file path and names `gitDiff / gitDiffCached / gitDiffWorktree` as the place the cap lives. After the DRY refactor in this same diff, none of those three helpers carries the `maxBuffer` value anymore — they each one-line-delegate to `runGitDiff`, and the cap is the `DIFF_MAX_BUFFER` const consumed inside `runGitDiff`. So the operator-facing pointer is already pointing at the wrong functions the moment it ships. Per the project's documentation rule on rot-prone specifics, an embedded source path in an adopter-facing message is a rot vector; here it rotted within the same commit that introduced it.
+
+Lower-stakes than the duplicated-constant finding, but it compounds with it: the message both names a stale location and restates the magic number. Minimal fix: point at `runGitDiff` / `DIFF_MAX_BUFFER` (the actual cap site), or drop the file-path-and-function-name specificity entirely and name the const, which won't drift when the helpers are reshuffled again.
+
+---
+
+I checked and found clean: the `computeAuditedDiff` short-circuit ordering and the new `too-large` early-returns (range → staged → unstaged, each overflow returning immediately with the correct `tooLargeLayer`) are correct and well-covered by the new tests, including the no-collapse regression-lock pinning `too-large` ≠ `empty`; the `isMaxBufferError` classifier handles the `ENOBUFS` / `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` code paths plus the message fallback and rejects `null`/`undefined`/string/number/`{}` cleanly; the `runImplementHook` wiring refuses with exit 1 + the layer-specific cure and preserves the separate `empty` refusal; the `DiffCallResult` discriminated-union threading is type-consistent across the DI bag and the three call sites; and the audit-log appends (the four AUDIT-20260603-0x blocks + the AUDIT-39 status flip to `acknowledged-partial-fix`) are internally consistent with the commit subjects. My four findings are the missing/false integration-smoke claim plus untested `runGitDiff` (-01), the `ok:true` mislabeling of caught git errors (-02), and two coupled cure-message hygiene issues — duplicated 50 MB constant (-03) and a stale file-path pointer the same refactor invalidated (-04). I did not re-report the already-slushed `catch`-swallow framing (AUDIT-39 body), the `IsAncestorOfHeadOptions` stale name (AUDIT-51), or the divergence-notice dead-code / upstream-base plumbing already captured as AUDIT-20260603-01/-02.
