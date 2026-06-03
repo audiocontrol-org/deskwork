@@ -110,7 +110,13 @@ describe('deskwork add writes entry-centric sidecar (Issue #184)', () => {
     expect(sidecar.source).toBe('manual');
     expect(sidecar.keywords).toEqual([]);
     expect(sidecar.iterationByStage).toEqual({});
-    expect('artifactPath' in sidecar).toBe(false);
+    // Phase 39c-2b (sub-task b): `add` now composes + stamps the
+    // entry's authoritative `artifactPath` from the default lane's
+    // `scaffoldDefaults.markdown` (bootstrapped from the legacy
+    // `sites.main.contentDir = 'src/content'`) + the default `index`
+    // layout + the slug. Previously this field was absent — the
+    // regression-lock is now flipped to assert presence + value.
+    expect(sidecar.artifactPath).toBe('src/content/my-new-idea/index.md');
     expect('datePublished' in sidecar).toBe(false);
     expect(typeof sidecar.createdAt).toBe('string');
     expect(typeof sidecar.updatedAt).toBe('string');

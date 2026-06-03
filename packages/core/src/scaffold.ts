@@ -25,6 +25,10 @@ import type { ContentIndex } from './content-index.ts';
 import { buildContentIndex } from './content-index.ts';
 import { resolveSite, resolveBlogFilePath } from './paths.ts';
 import { writeFrontmatter } from './frontmatter.ts';
+import {
+  layoutToContentRelativePath,
+  type ScaffoldLayout as LaneScaffoldLayout,
+} from './lanes/scaffold-path.ts';
 
 export interface ScaffoldResult {
   /** Absolute path to the created markdown file */
@@ -41,8 +45,12 @@ export interface ScaffoldResult {
   contentRelativePath: string;
 }
 
-/** Layout options for `scaffoldBlogPost`. Picks the on-disk shape. */
-export type ScaffoldLayout = 'index' | 'readme' | 'flat';
+/**
+ * Layout options for `scaffoldBlogPost`. Picks the on-disk shape.
+ * Re-exported from the lanes scaffold-path module so the layout→path
+ * contract has a single source of truth (Phase 39c-2b).
+ */
+export type ScaffoldLayout = LaneScaffoldLayout;
 
 export interface ScaffoldOptions {
   /** Override `config.author` for this post. */
@@ -170,21 +178,6 @@ export function scaffoldBlogPost(
     contentRelativePath ??
     relative(join(projectRoot, siteCfg.contentDir), filePath);
   return { filePath, relativePath, contentRelativePath: reported };
-}
-
-/** Map a ScaffoldLayout + slug to the contentDir-relative file path. */
-function layoutToContentRelativePath(
-  layout: ScaffoldLayout,
-  slug: string,
-): string {
-  switch (layout) {
-    case 'index':
-      return `${slug}/index.md`;
-    case 'readme':
-      return `${slug}/README.md`;
-    case 'flat':
-      return `${slug}.md`;
-  }
 }
 
 function buildBody(title: string, withOutline: boolean): string {

@@ -141,6 +141,11 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
         'create', 'mockups',
         '--template', 'visual-test',
         '--scaffold-default', 'markdown=content/mockups',
+        // Phase 39c-2b (sub-task b): `add --kind html-mockup` now
+        // composes artifactPath from the lane's scaffoldDefaults for
+        // THAT kind. The lane must declare an html-mockup default or
+        // the add fails loudly (no fallback).
+        '--scaffold-default', 'html-mockup=content/mockups',
         '--name', 'Mockups',
       );
       expect(laneRes.stderr).toBe('');
@@ -170,6 +175,9 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
       expect(sidecar['source']).toBe('manual');
       expect(sidecar['keywords']).toEqual([]);
       expect(sidecar['iterationByStage']).toEqual({});
+      // artifactPath composed from scaffoldDefaults[html-mockup] +
+      // default `index` layout + slug.
+      expect(sidecar['artifactPath']).toBe('content/mockups/design-x/index.md');
     },
   );
 
@@ -275,6 +283,108 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
         project, '.deskwork', 'lanes', 'default.json',
       );
       expect(existsSync(defaultLanePath)).toBe(true);
+    },
+  );
+
+  it(
+    'default --layout stamps <dir>/<slug>/index.md onto artifactPath (zero behavior change)',
+    () => {
+      // Legacy site fixture → bootstrap default lane with
+      // scaffoldDefaults.markdown = 'docs' (sites.main.contentDir).
+      const added = addCmd(project, '--slug', 'first-post', 'First post');
+      expect(added.stderr).toBe('');
+      expect(added.code).toBe(0);
+
+      const uuid = uuidFromAddOutput(project, added.stdout);
+      const sidecar = readSidecar(project, uuid);
+      expect(sidecar['artifactPath']).toBe('docs/first-post/index.md');
+    },
+  );
+
+  it(
+    '--layout flat stamps <dir>/<slug>.md; --layout readme stamps <dir>/<slug>/README.md',
+    () => {
+      const flat = addCmd(
+        project, '--slug', 'flat-post', '--layout', 'flat', 'Flat post',
+      );
+      expect(flat.stderr).toBe('');
+      expect(flat.code).toBe(0);
+      const flatUuid = uuidFromAddOutput(project, flat.stdout);
+      expect(readSidecar(project, flatUuid)['artifactPath']).toBe(
+        'docs/flat-post.md',
+      );
+
+      const readme = addCmd(
+        project, '--slug', 'readme-post', '--layout', 'readme', 'Readme post',
+      );
+      expect(readme.stderr).toBe('');
+      expect(readme.code).toBe(0);
+      const readmeUuid = uuidFromAddOutput(project, readme.stdout);
+      expect(readSidecar(project, readmeUuid)['artifactPath']).toBe(
+        'docs/readme-post/README.md',
+      );
+    },
+  );
+
+  it(
+    'rejects --layout outside {index,readme,flat} with non-zero exit and no disk mutation',
+    () => {
+      const bad = addCmd(project, '--layout', 'sidebar', 'Bad layout');
+      expect(bad.code).not.toBe(0);
+      expect(bad.stderr).toContain('sidebar');
+      expect(bad.stderr).toContain('index');
+      expect(bad.stderr).toContain('readme');
+      expect(bad.stderr).toContain('flat');
+
+      const calendarRaw = readFileSync(
+        join(project, '.deskwork', 'calendar.md'),
+        'utf-8',
+      );
+      expect(calendarRaw).not.toContain('Bad layout');
+    },
+  );
+
+  it(
+    'fails loudly when the lane has no scaffoldDefaults for the requested kind',
+    () => {
+      // A lane that scaffolds markdown but NOT html-mockup. Asking
+      // `add --kind html-mockup` must abort with an actionable error
+      // that names the lane + the kind — and leave calendar.md untouched.
+      const created = pipelineCmd(
+        project,
+        'create', 'visual-test',
+        '--shape', 'Sketched,Iterating,Approved,Shipped',
+        '--name', 'Visual test pipeline',
+        '--description', '39c-2b loud-error fixture',
+      );
+      expect(created.code).toBe(0);
+
+      const laneRes = laneCmd(
+        project,
+        'create', 'mdonly',
+        '--template', 'visual-test',
+        '--scaffold-default', 'markdown=content/md',
+        '--name', 'Markdown only',
+      );
+      expect(laneRes.code).toBe(0);
+
+      const bad = addCmd(
+        project,
+        '--lane', 'mdonly',
+        '--stage', 'Sketched',
+        '--kind', 'html-mockup',
+        'no-scaffold-default',
+      );
+      expect(bad.code).not.toBe(0);
+      expect(bad.stderr).toContain('mdonly');
+      expect(bad.stderr).toContain('html-mockup');
+
+      // No disk mutation: the calendar must not carry the rejected entry.
+      const calendarRaw = readFileSync(
+        join(project, '.deskwork', 'calendar.md'),
+        'utf-8',
+      );
+      expect(calendarRaw).not.toContain('no-scaffold-default');
     },
   );
 

@@ -6,6 +6,7 @@
  *                [--content-url URL] [--source manual|analytics]
  *                [--lane <lane-id>] [--stage <stage>]
  *                [--kind markdown|html-mockup|single-file-html|image]
+ *                [--layout index|readme|flat]
  *                <title> [description]
  *
  * Writes the calendar atomically. Emits a JSON result on stdout:
@@ -33,8 +34,17 @@ import { createFreshEntrySidecar } from '@deskwork/core/entry/create';
 import {
   bootstrapDefaultLaneIfMissing,
   loadLaneConfig,
+  composeAddArtifactPath,
+  parseScaffoldLayout,
+  SCAFFOLD_LAYOUTS,
+  DEFAULT_SCAFFOLD_LAYOUT,
 } from '@deskwork/core/lanes';
-import { ArtifactKindSchema, type ArtifactKind } from '@deskwork/core/lanes';
+import {
+  ArtifactKindSchema,
+  type ArtifactKind,
+  type LaneConfig,
+  type ScaffoldLayout,
+} from '@deskwork/core/lanes';
 import { loadPipelineTemplate } from '@deskwork/core/pipelines';
 
 const DEFAULT_LANE_ID = 'default';
@@ -50,6 +60,7 @@ export async function run(argv: string[]): Promise<void> {
     'lane',
     'stage',
     'kind',
+    'layout',
   ] as const;
   const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 
@@ -61,6 +72,7 @@ export async function run(argv: string[]): Promise<void> {
         '[--content-url URL] [--source manual|analytics] [--slug <path>] ' +
         '[--lane <lane-id>] [--stage <stage>] ' +
         '[--kind markdown|html-mockup|single-file-html|image] ' +
+        '[--layout index|readme|flat] ' +
         '<title> [description]',
       2,
     );
@@ -107,10 +119,26 @@ export async function run(argv: string[]): Promise<void> {
   // fails, the calendar.md write and sidecar write are both skipped —
   // adopting `fail` here on bad input is the same contract as `--type` /
   // `--source` / `--slug`.
-  const { laneId, currentStage, artifactKind } = await resolveLaneStageKind(
+  const { lane, laneId, currentStage, artifactKind } = await resolveLaneStageKind(
     projectRoot,
     flags,
   );
+
+  // Validate --layout BEFORE any disk mutation (same pre-write contract
+  // as --type / --source / --stage / --kind). When omitted, the global
+  // default `index` reproduces the legacy `{slug}/index.md` shape.
+  let layout: ScaffoldLayout = DEFAULT_SCAFFOLD_LAYOUT;
+  if (flags['layout'] !== undefined) {
+    const parsedLayout = parseScaffoldLayout(flags['layout']);
+    if (parsedLayout === undefined) {
+      fail(
+        `Invalid --layout "${flags['layout']}". `
+          + `Must be one of: ${SCAFFOLD_LAYOUTS.join(', ')}.`,
+        2,
+      );
+    }
+    layout = parsedLayout;
+  }
 
   const calendar = readCalendar(calendarPath);
 
@@ -123,6 +151,19 @@ export async function run(argv: string[]): Promise<void> {
       ...(flags['content-url'] !== undefined ? { contentUrl: flags['content-url'] } : {}),
       ...(flags.slug !== undefined ? { slug: flags.slug } : {}),
     });
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+
+  // Phase 39c-2b (sub-task b): compose the new entry's authoritative
+  // `artifactPath` from the lane's add-time `scaffoldDefaults[kind]`
+  // (directory) + the requested layout + the slug. Done BEFORE
+  // `writeCalendar` so a lane that declares no default for this kind
+  // fails loudly with NO disk mutation (calendar.md + sidecar both
+  // skipped) — same pre-write contract as the flag validations above.
+  let artifactPath: string;
+  try {
+    artifactPath = composeAddArtifactPath(lane, artifactKind, entry.slug, layout);
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
   }
@@ -149,6 +190,7 @@ export async function run(argv: string[]): Promise<void> {
     source,
     lane: laneId,
     artifactKind,
+    artifactPath,
   });
 
   emit({
@@ -200,7 +242,12 @@ export async function run(argv: string[]): Promise<void> {
 async function resolveLaneStageKind(
   projectRoot: string,
   flags: Record<string, string>,
-): Promise<{ laneId: string; currentStage: string; artifactKind: ArtifactKind }> {
+): Promise<{
+  lane: LaneConfig;
+  laneId: string;
+  currentStage: string;
+  artifactKind: ArtifactKind;
+}> {
   const explicitLane = flags['lane'];
   const laneId = explicitLane ?? DEFAULT_LANE_ID;
 
@@ -266,5 +313,5 @@ async function resolveLaneStageKind(
     artifactKind = parsed.data;
   }
 
-  return { laneId, currentStage, artifactKind };
+  return { lane, laneId, currentStage, artifactKind };
 }

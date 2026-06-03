@@ -26,6 +26,19 @@ export {
 
 export { detectArtifactKind } from './detection.ts';
 
+// Phase 39c-2b (sub-task b) — add-time artifactPath composition. The
+// directory comes from the lane's `scaffoldDefaults[kind]`; the on-disk
+// shape comes from the layout; the slug fills the rest. Fails loudly
+// when the lane declares no default for the requested kind.
+export {
+  composeAddArtifactPath,
+  layoutToContentRelativePath,
+  parseScaffoldLayout,
+  DEFAULT_SCAFFOLD_LAYOUT,
+  SCAFFOLD_LAYOUTS,
+  type ScaffoldLayout,
+} from './scaffold-path.ts';
+
 export {
   bootstrapDefaultLaneIfMissing,
   type BootstrapResult,
