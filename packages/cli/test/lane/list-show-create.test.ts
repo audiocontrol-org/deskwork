@@ -34,12 +34,12 @@ describe('deskwork lane list', () => {
     expect(parsed.lanes).toEqual([]);
   });
 
-  it('emits active lanes with id / name / pipelineTemplate / contentDir', () => {
+  it('emits active lanes with id / name / pipelineTemplate / scaffoldDefaults', () => {
     writeLaneJson(project, 'default', {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     const res = lane(project, 'list');
     expect(res.code).toBe(0);
@@ -65,13 +65,13 @@ describe('deskwork lane list', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     writeLaneJson(project, 'stale', {
       id: 'stale',
       name: 'Stale',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
       archivedAt: '2026-05-28T10:00:00.000Z',
     });
     const res = lane(project, 'list');
@@ -84,13 +84,13 @@ describe('deskwork lane list', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     writeLaneJson(project, 'stale', {
       id: 'stale',
       name: 'Stale',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
       archivedAt: '2026-05-28T10:00:00.000Z',
     });
     const res = lane(project, 'list', '--include-archived');
@@ -107,13 +107,13 @@ describe('deskwork lane list', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     writeLaneJson(project, 'mockups', {
       id: 'mockups',
       name: 'Mockups',
       pipelineTemplate: 'editorial',
-      contentDir: 'src/mockups',
+      scaffoldDefaults: { markdown: 'src/mockups' },
     });
     // Write a malformed lane JSON directly (bypassing writeLaneJson's
     // JSON.stringify), so the enumeration includes it but loadLaneConfig
@@ -140,7 +140,7 @@ describe('deskwork lane show', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     const res = lane(project, 'show', 'default');
     expect(res.code).toBe(0);
@@ -154,7 +154,7 @@ describe('deskwork lane show', () => {
       id: 'stale',
       name: 'Stale',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
       archivedAt: '2026-05-28T10:00:00.000Z',
     });
     const res = lane(project, 'show', 'stale');
@@ -181,12 +181,12 @@ describe('deskwork lane show', () => {
 });
 
 describe('deskwork lane create', () => {
-  it('writes a new lane config bound to the editorial preset', () => {
+  it('writes a new lane config with scaffoldDefaults from --scaffold-default', () => {
     const res = lane(
       project,
       'create', 'mockups',
       '--template', 'editorial',
-      '--content-dir', 'src/mockups',
+      '--scaffold-default', 'markdown=src/mockups',
       '--name', 'Mockups',
     );
     expect(res.stderr).toBe('');
@@ -198,7 +198,48 @@ describe('deskwork lane create', () => {
     const onDisk = readLaneJson(project, 'mockups');
     expect(onDisk['id']).toBe('mockups');
     expect(onDisk['name']).toBe('Mockups');
-    expect(onDisk['contentDir']).toBe('src/mockups');
+    // Phase 39: lanes carry no contentDir; the dir lands under
+    // scaffoldDefaults keyed by artifact kind.
+    expect(onDisk['scaffoldDefaults']).toEqual({ markdown: 'src/mockups' });
+    expect(onDisk['contentDir']).toBeUndefined();
+  });
+
+  it('accepts repeated --scaffold-default for multiple artifact kinds', () => {
+    const res = lane(
+      project,
+      'create', 'multi',
+      '--template', 'editorial',
+      '--scaffold-default', 'markdown=docs/posts',
+      '--scaffold-default', 'image=docs/images',
+    );
+    expect(res.stderr).toBe('');
+    expect(res.code).toBe(0);
+    const onDisk = readLaneJson(project, 'multi');
+    expect(onDisk['scaffoldDefaults']).toEqual({
+      markdown: 'docs/posts',
+      image: 'docs/images',
+    });
+  });
+
+  it('creates a lane with NO scaffoldDefaults (location is the entry property)', () => {
+    const res = lane(project, 'create', 'plain', '--template', 'editorial');
+    expect(res.stderr).toBe('');
+    expect(res.code).toBe(0);
+    const onDisk = readLaneJson(project, 'plain');
+    expect(onDisk['scaffoldDefaults']).toBeUndefined();
+    expect(onDisk['contentDir']).toBeUndefined();
+  });
+
+  it('records --host onto the lane when supplied', () => {
+    const res = lane(
+      project,
+      'create', 'site',
+      '--template', 'editorial',
+      '--host', 'example.com',
+    );
+    expect(res.code).toBe(0);
+    const onDisk = readLaneJson(project, 'site');
+    expect(onDisk['host']).toBe('example.com');
   });
 
   it('defaults --name to the id when omitted', () => {
@@ -206,7 +247,7 @@ describe('deskwork lane create', () => {
       project,
       'create', 'mockups',
       '--template', 'editorial',
-      '--content-dir', 'src/mockups',
+      '--scaffold-default', 'markdown=src/mockups',
     );
     expect(res.code).toBe(0);
     const onDisk = readLaneJson(project, 'mockups');
@@ -218,13 +259,13 @@ describe('deskwork lane create', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     const res = lane(
       project,
       'create', 'default',
       '--template', 'editorial',
-      '--content-dir', 'docs',
+      '--scaffold-default', 'markdown=docs',
     );
     expect(res.code).not.toBe(0);
     expect(res.stderr).toMatch(/file already exists/);
@@ -235,22 +276,42 @@ describe('deskwork lane create', () => {
       project,
       'create', 'mockups',
       '--template', 'no-such-template',
-      '--content-dir', 'src/mockups',
+      '--scaffold-default', 'markdown=src/mockups',
     );
     expect(res.code).not.toBe(0);
     expect(res.stderr).toMatch(/does not resolve|not found/);
   });
 
   it('refuses when --template is missing', () => {
-    const res = lane(project, 'create', 'mockups', '--content-dir', 'src/mockups');
+    const res = lane(
+      project,
+      'create', 'mockups',
+      '--scaffold-default', 'markdown=src/mockups',
+    );
     expect(res.code).toBe(2);
     expect(res.stderr).toMatch(/Missing required flag --template/);
   });
 
-  it('refuses when --content-dir is missing', () => {
-    const res = lane(project, 'create', 'mockups', '--template', 'editorial');
+  it('refuses a --scaffold-default with an unknown artifact kind', () => {
+    const res = lane(
+      project,
+      'create', 'mockups',
+      '--template', 'editorial',
+      '--scaffold-default', 'bogus=src/mockups',
+    );
     expect(res.code).toBe(2);
-    expect(res.stderr).toMatch(/Missing required flag --content-dir/);
+    expect(res.stderr).toMatch(/Invalid --scaffold-default kind/);
+  });
+
+  it('refuses a --scaffold-default missing the kind=dir shape', () => {
+    const res = lane(
+      project,
+      'create', 'mockups',
+      '--template', 'editorial',
+      '--scaffold-default', 'no-equals-sign',
+    );
+    expect(res.code).toBe(2);
+    expect(res.stderr).toMatch(/expected <kind>=<dir>/);
   });
 
   it('refuses lane ids that fail the kebab-case charset', () => {
@@ -258,7 +319,7 @@ describe('deskwork lane create', () => {
       project,
       'create', 'UPPER',
       '--template', 'editorial',
-      '--content-dir', 'docs',
+      '--scaffold-default', 'markdown=docs',
     );
     expect(res.code).not.toBe(0);
     expect(res.stderr).toMatch(/Invalid lane id/);
@@ -269,7 +330,7 @@ describe('deskwork lane create', () => {
       project,
       'create', 'with space',
       '--template', 'editorial',
-      '--content-dir', 'docs',
+      '--scaffold-default', 'markdown=docs',
     );
     expect(res.code).not.toBe(0);
     expect(res.stderr).toMatch(/Invalid lane id/);
@@ -280,21 +341,21 @@ describe('deskwork lane create', () => {
       project,
       'create', '../../etc/foo',
       '--template', 'editorial',
-      '--content-dir', 'docs',
+      '--scaffold-default', 'markdown=docs',
     );
     expect(res.code).not.toBe(0);
     expect(res.stderr).toMatch(/Invalid lane id/);
   });
 
-  it('refuses --content-dir that resolves outside the project root', () => {
+  it('refuses a --scaffold-default dir that resolves outside the project root', () => {
     const res = lane(
       project,
       'create', 'mockups',
       '--template', 'editorial',
-      '--content-dir', '../../tmp/foo',
+      '--scaffold-default', 'markdown=../../tmp/foo',
     );
     expect(res.code).not.toBe(0);
-    expect(res.stderr).toMatch(/Invalid contentDir/);
+    expect(res.stderr).toMatch(/Invalid scaffoldDefaults dir/);
   });
 });
 

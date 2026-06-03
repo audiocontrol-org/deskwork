@@ -28,21 +28,25 @@
  *       id: 'default'
  *       name: 'Default'
  *       pipelineTemplate: 'editorial'
- *       contentDir: <projectConfig.sites[defaultSite].contentDir>
+ *       scaffoldDefaults: { markdown: <projectConfig.sites[defaultSite].contentDir> }
  *     and appends a `lane-migration` journal event identifying the
  *     legacy site as the source. Returns
- *     `{ created: true, path: <pathWritten> }`.
+ *     `{ created: true, path: <pathWritten> }`. Per the sites→lanes
+ *     retirement (Phase 39), a lane carries NO `contentDir` — the legacy
+ *     site's content directory becomes the lane's add-time
+ *     `scaffoldDefaults` for the `markdown` kind (the editorial
+ *     pipeline's artifact kind), never identity or resolution.
  *
  * The function does NOT auto-fire from inside `loadLaneConfig`.
  * Coupling a read with a write would surprise callers; the bootstrap
  * is an explicit migration step that callers (CLI install flow,
  * studio first-boot, doctor migration) invoke when appropriate.
  *
- * The default lane's `contentDir` is written verbatim from the legacy
- * `sites.<defaultSite>.contentDir`. Path normalization (absolute vs
- * relative, trailing slashes, symlink resolution) is intentionally
- * left to doctor — the bootstrap goal is to preserve operator intent,
- * not to second-guess it.
+ * The default lane's `scaffoldDefaults.markdown` is written verbatim
+ * from the legacy `sites.<defaultSite>.contentDir`. Path normalization
+ * (absolute vs relative, trailing slashes, symlink resolution) is
+ * intentionally left to doctor — the bootstrap goal is to preserve
+ * operator intent, not to second-guess it.
  */
 
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -116,7 +120,7 @@ export async function bootstrapDefaultLaneIfMissing(
     id: 'default',
     name: 'Default',
     pipelineTemplate: 'editorial',
-    contentDir: site.contentDir,
+    scaffoldDefaults: { markdown: site.contentDir },
   };
 
   // Defensive: round-trip through the schema before writing, so the
@@ -146,9 +150,13 @@ export async function bootstrapDefaultLaneIfMissing(
       migration: 'default-lane-from-legacy-site',
       source: `sites.${defaultSiteId}`,
       target: 'lanes.default',
+      // New events emit `scaffoldDefaults` (Phase 39); the legacy
+      // `contentDir` detail key is gone from new writes. Old on-disk
+      // events that carry `contentDir` still parse — the event's
+      // `details` is a free-form `z.record(z.string(), z.unknown())`.
       details: {
         legacySiteId: defaultSiteId,
-        contentDir: site.contentDir,
+        scaffoldDefaults: { markdown: site.contentDir },
         pipelineTemplate: 'editorial',
       },
     });

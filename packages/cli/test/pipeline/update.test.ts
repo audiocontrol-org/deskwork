@@ -254,7 +254,6 @@ describe('deskwork pipeline update --remove-stage', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'my-blog',
-      contentDir: 'docs',
     });
     writeSidecar(
       project,
@@ -276,7 +275,6 @@ describe('deskwork pipeline update --remove-stage', () => {
       id: 'other',
       name: 'Other',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeSidecar(
       project,

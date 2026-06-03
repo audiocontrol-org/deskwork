@@ -7,8 +7,8 @@
  *   deskwork lane list                              — enumerate active lanes
  *   deskwork lane list --include-archived           — include archived lanes
  *   deskwork lane show <id>                         — show a single lane
- *   deskwork lane create <id> --template <id> --content-dir <path> [--name <label>]
- *   deskwork lane update <id> [--name <label>] [--template <id>] [--content-dir <path>]
+ *   deskwork lane create <id> --template <id> [--scaffold-default <kind>=<dir>]... [--host <h>] [--name <label>]
+ *   deskwork lane update <id> [--name <label>] [--template <id>] [--scaffold-default <kind>=<dir>]... [--host <h>]
  *   deskwork lane archive <id>                      — set archivedAt
  *   deskwork lane restore <id>                      — clear archivedAt
  *   deskwork lane purge <id>                        — delete the JSON (refused when entries reference it)
@@ -17,6 +17,12 @@
  * Each handler maps the parsed argv onto the matching core operation
  * and emits a structured JSON result on stdout. Errors are routed
  * through `fail` (stderr + non-zero exit).
+ *
+ * Per Phase 39 (sites→lanes retirement) a lane carries no `contentDir`.
+ * The former `--content-dir <path>` flag is replaced by the REPEATABLE
+ * `--scaffold-default <kind>=<dir>` flag (one per artifact kind the
+ * lane scaffolds). `scaffoldDefaults` is an add-time convenience only —
+ * never identity, never resolution.
  */
 
 import {
@@ -35,13 +41,17 @@ import {
   restoreLane,
   showLane,
   updateLane,
+  ArtifactKindSchema,
+  type ArtifactKind,
+  type LaneConfig,
 } from '@deskwork/core/lanes';
 import { resolveEntryUuid } from '@deskwork/core/sidecar';
 
 const KNOWN_FLAGS = [
   'template',
   'name',
-  'content-dir',
+  'scaffold-default',
+  'host',
   'to',
   'target-stage',
 ] as const;
@@ -51,15 +61,87 @@ const VERB_USAGE: Readonly<Record<string, string>> = {
   list: 'deskwork lane <project-root> list [--include-archived]',
   show: 'deskwork lane <project-root> show <id>',
   create:
-    'deskwork lane <project-root> create <id> --template <id> --content-dir <path> [--name <label>]',
+    'deskwork lane <project-root> create <id> --template <id> [--scaffold-default <kind>=<dir>]... [--host <h>] [--name <label>]',
   update:
-    'deskwork lane <project-root> update <id> [--name <label>] [--template <id>] [--content-dir <path>]',
+    'deskwork lane <project-root> update <id> [--name <label>] [--template <id>] [--scaffold-default <kind>=<dir>]... [--host <h>]',
   archive: 'deskwork lane <project-root> archive <id>',
   restore: 'deskwork lane <project-root> restore <id>',
   purge: 'deskwork lane <project-root> purge <id>',
   move:
     'deskwork lane <project-root> move <slug-or-uuid> --to <lane-id> [--target-stage <name>]',
 };
+
+/**
+ * Collect every `--scaffold-default <kind>=<dir>` occurrence from a raw
+ * argv slice into a `Partial<Record<ArtifactKind, string>>`. The flag
+ * is REPEATABLE — `parseArgs` collapses repeated flags (last-wins), so
+ * the raw argv is scanned directly to honor every occurrence.
+ *
+ * Accepts both `--scaffold-default kind=dir` (two tokens) and
+ * `--scaffold-default=kind=dir` (single token) shapes. Throws a
+ * descriptive error on a malformed pair (missing `=`, unknown kind,
+ * empty dir, duplicate kind).
+ *
+ * Returns `undefined` when no occurrence is present so callers can omit
+ * the field entirely.
+ */
+function collectScaffoldDefaults(
+  argv: readonly string[],
+): Partial<Record<ArtifactKind, string>> | undefined {
+  const out: Partial<Record<ArtifactKind, string>> = {};
+  let seen = false;
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    let pair: string | undefined;
+    if (token === '--scaffold-default') {
+      pair = argv[i + 1];
+      i++;
+    } else if (token.startsWith('--scaffold-default=')) {
+      pair = token.slice('--scaffold-default='.length);
+    } else {
+      continue;
+    }
+    if (pair === undefined || pair.startsWith('--')) {
+      fail('Flag --scaffold-default requires a <kind>=<dir> value', 2);
+    }
+    const eq = pair.indexOf('=');
+    if (eq < 0) {
+      fail(
+        `Invalid --scaffold-default value ${JSON.stringify(pair)}: `
+          + 'expected <kind>=<dir>.',
+        2,
+      );
+    }
+    const kindRaw = pair.slice(0, eq);
+    const dir = pair.slice(eq + 1);
+    const kindResult = ArtifactKindSchema.safeParse(kindRaw);
+    if (!kindResult.success) {
+      fail(
+        `Invalid --scaffold-default kind ${JSON.stringify(kindRaw)}: `
+          + `must be one of ${ArtifactKindSchema.options.join(', ')}.`,
+        2,
+      );
+    }
+    if (dir.length === 0) {
+      fail(
+        `Invalid --scaffold-default value ${JSON.stringify(pair)}: `
+          + 'directory must be non-empty.',
+        2,
+      );
+    }
+    const kind = kindResult.data;
+    if (out[kind] !== undefined) {
+      fail(
+        `Duplicate --scaffold-default kind ${JSON.stringify(kind)}: `
+          + 'each artifact kind may be set at most once.',
+        2,
+      );
+    }
+    out[kind] = dir;
+    seen = true;
+  }
+  return seen ? out : undefined;
+}
 
 function genericUsage(): never {
   fail(
@@ -98,10 +180,10 @@ export async function run(argv: string[]): Promise<void> {
       await handleShow(projectRoot, rest);
       return;
     case 'create':
-      await handleCreate(projectRoot, rest, flags);
+      await handleCreate(projectRoot, rest, flags, collectScaffoldDefaults(argv));
       return;
     case 'update':
-      await handleUpdate(projectRoot, rest, flags);
+      await handleUpdate(projectRoot, rest, flags, collectScaffoldDefaults(argv));
       return;
     case 'archive':
       await handleArchive(projectRoot, rest);
@@ -141,7 +223,10 @@ async function handleList(
         id: entry.id,
         name: entry.config.name,
         pipelineTemplate: entry.config.pipelineTemplate,
-        contentDir: entry.config.contentDir,
+        ...(entry.config.scaffoldDefaults !== undefined && {
+          scaffoldDefaults: entry.config.scaffoldDefaults,
+        }),
+        ...(entry.config.host !== undefined && { host: entry.config.host }),
         archived: entry.archived,
         ...(entry.config.archivedAt !== undefined && {
           archivedAt: entry.config.archivedAt,
@@ -163,10 +248,7 @@ async function handleShow(projectRoot: string, rest: string[]): Promise<void> {
   try {
     const lane = showLane(projectRoot, id);
     emit({
-      id: lane.id,
-      name: lane.name,
-      pipelineTemplate: lane.pipelineTemplate,
-      contentDir: lane.contentDir,
+      ...laneFields(lane),
       archived:
         typeof lane.archivedAt === 'string' && lane.archivedAt.length > 0,
       ...(lane.archivedAt !== undefined && { archivedAt: lane.archivedAt }),
@@ -179,19 +261,19 @@ async function handleShow(projectRoot: string, rest: string[]): Promise<void> {
 /**
  * Shared envelope for create / update / show emit payloads. Keeps the
  * key set named once so adding e.g. a `description` field to a lane
- * shows up in every read/write surface together.
+ * shows up in every read/write surface together. Per Phase 39 a lane
+ * has no `contentDir`; the optional `scaffoldDefaults` / `host` fields
+ * render only when present.
  */
-function laneFields(lane: {
-  id: string;
-  name: string;
-  pipelineTemplate: string;
-  contentDir: string;
-}): Record<string, string> {
+function laneFields(lane: LaneConfig): Record<string, unknown> {
   return {
     id: lane.id,
     name: lane.name,
     pipelineTemplate: lane.pipelineTemplate,
-    contentDir: lane.contentDir,
+    ...(lane.scaffoldDefaults !== undefined && {
+      scaffoldDefaults: lane.scaffoldDefaults,
+    }),
+    ...(lane.host !== undefined && { host: lane.host }),
   };
 }
 
@@ -199,17 +281,14 @@ async function handleCreate(
   projectRoot: string,
   rest: string[],
   flags: Record<string, string>,
+  scaffoldDefaults: Partial<Record<ArtifactKind, string>> | undefined,
 ): Promise<void> {
   if (rest.length < 1) verbUsage('create');
   const [id] = rest;
   if (flags['template'] === undefined) {
     fail('Missing required flag --template <pipeline-id>', 2);
   }
-  if (flags['content-dir'] === undefined) {
-    fail('Missing required flag --content-dir <path>', 2);
-  }
   const template = flags['template'];
-  const contentDir = flags['content-dir'];
   const name = flags['name'] ?? id;
 
   try {
@@ -217,7 +296,8 @@ async function handleCreate(
       id,
       name,
       pipelineTemplate: template,
-      contentDir,
+      ...(scaffoldDefaults !== undefined && { scaffoldDefaults }),
+      ...(flags['host'] !== undefined && { host: flags['host'] }),
     });
     emit({
       created: true,
@@ -233,6 +313,7 @@ async function handleUpdate(
   projectRoot: string,
   rest: string[],
   flags: Record<string, string>,
+  scaffoldDefaults: Partial<Record<ArtifactKind, string>> | undefined,
 ): Promise<void> {
   if (rest.length < 1) verbUsage('update');
   const [id] = rest;
@@ -244,9 +325,8 @@ async function handleUpdate(
       ...(flags['template'] !== undefined && {
         pipelineTemplate: flags['template'],
       }),
-      ...(flags['content-dir'] !== undefined && {
-        contentDir: flags['content-dir'],
-      }),
+      ...(scaffoldDefaults !== undefined && { scaffoldDefaults }),
+      ...(flags['host'] !== undefined && { host: flags['host'] }),
     });
     emit({
       updated: true,

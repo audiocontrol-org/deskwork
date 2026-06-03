@@ -9,23 +9,23 @@
  *                                  the key schema is the ArtifactKind enum).
  *
  * The schema stays `.strict()`, so an unknown TOP-LEVEL key still fails parse.
- * `contentDir` is intentionally retained in 39a (removed in 39c); the
- * `makeLane` helper keeps it present so these tests stay green across 39a.
+ * `contentDir` was removed from the lane in Phase 39c; the `makeLane` helper
+ * no longer includes it (a lane carrying `contentDir` now fails parse — see
+ * `types.test.ts` for that rejection case).
  */
 
 import { describe, it, expect } from 'vitest';
 import { LaneConfigSchema } from '../../src/lanes/types.ts';
 
 /**
- * Minimally-valid lane config, optionally overriding any field. `contentDir`
- * stays present per 39a (its removal is 39c's job).
+ * Minimally-valid lane config, optionally overriding any field. A lane
+ * carries NO `contentDir` (Phase 39c sites→lanes retirement).
  */
 function makeLane(overrides: Record<string, unknown> = {}): unknown {
   return {
     id: 'default',
     name: 'Default',
     pipelineTemplate: 'editorial',
-    contentDir: 'docs',
     ...overrides,
   };
 }

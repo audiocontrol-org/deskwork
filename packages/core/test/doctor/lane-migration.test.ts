@@ -110,7 +110,9 @@ describe('migrateLaneMembership', () => {
     const lane = JSON.parse(laneRaw);
     expect(lane.id).toBe('default');
     expect(lane.pipelineTemplate).toBe('editorial');
-    expect(lane.contentDir).toBe('docs');
+    // Phase 39: the bootstrapped lane carries no contentDir — the legacy
+    // site dir becomes the add-time scaffoldDefaults.markdown.
+    expect(lane.scaffoldDefaults).toEqual({ markdown: 'docs' });
 
     // Sidecars carry lane + artifactKind.
     const after1 = await readSidecar(root, u1);

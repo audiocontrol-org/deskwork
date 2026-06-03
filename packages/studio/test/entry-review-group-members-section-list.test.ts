@@ -53,7 +53,7 @@ function makeEntry(overrides: Partial<Entry> & Pick<Entry, 'uuid' | 'slug' | 'ti
 function writeLaneConfig(root: string, id: string, name: string, pipeline: string, contentDir: string): Promise<void> {
   return writeFile(
     join(root, '.deskwork', 'lanes', `${id}.json`),
-    JSON.stringify({ id, name, pipelineTemplate: pipeline, contentDir }, null, 2),
+    JSON.stringify({ id, name, pipelineTemplate: pipeline, scaffoldDefaults: { markdown: contentDir } }, null, 2),
   );
 }
 

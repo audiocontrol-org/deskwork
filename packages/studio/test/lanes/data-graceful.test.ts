@@ -45,7 +45,7 @@ function writeHealthyLane(
     id,
     name: id,
     pipelineTemplate,
-    contentDir: id,
+    scaffoldDefaults: { markdown: id },
   });
 }
 
@@ -90,7 +90,6 @@ describe('loadLanesPageData — graceful degradation on malformed lane config', 
     writeLaneJson(root, 'noname-lane', {
       id: 'noname-lane',
       pipelineTemplate: 'editorial',
-      contentDir: 'noname',
     });
 
     const data = await loadLanesPageData(root);
@@ -107,7 +106,6 @@ describe('loadLanesPageData — graceful degradation on malformed lane config', 
       id: 'inside-name',
       name: 'Misnamed',
       pipelineTemplate: 'editorial',
-      contentDir: 'misnamed',
     });
 
     const data = await loadLanesPageData(root);
@@ -123,7 +121,6 @@ describe('loadLanesPageData — graceful degradation on malformed lane config', 
       id: 'orphan-pipeline-lane',
       name: 'Orphan',
       pipelineTemplate: 'does-not-exist',
-      contentDir: 'orphan',
     });
 
     const data = await loadLanesPageData(root);

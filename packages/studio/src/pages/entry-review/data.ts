@@ -294,11 +294,17 @@ async function loadGroupMembersBundle(
       if (!usedLaneIds.has(laneId)) continue;
       try {
         const config = loadLaneConfig(laneId, projectRoot);
+        // Phase 39 (sites→lanes retirement): a lane carries no
+        // contentDir. Project the runtime-contract fields; scaffoldDefaults
+        // / host are optional and copied only when present.
         const strict: LaneConfig = {
           id: config.id,
           name: config.name,
           pipelineTemplate: config.pipelineTemplate,
-          contentDir: config.contentDir,
+          ...(config.scaffoldDefaults !== undefined && {
+            scaffoldDefaults: config.scaffoldDefaults,
+          }),
+          ...(config.host !== undefined && { host: config.host }),
         };
         // Load template FIRST; only register the lane once the
         // template-side load succeeds. If the template load throws,

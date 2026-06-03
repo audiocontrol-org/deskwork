@@ -43,7 +43,6 @@ describe('resolveEntryTemplate', () => {
         id: 'mockups',
         name: 'Mockups',
         pipelineTemplate: 'visual',
-        contentDir: 'mockups',
       }),
     );
     const entry = baseEntry({ lane: 'mockups', currentStage: 'Sketched' });

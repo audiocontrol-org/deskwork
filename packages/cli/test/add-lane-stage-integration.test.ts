@@ -140,7 +140,7 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
         project,
         'create', 'mockups',
         '--template', 'visual-test',
-        '--content-dir', 'content/mockups',
+        '--scaffold-default', 'markdown=content/mockups',
         '--name', 'Mockups',
       );
       expect(laneRes.stderr).toBe('');
@@ -190,7 +190,7 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
         project,
         'create', 'mockups',
         '--template', 'visual-test',
-        '--content-dir', 'content/mockups',
+        '--scaffold-default', 'markdown=content/mockups',
         '--name', 'Mockups',
       );
       expect(laneRes.code).toBe(0);
@@ -295,7 +295,7 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
         project,
         'create', 'mockups',
         '--template', 'visual-test',
-        '--content-dir', 'content/mockups',
+        '--scaffold-default', 'markdown=content/mockups',
         '--name', 'Mockups',
       );
       expect(laneRes.code).toBe(0);

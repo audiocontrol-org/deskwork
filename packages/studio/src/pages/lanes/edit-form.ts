@@ -9,11 +9,16 @@
  * The form is a CLIENT-SIDE copy-builder. Per THESIS Consequence 2
  * the studio never mutates state — the form's copy button produces
  * `/deskwork:lane update <id> [--name <label>] [--template <id>]
- * [--content-dir <path>]` with ONLY the fields that differ from
- * the current lane config. The client controller in `lanes-page.ts`
- * compares the form's live values against `data-current-*`
- * attributes on each field and rebuilds the slash command on
- * every change event.
+ * [--scaffold-default markdown=<dir>] [--host <h>]` with ONLY the
+ * fields that differ from the current lane config. The client
+ * controller in `lanes-page.ts` compares the form's live values
+ * against `data-current-*` attributes on each field and rebuilds the
+ * slash command on every change event.
+ *
+ * Per Phase 39 (sites→lanes retirement) a lane carries no `contentDir`;
+ * the former content-dir input becomes the lane's add-time
+ * `scaffoldDefaults.markdown` directory (the editorial pipeline's
+ * artifact kind) plus an optional `host` input.
  *
  * The lane's `id` is immutable (per Task 6.1's CLI contract); the
  * form does not present an id field.
@@ -46,7 +51,8 @@ export function renderEditForm(
           Edit <code>${row.id}</code>
         </h3>
         <p class="lanes-form-desc">
-          Mutate <code>name</code> / <code>template</code> / <code>contentDir</code>.
+          Mutate <code>name</code> / <code>template</code> /
+          <code>scaffoldDefaults.markdown</code> / <code>host</code>.
           The slash command below carries only the fields that changed.
         </p>
       </header>
@@ -75,14 +81,27 @@ export function renderEditForm(
           </select>
         </label>
         <label class="lanes-field">
-          <span class="lanes-field-label">Content dir</span>
+          <span class="lanes-field-label">Scaffold default (markdown)</span>
           <input
             class="lanes-input"
             type="text"
-            name="contentDir"
-            data-lanes-field="contentDir"
-            data-current="${row.contentDir}"
-            value="${row.contentDir}"
+            name="scaffoldMarkdown"
+            data-lanes-field="scaffoldMarkdown"
+            data-current="${row.scaffoldDefaults['markdown'] ?? ''}"
+            value="${row.scaffoldDefaults['markdown'] ?? ''}"
+            autocomplete="off"
+            spellcheck="false"
+          >
+        </label>
+        <label class="lanes-field">
+          <span class="lanes-field-label">Host (optional)</span>
+          <input
+            class="lanes-input"
+            type="text"
+            name="host"
+            data-lanes-field="host"
+            data-current="${row.host ?? ''}"
+            value="${row.host ?? ''}"
             autocomplete="off"
             spellcheck="false"
           >

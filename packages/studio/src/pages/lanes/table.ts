@@ -2,8 +2,10 @@
  * Lane-table renderer for `/dev/lanes` (Phase 6 Task 6.3).
  *
  * Renders the active-lane table: one row per lane with id, name,
- * bound pipeline template, contentDir, entry count, plus per-row
- * Edit / Archive buttons and a reorder handle.
+ * bound pipeline template, scaffold defaults, entry count, plus
+ * per-row Edit / Archive buttons and a reorder handle. Per Phase 39
+ * (sites→lanes retirement) a lane carries no `contentDir`; the column
+ * surfaces the lane's add-time `scaffoldDefaults` instead.
  *
  * Per `.claude/rules/affordance-placement.md`, the row's controls
  * live ON the row (component-attached, not toolbar-attached) —
@@ -98,7 +100,7 @@ function renderTableRow(
       <td class="lanes-cell lanes-cell--id"><code>${row.id}</code></td>
       <td class="lanes-cell lanes-cell--name">${row.name}</td>
       <td class="lanes-cell lanes-cell--template"><code>${row.pipelineTemplate}</code></td>
-      <td class="lanes-cell lanes-cell--content-dir"><code>${row.contentDir}</code></td>
+      <td class="lanes-cell lanes-cell--scaffold-defaults">${renderScaffoldDefaults(row.scaffoldDefaults)}</td>
       <td class="lanes-cell lanes-cell--count">${row.entryCount}</td>
       <td class="lanes-cell lanes-cell--visibility">
         <span
@@ -125,6 +127,26 @@ function renderTableRow(
         ${renderEditForm(row, availableTemplates)}
       </td>
     </tr>`);
+}
+
+/**
+ * Render a lane's add-time `scaffoldDefaults` as a compact list of
+ * `<kind> → <dir>` pairs. Empty map renders an em-dash so the column
+ * still communicates "no scaffold defaults configured" rather than a
+ * blank cell. Per Phase 39 this replaces the former content-dir cell.
+ */
+function renderScaffoldDefaults(
+  scaffoldDefaults: Readonly<Record<string, string>>,
+): RawHtml {
+  const entries = Object.entries(scaffoldDefaults);
+  if (entries.length === 0) {
+    return unsafe(html`<span class="lanes-scaffold-empty" aria-label="No scaffold defaults">—</span>`);
+  }
+  const items = entries.map(
+    ([kind, dir]) =>
+      unsafe(html`<li class="lanes-scaffold-item"><code class="lanes-scaffold-kind">${kind}</code> → <code class="lanes-scaffold-dir">${dir}</code></li>`),
+  );
+  return unsafe(html`<ul class="lanes-scaffold-list">${items}</ul>`);
 }
 
 interface CopyButtonInput {
@@ -258,7 +280,7 @@ function renderHeadRow(): RawHtml {
       <th class="lanes-th lanes-th--id" scope="col">ID</th>
       <th class="lanes-th lanes-th--name" scope="col">Name</th>
       <th class="lanes-th lanes-th--template" scope="col">Template</th>
-      <th class="lanes-th lanes-th--content-dir" scope="col">Content dir</th>
+      <th class="lanes-th lanes-th--scaffold-defaults" scope="col">Scaffold defaults</th>
       <th class="lanes-th lanes-th--count" scope="col">Entries</th>
       <th class="lanes-th lanes-th--visibility" scope="col">State</th>
       <th class="lanes-th lanes-th--actions" scope="col">Actions</th>

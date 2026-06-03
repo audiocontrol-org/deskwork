@@ -21,9 +21,10 @@
  * is bypassed.
  *
  * Required fields for `/deskwork:lane create <id> --template
- * <template> --content-dir <path>`: `id`, `template`, `contentDir`.
- * The `name` flag is optional (only emitted when filled) per
- * `buildCreateCommand` in `lanes-page.ts`.
+ * <template>`: `id`, `template`. Per Phase 39 (sites→lanes retirement)
+ * a lane carries no contentDir; the scaffold-default (markdown) and host
+ * flags are OPTIONAL (only emitted when filled) per `buildCreateCommand`
+ * in `lanes-page.ts`. The `name` flag is likewise optional.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -65,9 +66,12 @@ function buildNewForm(
   }
   form.appendChild(select);
 
-  const contentDir = document.createElement('input');
-  contentDir.dataset.lanesField = 'contentDir';
-  form.appendChild(contentDir);
+  const scaffoldMarkdown = document.createElement('input');
+  scaffoldMarkdown.dataset.lanesField = 'scaffoldMarkdown';
+  form.appendChild(scaffoldMarkdown);
+  const host = document.createElement('input');
+  host.dataset.lanesField = 'host';
+  form.appendChild(host);
 
   const preview = document.createElement('code');
   preview.dataset.lanesPreview = '';
@@ -125,7 +129,7 @@ describe('lanes-page client controller — Copy-button validation (AUDIT-2026053
     vi.restoreAllMocks();
   });
 
-  it('New form: Copy disables + inline notice when all required fields (id, template, contentDir) are empty', async () => {
+  it('New form: Copy disables + inline notice when required fields (id, template) are empty', async () => {
     const container = buildContainer();
     const form = buildNewForm(container, ['editorial', 'visual']);
     const { calls } = installClipboardStub();
@@ -143,11 +147,11 @@ describe('lanes-page client controller — Copy-button validation (AUDIT-2026053
     expect(notice).not.toBeNull();
     expect(notice!.hidden).toBe(false);
     // The notice names the missing required fields so the operator
-    // knows exactly which inputs to fill.
+    // knows exactly which inputs to fill. Phase 39: only id + template
+    // are required (scaffold default + host are optional).
     expect(notice!.textContent).toContain('Fill required');
     expect(notice!.textContent).toContain('id');
     expect(notice!.textContent).toContain('template');
-    expect(notice!.textContent).toContain('content-dir');
 
     // Defense-in-depth: synthetic click on the disabled button must
     // not clipboard the placeholder-bearing command.
@@ -157,7 +161,7 @@ describe('lanes-page client controller — Copy-button validation (AUDIT-2026053
     expect(calls.length).toBe(0);
   });
 
-  it('New form: filling only id leaves Copy disabled (template + contentDir still required)', () => {
+  it('New form: filling only id leaves Copy disabled (template still required)', () => {
     const container = buildContainer();
     const form = buildNewForm(container, ['editorial', 'visual']);
     initLanesPage();
@@ -176,11 +180,10 @@ describe('lanes-page client controller — Copy-button validation (AUDIT-2026053
       '[data-lanes-copy-notice]',
     );
     expect(notice!.textContent).toContain('template');
-    expect(notice!.textContent).toContain('content-dir');
     expect(notice!.textContent).not.toContain(' id ');
   });
 
-  it('New form: filling id + template leaves Copy disabled (contentDir still required)', () => {
+  it('New form: filling id + template ENABLES Copy (scaffold default is optional in Phase 39)', () => {
     const container = buildContainer();
     const form = buildNewForm(container, ['editorial', 'visual']);
     initLanesPage();
@@ -200,14 +203,16 @@ describe('lanes-page client controller — Copy-button validation (AUDIT-2026053
     const copy = form.querySelector<HTMLButtonElement>(
       '[data-lanes-copy-button="new"]',
     )!;
-    expect(copy.disabled).toBe(true);
+    // Phase 39: a lane carries no contentDir; the scaffold default is
+    // optional, so id + template is a complete, valid create command.
+    expect(copy.disabled).toBe(false);
     const notice = copy.parentElement!.querySelector<HTMLElement>(
       '[data-lanes-copy-notice]',
     );
-    expect(notice!.textContent).toContain('content-dir');
+    expect(notice!.hidden).toBe(true);
   });
 
-  it('New form: filling all required fields enables Copy + hides notice + clipboard works', async () => {
+  it('New form: filling required fields + optional scaffold enables Copy + hides notice + clipboard works', async () => {
     const container = buildContainer();
     const form = buildNewForm(container, ['editorial', 'visual']);
     const { calls } = installClipboardStub();
@@ -225,11 +230,11 @@ describe('lanes-page client controller — Copy-button validation (AUDIT-2026053
     select.value = 'visual';
     select.dispatchEvent(changeEvent());
 
-    const contentDir = form.querySelector<HTMLInputElement>(
-      '[data-lanes-field="contentDir"]',
+    const scaffold = form.querySelector<HTMLInputElement>(
+      '[data-lanes-field="scaffoldMarkdown"]',
     )!;
-    contentDir.value = 'mockups';
-    contentDir.dispatchEvent(inputEvent());
+    scaffold.value = 'mockups';
+    scaffold.dispatchEvent(inputEvent());
 
     const copy = form.querySelector<HTMLButtonElement>(
       '[data-lanes-copy-button="new"]',
@@ -246,16 +251,15 @@ describe('lanes-page client controller — Copy-button validation (AUDIT-2026053
     await Promise.resolve();
     expect(calls.length).toBe(1);
     expect(calls[0]).toContain(
-      '/deskwork:lane create "mockups" --template "visual" --content-dir "mockups"',
+      '/deskwork:lane create "mockups" --template "visual" --scaffold-default "markdown=mockups"',
     );
     // The clipboard payload must NEVER contain the placeholder
     // angle-brackets — those are preview-only shape, not valid args.
     expect(calls[0]).not.toContain('<id>');
     expect(calls[0]).not.toContain('<template>');
-    expect(calls[0]).not.toContain('<path>');
   });
 
-  it('New form: re-emptying a required field after fill re-disables Copy + re-shows notice', () => {
+  it('New form: re-emptying a REQUIRED field after fill re-disables Copy + re-shows notice', () => {
     const container = buildContainer();
     const form = buildNewForm(container, ['editorial', 'visual']);
     initLanesPage();
@@ -270,25 +274,20 @@ describe('lanes-page client controller — Copy-button validation (AUDIT-2026053
     )!;
     select.value = 'visual';
     select.dispatchEvent(changeEvent());
-    const contentDir = form.querySelector<HTMLInputElement>(
-      '[data-lanes-field="contentDir"]',
-    )!;
-    contentDir.value = 'mockups';
-    contentDir.dispatchEvent(inputEvent());
 
     const copy = form.querySelector<HTMLButtonElement>(
       '[data-lanes-copy-button="new"]',
     )!;
     expect(copy.disabled).toBe(false);
 
-    // Clear contentDir — Copy must re-disable.
-    contentDir.value = '';
-    contentDir.dispatchEvent(inputEvent());
+    // Clear the id (a required field) — Copy must re-disable.
+    idInput.value = '';
+    idInput.dispatchEvent(inputEvent());
     expect(copy.disabled).toBe(true);
     const notice = copy.parentElement!.querySelector<HTMLElement>(
       '[data-lanes-copy-notice]',
     );
     expect(notice!.hidden).toBe(false);
-    expect(notice!.textContent).toContain('content-dir');
+    expect(notice!.textContent).toContain('id');
   });
 });

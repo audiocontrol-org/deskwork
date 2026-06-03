@@ -2,9 +2,12 @@
  * lane update — mutate a subset of fields on an existing lane config.
  *
  * Phase 6 Task 6.1 (graphical-entries). Accepts optional patches for
- * `name`, `pipelineTemplate`, and `contentDir`. The lane's `id`
- * cannot change (it's the filename). The `archivedAt` field is owned
- * by `archive` / `restore` and is not mutable through `update`.
+ * `name`, `pipelineTemplate`, `scaffoldDefaults`, and `host`. The
+ * lane's `id` cannot change (it's the filename). The `archivedAt`
+ * field is owned by `archive` / `restore` and is not mutable through
+ * `update`. Per Phase 39 (sites→lanes retirement) a lane carries no
+ * `contentDir` — the former `--content-dir` patch is replaced by
+ * `scaffoldDefaults` (add-time directories, keyed by artifact kind).
  *
  * Cross-validation:
  *   - If `pipelineTemplate` is patched, the new template MUST resolve
@@ -22,15 +25,22 @@
 
 import { appendJournalEvent } from '../../journal/append.ts';
 import { loadPipelineTemplate } from '../../pipelines/loader.ts';
-import { assertSafeContentDir, loadLaneConfig } from '../loader.ts';
-import { type LaneConfig } from '../types.ts';
+import { assertSafeScaffoldDir, loadLaneConfig } from '../loader.ts';
+import { type ArtifactKind, type LaneConfig } from '../types.ts';
 import { commitLaneConfig } from './commit.ts';
 
 export interface UpdateLaneOptions {
   readonly id: string;
   readonly name?: string;
   readonly pipelineTemplate?: string;
-  readonly contentDir?: string;
+  /**
+   * Replacement scaffold-default directories, keyed by artifact kind.
+   * Replaces the whole `scaffoldDefaults` map when supplied (a lane
+   * carries no `contentDir` — Phase 39 sites→lanes retirement).
+   */
+  readonly scaffoldDefaults?: Partial<Record<ArtifactKind, string>>;
+  /** Replacement website host. */
+  readonly host?: string;
 }
 
 export interface UpdateLaneResult {
@@ -45,33 +55,39 @@ export async function updateLane(
 ): Promise<UpdateLaneResult> {
   const existing = loadLaneConfig(opts.id, projectRoot);
 
-  const patches: Record<string, string> = {};
+  const patches: Record<string, unknown> = {};
   if (opts.name !== undefined) patches['name'] = opts.name;
   if (opts.pipelineTemplate !== undefined) {
     patches['pipelineTemplate'] = opts.pipelineTemplate;
   }
-  if (opts.contentDir !== undefined) {
-    assertSafeContentDir(projectRoot, opts.contentDir);
-    patches['contentDir'] = opts.contentDir;
+  if (opts.scaffoldDefaults !== undefined) {
+    for (const dir of Object.values(opts.scaffoldDefaults)) {
+      if (dir !== undefined) assertSafeScaffoldDir(projectRoot, dir);
+    }
+    patches['scaffoldDefaults'] = opts.scaffoldDefaults;
+  }
+  if (opts.host !== undefined) {
+    patches['host'] = opts.host;
   }
 
   const changedFields = Object.keys(patches);
   if (changedFields.length === 0) {
     throw new Error(
       `Cannot update lane "${opts.id}": no patch fields supplied. `
-      + `Pass at least one of --name, --template, --content-dir.`,
+      + `Pass at least one of --name, --template, --scaffold-default, --host.`,
     );
   }
 
   // Cross-validate the patched pipeline template up front so we don't
   // half-write a broken lane.
-  if (patches['pipelineTemplate'] !== undefined) {
+  const patchedTemplate = patches['pipelineTemplate'];
+  if (typeof patchedTemplate === 'string') {
     try {
-      loadPipelineTemplate(patches['pipelineTemplate'], projectRoot);
+      loadPipelineTemplate(patchedTemplate, projectRoot);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       throw new Error(
-        `Cannot update lane "${opts.id}": pipelineTemplate "${patches['pipelineTemplate']}" `
+        `Cannot update lane "${opts.id}": pipelineTemplate "${patchedTemplate}" `
         + `does not resolve:\n${detail}`,
       );
     }
@@ -88,9 +104,19 @@ export async function updateLane(
     after[field] = patches[field];
   }
 
+  // Build the patched lane from typed options rather than spreading the
+  // `unknown`-valued `patches` bag, so the merge stays type-safe (no
+  // `as` cast). `commitLaneConfig` re-validates the result via Zod.
   const updated: LaneConfig = {
     ...existing,
-    ...patches,
+    ...(opts.name !== undefined && { name: opts.name }),
+    ...(opts.pipelineTemplate !== undefined && {
+      pipelineTemplate: opts.pipelineTemplate,
+    }),
+    ...(opts.scaffoldDefaults !== undefined && {
+      scaffoldDefaults: opts.scaffoldDefaults,
+    }),
+    ...(opts.host !== undefined && { host: opts.host }),
   };
 
   const { lane, path } = commitLaneConfig(projectRoot, opts.id, updated, 'update');

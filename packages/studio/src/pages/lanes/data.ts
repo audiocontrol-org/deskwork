@@ -56,7 +56,16 @@ export interface LaneRow {
   readonly id: string;
   readonly name: string;
   readonly pipelineTemplate: string;
-  readonly contentDir: string;
+  /**
+   * Add-time scaffold directories keyed by artifact kind. Per Phase 39
+   * (sites→lanes retirement) a lane carries no `contentDir`; this is the
+   * lane's only location-adjacent metadata and is an add-time
+   * convenience only — never identity, never resolution. Empty object
+   * when the lane defines no scaffold defaults.
+   */
+  readonly scaffoldDefaults: Readonly<Record<string, string>>;
+  /** Website host — present only when the lane publishes a site. */
+  readonly host: string | null;
   readonly archived: boolean;
   readonly archivedAt: string | null;
   readonly entryCount: number;
@@ -133,6 +142,22 @@ export interface LanesPageData {
   readonly availableTemplates: readonly string[];
 }
 
+/**
+ * Normalize a lane's optional `scaffoldDefaults` (a partial map that may
+ * carry `undefined` values) into a plain `Record<string, string>`
+ * dropping any undefined entries — the renderer-facing shape.
+ */
+function normalizeScaffoldDefaults(
+  scaffoldDefaults: LaneConfig['scaffoldDefaults'],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (scaffoldDefaults === undefined) return out;
+  for (const [kind, dir] of Object.entries(scaffoldDefaults)) {
+    if (typeof dir === 'string' && dir.length > 0) out[kind] = dir;
+  }
+  return out;
+}
+
 function laneRowFromConfig(
   id: string,
   config: LaneConfig,
@@ -146,7 +171,11 @@ function laneRowFromConfig(
     id,
     name: config.name,
     pipelineTemplate: config.pipelineTemplate,
-    contentDir: config.contentDir,
+    scaffoldDefaults: normalizeScaffoldDefaults(config.scaffoldDefaults),
+    host:
+      typeof config.host === 'string' && config.host.length > 0
+        ? config.host
+        : null,
     archived: archivedAt !== null,
     archivedAt,
     entryCount,

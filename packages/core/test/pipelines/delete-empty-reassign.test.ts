@@ -80,7 +80,6 @@ function writeDefaultLane(projectRoot: string, pipelineTemplate: string): void {
         id: 'default',
         name: 'Default',
         pipelineTemplate,
-        contentDir: 'docs',
       },
       null,
       2,

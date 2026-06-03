@@ -116,10 +116,10 @@ function laneFromSite(slug: string, site: LegacySite): LaneConfig {
     id: slug,
     name: slug,
     pipelineTemplate: MIGRATION_PIPELINE_TEMPLATE,
-    // `contentDir` is still required by the 39b schema (removed in 39c).
-    // Write it from the legacy site verbatim so the file validates; the
-    // authoritative location info is the new `scaffoldDefaults`.
-    contentDir: site.contentDir,
+    // Per Phase 39c the lane carries no `contentDir` — the legacy site's
+    // content directory becomes the lane's add-time `scaffoldDefaults`
+    // (the `markdown` kind, the editorial pipeline's artifact kind).
+    // Location info is the ENTRY's `artifactPath`, never the lane.
     scaffoldDefaults: { markdown: site.contentDir },
     ...(site.host !== undefined ? { host: site.host } : {}),
   };

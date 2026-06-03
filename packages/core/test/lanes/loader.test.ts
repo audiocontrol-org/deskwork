@@ -43,13 +43,13 @@ describe('loadLaneConfig', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     const lane = loadLaneConfig('default', projectRoot);
     expect(lane.id).toBe('default');
     expect(lane.name).toBe('Default');
     expect(lane.pipelineTemplate).toBe('editorial');
-    expect(lane.contentDir).toBe('docs');
+    expect(lane.scaffoldDefaults).toEqual({ markdown: 'docs' });
   });
 
   it('passes through unknown extra fields (e.g. $rationale)', () => {
@@ -58,7 +58,7 @@ describe('loadLaneConfig', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     const lane = loadLaneConfig('default', projectRoot);
     expect(lane.id).toBe('default');
@@ -91,7 +91,6 @@ describe('loadLaneConfig', () => {
       id: 'default',
       name: 'Default',
       // pipelineTemplate missing — required
-      contentDir: 'docs',
     });
     expect(() => loadLaneConfig('default', projectRoot))
       .toThrow(/failed Zod validation/);
@@ -102,7 +101,6 @@ describe('loadLaneConfig', () => {
       id: 'mockups',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     expect(() => loadLaneConfig('default', projectRoot))
       .toThrow(/declares id "mockups" but was loaded as "default"/);
@@ -113,7 +111,6 @@ describe('loadLaneConfig', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'does-not-exist',
-      contentDir: 'docs',
     });
     expect(() => loadLaneConfig('default', projectRoot))
       .toThrow(/references pipelineTemplate "does-not-exist"/);
@@ -168,7 +165,6 @@ describe('loadLaneConfig', () => {
       id: 'mockups',
       name: 'Mockups',
       pipelineTemplate: 'visual',
-      contentDir: 'src/mockups',
     });
     const lane = loadLaneConfig('mockups', projectRoot);
     expect(lane.pipelineTemplate).toBe('visual');
@@ -200,13 +196,11 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'mockups', {
       id: 'mockups',
       name: 'Mockups',
       pipelineTemplate: 'visual',
-      contentDir: 'src/mockups',
     });
     expect(listLaneConfigs(projectRoot)).toEqual(['default', 'mockups']);
   });
@@ -216,13 +210,11 @@ describe('listLaneConfigs', () => {
       id: 'zebra',
       name: 'Zebra',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'alpha', {
       id: 'alpha',
       name: 'Alpha',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     const ids = listLaneConfigs(projectRoot);
     expect(ids).toEqual([...ids].sort());
@@ -238,7 +230,6 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     const ids = listLaneConfigs(projectRoot);
     expect(ids).toEqual(['default']);
@@ -249,13 +240,11 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'stale', {
       id: 'stale',
       name: 'Stale',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
       archivedAt: '2026-05-28T10:00:00.000Z',
     });
     expect(listLaneConfigs(projectRoot)).toEqual(['default']);
@@ -266,13 +255,11 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'stale', {
       id: 'stale',
       name: 'Stale',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
       archivedAt: '2026-05-28T10:00:00.000Z',
     });
     expect(listLaneConfigs(projectRoot, { includeArchived: true })).toEqual([
@@ -292,7 +279,6 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     expect(listLaneConfigs(projectRoot)).toEqual(['broken', 'default']);
   });

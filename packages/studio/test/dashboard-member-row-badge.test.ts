@@ -52,7 +52,7 @@ function writeLaneConfig(
 ): Promise<void> {
   return writeFile(
     join(root, '.deskwork', 'lanes', `${id}.json`),
-    JSON.stringify({ id, name, pipelineTemplate: pipeline, contentDir }, null, 2),
+    JSON.stringify({ id, name, pipelineTemplate: pipeline, scaffoldDefaults: { markdown: contentDir } }, null, 2),
   );
 }
 

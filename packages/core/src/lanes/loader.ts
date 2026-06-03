@@ -82,29 +82,35 @@ export function assertSafeLaneId(projectRoot: string, id: string): void {
 }
 
 /**
- * Refuse a `contentDir` whose resolved path escapes the project root.
- * Lane configs constrain `contentDir` to the project tree; an
- * operator passing `--content-dir ../../tmp/foo` (or any other shape
- * that resolves higher in the filesystem) is a path-traversal
- * exposure and is refused at the create / update boundaries. Mirrors
+ * Refuse a `scaffoldDefaults` directory value whose resolved path
+ * escapes the project root. A lane's `scaffoldDefaults` map binds an
+ * `artifactKind` to the directory where `/deskwork:add` drops a NEW
+ * file of that kind; an operator passing
+ * `--scaffold-default markdown=../../tmp/foo` (or any other shape that
+ * resolves higher in the filesystem) is a path-traversal exposure and
+ * is refused at the create / update boundaries. Mirrors
  * `assertSafeLaneId` — same belt-and-suspenders shape.
+ *
+ * Per the sites→lanes retirement (Phase 39) this replaces the former
+ * `assertSafeContentDir` check: a lane no longer carries a
+ * `contentDir`, so the boundary check re-homes onto each scaffold dir.
  *
  * Absolute paths equal to or inside the project root are accepted
  * verbatim; relative paths resolve against the project root.
  */
-export function assertSafeContentDir(
+export function assertSafeScaffoldDir(
   projectRoot: string,
-  contentDir: string,
+  scaffoldDir: string,
 ): void {
   const projectAbs = resolve(projectRoot);
-  const targetAbs = isAbsolute(contentDir)
-    ? resolve(contentDir)
-    : resolve(projectAbs, contentDir);
+  const targetAbs = isAbsolute(scaffoldDir)
+    ? resolve(scaffoldDir)
+    : resolve(projectAbs, scaffoldDir);
   const rel = relative(projectAbs, targetAbs);
   if (rel.startsWith('..') || isAbsolute(rel)) {
     throw new Error(
-      `Invalid contentDir ${JSON.stringify(contentDir)}: resolved path `
-      + `${targetAbs} must resolve inside the project root ${projectAbs}.`,
+      `Invalid scaffoldDefaults dir ${JSON.stringify(scaffoldDir)}: resolved `
+      + `path ${targetAbs} must resolve inside the project root ${projectAbs}.`,
     );
   }
 }

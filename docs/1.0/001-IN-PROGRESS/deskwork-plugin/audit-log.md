@@ -658,3 +658,67 @@ Surface:    `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:258-289`
 The -15 fix is correct as a defensive contract, but worth flagging for how the operator reads its "fixed" claim. For `apply()` to run, audit must have fired the finding, which requires the rule to have run, which requires `selectSites` to have returned a site — which requires the *in-memory* `config.sites` (from `readConfig`) to be non-empty. `legacyLaneBases` is built from `readLegacySites`, which reads the *same* `.deskwork/config.json`. The two readers cannot disagree on the same file, so `bases.length === 0` while the rule is running is unreachable through the normal runner (as the original -15 finding already noted). The new test forces the state only by passing `validConfig()` (in-memory sites = `blog`) while writing `{version:1}` to disk (sites-migration-noop-honesty.test.ts:51-90) — a divergence that cannot occur in production now that `readConfig` reads the same file the rule does.
 
 No change requested — the guard is harmless belt-and-suspenders and the honest `applied: false` is the right contract. But the regression test pins behavior for an impossible-in-production input, so it would not catch a regression in the *reachable* path (it has none). If the operator wants -15 to carry real protective value, the test that matters is the one already covered elsewhere (a genuinely-empty config short-circuits before the rule via `selectSites`), not this in-memory/disk-mismatch construction.
+
+## 2026-06-03 — audit-barrage lift (20260603T025928038Z-deskwork-plugin)
+
+### AUDIT-20260603-20 — Import-pattern regression in `resolve-artifact.ts` — `@/` alias replaced with a relative `../` import
+
+Finding-ID: AUDIT-20260603-20
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/src/entry/resolve-artifact.ts:19-20`
+
+The diff actively changes the `Entry` import from the project-mandated alias form to a relative path:
+
+```
+-import type { Entry } from '@/schema/entry.ts';
++import { existsSync } from 'node:fs';
++import { basename, dirname, join } from 'node:path';
++import type { Entry } from '../schema/entry.ts';
+```
+
+Both the user-global and work-level `CLAUDE.md` state, verbatim: *"Always use the @/ import pattern for TypeScript."* The pre-39d file already complied (`@/schema/entry.ts`); this edit regresses it to `../schema/entry.ts`. It compiles, so it's hygiene rather than a correctness bug — but it's a guideline violation introduced *by this diff*, on a file the diff otherwise rewrites, so the cost of fixing it now is one line. Restore `@/schema/entry.ts`. (Worth a grep of the surrounding `entry/` directory to confirm this isn't a creeping pattern — the sibling `iterate.ts` in the same diff correctly uses relative `../entry/resolve-artifact.ts`, so the convention is applied inconsistently across the two edited files.)
+
+### AUDIT-20260603-21 — Studio + iterate resolvers now throw on pre-migration (path-less) entries — verify the call-site boundaries render the throw rather than crash
+
+Finding-ID: AUDIT-20260603-21
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `packages/studio/src/lib/entry-resolver.ts:52-60` (`resolveIndexPath` throw) + `packages/core/src/iterate/iterate.ts:51-59` (`resolveIndexPath` throw)
+
+Both `resolveIndexPath` implementations now `throw` when `resolveStoredArtifactPath` returns `null` (entry lacks `artifactPath`). This is the correct "no fallback — throw" contract, but it converts a previously-degrading read into a hard failure on the exact population that exists during an *upgrade*: every legacy/pre-migration sidecar (created before `artifactPath` was authoritative) lacks the field. Before 39d, the studio fell back to `<contentDir>/<slug>/index.md` and rendered; after 39d, opening any such entry's review surface throws.
+
+The diff shows the throw but not the boundary that catches it. `resolveEntry` (studio, `entry-resolver.ts`) propagates the throw to whatever Hono route renders the entry — if that route has no try/catch that converts the error into a "run `deskwork doctor --fix`" page, the studio returns an unhandled 500 on every legacy entry until the operator migrates. That is the precise upgrade-path window where an adopter is most likely to open the studio to *see* what needs migrating. The fix isn't to re-add the fallback (the throw is right); it's to confirm the studio route + the iterate CLI caller catch this specific error and surface the actionable message, and add a test that the route degrades gracefully rather than 500s. If that handling already exists outside the diff, this is a no-op — but it is not demonstrated by the diff and is the highest-impact unproven claim in the change.
+
+### AUDIT-20260603-22 — Three new error/finding messages promise `deskwork doctor --fix` will backfill, but the only backfiller is gated on legacy `sites`
+
+Finding-ID: AUDIT-20260603-22
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `packages/core/src/doctor/validate.ts:348-355` (`validateMissingArtifactPath` message) + `packages/core/src/iterate/iterate.ts:53-58` (throw) + `packages/studio/src/lib/entry-resolver.ts:54-59` (throw)
+
+This diff deletes the runtime `backfillArtifactPaths` from `repair.ts` (repair.ts:25-72 removed) and adds three operator-facing messages that all instruct *"run `deskwork doctor --fix` to backfill artifactPath"*. After this deletion the **only** path that stamps `artifactPath` is `sites-migration-backfill.ts`, which the slushed findings -15/-16/-19 establish fires only when legacy `config.sites` is present. So the guidance is correct *only* for a project still carrying a `sites` block. For a project with no legacy sites and a path-less entry (the lane-native state 39c moves toward, and any partial-migration state today), `doctor --fix` does nothing, yet the iterate/studio throw and the `missing-artifact-path` finding all send the operator into a remedy that can't converge — the operator runs `doctor --fix`, sees no change, hits the same throw, repeats.
+
+This is a distinct surface from the slushed -16/-19 (which are about `apply()`'s return contract): here it's three user-visible strings, added in *this* diff, hardcoding the sites-migration as *the* backfiller. The messages also go stale the moment 39c removes `sites`, because the migration rule will stop firing entirely. A safe fix is to phrase the guidance conditionally (or point at the lane-native backfill once it exists) rather than naming the sites-migration as a guaranteed remedy — and, minimally, to not promise a backfill the codebase can't currently perform for the no-sites case.
+
+### AUDIT-20260603-23 — `refineToIndexDoc`'s `index.md`-preference silently hijacks shared-directory layouts whenever any `index.md` coexists
+
+Finding-ID: AUDIT-20260603-23
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/src/entry/resolve-artifact.ts:66-74` (`refineToIndexDoc`)
+
+The extracted helper prefers `<docDir>/index.md` *iff it exists*, otherwise returns the stored artifact path — to support "shared-directory layouts (multiple entries per directory, each addressed by its own filename, e.g. prd.md / workplan.md / README.md)". But the two cases collide: if a shared directory contains `index.md` *and* `prd.md` / `workplan.md` / `README.md`, every entry in that directory — regardless of its own stored filename — resolves to the single `index.md`, because `existsSync(indexPath)` short-circuits before the filename is consulted. The stored-filename addressing the comment promises only works when no `index.md` is present.
+
+The logic is unchanged from the pre-39d copies in `iterate.ts`/`entry-resolver.ts` (this diff only *centralizes* it), so it's not a new defect — but the extraction now binds both the core iterate verb and the studio resolver to the same fragile rule, so a directory that gains an `index.md` would mis-resolve identically in both surfaces. Worth a guard or a test pinning that `refineToIndexDoc('docs/x/prd.md')` returns `prd.md` even when `docs/x/index.md` exists, so the "shared-directory" contract the docblock advertises is actually enforced rather than incidentally true for deskwork's own index-less feature dirs.
+
+### AUDIT-20260603-24 — `validateMissingArtifactPath` dropped the file-existence gate — it now fires for every path-less pipeline entry, including not-yet-written ones
+
+Finding-ID: AUDIT-20260603-24
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/src/doctor/validate.ts:337-356` (`validateMissingArtifactPath`)
+
+Pre-39d, this rule only reported an entry when the slug+stage heuristic *resolved to a file that existed on disk* (`if (!(await fileExists(heuristic))) continue;`) — i.e. a genuinely backfillable case. The new body removes that gate entirely: it reports any entry that lacks `artifactPath` and isn't off-pipeline (`isOffPipelineStage` guard only). That broadening is intentional for migration, but it also means a freshly-created entry that legitimately has no on-disk artifact yet (e.g. an `Ideas`/`Drafting` entry whose file hasn't been authored) now produces a `missing-artifact-path` finding on every `--check`, where before it was silent.
+
+Whether this is noise or a true gap depends entirely on whether the creation paths (`/deskwork:add`, ingest) stamp `artifactPath` at creation time — which the diff doesn't show. If they do, the rule is fine; if any creation path leaves `artifactPath` unset until the file is written, every new entry will flag until migrated, and the operator's only documented remedy (Finding 03) won't help a brand-new entry. Recommend verifying the create-side stamps `artifactPath` (and adding a fixture for "new entry, file not yet written" to pin the intended behavior), so this rule's broadened trigger doesn't turn the normal authoring flow into a doctor finding.

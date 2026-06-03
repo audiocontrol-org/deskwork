@@ -3,11 +3,14 @@
  * pipeline template.
  *
  * Lanes are the graphical-entries unit of parallel-pipeline tracking
- * (PRD § Lanes). A project hosts one or more lanes; each lane has its
- * own content directory, its own pipeline template, and its own stage
- * vocabulary derived from that template. Entries live inside a single
- * lane; the entry's sidecar carries `lane: <laneId>` to identify
- * membership.
+ * (PRD § Lanes). A project hosts one or more lanes; each lane has a
+ * pipeline template and a stage vocabulary derived from that template.
+ * A lane is a LOGICAL grouping identified by `id` — it carries NO
+ * location of its own. Per the sites→lanes retirement (Phase 39),
+ * location is a property of the ENTRY (`entry.artifactPath`), never the
+ * lane. A lane "spans" whatever directories/filesystems its entries
+ * happen to live in — emergent from the entries, not declared on the
+ * lane. Entries carry `lane: <laneId>` to identify membership.
  *
  * Plugin defaults: there are none. Lanes are project-owned; every lane
  * config lives under `<projectRoot>/.deskwork/lanes/<id>.json`. The
@@ -25,13 +28,6 @@
  *   - `pipelineTemplate` is a non-empty string referencing a
  *     PipelineTemplate id; the loader cross-validates that the
  *     referenced template resolves via `loadPipelineTemplate`.
- *   - `contentDir` is a non-empty path; relative paths are resolved
- *     against the project root by callers, absolute paths are taken
- *     verbatim. Doctor may normalize later; the schema enforces
- *     non-empty only. **Retained for back-compat through Phase 39's
- *     expand/contract sequence — now redundant; its removal is 39c's
- *     job.** Per the sites→lanes retirement (Phase 39), location is a
- *     property of the ENTRY (`entry.artifactPath`), not the lane.
  *   - `host` (optional) — present only when this lane publishes its
  *     content tree as a website. A lane without a host is fully valid
  *     (the collection model is renderer-independent). Where the host
@@ -121,9 +117,13 @@ export const LaneConfigSchema = z.object({
   ),
   name: z.string().min(1, 'name must be a non-empty string'),
   pipelineTemplate: z.string().min(1, 'pipelineTemplate must be a non-empty string'),
-  // Retained through Phase 39's expand/contract (now redundant; removed
-  // in 39c). Location is an ENTRY property (`entry.artifactPath`).
-  contentDir: z.string().min(1, 'contentDir must be a non-empty string'),
+  // NOTE: a lane carries NO location. `contentDir` was removed in
+  // Phase 39c (sites→lanes retirement) — location is an ENTRY property
+  // (`entry.artifactPath`). A lane's only location-adjacent field is the
+  // optional add-time `scaffoldDefaults` below, which is never identity
+  // and never used for resolution. Because the schema is `.strict()`, a
+  // legacy on-disk lane carrying `contentDir` now FAILS parse with an
+  // unknown-key error; the doctor migration cleans it.
   // Optional — present only when this lane publishes to a website.
   host: z.string().min(1, 'host must be a non-empty string when present').optional(),
   // Optional, PARTIAL-by-construction map from ArtifactKind → scaffold
@@ -146,9 +146,9 @@ export const LaneConfigSchema = z.object({
  * inferred type tracks it without manual duplication.
  *
  * The schema is `.strict()`, so the inferred type lists exactly the
- * declared keys: `id`, `name`, `pipelineTemplate`, `contentDir`,
- * `host` (optional), `scaffoldDefaults` (optional), `archivedAt`
- * (optional), `$rationale` (optional). Unknown top-level keys fail
- * parse at the schema layer (AUDIT-20260530-08 fix).
+ * declared keys: `id`, `name`, `pipelineTemplate`, `host` (optional),
+ * `scaffoldDefaults` (optional), `archivedAt` (optional), `$rationale`
+ * (optional). Unknown top-level keys — including the retired
+ * `contentDir` — fail parse at the schema layer (AUDIT-20260530-08 fix).
  */
 export type LaneConfig = z.infer<typeof LaneConfigSchema>;
