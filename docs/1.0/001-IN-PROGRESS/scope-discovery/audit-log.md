@@ -4028,7 +4028,7 @@ That gap matters because the fix *reduces* normalization: it deletes the only me
 ### AUDIT-20260603-86 — Duplicate `Task 20` heading — two distinct tasks now share the same number
 
 Finding-ID: AUDIT-20260603-86 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     acknowledged-phase-26-task-4-addresses-ledger-case-non-ledger-collision-tracked-separately-2026-06-03
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 20 (fix-finding-AUDIT-20260603-83)` (hunk `@@ -47,35 +47,50 @@`) vs. `### Task 20 (fix-finding-AUDIT-20260603-82)` (hunk `@@ -83,6 +98,40 @@`)
 
@@ -4039,7 +4039,7 @@ The root cause is an off-by-one in whatever assigned the new numbers. The pre-di
 ### AUDIT-20260603-87 — MIGRATING.md still leaks dev-branch framing ("Phase 24 implementation … on this branch") into an adopter-facing doc
 
 Finding-ID: AUDIT-20260603-87
-Status:     open
+Status:     fixed-pending-sha
 Severity:   low
 Surface:    `MIGRATING.md:60` ("Issues defused" paragraph, hunk `@@ -57,7 +57,7 @@`)
 

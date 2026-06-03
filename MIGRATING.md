@@ -57,7 +57,7 @@ Per the ADR: a discipline that only fires from `.husky/` doesn't exist for an ad
 
 ### Issues defused
 
-GH [#401](https://github.com/audiocontrol-org/deskwork/issues/401) (over-build pathology), [#402](https://github.com/audiocontrol-org/deskwork/issues/402) (bookkeeping ratchet), [#403](https://github.com/audiocontrol-org/deskwork/issues/403) (gate-amplified scope errors) — all dispositioned by removing the gate surfaces that caused them. The Phase 24 implementation itself shipped with `0` `--no-verify` invocations on this branch.
+GH [#401](https://github.com/audiocontrol-org/deskwork/issues/401) (over-build pathology), [#402](https://github.com/audiocontrol-org/deskwork/issues/402) (bookkeeping ratchet), [#403](https://github.com/audiocontrol-org/deskwork/issues/403) (gate-amplified scope errors) — all dispositioned by removing the gate surfaces that caused them. Removing those surfaces eliminated the `--no-verify` bypasses they had previously forced on bookkeeping commits.
 
 ---
 
