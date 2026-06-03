@@ -3898,3 +3898,16 @@ Surface:    `plugins/dw-lifecycle/templates/scope-discovery/README.md:21-30` (mi
 The project-side scope-discovery template still documents `hooks-installed.json` as a shipped file with “Provenance for `install-scope-discovery-hooks` (do not hand-edit)” at line 30. The audited diff removes the install/uninstall hook command surfaces and resolves AUDIT-70, but this template remains an adopter-facing artifact that preserves the retired installer’s data model as if it still exists.
 
 This matters because `install-scope-discovery` copies these templates into adopting projects; stale template prose becomes durable local documentation. Fix by removing the `hooks-installed.json` row, and if the file is no longer emitted anywhere, ensure the template payload and installer tests no longer expect it.
+
+## 2026-06-03 — audit-barrage lift (20260603T202405320Z-scope-discovery)
+
+### AUDIT-20260603-76 — Tasks 16/17/18 reproduce the exact "fixed-finding with an open, wrong-shaped task" contradiction that AUDIT-72 named — within the same commit that claims to fix it
+
+Finding-ID: AUDIT-20260603-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     fixed-pending-sha
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 16/17/18 (diff hunks `@@ -226,15 +226,33 @@` and `@@ -259,39 +297,76 @@`) vs. `audit-log.md` AUDIT-73/74/75 (`Status: fixed-b178bdd0`)
+
+AUDIT-72's whole point was: don't leave unchecked, bug-shaped TDD tasks in the workplan for findings the audit-log already marks `fixed`. This diff resolves AUDIT-72 — and then commits the identical defect for AUDIT-73/74/75. Tasks 16 (AUDIT-73), 17 (AUDIT-74), and 18 (AUDIT-75) are added with **every** checkbox unchecked, including "Step 1: write failing test", "Step 3: implement the fix", and "Audit-log Status flipped to `fixed-<sha>`". Yet all three findings already carry `Status: fixed-b178bdd0` in the audit-log. Compare the treatment of Tasks 9/10/13/14 in this same diff, whose "Audit-log Status flipped to `fixed-<sha>`" boxes ARE flipped to `[x]`. The asymmetry is internal to one commit range: four findings are fixed, four of their tasks get reconciled, three do not.
+
+A reader running `/dw-lifecycle:pickup` sees three in-flight fix tasks for work the audit-log calls done — the precise drift AUDIT-72 (and AUDIT-59 before it) called out. Fix: reconcile Tasks 16/17/18 the same way Tasks 9/10/13/14 were reconciled in this diff — flip their status boxes / mark complete with the `b178bdd0` SHA — or remove them as promote-findings scaffolds superseded by the already-landed fix.

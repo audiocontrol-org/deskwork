@@ -189,6 +189,23 @@ Acknowledges AUDIT-20260603-50. Surface: `docs/1.0/001-IN-PROGRESS/scope-discove
 - [x] Audit-log Status flipped to `acknowledged-template-rewritten-fix-task-block-corrected-2026-06-03`.
 
 
+
+### Task 19 (fix-finding-AUDIT-20260603-76) (non-bug): AUDIT-20260603-76 — Tasks 16/17/18 reproduce the exact "fixed-finding with an op…
+
+Closes AUDIT-20260603-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 16/17/18 (diff hunks `@@ -226,15 +226,33 @@` and `@@ -259,39 +297,76 @@`) vs. `audit-log.md` AUDIT-73/74/75 (`Status: fixed-b178bdd0`).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback).
+
+- [x] Step 1 (disposition): Tasks 16/17/18 were auto-positioned with the code-defect TDD template BEFORE the workplan-task-renderer non-bug allowlist landed in the same commit (b178bdd0, AUDIT-72 root-cause fix). The fix-task blocks now check off their TDD-style steps as N/A with explicit notes pointing at the same-commit renderer fix; future promotes against skill/template/command surfaces will mint non-bug blocks per the new allowlist (`/(?:plugins\/[^/]+\/(?:skills|templates|commands))/` patterns).
+- [x] Step 2: applied — Tasks 16/17/18 in this workplan rewritten with `[x]` boxes + per-step N/A annotations + commit-sha citations to b178bdd0.
+- [x] Step 3: committing with `Closes AUDIT-20260603-76` trailer.
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (Tasks 16/17/18 reconciled in this commit).
+- [x] Audit-log Status flipped to `fixed-pending-sha` → will resolve to actual commit SHA after this commit lands.
+
 ### Task 8 (fix-finding-AUDIT-20260603-51): AUDIT-20260603-51 — Root cause of AUDIT-49 left unfixed: the generator `workplan…
 
 Closes AUDIT-20260603-51. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:152` (not in the diff) vs. the workplan Step 3 hand-edit that IS in the diff. Severity: medium.
@@ -241,61 +258,61 @@ Closes AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-mo
 
 - [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
 ### Task 16 (fix-finding-AUDIT-20260603-73): AUDIT-20260603-73 — Doctor `SKILL.md` rule-count claim ("eight") is not reconcil…
 
-Closes AUDIT-20260603-73 (claude-03 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md` (single hunk `@@ -39,9 +39,7 @@`) vs. AUDIT-20260603-71 requirement "update the rule count/table to match". Severity: medium.
+**Complete in b178bdd0.** This block was auto-positioned with the code-defect template BEFORE the workplan-task-renderer non-bug allowlist fix landed in the SAME commit (b178bdd0, AUDIT-72 root-cause fix). The actual disposition was skill-prose (rewrote the "eight scope-discovery-specific checks" sentence in doctor/SKILL.md to avoid the count claim). Per AUDIT-20260603-76: marking the TDD-style steps complete to reconcile the workplan with the audit-log's `fixed-b178bdd0` status.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-73 (claude-03 + codex-03; cross-model)` in subject
+- [x] Step 1: N/A — skill-prose surface; no failing test exists.
+- [x] Step 2: N/A — see Step 1.
+- [x] Step 3: implemented in b178bdd0 (doctor/SKILL.md rule-count phrasing rewritten).
+- [x] Step 4: N/A — no test.
+- [x] Step 5: committed in b178bdd0 with `Closes AUDIT-20260603-73` trailer.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] N/A — non-bug skill-prose fix; the renderer fix shipped in the same commit teaches the auto-positioner to mint non-bug blocks for skill surfaces going forward.
+- [x] N/A — no test to run.
+- [x] Audit-log Status flipped to `fixed-b178bdd0` via apply-audit-flips.
 
 
 ### Task 17 (fix-finding-AUDIT-20260603-74): AUDIT-20260603-74 — `migrate-from-pilot` still routes operators to retired comma…
 
-Closes AUDIT-20260603-74. Surface: `plugins/dw-lifecycle/skills/migrate-from-pilot/SKILL.md:71-75` (missing from this diff, but should be). Severity: high.
+**Complete in b178bdd0.** Same shape as Task 16 — auto-positioned with the code-defect TDD template (with the HIGH-severity Option D regression-lock addendum) BEFORE the renderer non-bug allowlist landed in the same commit. The actual disposition was skill-prose (migrate-from-pilot/SKILL.md Step 3 rewritten to point at the Phase 24 no-git-hook-enforcement contract). Per AUDIT-20260603-76: marking the TDD-style steps complete.
 
-- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
-- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
-- [ ] Step 5: commit with `Closes AUDIT-20260603-74` in subject
+- [x] Step 0: working-code invariant — N/A for skill-prose; the SKILL.md prose was the working surface and the rewrite was the substantive fix.
+- [x] Step 1: N/A — no failing test exists for skill-prose surface.
+- [x] Step 1b: N/A — no regression-lock test.
+- [x] Step 2: N/A.
+- [x] Step 3: implemented in b178bdd0 (migrate-from-pilot/SKILL.md Step 3 rewritten).
+- [x] Step 4: N/A.
+- [x] Step 5: committed in b178bdd0 with `Closes AUDIT-20260603-74` trailer.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] N/A — non-bug skill-prose fix.
+- [x] N/A — no test.
+- [x] N/A — no test to run.
+- [x] Audit-log Status flipped to `fixed-b178bdd0` via apply-audit-flips.
 
 
 ### Task 18 (fix-finding-AUDIT-20260603-75): AUDIT-20260603-75 — Scope-discovery template README still installs a retired hoo…
 
-Closes AUDIT-20260603-75. Surface: `plugins/dw-lifecycle/templates/scope-discovery/README.md:21-30` (missing from this diff, but should be). Severity: medium.
+**Complete in b178bdd0.** Same shape as Tasks 16/17 — auto-positioned with the code-defect TDD template BEFORE the renderer non-bug allowlist landed. The actual disposition was template-prose (templates/scope-discovery/README.md row removed). Per AUDIT-20260603-76: marking the TDD-style steps complete.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-75` in subject
+- [x] Step 1: N/A — template-prose surface; no failing test.
+- [x] Step 2: N/A.
+- [x] Step 3: implemented in b178bdd0 (templates/scope-discovery/README.md row removed).
+- [x] Step 4: N/A.
+- [x] Step 5: committed in b178bdd0 with `Closes AUDIT-20260603-75` trailer.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] N/A — non-bug template-prose fix.
+- [x] N/A — no test to run.
+- [x] Audit-log Status flipped to `fixed-b178bdd0` via apply-audit-flips.
 
 ### Task 9 (fix-finding-AUDIT-20260603-66): AUDIT-20260603-66 — Orphaned canonical template `agent-step-0-fragment.md` survi…
 
