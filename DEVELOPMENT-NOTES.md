@@ -4089,3 +4089,67 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - Triage: [#401](https://github.com/audiocontrol-org/deskwork/issues/401), [#402](https://github.com/audiocontrol-org/deskwork/issues/402), [#403](https://github.com/audiocontrol-org/deskwork/issues/403) close once Phase 24 ships the relocations (these are diagnoses scoped into Phase 24); [#404](https://github.com/audiocontrol-org/deskwork/issues/404) and [#405](https://github.com/audiocontrol-org/deskwork/issues/405) are net-new parent issues just filed.
 - Address TBD markers: (no bare TBD markers introduced this session)
 - Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals
+
+## 2026-06-03 (cont. 2): Phase 24 demolition + audit-finding sweep + workplan archive + Phase 26 capture
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Burn through the audit-finding triage that the session-end commit (38b7bc16) surfaced, then dismantle the commit/push gate pathology blocking the corrections, then mechanize what was learned. The session ended up validating Phase 24's architectural thesis empirically — the gates that capture Phase 24's retirement were the same gates that blocked landing the corrections required to capture Phase 24's retirement.
+
+**Accomplished:**
+
+- **AUDIT-finding triage (10 findings).** Reviewed AUDIT-20260603-22..36 surfaced by the morning's barrage + this session's implement-hook run. Categorized: addressed-at-source / orthogonal-deskwork-bug / slushed-stand. AUDIT-25 filed as deskwork [#406](https://github.com/audiocontrol-org/deskwork/issues/406) (induct-from-Published leaves stale `datePublished`). AUDIT-24/26/27/28/29/30/31 addressed at source via PRD + workplan corrections in commit `81bba0f2`. AUDIT-32/33/34/35/36 addressed at source via journal + workplan + PRD corrections in commit `6e8d1d81` + status flips in `3e6c20b9`.
+- **Operator-authorized Phase 24 demolition (Tasks 2-3 partial).** When the commit-msg gate refused the AUDIT correction commit (per the exact ratchet [#402](https://github.com/audiocontrol-org/deskwork/issues/402) names), operator explicitly authorized dismantling the gates ahead of the captured atomic-batch ordering. Commit `81bba0f2`: `.husky/commit-msg` deleted; audit-gate blocks removed from `.husky/pre-push` + `.husky/pre-commit` (both reduced to no-op stubs with relocation-pointer comments). CLI subcommand source retirement (the bulk of Phase 24 Task 2/3) remains pending — implementation session work.
+- **CLI tooling discoverability gap closed mid-session.** Operator asked whether there's CLI tooling to update the audit log (instead of my hand-flipping AUDIT statuses). Answer: yes — `dw-lifecycle apply-audit-flips --feature scope-discovery --apply` reads `Closes AUDIT-X` commit trailers and flips audit-log entries. I'd conflated it with the dismantled hook chain; it's actually a standalone CLI verb. Dry-run against the session's commits confirmed all 10 closures already-dispositioned (because I hand-flipped them).
+- **Manual workplan archive operation.** 16 completed phases (1-5, 9-10, 13-14, 16-19, 21-23) moved from `workplan.md` to a new sibling `workplan-archive.md`. Active workplan: 4477 → 1036 lines (77% smaller). Active phases now: 6, 7, 8, 11, 12, 15, 20, 24, 25, 26. A new `<!-- workplan-archive-ledger -->` comment block in the active workplan captures `archived-phases: 1-5, 9-10, 13-14, 16-19, 21-23` + `archived-fix-tasks: 5.1-5.123` + `next-fix-task-id: 5.124` so the auto-positioner doesn't collide on future promotes.
+- **Phase 26 captured ([#407](https://github.com/audiocontrol-org/deskwork/issues/407)).** Productizes the manual archive operation as CLI verbs (`dw-lifecycle archive-phases` + `unarchive-phases`) + teaches `promote-findings` auto-positioner to read the ledger. 6 tasks captured. PRD trigger + extension + acceptance criteria added; README phase status row 26 added; workplan Phase 26 section added.
+- **Phase 24 Tasks 2-3 honestly annotated** as **Partial — file-level demolition shipped in 81bba0f2**. Applicable Steps checked off; remaining (CLI subcommand source retirement) explicitly left `[ ]` for the implementation session.
+- **4 stale fix-task Extras blocks removed** from workplan (Tasks 5.118/5.119/5.121/5.122 for AUDIT-20260602-41/42/45/46 — all closed yesterday). The Extras were the second half of the gate-refusal that motivated the demolition.
+
+**Didn't work / had to redo:**
+
+- **Initial recommendation against archiving (option B sweep > option C archive split) was wrong.** The operator pushed back: *"I don't understand why B is better than archiving?"* On honest re-examination, 3 of 4 cons I'd raised against archiving were overstated or false (audit-log line refs rot the same either way; tooling doesn't actually assume one workplan; deskwork's feature-complete archive is feature-level, not phase-level). Archive strictly wins on history accessibility. Revised the recommendation, acknowledged the original was wrong, and the operator's intuition was correct. Subsequent design conversation (operator: *"would archiving fully complete phases solve the collision issue?"*) + (operator: *"what if we annotate the live workplan with a compact notation... can be reduced to a cli operation"*) drove to the ledger + Phase 26 productization shape.
+- **Hand-flipping audit statuses instead of using `apply-audit-flips`.** Operator caught this with the discoverability question. The verb is standalone; I'd conflated it with the dismantled hooks. Fixed forward by demonstrating the verb works post-dismantling.
+- **Hit the commit-msg gate ratchet on the AUDIT-corrections commit.** The commit-msg gate refused (per [#402](https://github.com/audiocontrol-org/deskwork/issues/402)'s exact mechanism); the `check-open-findings` cascade demanded promote-findings against open findings whose fixes were already staged. Operator framing: *"dismantle the commit checks right now. This is ridiculous."* Demolition followed.
+
+**Course corrections:**
+
+- **[PROCESS]** Architectural reframes that touch their own enforcement are a special-case for the orchestrator-vs-implementation split. The general rule says implementation happens in a separate session; the operator's explicit authorization for in-orchestrator demolition was the override. The session worked because the demolition was minimal (delete `.husky/commit-msg`, gut two pre-* blocks) — not because the rule was wrong. Future architectural-self-retirement work should expect the same shape.
+- **[PROCESS]** Recommend honestly when the operator's intuition challenges mine; do not defend overstated cons. The archive vs sweep arc this session was clean because I admitted overstating; the operator's design instinct was right, and the resulting Phase 26 shape (ledger + CLI verbs + doctor rule) is better than my original sweep recommendation would have produced.
+- **[PROCESS]** Surface CLI tooling discoverability when offering hand-rolled operations. The audit-status hand-flipping was unnecessary; `apply-audit-flips` would have done it cleanly. Building the habit of checking *"is there a verb for this?"* before hand-editing audit-log entries.
+
+**Quantitative:**
+
+- Messages (operator turns this continuation): ~24
+- Commits since first session-end (`38b7bc16`): 6 (`81bba0f2`, `6e8d1d81`, `3e6c20b9`, `4999afb0`, `f823f485`, plus this session-end-2)
+- New GH issues filed: 2 ([#406](https://github.com/audiocontrol-org/deskwork/issues/406) deskwork bug, [#407](https://github.com/audiocontrol-org/deskwork/issues/407) Phase 26)
+- Audit findings dispositioned at source: 10 (AUDIT-20260603-24/26/27/28/29/30/31/32/33/34/35/36 — addressed; AUDIT-22/23 partially; AUDIT-25 filed as deskwork issue)
+- Audit findings at session end: 0 open in scope-discovery audit-log
+- Workplan reduction: 4477 → 1036 lines (77% smaller via archive)
+- Phases captured: 1 (Phase 26)
+
+**Insights:**
+
+- **The session executed the very pathology its own work was meant to retire.** The commit-msg gate refused commits whose purpose was to dismantle the commit-msg gate. The check-open-findings gate refused commits whose purpose was to address its own findings. This is exactly #403's *"gates enforce local correctness but amplify scope errors"* shape, instantiated against itself. The empirical demonstration is more convincing than any captured-PRD argument.
+- **Tooling discoverability is a permanent agent failure mode.** I hand-flipped 10 audit-log statuses across 2 commits before the operator asked the obvious question. The verb has existed for weeks; it's documented in the workplan + skill prose. Building the *"check for a verb first"* habit is more durable than memorizing which verbs exist.
+- **Archive + ledger is the design pattern the workplan was asking for.** A long-running feature accumulates phase debt; the ledger annotation makes the active workplan slim *while preserving the auto-positioner's ID continuity*. Phase 26's productization will pay for itself the first time `/dwi` runs against the slim active workplan vs the bloated one.
+- **Operator-authorized scope overrides are NOT weasel.** The orchestrator-vs-implementation rule says implementation lives in a separate session; this session ran demolition in the orchestrator because the operator explicitly authorized *"dismantle the commit checks right now."* The rule isn't absolute; the operator's explicit override is the supported exception. Distinguishing operator-authorized overrides from agent-decided shortcuts is what keeps "don't weasel" load-bearing.
+
+### Hygiene observations
+
+- workplan `/Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:1125` — markers: out-of-scope — `### Phase 26 — Out of Scope` (false positive: section header, not a TBD)
+- issue [#401](https://github.com/audiocontrol-org/deskwork/issues/401) [OPEN] referenced this session: Friction: audit-driven implement loop spiraled a 1-commit sub-task into multi-round over-build (39c-2b)
+- issue [#402](https://github.com/audiocontrol-org/deskwork/issues/402) [OPEN] referenced this session: Bookkeeping ratchet (hook-coverage gate) + general bookkeeping proliferation in the implement loop
+- issue [#403](https://github.com/audiocontrol-org/deskwork/issues/403) [OPEN] referenced this session: Friction synthesis: implement-loop gates enforce local correctness but amplify scope errors
+- issue [#404](https://github.com/audiocontrol-org/deskwork/issues/404) [OPEN] referenced this session: Phase 24: Retire git-hook enforcement; relocate discipline into skill bodies
+- issue [#405](https://github.com/audiocontrol-org/deskwork/issues/405) [OPEN] referenced this session: Phase 25: Editor terminology cleanup — adopt project-neutral `module` everywhere
+- issue [#406](https://github.com/audiocontrol-org/deskwork/issues/406) [OPEN] referenced this session: induct from Published leaves stale datePublished — currentStage / datePublished contradiction
+- issue [#407](https://github.com/audiocontrol-org/deskwork/issues/407) [OPEN] referenced this session: Phase 26: Workplan archive verb — productize the manual archive operation
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: Open a fresh `/dwi` session against this worktree. First unchecked Phase 24 work is Task 1 (decision artifact: ADR at `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` + rule at `.claude/rules/enforcement-lives-in-skills.md`). Alternative starting points: Phase 24 Task 4 (relocate structural chain into `/dw-lifecycle:session-start`) if the operator wants visible payoff first; Phase 26 Task 1 (ledger format spec) if the operator wants to productize the archive shape before more burndown.
+- Triage: [#401](https://github.com/audiocontrol-org/deskwork/issues/401) / [#402](https://github.com/audiocontrol-org/deskwork/issues/402) / [#403](https://github.com/audiocontrol-org/deskwork/issues/403) close once Phase 24 relocations land. [#404](https://github.com/audiocontrol-org/deskwork/issues/404) / [#405](https://github.com/audiocontrol-org/deskwork/issues/405) / [#407](https://github.com/audiocontrol-org/deskwork/issues/407) are the active parents. [#406](https://github.com/audiocontrol-org/deskwork/issues/406) is a deskwork-side bug awaiting deskwork-team triage.
+- Address TBD markers: hygiene-tool false-positive on Phase 26 — Out of Scope section header. No real TBD markers introduced this session.
+- Dismantle stale worktrees: `/Users/orion/work/deskwork-work/graphical-entries` (`feature/graphical-entries`) — 4 of 9 signals (unchanged from session-end-1; pre-existing).
