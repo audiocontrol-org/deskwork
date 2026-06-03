@@ -21,6 +21,7 @@ import { check as overrideDrift } from './override-drift.js';
 import { check as catalogEntryMissingStatus } from './catalog-entry-missing-status.js';
 import { check as provenanceOrphanedEntries } from './provenance-orphaned-entries.js';
 import { check as fixTaskTddDiscipline } from './fix-task-tdd-discipline.js';
+import { check as workplanArchiveLedgerCoherence } from './workplan-archive-ledger-coherence.js';
 import type { DoctorRuleCheck } from './types.js';
 
 export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
@@ -33,6 +34,7 @@ export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
   catalogEntryMissingStatus,
   provenanceOrphanedEntries,
   fixTaskTddDiscipline,
+  workplanArchiveLedgerCoherence,
 ];
 
 export type { DoctorRuleCheck, DoctorRuleOptions, ScopeDoctorFinding } from './types.js';
