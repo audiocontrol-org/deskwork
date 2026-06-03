@@ -1304,13 +1304,15 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 9 — Adopter migration
 
-- Step 1: Decide migration path: ship a one-shot `dw-lifecycle uninstall-everything-hook-related` verb that removes managed blocks from `.husky/`, deletes `hooks-installed.json`, and surfaces a report — OR document a manual sweep. (Lean: ship the verb; the migration is mechanical and one-shot.)
-- Step 2: If verb: implement, test, ship as part of Phase 24's release.
-- Step 3: Write release-notes entry naming this as a breaking change; cite the relocation map; cite the principle.
-- Step 4: Update plugin README and `MIGRATING.md` (or create one) capturing the upgrade path.
-- Step 5: Commit.
+**Complete.** Operator-confirmed "ship now" via AskUserQuestion 2026-06-03.
 
-**Acceptance:** An adopter who installed `install-scope-discovery-hooks` in v0.35.0 has a documented path to remove the installed hooks and pick up the new skill-body discipline on the version bump.
+- [x] Step 1: Migration path decided — ship the verb (per operator decision; lean confirmed).
+- [x] Step 2: Verb implemented at `plugins/dw-lifecycle/src/scope-discovery/uninstall-everything-hook-related.ts` + subcommand wrapper at `plugins/dw-lifecycle/src/subcommands/uninstall-everything-hook-related.ts` + 11 vitest scenarios at `plugins/dw-lifecycle/src/__tests__/scope-discovery/uninstall-everything-hook-related.test.ts` (all pass). CLI dispatch registered in `cli.ts`. The verb walks `.husky/{pre-commit, pre-push, commit-msg}` + removes `dw-lifecycle`-managed blocks bounded by the canonical marker pair (`# >>> dw-lifecycle scope-discovery hook >>>` / `# <<< dw-lifecycle scope-discovery hook <<<`); deletes `.dw-lifecycle/scope-discovery/{hooks-installed.json, last-hook-run.json, hook-run-log.jsonl}` when present. Dry-run by default; `--apply` performs mutations. Operator-authored content outside managed blocks preserved verbatim.
+- [x] Step 3: Release-notes section added to `MIGRATING.md` § "Migrating to v0.36.0+ (Phase 24 — no git-hook enforcement)" — names the breaking change, lists retired surfaces, documents the one-shot migration command, cites the ADR + rule, names the #401/#402/#403 issues defused.
+- [x] Step 4: `MIGRATING.md` covers the upgrade path. Plugin README not updated this commit (the README points at the marketplace install path which doesn't change; the MIGRATING.md is the canonical breaking-change doc).
+- [x] Step 5: Commit.
+
+**Acceptance:** ✅ An adopter who installed `install-scope-discovery-hooks` in v0.35.0 has a one-shot migration command (`dw-lifecycle uninstall-everything-hook-related --apply`) + a documented upgrade path in `MIGRATING.md`.
 
 ### Task 10 — Live dogfood verification
 
@@ -1336,9 +1338,9 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 - [x] Each relocation has a passing test exercising the new skill-body behavior — N/A per testing.md for skill-prose; the renderer-template AUDIT-72 fix did get its 3 new failing-test blocks via TDD.
 - [x] Live dogfood verification documents the bookkeeping ratio reduction (1.2:1, down from ~3:1).
 - [x] Workplan + README reflect Phase 15/17/21/22/23 retirements consistently.
-- [ ] Release notes capture the breaking change — pending in Phase 24 Task 9.
+- [x] Release notes capture the breaking change (`MIGRATING.md` § "Migrating to v0.36.0+").
 - [ ] No GitHub issue remains open whose root cause is now-deleted machinery — pending operator post-release closure per `Issue closure requires verification in a formally-installed release` rule.
-- [ ] Adopter migration path is documented (verb or doc-only per operator decision) — pending in Phase 24 Task 9; operator picked "Ship now."
+- [x] Adopter migration path is documented (verb `dw-lifecycle uninstall-everything-hook-related` + `MIGRATING.md` § "Migrating to v0.36.0+").
 
 **Open decisions (operator drives at scoping time, per "Capture mode vs scope mode" discipline):**
 

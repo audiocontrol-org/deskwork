@@ -1,3 +1,66 @@
+## Migrating to v0.36.0+ (Phase 24 — no git-hook enforcement)
+
+v0.36.0 retires the `dw-lifecycle` plugin's git-hook enforcement chain. Adopters who ran `dw-lifecycle install-scope-discovery-hooks` (or `install-agent-prompts`) in v0.35.0 or earlier need to clean up the installed artifacts.
+
+### What changed
+
+Per the no-git-hook-enforcement architectural decision (ADR at `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` + operational rule at `.claude/rules/enforcement-lives-in-skills.md`), `dw-lifecycle` enforcement now lives in skill bodies + CLI verbs that adopters get from `claude plugin install`. The discipline that used to fire from `.husky/{pre-commit,pre-push,commit-msg}` is gone; the equivalent checks now fire from:
+
+- `/dw-lifecycle:session-start` — advisory structural snapshot (clones / anti-patterns / adopter holdouts / editor-symmetry deltas) at session boot.
+- `/dw-lifecycle:implement` — enforcing end-of-task chain (structural + audit-barrage + workplan-aware open-findings gate + apply-flips + fix-task TDD advisory).
+- `/dw-lifecycle:session-end` — closing discipline (disposition-survivor + no-bare-TBDs + no-open-findings-without-disposition).
+- `/dw-lifecycle:review` — primary PR-readiness surface (Step 0 refactor preconditions + structural chain + fleet symmetry).
+
+### Retired surfaces
+
+The following CLI verbs + skills + doctor rules + artifacts are RETIRED:
+
+- `dw-lifecycle install-scope-discovery-hooks` (subcommand + skill folder)
+- `dw-lifecycle uninstall-scope-discovery-hooks` (subcommand + skill folder)
+- `dw-lifecycle install-agent-prompts` (subcommand + skill folder)
+- `dw-lifecycle check-implement-hook-ran` (commit-msg gate)
+- `dw-lifecycle check-implement-hook-coverage` (pre-push gate)
+- `dw-lifecycle check-implement-hook-coverage --upstream-base-ref` flag
+- `hooks-installed-missing` doctor rule
+- `agent-prompt-mirror-drift` doctor rule
+- `.dw-lifecycle/scope-discovery/{hooks-installed.json,last-hook-run.json,hook-run-log.jsonl}` working-tree artifacts
+
+### Migration: one-shot adopter cleanup
+
+Run the migration helper:
+
+```bash
+dw-lifecycle uninstall-everything-hook-related              # dry-run; reports what would change
+dw-lifecycle uninstall-everything-hook-related --apply      # performs the removals
+```
+
+The helper:
+
+- Removes `dw-lifecycle`-managed blocks (bounded by `# >>> dw-lifecycle scope-discovery hook >>>` / `# <<< dw-lifecycle scope-discovery hook <<<`) from `.husky/{pre-commit,pre-push,commit-msg}`. Operator-authored content outside the managed blocks is preserved verbatim.
+- Deletes `.dw-lifecycle/scope-discovery/hooks-installed.json` (the install manifest), `.dw-lifecycle/scope-discovery/last-hook-run.json` (Phase 22 marker), and `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (Phase 23 per-SHA log) when present.
+
+If your `.husky/` files contained ONLY the managed block (no operator content), the helper leaves the file with just the shebang line. You can delete the file manually if husky doesn't need the hook present; otherwise the file works as a no-op stub.
+
+If you customized the managed block (e.g., added extra checks INSIDE the marker pair), the helper still removes the entire block — the markers are the contract. Copy your customizations OUT of the managed-block markers BEFORE running the migration if you want to keep them.
+
+### What stays
+
+The CLI verbs that DO the underlying checks — `check-clones`, `check-anti-patterns`, `check-adopters`, `check-disposition-survivor`, `check-editor-symmetry`, `check-refactor-preconditions`, `check-deprecations`, `audit-barrage`, `audit-barrage-lift`, `promote-findings`, `check-open-findings`, `apply-audit-flips`, `implement-hook`, etc. — all stay. The plugin ships them; the skill bodies invoke them. If you want a project-specific git hook, wire any of them into your own `.husky/<hook>` manually; we don't ship the install machinery anymore.
+
+`install-scope-discovery` (the basic config-dir bootstrap that creates `.dw-lifecycle/scope-discovery/` + seeds empty registries) is preserved — adopters still need it on first install.
+
+`migrate-from-pilot` (audiocontrol-pilot-to-plugin migration) is preserved + updated to skip the retired hook-install step.
+
+### Why
+
+Per the ADR: a discipline that only fires from `.husky/` doesn't exist for an adopter who follows the public install path. Wiring discipline into git hooks distorted our perception of what works (we experienced the gates via our own hand-rolled `.husky/`; adopters experienced nothing). The Phase 24 reframe makes the discipline travel with the plugin install, not as a separate `install-*-hooks` invocation.
+
+### Issues defused
+
+GH [#401](https://github.com/audiocontrol-org/deskwork/issues/401) (over-build pathology), [#402](https://github.com/audiocontrol-org/deskwork/issues/402) (bookkeeping ratchet), [#403](https://github.com/audiocontrol-org/deskwork/issues/403) (gate-amplified scope errors) — all dispositioned by removing the gate surfaces that caused them. Live dogfood (Phase 24 Task 10) measured bookkeeping ratio down from #403's ~3:1 baseline; 0 `--no-verify` invocations needed across the Phase 24 implementation itself.
+
+---
+
 ## Migrating to v0.16.0 (open-issue tranche cleanup)
 
 v0.16.0 ships the open-issue-tranche-cleanup feature. The behavior changes adopters should know about:
