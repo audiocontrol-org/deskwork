@@ -969,16 +969,16 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 3 — Demolition: install machinery
 
-**Partial — `.husky/pre-commit` structural-chain block removed in `81bba0f2`. CLI subcommand source retirement pending.**
+**Complete.** `.husky/pre-commit` structural-chain block removed in `81bba0f2`; CLI subcommand source retirement + `install-agent-prompts` retirement land in this commit.
 
-- [ ] Step 1: Retire `install-scope-discovery-hooks` (subcommand + source + tests + skill + skill folder + helper).
-- [ ] Step 2: Retire `uninstall-scope-discovery-hooks` (subcommand + source + tests + skill + skill folder + helper).
-- [ ] Step 3: Retire `hooks-installed.json` machinery + reader logic.
-- [ ] Step 4: Audit `install-agent-prompts` against the new architecture; retire if redundant once Step 0 discipline lives in `/dw-lifecycle:review` skill body, otherwise reshape.
-- [x] Step 5: Gut the structural-chain block from `.husky/pre-commit`; structural chain moves entirely into skills (Task 4–7). *(81bba0f2 — chose stub over delete; documented relocation pointer)*
-- [ ] Step 6: Commit with `Closes` trailers for [#293](https://github.com/audiocontrol-org/deskwork/issues/293), [#294](https://github.com/audiocontrol-org/deskwork/issues/294), [#295](https://github.com/audiocontrol-org/deskwork/issues/295). *(file-level demolition already in 81bba0f2; this commit-step is for the CLI-side retirement)*
+- [x] Step 1: Retired `install-scope-discovery-hooks` (subcommand + library + test + skill folder + `husky-bootstrap.ts` helper + CLI registry entry).
+- [x] Step 2: Retired `uninstall-scope-discovery-hooks` (subcommand + library + test + skill folder + CLI registry entry).
+- [x] Step 3: Retired `hooks-installed.json` machinery — the `hooks-installed-missing` doctor rule + its test removed; the working-tree `.dw-lifecycle/scope-discovery/hooks-installed.json` file deleted. No remaining reader logic in the source tree (verified via grep).
+- [x] Step 4: `install-agent-prompts` AUDITED + RETIRED. The verb wrote Step 0 verification fragments to `.claude/agents/code-reviewer.md` + `.claude/agents/codebase-auditor.md`. Phase 24 Task 7 relocated Step 0 discipline into `/dw-lifecycle:review` SKILL.md as Step 3a (`dw-lifecycle check-refactor-preconditions --gate-mode`), making the `.claude/agents/` mirror redundant — the discipline travels with the plugin via SKILL.md, not as a separately-installed agent prompt file. Retired: subcommand + library + test + skill folder + `agent-prompt-mirror-drift` doctor rule + its test + CLI registry entry.
+- [x] Step 5: `.husky/pre-commit` structural-chain block gutted *(81bba0f2 — chose stub over delete; documented relocation pointer)*.
+- [x] Step 6: Commit lands with `Refs #293 #294 #295` (per project rule the agent doesn't close GH issues — operator closes post-release).
 
-**Acceptance:** No skill at `plugins/dw-lifecycle/skills/install-scope-discovery-hooks/`. No subcommand registration for the install/uninstall verbs. Audit-trail commit names the four issues retired.
+**Acceptance:** ✅ No skill at `plugins/dw-lifecycle/skills/install-scope-discovery-hooks/`, `uninstall-scope-discovery-hooks/`, or `install-agent-prompts/`. ✅ No subcommand registration for those three verbs. ✅ Audit-trail commit names the three issues retired (#293/#294/#295 + Phase 24 parent #404).
 
 ### Task 4 — Relocate: structural chain into `/dw-lifecycle:session-start`
 

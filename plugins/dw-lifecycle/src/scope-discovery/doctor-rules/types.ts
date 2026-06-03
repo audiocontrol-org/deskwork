@@ -17,9 +17,7 @@
  *   clones-yaml-schema-violation
  *   anti-patterns-yaml-schema-violation
  *   clones-yaml-refactor-incomplete
- *   agent-prompt-mirror-drift
  *   override-drift
- *   hooks-installed-missing
  *
  * The doctor's external Finding shape (`{ rule, severity, message }`)
  * is the SSOT; this file mirrors it so individual rule files don't

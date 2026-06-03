@@ -3735,3 +3735,52 @@ Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 20 Task
 Within this one commit two statements contradict. Task 8 Step 3 invokes `agent-discipline.md` § "Issue closure requires verification in a formally-installed release" — "the agent posts evidence; the operator … makes the closing transition" — and explicitly defers closure to the operator's release-verification queue. Yet the reframed Phase 20 Task 2 acceptance checkbox is marked `[x]` with "GH #387 — closed as reframed-by-Phase-24 (not retired; elevated)." Either #387 is closed (which the agent is not permitted to do per the very rule Task 8 cites) or it isn't (and the `[x]` is a false completion claim).
 
 Compounding it: Task 8 Step 3's operator-closure disposition list is `#293 / #294 / #295 / #352 / #373 / #374` — **#387 is absent**. So #387 is claimed-closed by Task 2 but is not tracked in the operator's closure queue, meaning if the Task 2 `[x]` is wrong (it almost certainly is, since closure is the operator's call) the omission means no surface will catch the un-closed issue at release time. Fix: change the Task 2 acceptance line from `[x] closed` to evidence-posted-pending-operator-closure, and add #387 to Task 8 Step 3's queue with the "reframed/elevated, close on verification" disposition.
+
+## 2026-06-03 — audit-barrage lift (20260603T195852568Z-scope-discovery)
+
+### AUDIT-20260603-61 — Skill body still documents the retired marker/log/pre-push machinery as live — and references two functions this commit deletes
+
+Finding-ID: AUDIT-20260603-61
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/implement/SKILL.md:167,169,171`
+
+This commit retires the marker write (`last-hook-run.json`), the per-run log (`hook-run-log.jsonl`), the pre-push coverage gate, and the helpers `enumerateCommitsInRange` + `appendHookRunLogEntriesForRange`. But `implement/SKILL.md` still makes present-tense claims that all of this is live: line 169 — *"The verb writes `last-hook-run.json` after every legitimate exit (success + skip + outage) and appends to `hook-run-log.jsonl` so the pre-push gate can walk a multi-commit range"* — is now entirely false (the verb writes neither; the gate is gone). Line 171's whole "Phase 23: per-SHA log writes" paragraph describes behavior the verb no longer has and names its implementation as *"`enumerateCommitsInRange` in `scope-discovery/util/git-ancestry.ts` + `appendHookRunLogEntriesForRange` in `scope-discovery/promote-findings/hook-run-log.ts`"* — both functions and the second file are deleted in this very diff. Line 167's `gate result` report field (`allowed: open-findings-scoped-as-next` etc.) likewise documents a gate this chain dismantles.
+
+This matters more here than ordinary doc drift because of the project's own `enforcement-lives-in-skills.md` rule: the skill body *is* the contract adopters get. The commit moved the workplan checkbox to "Complete" and acknowledged the relocation at `SKILL.md:40` (backward-looking, correct), but left the operational prose at 167/169/171 asserting a machine that no longer exists. An agent reading lines 169–171 will believe `implement-hook` is recording coverage that the next push depends on. Fix: rewrite 167/169/171 in the same commit to state that no marker/log is written and the verb forward-progresses without a pre-push coverage gate (mirroring the new `implement-hook.ts` comments at the no-new-diff / outage / happy paths).
+
+### AUDIT-20260603-62 — Orphaned one-time backfill script writes to the retired log path
+
+Finding-ID: AUDIT-20260603-62
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `scripts/backfill-hook-run-log.mjs:1-23`
+
+`scripts/backfill-hook-run-log.mjs` exists solely to *"write synthetic hook-run-log entries"* into `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (line 23) so the (now-retired) pre-push gate would accept already-landed commits. With the log file deleted, both reader libraries (`hook-run-log.ts`, `check-implement-hook-coverage.ts`) gone, and the pre-push gate retired, this script is dead: running it would recreate a file nothing reads. Per the project's hygiene rules (no dead code; "just for now" one-time scripts become canon if not swept), the demolition commit that retired the log should also delete its backfill helper. Leaving it invites a future maintainer to run it and conclude the log is still load-bearing. Fix: `git rm scripts/backfill-hook-run-log.mjs` as part of this retirement.
+
+### AUDIT-20260603-63 — `.gitignore` still carries (and previously also tracked) the retired marker artifacts
+
+Finding-ID: AUDIT-20260603-63
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `.gitignore:47-48`
+
+`.gitignore` lines 47–48 still ignore `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` and `.../last-hook-run.json`. Both are now retired artifacts that nothing in the source tree writes — dead ignore rules. Worth noting the contradictory prior state this commit half-resolves: `hook-run-log.jsonl` was simultaneously listed in `.gitignore` AND tracked at `HEAD~1` (it had been force-added past the ignore), which is exactly the confusing dual state a cleanup should eliminate. This commit deletes the tracked file but leaves the stale ignore lines, so the contradiction's residue persists. `last-hook-run.json` was never tracked, so workplan Step 8's "working-tree `last-hook-run.json` deleted" claim is about a purely-local untracked file (fine, but unverifiable from the commit). Fix: drop both lines from `.gitignore` in the retirement commit.
+
+### AUDIT-20260603-64 — Stale doc comments name the deleted gate verbs as live consumers
+
+Finding-ID: AUDIT-20260603-64 (claude-04 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:33-34`, `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:4,35,72`
+
+The header comment in `implement-hook.ts:33-34` still describes the verb as composing *"with the commit-msg gate (`check-implement-hook-ran`) and pre-push gate (`check-implement-hook-coverage`)"* — both deleted in this diff. `git-ancestry.ts` doc comments (lines 4, 35, 72) describe `checkAncestry`/`ancestryAsGateBoolean` as the collapse arrow *"used by `check-implement-hook-ran`"* and *"Collapse arrow for the commit-msg gate (`check-implement-hook-ran`)"* — that named consumer no longer exists (the helper survives only because `pickFallbackBaseline`/`ancestryAsBarrageTip` still use it via `implement-hook`). These comments will mislead the next reader into grepping for a verb that was removed. Fix: update the comments to reflect the surviving consumer (the audit-barrage diff-range computation) and drop the retired-verb references.
+
+### AUDIT-20260603-65 — Dead classification branches in workplan-task-renderer for now-deleted artifact surfaces
+
+Finding-ID: AUDIT-20260603-65
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:64,87-88`
+
+`workplan-task-renderer.ts:87-88` classify any audit-finding whose surface matches `/last-hook-run\.json/` or `/hook-run-log\.jsonl/` as a `'non-bug'` (config/marker artifact), with the rationale comment at lines 63-64 naming those exact files. With both artifacts retired and removed from the tree, no future finding will ever cite those surfaces, so these branches are dead. This is harmless (the regexes simply never match) and arguably defensible to keep for back-compat with historical audit-log entries that reference the old paths — but it's residue worth a deliberate keep/drop decision rather than silent survival. No fix required; flagging so the operator can decide whether to prune alongside the rest of the retirement.

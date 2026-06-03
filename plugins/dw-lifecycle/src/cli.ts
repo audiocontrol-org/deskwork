@@ -23,10 +23,7 @@ import { scopeExport } from './subcommands/scope-export.js';
 import { refreshClonesBaseline } from './subcommands/refresh-clones-baseline.js';
 import { disposeClone } from './subcommands/dispose-clone.js';
 import { installScopeDiscovery } from './subcommands/install-scope-discovery.js';
-import { installScopeDiscoveryHooks } from './subcommands/install-scope-discovery-hooks.js';
-import { installAgentPrompts } from './subcommands/install-agent-prompts.js';
 import { migrateFromPilot } from './subcommands/migrate-from-pilot.js';
-import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-discovery-hooks.js';
 import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
 import { auditBarrage } from './subcommands/audit-barrage.js';
 import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
@@ -91,10 +88,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'refresh-clones-baseline': refreshClonesBaseline,
   'dispose-clone': disposeClone,
   'install-scope-discovery': installScopeDiscovery,
-  'install-scope-discovery-hooks': installScopeDiscoveryHooks,
-  'install-agent-prompts': installAgentPrompts,
   'migrate-from-pilot': migrateFromPilot,
-  'uninstall-scope-discovery-hooks': uninstallScopeDiscoveryHooks,
   'orchestrator-turn': orchestratorTurn,
   'audit-barrage': auditBarrage,
   'audit-barrage-render': auditBarrageRender,
