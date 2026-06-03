@@ -855,3 +855,96 @@ The entry records a real degraded state — a third-party plugin agent was hand-
 ---
 
 I also checked, and found clean: the appended `hook-run-log.jsonl` line (well-formed JSON, `fired-and-slushed` is an existing enum value, consistent with prior lines); the README documentation-rot rule does **not** apply here (this is internal `docs/1.0/001-IN-PROGRESS/` feature tracking, where version-bound text is explicitly permitted, not adopter-facing); and the four audit-log blocks themselves are internally consistent and correctly anchored to real surfaces (I did not re-litigate their dispositions, per the audit-log-excerpt instruction). My three findings concentrate on the one place a docs-only commit can still mislead: the honesty of the session's self-reported audit accounting and two internal inconsistencies.
+
+## 2026-06-03 — audit-barrage lift (20260603T093102687Z-deskwork-plugin)
+
+### AUDIT-20260603-35 — `shortform-start` is classified as resolving an existing entry's `artifactPath`, but it CREATES a new shortform file whose path-composer (`resolveShortformFilePath`) is being retired with no replacement
+
+Finding-ID: AUDIT-20260603-35
+Status:     resolved-2026-06-03 — folded into the design (§ "39c-2b design amendment" of the spec; shortform-start reclassified as a create-verb composing from the parent's artifactPath dir). Operator chose "amend the design" (option a).
+Severity:   medium
+Surface:    `docs/superpowers/specs/2026-06-02-sites-to-lanes-retirement-design.md` § "CLI-verb resolution migration" (existing-entry verb list) + § "`add`-time path composition" (Retires the slug-template family) — and workplan.md:1948-1951 (39c-2b)
+
+The migration section sorts the 11 verbs into exactly two patterns: "resolve via `entry.artifactPath`" (existing entry) or "compose-then-stamp via `scaffoldDefaults[K]`" (`add`, a new entry). `shortform-start` is placed in the **existing-entry** bucket. But `shortform-start` does not act on the parent entry's main artifact — per its own skill description it *"Creates a markdown file in the entry's scrapbook"*, i.e. it creates a NEW file at a path that was previously computed by `resolveShortformFilePath` (which the same design explicitly retires: *"Retires the slug-template family … `resolveShortformFilePath`"*). Resolving `entry.artifactPath` yields the parent's longform path (e.g. `posts/foo/index.md`), not a scrapbook destination for the new shortform draft.
+
+So the new shortform file's destination is composed by neither pattern: it is not an existing-entry resolution (the file doesn't exist yet) and it is not the `add --lane X --kind K` scaffold path (shortform-start is a distinct verb with scrapbook-relative semantics). This is the exact gap that blocked 39c-2 originally — a resolution path under-mapped by the spec. As written, the terminal deletion step (delete `resolveShortformFilePath`) cannot land green because `shortform-start` would have no path source. A reasonable fix: add a third composition rule for `shortform-start` (scrapbook destination derived from the parent's `artifactPath` directory + a shortform layout), and move `shortform-start` out of the "resolve via `entry.artifactPath`" list, since it is a create-verb, not an act-on-existing verb.
+
+### AUDIT-20260603-36 — `rename-slug` "moves the file and rewrites `artifactPath` to the new location" without specifying how the new location is derived from old path + new slug — which inherently requires the layout knowledge being retired
+
+Finding-ID: AUDIT-20260603-36
+Status:     resolved-2026-06-03 — folded into the design (§ "39c-2b design amendment"; rename-slug derives the new path by layout detection from the stored artifactPath). Operator chose "amend the design" (option a).
+Severity:   medium
+Surface:    `docs/superpowers/specs/2026-06-02-sites-to-lanes-retirement-design.md` § "CLI-verb resolution migration" (`rename-slug` note: *"renaming moves the file and rewrites `entry.artifactPath` to the new location; it no longer recomputes a path from a template"*)
+
+`rename-slug` is the one existing-entry verb whose target path is a *function of the slug*. To rename `old-slug` → `new-slug`, the new on-disk location must be derived: `posts/old-slug/index.md` → `posts/new-slug/index.md` (index/readme layout, replace the directory component) versus `posts/old-slug.md` → `posts/new-slug.md` (flat layout, replace the filename stem). The spec says rename "no longer recomputes a path from a template" and simply "rewrites `artifactPath` to the new location" — but it never says how that new location is computed. Deriving it from the stored `artifactPath` + new slug requires knowing which path component encodes the slug, i.e. the layout — the precise machinery (`layoutToContentRelativePath` / the slug-template family) the design retires.
+
+This leaves `rename-slug` underspecified: an implementer cannot derive the new path without re-introducing layout awareness, and a naive "string-replace old-slug with new-slug in artifactPath" is fragile (breaks if the slug substring appears elsewhere in the path, or if the directory and filename disagree). The fix is to specify the rename derivation explicitly — e.g. detect the layout from the stored `artifactPath` shape and re-apply `layoutToContentRelativePath(detectedLayout, newSlug)` against the same parent directory — and acknowledge that `rename-slug` is the verb that keeps a slug→path dependency even after the template family is gone.
+
+### AUDIT-20260603-37 — "Zero behavior change" / "byte-for-byte identical" cutover claim is false for any adopter who customized `blogFilenameTemplate` away from `{slug}/index.md`
+
+Finding-ID: AUDIT-20260603-37
+Status:     resolved-2026-06-03 — folded into the design (§ "39c-2b design amendment"; "zero behavior change" claim scoped to default-template adopters + migration maps custom blogFilenameTemplate to a layout / halts loudly). Operator chose "amend the design" (option a).
+Severity:   medium
+Surface:    `docs/superpowers/specs/2026-06-02-sites-to-lanes-retirement-design.md` § "`add`-time path composition" (*"Defaulting layout to `index` keeps every adopter's `add` byte-for-byte identical after the `sites` retirement"* and Decisions-log rows 11/12)
+
+The design defends defaulting layout to `index` with a strong claim: defaulting to `index` keeps *"every adopter's `add` byte-for-byte identical"* because it *"matches the current `{slug}/index.md` template default."* But the artifact being retired is named `blogFilenameTemplate` — a *template* with a *default*, which by construction means adopters could override it. Any project that set `blogFilenameTemplate` to a non-default value (e.g. `{slug}.md` flat, or a custom shape) will NOT get a byte-for-byte-identical `add` after the cutover — they will silently get the new fixed global `index` default instead of their configured layout. The claim holds only for adopters who left the template at its default.
+
+This is the silent-regression failure mode the project's no-fallbacks discipline exists to catch, except here it's the *removal* of a configurable surface replaced by a hardcoded default. Two gaps: (1) the "zero behavior change" claim should be scoped to *default-template adopters*, not "every adopter"; (2) there is no doctor detection specced for "config has a non-default `blogFilenameTemplate`" so the migration cannot warn the affected adopters or carry their custom layout forward. Minimally, the cutover (`doctor --fix`) should detect a non-default `blogFilenameTemplate` and either map it to the corresponding `--layout` default or fail loudly — consistent with row 13's "missing scaffoldDefaults fails loudly" stance.
+
+### AUDIT-20260603-38 — The "11 `resolveSite` callers" inventory is internally inconsistent between the workplan DISCOVERY note and the spec migration section — `rename-slug`'s bucket shifted and the arithmetic doesn't reconcile
+
+Finding-ID: AUDIT-20260603-38
+Status:     resolved-2026-06-03 — folded into the design (§ "39c-2b design amendment"; canonical consumer roster published: 10 CLI command files + 2 core modules). Operator chose "amend the design" (option a).
+Severity:   low
+Surface:    `workplan.md` 39c-2 DISCOVERY note (*"11 CLI-verb callers (publish/induct/shortform-start/add/cancel/approve/ingest/distribute/block/iterate)"*) vs. spec § "CLI-verb resolution migration" (*"The 11 `resolveSite` callers split into two…"* with existing-entry list of 9 including `rename-slug`, + `add` + `ingest`)
+
+The two documents both assert "11" but disagree on membership. The workplan DISCOVERY parenthetical lists **10** names (publish, induct, shortform-start, add, cancel, approve, ingest, distribute, block, iterate) under "11 CLI-verb callers," and places `rename-slug` in a *separate* "slug-template family" consumer list — not among the `resolveSite` callers. The spec migration section reaches 11 by counting 9 existing-entry verbs (which now **includes** `rename-slug`) + `add` + `ingest`. So `rename-slug` migrated from the slug-template-family bucket into the `resolveSite`-callers bucket between the two docs, and the original 10-name list never named the 11th caller.
+
+This is a count/inventory drift, not a logic bug, but it matters: an implementer working from "migrate the 11 `resolveSite` callers" against the workplan's 10-name list will be one short and has no authoritative roster of which 11 functions to touch. The fix is to publish one canonical, enumerated list of the 11 callers (with `rename-slug` explicitly in or out) in a single place and reference it from both docs, so the terminal "delete `resolveSite`/`siteConfig`" step has a verifiable completion check rather than a number that doesn't match its own enumeration.
+
+---
+
+I also checked and found clean: the `layoutToContentRelativePath` mapping (index/readme/flat → `<slug>/index.md` / `<slug>/README.md` / `<slug>.md`) is internally consistent between spec and workplan; the "missing `scaffoldDefaults[K]` fails loudly" decision (row 13) correctly honors the no-fallbacks rule; the Decisions-log additions (rows 11–14) trace to the prose; and the "Open sub-question (captured, not blocking)" about a per-lane `defaultLayout` is legitimate capture-mode recording, not a will-fix-later code deferral, so it is not a discipline violation.
+
+## 2026-06-03 — audit-barrage lift (20260603T095004094Z-deskwork-plugin)
+
+### AUDIT-20260603-39 — `layoutToContentRelativePath` hardcodes the `.md` extension, so `add --kind {html-mockup,single-file-html,image}` stamps a markdown `artifactPath` onto a non-markdown artifact
+
+Finding-ID: AUDIT-20260603-39
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/lanes/scaffold-path.ts:52-64` (`layoutToContentRelativePath`) + `:83-105` (`composeAddArtifactPath`) + `packages/cli/test/add-lane-stage-integration.test.ts:178-180`
+
+`composeAddArtifactPath` selects the directory by `kind` (`lane.scaffoldDefaults?.[kind]`, line 89) but then composes the filename via `layoutToContentRelativePath(layout, slug)`, which is **kind-blind** and hardcodes `.md` for every layout (`${slug}/index.md`, `${slug}/README.md`, `${slug}.md`). `ArtifactKind` (`types.ts:104-108`) is one of `markdown | html-mockup | single-file-html | image`, and the kind docblocks are explicit about shape: `html-mockup` is *"a directory containing `index.html`"* (`types.ts:90`), `single-file-html` is *"a loose `.html` file"* (`:93-94`). So `add --kind html-mockup` stamps `…/design-x/index.md` as the entry's authoritative `artifactPath` for an artifact that lives at `…/design-x/index.html`, and `--kind image` stamps `…/<slug>/index.md` for an image. Since the comment in `scaffold-path.ts:6-9` declares this path *"authoritative (resolution never recomputes it),"* every downstream consumer (publish, distribute, doctor, studio resolution) will read the wrong on-disk location for these kinds.
+
+The integration test at `add-lane-stage-integration.test.ts:178-180` doesn't catch this — it *locks the bug in*: it asserts `sidecar['artifactPath']` is `'content/mockups/design-x/index.md'` for `--kind html-mockup`. Per `.claude/rules/testing.md` ("tests that don't test the contract they claim"), this is a test asserting the implemented behavior rather than the kind's actual on-disk contract. A reasonable fix: make the layout→relative-path mapping kind-aware (the extension and `index`-filename must derive from the kind — `index.html` for `html-mockup`, a bare `<slug>.html` for `single-file-html`, and `image` likely shouldn't accept a layout at all), and change the integration test to assert `index.html` for the html-mockup case.
+
+---
+
+### AUDIT-20260603-40 — `composeAddArtifactPath` joins with `node:path.join`, producing platform-dependent separators inconsistent with the forward-slash paths `layoutToContentRelativePath` emits
+
+Finding-ID: AUDIT-20260603-40
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/lanes/scaffold-path.ts:29` (`import { join } from 'node:path'`) + `:104` (`return join(directory, relativePath)`)
+
+`layoutToContentRelativePath` deliberately emits POSIX-separated relative paths (`${slug}/index.md`, lines 57-62), and every test asserts forward-slash `artifactPath` values (`'docs/first-post/index.md'`, `'src/content/blog/my-post/index.md'`). But line 104 composes the final value with `node:path.join`, whose separator is platform-dependent — on Windows it returns `directory\slug\index.md` (and re-normalizes the `/` from the relative part to `\`). The result is a stored `artifactPath` whose separator convention silently differs by OS, breaking string-equality with the slug/host-relative paths the rest of the system stores and compares (and the test-suite would fail on Windows). `join` also silently normalizes `..` and collapses duplicate slashes, which can mask a malformed `scaffoldDefaults` directory rather than surfacing it.
+
+Because `artifactPath` is declared authoritative and persisted to the sidecar, a separator mismatch is durable, not transient. The fix is to compose with an explicit forward-slash join (e.g. `posix.join` from `node:path` or a literal `` `${directory}/${relativePath}` `` with a single-slash guard), consistent with how `layoutToContentRelativePath` already hardcodes `/`. Whichever is chosen, the convention should be the same on both sides of the join.
+
+---
+
+### AUDIT-20260603-41 — `add` stamps a lanes-composed `artifactPath`, but `scaffoldBlogPost` still derives the on-disk location via the retiring sites-based `resolveSite`/`resolveBlogFilePath` — verify the file-creating path honors the stamped value
+
+Finding-ID: AUDIT-20260603-41
+Status:     open
+Severity:   medium
+Surface:    `packages/cli/src/commands/add.ts:155-167` (compose + stamp) vs. `packages/core/src/scaffold.ts:27` (`import { resolveSite, resolveBlogFilePath } from './paths.ts'`) — still present after the refactor
+
+This diff introduces a second, parallel path-composition system. `add` now composes `artifactPath` from `lane.scaffoldDefaults[kind]` (lanes-based) and stamps it as authoritative, while `scaffoldBlogPost` in `scaffold.ts` continues to compute its on-disk target from `resolveSite` + `resolveBlogFilePath` (the sites-based machinery the 39c retirement is removing). The refactor only extracted the shared `layoutToContentRelativePath` helper (scaffold.ts:183-194 deleted, now imported from `scaffold-path.ts`); the *directory* source on the two paths still differs — lanes `scaffoldDefaults` vs. sites `contentDir`. If any code that actually creates the content file goes through `scaffoldBlogPost`/`resolveBlogFilePath` rather than reading the entry's stamped `artifactPath`, the stamped path and the created file diverge for any lane whose `scaffoldDefaults[markdown]` ≠ the legacy `sites.main.contentDir`.
+
+The diff doesn't include the file-creating caller, so I can't confirm the divergence fires — but the surface is exactly the cross-cutting seam this sub-task touches, and it isn't shown as updated. The check the operator should run: confirm that the verb which materializes the artifact on disk (draft/scaffold) reads `entry.artifactPath` and does **not** recompute via `resolveBlogFilePath`. If it recomputes, that recomputation must be retired in lockstep with this stamp, or `add`'s "authoritative" claim is false the moment the file is written somewhere else.
+
+---
+
+I also checked and found clean: the pre-write ordering (`composeAddArtifactPath` is called inside its own try/catch *before* `writeCalendar`, add.ts:158-167, so a missing-default lane aborts with no disk mutation — the integration test at lines 360-393 verifies calendar.md stays untouched); the loud-error path (names lane id + kind + the real `lane update --scaffold-default` remediation command, which exists per `lane.ts:11,185`); the `--layout` flag validation (rejects out-of-set values pre-write with exit 2, mirroring `--kind`/`--source`); and the single-source-of-truth refactor (`scaffold.ts` correctly re-exports `ScaffoldLayout` and imports the mapping helper rather than duplicating it). My three findings concentrate on the kind-blindness of the composer, separator portability, and the unverified seam between the new stamp and the old file-creating path.

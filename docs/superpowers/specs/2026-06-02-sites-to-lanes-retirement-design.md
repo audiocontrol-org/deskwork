@@ -94,7 +94,7 @@ A doctor rule detects the pre-migration shape (config has `sites`, or entries la
    - `flat` → `<slug>.md`
 4. **`artifactPath`** ← `join(scaffoldDefaults[K], relativePath)`, stamped onto the new entry's sidecar. From that point it is authoritative; resolution never recomputes it.
 
-**Default rationale (least surprise):** today, `add` with no flags produces `<slug>/index.md` (the `blogFilenameTemplate` default `{slug}/index.md`). Defaulting layout to `index` keeps every adopter's `add` byte-for-byte identical after the `sites` retirement.
+**Default rationale (least surprise):** today, `add` with no flags produces `<slug>/index.md` (the `blogFilenameTemplate` default `{slug}/index.md`). Defaulting layout to `index` keeps `add` byte-for-byte identical **for adopters who left `blogFilenameTemplate` at its default**. ⚠️ This is NOT zero-change for adopters who *customized* `blogFilenameTemplate` — see the **39c-2b design amendment** below (AUDIT-37) for how the migration carries a custom template forward.
 
 **Retires the slug-template family.** `resolveBlogFilePath` / `resolveEntryFilePath` / `resolveShortformFilePath` / `resolveBlogPostDir` (and `blogFilenameTemplate`) currently build the full path from `siteConfig().contentDir`. They are replaced by the `scaffoldDefaults[K]` + `layoutToContentRelativePath` composition above; the `{slug}` template-substitution machinery is removed with `sites`.
 
@@ -102,14 +102,68 @@ A doctor rule detects the pre-migration shape (config has `sites`, or entries la
 
 ## CLI-verb resolution migration (39c-2b design pass — 2026-06-03)
 
-The 11 `resolveSite` callers split into two resolution patterns by whether the verb acts on an existing entry or creates a new one:
+The consumers split into **three** patterns (the post-barrage amendment below corrects an earlier two-bucket split — see AUDIT-35/38 — and publishes the canonical roster):
 
-- **Verbs on an EXISTING entry** (publish, induct, cancel, approve, block, iterate, distribute, shortform-start, rename-slug): resolve the artifact via **`entry.artifactPath`** — extending 39d's entry-review flip to the CLI-verb path. No `contentDir`, no slug+stage search. An entry missing `artifactPath` is a `doctor --fix`-able state (39b backfills it); the verb **throws with that guidance** rather than guessing.
-- **`add` (creates a NEW entry):** no `artifactPath` exists yet → compose it via the `scaffoldDefaults[K]` model above, then stamp it.
+- **Act-on-EXISTING-entry verbs** (publish, induct, cancel, approve longform, block, iterate longform, distribute): resolve the artifact via **`entry.artifactPath`** — extending 39d's entry-review flip to the CLI-verb path. No `contentDir`, no slug+stage search. An entry missing `artifactPath` is a `doctor --fix`-able state (39b backfills it); the verb **throws with that guidance** rather than guessing.
+- **Create-a-NEW-file verbs** (`add`; `shortform-start` + the shortform branches of `approve`/`iterate`): no destination exists yet → *compose-then-stamp*. `add` composes its main artifact from the `scaffoldDefaults[K]` model above; the shortform verbs compose a scrapbook-child path from the **parent entry's `artifactPath` directory** (see AUDIT-35 in the amendment) — NOT from `contentDir`.
 - **`ingest --apply`:** stamps `artifactPath` from the discovered on-disk file (already specced in § Surface impacts).
-- **`rename-slug` note:** renaming moves the file and rewrites `entry.artifactPath` to the new location; it no longer recomputes a path from a template.
+- **`rename-slug`:** a slug→path verb — it detects the layout from the stored `artifactPath` and recomposes against the same base directory (see AUDIT-36 in the amendment). It keeps a slug→path dependency even after the template family is gone.
 
-Only after every verb resolves via `entry.artifactPath` (or composes-then-stamps, for `add`) can `resolveSite` / `siteConfig` / `resolveContentDir` / `config.sites` / `SiteConfig` be deleted — the terminal step of 39c-2b.
+Only after every consumer resolves via `entry.artifactPath` (or composes-then-stamps) can `resolveSite` / `siteConfig` / `resolveContentDir` / `config.sites` / `SiteConfig` be deleted — the terminal step of 39c-2b. The **canonical consumer roster** is in the amendment below (AUDIT-38).
+
+## 39c-2b design amendment (2026-06-03, post-barrage findings)
+
+The audit-barrage on the 39c-2b design pass + sub-task (b) commit surfaced six gaps (AUDIT-20260603-35..40). The design pass under-mapped the same class of resolution path that originally made 39c-2 STOP. Resolutions:
+
+### AUDIT-39 (HIGH) — path composition must be kind-aware, not markdown-only
+
+The Option-1 model composed the relative path from `layout` alone, hardcoding `.md`. But `ArtifactKind` is `markdown | html-mockup | single-file-html | image`, and a non-markdown kind stamped with a `.md` `artifactPath` is wrong at the authoritative source. The composer is now **`(kind, layout, slug) → relativePath`**:
+
+| kind | extension | default layout | shape (at default layout) |
+|---|---|---|---|
+| `markdown` | `.md` | `index` | `<slug>/index.md` |
+| `html-mockup` | `.html` | `index` | `<slug>/index.html` (a directory containing `index.html`) |
+| `single-file-html` | `.html` | `flat` | `<slug>.html` (a loose file) |
+| `image` | — | — | **not templatable** |
+
+- The **extension is derived from the kind**; `layout` selects the filename pattern (`index` → `<slug>/index.<ext>`, `readme` → `<slug>/README.<ext>`, `flat` → `<slug>.<ext>`).
+- The **default layout is per-kind** (markdown/html-mockup → `index`; single-file-html → `flat`), refining the earlier "global `index` default." `--layout` still overrides. For `markdown` this preserves the zero-change default (`<slug>/index.md`).
+- **`image` is not templatable** (binary; there is no body to scaffold). `add --kind image` requires an explicit `--artifact-path <path>`; absent → **fail loudly** (consistent with the no-fallbacks rule and Decision #13). The `--layout` flag does not apply to `image`.
+- The sub-task (b) integration test that asserted `…/index.md` for `--kind html-mockup` **locked the bug in**; it must assert `…/index.html`.
+
+### AUDIT-40 (medium) — compose with forward slashes, not `node:path.join`
+
+`artifactPath` is persisted and string-compared against the POSIX-separated paths the rest of the system stores. `node:path.join` yields `\`-separated paths on Windows, so the composer must join with an explicit forward slash (`node:path/posix.join` or a single-slash template), matching how the relative-path helper already hardcodes `/`.
+
+### AUDIT-37 (medium) — scope the "zero behavior change" claim + migrate custom `blogFilenameTemplate`
+
+"Zero change" holds only for adopters who left `blogFilenameTemplate` at its `{slug}/index.md` default (claim scoped inline above). For a **customized** template, the migration (`doctor --fix`, 39b/39e) maps it to a layout and fails loudly when it cannot:
+
+| legacy `blogFilenameTemplate` | maps to |
+|---|---|
+| `{slug}/index.md` | layout `index` (markdown) |
+| `{slug}/README.md` | layout `readme` |
+| `{slug}.md` | layout `flat` |
+| anything else | **migration halts** with an actionable error — the operator sets `scaffoldDefaults` + layout (or an explicit per-entry `artifactPath`) by hand |
+
+This prevents a silent layout regression for custom-template adopters.
+
+### AUDIT-35 (medium) — `shortform-start` is a create-verb, not an act-on-existing verb
+
+Moved to the create-verb bucket (above). A shortform draft is a NEW file in the parent entry's scrapbook. Its destination is composed from the **parent entry's `artifactPath` directory** (via `resolveStoredArtifactPath` → the entry dir) + `scrapbook/shortform/<platform>[-<channel>].md` — replacing `resolveShortformFilePath`'s old `findEntryFile`/`contentDir` search. The shortform branches of `approve`/`iterate` resolve the same way.
+
+### AUDIT-36 (medium) — `rename-slug` derives the new path by layout detection
+
+`rename-slug` keeps a slug→path dependency. The new path is derived: **detect the layout from the stored `artifactPath` shape** (`…/<slug>/index.<ext>` → `index`; `…/<slug>/README.<ext>` → `readme`; `…/<slug>.<ext>` → `flat`), then recompose `composeRelativePath(kind, detectedLayout, newSlug)` against the same base directory; move the file; rewrite `artifactPath`. No naive slug-substring replacement (fragile when the slug appears elsewhere in the path).
+
+### AUDIT-38 (low) — canonical consumer roster
+
+The "11 callers" count was imprecise. The authoritative roster of `resolveSite`/`siteConfig`/slug-template consumers to migrate before the terminal deletion:
+
+- **CLI command files (10):** `add`, `ingest`, `publish`, `block`, `cancel`, `approve` (longform + shortform call sites), `distribute`, `induct`, `shortform-start`, `iterate` (longform + shortform call sites). (12 `resolveSite` call sites across these 10 files.)
+- **Core modules (2):** `packages/core/src/scaffold.ts` (`resolveSite` + `resolveBlogFilePath`), `packages/core/src/rename-slug.ts` (`resolveBlogPostDir` + slug-template).
+
+The terminal-deletion step's completion check is: zero `resolveSite`/`siteConfig`/`resolveContentDir`/`resolveBlogFilePath`/`resolveBlogPostDir`/`resolveEntryFilePath`/`resolveShortformFilePath` references remain outside the 39b migration reader.
 
 ## Decisions log
 
@@ -129,6 +183,12 @@ Only after every verb resolves via `entry.artifactPath` (or composes-then-stamps
 | 12 | Default layout = `index` (`<slug>/index.md`) | Least surprise — matches the current `{slug}/index.md` template default. |
 | 13 | Missing `scaffoldDefaults[K]` fails loudly (no silent fallback) | Per the no-fallbacks rule; an undefined scaffold dir is an actionable error, not a guess. |
 | 14 | CLI verbs on existing entries resolve via `entry.artifactPath` only | Extends 39d's flip to the verb path; eliminates the last slug+stage search before `sites` can be deleted. |
+| 15 | Path composition is kind-aware (extension from kind; layout selects filename pattern) | AUDIT-39: a non-markdown kind stamped with `.md` is wrong at the authoritative source. |
+| 16 | Default layout is per-kind (md/html-mockup → index; single-file-html → flat) | AUDIT-39: refines the global-`index` default so each kind's natural shape is honored; markdown's default is unchanged. |
+| 17 | `image` kind is not templatable; `add --kind image` requires explicit `--artifact-path`, else fails loud | AUDIT-39: a binary has no body to scaffold; no fallback (Decision #13). |
+| 18 | `artifactPath` composed with forward-slash join, never `node:path.join` | AUDIT-40: persisted path must be POSIX-separated for cross-OS string-equality. |
+| 19 | Custom `blogFilenameTemplate` migrates to a layout; unmappable shapes halt the migration | AUDIT-37: prevents a silent layout regression for custom-template adopters. |
+| 20 | `shortform-start` (+ shortform approve/iterate) is a create-verb composing from the parent entry's `artifactPath` dir; `rename-slug` derives the new path by layout detection | AUDIT-35/36: both were under-mapped by the two-bucket split. |
 
 ## The paused release (§9 cross-ref)
 

@@ -2041,3 +2041,57 @@ Closes AUDIT-20260603-15. Surface: `packages/core/src/doctor/rules/sites-to-lane
 - [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
 - [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.6 (fix-finding-AUDIT-20260603-39): AUDIT-20260603-39 — `layoutToContentRelativePath` hardcodes the `.md` extension,…
+
+Closes AUDIT-20260603-39. Surface: `packages/core/src/lanes/scaffold-path.ts:52-64` (`layoutToContentRelativePath`) + `:83-105` (`composeAddArtifactPath`) + `packages/cli/test/add-lane-stage-integration.test.ts:178-180`. Severity: high.
+
+- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
+- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
+- [ ] Step 5: commit with `Closes AUDIT-20260603-39` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.7 (fix-finding-AUDIT-20260603-40): AUDIT-20260603-40 — `composeAddArtifactPath` joins with `node:path.join`, produc…
+
+Closes AUDIT-20260603-40. Surface: `packages/core/src/lanes/scaffold-path.ts:29` (`import { join } from 'node:path'`) + `:104` (`return join(directory, relativePath)`). Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260603-40` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.8 (fix-finding-AUDIT-20260603-41): AUDIT-20260603-41 — `add` stamps a lanes-composed `artifactPath`, but `scaffoldB…
+
+Closes AUDIT-20260603-41. Surface: `packages/cli/src/commands/add.ts:155-167` (compose + stamp) vs. `packages/core/src/scaffold.ts:27` (`import { resolveSite, resolveBlogFilePath } from './paths.ts'`) — still present after the refactor. Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260603-41` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
