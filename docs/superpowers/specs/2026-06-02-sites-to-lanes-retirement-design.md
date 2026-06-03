@@ -1,7 +1,7 @@
 # Sites → Lanes Retirement — Design Spec
 
 **Date:** 2026-06-02
-**Status:** Accepted (brainstorm complete; pending implementation plan)
+**Status:** Accepted (brainstorm complete; pending implementation plan). **Addendum 2026-06-03:** 39c-2b design pass added — see § "`add`-time path composition" and § "CLI-verb resolution migration" (operator chose Option 1 + global `index` default).
 **Branch context:** authored on `feature/deskwork-plugin` at a point where `main` (v0.34.0) has shipped the graphical-entries lane model; this spec supersedes the in-flight `#394` "search every site's contentDir" fix (which is dropped — see §9).
 
 ## Problem
@@ -80,6 +80,37 @@ A doctor rule detects the pre-migration shape (config has `sites`, or entries la
 - **ingest / add** — `add --lane X --kind K` scaffolds into `lane.scaffoldDefaults[K]` (or an explicit destination), then stamps the resulting `artifactPath` onto the new entry. `ingest --apply` stamps `artifactPath` for every backfilled entry.
 - **config schema + loader** (`packages/core/src/config.ts`) — `SiteConfig` / `sites` removed; the migration-time tolerant reader is the only path that still parses a legacy `sites` block.
 
+## `add`-time path composition (39c-2b design pass — 2026-06-03)
+
+**Decision (operator, 2026-06-03):** *Option 1* — `scaffoldDefaults[K]` carries the **directory only**; the file's on-disk shape (its *layout*) is a separate, defaulted concern. Chosen over a full path-template field (Option 2) and a fixed-flat-filename model (Option 3) because it is the smallest change and preserves all three existing layouts with **zero behavior change** at the cutover.
+
+**How `add --lane X --kind K` composes the destination:**
+
+1. **Directory** ← `lane.scaffoldDefaults[K]`. If the lane defines no default for kind `K`, `add` **fails loudly** with guidance (no silent fallback, per the no-fallbacks rule) — the operator either passes an explicit destination or adds the default to the lane.
+2. **Layout** ← `--layout {index|readme|flat}` if given; else the global default **`index`**.
+3. **Relative path** ← `layoutToContentRelativePath(layout, slug)` (the existing `scaffold.ts` helper):
+   - `index` → `<slug>/index.md` (default)
+   - `readme` → `<slug>/README.md`
+   - `flat` → `<slug>.md`
+4. **`artifactPath`** ← `join(scaffoldDefaults[K], relativePath)`, stamped onto the new entry's sidecar. From that point it is authoritative; resolution never recomputes it.
+
+**Default rationale (least surprise):** today, `add` with no flags produces `<slug>/index.md` (the `blogFilenameTemplate` default `{slug}/index.md`). Defaulting layout to `index` keeps every adopter's `add` byte-for-byte identical after the `sites` retirement.
+
+**Retires the slug-template family.** `resolveBlogFilePath` / `resolveEntryFilePath` / `resolveShortformFilePath` / `resolveBlogPostDir` (and `blogFilenameTemplate`) currently build the full path from `siteConfig().contentDir`. They are replaced by the `scaffoldDefaults[K]` + `layoutToContentRelativePath` composition above; the `{slug}` template-substitution machinery is removed with `sites`.
+
+**Open sub-question (captured, not blocking):** whether a lane carries an optional `defaultLayout` field, or layout stays purely a per-`add` flag with the global `index` default. The global-`index` default already satisfies the zero-behavior-change goal; a per-lane default is an additive convenience the implementation plan can decide.
+
+## CLI-verb resolution migration (39c-2b design pass — 2026-06-03)
+
+The 11 `resolveSite` callers split into two resolution patterns by whether the verb acts on an existing entry or creates a new one:
+
+- **Verbs on an EXISTING entry** (publish, induct, cancel, approve, block, iterate, distribute, shortform-start, rename-slug): resolve the artifact via **`entry.artifactPath`** — extending 39d's entry-review flip to the CLI-verb path. No `contentDir`, no slug+stage search. An entry missing `artifactPath` is a `doctor --fix`-able state (39b backfills it); the verb **throws with that guidance** rather than guessing.
+- **`add` (creates a NEW entry):** no `artifactPath` exists yet → compose it via the `scaffoldDefaults[K]` model above, then stamp it.
+- **`ingest --apply`:** stamps `artifactPath` from the discovered on-disk file (already specced in § Surface impacts).
+- **`rename-slug` note:** renaming moves the file and rewrites `entry.artifactPath` to the new location; it no longer recomputes a path from a template.
+
+Only after every verb resolves via `entry.artifactPath` (or composes-then-stamps, for `add`) can `resolveSite` / `siteConfig` / `resolveContentDir` / `config.sites` / `SiteConfig` be deleted — the terminal step of 39c-2b.
+
 ## Decisions log
 
 | # | Decision | Rationale |
@@ -94,6 +125,10 @@ A doctor rule detects the pre-migration shape (config has `sites`, or entries la
 | 8 | Retire per-site `calendarPath`; calendar is a single derived projection | Entry-centric model already derives the calendar; per-site files were the other half of #394. |
 | 9 | Migration = `doctor --fix` clean cutover | Pre-1.0 decisive cutover; adopters run doctor once. |
 | 10 | Drop the in-flight `#394` search-all-sites fix | Wrong layer; superseded by entry-owns-path resolution. |
+| 11 | `add`-time destination = `scaffoldDefaults[K]` dir + separate layout (Option 1) | Smallest change; preserves all 3 layouts; default `index` = today's behavior (zero-change cutover). Operator 2026-06-03. |
+| 12 | Default layout = `index` (`<slug>/index.md`) | Least surprise — matches the current `{slug}/index.md` template default. |
+| 13 | Missing `scaffoldDefaults[K]` fails loudly (no silent fallback) | Per the no-fallbacks rule; an undefined scaffold dir is an actionable error, not a guess. |
+| 14 | CLI verbs on existing entries resolve via `entry.artifactPath` only | Extends 39d's flip to the verb path; eliminates the last slug+stage search before `sites` can be deleted. |
 
 ## The paused release (§9 cross-ref)
 
