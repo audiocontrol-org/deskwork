@@ -3040,3 +3040,150 @@ Lower-stakes than the duplicated-constant finding, but it compounds with it: the
 ---
 
 I checked and found clean: the `computeAuditedDiff` short-circuit ordering and the new `too-large` early-returns (range → staged → unstaged, each overflow returning immediately with the correct `tooLargeLayer`) are correct and well-covered by the new tests, including the no-collapse regression-lock pinning `too-large` ≠ `empty`; the `isMaxBufferError` classifier handles the `ENOBUFS` / `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` code paths plus the message fallback and rejects `null`/`undefined`/string/number/`{}` cleanly; the `runImplementHook` wiring refuses with exit 1 + the layer-specific cure and preserves the separate `empty` refusal; the `DiffCallResult` discriminated-union threading is type-consistent across the DI bag and the three call sites; and the audit-log appends (the four AUDIT-20260603-0x blocks + the AUDIT-39 status flip to `acknowledged-partial-fix`) are internally consistent with the commit subjects. My four findings are the missing/false integration-smoke claim plus untested `runGitDiff` (-01), the `ok:true` mislabeling of caught git errors (-02), and two coupled cure-message hygiene issues — duplicated 50 MB constant (-03) and a stale file-path pointer the same refactor invalidated (-04). I did not re-report the already-slushed `catch`-swallow framing (AUDIT-39 body), the `IsAncestorOfHeadOptions` stale name (AUDIT-51), or the divergence-notice dead-code / upstream-base plumbing already captured as AUDIT-20260603-01/-02.
+
+## 2026-06-03 — audit-barrage lift (20260603T004921144Z-scope-discovery)
+
+### AUDIT-20260603-09 — AUDIT-39 + AUDIT-03 flipped to `fixed-f6b70b67` while the SAME commit appends a finding documenting the unresolved half of AUDIT-39's complaint
+
+Finding-ID: AUDIT-20260603-09
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — AUDIT-20260602-39 status line (`+Status: fixed-f6b70b67`) and AUDIT-20260603-03 status line (`+Status: fixed-f6b70b67`), vs. the AUDIT-20260603-06 block appended in the same diff.
+
+AUDIT-39's own body (quoted earlier in this same file) names **two** conflations in the pre-fix `catch { return ''; }`: (a) maxBuffer-overflow vs. empty-tree, and (b) "not a git repo" / "bad ref" vs. empty-tree. The `f6b70b67` fix resolves only (a) by surfacing `too-large`. This very diff *also* appends AUDIT-20260603-06, whose heading is literally *"reintroduces the other half of AUDIT-39's complaint"* and whose body states (b) "is untouched and is now arguably *more* misleading." So the diff simultaneously (1) marks AUDIT-39 fully `fixed-f6b70b67` and (2) documents, in the adjacent block, that AUDIT-39's named mechanism is half-unaddressed. That is exactly the closure-vs-coverage inconsistency shape AUDIT-52 named and that AUDIT-20260603-03 itself was filed to call out — recurring in the act of closing AUDIT-03.
+
+The honest status is `acknowledged-partial-fix` (which is in fact what `da52fcee` set the day before: `acknowledged-partial-fix-81875d74-...`). Flipping straight to `fixed` regresses that more-accurate status. A reasonable fix: keep AUDIT-39 (and AUDIT-03, which trailers the same `f6b70b67`) at `acknowledged-partial-fix-f6b70b67-maxbuffer-classified-pending-git-error-distinction`, with the residual (b) tracked by the open AUDIT-20260603-06, until the `{ ok: false, kind: 'git-error' }` variant AUDIT-06 prescribes lands.
+
+### AUDIT-20260603-10 — Appended barrage's "checked clean" paragraph claims AUDIT-39 was flipped to `acknowledged-partial-fix` — but the same diff flips it to `fixed-f6b70b67`
+
+Finding-ID: AUDIT-20260603-10
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — the closing "I checked and found clean" paragraph of the `20260603T002818476Z` barrage block: *"the AUDIT-39 status flip to `acknowledged-partial-fix`) are internally consistent with the commit subjects."*
+
+The closing paragraph of the appended barrage asserts that AUDIT-39 was flipped to `acknowledged-partial-fix` and that this is "internally consistent with the commit subjects." But the AUDIT-20260602-39 status line *in the same diff* reads `+Status: fixed-f6b70b67`. The file now self-contradicts: one line says `fixed-f6b70b67`, the summary paragraph says `acknowledged-partial-fix`. This is a timing artifact — the barrage ran against `f6b70b67` (when da52fcee had set `acknowledged-partial-fix`), then the later `9e67e90d` flip to `fixed-f6b70b67` was committed alongside the barrage text without reconciling the summary — but the committed result is a document that describes a status different from the one it records. It also compounds AUDIT-BARRAGE-claude-01: the summary paragraph's own value (`acknowledged-partial-fix`) is the *correct* one, which is itself evidence the `fixed-f6b70b67` flip overclaimed. Minimal fix: reconcile the summary sentence to the status actually committed (`fixed-f6b70b67`), or — preferred per finding -01 — restore the status line to `acknowledged-partial-fix` so both agree on the accurate value.
+
+### AUDIT-20260603-11 — The v0.35.0 release HEAD commit has no `hook-run-log.jsonl` entry — the exact Phase 23 bypass shape recurred live at this release
+
+Finding-ID: AUDIT-20260603-11
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (last appended `tip` is `9e67e90d…`) vs. the release HEAD `chore: release v0.35.0` (`50731723`, the commit carrying every version bump in this diff).
+
+The three appended log entries cover `da52fcee` (no-new-diff-skip), `f6b70b67` (fired-and-slushed), and `9e67e90d` (no-new-diff-skip). The chore-release commit `50731723` — which is HEAD and the actual carrier of the marketplace + package.json version bumps in this diff — has **no** per-SHA entry. Under the pre-push gate's per-SHA coverage check, an unlogged commit is flagged as uncovered, so this release was necessarily pushed with `--no-verify` (the gate Phase 17 Task 5 set out to make unbypassable). This is the precise bookkeeping-skip bypass that the feature's own Phase 23 scope (Task 2 — *"a release-bump-style commit pushes cleanly without --no-verify after this lands"*) exists to close, recurring live at v0.35.0.
+
+This finding is anchored evidence that the gap is not hypothetical: the diff under audit is itself the artifact of the bypass. Phase 23 is not implemented in this diff (no `enumerateCommitsInRange`, no per-SHA loop at the append call sites — the only code change is version-string bumps), so the recurrence is expected — but it should be recorded that the v0.35.0 release added another `--no-verify` push to the same tally as the morning's merge-from-main bypass, reinforcing the Phase 23 priority. No fix is appropriate in a release commit; the disposition is to ensure Phase 23 lands before the next release rather than accruing another bypassed tip.
+
+## 2026-06-03 — audit-barrage lift (20260603T010215769Z-scope-discovery)
+
+### AUDIT-20260603-12 — Silent single-entry fallback on enumeration-empty re-opens the exact `--no-verify` gap Phase 23 closes
+
+Finding-ID: AUDIT-20260603-12
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` — `writeMarkerSafe`, the `tipsToLog.length > 0 ? … : []` branch and its `else` single-entry fallback (~lines 711–740); `git-ancestry.ts` `enumerateCommitsInRange` catch (~lines 198–205).
+
+`enumerateCommitsInRange` returns `[]` on *any* git error (`catch { return []; }`), and `writeMarkerSafe` then falls back to a single HEAD-only entry whenever `tipsToLog` is empty. The comment itself conflates the cases: *"Used when priorTip is null OR when enumeration returned empty (bad range / git error / truly empty range)."* But for a **non-null, ancestry-validated** `priorTip`, the range `priorTip..HEAD` is guaranteed to contain at least HEAD — so an empty result there can *only* mean a git error (GC'd ref, spawn failure, corrupt object), never a legitimately-empty range. In that case the code silently logs only HEAD, leaving every intermediate commit in the range uncovered. The pre-push gate then refuses those commits and the operator is back to `--no-verify` — the precise failure Phase 23 exists to eliminate, now reachable silently with zero diagnostic on stderr.
+
+This is the recurring AUDIT-39 / AUDIT-20260603-06 shape (a `catch`-to-empty that hides a real git failure behind a benign-looking value) reappearing on the write side. The feature's own Step 0 invariant says the defense must be preserved; a silent degrade defeats it. A reasonable fix: when `priorTip !== null` and enumeration returns empty, write to `args.stderr` (the gate-relevant warning) before falling back, or distinguish "git errored" from "truly empty" so the non-null-priorTip-but-empty case is treated as the anomaly it is rather than swallowed.
+
+### AUDIT-20260603-13 — The production seam introduced by this diff — `writeMarkerSafe`'s range logic — has no test; the "load-bearing" test exercises only the leaf helper
+
+Finding-ID: AUDIT-20260603-13
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/hook-run-log.test.ts` (the `Phase 23 load-bearing` test, ~lines 240–262); absent: any test driving `runImplementHook` → `writeMarkerSafe` with a multi-commit range.
+
+Task 1's own acceptance criterion reads: *"Per-SHA append verified in a test that drives the full `runImplementHook` with a 3-commit synthetic range."* No such test is in the diff. The two new helpers (`enumerateCommitsInRange`, `appendHookRunLogEntriesForRange`) are each tested in isolation, but the actual new production logic — `writeMarkerSafe`'s `priorTip` computation, the ancestry-safety gate on the skip path, and the `enumerateCommitsInRange → appendHookRunLogEntriesForRange` wiring — is unexercised. The test labeled `Phase 23 load-bearing: 3-commit batch → 3 log entries (the v0.35.0 shape)` feeds a hand-built SHA array directly to `appendHookRunLogEntriesForRange`; it never calls `enumerateCommitsInRange` and never touches `runImplementHook`. So it does not test the v0.35.0 *shape* — it tests that a loop appends N entries, which the simpler `writes one entry per SHA` test already covers. This is exactly the "suite is green while the DI seam is unexercised" pattern prior findings (AUDIT-43) named and the diff reintroduces. The integration acceptance criterion checkbox is correctly left `[ ]`, but the workplan marks Step 5 GREEN at "495/495", which overstates coverage of the seam. Fix: add a `runImplementHook` test with a real tmp-git 3-commit batch asserting three per-SHA log entries land, OR rename the "load-bearing" test to scope what it actually verifies (the append loop, not the v0.35.0 path).
+
+### AUDIT-20260603-14 — Workplan marks Task 2's acceptance criterion "VERIFIED by Phase 23 Task 3 live repro" while Task 3 is entirely unexecuted
+
+Finding-ID: AUDIT-20260603-14
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 2 Acceptance Criteria (`A release-bump-style commit … pushes cleanly without --no-verify after this lands. **VERIFIED by Phase 23 Task 3 live repro.**`) vs. Task 3, whose Steps 1–4 and all three acceptance criteria are unchecked `[ ]`.
+
+Task 2's release-bump acceptance line carries a bold **VERIFIED by Phase 23 Task 3 live repro** annotation, but Task 3 ("Live verification — re-run the v0.35.0 release shape without `--no-verify`") has not been run: every step and every acceptance criterion under it is an open `[ ]`, including "Live repro on a synthetic branch succeeds without `--no-verify`" and "SKILL.md documents the per-SHA log-write semantic." A criterion cannot be "verified by" a task that hasn't executed. This is the closure-overclaim shape the prior audit cycle repeatedly flagged (AUDIT-20260603-09/-10): a status annotation asserting verification that the referenced evidence does not yet provide. Per the project's "agent posts evidence; operator decides closure" rule, the honest state is: Task 2's per-SHA append behavior is implemented and unit-covered, but the *release-bump-pushes-cleanly* claim is pending Task 3's live repro. Fix: strike the **VERIFIED by Task 3** annotation (or downgrade it to "pending Task 3 live repro") until Task 3 actually runs and the synthetic-branch push exits 0 without bypass.
+
+### AUDIT-20260603-15 — Per-SHA entries are appended newest-first, breaking the log's append-chronological invariant within a batch
+
+Finding-ID: AUDIT-20260603-15
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts` — `appendHookRunLogEntriesForRange` (~lines 134–143); fed by `enumerateCommitsInRange`'s `git rev-list` output (newest-first).
+
+`enumerateCommitsInRange` documents and returns SHAs in `git rev-list`'s default **newest-first** order, and `appendHookRunLogEntriesForRange` iterates that list as-is, appending HEAD's entry *before* its ancestors'. Until now the log was append-chronological (each single append = the latest run, last line = most recent). After Phase 23, a multi-commit batch writes entries in reverse-chronological order within the batch, so the file is no longer monotonically ordered by commit recency. The pre-push gate is set-membership-based so it is unaffected, and `readLatestBarrageTip` appears to read the marker rather than the log's last line — but the file is described in-repo as "durable history," and any future consumer (log analysis, "find the most recent run," a doctor rule walking the tail) that assumes chronological append order will read the oldest commit of the last batch as "latest." The new tests assert membership (`toContain`) and the explicit-tips ordering test pins the *input* order, so neither would catch a recency-ordering regression. Low-cost fix: `[...tips].reverse()` before the loop (oldest-first), or document explicitly that the log is not chronologically ordered and that consumers must use the marker for recency.
+
+### AUDIT-20260603-16 — `pickFallbackBaseline`'s JSDoc is orphaned — `enumerateCommitsInRange` was inserted between the docstring and the function it documents
+
+Finding-ID: AUDIT-20260603-16
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts` — insertion at ~line 165: the existing `/** … Pure function over the DI bag. */` block, then the new `enumerateCommitsInRange` interface+function, then `export function pickFallbackBaseline(...)`.
+
+The pre-existing `/** … * Pure function over the DI bag. */` block-comment documented `pickFallbackBaseline` (it directly preceded it). The diff inserts the new `// Phase 23 …` line comment, `EnumerateCommitsInRangeOptions`, and `enumerateCommitsInRange` *between* that docstring and `pickFallbackBaseline`. The result: `pickFallbackBaseline` now has no adjacent docstring, and the orphaned `/** … Pure function over the DI bag. */` floats above an unrelated line comment for `enumerateCommitsInRange`. This is a names-don't-reveal-intent / doc-drift hygiene issue — IDEs and readers will now attribute the stale docstring to the wrong symbol or show `pickFallbackBaseline` as undocumented. Fix: move the new function below `pickFallbackBaseline` (preserving its docstring adjacency), or relocate the orphaned `/** */` block back down to immediately precede `pickFallbackBaseline`.
+
+### AUDIT-20260603-17 — Asymmetric ancestry validation across the three `writeMarkerSafe` call sites
+
+Finding-ID: AUDIT-20260603-17
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` — skip-path call site (~lines 286–321, computes `priorTip` via `readLatestBarrageTip` + `checkAncestry` + `ancestryAsBarrageTip`) vs. barrage-outage (~line 506) and happy-path (~line 634) call sites, which both pass `priorTip: lastBarrageTip` directly.
+
+The no-new-diff-skip path carefully re-derives `priorTip` and runs it through the ancestry-safety gate ("only trust the prior tip when it's still reachable from HEAD; a diverged tip would enumerate the wrong history"). The other two call sites pass `lastBarrageTip` raw. If `lastBarrageTip` is already ancestry-validated upstream (i.e., the same value used to compute the barrage range earlier in the main flow), this is correct and consistent — but the diff doesn't show that derivation, and the asymmetry is a latent trap: should `lastBarrageTip` ever be a diverged/raw value at those sites, `enumerateCommitsInRange(diverged..HEAD)` would enumerate commits reachable from HEAD but not the diverged tip (over-logging already-covered SHAs, or — on a force-pushed/rewritten history — a misleading range). Worth confirming `lastBarrageTip` carries the same ancestry guarantee the skip path enforces; if so, a one-line comment at the happy-path call site stating "lastBarrageTip is ancestry-validated at <site>" would make the asymmetry intentional rather than accidental. If not, the same `checkAncestry`/`ancestryAsBarrageTip` treatment belongs at all three sites.
+
+---
+
+Checked and clean: `appendHookRunLogEntriesForRange` correctly delegates per-entry to `appendHookRunLogEntry` (preserving `O_APPEND` atomicity and the first-append sentinel side-effect), the empty-tips no-op is covered, and schema validation propagates from the base entry; `enumerateCommitsInRange`'s real-git fixture tests cover the 1/3/empty/bad-range/non-git matrix as the acceptance criterion requires; the `MarkerWriteArgs.priorTip: string | null` threading is type-consistent across all three call sites; and the fallback-to-single-entry is type-safe. My findings concentrate on the silent-degrade fallback (-01, the strongest), the untested integration seam plus mislabeled "load-bearing" test (-02), and the premature Task-3 verification claim in the workplan (-03).
+
+## 2026-06-03 — audit-barrage lift (20260603T010657327Z-scope-discovery)
+
+### AUDIT-20260603-18 — Skip-path runs don't advance the barrage tip, so the next fired barrage re-logs already-logged commits — contradictory dispositions and quadratic log growth
+
+Finding-ID: AUDIT-20260603-18
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (the new `d42cd022…` entries, appended twice); root cause in `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` — `writeMarkerSafe` range enumeration (lines 719-745) + `readLatestBarrageTip` (lines 753-773).
+
+The diff appends `d42cd02271…` to the log **twice with conflicting dispositions**: once as `no-new-diff-skip` at `01:00:49` (`runDir:null`) and again as `fired-and-slushed` at `01:04:54` (`runDir:…20260603T010215769Z`). I traced why. `readLatestBarrageTip` derives the prior tip from the newest `audit-runs/*/tip.sha`, but the `no-new-diff-skip` path passes `runDir: null` and never creates an audit-runs directory — so a skip run does **not** advance the barrage tip. The next *fired* run therefore re-reads the same prior tip (`50731723`) and `enumerateCommitsInRange('50731723..f183b746')` re-walks `d42cd022`, which an earlier skip run already logged. The log now records `d42cd022` as both "skipped, not audited" and "audited in a barrage" — a self-contradiction in what the file header (hook-run-log.ts:11-15) calls append-only durable history. For the set-membership pre-push gate this is harmless, but any consumer that asks "what disposition did this commit get?" gets two answers.
+
+Worse, the re-walk is unbounded across a streak of skip runs. Because the prior tip stays pinned at the last *fired* barrage for the whole skip streak, skip-at-B logs `[B]`, skip-at-C logs `[C,B]`, skip-at-D logs `[D,C,B]` — O(N²) appends and N duplicate entries for the earliest commit across N consecutive bookkeeping commits. A reasonable fix: dedup against already-logged tips before appending (read the log, skip SHAs already present), or advance a skip-aware "last covered tip" marker that `readLatestBarrageTip`/the range computation respects so each commit is logged exactly once.
+
+---
+
+### AUDIT-20260603-19 — Task 3 marked `[LIVE-VERIFIED]`, but the push it cites covered "1 unpushed commit" — not the multi-commit batch shape the task exists to verify
+
+Finding-ID: AUDIT-20260603-19
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 3 Step 2 and its three now-checked acceptance criteria.
+
+Task 3's title is "re-run the **v0.35.0 release shape** without `--no-verify`," and v0.35.0's failure was a **multi-commit batch** where intermediate commits lacked log entries. The new Step 2 evidence quotes the gate's own stdout: *"check-implement-hook-coverage: All **1 unpushed commit(s)** have matching hook-run entries."* A single unpushed commit does not reproduce the multi-commit-batch gate path — the gate validated exactly one SHA, which is the case that worked *before* Phase 23 too. The per-SHA entries were written, but the push that was supposed to prove the fix only exercised the one-commit path. So the `[x] Live repro on this branch succeeds without --no-verify` criterion is checked off against evidence that doesn't cover the scenario the task names.
+
+Per the project's verification-rigor rules ("agent posts evidence; operator decides closure" and the spec-compliance-probe lesson — assert the *claim*, not the mechanism), the honest state is: per-SHA writing is implemented and the gate passed for a single commit; the *multi-commit batch pushes cleanly* claim is not yet demonstrated. A fix: stage ≥2 unpushed commits (a fix commit + a bookkeeping commit covered by one hook run), push them together, and capture `All N unpushed commit(s)` with N>1 — or downgrade the `[LIVE-VERIFIED]` tag to "pending multi-commit repro" until that exists.
+
+---
+
+### AUDIT-20260603-20 — Task 2's release-bump criterion stays `[ ]` yet carries a bold "VERIFIED by Task 3" annotation that Task 3's single-commit evidence doesn't support
+
+Finding-ID: AUDIT-20260603-20
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 2 Acceptance Criteria: *"A release-bump-style commit (chore: release vX.Y.Z) pushes cleanly without --no-verify after this lands. **VERIFIED by Phase 23 Task 3 live repro.**"*
+
+This is the prior AUDIT-20260603-14 shape persisting after Task 3 was marked done. The annotation asserts the release-bump-pushes-cleanly behavior was verified by Task 3, but (per AUDIT-BARRAGE-claude-02) Task 3's actual evidence is a one-commit push, and a `chore: release` commit is specifically a *bookkeeping* commit that historically rode in a multi-commit batch. No push in the cited evidence demonstrates a release-bump commit clearing the gate as part of a batch. The criterion box is correctly left unchecked, which is good — but the bold "VERIFIED" annotation contradicts the unchecked box and overstates what the evidence shows. Fix: either strike the annotation or rephrase to "implemented + unit-covered; release-bump batch push pending Task 3 multi-commit repro."
+
+---
+
+### AUDIT-20260603-21 — SKILL.md Phase 23 note claims per-SHA entries "all sharing disposition" — silent on cross-run re-coverage that gives one SHA conflicting dispositions
+
+Finding-ID: AUDIT-20260603-21
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/skills/implement/SKILL.md:140` (the new "Phase 23: per-SHA log writes." paragraph).
+
+The doc states: *"the verb appends ONE entry per SHA in the audited range, all sharing disposition + timestamp + runDir."* That is accurate *within a single run*, but the live artifact in this same diff shows it is not the whole story across runs: `d42cd022` carries `no-new-diff-skip` from one run and `fired-and-slushed` from a later run (see AUDIT-BARRAGE-claude-01). An operator reading "one entry per SHA, all sharing disposition" will reasonably expect each SHA to have a single, stable disposition; the implementation re-logs commits across runs with whatever disposition the later run had. If claude-01 is fixed by dedup, this paragraph becomes correct as written; if not, the doc should add a sentence noting a SHA may receive multiple entries with differing dispositions across runs and that the gate treats coverage as set-membership (latest disposition is not authoritative).
+
+---
+
+**Checked and clean:** `appendHookRunLogEntriesForRange` (hook-run-log.ts:137-145) correctly delegates per-entry to `appendHookRunLogEntry`, preserving `O_APPEND` atomicity and the first-append sentinel side-effect; the no-new-diff-skip path's ancestry guard (implement-hook.ts:301-305) mirrors the main path; the SKILL.md implementation pointers name the right files. My findings concentrate on the strongest new signal — the skip-path-doesn't-advance-tip re-coverage that produces contradictory dispositions and quadratic growth (claude-01) — plus the Task 3 live-verification overclaim where the cited push covered one commit, not the multi-commit batch the task exists to prove (claude-02).
