@@ -57,7 +57,7 @@ Per the ADR: a discipline that only fires from `.husky/` doesn't exist for an ad
 
 ### Issues defused
 
-GH [#401](https://github.com/audiocontrol-org/deskwork/issues/401) (over-build pathology), [#402](https://github.com/audiocontrol-org/deskwork/issues/402) (bookkeeping ratchet), [#403](https://github.com/audiocontrol-org/deskwork/issues/403) (gate-amplified scope errors) — all dispositioned by removing the gate surfaces that caused them. Live dogfood (Phase 24 Task 10) confirmed `0` `--no-verify` invocations needed across the Phase 24 implementation itself; the bookkeeping-vs-substance ratio dropped from the level that motivated #403 (specific number not stated here — per the project's AUDIT-04 convention + AUDIT-20260603-78 + AUDIT-20260603-82, ratio claims need reconciled arithmetic backing them, and the v0.36.0 dogfood numbers were captured in the journal at a precision that didn't reconcile cleanly across `fixed-<sha>` vs `acknowledged-<reason>` status forms; adopters can re-measure on their own Phase 24-era branches).
+GH [#401](https://github.com/audiocontrol-org/deskwork/issues/401) (over-build pathology), [#402](https://github.com/audiocontrol-org/deskwork/issues/402) (bookkeeping ratchet), [#403](https://github.com/audiocontrol-org/deskwork/issues/403) (gate-amplified scope errors) — all dispositioned by removing the gate surfaces that caused them. The Phase 24 implementation itself shipped with `0` `--no-verify` invocations on this branch.
 
 ---
 

@@ -76,12 +76,17 @@ describe('removeManagedBlock — pure-fn', () => {
     expect(removeManagedBlock(contents)).toBeNull();
   });
 
-  // AUDIT-20260603-81 regression-lock: removeManagedBlock must NOT
-  // collapse blank-line runs anywhere OUTSIDE the splice point. The
-  // operator-authored section can legitimately contain 3+ consecutive
-  // newlines as a visual separator; verbatim preservation requires
-  // leaving those runs intact.
-  it('preserves operator-authored 3+ newline runs OUTSIDE the splice point (AUDIT-81)', () => {
+  // AUDIT-20260603-81 BUG-REPRO: removeManagedBlock must NOT collapse
+  // blank-line runs anywhere OUTSIDE the splice point. Pre-fix the
+  // global `.replace(/\n{3,}/g, '\n\n')` was rewriting operator-
+  // authored separator runs (3+ newlines) regardless of distance from
+  // the managed block. This test fails against the over-broad regex
+  // and passes against the fix. The COMPANION regression-lock test
+  // (the "removes a single managed block + strips surrounding blank
+  // line" case at the top of this describe block) pins the splice-point
+  // invariant — together they satisfy the Option D ≥2-block discipline
+  // per AUDIT-20260603-85.
+  it('preserves operator-authored 3+ newline runs OUTSIDE the splice point (AUDIT-81 bug-repro)', () => {
     const operatorSection = [
       '#!/usr/bin/env bash',
       'operator_command_one',

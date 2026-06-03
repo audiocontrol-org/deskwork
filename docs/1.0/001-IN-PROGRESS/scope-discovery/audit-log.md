@@ -3987,3 +3987,38 @@ Surface:    `MIGRATING.md:60` ("Issues defused" paragraph) vs. `docs/1.0/001-IN-
 The MIGRATING.md "Issues defused" section asserts: *"Live dogfood (Phase 24 Task 10) measured bookkeeping ratio down from #403's ~3:1 baseline; 0 `--no-verify` invocations needed across the Phase 24 implementation itself."* AUDIT-78 (resolved in this same branch as `fixed-f966d6ee`) found exactly this ratio family of numbers unreconciled, and Task 20's disposition says the unreconciled count lines were *removed* from the journal per the AUDIT-04 convention ("Skip the line entirely if the arithmetic isn't reconciled — false precision erodes trust more than absence"). So the disposition scrubbed the claim from the internal journal, yet the identical "down from ~3:1" framing now lives in the **adopter-facing** migration doc — a more durable and more public surface than the journal it was removed from.
 
 Compounding this: AUDIT-77 (`fixed-f966d6ee`) established that the core Phase 24 thesis test (clone-group regression against `/dw-lifecycle:implement`'s end-of-task gate) was *not actually run* — Task 10 Step 3 was downgraded to `[~]` partial-completion. The MIGRATING.md "Issues defused" prose presents the dogfood result as settled fact without that caveat. Meanwhile workplan Task 10 still carries `[x] Live dogfood verification documents the bookkeeping ratio reduction (1.2:1, down from ~3:1)` referencing a number the journal no longer contains. Fix: bring MIGRATING.md in line with the AUDIT-77/78 dispositions — either drop the unreconciled ratio claim and the "0 --no-verify" precision, or qualify it to match the honest `[~]` partial-verification state, and reconcile the Task 10 acceptance line so it doesn't cite a scrubbed number.
+
+## 2026-06-03 — audit-barrage lift (20260603T210505136Z-scope-discovery)
+
+### AUDIT-20260603-83 — Fixed-finding / all-unchecked-task contradiction regresses AGAIN for Tasks 19/20 — inside the range that resolves AUDIT-79 about this exact shape
+
+Finding-ID: AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)
+Status:     fixed-pending-sha
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -46,6 +46,43 @@`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-81/82 (`Status: fixed-2e962b59`)
+
+This diff adds **Task 19 (fix-finding-AUDIT-20260603-81)** and **Task 20 (fix-finding-AUDIT-20260603-82)** with every checkbox unchecked — Steps 0–5, all three Task-19 Acceptance boxes (including `[ ] Audit-log Status flipped to fixed-<sha>`), and all three Task-20 Acceptance boxes. Yet in the *same diff* the audit-log records both AUDIT-81 and AUDIT-82 as `Status: fixed-2e962b59`. So the SSOT says "resolved" while the workplan presents two not-yet-started fix/disposition tasks for that same resolved work.
+
+This is the fourth recurrence of the shape the audit-log keeps flagging (AUDIT-59 → AUDIT-72 → AUDIT-76 → AUDIT-79), and it regressed *inside the commit range whose stated job is resolving AUDIT-79* (`299e57f9` is the immediately-prior commit; AUDIT-79 named the identical Tasks-19/20-unchecked-vs-fixed contradiction). The "surface a new instance only if the shape regressed" test is met. A reader running `/dw-lifecycle:pickup` sees two in-flight fix tasks for work the audit-log calls done. Fix: reconcile Tasks 19/20 the same way Tasks 9/10/13/14 were (flip the boxes / mark complete with `2e962b59`), or remove them as promote-findings scaffolds superseded by the already-landed fix.
+
+### AUDIT-20260603-84 — AUDIT-82's MIGRATING.md rewrite leaks internal audit scaffolding into an adopter-facing doc and retains the unverified claims it was meant to remove
+
+Finding-ID: AUDIT-20260603-84 (claude-03 + codex-02; cross-model)
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `MIGRATING.md:60` ("Issues defused" paragraph)
+
+The rewrite swaps a clean (if unreconciled) sentence for a parenthetical that dumps internal process vocabulary into a **public migration guide**: `per the project's AUDIT-04 convention + AUDIT-20260603-78 + AUDIT-20260603-82, ratio claims need reconciled arithmetic … the v0.36.0 dogfood numbers … didn't reconcile cleanly across` `fixed-<sha>` `vs` `acknowledged-<reason>` `status forms`. An adopter following MIGRATING.md has no model for `AUDIT-20260603-78`, `AUDIT-04`, or the `fixed-<sha>`/`acknowledged-<reason>` audit-status taxonomy — these are internal audit-log artifacts, exactly the kind of scaffolding the documentation rule keeps out of adopter surfaces. The honest move AUDIT-82 offered was to *drop* the ratio claim, not to footnote it with the reason it can't be substantiated.
+
+Two substantive claims also survive that AUDIT-77/82 flagged: (1) the text still asserts the ratio "dropped from the level that motivated #403" — a directional claim resting on the same numbers AUDIT-78 found unreconciled and AUDIT-82 said were scrubbed; de-quantifying it doesn't make the direction verified. (2) It still states ``0`` `--no-verify` invocations "across the Phase 24 implementation itself" as settled, with no nod to AUDIT-77's finding that the core clone-group thesis test was never run (Task 10 Step 3 was downgraded to `[~]`). Fix: cut the directional ratio claim and the internal-jargon parenthetical entirely (leave only the verifiable `0 --no-verify` observation, or qualify it against the `[~]` partial state), rather than relocating the unreconciliation into a doc adopters read.
+
+### AUDIT-20260603-85 — Option D test-count not met — single added test is the bug-repro; no regression-lock pins the splice-point cleanup the fix touches
+
+Finding-ID: AUDIT-20260603-85
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/uninstall-everything-hook-related.test.ts:78-108` vs. `workplan.md` Task 19 Acceptance ("test block count for this finding is ≥2 per Option D discipline")
+
+Task 19's own acceptance requires two test blocks: Step 1 (bug-repro at the cited surface) **and** Step 1b (a regression-lock pinning the Step 0 working-code invariant — the behavior the fix would break if wrong). The diff adds exactly one `it(...)` block, "preserves operator-authored 3+ newline runs OUTSIDE the splice point". Despite the comment labeling it "regression-lock," this block *is* the bug-repro: it fails against the old global-collapse code and passes against the fix. There is no second test pinning what the fix's working-code invariant actually is — that removing the managed block still produces a clean single-blank-line join at the splice point.
+
+That gap matters because the fix *reduces* normalization: it deletes the only mechanism that previously guaranteed the splice point wouldn't leave 3+ blank lines. The new test asserts behavior *far from* the splice but verifies nothing *at* it — e.g., that a block flanked by blank lines on both sides collapses to one blank line, or that an unflanked block doesn't fuse `command_a` and `command_b` with no newline. With only `toContain` assertions on a far-from-splice run, the contract the fix changed is untested. Fix: add the second test block asserting the exact splice-point output (e.g., `removeManagedBlock` of `before\n\n<BLOCK>\n\nafter` yields `before\n\nafter`), satisfying both the ≥2-block acceptance and the genuine coverage hole.

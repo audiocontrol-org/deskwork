@@ -47,41 +47,90 @@ note: archived 2026-06-03 via scripts/archive-phases-onetime.ts; Phase 26 produc
 - [x] `check-disposition-survivor` — landed as `dw-lifecycle check-disposition-survivor`. Pre-commit gate that fails the commit on any `keep-with-reason`/`refactor`/`ignore-with-justification` → `pending` transition unless the operator passes `--allow-disposition-loss`. Compares HEAD's baseline (via `git show`) against the working tree. Closes [#289](https://github.com/audiocontrol-org/deskwork/issues/289); pilot reference: TF-013 (AUDIT-20260525-06). Phase 8 hook-chain wires it in.
 
 
-### Task 19 (fix-finding-AUDIT-20260603-81): AUDIT-20260603-81 — Global newline-collapse regex rewrites operator content outs…
 
-Closes AUDIT-20260603-81 (claude-01 + claude-02 + claude-04 + codex-03 + codex-04; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/uninstall-everything-hook-related.ts:117` (the `return` line of `removeManagedBlock`). Severity: high.
+### Task 20 (fix-finding-AUDIT-20260603-83) (non-bug): AUDIT-20260603-83 — Fixed-finding / all-unchecked-task contradiction regresses A…
 
-- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
-- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
-- [ ] Step 5: commit with `Closes AUDIT-20260603-81 (claude-01 + claude-02 + claude-04 + codex-03 + codex-04; cross-model)` in subject
-
-**Acceptance Criteria:**
-
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
-
-
-### Task 20 (fix-finding-AUDIT-20260603-82) (non-bug): AUDIT-20260603-82 — Unreconciled "1.2:1 / down from ~3:1" bookkeeping-ratio clai…
-
-Closes AUDIT-20260603-82 (claude-03 + codex-01 + codex-02; cross-model). Surface: `MIGRATING.md:60` ("Issues defused" paragraph) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 20 (AUDIT-78 disposition) + Task 10 acceptance line.
+Closes AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -46,6 +46,43 @@`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-81/82 (`Status: fixed-2e962b59`).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
 - [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
 - [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-82 (claude-03 + codex-01 + codex-02; cross-model)` in subject (use `Closes AUDIT-20260603-82 (claude-03 + codex-01 + codex-02; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)` in subject (use `Closes AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
 
 **Acceptance Criteria:**
 
 - [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
 - [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 21 (fix-finding-AUDIT-20260603-84): AUDIT-20260603-84 — AUDIT-82's MIGRATING.md rewrite leaks internal audit scaffol…
+
+Closes AUDIT-20260603-84 (claude-03 + codex-02; cross-model). Surface: `MIGRATING.md:60` ("Issues defused" paragraph). Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260603-84 (claude-03 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 22 (fix-finding-AUDIT-20260603-85) (non-bug): AUDIT-20260603-85 — Option D test-count not met — single added test is the bug-r…
+
+Closes AUDIT-20260603-85. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/uninstall-everything-hook-related.test.ts:78-108` vs. `workplan.md` Task 19 Acceptance ("test block count for this finding is ≥2 per Option D discipline").
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-85` in subject (use `Closes AUDIT-20260603-85` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+### Task 19 (fix-finding-AUDIT-20260603-81): AUDIT-20260603-81 — Global newline-collapse regex rewrites operator content outs…
+
+**Complete in 2e962b59.**
+
+- [x] Step 0 (working-code invariant): `removeManagedBlock` correctly produces a clean single-blank-line join at the splice point when it strips the surrounding boundary newlines. That's exercised by the existing "removes a single managed block + strips surrounding blank line" test (lines 22–38).
+- [x] Step 1 (bug-repro): added "preserves operator-authored 3+ newline runs OUTSIDE the splice point" test at lines 79–105 — fails against the pre-fix code (which globally collapsed `\n{3,}` → `\n\n`), passes against the fix.
+- [x] Step 1b (regression-lock): the splice-point clean-join invariant is pinned by the existing "removes a single managed block + strips surrounding blank line" test, which would fail if the fix removed too many splice-point newlines.
+- [x] Step 2: confirmed RED pre-fix (bug-repro fails), confirmed GREEN post-fix.
+- [x] Step 3: implemented in 2e962b59 — dropped the global `.replace(/\n{3,}/g, '\n\n')`.
+- [x] Step 4: all 12/12 tests pass.
+- [x] Step 5: committed with `Closes AUDIT-20260603-81` trailer.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/uninstall-everything-hook-related.test.ts:79-105`.
+- [x] Regression-lock test exists in the same file at lines 22–38 (preserves the splice-point clean-join invariant). Per AUDIT-20260603-85: the two-test pair satisfies the ≥2-blocks Option D discipline; the labeling in 2e962b59 was inverted (called the bug-repro a "regression-lock"); the comment is corrected in the subsequent commit.
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/uninstall-everything-hook-related.test.ts` exits 0 (passes against the fix).
+- [x] Audit-log Status flipped to `fixed-2e962b59` via apply-audit-flips.
+
+
+### Task 20 (fix-finding-AUDIT-20260603-82) (non-bug): AUDIT-20260603-82 — Unreconciled "1.2:1 / down from ~3:1" bookkeeping-ratio clai…
+
+**Complete in 2e962b59.**
+
+- [x] Step 1 (disposition): rewrote the MIGRATING.md "Issues defused" paragraph to drop the specific ratio claim. Per AUDIT-04 + AUDIT-78: when arithmetic doesn't reconcile, drop the precision rather than restate. Per AUDIT-20260603-84 (caught the rewrite's verbose parenthetical leaking internal vocabulary): the final form in the subsequent commit removes the parenthetical entirely, keeping only "0 `--no-verify` invocations needed" which IS reconciled.
+- [x] Step 2: applied in 2e962b59; further cleaned in the AUDIT-84 follow-up commit per its disposition.
+- [x] Step 3: committed with `Closes AUDIT-20260603-82` trailer.
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch.
+- [x] Audit-log Status flipped to `fixed-2e962b59`.
 
 ### Task 4: Install / migrate / uninstall commands
 
