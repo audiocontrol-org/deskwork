@@ -911,7 +911,7 @@ I also checked and found clean: the `layoutToContentRelativePath` mapping (index
 ### AUDIT-20260603-39 — `layoutToContentRelativePath` hardcodes the `.md` extension, so `add --kind {html-mockup,single-file-html,image}` stamps a markdown `artifactPath` onto a non-markdown artifact
 
 Finding-ID: AUDIT-20260603-39
-Status:     open
+Status:     fixed-2c5d35a3f2a683f804c89a44b67c7011bca1acbd
 Severity:   high
 Surface:    `packages/core/src/lanes/scaffold-path.ts:52-64` (`layoutToContentRelativePath`) + `:83-105` (`composeAddArtifactPath`) + `packages/cli/test/add-lane-stage-integration.test.ts:178-180`
 
@@ -924,7 +924,7 @@ The integration test at `add-lane-stage-integration.test.ts:178-180` doesn't cat
 ### AUDIT-20260603-40 — `composeAddArtifactPath` joins with `node:path.join`, producing platform-dependent separators inconsistent with the forward-slash paths `layoutToContentRelativePath` emits
 
 Finding-ID: AUDIT-20260603-40
-Status:     open
+Status:     fixed-2c5d35a3f2a683f804c89a44b67c7011bca1acbd
 Severity:   medium
 Surface:    `packages/core/src/lanes/scaffold-path.ts:29` (`import { join } from 'node:path'`) + `:104` (`return join(directory, relativePath)`)
 
@@ -937,7 +937,7 @@ Because `artifactPath` is declared authoritative and persisted to the sidecar, a
 ### AUDIT-20260603-41 — `add` stamps a lanes-composed `artifactPath`, but `scaffoldBlogPost` still derives the on-disk location via the retiring sites-based `resolveSite`/`resolveBlogFilePath` — verify the file-creating path honors the stamped value
 
 Finding-ID: AUDIT-20260603-41
-Status:     open
+Status:     fixed-2c5d35a3f2a683f804c89a44b67c7011bca1acbd
 Severity:   medium
 Surface:    `packages/cli/src/commands/add.ts:155-167` (compose + stamp) vs. `packages/core/src/scaffold.ts:27` (`import { resolveSite, resolveBlogFilePath } from './paths.ts'`) — still present after the refactor
 
@@ -954,7 +954,7 @@ I also checked and found clean: the pre-write ordering (`composeAddArtifactPath`
 ### AUDIT-20260603-42 — Decision #17 introduces a new required `--artifact-path` CLI flag for `image` kind, but no promoted task scopes adding it — and the AUDIT-39 fix breaks `add --kind image` the moment it lands without it
 
 Finding-ID: AUDIT-20260603-42
-Status:     open
+Status:     fixed-2c5d35a3f2a683f804c89a44b67c7011bca1acbd (addendum 2026-06-03: the `--artifact-path` flag this finding scoped was REVERTED in the markdown-only correction; the underlying concern — image has no path source — is now resolved by `add` rejecting image. Net: resolved-by-removal.)
 Severity:   high
 Surface:    spec `docs/superpowers/specs/2026-06-02-sites-to-lanes-retirement-design.md` § "39c-2b design amendment" Decision #17 + AUDIT-39 table (`image | — | — | not templatable`) vs. `workplan.md` Task 39.6 acceptance criteria + `packages/cli/src/commands/add.ts:158-194` (no `--artifact-path` flag)
 
@@ -980,7 +980,7 @@ So the roster has the same shape of gap it claims to fix: an implementer working
 ### AUDIT-20260603-44 — Per-kind default layout + "`--layout` still overrides" lets `single-file-html --layout index` produce a directory-shaped path that contradicts the kind's documented "loose `.html` file" contract — legal layouts per kind are unconstrained
 
 Finding-ID: AUDIT-20260603-44
-Status:     open
+Status:     fixed-2c5d35a3f2a683f804c89a44b67c7011bca1acbd (addendum 2026-06-03: the per-kind legal-layout matrix this finding scoped was REVERTED in the markdown-only correction; moot — markdown's three layouts are all legal and there is no other kind. Resolved-by-removal.)
 Severity:   medium
 Surface:    spec § "AUDIT-39 (HIGH)" table + bullets (*"The default layout is per-kind … `--layout` still overrides"*) vs. `packages/core/src/lanes/types.ts:93-94` (`single-file-html` — *"a loose `.html` file (not inside an html-mockup directory)"*)
 
@@ -1004,3 +1004,42 @@ This is documentation-consistency rather than a logic bug, but it's the rot-vect
 ---
 
 I also checked and found clean: the three new workplan tasks (39.6/39.7/39.8) correctly apply the Option-D discipline — only 39.6 (HIGH) carries the Step 0 working-code-invariant + Step 1b regression-lock pair, while the two mediums get the single bug-repro test, consistent with "HIGH+ findings get a regression-lock test"; the `hook-run-log.jsonl` appends are well-formed JSON with valid enum dispositions (`no-new-diff-skip`, `fired-and-slushed`, `fired-and-promoted`); the AUDIT-37 inline scoping edit (the "byte-for-byte identical" claim is now correctly narrowed to *"adopters who left `blogFilenameTemplate` at its default"* with a ⚠️ pointer to the migration mapping table) properly resolves the prior finding; and the AUDIT-40 amendment's `node:path/posix.join` prescription is a real, correct API. My findings concentrate on the one unscoped new CLI surface (`--artifact-path`), the residual roster ambiguity around `rename-slug`, the unconstrained kind×layout override matrix, and a stale decision-citation pair.
+
+## 2026-06-03 — audit-barrage lift (20260603T102824932Z-deskwork-plugin)
+
+### AUDIT-20260603-46 — Image `--artifact-path` is stamped verbatim with zero normalization, bypassing the POSIX/relative invariant the same commit establishes for composed paths (AUDIT-40)
+
+Finding-ID: AUDIT-20260603-46
+Status:     resolved-2026-06-03 — MOOT: `add` is now markdown-only (operator correction); the image `--artifact-path` branch is removed, so there is no verbatim image path to normalize.
+Severity:   high
+Surface:    `packages/cli/src/commands/add.ts` (image branch: `artifactPath = artifactPathFlag;`, ~`:218-221`) + the `--kind image requires --artifact-path` validation (~`:148-156`) vs. `packages/core/src/lanes/scaffold-path.ts:215-218` (`posix.join` for composed paths)
+
+The same commit that introduces AUDIT-40's invariant — *"`artifactPath` is persisted and string-compared against the forward-slash paths the rest of the system stores, so the join uses `node:path/posix`"* (scaffold-path.ts docblock + `posix.join` at the composed-path return) — opens a hole in that invariant for the `image` kind. For image, the path is taken straight from `--artifact-path` and stamped verbatim (`artifactPath = artifactPathFlag;`) with no normalization, no separator coercion, and no relative-path check. The new test only exercises a clean input (`'assets/images/hero.png'`), so the gap is unguarded.
+
+Concretely: `add --kind image --artifact-path "assets\images\hero.png"` (a backslash path, the exact platform divergence AUDIT-40 names as durable) stamps backslashes into the sidecar; `--artifact-path /abs/path.png` stamps a non-relative path while every composed path is project-root-relative; and `--artifact-path ''` (empty) passes the `=== undefined` guard and stamps an empty `artifactPath`. All three are durable, written-to-disk divergences from the convention the rest of the system relies on for string-equality resolution — the *same* failure class AUDIT-40 was filed to close, reintroduced through the verbatim axis. The fix: run the image path through the same POSIX/relative normalization-or-rejection the composer guarantees (reject backslashes/absolute pre-write with exit 2, reject empty), so "all stamped artifactPaths are forward-slash and relative" holds for every kind, not just templatable ones.
+
+---
+
+### AUDIT-20260603-47 — Kind-aware stamp escalates the AUDIT-41 seam from "possible divergence" to "guaranteed divergence" for non-markdown kinds — `scaffoldBlogPost` is markdown-only and nothing guards the mismatch
+
+Finding-ID: AUDIT-20260603-47
+Status:     resolved-2026-06-03 — resolved exactly as this finding's mitigation recommended: `add` now refuses non-markdown kinds (fail loud, exit 2). No non-markdown entry can be created, so the stamp-vs-markdown-materializer divergence cannot occur.
+Severity:   medium
+Surface:    `packages/core/src/lanes/scaffold-path.ts:152-160` (`layoutToContentRelativePath` now hardcodes `'markdown'`, "Retained for the legacy file-creating `scaffoldBlogPost` path … which only ever scaffolds markdown") vs. `add.ts` stamping `<slug>/index.html` for `--kind html-mockup`
+
+AUDIT-41 was dispositioned by proving `add` creates no content file (the stamp is a forward reference; materialization migration is "sub-task (a)"). That disposition was sound when the stamp was uniformly `.md` — for the only kind the materializer handles (markdown), the stamped extension and the file-creator's extension *agreed*, so the deferred divergence was limited to the directory. This commit changes the shape: the stamp is now kind-aware (`html-mockup → …/index.html`, `single-file-html → ….html`), while `layoutToContentRelativePath`/`scaffoldBlogPost` remains markdown-only by construction (it hardcodes `'markdown'`). So a non-markdown entry's stamped path can *never* be honored by the verb that materializes the file — the extension mismatch is now guaranteed, not merely possible.
+
+This is not re-litigating AUDIT-41's disposition; it's flagging that the underlying shape regressed. The diff ships a feature (`add --kind html-mockup/single-file-html`) that stamps an authoritative path the materialization layer is structurally incapable of producing, with no doctor rule, no test, and no guard preventing an operator from creating such an entry and later hitting a file-at-wrong-location. The minimum mitigation that doesn't widen scope: either gate `add` to refuse non-markdown kinds until sub-task (a) lands (fail loud, per the no-fallbacks rule), or file the seam as a tracked issue referenced from the `layoutToContentRelativePath` docblock — *"only ever scaffolds markdown"* is a latent contradiction with a kind-aware stamp and should not travel as an unguarded comment.
+
+---
+
+### AUDIT-20260603-48 — AUDIT-42 (severity HIGH, substantive source change) is shaped as a "(non-bug)" doc-only disposition in workplan Task 39.9, bypassing the Option-D regression-lock task structure a HIGH source bug warrants
+
+Finding-ID: AUDIT-20260603-48
+Status:     resolved-2026-06-03 — MOOT: the AUDIT-42 `--artifact-path` source change was reverted with the kind-aware attempt; there is no longer a HIGH source change to re-shape. (The promote-findings non-bug-vs-bug shaping concern is noted for the tooling backlog.)
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md` Task 39.9 (`(non-bug)` label + *"This finding's surface is non-source (docs, registry, markers…)"*) vs. the actual AUDIT-42 fix in `packages/cli/src/commands/add.ts:131-191` (new flag, parse, validate, branch) + 4 new integration tests
+
+Task 39.9 is titled `(non-bug)` and its boilerplate asserts *"This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test."* That classification is contradicted by the task's own body and by the diff: AUDIT-42 (severity **high**) landed a genuine CLI surface — the `--artifact-path` flag with parsing, mutually-exclusive validation against `--layout`, fail-loud-when-absent-for-image, and four new tests in `add-lane-stage-integration.test.ts`. The task even says *"a real code change verifiable by test."* So the "(non-bug)/non-source" framing is wrong.
+
+The consequence isn't cosmetic: by being shaped as a 3-step non-bug disposition, the HIGH fix skipped the Option-D task structure (Step 0 working-code invariant + Step 1 bug-repro + Step 1b regression-lock + Step 2 pre-fix-fail confirmation) that the project's own audit-discipline applies to HIGH+ source findings — the same structure correctly applied to 39.6 and newly applied to 39.11 (AUDIT-44). The tests that landed are happy-path/rejection assertions, not a confirmed-failing-then-green pair anchored at the finding's surface. The fix: re-shape Task 39.9 as a real fix-finding task (it produced source), or, if the workplan's auto-promotion mis-classified it, note that the promoter mapped a HIGH source finding to the non-bug template — a promote-findings shaping bug worth its own correction so the next HIGH source finding doesn't silently skip the regression-lock discipline.

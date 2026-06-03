@@ -5,10 +5,15 @@
  *   deskwork-add <project-root> [--site <slug>] [--type blog|youtube|tool]
  *                [--content-url URL] [--source manual|analytics]
  *                [--lane <lane-id>] [--stage <stage>]
- *                [--kind markdown|html-mockup|single-file-html|image]
+ *                [--kind markdown]
  *                [--layout index|readme|flat]
- *                [--artifact-path <path>]
  *                <title> [description]
+ *
+ * Markdown only (operator decision): `deskwork add` creates markdown
+ * entries. `--kind` still parses the four ArtifactKindSchema values
+ * (graphical-entries shares the type), but a non-markdown value is
+ * rejected loudly pre-write — the verb that materializes the file
+ * (scaffoldBlogPost) is markdown-only.
  *
  * Writes the calendar atomically. Emits a JSON result on stdout:
  *   { "slug": "...", "stage": "Ideas", "site": "...", "calendarPath": "..." }
@@ -37,8 +42,6 @@ import {
   loadLaneConfig,
   composeAddArtifactPath,
   parseScaffoldLayout,
-  isLayoutLegalForKind,
-  legalLayoutsForKind,
   SCAFFOLD_LAYOUTS,
 } from '@deskwork/core/lanes';
 import {
@@ -63,7 +66,6 @@ export async function run(argv: string[]): Promise<void> {
     'stage',
     'kind',
     'layout',
-    'artifact-path',
   ] as const;
   const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 
@@ -74,9 +76,8 @@ export async function run(argv: string[]): Promise<void> {
       'Usage: deskwork-add <project-root> [--site <slug>] [--type blog|youtube|tool] ' +
         '[--content-url URL] [--source manual|analytics] [--slug <path>] ' +
         '[--lane <lane-id>] [--stage <stage>] ' +
-        '[--kind markdown|html-mockup|single-file-html|image] ' +
+        '[--kind markdown] ' +
         '[--layout index|readme|flat] ' +
-        '[--artifact-path <path>] ' +
         '<title> [description]',
       2,
     );
@@ -128,68 +129,35 @@ export async function run(argv: string[]): Promise<void> {
     flags,
   );
 
-  // Resolve the artifactPath SOURCE BEFORE any disk mutation (same
-  // pre-write contract as --type / --source / --stage / --kind). Two
-  // mutually-exclusive sources:
-  //
-  //   - `image` kind: NOT templatable (AUDIT-42). Requires an explicit
-  //     `--artifact-path <path>`, stamped verbatim. `--layout` is
-  //     rejected (an image has no layout shape).
-  //   - templatable kinds (markdown / html-mockup / single-file-html):
-  //     compose from scaffoldDefaults[kind] + per-kind layout + slug.
-  //     `--artifact-path` is rejected (the path is composed, not given).
-  //
-  // `--layout`, when supplied for a templatable kind, must be both a
-  // legal value AND legal for that kind (AUDIT-44). When omitted, the
-  // per-kind default fires inside composeAddArtifactPath.
-  const artifactPathFlag = flags['artifact-path'];
-  let layout: ScaffoldLayout | undefined;
+  // Markdown only (operator decision): `deskwork add` materializes the
+  // file via the markdown-only scaffoldBlogPost verb, so a non-markdown
+  // kind cannot be created. Reject it loudly BEFORE any disk mutation —
+  // same pre-write contract as --type / --source / --stage. (The schema
+  // accepts the value; this is an explicit add-side guard.)
+  if (artifactKind !== 'markdown') {
+    fail(
+      `--kind "${artifactKind}" is not supported: deskwork add only `
+        + `supports markdown entries right now (file creation for `
+        + `non-markdown kinds is not implemented). Use --kind markdown `
+        + `(the default), or omit --kind.`,
+      2,
+    );
+  }
 
-  if (artifactKind === 'image') {
-    if (flags['layout'] !== undefined) {
+  // Resolve the markdown layout BEFORE any disk mutation. `--layout`,
+  // when supplied, must be one of the legal markdown shapes; when
+  // omitted, the default fires inside composeAddArtifactPath.
+  let layout: ScaffoldLayout | undefined;
+  if (flags['layout'] !== undefined) {
+    const parsedLayout = parseScaffoldLayout(flags['layout']);
+    if (parsedLayout === undefined) {
       fail(
-        `--layout is not valid with --kind image: an image is a binary `
-          + `with no layout shape. Pass --artifact-path <path> instead.`,
+        `Invalid --layout "${flags['layout']}". `
+          + `Must be one of: ${SCAFFOLD_LAYOUTS.join(', ')}.`,
         2,
       );
     }
-    if (artifactPathFlag === undefined) {
-      fail(
-        `--kind image requires --artifact-path <path>: an image is not `
-          + `templatable (no body to scaffold), so deskwork cannot compose `
-          + `a path. Pass the path to the image file explicitly.`,
-        2,
-      );
-    }
-  } else {
-    if (artifactPathFlag !== undefined) {
-      fail(
-        `--artifact-path is only valid with --kind image. For kind `
-          + `"${artifactKind}", the path is composed from the lane's `
-          + `scaffoldDefaults plus --layout; pass --layout instead.`,
-        2,
-      );
-    }
-    if (flags['layout'] !== undefined) {
-      const parsedLayout = parseScaffoldLayout(flags['layout']);
-      if (parsedLayout === undefined) {
-        fail(
-          `Invalid --layout "${flags['layout']}". `
-            + `Must be one of: ${SCAFFOLD_LAYOUTS.join(', ')}.`,
-          2,
-        );
-      }
-      if (!isLayoutLegalForKind(artifactKind, parsedLayout)) {
-        const legal = legalLayoutsForKind(artifactKind).join(', ') || '(none)';
-        fail(
-          `--layout "${parsedLayout}" is not legal for --kind `
-            + `"${artifactKind}". Legal layouts for "${artifactKind}": `
-            + `${legal}.`,
-          2,
-        );
-      }
-      layout = parsedLayout;
-    }
+    layout = parsedLayout;
   }
 
   const calendar = readCalendar(calendarPath);
@@ -208,30 +176,22 @@ export async function run(argv: string[]): Promise<void> {
   }
 
   // Phase 39c-2b (sub-task b): determine the new entry's authoritative
-  // `artifactPath`. For `image` the operator supplied it verbatim via
-  // `--artifact-path` (validated above). For templatable kinds, compose
-  // it kind-aware from the lane's `scaffoldDefaults[kind]` (directory) +
-  // the per-kind/explicit layout + the slug. Done BEFORE `writeCalendar`
-  // so a lane that declares no default for this kind fails loudly with
-  // NO disk mutation (calendar.md + sidecar both skipped) — same
-  // pre-write contract as the flag validations above.
+  // `artifactPath`. Markdown only — compose it from the lane's
+  // `scaffoldDefaults['markdown']` (directory) + the explicit/default
+  // layout + the slug. Done BEFORE `writeCalendar` so a lane that
+  // declares no markdown default fails loudly with NO disk mutation
+  // (calendar.md + sidecar both skipped) — same pre-write contract as
+  // the flag validations above.
   let artifactPath: string;
-  if (artifactKind === 'image') {
-    if (artifactPathFlag === undefined) {
-      fail('--kind image requires --artifact-path (programmer error)', 2);
-    }
-    artifactPath = artifactPathFlag;
-  } else {
-    try {
-      artifactPath = composeAddArtifactPath(
-        lane,
-        artifactKind,
-        entry.slug,
-        layout,
-      );
-    } catch (err) {
-      fail(err instanceof Error ? err.message : String(err));
-    }
+  try {
+    artifactPath = composeAddArtifactPath(
+      lane,
+      artifactKind,
+      entry.slug,
+      layout,
+    );
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
   }
 
   writeCalendar(calendarPath, calendar);

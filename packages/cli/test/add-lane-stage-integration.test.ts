@@ -123,7 +123,7 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
   afterEach(() => { destroyProject(project); });
 
   it(
-    'creates a sidecar with the requested lane, stage, and artifactKind',
+    'creates a sidecar with the requested lane, stage, and markdown artifactKind',
     () => {
       // Set up a custom pipeline + lane bound to it.
       const created = pipelineCmd(
@@ -141,23 +141,19 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
         'create', 'mockups',
         '--template', 'visual-test',
         '--scaffold-default', 'markdown=content/mockups',
-        // Phase 39c-2b (sub-task b): `add --kind html-mockup` now
-        // composes artifactPath from the lane's scaffoldDefaults for
-        // THAT kind. The lane must declare an html-mockup default or
-        // the add fails loudly (no fallback).
-        '--scaffold-default', 'html-mockup=content/mockups',
         '--name', 'Mockups',
       );
       expect(laneRes.stderr).toBe('');
       expect(laneRes.code).toBe(0);
 
-      // Add an entry at Iterating in the mockups lane, classified as
-      // an html-mockup artifact (the dashboard compose chip's shape).
+      // Add an entry at Iterating in the mockups lane. Markdown only —
+      // the dashboard compose chip's lane/stage shape resolves the lane
+      // and stamps a markdown artifactPath.
       const added = addCmd(
         project,
         '--lane', 'mockups',
         '--stage', 'Iterating',
-        '--kind', 'html-mockup',
+        '--kind', 'markdown',
         'design-x',
       );
       expect(added.stderr).toBe('');
@@ -171,15 +167,94 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
       expect(sidecar['title']).toBe('design-x');
       expect(sidecar['currentStage']).toBe('Iterating');
       expect(sidecar['lane']).toBe('mockups');
-      expect(sidecar['artifactKind']).toBe('html-mockup');
+      expect(sidecar['artifactKind']).toBe('markdown');
       expect(sidecar['source']).toBe('manual');
       expect(sidecar['keywords']).toEqual([]);
       expect(sidecar['iterationByStage']).toEqual({});
-      // artifactPath composed from scaffoldDefaults[html-mockup] +
-      // default `index` layout + slug. AUDIT-39: the extension derives
-      // from the KIND (html-mockup → .html), NOT a hardcoded `.md`. The
-      // prior `.md` assertion locked the AUDIT-39 HIGH bug in.
-      expect(sidecar['artifactPath']).toBe('content/mockups/design-x/index.html');
+      // artifactPath composed from scaffoldDefaults[markdown] + default
+      // `index` layout + slug.
+      expect(sidecar['artifactPath']).toBe('content/mockups/design-x/index.md');
+    },
+  );
+
+  it(
+    'rejects --kind html-mockup loudly (markdown only) with exit 2 and no disk mutation',
+    () => {
+      const created = pipelineCmd(
+        project,
+        'create', 'visual-test',
+        '--shape', 'Sketched,Iterating,Approved,Shipped',
+        '--name', 'Visual test pipeline',
+        '--description', 'markdown-only rejection fixture',
+      );
+      expect(created.code).toBe(0);
+
+      const laneRes = laneCmd(
+        project,
+        'create', 'mockups',
+        '--template', 'visual-test',
+        '--scaffold-default', 'markdown=content/mockups',
+        '--name', 'Mockups',
+      );
+      expect(laneRes.code).toBe(0);
+
+      const bad = addCmd(
+        project,
+        '--lane', 'mockups',
+        '--stage', 'Iterating',
+        '--kind', 'html-mockup',
+        'rejected-mockup',
+      );
+      expect(bad.code).toBe(2);
+      expect(bad.stderr).toContain('html-mockup');
+      expect(bad.stderr).toContain('markdown');
+
+      // No disk mutation: neither a calendar row nor a sidecar.
+      const calendarRaw = readFileSync(
+        join(project, '.deskwork', 'calendar.md'),
+        'utf-8',
+      );
+      expect(calendarRaw).not.toContain('rejected-mockup');
+    },
+  );
+
+  it(
+    'rejects --kind image loudly (markdown only) with exit 2 and no disk mutation',
+    () => {
+      const created = pipelineCmd(
+        project,
+        'create', 'visual-test',
+        '--shape', 'Sketched,Iterating,Approved,Shipped',
+        '--name', 'Visual test pipeline',
+        '--description', 'markdown-only image rejection fixture',
+      );
+      expect(created.code).toBe(0);
+
+      const laneRes = laneCmd(
+        project,
+        'create', 'gallery',
+        '--template', 'visual-test',
+        '--scaffold-default', 'markdown=content/img',
+        '--name', 'Gallery',
+      );
+      expect(laneRes.code).toBe(0);
+
+      const bad = addCmd(
+        project,
+        '--lane', 'gallery',
+        '--stage', 'Sketched',
+        '--kind', 'image',
+        'rejected-image',
+      );
+      expect(bad.code).toBe(2);
+      expect(bad.stderr).toContain('image');
+      expect(bad.stderr).toContain('markdown');
+
+      const calendarRaw = readFileSync(
+        join(project, '.deskwork', 'calendar.md'),
+        'utf-8',
+      );
+      expect(calendarRaw).not.toContain('rejected-image');
     },
   );
 
@@ -347,11 +422,12 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
   );
 
   it(
-    'fails loudly when the lane has no scaffoldDefaults for the requested kind',
+    'fails loudly when the lane has no markdown scaffoldDefault',
     () => {
-      // A lane that scaffolds markdown but NOT html-mockup. Asking
-      // `add --kind html-mockup` must abort with an actionable error
-      // that names the lane + the kind — and leave calendar.md untouched.
+      // A lane bound to a custom pipeline but with NO markdown
+      // scaffoldDefault. `add` (markdown only) must abort with an
+      // actionable error that names the lane + markdown — and leave
+      // calendar.md untouched.
       const created = pipelineCmd(
         project,
         'create', 'visual-test',
@@ -363,23 +439,22 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
 
       const laneRes = laneCmd(
         project,
-        'create', 'mdonly',
+        'create', 'nomd',
         '--template', 'visual-test',
-        '--scaffold-default', 'markdown=content/md',
-        '--name', 'Markdown only',
+        '--scaffold-default', 'html-mockup=content/mockups',
+        '--name', 'No markdown default',
       );
       expect(laneRes.code).toBe(0);
 
       const bad = addCmd(
         project,
-        '--lane', 'mdonly',
+        '--lane', 'nomd',
         '--stage', 'Sketched',
-        '--kind', 'html-mockup',
         'no-scaffold-default',
       );
       expect(bad.code).not.toBe(0);
-      expect(bad.stderr).toContain('mdonly');
-      expect(bad.stderr).toContain('html-mockup');
+      expect(bad.stderr).toContain('nomd');
+      expect(bad.stderr).toContain('markdown');
 
       // No disk mutation: the calendar must not carry the rejected entry.
       const calendarRaw = readFileSync(
@@ -426,226 +501,6 @@ describe('deskwork add --lane --stage --kind (AUDIT-20260528-39)', () => {
 
       expect(sidecar['currentStage']).toBe('Sketched');
       expect(sidecar['lane']).toBe('mockups');
-    },
-  );
-
-  it(
-    'single-file-html stamps <dir>/<slug>.html at its per-kind default (flat)',
-    () => {
-      const created = pipelineCmd(
-        project,
-        'create', 'visual-test',
-        '--shape', 'Sketched,Iterating,Approved,Shipped',
-        '--name', 'Visual test pipeline',
-        '--description', '39c-2b single-file-html fixture',
-      );
-      expect(created.code).toBe(0);
-
-      const laneRes = laneCmd(
-        project,
-        'create', 'pages',
-        '--template', 'visual-test',
-        '--scaffold-default', 'single-file-html=content/pages',
-        '--name', 'Pages',
-      );
-      expect(laneRes.code).toBe(0);
-
-      // No --layout: single-file-html's per-kind default is `flat`.
-      const added = addCmd(
-        project,
-        '--lane', 'pages',
-        '--stage', 'Sketched',
-        '--kind', 'single-file-html',
-        'banner',
-      );
-      expect(added.stderr).toBe('');
-      expect(added.code).toBe(0);
-
-      const uuid = uuidFromAddOutput(project, added.stdout);
-      const sidecar = readSidecar(project, uuid);
-      expect(sidecar['artifactKind']).toBe('single-file-html');
-      // AUDIT-39: .html extension from the kind; AUDIT-44: per-kind
-      // default layout `flat` → loose `<slug>.html` file.
-      expect(sidecar['artifactPath']).toBe('content/pages/banner.html');
-    },
-  );
-
-  it(
-    'rejects an illegal (kind, layout) combo pre-write (single-file-html + index) — AUDIT-44',
-    () => {
-      const created = pipelineCmd(
-        project,
-        'create', 'visual-test',
-        '--shape', 'Sketched,Iterating,Approved,Shipped',
-        '--name', 'Visual test pipeline',
-        '--description', '39c-2b illegal-combo fixture',
-      );
-      expect(created.code).toBe(0);
-
-      const laneRes = laneCmd(
-        project,
-        'create', 'pages',
-        '--template', 'visual-test',
-        '--scaffold-default', 'single-file-html=content/pages',
-        '--name', 'Pages',
-      );
-      expect(laneRes.code).toBe(0);
-
-      const bad = addCmd(
-        project,
-        '--lane', 'pages',
-        '--stage', 'Sketched',
-        '--kind', 'single-file-html',
-        '--layout', 'index',
-        'bad-combo',
-      );
-      // Exit 2 (same shape as the invalid --layout-value rejection).
-      expect(bad.code).toBe(2);
-      expect(bad.stderr).toContain('single-file-html');
-      expect(bad.stderr).toContain('index');
-
-      // No disk mutation: the calendar must not carry the rejected entry.
-      const calendarRaw = readFileSync(
-        join(project, '.deskwork', 'calendar.md'),
-        'utf-8',
-      );
-      expect(calendarRaw).not.toContain('bad-combo');
-    },
-  );
-
-  it(
-    '--kind image without --artifact-path fails loud (exit 2, no disk mutation) — AUDIT-42',
-    () => {
-      const created = pipelineCmd(
-        project,
-        'create', 'visual-test',
-        '--shape', 'Sketched,Iterating,Approved,Shipped',
-        '--name', 'Visual test pipeline',
-        '--description', '39c-2b image-no-path fixture',
-      );
-      expect(created.code).toBe(0);
-
-      const laneRes = laneCmd(
-        project,
-        'create', 'gallery',
-        '--template', 'visual-test',
-        '--scaffold-default', 'image=content/img',
-        '--name', 'Gallery',
-      );
-      expect(laneRes.code).toBe(0);
-
-      const bad = addCmd(
-        project,
-        '--lane', 'gallery',
-        '--stage', 'Sketched',
-        '--kind', 'image',
-        'no-path-image',
-      );
-      expect(bad.code).toBe(2);
-      expect(bad.stderr).toContain('--artifact-path');
-      expect(bad.stderr).toContain('image');
-
-      const calendarRaw = readFileSync(
-        join(project, '.deskwork', 'calendar.md'),
-        'utf-8',
-      );
-      expect(calendarRaw).not.toContain('no-path-image');
-    },
-  );
-
-  it(
-    '--kind image with --artifact-path stamps the path verbatim — AUDIT-42',
-    () => {
-      const created = pipelineCmd(
-        project,
-        'create', 'visual-test',
-        '--shape', 'Sketched,Iterating,Approved,Shipped',
-        '--name', 'Visual test pipeline',
-        '--description', '39c-2b image-with-path fixture',
-      );
-      expect(created.code).toBe(0);
-
-      const laneRes = laneCmd(
-        project,
-        'create', 'gallery',
-        '--template', 'visual-test',
-        '--scaffold-default', 'image=content/img',
-        '--name', 'Gallery',
-      );
-      expect(laneRes.code).toBe(0);
-
-      const added = addCmd(
-        project,
-        '--lane', 'gallery',
-        '--stage', 'Sketched',
-        '--kind', 'image',
-        '--artifact-path', 'assets/images/hero.png',
-        'hero',
-      );
-      expect(added.stderr).toBe('');
-      expect(added.code).toBe(0);
-
-      const uuid = uuidFromAddOutput(project, added.stdout);
-      const sidecar = readSidecar(project, uuid);
-      expect(sidecar['artifactKind']).toBe('image');
-      // Stamped verbatim — not composed.
-      expect(sidecar['artifactPath']).toBe('assets/images/hero.png');
-    },
-  );
-
-  it(
-    '--kind image rejects --layout (image has no layout shape) — AUDIT-42',
-    () => {
-      const created = pipelineCmd(
-        project,
-        'create', 'visual-test',
-        '--shape', 'Sketched,Iterating,Approved,Shipped',
-        '--name', 'Visual test pipeline',
-        '--description', '39c-2b image-layout-reject fixture',
-      );
-      expect(created.code).toBe(0);
-
-      const laneRes = laneCmd(
-        project,
-        'create', 'gallery',
-        '--template', 'visual-test',
-        '--scaffold-default', 'image=content/img',
-        '--name', 'Gallery',
-      );
-      expect(laneRes.code).toBe(0);
-
-      const bad = addCmd(
-        project,
-        '--lane', 'gallery',
-        '--stage', 'Sketched',
-        '--kind', 'image',
-        '--layout', 'index',
-        '--artifact-path', 'assets/images/x.png',
-        'layout-image',
-      );
-      expect(bad.code).toBe(2);
-      expect(bad.stderr).toContain('--layout');
-      expect(bad.stderr).toContain('image');
-    },
-  );
-
-  it(
-    '--artifact-path is rejected for a templatable kind (path is composed)',
-    () => {
-      // Default lane (markdown) bootstrapped from the legacy site fixture.
-      const bad = addCmd(
-        project,
-        '--artifact-path', 'somewhere/forced.md',
-        'forced-path',
-      );
-      expect(bad.code).toBe(2);
-      expect(bad.stderr).toContain('--artifact-path');
-
-      const calendarRaw = readFileSync(
-        join(project, '.deskwork', 'calendar.md'),
-        'utf-8',
-      );
-      expect(calendarRaw).not.toContain('forced-path');
     },
   );
 

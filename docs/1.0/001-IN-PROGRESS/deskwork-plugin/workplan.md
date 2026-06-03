@@ -1946,7 +1946,7 @@ Tasks (TDD-shaped; map to spec § Scope a–e):
   - **DISCOVERY (39c-2 guardrail STOP, 2026-06-03): the accepted spec + blueprint under-mapped a whole resolution subsystem.** Removing `config.sites` is blocked by `resolveSite`/`siteConfig` (paths.ts) which feed **11 CLI-verb callers** (publish/induct/shortform-start/add/cancel/approve/ingest/distribute/block/iterate) + a `siteConfig().contentDir`-backed slug-template family (`resolveBlogFilePath`/`resolveEntryFilePath`/`resolveShortformFilePath`/`resolveBlogPostDir`) used by scaffold/publish/iterate/approve/rename-slug. **39d migrated only the entry-review resolution path, NOT the CLI-verb path** — those verbs still resolve via `siteConfig().contentDir`, with no migrated replacement. And re-pointing `scaffold.ts` at `lane.scaffoldDefaults` (the spec's `add --lane X --kind K`) has **no production design yet**. Splitting 39c:
     - [x] **39c-2a ✅ — green-able prep (no `sites`-schema removal).** Calendar collapse (`resolveCalendarPath` → fixed `.deskwork/calendar.md`), delete dead `resolveSiteHost`/`resolveSiteBaseUrl`, doctor per-site → single-project scope, studio `defaultSite` collapse + `host` re-home to `lane.host`, `review/*` `site in config.sites` validation drops, `install` writes a default lane, discovery-walk callers → sidecar enumeration, **rewrite the legacy-`sites` test fixtures to the lane shape (greens the 9 transitional cli failures)**. Leaves `config.sites` in the schema (tolerated) for the CLI-verb family. Keeps all 3 suites green.
     - [ ] **39c-2b — CLI-verb resolution migration + scaffold model. DESIGN RESOLVED 2026-06-03** (operator chose Option 1; spec §"`add`-time path composition" + §"CLI-verb resolution migration"). Implement, TDD-first, then delete `sites`:
-      - [ ] **(b) `add`-time scaffold model.** `add --lane X --kind K` composes the destination as `scaffoldDefaults[K]` (directory) + `layoutToContentRelativePath(layout, slug)`; layout = `--layout` flag else global default **`index`** (`<slug>/index.md`, = today's behavior). Missing `scaffoldDefaults[K]` → **fail loudly** (no fallback). Stamp the composed `artifactPath` onto the new entry. Retire the `resolveBlogFilePath`/`resolveEntryFilePath`/`resolveShortformFilePath`/`resolveBlogPostDir` slug-template family + `blogFilenameTemplate`. TDD: add-with-default-layout produces `<slug>/index.md` under `scaffoldDefaults[post]`; `--layout flat`/`readme` variants; missing-default-throws; `artifactPath` stamped.
+      - [x] **(b) `add`-time scaffold model — DONE (markdown-only).** `add` composes `scaffoldDefaults['markdown']` (directory) + `layoutToContentRelativePath(layout, slug)`; layout = `--layout {index|readme|flat}` else default **`index`** (`<slug>/index.md`, = today's behavior). Missing `scaffoldDefaults['markdown']` → fail loud. Composed `artifactPath` (POSIX forward-slash) stamped onto the new entry. **Non-markdown `--kind` is rejected (fail loud, exit 2)** — multi-kind support is deferred until the materializer (`scaffoldBlogPost`) handles those types; NOT in this retirement's scope. (A first attempt over-built kind-aware composition; reverted per operator correction 2026-06-03 — see spec § "39c-2b design amendment", AUDIT-39 correction.) The slug-template-family retirement remains sub-task (a)+(c) (other verbs still consume it).
       - [ ] **(a) CLI-verb resolution flip.** The verbs acting on EXISTING entries (publish/induct/cancel/approve/block/iterate/distribute/shortform-start/rename-slug) resolve via `entry.artifactPath` only — extend 39d's flip to the verb path; missing-path throws with `doctor --fix` guidance (no slug+stage search). `rename-slug` moves the file and rewrites `artifactPath`. TDD per verb: resolves via stored path; throws on absent path.
       - [ ] **(c) Terminal deletion.** Only after (a)+(b) land green across all 3 workspaces: delete `resolveSite`/`siteConfig`/`resolveContentDir`/`config.sites`/`SiteConfig` (tolerant reader stays only inside 39b's migration). `tsc --noEmit` clean; the "retire sites" headline lands.
 - [x] **39d — Doctor resolution reads `entry.artifactPath` only.** ✅ — `resolveArtifactPath` delegates to `resolveStoredArtifactPath` (no heuristic); deleted `artifactPathForStage` from validate.ts + repair.ts runtime; iterate.ts + studio entry-resolver throw `doctor --fix` on absent path; #394 regression fixture (2 sites/same slug → 0 findings) green; 3 fixtures stamped; shared `refineToIndexDoc` extracted. core 1014 + studio 681 pass. `file-presence` / `frontmatter-sidecar` / `missing-artifact-path` resolve via the stored path; no base search. Confirm `#394`-class multi-site false-positives cannot recur (regression fixture). Remove the dropped #394 search code.
@@ -2058,7 +2058,7 @@ Closes AUDIT-20260603-42. Surface: spec `docs/superpowers/specs/2026-06-02-sites
 
 - [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [x] The named action has landed in this branch (the `--artifact-path` flag + tests are present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
 ### Task 39.10 (fix-finding-AUDIT-20260603-43): AUDIT-20260603-43 — AUDIT-38's "canonical consumer roster" names `rename-slug` a…
@@ -2093,7 +2093,7 @@ Closes AUDIT-20260603-44. Surface: spec § "AUDIT-39 (HIGH)" table + bullets (*"
 
 - [x] Failing test exists at `packages/core/test/scaffold-path.test.ts` (cited in Step 1)
 - [x] `npx vitest run packages/core/test/scaffold-path.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 39.12 (fix-finding-AUDIT-20260603-45): AUDIT-20260603-45 — Decisions log keeps #12 ("global `index` default") un-supers…
@@ -2130,7 +2130,7 @@ Closes AUDIT-20260603-39. Surface: `packages/core/src/lanes/scaffold-path.ts:52-
 - [x] Failing test exists at `packages/core/test/scaffold-path.test.ts` (cited in Step 1)
 - [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline (29 test blocks)
 - [x] `npx vitest run packages/core/test/scaffold-path.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 39.7 (fix-finding-AUDIT-20260603-40): AUDIT-20260603-40 — `composeAddArtifactPath` joins with `node:path.join`, produc…
@@ -2147,7 +2147,7 @@ Closes AUDIT-20260603-40. Surface: `packages/core/src/lanes/scaffold-path.ts:29`
 
 - [x] Failing test exists at `packages/core/test/scaffold-path.test.ts` (cited in Step 1)
 - [x] `npx vitest run packages/core/test/scaffold-path.test.ts` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 39.8 (fix-finding-AUDIT-20260603-41): AUDIT-20260603-41 — `add` stamps a lanes-composed `artifactPath`, but `scaffoldB…
@@ -2164,4 +2164,58 @@ Closes AUDIT-20260603-41. Surface: `packages/cli/src/commands/add.ts:155-167` (c
 
 - [x] Failing test exists at `packages/cli/test/add-lane-stage-integration.test.ts` (cited in Step 1)
 - [x] `npx vitest run packages/cli/test/add-lane-stage-integration.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.13 (fix-finding-AUDIT-20260603-46): AUDIT-20260603-46 — Image `--artifact-path` is stamped verbatim with zero normal…
+
+Closes AUDIT-20260603-46. Surface: `packages/cli/src/commands/add.ts` (image branch: `artifactPath = artifactPathFlag;`, ~`:218-221`) + the `--kind image requires --artifact-path` validation (~`:148-156`) vs. `packages/core/src/lanes/scaffold-path.ts:215-218` (`posix.join` for composed paths). Severity: high.
+
+- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
+- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
+- [ ] Step 5: commit with `Closes AUDIT-20260603-46` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.14 (fix-finding-AUDIT-20260603-47): AUDIT-20260603-47 — Kind-aware stamp escalates the AUDIT-41 seam from "possible …
+
+Closes AUDIT-20260603-47. Surface: `packages/core/src/lanes/scaffold-path.ts:152-160` (`layoutToContentRelativePath` now hardcodes `'markdown'`, "Retained for the legacy file-creating `scaffoldBlogPost` path … which only ever scaffolds markdown") vs. `add.ts` stamping `<slug>/index.html` for `--kind html-mockup`. Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260603-47` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.15 (fix-finding-AUDIT-20260603-48) (non-bug): AUDIT-20260603-48 — AUDIT-42 (severity HIGH, substantive source change) is shape…
+
+Closes AUDIT-20260603-48. Surface: `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md` Task 39.9 (`(non-bug)` label + *"This finding's surface is non-source (docs, registry, markers…)"*) vs. the actual AUDIT-42 fix in `packages/cli/src/commands/add.ts:131-191` (new flag, parse, validate, branch) + 4 new integration tests.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-48` in subject (use `Closes AUDIT-20260603-48` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.

@@ -4,22 +4,22 @@
  * value-in / value-out assertions — the disk side is covered by the CLI
  * integration tests.
  *
- * Post-barrage amendment (AUDIT-20260603-39/40/44/45): composition is
- * now KIND-AWARE — the extension derives from the artifact kind, legal
- * layouts are constrained per kind, the default layout is per-kind, and
- * the join is forward-slash (POSIX) only.
+ * Simplification (operator decision): `deskwork add` supports ONLY
+ * markdown entries right now — the verb that materializes the file
+ * (scaffoldBlogPost) is markdown-only, so non-markdown kinds can't be
+ * created. The premature multi-kind machinery (per-kind extensions,
+ * per-kind legal-layout matrix, image --artifact-path) is removed; a
+ * non-markdown kind is rejected loudly. The POSIX forward-slash join
+ * (AUDIT-40) is retained.
  */
 
 import { describe, it, expect } from 'vitest';
 import {
   composeAddArtifactPath,
-  composeRelativePath,
   layoutToContentRelativePath,
   parseScaffoldLayout,
-  defaultLayoutForKind,
-  legalLayoutsForKind,
-  isLayoutLegalForKind,
   DEFAULT_SCAFFOLD_LAYOUT,
+  SCAFFOLD_LAYOUTS,
 } from '../src/lanes/scaffold-path.ts';
 import type { LaneConfig } from '../src/lanes/types.ts';
 
@@ -33,7 +33,7 @@ function lane(overrides?: Partial<LaneConfig>): LaneConfig {
   };
 }
 
-describe('layoutToContentRelativePath (markdown-only legacy helper)', () => {
+describe('layoutToContentRelativePath (markdown shapes)', () => {
   it('maps index → <slug>/index.md', () => {
     expect(layoutToContentRelativePath('index', 'my-post')).toBe(
       'my-post/index.md',
@@ -49,75 +49,15 @@ describe('layoutToContentRelativePath (markdown-only legacy helper)', () => {
   });
 });
 
-describe('composeRelativePath (kind-aware) — AUDIT-39', () => {
-  it('markdown + index → <slug>/index.md', () => {
-    expect(composeRelativePath('markdown', 'index', 'my-post')).toBe(
-      'my-post/index.md',
-    );
-  });
-  it('markdown + readme → <slug>/README.md', () => {
-    expect(composeRelativePath('markdown', 'readme', 'my-post')).toBe(
-      'my-post/README.md',
-    );
-  });
-  it('markdown + flat → <slug>.md', () => {
-    expect(composeRelativePath('markdown', 'flat', 'my-post')).toBe(
-      'my-post.md',
-    );
-  });
-  it('html-mockup + index → <slug>/index.html', () => {
-    expect(composeRelativePath('html-mockup', 'index', 'design-x')).toBe(
-      'design-x/index.html',
-    );
-  });
-  it('single-file-html + flat → <slug>.html', () => {
-    expect(composeRelativePath('single-file-html', 'flat', 'banner')).toBe(
-      'banner.html',
-    );
-  });
-  it('rejects an illegal (kind, layout) combination', () => {
-    expect(() =>
-      composeRelativePath('single-file-html', 'index', 'banner'),
-    ).toThrowError(/single-file-html/);
-    expect(() =>
-      composeRelativePath('html-mockup', 'flat', 'design-x'),
-    ).toThrowError(/html-mockup/);
-  });
-  it('rejects image (not templatable)', () => {
-    expect(() =>
-      composeRelativePath('image', 'index', 'photo'),
-    ).toThrowError(/image/);
-  });
-});
-
-describe('per-kind layout policy — AUDIT-44', () => {
-  it('markdown allows index, readme, flat; default index', () => {
-    expect(legalLayoutsForKind('markdown')).toEqual(['index', 'readme', 'flat']);
-    expect(defaultLayoutForKind('markdown')).toBe('index');
-  });
-  it('html-mockup allows only index; default index', () => {
-    expect(legalLayoutsForKind('html-mockup')).toEqual(['index']);
-    expect(defaultLayoutForKind('html-mockup')).toBe('index');
-  });
-  it('single-file-html allows only flat; default flat', () => {
-    expect(legalLayoutsForKind('single-file-html')).toEqual(['flat']);
-    expect(defaultLayoutForKind('single-file-html')).toBe('flat');
-  });
-  it('image has no legal layouts and no default', () => {
-    expect(legalLayoutsForKind('image')).toEqual([]);
-    expect(defaultLayoutForKind('image')).toBeUndefined();
-  });
-  it('isLayoutLegalForKind reflects the policy', () => {
-    expect(isLayoutLegalForKind('markdown', 'flat')).toBe(true);
-    expect(isLayoutLegalForKind('single-file-html', 'index')).toBe(false);
-    expect(isLayoutLegalForKind('html-mockup', 'readme')).toBe(false);
-    expect(isLayoutLegalForKind('image', 'index')).toBe(false);
-  });
-});
-
 describe('DEFAULT_SCAFFOLD_LAYOUT', () => {
-  it('is index — the markdown/html-mockup per-kind default', () => {
+  it('is index — the global markdown default (Decision #12)', () => {
     expect(DEFAULT_SCAFFOLD_LAYOUT).toBe('index');
+  });
+});
+
+describe('SCAFFOLD_LAYOUTS', () => {
+  it('is the three legal markdown layouts', () => {
+    expect(SCAFFOLD_LAYOUTS).toEqual(['index', 'readme', 'flat']);
   });
 });
 
@@ -133,28 +73,10 @@ describe('parseScaffoldLayout', () => {
   });
 });
 
-describe('composeAddArtifactPath', () => {
+describe('composeAddArtifactPath (markdown only)', () => {
   it('markdown default layout composes <dir>/<slug>/index.md', () => {
     expect(composeAddArtifactPath(lane(), 'markdown', 'my-post')).toBe(
       'src/content/blog/my-post/index.md',
-    );
-  });
-
-  it('html-mockup default layout composes <dir>/<slug>/index.html', () => {
-    const multi = lane({
-      scaffoldDefaults: { 'html-mockup': 'content/mockups' },
-    });
-    expect(composeAddArtifactPath(multi, 'html-mockup', 'design-x')).toBe(
-      'content/mockups/design-x/index.html',
-    );
-  });
-
-  it('single-file-html default layout composes <dir>/<slug>.html', () => {
-    const multi = lane({
-      scaffoldDefaults: { 'single-file-html': 'content/html' },
-    });
-    expect(composeAddArtifactPath(multi, 'single-file-html', 'banner')).toBe(
-      'content/html/banner.html',
     );
   });
 
@@ -182,36 +104,41 @@ describe('composeAddArtifactPath', () => {
     expect(result.split('/').length).toBeGreaterThan(1);
   });
 
-  it('rejects an illegal (kind, layout) override — AUDIT-44', () => {
-    const multi = lane({
-      scaffoldDefaults: { 'single-file-html': 'content/html' },
-    });
+  it('rejects a non-markdown kind loudly (html-mockup)', () => {
     expect(() =>
-      composeAddArtifactPath(multi, 'single-file-html', 'banner', 'index'),
+      composeAddArtifactPath(lane(), 'html-mockup', 'design-x'),
+    ).toThrowError(/markdown/);
+    expect(() =>
+      composeAddArtifactPath(lane(), 'html-mockup', 'design-x'),
+    ).toThrowError(/html-mockup/);
+  });
+
+  it('rejects a non-markdown kind loudly (single-file-html)', () => {
+    expect(() =>
+      composeAddArtifactPath(lane(), 'single-file-html', 'banner'),
     ).toThrowError(/single-file-html/);
   });
 
-  it('rejects image (not templatable) — AUDIT-42', () => {
-    const multi = lane({ scaffoldDefaults: { image: 'content/img' } });
+  it('rejects a non-markdown kind loudly (image)', () => {
     expect(() =>
-      composeAddArtifactPath(multi, 'image', 'photo'),
+      composeAddArtifactPath(lane(), 'image', 'photo'),
     ).toThrowError(/image/);
   });
 
-  it('throws a loud, actionable error when the kind has no default', () => {
-    const onlyMarkdown = lane({
+  it('throws a loud error when the markdown default is absent', () => {
+    const noMarkdown = lane({
       id: 'mockups',
-      scaffoldDefaults: { markdown: 'src/content/blog' },
+      scaffoldDefaults: { 'html-mockup': 'content/mockups' },
     });
     expect(() =>
-      composeAddArtifactPath(onlyMarkdown, 'html-mockup', 'design-x'),
+      composeAddArtifactPath(noMarkdown, 'markdown', 'design-x'),
     ).toThrowError(/mockups/);
     expect(() =>
-      composeAddArtifactPath(onlyMarkdown, 'html-mockup', 'design-x'),
-    ).toThrowError(/html-mockup/);
+      composeAddArtifactPath(noMarkdown, 'markdown', 'design-x'),
+    ).toThrowError(/markdown/);
     // Names the fix (no silent fallback).
     expect(() =>
-      composeAddArtifactPath(onlyMarkdown, 'html-mockup', 'design-x'),
+      composeAddArtifactPath(noMarkdown, 'markdown', 'design-x'),
     ).toThrowError(/scaffold-default/);
   });
 
