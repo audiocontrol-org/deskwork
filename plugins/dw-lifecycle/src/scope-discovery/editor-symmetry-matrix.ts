@@ -125,7 +125,7 @@ export interface MatrixRow {
 }
 
 export interface SymmetryMatrix {
-  readonly editors: readonly string[];
+  readonly modules: readonly string[];
   readonly rows: readonly MatrixRow[];
   /** Total unique TS/TSX files visited across all manifest scans. */
   readonly filesVisited: number;
@@ -159,14 +159,14 @@ export async function computeMatrix(opts: ComputeOptions): Promise<SymmetryMatri
   // preserved (back-compat with all pre-Phase-11 baselines).
   const activeEntries = filterActiveEntries(registry.entries);
   if (activeEntries.length === 0) {
-    return { editors, rows: [], filesVisited: 0, moduleRoot };
+    return { modules: editors, rows: [], filesVisited: 0, moduleRoot };
   }
   const visited = new Set<string>();
   const rows: MatrixRow[] = [];
   for (const entry of activeEntries) {
     rows.push(await computeRow(entry, rootAbs, editors, moduleRoot, visited));
   }
-  return { editors, rows, filesVisited: visited.size, moduleRoot };
+  return { modules: editors, rows, filesVisited: visited.size, moduleRoot };
 }
 
 interface PerEditorBuckets {

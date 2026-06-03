@@ -273,13 +273,13 @@ async function collectEditorSymmetryFindings(
     // enforced entries by `computeMatrix`; assert the invariant.
     if (!isActivelyEnforced(row.status)) {
       throw new Error(
-        `regime-holdout-detector: editor-symmetry matrix surfaced row ` +
+        `regime-holdout-detector: module-symmetry matrix surfaced row ` +
           `'${row.entry.id}' with status '${row.status}'. computeMatrix is ` +
           `expected to filter to blessed/cursed entries; this row should ` +
           `never have surfaced.`,
       );
     }
-    matrix.editors.forEach((editor, idx) => {
+    matrix.modules.forEach((editor, idx) => {
       const cell = row.cells[idx];
       if (cell === undefined) return;
       if (cell.status !== 'partial' && cell.status !== 'missing') return;
@@ -289,7 +289,7 @@ async function collectEditorSymmetryFindings(
           ? `editor '${editor}' targeted by manifest '${row.entry.id}' but has no adopters (expected ${cell.expected}, actual ${cell.actual}, holdouts ${cell.holdouts})`
           : `editor '${editor}' partially adopts manifest '${row.entry.id}' (expected ${cell.expected}, actual ${cell.actual}, holdouts ${cell.holdouts})`;
       out.push({
-        source: 'editor-symmetry',
+        source: 'module-symmetry',
         id: composite,
         file: `${input.moduleRoot}/${editor}/`,
         shape,
@@ -396,7 +396,7 @@ function deriveMeta(findings: readonly RegimeHoldoutFinding[]): RegimeHoldoutMet
       case 'adopter-manifest':
         adopter += 1;
         break;
-      case 'editor-symmetry':
+      case 'module-symmetry':
         symmetry += 1;
         break;
       case 'deprecation':
@@ -416,7 +416,7 @@ function deriveMeta(findings: readonly RegimeHoldoutFinding[]): RegimeHoldoutMet
   return {
     anti_pattern_count: antiPattern,
     adopter_manifest_count: adopter,
-    editor_symmetry_holdout_count: symmetry,
+    module_symmetry_holdout_count: symmetry,
     deprecation_count: deprecation,
     total: findings.length,
     actively_enforced_count: activelyEnforced,

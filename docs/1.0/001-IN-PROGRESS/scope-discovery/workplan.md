@@ -1512,13 +1512,15 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 3 — Schema rename + Zod types
 
-- Step 1: Write failing tests reading/writing the new field name `module_symmetry`.
-- Step 2: Rename `editor_symmetry:` → `module_symmetry:` in the adopter-manifests YAML schema + Zod types.
-- Step 3: Rename `regime_holdouts.editor_symmetry` → `regime_holdouts.module_symmetry`.
-- Step 4: Update `RegimeHoldoutSource` type + every consumer.
-- Step 5: Confirm tests pass; `tsc` clean.
+**Complete (2026-06-03 cont. 5).** Hard-renamed the wire-format `editor_symmetry` → `module_symmetry` across schema + types + every consumer. Doctor-rule migration for adopter YAML lands in Task 8 (legacy `editor_symmetry:` → `module_symmetry:` auto-rewrite under `--fix`). All 2641/2641 plugin tests green; tsc clean.
 
-**Acceptance:** Schema reads `module_symmetry` end-to-end. Old name reads only via the migration codepath (if alias retained) or not at all (if hard-renamed).
+- [x] Step 1: failing tests demonstrated via the existing test suite — every test using the old field name failed against the renamed schema until updated; the rename IS the change under test.
+- [x] Step 2: `editor_symmetry:` → `module_symmetry:` in `scope-manifest.yaml.schema.json` (property key + `required` array entry + `by_source` sub-object's required + properties + description text).
+- [x] Step 3: `regime_holdouts.editor_symmetry` → `regime_holdouts.module_symmetry` in `synthesis-types.ts` (`ManifestRegimeHoldouts` field + `ManifestRegimeHoldoutMeta.by_source` field).
+- [x] Step 4: `RegimeHoldoutSource` union literal `'editor-symmetry'` → `'module-symmetry'` + `RegimeHoldoutMeta.editor_symmetry_holdout_count` → `module_symmetry_holdout_count` in `discovery-agents/types.ts`. `SymmetryMatrix.editors` → `SymmetryMatrix.modules` public field in `editor-symmetry-matrix.ts`. Every consumer updated: synthesis.ts, synthesis-derive-regime.ts, synthesis-report.ts (`PerBucketCategoryCounts`), scope-widen-delta.ts (`ScopeWidenDelta` + merge/format), regime-holdout-detector.ts (matrix walk + meta builder + error message), editor-symmetry-report.ts (table headers + suggestion rows), check-editor-symmetry.ts (cell-count summary). Tests updated: editor-symmetry, scope-widen, synthesis-report, keygroup-summary-repro, regime-holdout-detector.
+- [x] Step 5: `tsc -p plugins/dw-lifecycle --noEmit` exit 0; `npx vitest run` from `plugins/dw-lifecycle/` reports 205 test files / 2641 tests, all passing.
+
+**Acceptance:** ✅ Schema reads `module_symmetry` end-to-end. Hard rename (no alias path); the adopter-YAML migration codepath is Task 8's doctor rule.
 
 ### Task 4 — Source identifier rename
 

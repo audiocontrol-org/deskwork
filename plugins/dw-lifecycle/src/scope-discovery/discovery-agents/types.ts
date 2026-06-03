@@ -206,7 +206,7 @@ export interface PrdThemedFindings {
  *   - 'anti-pattern'     — code matches a registered legacy shape.
  *   - 'adopter-manifest' — file matches a manifest's expected-adopter
  *     glob but does NOT import the canonical primitive.
- *   - 'editor-symmetry'  — one editor in a multi-editor manifest fails
+ *   - 'module-symmetry'  — one module in a multi-module manifest fails
  *     to adopt while peers do.
  *   - 'deprecation'      — an importer of a `@deprecated` file is
  *     blocking the file's deletion.
@@ -214,7 +214,7 @@ export interface PrdThemedFindings {
 export type RegimeHoldoutSource =
   | 'anti-pattern'
   | 'adopter-manifest'
-  | 'editor-symmetry'
+  | 'module-symmetry'
   | 'deprecation';
 
 /**
@@ -292,7 +292,7 @@ export interface RegimeHoldoutFinding {
 export interface RegimeHoldoutMeta {
   readonly anti_pattern_count: number;
   readonly adopter_manifest_count: number;
-  readonly editor_symmetry_holdout_count: number;
+  readonly module_symmetry_holdout_count: number;
   readonly deprecation_count: number;
   readonly total: number;
   /**
@@ -321,7 +321,7 @@ export interface RegimeHoldoutFindings {
  *
  * Distinct from the regime-holdout-detector's adopter sub-pass: this
  * agent runs as a standalone fleet slot, narrating only the adopter-
- * manifest gate (no anti-pattern / editor-symmetry / deprecation
+ * manifest gate (no anti-pattern / module-symmetry / deprecation
  * fusion). Its findings flow into the same manifest section
  * (`regime_holdouts.adopter_manifests[]`) as the regime-holdout
  * detector's adopter findings — synthesis-derive-regime dedupes by

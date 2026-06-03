@@ -183,9 +183,9 @@ function formatSummary(
   if (matrix.rows.length === 0) {
     return 'editor-symmetry: registry empty; nothing to check.';
   }
-  const cellCount = matrix.rows.length * matrix.editors.length;
+  const cellCount = matrix.rows.length * matrix.modules.length;
   return (
-    `editor-symmetry: ${matrix.rows.length} convention(s) x ${matrix.editors.length} module(s) ` +
+    `editor-symmetry: ${matrix.rows.length} convention(s) x ${matrix.modules.length} module(s) ` +
     `= ${cellCount} cells; ` +
     `${totals['ok']} ✓, ${totals['partial']} ⚠, ${totals['missing']} ✗, ${totals['tracked']} ⏳, ${totals['na']} —.`
   );

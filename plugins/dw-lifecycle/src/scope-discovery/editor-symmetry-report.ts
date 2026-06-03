@@ -99,7 +99,7 @@ function intro(moduleRoot: string): string {
 }
 
 function renderTable(matrix: SymmetryMatrix): string {
-  const headers = ['Convention', ...matrix.editors];
+  const headers = ['Convention', ...matrix.modules];
   const sep = headers.map(() => '---');
   const lines: string[] = [];
   lines.push(`| ${headers.join(' | ')} |`);
@@ -164,7 +164,7 @@ function renderSuggestions(matrix: SymmetryMatrix): readonly string[] {
   const blocks: string[] = [];
   for (const row of matrix.rows) {
     const missing = row.cells
-      .map((cell, idx) => ({ cell, editor: matrix.editors[idx] }))
+      .map((cell, idx) => ({ cell, editor: matrix.modules[idx] }))
       .filter(({ cell }) => cell.status === 'missing' || cell.status === 'partial');
     if (missing.length === 0) continue;
     const lines: string[] = [];

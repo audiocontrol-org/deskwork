@@ -229,7 +229,7 @@ export async function synthesize(input: SynthesizeOptions): Promise<SynthesisOut
     warnings.push(
       'No regime-holdout-detector or adopter-manifest-checker findings supplied; ' +
         'manifest omits `regime_holdouts:` section. Run the agents to surface ' +
-        'anti-pattern / adopter-manifest / editor-symmetry / deprecation holdouts.',
+        'anti-pattern / adopter-manifest / module-symmetry / deprecation holdouts.',
     );
   }
   if (kind === 'ui' && partitioned.ui.length > 0) {

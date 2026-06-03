@@ -224,14 +224,14 @@ function buildAcceptanceManifest(args: {
     regime_holdouts: {
       anti_patterns: antiPatterns,
       adopter_manifests: [],
-      editor_symmetry: [],
+      module_symmetry: [],
       deprecations: [],
       meta: {
         total: antiPatterns.length,
         by_source: {
           anti_pattern: antiPatterns.length,
           adopter_manifest: 0,
-          editor_symmetry: 0,
+          module_symmetry: 0,
           deprecation: 0,
         },
         by_status: {
