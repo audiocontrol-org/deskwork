@@ -1492,19 +1492,23 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 1 — Inventory
 
-- Step 1: Grep every reference to `editor`, `editors`, `Editor`, `EDITOR`, `editor_symmetry`, `editorSymmetry`, `editorsTargetedByGlob`, `discoverEditors`, `editorForPath`, `editor-symmetry-*` across plugin source, schema, skills, tests, docs, rule files.
-- Step 2: Categorize each hit: schema field (breaking) / source identifier (mechanical) / file name / CLI verb name / skill prose / test fixture / doc reference / etymology paragraph (preserve as historical comment).
-- Step 3: Capture the inventory in a working scratch document at `docs/1.0/001-IN-PROGRESS/scope-discovery/phase-25-rename-inventory.md`.
+**Complete.** Inventory captured at `docs/1.0/001-IN-PROGRESS/scope-discovery/phase-25-inventory.md`.
 
-**Acceptance:** Inventory categorized; total hit count + per-category counts surfaced.
+- [x] Step 1: greppped every reference via `grep -rln 'editor_symmetry\|editor-symmetry\|discoverEditors\|editorForPath\|editorsTargetedByGlob\|SymmetryMatrix' plugins/`. ~40 files identified.
+- [x] Step 2: categorized — 5 primary source files (`editor-symmetry-*`, `util/editors.ts`, `check-editor-symmetry.ts` × 2); 4 schema/type surfaces; ~14 importer files; 12 test files; 6 skill body files; 3 command/template files.
+- [x] Step 3: inventory written to `phase-25-inventory.md` with full per-surface decomposition + the operator-confirmed strategy (single-rename + doctor migration + alias-for-one-release on CLI verb + audiocontrol-lockstep coordination via pilot-tracker issue).
+
+**Acceptance:** ✅ Inventory categorized + total file count (~40) + per-category counts surfaced + sequencing recommendation captured for the next session.
 
 ### Task 2 — Breaking-change strategy decision
 
-- Step 1: Decide: single-rename + doctor-rule migration, OR dual-name period with deprecation warning, OR dual-name forever.
-- Step 2: Document the decision in the Phase 25 ADR / decision-record fragment.
-- Step 3: If single-rename: confirm doctor rule is the chosen migration vehicle; if dual-name: confirm whether old name retires in a future phase or stays indefinitely.
+**Complete (operator-confirmed 2026-06-03 via blocking-questions pass).**
 
-**Acceptance:** Decision recorded with rationale.
+- [x] Step 1: Decision = **single-rename + doctor-rule migration**. Cleanest end-state; adopters do one `doctor --fix` to migrate. Operator-confirmed.
+- [x] Step 2: Decision recorded in `phase-25-inventory.md` § "Strategy recap" + this workplan annotation. Subordinate decisions: CLI verb shipped with alias for one release cycle (workplan Task 5 lean); skill folder retires entirely (no stub); audiocontrol pilot renames in lockstep (operator confirmed; coordinate via pilot-tracker issue).
+- [x] Step 3: Confirmed — `legacy-editor-symmetry-field-rename` doctor rule is the migration vehicle for adopter YAML (Task 8 deliverable).
+
+**Acceptance:** ✅ Decision recorded with rationale + four sub-decisions captured (strategy, CLI verb, skill folder, pilot coordination).
 
 ### Task 3 — Schema rename + Zod types
 
