@@ -445,3 +445,53 @@ This is distinct from the already-slushed AUDIT-20260602-30 (fabricated TDD sign
 ---
 
 **What I checked and found already-covered (not re-reported):** the `--no-tailscale` two-branch warning and its `--host 127.0.0.1` gap (AUDIT-06/11/12); the tri-state `checkAncestry` collapse arrows and inverse-safety invariant (AUDIT-41/45/46/47/52); `pickFallbackBaseline` selection logic including the post-merge `branch-point` test (AUDIT-39/02); `computeAuditedDiff` / `runGitDiff` maxBuffer classification and the `ok:true` swallow of generic git errors (AUDIT-03/05/06/35/39); the `EMPTY_DIFF_CURE_MESSAGE` placeholder and duplicated 50 MB constant (AUDIT-38/07/08); the divergence-notice dead code and unthreaded `DW_UPSTREAM_BASE_REF` (AUDIT-01/02); `inferFindingShape` allowlist whack-a-mole + `.claude/agents` gap (AUDIT-09/14); the informational auto-flip `!alreadyScoped` residue (AUDIT-79); and the deskwork-plugin spec's `Partial<Record>` typing + backfill collision + stale `#301` deferral pointer (AUDIT-20260602-03/04/05). The version bump to 0.35.0 is internally consistent across all eleven manifests. My three findings are the migration `scaffoldDefaults` derivation gap, the strict-schema-vs-tolerant-read bootstrapping gap, and the orphan-sweep stale-annotation bug — none captured by the prior dispositioned set.
+
+## 2026-06-03 — audit-barrage lift (20260603T013840403Z-deskwork-plugin)
+
+### AUDIT-20260603-04 — Workplan declares the `resolveContentDir` discovery-walk strategy "resolved," but the blueprint it cites still frames it as an open operator decision
+
+Finding-ID: AUDIT-20260603-04
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md` (added "Implementation sequence" paragraph) vs. `docs/1.0/001-IN-PROGRESS/deskwork-plugin/39-sites-to-lanes-blueprint.md` §1 NOTE + §5 risk #1
+
+The same commit introduces a direct contradiction between the two Phase-39 tracking docs about how the highest-reach symbol in the refactor (`resolveContentDir`, "the widest reach of any single symbol") gets re-homed. The workplan's new paragraph asserts the question is settled: *"Open design call resolved spec-consistently: the `resolveContentDir` discovery-walk callers move to **sidecar-driven enumeration** … not a scaffold-root walk."* But that paragraph explicitly routes implementers to the blueprint for the sequence (*"per `39-sites-to-lanes-blueprint.md`"*), and the blueprint — the authoritative implementation doc — still frames the identical decision as unresolved: §1 NOTE says *"39c must decide per-caller whether the walk is replaced by (a) a sidecar enumeration or (b) a per-lane `scaffoldDefaults` root walk,"* and §5 risk #1 says *"This is a design decision inside 39c that the spec does not fully pin down … Needs an operator call."*
+
+An implementer working from the blueprint (the cited source of truth) will see "needs an operator call" with two live options and may pick option (b) — the per-lane `scaffoldDefaults` root walk — which is the exact strategy the workplan says NOT to use. The cost is a wrong 39c implementation of the single largest refactor in the phase, plus the trust erosion the project's closure/tracking discipline exists to prevent. Fix: reconcile in the same commit — update blueprint §1 NOTE and §5 #1 to record the resolution (sidecar-driven enumeration, scaffold-root walk rejected), or strike the "resolved" claim from the workplan if it isn't actually settled. Right now both can't be true.
+
+---
+
+### AUDIT-20260603-05 — Blueprint 39b encodes the all-kinds→one-dir `scaffoldDefaults` derivation that AUDIT-20260603-01 named as the mis-routing anti-pattern — while -01 sits slushed and unresolved
+
+Finding-ID: AUDIT-20260603-05
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/39-sites-to-lanes-blueprint.md` §3 (39b) vs. `docs/1.0/001-IN-PROGRESS/deskwork-plugin/audit-log.md` AUDIT-20260603-01
+
+Three documents in this diff disagree on how migration step 1 derives a per-`artifactKind` `scaffoldDefaults` map from a legacy `site.contentDir` (which carries exactly one directory). The spec leaves it undefined; the audit-log records AUDIT-20260603-01 as `acknowledged-slush-pile` (i.e. open/unaddressed); but the blueprint silently *resolves* it with a concrete rule — §3 39b: *"`scaffoldDefaults` derived from `site.contentDir` keyed by the lane's pipeline kinds."* "Keyed by the lane's pipeline kinds" means mapping **every** pipeline kind to the single legacy directory (`{ <every kind>: site.contentDir }`). That is precisely the choice AUDIT-20260603-01 flagged as wrong: *"the wrong default silently drops new non-`post` artifacts into the legacy content dir."*
+
+So the implementation doc encodes the anti-pattern the audit finding warned against, the audit finding is parked as slushed rather than driving a correction, and neither the spec nor 39b's acceptance criteria carry a `scaffoldDefaults`-derivation assertion to catch it. An implementer faithfully following the blueprint backfills a lane that mis-routes every future non-default scaffold. Fix: decide the kind-assignment rule (the finding suggests "map the lane's *primary* kind to `site.contentDir`; leave other kinds unset"), write it into the spec, and add a 39b acceptance asserting the derived map shape — then bring the blueprint's §3 39b line into agreement with it.
+
+---
+
+### AUDIT-20260603-06 — AUDIT-20260603-01/-02 (design-blocking spec gaps for 39a/39b) were slushed, not scoped — diverging from how -03/-04 were folded and from the project's scope-don't-defer discipline
+
+Finding-ID: AUDIT-20260603-06
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/audit-log.md` AUDIT-20260603-01 + -02 `Status:` lines; `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (`"disposition":"fired-and-slushed"`)
+
+Both new findings -01 (scaffoldDefaults derivation undefined) and -02 (strict lane schema vs. tolerant legacy-`sites` read not reconciled — the migration must load a config the post-39c schema rejects) are marked `acknowledged-slush-pile-2026-06-03`. These are not hygiene notes: each is a gap an implementer hits *the moment 39a/39b start* (the spec doesn't say how to derive the map; the spec doesn't say whether the loader is dual-pass or the doctor bypasses it). The immediately-preceding entries in the very same file — AUDIT-20260602-03/04 — were the right precedent: both `fixed-2026-06-02 (folded into spec + workplan acceptance)`. The project's `agent-discipline.md` is explicit (operator, verbatim): *"Filing a bug report isn't good enough. It MUST BE SCOPED INTO THE WORKPLAN,"* and the `promote-findings` mechanism makes scope-into-workplan the default, gating the acknowledged path on a *recorded substantive reason*.
+
+No substantive reason for slushing -01/-02 appears in the diff — only the `fired-and-slushed` marker. -02 in particular is a cross-cutting correctness hazard: once 39c removes `sites` from the strict loader, every config-reading command (`install`, `studio`, `ingest`) on a pre-migration project either throws an unhandled Zod error or silently can't run, and the migration itself can't parse the shape it must migrate — this is design-blocking, not low-cost. (Note: -03, against `apply-audit-flips.ts`, is in the dw-lifecycle lane explicitly listed as **out of scope** for this feature, so slushing *it* here is defensible — but it should be filed against that lane rather than left only in this feature's slush pile.) Fix: fold -01 and -02 into the spec + 39a/39b acceptance now (before implementation), matching the -03/-04 treatment, or record the gating substantive reason if the operator genuinely chooses to park them.
+
+---
+
+### AUDIT-20260603-07 — Verified-clean items (negative signal for cross-model triage)
+
+Finding-ID: AUDIT-20260603-07
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/39-sites-to-lanes-blueprint.md` §3/§4 (39a Zod recipe)
+
+I checked the blueprint's recommended lane-schema recipe — `z.record(ArtifactKindSchema, z.string().min(1)).optional()` with the parenthetical claim *"partial by construction … unknown keys are rejected because the key schema is the enum"* — directly against the repo (Zod 3.25.76, `packages/core/node_modules/zod`). At **runtime** a single-kind map (`{ markdown: 'src/blog' }`) parses and an unknown key is rejected; at the **type level**, a `tsc --noEmit --strict` probe confirmed the inferred type is partial (`{ markdown: 'x' }` is assignable; a control `Record<allKinds,string>` correctly rejected the same partial literal). So the recipe satisfies both the spec's `Partial<Record<artifactKind,string>>` intent (AUDIT-20260602-04's fix) and the unknown-key rejection — I would have flagged it as a re-encoding of AUDIT-04 had the inference come back non-partial, but it did not. One cosmetic note only: the symbol is `ArtifactKindEnum` in `packages/core/src/schema/entry.ts:180`, not `ArtifactKindSchema` as the blueprint writes it — a rename for the implementer to reconcile, not a defect. I also confirmed the `fired-and-slushed` hook-log disposition is internally consistent with the three slushed audit-log entries (unlike the 39.0 marker-honesty problem, this enum value matches the recorded action).

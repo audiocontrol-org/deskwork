@@ -28,7 +28,23 @@
  *   - `contentDir` is a non-empty path; relative paths are resolved
  *     against the project root by callers, absolute paths are taken
  *     verbatim. Doctor may normalize later; the schema enforces
- *     non-empty only.
+ *     non-empty only. **Retained for back-compat through Phase 39's
+ *     expand/contract sequence — now redundant; its removal is 39c's
+ *     job.** Per the sites→lanes retirement (Phase 39), location is a
+ *     property of the ENTRY (`entry.artifactPath`), not the lane.
+ *   - `host` (optional) — present only when this lane publishes its
+ *     content tree as a website. A lane without a host is fully valid
+ *     (the collection model is renderer-independent). Where the host
+ *     reads land (studio URL formatting) is a downstream concern; the
+ *     schema only records the optional string.
+ *   - `scaffoldDefaults` (optional) — a PARTIAL map from `ArtifactKind`
+ *     to the directory where `/deskwork:add` drops a NEW file of that
+ *     kind. Partial by construction: a lane defines defaults only for
+ *     the kinds its pipeline actually scaffolds (e.g. a single-kind
+ *     map `{ markdown: 'src/content/blog' }` validates). It is a
+ *     convenience default used solely at add-time — NEVER identity,
+ *     NEVER resolution. Unknown keys are rejected because the key
+ *     schema is the `ArtifactKind` enum.
  *
  * The on-disk JSON additionally permits a top-level `"$rationale"`
  * string field as the JSON-with-comments workaround (matching the
@@ -71,6 +87,33 @@ import { z } from 'zod';
  */
 export const LANE_ID_REGEX = /^[a-z0-9][a-z0-9-]*$/;
 
+/**
+ * The four artifact kinds the lane-aware entry model recognizes:
+ *   - `markdown`           — a single `.md` file (the legacy editorial
+ *                            artifact shape).
+ *   - `html-mockup`        — a directory containing `index.html` plus
+ *                            optional sibling assets (mockups / design
+ *                            specs / standalone HTML deliverables).
+ *   - `single-file-html`   — a loose `.html` file (not inside an
+ *                            html-mockup directory).
+ *   - `image`              — a raster or vector image file (.png /
+ *                            .jpg / .jpeg / .gif / .webp / .svg).
+ *
+ * Detection: see `./detection.ts` (`detectArtifactKind`).
+ *
+ * Declared ABOVE `LaneConfigSchema` so the schema's `scaffoldDefaults`
+ * record can key off this enum (a `z.record` over the enum is partial
+ * by construction — see the `scaffoldDefaults` field docblock).
+ */
+export const ArtifactKindSchema = z.enum([
+  'markdown',
+  'html-mockup',
+  'single-file-html',
+  'image',
+]);
+
+export type ArtifactKind = z.infer<typeof ArtifactKindSchema>;
+
 export const LaneConfigSchema = z.object({
   id: z.string().regex(
     LANE_ID_REGEX,
@@ -78,7 +121,17 @@ export const LaneConfigSchema = z.object({
   ),
   name: z.string().min(1, 'name must be a non-empty string'),
   pipelineTemplate: z.string().min(1, 'pipelineTemplate must be a non-empty string'),
+  // Retained through Phase 39's expand/contract (now redundant; removed
+  // in 39c). Location is an ENTRY property (`entry.artifactPath`).
   contentDir: z.string().min(1, 'contentDir must be a non-empty string'),
+  // Optional — present only when this lane publishes to a website.
+  host: z.string().min(1, 'host must be a non-empty string when present').optional(),
+  // Optional, PARTIAL-by-construction map from ArtifactKind → scaffold
+  // directory. A single-kind map validates; unknown keys are rejected
+  // because the key schema is the ArtifactKind enum. Used solely at
+  // add-time to choose where a NEW file lands — never identity, never
+  // resolution.
+  scaffoldDefaults: z.record(ArtifactKindSchema, z.string().min(1)).optional(),
   archivedAt: z.string().datetime().optional(),
   // Sole explicitly-declared "extra" key — the comments-in-JSON
   // workaround that mirrors PipelineTemplateSchema (AUDIT-20260530-02).
@@ -94,30 +147,8 @@ export const LaneConfigSchema = z.object({
  *
  * The schema is `.strict()`, so the inferred type lists exactly the
  * declared keys: `id`, `name`, `pipelineTemplate`, `contentDir`,
- * `archivedAt` (optional), `$rationale` (optional). Unknown top-level
- * keys fail parse at the schema layer (AUDIT-20260530-08 fix).
+ * `host` (optional), `scaffoldDefaults` (optional), `archivedAt`
+ * (optional), `$rationale` (optional). Unknown top-level keys fail
+ * parse at the schema layer (AUDIT-20260530-08 fix).
  */
 export type LaneConfig = z.infer<typeof LaneConfigSchema>;
-
-/**
- * The four artifact kinds the lane-aware entry model recognizes:
- *   - `markdown`           — a single `.md` file (the legacy editorial
- *                            artifact shape).
- *   - `html-mockup`        — a directory containing `index.html` plus
- *                            optional sibling assets (mockups / design
- *                            specs / standalone HTML deliverables).
- *   - `single-file-html`   — a loose `.html` file (not inside an
- *                            html-mockup directory).
- *   - `image`              — a raster or vector image file (.png /
- *                            .jpg / .jpeg / .gif / .webp / .svg).
- *
- * Detection: see `./detection.ts` (`detectArtifactKind`).
- */
-export const ArtifactKindSchema = z.enum([
-  'markdown',
-  'html-mockup',
-  'single-file-html',
-  'image',
-]);
-
-export type ArtifactKind = z.infer<typeof ArtifactKindSchema>;
