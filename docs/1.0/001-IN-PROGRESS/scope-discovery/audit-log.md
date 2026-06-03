@@ -3945,7 +3945,7 @@ The convention says: *"If the arithmetic isn't reconciled … skip the line enti
 ### AUDIT-20260603-79 — Same fixed-finding-with-open-unchecked-task contradiction recurs for Tasks 19/20 — the exact shape AUDIT-72/76 named, regressed again in the commit that closes them
 
 Finding-ID: AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-299e57f9
 Severity:   high
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -206,6 +206,40 @@`) vs. `audit-log.md` AUDIT-77/78 (`Status: fixed-f966d6ee`)
 
