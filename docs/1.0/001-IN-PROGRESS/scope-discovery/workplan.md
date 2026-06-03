@@ -89,21 +89,21 @@ Closes AUDIT-20260603-90. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 - [x] Audit-log Status flipped open → `acknowledged-orphaned-scaffolding-removed-AUDIT-87-already-fixed-37666598-2026-06-03` in 9b9e100f.
 
 
-### Task 27 (fix-finding-AUDIT-20260603-91): AUDIT-20260603-91 — Doctor rule crashes on malformed ledgers instead of reportin…
+### Task 27 (fix-finding-AUDIT-20260603-91): AUDIT-20260603-91 — Doctor rule crashes on malformed ledgers instead of reporting or skipping
 
 Closes AUDIT-20260603-91. Surface: `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.ts:109-110`. Severity: medium.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-91` in subject
+- [x] Step 1: bug-repro test + cross-feature regression-lock added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.test.ts:124-198` (`AUDIT-91: malformed ledger emits a warning finding, does NOT throw` + `AUDIT-91 regression-lock: a malformed ledger in one feature does not block scanning of other features`).
+- [x] Step 2: confirmed test fails pre-fix — `parseLedgerContent` throws `ledger missing required field: archive-file`, the doctor rule has no `try/catch` at line 116 (formerly 109-110), the throw propagates and abandons the scan.
+- [x] Step 3: implemented in `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.ts` — wrapped `parseLedgerFromWorkplan(workplanBody)` in `try/catch`; on catch, pushes a `severity: warning` finding naming the slug + parse error message + actionable fix instruction, then `continue`s to the next slug. Imported `errorMessage` from `util/typeguards.js` for the error-string narrowing.
+- [x] Step 4: test passes — 9/9 in the rule's test file. The regression-lock confirms a malformed ledger in `test-feature` doesn't block surfacing of the `other-feature`'s extra-in-archive finding.
+- [x] Step 5: commit with `Closes AUDIT-20260603-91` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.test.ts:124-198`.
+- [x] `npx vitest run src/__tests__/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.test.ts` from `plugins/dw-lifecycle/` exits 0 (9/9 pass).
+- [x] Audit-log Status flipped to `fixed-<sha>` via the apply-audit-flips step.
 
 ### Task 2: Check-* gate commands
 

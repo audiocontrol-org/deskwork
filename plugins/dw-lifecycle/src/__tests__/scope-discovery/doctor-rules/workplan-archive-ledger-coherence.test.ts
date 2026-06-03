@@ -121,6 +121,80 @@ describe('workplan-archive-ledger-coherence doctor rule', () => {
     expect(findings[0]!.message).toMatch(/does not exist/);
   });
 
+  it('AUDIT-91: malformed ledger emits a warning finding, does NOT throw', async () => {
+    // Ledger annotation is structurally present but missing the required
+    // `archive-file` field → `parseLedgerFromWorkplan` would throw
+    // pre-fix; the doctor rule should catch and surface the parse error
+    // as a finding instead of aborting the whole scan.
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '<!-- workplan-archive-ledger',
+        'archived-phases: 1-2',
+        'archived-fix-tasks: none',
+        'next-fix-task-id: 1.1',
+        '-->',
+        '## Phase 3',
+      ].join('\n'),
+    );
+    // Pre-fix: this throws "ledger missing required field: archive-file".
+    // Post-fix: this returns a finding without throwing.
+    await expect(check({ repoRoot })).resolves.toBeDefined();
+    const findings = await check({ repoRoot });
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    const parseFinding = findings.find((f) => f.message.toLowerCase().includes('parse'));
+    expect(parseFinding, 'expected a finding mentioning the parse error').toBeDefined();
+    expect(parseFinding!.severity).toBe('warning');
+    expect(parseFinding!.message).toContain('test-feature');
+    expect(parseFinding!.message.toLowerCase()).toContain('archive-file');
+  });
+
+  it('AUDIT-91 regression-lock: a malformed ledger in one feature does not block scanning of other features', async () => {
+    // Set up TWO feature dirs: one with a malformed ledger, one with a
+    // valid extra-in-archive ledger. The valid feature's finding must
+    // still surface even though the malformed feature errored.
+    const otherFeatureDir = join(repoRoot, 'docs/1.0/001-IN-PROGRESS/other-feature');
+    mkdirSync(otherFeatureDir, { recursive: true });
+    // Malformed: missing archive-file field
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '<!-- workplan-archive-ledger',
+        'archived-phases: 1',
+        'archived-fix-tasks: none',
+        'next-fix-task-id: 1.1',
+        '-->',
+      ].join('\n'),
+    );
+    // Valid: extra-in-archive triggers a finding
+    writeFileSync(
+      join(otherFeatureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '<!-- workplan-archive-ledger',
+        'archived-phases: 1',
+        'archived-fix-tasks: none',
+        'archive-file: workplan-archive.md',
+        'next-fix-task-id: 1.1',
+        '-->',
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(otherFeatureDir, 'workplan-archive.md'),
+      '## Phase 1\n\n## Phase 2\n',
+    );
+    const findings = await check({ repoRoot });
+    // Must emit BOTH: the malformed-ledger warning AND the
+    // extra-in-archive warning from the other feature.
+    expect(findings.length).toBeGreaterThanOrEqual(2);
+    const malformedFinding = findings.find((f) => f.message.includes('test-feature'));
+    const extraFinding = findings.find((f) => f.message.includes('other-feature'));
+    expect(malformedFinding, 'malformed-ledger finding missing').toBeDefined();
+    expect(extraFinding, 'other-feature finding suppressed by malformed sibling').toBeDefined();
+  });
+
   it('all findings are severity: warning (non-blocking)', async () => {
     writeFileSync(
       join(featureDir, 'workplan.md'),

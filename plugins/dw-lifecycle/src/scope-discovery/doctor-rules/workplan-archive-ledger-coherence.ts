@@ -25,7 +25,8 @@
 
 import { readFile, readdir, access } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseLedgerFromWorkplan, type IdRange } from '../workplan-archive/ledger.js';
+import { parseLedgerFromWorkplan, type IdRange, type Ledger } from '../workplan-archive/ledger.js';
+import { errorMessage } from '../util/typeguards.js';
 import type { DoctorRuleCheck, ScopeDoctorFinding, DoctorRuleOptions } from './types.js';
 
 const RULE = 'workplan-archive-ledger-coherence';
@@ -113,7 +114,21 @@ export const check: DoctorRuleCheck = async (
         const workplanPath = join(featureDir, 'workplan.md');
         if (!(await pathExists(workplanPath))) continue;
         const workplanBody = await readFile(workplanPath, 'utf8');
-        const ledger = parseLedgerFromWorkplan(workplanBody);
+        // Per AUDIT-20260603-91: parseLedgerFromWorkplan throws on
+        // malformed ledger content. A malformed ledger in one feature
+        // must NOT abort the entire scan — emit a warning finding
+        // naming the slug + parse error and continue to other features.
+        let ledger: Ledger | null;
+        try {
+          ledger = parseLedgerFromWorkplan(workplanBody);
+        } catch (err) {
+          findings.push({
+            rule: RULE,
+            severity: 'warning',
+            message: `${slug}: ledger annotation parse error: ${errorMessage(err)}. Fix the workplan-archive-ledger HTML comment in workplan.md (or remove it if no archive exists yet).`,
+          });
+          continue;
+        }
         if (ledger === null) continue; // no ledger → no coherence check
         // Resolve archive file (relative to feature dir).
         const archivePath = join(featureDir, ledger.archiveFile);
