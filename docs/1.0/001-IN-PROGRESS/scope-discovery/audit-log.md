@@ -4022,3 +4022,31 @@ Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/uninstall-everyt
 Task 19's own acceptance requires two test blocks: Step 1 (bug-repro at the cited surface) **and** Step 1b (a regression-lock pinning the Step 0 working-code invariant — the behavior the fix would break if wrong). The diff adds exactly one `it(...)` block, "preserves operator-authored 3+ newline runs OUTSIDE the splice point". Despite the comment labeling it "regression-lock," this block *is* the bug-repro: it fails against the old global-collapse code and passes against the fix. There is no second test pinning what the fix's working-code invariant actually is — that removing the managed block still produces a clean single-blank-line join at the splice point.
 
 That gap matters because the fix *reduces* normalization: it deletes the only mechanism that previously guaranteed the splice point wouldn't leave 3+ blank lines. The new test asserts behavior *far from* the splice but verifies nothing *at* it — e.g., that a block flanked by blank lines on both sides collapses to one blank line, or that an unflanked block doesn't fuse `command_a` and `command_b` with no newline. With only `toContain` assertions on a far-from-splice run, the contract the fix changed is untested. Fix: add the second test block asserting the exact splice-point output (e.g., `removeManagedBlock` of `before\n\n<BLOCK>\n\nafter` yields `before\n\nafter`), satisfying both the ≥2-block acceptance and the genuine coverage hole.
+
+## 2026-06-03 — audit-barrage lift (20260603T211005240Z-scope-discovery)
+
+### AUDIT-20260603-86 — Duplicate `Task 20` heading — two distinct tasks now share the same number
+
+Finding-ID: AUDIT-20260603-86 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 20 (fix-finding-AUDIT-20260603-83)` (hunk `@@ -47,35 +47,50 @@`) vs. `### Task 20 (fix-finding-AUDIT-20260603-82)` (hunk `@@ -83,6 +98,40 @@`)
+
+After this diff the workplan contains **two headings literally numbered `### Task 20`**: one for AUDIT-83 (non-bug, all-unchecked) added in the first hunk, and one for AUDIT-82 (`**Complete in 2e962b59.**`, all-checked) appended in the second hunk. The final ordering is also scrambled: Task 20 (AUDIT-83) → Task 21 (AUDIT-84) → Task 22 (AUDIT-85) → Task 19 (AUDIT-81, complete) → Task 20 (AUDIT-82, complete).
+
+The root cause is an off-by-one in whatever assigned the new numbers. The pre-diff workplan already had Task 19 (AUDIT-81) and Task 20 (AUDIT-82); a correct auto-positioner (scan-of-workplan-max **+ 1**) should have numbered the three new findings 21/22/23. Instead they were numbered 20/21/22 — i.e. `next-id == max` rather than `max + 1` — colliding with the existing Task 20. This is precisely the off-by-one that Phase 26 Task 4's `computeAutoPosition` (`max(ledger.next-fix-task-id, scan-of-workplan-max + 1)`) is specced to prevent; the diff exhibits the bug live. Any tooling that keys a finding to a task number (`/dw-lifecycle:pickup`, `promote-findings` re-runs, the future ledger) now has an ambiguous `Task 20`. Fix: renumber the new tasks to 21/22/23 (or whatever `scan-of-workplan-max + 1` yields counting the completed tasks), and keep numbering monotonic.
+
+### AUDIT-20260603-87 — MIGRATING.md still leaks dev-branch framing ("Phase 24 implementation … on this branch") into an adopter-facing doc
+
+Finding-ID: AUDIT-20260603-87
+Status:     open
+Severity:   low
+Surface:    `MIGRATING.md:60` ("Issues defused" paragraph, hunk `@@ -57,7 +57,7 @@`)
+
+The rewrite correctly strips the `AUDIT-04`/`AUDIT-20260603-78`/`fixed-<sha>` taxonomy jargon AUDIT-84 flagged, but the replacement sentence — "*The Phase 24 implementation itself shipped with `0` `--no-verify` invocations on this branch*" — retains two internal-dev referents an adopter has no model for: "Phase 24" (a deskwork-internal workplan phase) and "this branch" (the deskwork feature branch). MIGRATING.md is read by adopters who have neither a Phase 24 nor "this branch"; the claim's verifiable content ("the gate removal meant no `--no-verify` bypasses were needed") survives without the dev-context anchors.
+
+This is the residual tail of the exact problem AUDIT-84 named — internal scaffolding in an adopter surface — just at lower amplitude than the parenthetical that was removed. Fix: reframe the observation in adopter terms (e.g. "removing the gate surfaces eliminated the `--no-verify` bypasses they had previously forced"), dropping "Phase 24" and "on this branch."
+
+---
+
+I checked the test-file change (a comment relabel only — bug-repro vs regression-lock; correct and matches the AUDIT-85 disposition), the audit-log additions (well-formed, statuses consistent), and the MIGRATING.md de-jargoning (the worst offender removed). The strong signals are the **duplicate `Task 20`** (off-by-one numbering, claude-01) and the **fifth recurrence of the fixed-vs-unchecked shape** (claude-02) — both are structural defects committed by the very diff that claims to resolve the prior instance.

@@ -39,6 +39,40 @@ note: archived 2026-06-03 via scripts/archive-phases-onetime.ts; Phase 26 produc
 - [x] `check-editor-symmetry [--write]` — landed in Phase 4 with `--write` flag honored; default writes to `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/editor-symmetry.md`.
 - [x] `check-refactor-preconditions [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag landed (default informational; flag flips to hook-friendly exit 1 on precondition failures).
 
+
+### Task 22 (fix-finding-AUDIT-20260603-86) (non-bug): AUDIT-20260603-86 — Duplicate `Task 20` heading — two distinct tasks now share t…
+
+Closes AUDIT-20260603-86 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 20 (fix-finding-AUDIT-20260603-83)` (hunk `@@ -47,35 +47,50 @@`) vs. `### Task 20 (fix-finding-AUDIT-20260603-82)` (hunk `@@ -83,6 +98,40 @@`).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-86 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)` in subject (use `Closes AUDIT-20260603-86 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 23 (fix-finding-AUDIT-20260603-87): AUDIT-20260603-87 — MIGRATING.md still leaks dev-branch framing ("Phase 24 imple…
+
+Closes AUDIT-20260603-87. Surface: `MIGRATING.md:60` ("Issues defused" paragraph, hunk `@@ -57,7 +57,7 @@`). Severity: low.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260603-87` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 3: Disposition + baseline commands
 
 - [x] `dispose-clone <id> --as <refactor|keep-with-reason|ignore-with-justification> [args]` — refuses without Step 0a/0b flags on refactor disposition. Single-id convenience wrapper around `batch-dispose`. `keep-with-reason` + `ignore-with-justification` pass through verbatim; `--as refactor` requires all Step 0a/0b precondition flags (`--canonical-side`, `--canonical-reason`, [`--new-shape-summary` if canonical-side=new], `--tests`, `--tests-proof-sha`, `--tests-proof-demonstration`) AND still refuses to write (refactor's 5 fields don't fit `--reason` shape; the wrapper redirects to manual editing + `dw-lifecycle check-refactor-preconditions`). The flag-presence requirement is a forcing function — the operator who tries `--as refactor` sees the full precondition surface in the error message. 19 vitest scenarios.
@@ -1582,11 +1616,13 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 1 — Ledger format specification
 
-- Step 1: Write a tests-first spec for the ledger annotation: comment-block format, field names (`archived-phases`, `archived-fix-tasks`, `archive-file`, `next-fix-task-id`, `note`), range compaction rule (contiguous IDs collapse to `start-end`, non-contiguous comma-separated).
-- Step 2: Add fixture markdown examples covering: empty archive, single-phase, multi-range, no-fix-tasks (`archived-fix-tasks: none`).
-- Step 3: Author parser + serializer pure-fns at `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts`. Round-trip parse → serialize → parse-equality test.
+**Complete.** Pure parser/serializer + 17 vitest scenarios shipped at `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` + `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/ledger.test.ts`. Includes range arithmetic helpers (`compareIds`, `isIdInRanges`) for the auto-positioner fix in Task 4.
 
-**Acceptance:** Parser handles every fixture; serializer produces stable output; round-trip test passes.
+- [x] Step 1: tests-first spec written covering comment-block format, all 5 field names, range compaction (contiguous → `start-end`; comma-separated; `none` = empty list; singletons OK).
+- [x] Step 2: fixture examples cover empty archive, single-phase, multi-range (the 2026-06-03 manual archive format verbatim), no-fix-tasks, error paths (missing fields, malformed lines, trailing hyphens).
+- [x] Step 3: parser + serializer + `findLedger` locator + `parseLedgerFromWorkplan` convenience all pure-fns. Round-trip parse → serialize → parse-equality tested for canonical example + empty-fix-tasks case + wrapped-block form.
+
+**Acceptance:** ✅ Parser handles every fixture (17/17 tests pass). ✅ Serializer produces stable output. ✅ Round-trip test passes. ✅ `compareIds` + `isIdInRanges` helpers available for the auto-positioner fix.
 
 ### Task 2 — `dw-lifecycle archive-phases` CLI verb
 
