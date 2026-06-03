@@ -56,6 +56,8 @@ import {
 import {
   computeAuditedDiff,
   EMPTY_DIFF_CURE_MESSAGE,
+  buildTooLargeCure,
+  type DiffCallResult,
 } from '../scope-discovery/promote-findings/audited-diff.js';
 import {
   checkAncestry,
@@ -149,46 +151,72 @@ function gitLogSubjects(repoRoot: string, range: string): string {
   }
 }
 
-function gitDiff(repoRoot: string, range: string): string {
-  try {
-    return execFileSync('git', ['diff', range], {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      maxBuffer: 50 * 1024 * 1024, // 50MB for large diffs
-    });
-  } catch {
-    return '';
+const DIFF_MAX_BUFFER = 50 * 1024 * 1024; // 50MB for large diffs
+
+/**
+ * Per AUDIT-20260603-03: `execFileSync` throws when stdout exceeds
+ * `maxBuffer`. Node sets `err.code === 'ENOBUFS'` (or, in newer
+ * versions, `'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'`); the message also
+ * contains the literal text "maxBuffer length exceeded." Match either
+ * signal so the classifier survives Node-version drift.
+ *
+ * Pre-AUDIT-39, `gitDiff{,Cached,Worktree}` had bare `catch { return ''; }`
+ * blocks that collapsed maxBuffer overflow into the same `''` value as
+ * "not a git repo" or "bad ref." `computeAuditedDiff` then surfaced
+ * `source: 'empty'` and the operator saw `EMPTY_DIFF_CURE_MESSAGE`
+ * ("no novel work to audit") — actively wrong when the cause was
+ * a 945k-insertion diff overflowing the 50 MB cap.
+ */
+export function isMaxBufferError(err: unknown): boolean {
+  if (err === null || typeof err !== 'object') return false;
+  const code = (err as { code?: string }).code;
+  if (
+    code === 'ENOBUFS' ||
+    code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
+  ) {
+    return true;
   }
+  const message = (err as { message?: string }).message ?? '';
+  return /maxBuffer length exceeded/i.test(message);
+}
+
+/**
+ * Run a `git diff` invocation with the maxBuffer cap and classify the
+ * result into the DiffCallResult discriminated union. Shared by the
+ * three `gitDiff*` helpers (commit-range, staged, unstaged) so the
+ * maxBuffer-error classification lives in exactly one place — the
+ * clone-detector caught the per-helper duplication; this is the DRY fix.
+ */
+function runGitDiff(repoRoot: string, args: readonly string[]): DiffCallResult {
+  try {
+    return {
+      ok: true,
+      diff: execFileSync('git', args.slice(), {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        maxBuffer: DIFF_MAX_BUFFER,
+      }),
+    };
+  } catch (err) {
+    if (isMaxBufferError(err)) return { ok: false, kind: 'too-large' };
+    return { ok: true, diff: '' };
+  }
+}
+
+function gitDiff(repoRoot: string, range: string): DiffCallResult {
+  return runGitDiff(repoRoot, ['diff', range]);
 }
 
 // Phase 22 Task 2 (#399 Friction 2): staged + unstaged diff helpers.
 // `git diff --cached` shows index-vs-HEAD; `git diff` shows worktree-vs-index.
 // Both are needed for the fallback chain when the commit range is empty.
-function gitDiffCached(repoRoot: string): string {
-  try {
-    return execFileSync('git', ['diff', '--cached'], {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      maxBuffer: 50 * 1024 * 1024,
-    });
-  } catch {
-    return '';
-  }
+function gitDiffCached(repoRoot: string): DiffCallResult {
+  return runGitDiff(repoRoot, ['diff', '--cached']);
 }
 
-function gitDiffWorktree(repoRoot: string): string {
-  try {
-    return execFileSync('git', ['diff'], {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      maxBuffer: 50 * 1024 * 1024,
-    });
-  } catch {
-    return '';
-  }
+function gitDiffWorktree(repoRoot: string): DiffCallResult {
+  return runGitDiff(repoRoot, ['diff']);
 }
 
 // Per AUDIT-20260602-41/-42/-43: the ancestry helper is imported from
@@ -381,6 +409,17 @@ export async function runImplementHook(args: RunArgs): Promise<number> {
       gitDiffWorktree: () => gitDiffWorktree(repoRootResolved),
     },
   });
+  if (auditedDiff.source === 'too-large') {
+    // Per AUDIT-20260603-03: a maxBuffer overflow is NOT the same as
+    // "no novel work." Emit the distinct cure naming the overflowing
+    // layer so the operator can act (split the commit, gitattributes
+    // skip, or raise the cap). Refusing on overflow is correct: a
+    // truncated diff fed to the barrage would silently elicit
+    // fabricated findings.
+    const layer = auditedDiff.tooLargeLayer ?? 'commit-range';
+    args.stderr.write(`${buildTooLargeCure(layer)}\n`);
+    return 1;
+  }
   if (auditedDiff.source === 'empty') {
     args.stderr.write(`${EMPTY_DIFF_CURE_MESSAGE}\n`);
     return 1;

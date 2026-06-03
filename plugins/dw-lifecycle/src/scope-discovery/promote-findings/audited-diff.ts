@@ -20,25 +20,62 @@
  * the operator sees the cure message rather than firing the barrage
  * on blank input.
  *
+ * AUDIT-20260602-39 + AUDIT-20260603-03 (maxBuffer-swallow): each DI
+ * callback now returns a discriminated `DiffCallResult` instead of a
+ * raw string, so an `execFileSync` `ERR_CHILD_PROCESS_STDIO_MAXBUFFER`
+ * surfaces as a distinct `'too-large'` source value rather than being
+ * silently collapsed into `'empty'`. The operator then sees a cure
+ * naming the buffer overflow, not the misleading "no novel work" cure.
+ *
  * Pure function over the dependency-injection bag — no fs, no child_process.
  */
 
-export type AuditedDiffSource = 'commit-range' | 'staged' | 'unstaged' | 'empty';
+export type AuditedDiffSource =
+  | 'commit-range'
+  | 'staged'
+  | 'unstaged'
+  | 'empty'
+  | 'too-large';
 
 export interface AuditedDiff {
-  /** The diff payload to feed the audit-barrage prompt. `''` when source === 'empty'. */
+  /**
+   * The diff payload to feed the audit-barrage prompt.
+   *  - `'commit-range'` / `'staged'` / `'unstaged'`: the captured diff.
+   *  - `'empty'`: `''`.
+   *  - `'too-large'`: `''` (the underlying source overflowed maxBuffer
+   *    — feeding a truncated diff to the barrage is worse than refusing).
+   */
   readonly diff: string;
-  /** Which fallback layer produced the diff. `empty` means all three were empty. */
+  /** Which fallback layer produced the diff (or named the failure). */
   readonly source: AuditedDiffSource;
+  /**
+   * When `source === 'too-large'`, which underlying layer overflowed.
+   * Lets the caller name the specific git invocation in the cure.
+   */
+  readonly tooLargeLayer?: 'commit-range' | 'staged' | 'unstaged';
 }
+
+/**
+ * Discriminated result the DI callbacks return. `ok: true` carries the
+ * captured diff string; `ok: false` distinguishes a maxBuffer overflow
+ * from a generic git error.
+ *
+ * Per AUDIT-20260602-39 / AUDIT-20260603-03 — the pre-fix callbacks
+ * returned a raw `string` and collapsed every error (including
+ * maxBuffer overflow) into `''`. That produced a backwards "no novel
+ * work" cure when the real cause was "diff exceeded the 50MB stdio cap."
+ */
+export type DiffCallResult =
+  | { readonly ok: true; readonly diff: string }
+  | { readonly ok: false; readonly kind: 'too-large' };
 
 export interface ComputeAuditedDiffDeps {
   /** Runs `git diff <range>` for a `tip..HEAD` (or similar) revision range. */
-  readonly gitDiffRange: (range: string) => string;
+  readonly gitDiffRange: (range: string) => DiffCallResult;
   /** Runs `git diff --cached` to capture staged-but-uncommitted changes. */
-  readonly gitDiffCached: () => string;
+  readonly gitDiffCached: () => DiffCallResult;
   /** Runs `git diff` (worktree vs index) to capture unstaged changes. */
-  readonly gitDiffWorktree: () => string;
+  readonly gitDiffWorktree: () => DiffCallResult;
 }
 
 export interface ComputeAuditedDiffArgs {
@@ -56,21 +93,41 @@ export interface ComputeAuditedDiffArgs {
  *
  * Whitespace-only diffs count as empty — git can emit a header-only
  * diff in some edge cases, and we want the fallback to fire there too.
+ *
+ * Per AUDIT-20260603-03 — when ANY layer signals `ok: false; kind: 'too-large'`,
+ * short-circuit immediately and emit `source: 'too-large'`. Refusing
+ * on overflow is correct (a truncated diff fed to the barrage would
+ * silently elicit fabricated findings just like a blank diff would).
+ * The caller distinguishes 'too-large' from 'empty' via the source
+ * value and surfaces the right cure.
  */
 export function computeAuditedDiff(args: ComputeAuditedDiffArgs): AuditedDiff {
   const { range, deps } = args;
-  const rangeDiff = deps.gitDiffRange(range);
-  if (rangeDiff.trim().length > 0) {
-    return { diff: rangeDiff, source: 'commit-range' };
+
+  const rangeResult = deps.gitDiffRange(range);
+  if (!rangeResult.ok) {
+    return { diff: '', source: 'too-large', tooLargeLayer: 'commit-range' };
   }
-  const stagedDiff = deps.gitDiffCached();
-  if (stagedDiff.trim().length > 0) {
-    return { diff: stagedDiff, source: 'staged' };
+  if (rangeResult.diff.trim().length > 0) {
+    return { diff: rangeResult.diff, source: 'commit-range' };
   }
-  const worktreeDiff = deps.gitDiffWorktree();
-  if (worktreeDiff.trim().length > 0) {
-    return { diff: worktreeDiff, source: 'unstaged' };
+
+  const stagedResult = deps.gitDiffCached();
+  if (!stagedResult.ok) {
+    return { diff: '', source: 'too-large', tooLargeLayer: 'staged' };
   }
+  if (stagedResult.diff.trim().length > 0) {
+    return { diff: stagedResult.diff, source: 'staged' };
+  }
+
+  const worktreeResult = deps.gitDiffWorktree();
+  if (!worktreeResult.ok) {
+    return { diff: '', source: 'too-large', tooLargeLayer: 'unstaged' };
+  }
+  if (worktreeResult.diff.trim().length > 0) {
+    return { diff: worktreeResult.diff, source: 'unstaged' };
+  }
+
   return { diff: '', source: 'empty' };
 }
 
@@ -95,3 +152,46 @@ export const EMPTY_DIFF_CURE_MESSAGE = [
   '"Diff under audit" section is fabricating — the refusal protects the',
   'audit-log from confabulated findings.',
 ].join('\n');
+
+/**
+ * Cure message for the `'too-large'` source.
+ *
+ * Per AUDIT-20260603-03: the pre-fix code silently swallowed
+ * `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` into `''` and the operator then
+ * saw the EMPTY_DIFF_CURE_MESSAGE, which is actively wrong — there IS
+ * novel work, it just overflowed the 50 MB stdio cap. This message
+ * names the actual cause + an actionable response.
+ *
+ * `{LAYER}` is replaced by the caller with the specific layer that
+ * overflowed (`commit-range` / `staged` / `unstaged`).
+ */
+export const TOO_LARGE_DIFF_CURE_MESSAGE_TEMPLATE = [
+  'implement-hook: refused — the {LAYER} diff exceeded the 50 MB stdio',
+  'maxBuffer cap (ERR_CHILD_PROCESS_STDIO_MAXBUFFER). The diff is real;',
+  'feeding a truncated copy to the audit-barrage would silently elicit',
+  'fabricated findings just like a blank diff would.',
+  '',
+  'Cure options:',
+  '  - Reduce the audited range: commit smaller batches so the per-task',
+  '    diff fits, then re-run implement-hook between commits.',
+  '  - Skip a large vendored / generated file from the audit via a',
+  '    `.gitattributes` `diff` driver (audit-barrage reads from git diff).',
+  '  - File an issue to raise the maxBuffer cap if the legitimate diff',
+  '    truly exceeds 50 MB. The cap is at',
+  '    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts`',
+  '    (gitDiff / gitDiffCached / gitDiffWorktree helpers).',
+  '',
+  'This refusal is correct (per AUDIT-20260603-03): a maxBuffer overflow',
+  'was previously caught { return ""; }, producing the misleading "no',
+  'novel work" cure. The audit-barrage protects against confabulation;',
+  'the maxBuffer classification protects against it too.',
+].join('\n');
+
+/**
+ * Build the `'too-large'` cure message with the specific overflowing
+ * layer substituted in. Pure function so the caller can use it without
+ * importing string-manipulation utilities.
+ */
+export function buildTooLargeCure(layer: 'commit-range' | 'staged' | 'unstaged'): string {
+  return TOO_LARGE_DIFF_CURE_MESSAGE_TEMPLATE.replace(/\{LAYER\}/g, layer);
+}
