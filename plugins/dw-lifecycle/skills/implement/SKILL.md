@@ -137,6 +137,8 @@ After every `implement-hook` invocation, the per-task report includes:
 
 The verb writes `last-hook-run.json` after every legitimate exit (success + skip + outage) and appends to `hook-run-log.jsonl` so the pre-push gate can walk a multi-commit range.
 
+**Phase 23: per-SHA log writes.** A single `implement-hook` invocation walks the range `<prior-tip>..<HEAD>` and the audit-barrage covers every commit in that range. Pre-Phase-23, the verb appended only ONE log entry with `tip: <HEAD-at-run-time>`, so the pre-push gate (which requires per-SHA coverage) refused earlier commits in a multi-commit batch — the operator's only escape was `--no-verify`. Post-Phase-23, the verb appends ONE entry per SHA in the audited range, all sharing disposition + timestamp + runDir. Mental model: one hook run covers its range, not just the tip. This applies to all dispositions including `no-new-diff-skip` (bookkeeping commits get per-SHA `no-new-diff-skip` entries). Implementation: `enumerateCommitsInRange` in `scope-discovery/util/git-ancestry.ts` + `appendHookRunLogEntriesForRange` in `scope-discovery/promote-findings/hook-run-log.ts`.
+
 ## Dispatch-wrapper engagement
 
 Every sub-agent dispatch fired by this skill — implementer, reviewer, code-explorer, code-architect, parallel fan-out workers — MUST be routed through the dispatch wrapper. The wrapper enforces three contracts on the sub-agent's return:

@@ -721,3 +721,7 @@
 {"tip":"da52fcee078022ef4f5aa49aea4d9e5fb3c2f547","timestamp":"2026-06-03T00:27:20.571Z","disposition":"no-new-diff-skip","runDir":null}
 {"tip":"f6b70b67da6e3d6783dda5f14510302f008667e6","timestamp":"2026-06-03T00:30:23.272Z","disposition":"fired-and-slushed","runDir":"/Users/orion/work/deskwork-work/scope-discovery/.dw-lifecycle/scope-discovery/audit-runs/20260603T002818476Z-scope-discovery"}
 {"tip":"9e67e90d0a8e4bc213420ea5fde3119ff8902b85","timestamp":"2026-06-03T00:32:18.550Z","disposition":"no-new-diff-skip","runDir":null}
+{"tip":"507317230aad8ce48f09ebd0d59e2a12828ec84a","timestamp":"2026-06-03T00:50:44.084Z","disposition":"fired-and-slushed","runDir":"/Users/orion/work/deskwork-work/scope-discovery/.dw-lifecycle/scope-discovery/audit-runs/20260603T004921144Z-scope-discovery"}
+{"timestamp":"2026-06-03T01:00:49.803Z","disposition":"no-new-diff-skip","runDir":null,"tip":"d42cd02271cc76de4d2b4348655fa8eedd9ef10d"}
+{"timestamp":"2026-06-03T01:04:54.926Z","disposition":"fired-and-slushed","runDir":"/Users/orion/work/deskwork-work/scope-discovery/.dw-lifecycle/scope-discovery/audit-runs/20260603T010215769Z-scope-discovery","tip":"f183b7462053399eefbd92029c4d40407a607a06"}
+{"timestamp":"2026-06-03T01:04:54.926Z","disposition":"fired-and-slushed","runDir":"/Users/orion/work/deskwork-work/scope-discovery/.dw-lifecycle/scope-discovery/audit-runs/20260603T010215769Z-scope-discovery","tip":"d42cd02271cc76de4d2b4348655fa8eedd9ef10d"}
