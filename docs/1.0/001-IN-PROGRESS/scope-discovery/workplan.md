@@ -157,6 +157,58 @@ Acknowledges AUDIT-20260603-49 (claude-02 + claude-03 + claude-04 + codex-01 + c
 - [x] The named action has landed in this branch.
 - [x] Audit-log Status flipped to `acknowledged-step-3-trailer-location-corrected-2026-06-03`.
 
+
+### Task 7 (fix-finding-AUDIT-20260603-50) (non-bug): AUDIT-20260603-50 — AUDIT-49's "fix" replaces a wrong claim with another wrong c…
+
+Acknowledges AUDIT-20260603-50. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 6 Step 3 (the `+- [x] Step 3: committed (\`f679a201\`)…` line) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-flip-from-commit.ts:43` and `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:15,84,362,413`.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [x] Step 1 (disposition): the AUDIT-49 hand-edit said the `Acknowledges` trailer in the commit body lets a "trailer-walker (apply-audit-flips and successors) find it." That's false: `auto-flip-from-commit.ts:43` is `CLOSES_VERB_RE = /\bcloses\b[\s:]+/gi` — the parser anchors on `Closes` ONLY. `Acknowledges` and `Defers` are deliberately NON-flipping audit-trail trailers. The fix: state plainly that `Acknowledges` is an audit-trail trailer with no machine effect; the audit-log status for a non-fix disposition is hand-set in the same commit, not auto-flipped. The body-trailer placement is for human readers + future code-walkers that explicitly opt into reading non-flip trailers (no such tool exists today); subject-vs-body is immaterial to `apply-audit-flips`.
+- [x] Step 2: applied to the AUDIT-47 fix-task's Step 3 (rewrote the "trailer-walker finds it" rationale); also fixed at the root (Task 8: workplan-task-renderer template).
+- [x] Step 3: committing with `Acknowledges AUDIT-20260603-50` trailer in the commit-message body (audit-trail; no auto-flip).
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch.
+- [x] Audit-log Status flipped to `acknowledged-template-rewritten-fix-task-block-corrected-2026-06-03`.
+
+
+### Task 8 (fix-finding-AUDIT-20260603-51): AUDIT-20260603-51 — Root cause of AUDIT-49 left unfixed: the generator `workplan…
+
+Closes AUDIT-20260603-51. Surface: `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:152` (not in the diff) vs. the workplan Step 3 hand-edit that IS in the diff. Severity: medium.
+
+- [x] Step 0 (working-code invariant): the renderer's `renderFixTaskBlock` function correctly emits a `Closes`/`Acknowledges` distinction with the AUDIT-20260602-01 anti-false-flip note. The defect is solely in the wording — the template hardcoded `Acknowledges <id>` "in subject" + framed apply-audit-flips' behavior in a way that was already wrong before AUDIT-49. The fix preserves the verb-distinction structure; only the wording around placement + auto-flip behavior changes.
+- [x] Step 1: failing tests added at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-task-renderer.test.ts:245-281` — (a) generated Step 3 must NOT claim subject-vs-body placement; (b) generated Step 3 must describe Acknowledges as audit-trail-only + cite apply-audit-flips + not include the false "trailer-walker finds it" justification.
+- [x] Step 2: ran `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-task-renderer.test.ts` — 2 new tests FAILED red; 27 existing passed.
+- [x] Step 3: implemented the fix at `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:152` — rewrote the template line. New wording: `commit with an \`Acknowledges ${id}\` trailer in the commit message` (no subject claim) + cites AUDIT-50/51 + states `apply-audit-flips parses Closes trailers ONLY; Acknowledges and Defers are audit-trail trailers that do NOT trigger an auto-flip`.
+- [x] Step 4: re-ran the test file — 29/29 pass; ran promote-findings/ directory — 466/466 pass. (Full scope-discovery suite shows 15 pre-existing clone-detector flake failures per #297 — unrelated to this change.)
+- [x] Step 5: committing with `Closes AUDIT-20260603-51` trailer in commit body (real code change with passing test).
+
+**Acceptance Criteria:**
+
+- [x] Failing tests exist at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-task-renderer.test.ts:245-281` (cited in Step 1).
+- [x] `npx vitest run plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-task-renderer.test.ts` exits 0 (passes against the fix).
+- [x] Audit-log Status flipped to `fixed-pending-sha` (will resolve to `fixed-<commit-sha>` after the commit lands; `apply-audit-flips --apply` will rewrite this on the next end-of-task hook run).
+
+
+### Task 9 (fix-finding-AUDIT-20260603-52) (non-bug): AUDIT-20260603-52 — This diff cements a false capability claim into the durable …
+
+Acknowledges AUDIT-20260603-52. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — the AUDIT-20260603-49 entry body added in this diff (*"the journal records that `dw-lifecycle apply-audit-flips` reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers and flips audit-log entries"*).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [x] Step 1 (disposition): the false paraphrase ("`apply-audit-flips` reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers") was cemented into the durable audit-log when I wrote the AUDIT-49 entry. Fix: edit the AUDIT-49 entry body in-place to correct the paraphrase, naming the actual behavior — `apply-audit-flips` reads `Closes` only; `Acknowledges` and `Defers` are non-flipping audit-trail trailers — and pointing at `auto-flip-from-commit.ts:43`'s `CLOSES_VERB_RE` as the source of truth.
+- [x] Step 2: applied — `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-49 entry body rewritten to correct the paraphrase + name the canonical regex source.
+- [x] Step 3: committing with `Acknowledges AUDIT-20260603-52` trailer in commit body.
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch.
+- [x] Audit-log Status flipped to `acknowledged-paraphrase-corrected-in-AUDIT-49-entry-2026-06-03`.
+
 ### Task 5: Validator + export commands
 
 - [x] `validate-scope-discovery` — runs all adversarial harnesses. Spawns `npx vitest run scope-discovery` from the dw-lifecycle workspace root; forwards stdout/stderr/exit-code verbatim. `--quiet` switches to the dot reporter. Exit codes mirror vitest (0 all-passed, 1 failure, 2 invalid args). 3 vitest scenarios cover the flag-parse contract; the spawn path is exercised in practice by every existing `npm test -- scope-discovery` run.

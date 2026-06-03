@@ -149,7 +149,7 @@ export function renderFixTaskBlock(
       '',
       `- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".`,
       `- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).`,
-      `- [ ] Step 3: commit with \`Acknowledges ${id}\` in subject (use \`Closes ${id}\` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use \`Acknowledges\`; for deferrals use \`Defers\`). Per AUDIT-20260602-01: \`apply-audit-flips\` parses \`Closes\` trailers as \`fixed-<sha>\` proposals — using \`Closes\` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.`,
+      `- [ ] Step 3: commit with an \`Acknowledges ${id}\` trailer in the commit message (use \`Closes ${id}\` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use \`Acknowledges\`; for deferrals use \`Defers\`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: \`apply-audit-flips\` parses \`Closes\` trailers ONLY — \`Acknowledges\` and \`Defers\` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using \`Closes\` on a non-fix disposition arms a false \`fixed-<sha>\` flip when the audit-log entry is later re-opened.`,
       '',
       '**Acceptance Criteria:**',
       '',

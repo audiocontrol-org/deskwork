@@ -3591,8 +3591,60 @@ Status:     acknowledged-step-3-trailer-location-corrected-2026-06-03
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 6 block, Step 3 (`committing with `Acknowledges AUDIT-20260603-47` in subject`) vs. the audited commit subject
 
-Step 3 of the new Task 6 block asserts: *"committing with `Acknowledges AUDIT-20260603-47` in subject."* The single commit in the audited range is `docs(scope-discovery): AUDIT-47 — resolve session-end Step 9 self-contradiction`. That subject contains neither the literal `Acknowledges` verb nor the full `AUDIT-20260603-47` ID — it uses the short form `AUDIT-47`. Per the prior audit excerpt, the journal records that `dw-lifecycle apply-audit-flips` *"reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers and flips audit-log entries."* A matcher keyed on `Acknowledges AUDIT-20260603-47` will not match this subject, so the status in `audit-log.md` was hand-set to `acknowledged-session-end-step9-contradiction-resolved-2026-06-03` rather than tool-flipped.
+Step 3 of the new Task 6 block asserts: *"committing with `Acknowledges AUDIT-20260603-47` in subject."* The single commit in the audited range is `docs(scope-discovery): AUDIT-47 — resolve session-end Step 9 self-contradiction`. That subject contains neither the literal `Acknowledges` verb nor the full `AUDIT-20260603-47` ID — it uses the short form `AUDIT-47`. (Correction per AUDIT-20260603-52: `apply-audit-flips` reads `Closes AUDIT-X` trailers ONLY — `Acknowledges` and `Defers` are non-flipping audit-trail trailers per `auto-flip-from-commit.ts:43`'s `CLOSES_VERB_RE`. The original paraphrase that named both verbs as flip-triggers was factually wrong.) The mismatch the finding names is still real: the workplan claimed the Acknowledges trailer was in the subject when the audit-trail trailer actually lives in the body; the audit-log status is hand-set by the operator at non-fix-disposition time, not tool-flipped, regardless of trailer location.
 
-This is the exact header/step/trailer-mismatch shape flagged on Task 7 in the prior excerpt, now recurring on Task 6. The cost is the same: a future `apply-audit-flips` dry-run reports AUDIT-47 as un-flipped-by-trailer (the tool can't reconcile the hand-set status against an absent trailer), and the workplan's claimed action diverges from the commit that actually landed. Fix: either make the commit subject carry the trailer the step claims (`Acknowledges AUDIT-20260603-47`), or change Step 3 to state the status was hand-set and explain why the auto-flip path was not used.
+This is the exact header/step/trailer-mismatch shape flagged on Task 7 in the prior excerpt, now recurring on Task 6. The cost is the same: the workplan's claimed action diverges from the commit that actually landed, and a future reader can't reconcile the documentation against the source. Fix: change Step 3 to accurately describe the actual commit subject + body-trailer structure (short-form `AUDIT-NN` in the subject for readability, full-ID `Acknowledges AUDIT-YYYYMMDD-NN` trailer in the body as the audit-trail), and state that the audit-log status was hand-set in the same commit (no auto-flip is possible for `Acknowledges` regardless of placement).
 
 ---
+
+## 2026-06-03 — audit-barrage lift (20260603T192308187Z-scope-discovery)
+
+### AUDIT-20260603-50 — AUDIT-49's "fix" replaces a wrong claim with another wrong claim — `apply-audit-flips` parses ONLY `Closes`, never `Acknowledges`, so the body-trailer rationale is false
+
+Finding-ID: AUDIT-20260603-50
+Status:     acknowledged-template-rewritten-fix-task-block-corrected-2026-06-03
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 6 Step 3 (the `+- [x] Step 3: committed (\`f679a201\`)…` line) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-flip-from-commit.ts:43` and `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:15,84,362,413`
+
+The new Step 3 asserts: *"the full-ID `Acknowledges AUDIT-20260603-47` trailer lives in the body **so a trailer-walker (apply-audit-flips and successors) finds it**."* I read the trailer-walker. `auto-flip-from-commit.ts:43` is `CLOSES_VERB_RE = /\bcloses\b[\s:]+/gi` — the **only** verb the parser anchors on. `apply-audit-flips.ts` documents itself (line 15) as parsing *"`Closes AUDIT-<id>` and `Closes: AUDIT-X, AUDIT-Y` references"*, its proposal builder calls `parseClosesAuditTrailers` (line 362→84), and its stderr literally reports *"found N Closes-AUDIT reference(s)"* (line 413). **`apply-audit-flips` never reads `Acknowledges` in subject OR body.** It is structurally blind to that verb.
+
+So the corrective rationale is false on its own terms: whether the `Acknowledges` trailer sits in the subject or the body is *irrelevant* to `apply-audit-flips` — the tool ignores the verb entirely. The same Step 3 sentence even contradicts itself: it says the trailer lives in the body *"so a trailer-walker finds it"* and then says *"the trailer is the audit-trail, **not the flip mechanism**."* Both can't be the point of the body placement. Worse, the codebase's own canonical note (`workplan-task-renderer.ts:152`, citing AUDIT-20260602-01) states plainly that *"`apply-audit-flips` parses `Closes` trailers"* and that `Acknowledges` is the deliberately-**non**-flipping verb for doc-only dispositions. AUDIT-49 was filed because Step 3 made an unverifiable trailer claim; the fix replaced *"in subject"* with *"in body so the walker finds it,"* which is equally untrue, then flipped the audit-log to `…-trailer-location-corrected-2026-06-03` and checked the box `[x] Complete`. The branch now records a correction that the source contradicts. Fix: state that `Acknowledges` is an audit-trail trailer with **no** machine effect (apply-audit-flips acts on `Closes` only), and drop the "so a trailer-walker finds it" justification entirely — the audit-log status for an acknowledged finding is hand-set by design, not tool-flipped.
+
+---
+
+### AUDIT-20260603-51 — Root cause of AUDIT-49 left unfixed: the generator `workplan-task-renderer.ts:152` still emits `Acknowledges … in subject`, so the defect regenerates on every promote-findings run
+
+Finding-ID: AUDIT-20260603-51
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:152` (not in the diff) vs. the workplan Step 3 hand-edit that IS in the diff
+
+AUDIT-49 patched a single hand-written workplan instance (Task 6 Step 3) but never touched the template that **produces** Step 3 lines. `workplan-task-renderer.ts:152` hardcodes: ``Step 3: commit with `Acknowledges ${id}` in subject (…)``. The AUDIT-49 fix establishes the opposite as the "established pattern" — short-form id in the subject, full-id `Acknowledges` trailer in the **body**. The generator and the just-blessed pattern now disagree, and because the generator is the source of every future fix-task's Step 3, the *exact* "Acknowledges … in subject" wording AUDIT-49 was filed to correct will be regenerated verbatim on the next `promote-findings` run. This is precisely the recurring-shape failure the prior audit excerpt flagged (*"the exact header/step/trailer-mismatch shape … now recurring on Task 6"*): each occurrence gets hand-patched, the template that mints them is never addressed, so the audit-log accrues a new AUDIT-NN every cycle.
+
+The diff doesn't mention the renderer at all, so a reviewer reading only this commit would believe the trailer-location problem is closed. It isn't — it's closed for one frozen instance and armed to recur. A real fix updates `workplan-task-renderer.ts:152` so the generated Step 3 either (a) says nothing about subject-vs-body (since location is immaterial to the tooling per Finding-01) or (b) matches whatever the operator decides the canonical pattern is, with a test asserting the generated line. Until the template is changed, marking AUDIT-49 `corrected` overstates the fix.
+
+---
+
+### AUDIT-20260603-52 — This diff cements a false capability claim into the durable audit-log: "apply-audit-flips reads `Acknowledges AUDIT-X` commit trailers"
+
+Finding-ID: AUDIT-20260603-52
+Status:     acknowledged-paraphrase-corrected-in-AUDIT-49-entry-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — the AUDIT-20260603-49 entry body added in this diff (*"the journal records that `dw-lifecycle apply-audit-flips` reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers and flips audit-log entries"*)
+
+The audit-log is the project's durable record, and this diff appends an entry that states `apply-audit-flips` *"reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers."* Per Finding-01, the implementation reads `Closes` only (`auto-flip-from-commit.ts:43`); `Acknowledges` is never parsed for a flip. The entry attributes the claim to "the journal," but capturing the inaccuracy verbatim into `audit-log.md` propagates it into a second canonical surface, where a future reader (or a future "successor" tool author who treats the audit-log as a spec) will design against a capability that doesn't exist. This is the documentation-drift bug-factory the project's own rules warn about — a stated behavior that the code contradicts. The cheap fix: when recording the finding, correct the paraphrase to *"apply-audit-flips reads `Closes AUDIT-X` trailers; `Acknowledges`/`Defers` are non-flipping audit-trail trailers"* so the durable record matches the source. (If the DEVELOPMENT-NOTES journal genuinely contains the wrong claim, that's a third surface worth correcting, but it's outside this diff.)
+
+---
+
+### AUDIT-20260603-53 — Verified clean: AUDIT-48 (the SKILL.md two-passage reconciliation) genuinely landed
+
+Finding-ID: AUDIT-20260603-53
+Status:     acknowledged-informational-2026-06-03
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/skills/session-end/SKILL.md:45` (Step 9 body) and `:72` (Closing-discipline error-handling bullet)
+
+Confirming the positive signal so the operator can weigh it against the negatives above. AUDIT-48's complaint was that the AUDIT-47 fix edited Step 9's body but left the error-handling bullet asserting *"no escape flag exists."* I read both passages post-diff: Step 9 body (line 45) and the error-handling bullet (line 72) now say the same thing — the verb retains a legacy `--allow-disposition-loss` flag from its `.husky` era, the skill body does NOT pass it at session-end, and *"No `--no-verify`-style escape is wired into session-end."* The factual claim ("the flag exists, just unused") and the behavioral claim ("session-end stops unconditionally") are consistent across both passages. The commit-trailer claims also check out: I ran `git log -1 --format=%B` on `f679a201` and `d51696d4` — the `Acknowledges` trailers the workplan cites are genuinely present in those commit bodies (the *existence* claim is true; only the *purpose* claim, Finding-01, is wrong). AUDIT-48 is a real, complete fix.
+
+---
+
+**Summary for triage:** AUDIT-48 is genuinely resolved. AUDIT-49 is not — its corrective rationale (`apply-audit-flips` "finds" the body `Acknowledges` trailer) is factually false (the walker parses `Closes` only), the claim is internally self-contradictory, the generator that produces the defect is untouched so it will recur, and the false capability claim is now cemented into the audit-log. The strongest signal is the cross-check that the codebase's *own* note (`workplan-task-renderer.ts:152`) already documents the correct behavior the AUDIT-49 hand-edit contradicts.
