@@ -1099,3 +1099,40 @@ This is the same failure class AUDIT-40 names, surviving on the `directory` axis
 ---
 
 I also checked and found clean: the markdown-only guard fires pre-`readCalendar`/`writeCalendar`, and both new integration tests (`rejects --kind html-mockup`/`--kind image`) assert exit 2 *and* `calendarRaw not contains` the rejected slug, so the no-disk-mutation contract is genuinely covered; the `default-when-`--kind`-omitted` path resolves to `markdown` (confirmed indirectly — the "no markdown scaffoldDefault" test omits `--kind` and asserts stderr contains both `nomd` and `markdown`, which only the scaffold-default-missing message carries, not the markdown-guard message); the export removals in `index.ts` (`composeRelativePath`/`defaultLayoutForKind`/`legalLayoutsForKind`/`isLayoutLegalForKind`) are matched by removals in `scaffold-path.ts` and the test file's import list, so no dangling re-export; and the `SCAFFOLD_LAYOUTS`/`DEFAULT_SCAFFOLD_LAYOUT` unit tests correctly pin the three legal markdown layouts after the matrix removal. My findings concentrate on the workplan↔audit-log disposition contradiction (the highest-value signal — it will actively misdirect an implementer), the stale AUDIT-45 resolution narrative, the duplicated/vestigial kind-gate, and the unverified directory-normalization edge of the AUDIT-40 invariant.
+
+## 2026-06-04 — audit-barrage lift (20260604T165135628Z-deskwork-plugin)
+
+### AUDIT-20260604-01 — body-state.ts's `PLACEHOLDER_MARKER` contract is now orphaned — the diff reworded the comment to survive the `scaffoldBlogPost` deletion instead of re-evaluating it; no `src/` path emits the marker and nothing in `src/` calls `bodyState()`
+
+Finding-ID: AUDIT-20260604-01 (claude-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/body-state.ts:5-7,25,49` (comment rewordings + `PLACEHOLDER_MARKER` + `bodyState()`) vs. the deleted `packages/core/src/scaffold.ts`
+
+This diff deletes `scaffold.ts` as dead code (correct — its only callers were tests). `scaffoldBlogPost` was the **sole writer** of the body-placeholder marker `'<!-- Write your post here -->'`. I grepped the whole tree: `"Write your post here"` / `PLACEHOLDER_MARKER` now appear only in `body-state.ts` (the definition), `body-state.test.ts`, and `USAGE-JOURNAL.md` — **zero `src/` emitters**. I also grepped for `bodyState(` across `**/src/**`: the only hit is the definition itself (the live studio dashboard test that consumed it is `describe.skip`, per `packages/studio/test/dashboard-bodystate.test.ts:90`, "count + reviewState badge instead"). So both the marker and the function it powers are now test-only artifacts.
+
+Rather than acknowledge that, the diff reworded the docblock from *"The scaffold produced by `scaffoldBlogPost` writes an H1…"* to *"A blog-post scaffold writes an H1…"* and the marker comment from *"written by scaffoldBlogPost"* to *"a blog-post scaffold writes"* (`body-state.ts:5-7,25`). That's the documentation-drift failure mode the project rules name: a comment edited to *describe a scaffolder that no longer exists in the codebase*, papering over the fact that the contract has no producer. The honest dispositions are either (a) delete `body-state.ts` as dead code the same way `scaffold.ts` was deleted, or (b) if it's retained for a future materializer, the comment must say "no current code path emits this marker; retained for <named consumer>" — not invent a generic "a blog-post scaffold" that doesn't exist. As written, a future reader will trust the comment and assume something still produces the marker.
+
+---
+
+### AUDIT-20260604-02 — `renameSlug` now hard-depends on the entry's sidecar existing; an entry with a calendar row but no sidecar file throws a raw `readSidecarSync` ENOENT, bypassing the actionable `doctor --fix` guidance the function provides for every other drift case
+
+Finding-ID: AUDIT-20260604-02 (claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-03; cross-model)
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/rename-slug.ts:170-176` (`readSidecarSync(projectRoot, entry.id)` then the `sidecar.artifactPath === undefined` guard)
+
+The flip replaces the calendar+slug-template resolution (`resolveBlogPostDir`) with `const sidecar = readSidecarSync(projectRoot, entry.id)`. The code then carefully handles two drift cases with `doctor --fix`-style errors: `artifactPath === undefined` (`rename-slug.ts:172-176`) and `artifactPath` not on disk (`:185-189`). But it does **not** handle the case where the sidecar *file itself* is absent — `readSidecarSync` will throw a raw `ENOENT` (or a schema-parse error) before either guard runs. Previously `renameSlug` never read the sidecar at all; it operated off the calendar entry + `resolveBlogPostDir`, so an entry with no sidecar still renamed. This is a new failure mode: a calendar entry that predates sidecar adoption, or whose sidecar was deleted, now crashes rename with an unactionable fs error instead of the "run `deskwork doctor --fix`" message the operator needs.
+
+The function already validates `entry.id` exists (`:143-147`) for exactly this defensive reason; the sidecar-existence check is the obvious companion. Minimum fix: wrap the `readSidecarSync` call (or precede it with a `sidecarPath` existence check) and map the absent-sidecar case to the same `doctor --fix` guidance the `artifactPath === undefined` branch already emits. The new `rename-slug.test.ts` seeds the sidecar in every case (`seed()` always writes `${UUID}.json`), so the no-sidecar path is untested — the gap is invisible to the suite.
+
+---
+
+### AUDIT-20260604-03 — The new sync `writeSidecarSync` duplicates `writeSidecar` (async) with the same mkdir/tmp/write/rename shape, but no `clones.yaml` entry was added — while the analogous read.ts async/sync pair *was* dispositioned (`f2aa9e0ff153`) in this very diff
+
+Finding-ID: AUDIT-20260604-03
+Status:     open
+Severity:   low
+Surface:    `packages/core/src/sidecar/write.ts:18-34` (`writeSidecarSync`) vs. `writeSidecar` (`:8-16`); `.dw-lifecycle/scope-discovery/clones.yaml` (added `f2aa9e0ff153` for `sidecar/read.ts:25-34 ↔ :47-56`, no write.ts sibling)
+
+This diff adds `writeSidecarSync` as an explicit sync mirror of `writeSidecar` — same `EntrySchema.safeParse` validation, same `sidecarPath`, same `mkdir`/`${path}.<pid>.tmp`/`write`/`rename` atomic-write sequence, differing only in sync-vs-async fs calls. That is the identical "async-sync sibling" shape the diff *did* register and disposition for `read.ts` (clone `f2aa9e0ff153`, `keep-with-reason`: *"residual readFile-vs-readFileSync + ENOENT mapping cannot share a call across the async/sync boundary"*). The write-side pair got no `clones.yaml` entry. Either jscpd's threshold didn't trip on the ~12-line write block (in which case the asymmetry is benign but worth a one-line note so a future `refresh-clones-baseline` doesn't surface it as a surprise NEW clone), or the detector missed it and the project's clone-discipline has a gap for the exact same shape it just dispositioned two files over. Given the project explicitly tracks this async/sync-sibling pattern, the write.ts pair should carry the same `keep-with-reason` disposition for consistency, so the two siblings are documented identically rather than one tracked and one invisible.
