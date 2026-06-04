@@ -24,7 +24,7 @@ import { readCalendar, writeCalendar } from './calendar.ts';
 import { readSidecarSync } from './sidecar/read.ts';
 import { writeSidecarSync } from './sidecar/write.ts';
 import { sidecarPath } from './sidecar/paths.ts';
-import { loadLaneConfig, laneConfigPath } from './lanes/loader.ts';
+import { loadLaneConfig } from './lanes/loader.ts';
 
 /**
  * Detect a slug rename's filesystem shape from the entry's stored
@@ -183,18 +183,28 @@ export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
 
   // Resolve the optional 301-redirect target (lane.redirectsPath, spec
   // Decision #23) BEFORE any filesystem/calendar mutation — AUDIT-20260604-08.
-  // `loadLaneConfig` is a THROWING resolver, so resolving it inline at the
-  // append step (after the artifact move + calendar write) risked a
-  // partial-apply: a sidecar naming an archived/purged/legacy-stale lane
-  // would crash AFTER the rename already mutated disk. Discriminate the
-  // same way the sidecar read does (AUDIT-20260604-05): a MISSING lane
-  // config is tolerated → skip the optional append (a renamed entry whose
-  // lane is gone is still a valid rename); a PRESENT-but-corrupt lane is
-  // operator-actionable → re-throw, but now pre-mutation so no partial state.
+  // `loadLaneConfig` is a THROWING resolver (it fails on a missing file AND
+  // on a present-but-unresolvable lane, e.g. a purged/archived pipeline
+  // template or corrupt JSON — loader.ts), so resolving it at the append
+  // step risked a partial-apply: a sidecar naming an unresolvable lane would
+  // crash AFTER the rename already mutated disk.
+  //
+  // Resolving redirectsPath is BEST-EFFORT optional website metadata
+  // (AUDIT-20260604-08, refined by the cross-model follow-up): a renamed
+  // entry whose lane is gone OR whose lane is otherwise unresolvable is
+  // still a valid rename. ANY lane-resolution failure → skip the optional
+  // append (NOT a partial-apply, NOT a hard error). An `existsSync` guard
+  // alone was asymmetric — it tolerated a missing file but still crashed on
+  // a present-but-pipeline-purged lane. A corrupt/unresolvable lane is a
+  // real problem, but renameSlug is not where it is surfaced: the lane-config
+  // doctor rules flag it. Done pre-mutation, so the swallowed failure can
+  // never leave partial state.
   let redirectsPath: string | undefined;
   if (sidecar.lane !== undefined) {
-    if (existsSync(laneConfigPath(projectRoot, sidecar.lane))) {
+    try {
       redirectsPath = loadLaneConfig(sidecar.lane, projectRoot).redirectsPath;
+    } catch {
+      redirectsPath = undefined;
     }
   }
   const move = planArtifactMove(sidecar.artifactPath, newSlug);

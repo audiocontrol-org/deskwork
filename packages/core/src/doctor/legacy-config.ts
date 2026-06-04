@@ -156,17 +156,16 @@ export function readLegacySites(projectRoot: string): LegacySites {
     // omit it, and the migration's later `dropSitesBlock` would then discard
     // a malformed-but-present value with no signal. Reject it loudly, mirroring
     // the live `parseSiteConfig` rule (config.ts), so the operator repairs it.
-    if (
-      'redirectsPath' in siteObj &&
-      readString(siteObj, 'redirectsPath') === undefined
-    ) {
+    // (Single read — `readString` is pure; reuse the result for the guard and
+    // the assignment.)
+    const redirectsPath = readString(siteObj, 'redirectsPath');
+    if ('redirectsPath' in siteObj && redirectsPath === undefined) {
       throw new Error(
         `sites-to-lanes migration: site "${slug}" in ${path} has an invalid ` +
           `"redirectsPath" (must be a non-empty string when set). Repair the ` +
           `config and re-run.`,
       );
     }
-    const redirectsPath = readString(siteObj, 'redirectsPath');
     const site: LegacySite = {
       contentDir,
       ...(calendarPath !== undefined ? { calendarPath } : {}),

@@ -2231,6 +2231,8 @@ Closes AUDIT-20260604-11. Surface: `packages/core/src/doctor/legacy-config.ts:66
 
 ### Task 39.25 (fix-finding-AUDIT-20260604-12) (non-bug): AUDIT-20260604-12 — `SiteConfig.redirectsPath` still documents the old runtime o…
 
+> Superseded by audit-log Status `acknowledged-2026-06-04 (non-bug doc-only reword; SiteConfig.redirectsPath docblock now marked LEGACY MIGRATION INPUT ONLY — no runtime change, no test possible)` — no TDD walk required.
+
 Acknowledges AUDIT-20260604-12. Surface: `packages/core/src/config.ts:67-70` (docblock only). Severity: low. **Non-bug / doc-only:** this is a comment reword — no runtime behavior changes, so NO test can exercise it (the TDD-bug shape does not apply; using `Acknowledges` not `Closes` avoids arming a false `fixed-<sha>` flip + a phantom test-citation expectation, per the non-bug-disposition discipline).
 
 - [x] Step 1 (disposition prose): reworded the `SiteConfig.redirectsPath` docblock to mark it LEGACY MIGRATION INPUT ONLY — it states the field is retired for runtime use, that `renameSlug` reads `loadLaneConfig(sidecar.lane).redirectsPath`, and that it is retained solely for the migration read until terminal deletion.
@@ -2240,7 +2242,7 @@ Acknowledges AUDIT-20260604-12. Surface: `packages/core/src/config.ts:67-70` (do
 
 - [x] Docblock no longer claims `renameSlug` appends here; points at the lane-owned model + terminal-deletion fate.
 - [x] No test (doc-only change); core suite stays green (1018).
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status is `acknowledged-2026-06-04` (NON-bug doc-only — NOT a `fixed-<sha>` flip; AUDIT-BARRAGE-codex-01 caught this criterion mis-stating the expected status as `fixed-<sha>`).
 
 ### Task 39.8 (fix-finding-AUDIT-20260603-41): AUDIT-20260603-41 — `add` stamps a lanes-composed `artifactPath`, but `scaffoldB…
 
@@ -2275,7 +2277,7 @@ Closes AUDIT-20260604-04 (claude-01 + claude-04 + codex-02; cross-model). Surfac
 
 - [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
 - [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
 ### Task 39.18 (fix-finding-AUDIT-20260604-05): AUDIT-20260604-05 — `renameSlug`'s bare `catch` reclassifies a corrupt/invalid s…

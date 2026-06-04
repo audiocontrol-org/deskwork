@@ -1201,7 +1201,7 @@ This is the identical mismatch that AUDIT-20260603-48 surfaced (a HIGH source ch
 ### AUDIT-20260604-08 — `loadLaneConfig(sidecar.lane, …)` throws on a named-but-unresolvable lane — rename crashes AFTER the filesystem + calendar are already mutated, and the "skip when unset" contract only covers `lane === undefined`
 
 Finding-ID: AUDIT-20260604-08 (claude-01 + claude-03 + codex-01; cross-model)
-Status:     open
+Status:     fixed-9e2e2bc3f5cdc5d1a62b7757d16ef91f0fc2fff0
 Severity:   high
 Surface:    `packages/core/src/rename-slug.ts:248-256` (the `sidecar.lane !== undefined ? loadLaneConfig(sidecar.lane, projectRoot).redirectsPath : undefined` block) + the step-4 placement after `writeCalendar` (`:236`)
 
@@ -1214,7 +1214,7 @@ The fix mirrors the read.ts discrimination the project already adopted: resolve 
 ### AUDIT-20260604-09 — Test suite is blind to the named-but-unresolvable-lane crash — all three new c4 tests seed a fully-valid lane, so the throwing path ships untested
 
 Finding-ID: AUDIT-20260604-09
-Status:     open
+Status:     fixed-9e2e2bc3f5cdc5d1a62b7757d16ef91f0fc2fff0
 Severity:   medium
 Surface:    `packages/core/test/rename-slug.test.ts:221-280` (the three `39c c4 lane.redirectsPath` cases) — `seedLane('main', …)`, `seedLane('main')`, and no-lane
 
@@ -1225,7 +1225,7 @@ This is the same observation prior findings made about the sidecar tests (AUDIT-
 ### AUDIT-20260604-10 — Existing lane files skip the new `redirectsPath` migration and then the legacy source is dropped
 
 Finding-ID: AUDIT-20260604-10
-Status:     open
+Status:     fixed-9e2e2bc3f5cdc5d1a62b7757d16ef91f0fc2fff0
 Severity:   medium
 Surface:    `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:306-344`
 
@@ -1236,7 +1236,7 @@ This can happen on a repair rerun or any partially migrated project where lane f
 ### AUDIT-20260604-11 — Invalid legacy `redirectsPath` is silently omitted instead of failing like live config parsing
 
 Finding-ID: AUDIT-20260604-11
-Status:     open
+Status:     fixed-9e2e2bc3f5cdc5d1a62b7757d16ef91f0fc2fff0
 Severity:   medium
 Surface:    `packages/core/src/doctor/legacy-config.ts:66-69` and `packages/core/src/doctor/legacy-config.ts:152-159`
 
@@ -1254,3 +1254,57 @@ Surface:    missing from diff: `packages/core/src/config.ts:67-70`
 The implementation moves rename redirects to `LaneConfig.redirectsPath`, and the workplan explicitly says `SiteConfig.redirectsPath` is kept only for migration read until terminal deletion. But the retained `SiteConfig` comment still says “The slug-rename helper appends 301 redirects here when an existing post is renamed” at `config.ts:67-70`.
 
 That is now false: `renameSlug` reads `loadLaneConfig(sidecar.lane).redirectsPath` instead. This is documentation drift in a live type definition, and it points future maintainers back toward the retired site-owned model. Reword the comment to mark it as legacy migration input only.
+
+## 2026-06-04 — audit-barrage lift (20260604T210215230Z-deskwork-plugin)
+
+> **Addendum 2026-06-04 (dampener engaged → these slushed, but all four are self-caused defects in the SAME-turn fix commit `9e2e2bc3`, so they were ADDRESSED immediately rather than parked — the dampener slushes bookkeeping churn, not flaws in the deliverable being built):**
+> - **AUDIT-13 (MED) — FIXED:** the AUDIT-08 fix used an `existsSync` guard that tolerated a missing lane file but still crashed on a present-but-unresolvable lane (purged pipeline). Changed to best-effort resolution: `loadLaneConfig` wrapped in try/catch → ANY resolution failure skips the optional redirect (resolving `redirectsPath` is optional website metadata; a corrupt/unresolvable lane is surfaced by the lane-config doctor rules, not by crashing a valid rename). Added a purged-pipeline test + converted the corrupt-JSON test from "throws" to "completes + skips" (`rename-slug.test.ts`). Pre-mutation, so still no partial-apply.
+> - **AUDIT-14 (MED) — NON-BUG for the current schema (documented, not code-changed):** the AUDIT-10 merge reads via `loadLaneConfig` then re-writes. `LaneConfigSchema` is `.strict()` with NO `.default()` fields, so a successfully-loaded lane carries exactly its on-disk valid fields ($rationale included) and an unknown key would have THROWN at load (strict) — not been silently stripped. The "reshape operator file" scenario is therefore unreachable; `commitLaneConfig` re-validates via the same `safeParse` gate the create branch uses. Added a clarifying comment recording why the round-trip is faithful.
+> - **AUDIT-15 (LOW) — FIXED:** hoisted the duplicate `readString(siteObj, 'redirectsPath')` in the AUDIT-11 guard into a single `const`.
+> - **AUDIT-16 (LOW) — FIXED:** Task 39.25's acceptance criterion mis-stated the expected status as `fixed-<sha>`; corrected to `acknowledged-2026-06-04` (matching the non-bug audit-log state).
+
+### AUDIT-20260604-13 — AUDIT-08 fix tolerates a *missing* lane file but still hard-fails a rename when the lane's pipeline is purged — asymmetric handling of the same optional lookup
+
+Finding-ID: AUDIT-20260604-13
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `packages/core/src/rename-slug.ts:248-256` (the `existsSync(laneConfigPath(...))` guard) + `packages/core/test/rename-slug.test.ts:289-331`
+
+The fix discriminates "skip vs throw" purely on **file presence**: `if (existsSync(laneConfigPath(projectRoot, sidecar.lane)))` then `loadLaneConfig(...)`. But `loadLaneConfig` throws on *two* drift shapes, confirmed at `loader.ts:155-167` and its docblock (`:160-167`): (a) the lane file is absent, and (b) the lane file is present but its `pipelineTemplate` does not resolve. The `existsSync` guard only covers (a). A lane whose config file still exists while its referenced pipeline was deleted (`/deskwork:pipeline delete`) or archived still passes `existsSync`, reaches `loadLaneConfig`, and throws — so `renameSlug` hard-fails.
+
+That is the exact failure class AUDIT-08 set out to eliminate. The finding's own tolerate-list named "archived/purged" lanes, and the spec rationale retained in the code (`rename-slug.ts:262-266`) says the redirect append is *optional* website metadata — "a renamed entry whose lane is gone is still a valid rename." A renamed entry whose lane's *pipeline* is gone is equally valid: the only thing the lane is consulted for here is the optional `redirectsPath`. Blocking the whole rename on an unresolvable pipeline is disproportionate and asymmetric with the missing-file case. The regression-lock test (`:316`) only exercises corrupt JSON, classifying it as operator-actionable; the purged-pipeline path ships untested and throwing. A focused fix would wrap the `loadLaneConfig` call in a try/catch that maps *any* resolution failure to a skip of the optional append (resolving `redirectsPath` is best-effort), rather than gating on `existsSync` alone.
+
+### AUDIT-20260604-14 — AUDIT-10 merge round-trips the operator's existing lane file through the Zod schema and rewrites it — contradicting the "preserving operator-authored fields" claim, and skipping the schema-validation gate the create path uses
+
+Finding-ID: AUDIT-20260604-14
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:306-334`
+
+The merge does `const existing = loadLaneConfig(slug, ctx.projectRoot);` then `commitLaneConfig(ctx.projectRoot, slug, { ...existing, redirectsPath: site.redirectsPath }, ...)`. `loadLaneConfig` returns `LaneConfigSchema.safeParse(parsed).data` (`loader.ts:152`), i.e. the **normalized** object — Zod strips keys the schema doesn't know and materializes any schema defaults. Writing that normalized object back to disk therefore mutates the operator's lane file *beyond* adding `redirectsPath`: any operator key outside the schema is dropped, and any defaulted-but-omitted field is now written out explicitly. The inline comment claims this path is "preserving operator-authored fields," but it preserves only schema-recognized fields in their post-normalization form — a stronger rewrite than "add one field." The AUDIT-10 test (`sites-to-lanes-migration.test.ts:196`) only asserts the two fields it seeded survive, so it cannot catch a stripped extra key or an injected default.
+
+Secondarily, the merge commits `{ ...existing, redirectsPath }` **without** the `LaneConfigSchema.safeParse` gate the brand-new-lane branch applies just below (`:341-343` — `const validated = LaneConfigSchema.safeParse(lane); if (!validated.success) ...`). The merged shape is very likely valid since `redirectsPath` is a string, but the create path and the merge path now treat schema validation inconsistently. The narrower, intent-matching fix is to read the lane's *raw* JSON (as the loader does at `readAndValidate`), add only `redirectsPath`, validate, and write — so a repair rerun never silently reshapes an operator's file.
+
+### AUDIT-20260604-15 — `readLegacySites` reads `redirectsPath` twice (validation check + assignment)
+
+Finding-ID: AUDIT-20260604-15
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `packages/core/src/doctor/legacy-config.ts:157-168`
+
+The new AUDIT-11 guard calls `readString(siteObj, 'redirectsPath')` inside the `if` (`:159`) and then again on the next line for the actual assignment (`const redirectsPath = readString(siteObj, 'redirectsPath');`, `:168`). Two reads of the same key where one suffices. It is not a correctness bug (`readString` is pure), but it is duplicated logic in a validation path — hoist the result into a single `const` and test it (`raw !== undefined` after confirming the key is present). Minor hygiene; flagging since the surrounding code is otherwise careful about single-read patterns.
+
+---
+
+Summary: two `medium` findings worth triage — the rename-redirect resolution still throws on a purged-pipeline lane (AUDIT-08's tolerance is narrower than its own stated scope, and that path is untested), and the AUDIT-10 merge rewrites operator lane files through the schema rather than appending one field. One `low` hygiene note. The AUDIT-11 and AUDIT-12 changes are otherwise sound; the read-only audit path already absorbs the new throw gracefully.
+
+### AUDIT-20260604-16 — Task 39.25 claims the non-bug acknowledgement flipped to `fixed-<sha>`
+
+Finding-ID: AUDIT-20260604-16
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md:2232-2245`
+
+Task 39.25 correctly uses the non-bug shape in its header/body: it says `Acknowledges AUDIT-20260604-12`, explains this is doc-only, and explicitly says using `Acknowledges` avoids a false `fixed-<sha>` flip. But the acceptance criteria still end with `Audit-log Status flipped to fixed-<sha>` at `:2245` rather than an acknowledged status. In the provided diff that checkbox is also left unchecked, while the audit-log entry itself is `acknowledged-2026-06-04`.
+
+This is exactly the bookkeeping trap the task prose says it is avoiding: a future close/check pass could read the acceptance criterion and try to force a `fixed-*` status for a doc-only acknowledgement. The reasonable fix is to change the criterion to the actual expected status shape, e.g. `acknowledged-2026-06-04 (...)`, and mark it consistently with the audit-log state.

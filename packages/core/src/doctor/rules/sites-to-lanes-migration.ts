@@ -310,10 +310,19 @@ const rule: DoctorRule = {
           // migration) was previously skipped wholesale — then Step 3's
           // dropSitesBlock removed the only remaining copy of the legacy
           // `redirectsPath`, silently discarding it. Merge the legacy
-          // redirectsPath onto the existing lane when the lane lacks it,
-          // preserving operator-authored fields. Other fields are not
-          // re-derived here (the lane already exists by operator/earlier
-          // intent); only the c4-introduced redirectsPath is reconciled.
+          // redirectsPath onto the existing lane when the lane lacks it.
+          //
+          // Faithfulness (AUDIT-20260604-08-followup / claude-02): reading
+          // via loadLaneConfig is faithful here because LaneConfigSchema is
+          // `.strict()` with NO `.default()` fields — a successfully-loaded
+          // lane carries exactly its on-disk valid fields ($rationale
+          // included), and an unknown key would have THROWN at load (strict),
+          // not been silently stripped. So `{ ...existing, redirectsPath }`
+          // adds one field and re-writes the rest verbatim; commitLaneConfig
+          // re-validates via the same LaneConfigSchema.safeParse gate the
+          // create branch uses below. Only the c4-introduced redirectsPath is
+          // reconciled; other fields are not re-derived (the lane already
+          // exists by operator/earlier intent).
           if (site.redirectsPath !== undefined) {
             const existing = loadLaneConfig(slug, ctx.projectRoot);
             if (existing.redirectsPath === undefined) {
