@@ -420,12 +420,23 @@ export async function resolveFeatureDir(repoRoot: string, slug: string): Promise
 /**
  * Convenience for the `--all` flag's pre-read step in the CLI shim.
  * Returns the absolute path of the feature's `workplan.md` after
- * resolving through `resolveFeatureDir`.
+ * resolving through `resolveFeatureDir`, AND verifies the workplan
+ * file itself exists. AUDIT-20260604-21: returning a path without
+ * confirming the file is present makes the failure surface a raw
+ * fs.readFile `ENOENT` rather than the friendly resolver error; the
+ * existence check moves the operator-actionable message up one
+ * layer.
  */
 export async function resolveFeatureWorkplanPath(
   repoRoot: string,
   slug: string,
 ): Promise<string> {
   const dir = await resolveFeatureDir(repoRoot, slug);
-  return join(dir, 'workplan.md');
+  const workplanPath = join(dir, 'workplan.md');
+  if (!(await pathExists(workplanPath))) {
+    throw new ArchivePhasesError(
+      `feature dir resolved to "${dir}" but workplan.md is missing`,
+    );
+  }
+  return workplanPath;
 }

@@ -4391,3 +4391,42 @@ The `--all` branch reads the workplan from a hardcoded path: `join(repoRoot, 'do
 Consequences: (1) `archive-phases --all --feature <slug>` against a feature in `002-WAITING` or `003-COMPLETE` fails at line 124 with an opaque `--all could not read .../001-IN-PROGRESS/...` exit-2, while `archive-phases --phases 1-5 --feature <slug>` for the *same* feature succeeds — two modes of one command resolve paths inconsistently. The workplan claims "the verb itself works standalone"; for non-in-progress features the `--all` mode does not. (2) Even in the happy `001-IN-PROGRESS` case, the workplan is read twice (once in the CLI to enumerate, once inside `archivePhases`), and the hardcoded `1.0` version string is a rot vector the moment the docs tree ever advances past `1.0` — `resolveFeatureDir` carries the same `1.0` hardcode but at least centralizes it.
 
 Fix: export `resolveFeatureDir` from `archive-phases.ts` and have the CLi's `--all` branch resolve the workplan path through it (then read `join(featureDir, 'workplan.md')`), eliminating both the divergence and the double-derivation. A single resolver is the contract; two copies that disagree on which statuses exist is the bug.
+
+## 2026-06-04 — audit-barrage lift (20260604T034153434Z-scope-discovery)
+
+### AUDIT-20260604-19 — The "AUDIT-18 bug-repro" test exercises the library resolver, not the buggy CLI `--all` surface — it would pass against the pre-fix logic
+
+Finding-ID: AUDIT-20260604-19
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts:48-124` vs. `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:113-130`
+
+AUDIT-18's bug lived entirely in the **CLI shim** — `subcommands/archive-phases.ts`'s `--all` branch hardcoded `join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', ...)`. The library's `resolveFeatureDir` already walked all three status dirs correctly *before* this commit (the diff only changes `async function` → `export async function` plus a docblock; the loop body is untouched). Every new test added here calls `resolveFeatureDir` / `resolveFeatureWorkplanPath` **directly** — including the one labeled `'AUDIT-18 bug-repro: resolveFeatureDir locates a feature in 003-COMPLETE (the case the hardcoded path missed)'`. But `resolveFeatureDir` never missed that case; the *CLI* missed it by not calling the resolver at all.
+
+The consequence: the "bug-repro" test does not reproduce the bug. Run against pre-fix code, it fails only because `resolveFeatureWorkplanPath` didn't exist yet (an import/compile failure — which Step 2 of the workplan literally admits: *"tests fail against current code (the new … exports don't exist pre-fix)"*). A missing-export failure is not a behavioral regression test. No test in this commit invokes `archivePhasesCli(['--all', '--feature', <slug>, ...])` against a fixture feature in `002-WAITING` or `003-COMPLETE` and asserts it succeeds — which is the exact contract AUDIT-18 said was broken. This is the "tests that don't test the contract they claim to test" trap (project testing rule; cf. the spec-test-blind-spots memory). A genuine regression-lock would drive the CLI entrypoint end-to-end against a non-in-progress fixture; the current suite would let a future refactor re-hardcode the CLI path without any test going red.
+
+### AUDIT-20260604-20 — AUDIT-18's double-derivation of the feature dir was not eliminated — the fix arguably adds a third resolution pass
+
+Finding-ID: AUDIT-20260604-20
+Status:     open
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:118-135` + `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:418-431`
+
+AUDIT-18's recommended fix was explicit: *"route the workplan path through [resolveFeatureDir] … eliminating both the divergence **and the double-derivation**."* The committed fix closes the divergence but leaves the double-derivation in place — and adds to it. The CLI `--all` branch now calls `resolveFeatureWorkplanPath` (which calls `resolveFeatureDir`, up to three `stat`/access probes), then `readFile(workplanPath)`, then hands off to `archivePhases(...)`, which internally calls `resolveFeatureDir` **again** (another up-to-three probes) and reads the workplan body a second time. Net effect versus pre-fix: one *additional* feature-dir resolution pass was introduced, and the redundant workplan read AUDIT-18 named is untouched.
+
+This is low-cost at runtime (a handful of `stat` calls + a small file read), so it's not a correctness defect — but it's a partial close of a finding whose stated scope included the redundancy, and the divergence-class risk persists in a softer form: `resolveFeatureWorkplanPath`'s probe and `archivePhases`'s internal probe can in principle disagree if the tree changes between them (the result of the CLI's resolution is discarded; only `workplanBody` is forwarded, so `archivePhases` re-resolves from scratch). A cleaner shape is to resolve once and thread the resolved `featureDir` (or the workplan body) into `archivePhases` so a single resolution is the contract. At minimum, the workplan's Acceptance for Task 36 should not be checked as fully closing AUDIT-18 while the double-derivation half remains open.
+
+### AUDIT-20260604-21 — `resolveFeatureWorkplanPath` returns a path without confirming `workplan.md` exists — the dir-exists-but-no-workplan case bypasses the friendly resolver error
+
+Finding-ID: AUDIT-20260604-21
+Status:     open
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:422-431` + `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:118-135`
+
+`resolveFeatureDir` probes for **directory** existence and `resolveFeatureWorkplanPath` then blindly appends `workplan.md` without checking the file is there. So for a feature whose status dir exists (e.g. `docs/1.0/002-WAITING/<slug>/`) but which has no `workplan.md`, the resolver succeeds and the new CLI catch at lines ~125-130 — the one that emits the helpful `"--all could not resolve feature dir for slug …"` message — never fires. Control falls through to the subsequent `readFile(workplanPath)`, and the operator gets whatever that path's error handling produces (a raw-ish ENOENT against the workplan path) rather than guidance tied to feature resolution.
+
+The new test `'resolveFeatureWorkplanPath appends workplan.md to the resolved feature dir'` (lines ~96-106) deliberately creates the dir **without** a `workplan.md` and asserts the returned path — codifying that the function does not validate file existence. That's a defensible contract, but it means the function's name (`...WorkplanPath`) over-promises: it returns a *candidate* workplan path, existence unverified. Worth either (a) documenting in the docblock that the returned path is not guaranteed to exist (callers must handle a downstream read failure), or (b) checking for the file and folding the missing-workplan case into the `ArchivePhasesError` so the single friendly CLI catch covers both "no feature dir" and "feature dir but no workplan." Not a correctness bug — the readFile still fails safely — but the error-surface seam is inconsistent with the resolver's stated purpose.
+
+---
+
+What I checked that came back clean: the `process.exit(2)` control flow in the CLI catch is sound (TS treats `process.exit` as `never`, so `workplanPath` is correctly seen as definitely-assigned at the subsequent `readFile`); the exported `resolveFeatureDir` docblock accurately describes the three-status probe and cites AUDIT-18; the `clones.yaml` disposition flips (`52ca2ff2a12b`, `6719db346975`, `ed62c6a325a0` → `keep-with-reason`) carry substantive per-verb-typed-error / argv-boilerplate reasons consistent with the project's keep-with-reason convention; and the audit-log append correctly records AUDIT-18 as `fixed-<sha>`. The `1.0` hardcode persists but AUDIT-18 already accepted that resolveFeatureDir "at least centralizes it," so I did not re-litigate it.

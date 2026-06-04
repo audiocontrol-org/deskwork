@@ -97,12 +97,31 @@ describe('resolveFeatureDir + resolveFeatureWorkplanPath — three-status resolv
     }
   });
 
-  it('resolveFeatureWorkplanPath appends workplan.md to the resolved feature dir', async () => {
+  it('resolveFeatureWorkplanPath appends workplan.md to the resolved feature dir AND verifies the file exists', async () => {
     const root = await fixture('workplan-path');
     try {
       mkdirSync(join(root, 'docs/1.0/003-COMPLETE/demo'), { recursive: true });
+      writeFileSync(join(root, 'docs/1.0/003-COMPLETE/demo/workplan.md'), '# Demo');
       const path = await resolveFeatureWorkplanPath(root, 'demo');
       expect(path).toBe(join(root, 'docs/1.0/003-COMPLETE/demo/workplan.md'));
+    } finally {
+      const { rm } = await import('node:fs/promises');
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('AUDIT-21 bug-repro: resolveFeatureWorkplanPath throws when the dir exists but workplan.md is missing', async () => {
+    // Pre-fix, the function returned the path without confirming the
+    // file; the caller would hit a raw fs.readFile ENOENT downstream.
+    // Post-fix, the resolver throws ArchivePhasesError with the
+    // dir-vs-file distinction in the message.
+    const root = await fixture('workplan-missing');
+    try {
+      mkdirSync(join(root, 'docs/1.0/003-COMPLETE/demo'), { recursive: true });
+      // Intentionally no workplan.md.
+      await expect(resolveFeatureWorkplanPath(root, 'demo')).rejects.toThrow(
+        /workplan\.md is missing/,
+      );
     } finally {
       const { rm } = await import('node:fs/promises');
       await rm(root, { recursive: true, force: true });

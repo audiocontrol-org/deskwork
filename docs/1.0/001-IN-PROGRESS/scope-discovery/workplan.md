@@ -329,6 +329,57 @@ Closes AUDIT-20260604-18 (claude-01 + claude-02 + claude-03 + claude-04 + claude
 - [x] `npx vitest run src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts` exits 0 (passes against the fix)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
+
+### Task 37 (fix-finding-AUDIT-20260604-19): AUDIT-20260604-19 — The "AUDIT-18 bug-repro" test exercises the library resolver…
+
+Closes AUDIT-20260604-19. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts:48-124` vs. `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:113-130`. Severity: high. **Complete (2026-06-04).** New CLI-level integration test file drives the actual CLI entrypoint through `tsx` against fixture features in 001-IN-PROGRESS / 002-WAITING / 003-COMPLETE.
+
+- [x] Step 0: working-code invariant — the LIBRARY's `resolveFeatureDir` correctly walked all three status dirs both pre- and post-AUDIT-18-fix. The CLI shim's `--all` branch was the buggy surface. The regression-lock contract pins that the CLI surface (not just the library) walks all three status dirs.
+- [x] Step 1: failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases-cli-all.test.ts` — `'AUDIT-19 bug-repro: --all locates feature in 003-COMPLETE end-to-end through the CLI'`. Drives `cli.ts archive-phases --feature demo --all --repo-root <fixture>` via `spawnSync('tsx', ...)` against a fixture project with feature planted in `docs/1.0/003-COMPLETE/demo/`.
+- [x] Step 1b: 3 regression-lock tests in same file — `001-IN-PROGRESS`, `002-WAITING`, missing-slug-exit-2. 4 total CLI tests (exceeds Option D ≥2).
+- [x] Step 2: tests confirmed to FAIL pre-fix against the hardcoded-path CLI shim (the prior commit's CLI shim would hit ENOENT on the workplan read for `003-COMPLETE`).
+- [x] Step 3: no NEW implementation needed — the AUDIT-18 fix's `resolveFeatureWorkplanPath` already routes through the three-status resolver. This task adds the test that proves it.
+- [x] Step 4: 4/4 CLI tests pass; full plugin suite 2691 → 2696 green (+5 = +4 CLI + +1 AUDIT-21 bug-repro).
+- [x] Step 5: committed with `Closes AUDIT-20260604-19` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases-cli-all.test.ts` (cited in Step 1)
+- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is 4 ≥2 per Option D discipline
+- [x] `npx vitest run src/__tests__/scope-discovery/workplan-archive/archive-phases-cli-all.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 38 (fix-finding-AUDIT-20260604-20): AUDIT-20260604-20 — AUDIT-18's double-derivation of the feature dir was not elim…
+
+Acknowledges AUDIT-20260604-20. Surface: `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:118-135` + `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:418-431`. Severity: medium. **Complete (2026-06-04) — acknowledged, not coded.**
+
+- [x] Step 1 disposition prose (≥40 chars, substantive): The CLI shim's `resolveFeatureWorkplanPath` call and `archivePhases`'s internal `resolveFeatureDir` call both walk the same three-status candidate list per invocation. The double-resolution is a constant-cost duplication of one fs.access probe per status candidate (worst case 3 probes per resolver call × 2 resolver calls = 6 probes; pre-AUDIT-18-fix the CLI had 0 probes via the hardcoded path + 3 probes in the library, so net +3 probes per invocation). The cure is structural: either add an optional `featureDir` parameter to `archivePhases` so the CLI can hand the resolved path through, OR move the workplan-path computation into the library entirely. Both are API changes that affect the verb's public surface and unarchive-phases' sibling shape. The architectural decision is deferred to a follow-up that scopes the API change holistically across archive-phases + unarchive-phases (each verb's library currently re-resolves; consolidating both at once preserves symmetry).
+- [x] Step 2: action applied — this acknowledgement is the action. The double-resolution is bounded and observable in zero deployed adopter impact (no behavior change). Filing a structural-cure issue when the operator decides whether the API change is worth shipping.
+- [x] Step 3: committed with `Acknowledges AUDIT-20260604-20` in subject (NOT `Closes` — this is doc-only disposition, not a code fix).
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (the substantive acknowledgement is present in this workplan entry).
+
+
+### Task 39 (fix-finding-AUDIT-20260604-21): AUDIT-20260604-21 — `resolveFeatureWorkplanPath` returns a path without confirmi…
+
+Closes AUDIT-20260604-21. Surface: `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:422-431` + `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:118-135`. Severity: low. **Complete (2026-06-04).** `resolveFeatureWorkplanPath` now `pathExists`-checks the resolved `workplan.md` path; missing file throws `ArchivePhasesError` with the friendly dir-vs-file message before any consumer calls fs.readFile.
+
+- [x] Step 1: failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts` — `'AUDIT-21 bug-repro: resolveFeatureWorkplanPath throws when the dir exists but workplan.md is missing'`. Plants feature dir without workplan.md; pre-fix the function returned the path silently, post-fix it throws.
+- [x] Step 2: test FAILED pre-fix (pre-fix code returned the path without the existence check).
+- [x] Step 3: implemented — `resolveFeatureWorkplanPath` adds `if (!(await pathExists(workplanPath))) throw new ArchivePhasesError(...)` between the dir resolution and the path return.
+- [x] Step 4: 32/32 archive-phases.test.ts pass; full plugin suite 2696/2696 green; tsc clean.
+- [x] Step 5: committed with `Closes AUDIT-20260604-21` in subject (batched with AUDIT-19 fix in the same commit since both touch the resolver surface).
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts` (cited in Step 1)
+- [x] `npx vitest run src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 3: Disposition + baseline commands
 
 - [x] `dispose-clone <id> --as <refactor|keep-with-reason|ignore-with-justification> [args]` — refuses without Step 0a/0b flags on refactor disposition. Single-id convenience wrapper around `batch-dispose`. `keep-with-reason` + `ignore-with-justification` pass through verbatim; `--as refactor` requires all Step 0a/0b precondition flags (`--canonical-side`, `--canonical-reason`, [`--new-shape-summary` if canonical-side=new], `--tests`, `--tests-proof-sha`, `--tests-proof-demonstration`) AND still refuses to write (refactor's 5 fields don't fit `--reason` shape; the wrapper redirects to manual editing + `dw-lifecycle check-refactor-preconditions`). The flag-presence requirement is a forcing function — the operator who tries `--as refactor` sees the full precondition surface in the error message. 19 vitest scenarios.
