@@ -29,12 +29,12 @@ Run the `audiocontrol` three-track audit/review protocol on recent changes. The 
    dw-lifecycle check-clones --gate-mode
    dw-lifecycle check-anti-patterns --feature <slug> --gate-mode
    dw-lifecycle check-adopters --feature <slug> --gate-mode
-   dw-lifecycle check-editor-symmetry --feature <slug>
+   dw-lifecycle check-module-symmetry --feature <slug>
    ```
 
    Any non-zero exit surfaces in the final review report; treat each as a PR-blocker until explicitly dispositioned (the operator may accept a finding with a documented reason; the auto-flip-friendly path is to file a fix-task via `promote-findings` or scope the finding directly into the workplan).
 
-   **Step 3c — Fleet-symmetry snapshot.** `check-editor-symmetry` from Step 3b doubles as the fleet snapshot (cross-module canonical-primitive adoption matrix). When the change touches a known canonical-primitive surface, the symmetry-delta count goes into the report verbatim.
+   **Step 3c — Fleet-symmetry snapshot.** `check-module-symmetry` from Step 3b doubles as the fleet snapshot (cross-module canonical-primitive adoption matrix). When the change touches a known canonical-primitive surface, the symmetry-delta count goes into the report verbatim.
 
    NEW clone groups, anti-pattern hits, adopter holdouts, and symmetry deltas are routed to the audit log the same way reviewer findings are (see Step 9); each becomes its own `Finding-ID` so future review passes don't re-report it.
 

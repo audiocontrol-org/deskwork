@@ -45,7 +45,7 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    dw-lifecycle check-clones --feature <slug> --gate-mode
    dw-lifecycle check-anti-patterns --feature <slug> --gate-mode
    dw-lifecycle check-adopters --feature <slug> --gate-mode
-   dw-lifecycle check-editor-symmetry --feature <slug>
+   dw-lifecycle check-module-symmetry --feature <slug>
    ```
 
    Any non-zero exit code (new clone group, new anti-pattern hit, new holdout, or symmetry delta the surface doesn't sanction) STOPS the loop. The agent surfaces the verb's stderr report verbatim and pauses until the operator decides how to disposition. The structural chain at end-of-implement-task is enforcing because the pathology that motivated `Just for now is bullshit` was the *audit-finding* chain (high volume, bookkeeping-heavy), not the structural one (low volume, real defects). When `.dw-lifecycle/scope-discovery/` is absent, Step 6a silently skips.

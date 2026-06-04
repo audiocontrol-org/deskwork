@@ -272,6 +272,43 @@ Closes AUDIT-20260604-01 (claude-01 + codex-03; cross-model). Surface: `.dw-life
 - [x] The named action has landed in this branch (README Phase 26 row updated this commit).
 - [x] Audit-log Status flipped open → `acknowledged-readme-phase-26-row-drops-absolute-count-2026-06-04` in this commit.
 
+
+### Task 34 (fix-finding-AUDIT-20260604-07): AUDIT-20260604-07 — Task 5's command markdown files route both slash-commands to…
+
+Closes AUDIT-20260604-07 (claude-01 + codex-01; cross-model). Surface: `plugins/dw-lifecycle/commands/check-module-symmetry.md` (new) + `plugins/dw-lifecycle/commands/check-editor-symmetry.md` (rewritten) vs. committed skill `plugins/dw-lifecycle/skills/check-editor-symmetry/SKILL.md`. Severity: high. **Complete (2026-06-04).** Fix overlapped with Phase 25 Task 6 (skill folder rename); landed in the same commit.
+
+- [x] Step 0: working-code invariant — every `commands/*.md` slash-command file must reference a skill name that resolves to a frontmatter `name:` under `plugins/dw-lifecycle/skills/<slug>/SKILL.md`. The prior `commands/check-editor-symmetry.md` resolved (the skill folder + SKILL.md `name: check-editor-symmetry` existed); the Task 5 commit re-routed both command files at the unregistered `check-module-symmetry` name. Regression-lock pins the broader invariant: every command file's referenced skill resolves.
+- [x] Step 1: failing test at `plugins/dw-lifecycle/src/__tests__/commands-skill-resolution.test.ts` — `'AUDIT-07 bug-repro: both check-module-symmetry.md and check-editor-symmetry.md route to a registered skill'`.
+- [x] Step 1b: regression-lock test at same file — `'regression-lock: every commands/*.md skill reference resolves to a registered skill'`. Walks every `commands/*.md`, parses the `Invoke the \`<name>\` skill` prose, and asserts the named skill exists in the on-disk `skills/<slug>/SKILL.md` frontmatter `name:` field.
+- [x] Step 2: tests fail pre-fix (confirmed via stash + run; commit cf0937e6 HEAD has commands routing at `check-module-symmetry` skill that doesn't exist).
+- [x] Step 3: implemented the fix via Phase 25 Task 6 (skill folder + SKILL.md content rename).
+- [x] Step 4: 2/2 tests pass; full plugin suite 2677/2677 green.
+- [x] Step 5: committed with `Closes AUDIT-20260604-07 (claude-01 + codex-01; cross-model)` in subject alongside Phase 25 Task 6.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/commands-skill-resolution.test.ts` (cited in Step 1)
+- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [x] `npx vitest run src/__tests__/commands-skill-resolution.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 35 (fix-finding-AUDIT-20260604-08): AUDIT-20260604-08 — `scope-inventory.ts` comment was advanced to the new verb na…
+
+Closes AUDIT-20260604-08. Surface: `plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:228,391,406,407` (comment touched by diff at the `check-module-symmetry` lines; identifiers/flag unchanged). Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260604-08` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 3: Disposition + baseline commands
 
 - [x] `dispose-clone <id> --as <refactor|keep-with-reason|ignore-with-justification> [args]` — refuses without Step 0a/0b flags on refactor disposition. Single-id convenience wrapper around `batch-dispose`. `keep-with-reason` + `ignore-with-justification` pass through verbatim; `--as refactor` requires all Step 0a/0b precondition flags (`--canonical-side`, `--canonical-reason`, [`--new-shape-summary` if canonical-side=new], `--tests`, `--tests-proof-sha`, `--tests-proof-demonstration`) AND still refuses to write (refactor's 5 fields don't fit `--reason` shape; the wrapper redirects to manual editing + `dw-lifecycle check-refactor-preconditions`). The flag-presence requirement is a forcing function — the operator who tries `--as refactor` sees the full precondition surface in the error message. 19 vitest scenarios.
@@ -1748,11 +1785,13 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 6 — Skill prose + skill folder rename
 
-- Step 1: Rename `plugins/dw-lifecycle/skills/check-editor-symmetry/` → `plugins/dw-lifecycle/skills/check-module-symmetry/`.
-- Step 2: Update SKILL.md content: name field in frontmatter, every verb-name reference, every body paragraph.
-- Step 3: Decide whether the old skill folder retires entirely or stays as a deprecated stub pointing at the new name.
+**Complete (2026-06-04).** Skill folder renamed via `git mv`; SKILL.md frontmatter `name:`, heading, and body self-references updated to `check-module-symmetry`. Cross-skill references in `session-start`, `review`, `implement`, and `check-adopters` SKILL.md bodies updated to the canonical verb. Old folder retires entirely (no stub) per Task 2 decision. Closes AUDIT-20260604-07 (HIGH; cross-model claude-01 + codex-01) — the new `commands/check-module-symmetry.md` + rewritten `commands/check-editor-symmetry.md` now route at a registered skill. New regression-lock test asserts every command file's referenced skill resolves to a frontmatter `name:` under `skills/`.
 
-**Acceptance:** Skill picker shows `check-module-symmetry`. Old skill (if kept as stub) clearly directs to the new name.
+- [x] Step 1: `git mv plugins/dw-lifecycle/skills/check-editor-symmetry plugins/dw-lifecycle/skills/check-module-symmetry`.
+- [x] Step 2: SKILL.md content updated — frontmatter `name: check-module-symmetry`, heading `# /dw-lifecycle:check-module-symmetry`, every body paragraph + cross-reference uses the canonical verb (Phase 25 rename note preserves the prior name for adopters reading the history). Cross-skill bodies (`session-start`, `review`, `implement`, `check-adopters`) updated.
+- [x] Step 3: Decision = **old skill folder retires entirely (no stub)**. Per Task 2 ("skill folder retires entirely"). The `commands/check-editor-symmetry.md` alias command file is the only adopter-visible legacy surface; it routes at the canonical skill so the deprecated slash-command continues to work.
+
+**Acceptance:** ✅ Skill picker shows `check-module-symmetry`. ✅ No stub left behind. ✅ AUDIT-20260604-07's commands → skill resolution test (`src/__tests__/commands-skill-resolution.test.ts`) passes — both `commands/check-module-symmetry.md` AND `commands/check-editor-symmetry.md` route at a registered skill.
 
 ### Task 7 — Doctor rules + agent-discipline + design-standards sweep
 

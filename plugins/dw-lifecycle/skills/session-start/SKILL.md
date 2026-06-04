@@ -32,7 +32,7 @@ dw-lifecycle session-start-recommendation --slug <feature-slug>
    dw-lifecycle check-clones --feature <slug> 2>&1 | tail -3
    dw-lifecycle check-anti-patterns --feature <slug> 2>&1 | tail -3
    dw-lifecycle check-adopters --feature <slug> 2>&1 | tail -3
-   dw-lifecycle check-editor-symmetry --feature <slug> 2>&1 | tail -3
+   dw-lifecycle check-module-symmetry --feature <slug> 2>&1 | tail -3
    ```
 
    Render the snapshot as a single block in the bootstrap report: `Structural snapshot: clones=N anti-patterns=N holdouts=N symmetry-deltas=N`. **Advisory only** — do NOT refuse to start the session on non-zero counts. The enforcing variant fires at the end of each implement-task per `/dw-lifecycle:implement` Step 6.
