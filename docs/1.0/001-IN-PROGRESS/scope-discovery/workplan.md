@@ -391,52 +391,58 @@ Closes AUDIT-20260604-21. Surface: `plugins/dw-lifecycle/src/scope-discovery/wor
 
 ### Task 20 (fix-finding-AUDIT-20260603-83) (non-bug): AUDIT-20260603-83 — Fixed-finding / all-unchecked-task contradiction regresses A…
 
+> Superseded by audit-log Status `fixed-9f9f640c` — workplan scaffolding orphaned; fix landed in the named commit. Ticking the unchecked boxes for workplan-audit-log coherence (the AUDIT-83/79/72 family of contradiction findings).
+
 Closes AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -46,6 +46,43 @@`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-81/82 (`Status: fixed-2e962b59`).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)` in subject (use `Closes AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [x] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [x] Step 3: commit with `Acknowledges AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)` in subject (use `Closes AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (the substantive edit or acknowledgement is present).
 - [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
 ### Task 21 (fix-finding-AUDIT-20260603-84): AUDIT-20260603-84 — AUDIT-82's MIGRATING.md rewrite leaks internal audit scaffol…
 
+> Superseded by audit-log Status `fixed-9f9f640c` — workplan scaffolding orphaned; fix landed in the named commit. Ticking the unchecked boxes for workplan-audit-log coherence (the AUDIT-83/79/72 family of contradiction findings).
+
 Closes AUDIT-20260603-84 (claude-03 + codex-02; cross-model). Surface: `MIGRATING.md:60` ("Issues defused" paragraph). Severity: medium.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-84 (claude-03 + codex-02; cross-model)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-84 (claude-03 + codex-02; cross-model)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 22 (fix-finding-AUDIT-20260603-85) (non-bug): AUDIT-20260603-85 — Option D test-count not met — single added test is the bug-r…
 
+> Superseded by audit-log Status `fixed-9f9f640c` — workplan scaffolding orphaned; fix landed in the named commit. Ticking the unchecked boxes for workplan-audit-log coherence (the AUDIT-83/79/72 family of contradiction findings).
+
 Closes AUDIT-20260603-85. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/uninstall-everything-hook-related.test.ts:78-108` vs. `workplan.md` Task 19 Acceptance ("test block count for this finding is ≥2 per Option D discipline").
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-85` in subject (use `Closes AUDIT-20260603-85` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [x] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [x] Step 3: commit with `Acknowledges AUDIT-20260603-85` in subject (use `Closes AUDIT-20260603-85` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (the substantive edit or acknowledgement is present).
 - [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 ### Task 19 (fix-finding-AUDIT-20260603-81): AUDIT-20260603-81 — Global newline-collapse regex rewrites operator content outs…
@@ -542,18 +548,20 @@ Acknowledges AUDIT-20260603-46 (claude-01 + claude-02 + claude-03 + claude-04 + 
 
 ### Task 19 (fix-finding-AUDIT-20260603-79) (non-bug): AUDIT-20260603-79 — Same fixed-finding-with-open-unchecked-task contradiction re…
 
+> Superseded by audit-log Status `fixed-299e57f9` — workplan scaffolding orphaned; fix landed in the named commit. Ticking the unchecked boxes for workplan-audit-log coherence (the AUDIT-83/79/72 family of contradiction findings).
+
 Closes AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -206,6 +206,40 @@`) vs. `audit-log.md` AUDIT-77/78 (`Status: fixed-f966d6ee`).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` in subject (use `Closes AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [x] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [x] Step 3: commit with `Acknowledges AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` in subject (use `Closes AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (the substantive edit or acknowledgement is present).
 - [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
@@ -739,18 +747,20 @@ Acknowledges AUDIT-20260603-52. Surface: `docs/1.0/001-IN-PROGRESS/scope-discove
 
 ### Task 15 (fix-finding-AUDIT-20260603-72) (non-bug): AUDIT-20260603-72 — Workplan Tasks 9–14 are fully unchecked while the same commi…
 
+> Superseded by audit-log Status `fixed-b178bdd0` — workplan scaffolding orphaned; fix landed in the named commit. Ticking the unchecked boxes for workplan-audit-log coherence (the AUDIT-83/79/72 family of contradiction findings).
+
 Closes AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:228-332` (Tasks 9–14) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:3790-3854` (AUDIT-66…71).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-model)` in subject (use `Closes AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [x] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [x] Step 3: commit with `Acknowledges AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-model)` in subject (use `Closes AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (the substantive edit or acknowledgement is present).
 - [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 
@@ -809,35 +819,39 @@ Closes AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-mo
 
 ### Task 9 (fix-finding-AUDIT-20260603-66): AUDIT-20260603-66 — Orphaned canonical template `agent-step-0-fragment.md` survi…
 
+> Superseded by audit-log Status `fixed-db630841` — workplan scaffolding orphaned; fix landed in the named commit. Ticking the unchecked boxes for workplan-audit-log coherence (the AUDIT-83/79/72 family of contradiction findings).
+
 Closes AUDIT-20260603-66. Surface: `plugins/dw-lifecycle/templates/scope-discovery/agent-step-0-fragment.md` (not in diff — should be) vs. the two deleted readers. Severity: medium.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-66` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-66` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 10 (fix-finding-AUDIT-20260603-67): AUDIT-20260603-67 — Reciprocal skill cross-references to the three retired verbs…
 
+> Superseded by audit-log Status `fixed-db630841` — workplan scaffolding orphaned; fix landed in the named commit. Ticking the unchecked boxes for workplan-audit-log coherence (the AUDIT-83/79/72 family of contradiction findings).
+
 Closes AUDIT-20260603-67 (claude-02 + codex-03; cross-model). Surface: sibling skill bodies that point at the deleted verbs — e.g. `plugins/dw-lifecycle/skills/install-scope-discovery/SKILL.md`, `plugins/dw-lifecycle/skills/complete/SKILL.md` (neither in this diff). Severity: medium.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-67 (claude-02 + codex-03; cross-model)` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-67 (claude-02 + codex-03; cross-model)` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -881,38 +895,42 @@ Closes AUDIT-20260603-69. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/wor
 
 ### Task 13 (fix-finding-AUDIT-20260603-70): AUDIT-20260603-70 — Retired slash commands still ship and point at deleted skill…
 
+> Superseded by audit-log Status `fixed-db630841` — workplan scaffolding orphaned; fix landed in the named commit. Ticking the unchecked boxes for workplan-audit-log coherence (the AUDIT-83/79/72 family of contradiction findings).
+
 Closes AUDIT-20260603-70. Surface: `plugins/dw-lifecycle/commands/install-agent-prompts.md:1-5`, `plugins/dw-lifecycle/commands/install-scope-discovery-hooks.md:1-5`, `plugins/dw-lifecycle/commands/uninstall-scope-discovery-hooks.md:1-5`, `plugins/dw-lifecycle/src/__tests__/shortcuts.test.ts:88-98`. Severity: high.
 
-- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
-- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
-- [ ] Step 5: commit with `Closes AUDIT-20260603-70` in subject
+- [x] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
+- [x] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
+- [x] Step 5: commit with `Closes AUDIT-20260603-70` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 14 (fix-finding-AUDIT-20260603-71): AUDIT-20260603-71 — Doctor skill documents deleted rules and repair commands as …
 
+> Superseded by audit-log Status `fixed-db630841` — workplan scaffolding orphaned; fix landed in the named commit. Ticking the unchecked boxes for workplan-audit-log coherence (the AUDIT-83/79/72 family of contradiction findings).
+
 Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:31-44`, `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/index.ts:26-35`. Severity: medium.
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260603-71` in subject
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260603-71` in subject
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 5: Validator + export commands
