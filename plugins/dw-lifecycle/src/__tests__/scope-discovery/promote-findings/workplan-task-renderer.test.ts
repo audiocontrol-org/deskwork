@@ -199,6 +199,34 @@ describe('inferFindingShape — Phase 18 Task 1 (AUDIT-02)', () => {
       inferFindingShape(finding({ surface: '.claude/CLAUDE.md line 99' })),
     ).toBe('non-bug');
   });
+
+  // AUDIT-20260603-72: plugin skill bodies / templates / slash-command shims
+  // are doc prose, not source code. Findings against them have no failing-test
+  // path; the renderer auto-positioner was minting unsatisfiable vitest ACs
+  // for skill+template+command findings before this allowlist entry landed.
+  it('infers non-bug for plugins/<plugin>/skills/<name>/SKILL.md surface (AUDIT-20260603-72)', () => {
+    expect(
+      inferFindingShape(
+        finding({ surface: 'plugins/dw-lifecycle/skills/install-scope-discovery/SKILL.md:46' }),
+      ),
+    ).toBe('non-bug');
+  });
+
+  it('infers non-bug for plugins/<plugin>/templates/** surface', () => {
+    expect(
+      inferFindingShape(
+        finding({ surface: 'plugins/dw-lifecycle/templates/scope-discovery/README.md:21-30' }),
+      ),
+    ).toBe('non-bug');
+  });
+
+  it('infers non-bug for plugins/<plugin>/commands/<name>.md slash-command shim', () => {
+    expect(
+      inferFindingShape(
+        finding({ surface: 'plugins/dw-lifecycle/commands/install-scope-discovery-hooks.md:1-5' }),
+      ),
+    ).toBe('non-bug');
+  });
 });
 
 describe('renderFixTaskBlock — non-bug variant (Phase 18 Task 1)', () => {
@@ -240,6 +268,48 @@ describe('renderFixTaskBlock — non-bug variant (Phase 18 Task 1)', () => {
     // Guidance names the alternatives + cites the audit
     expect(block.toLowerCase()).toContain('defers');
     expect(block).toContain('AUDIT-20260602-01');
+  });
+
+  // AUDIT-20260603-51: the template at workplan-task-renderer.ts:152
+  // used to say "commit with `Acknowledges <id>` in subject" — but the
+  // subject-vs-body location is immaterial to apply-audit-flips (which
+  // parses `Closes` trailers only, per auto-flip-from-commit.ts:43).
+  // The generated Step 3 must NOT make a subject-vs-body claim, must
+  // describe Acknowledges as an audit-trail trailer with no auto-flip
+  // effect, and must name the actual auto-flip behavior (Closes is the
+  // only verb the walker reads).
+  it('non-bug template Step 3 does not claim a subject-vs-body location for the trailer (AUDIT-20260603-51)', () => {
+    const block = renderFixTaskBlock(
+      finding({
+        findingId: 'AUDIT-20260601-91',
+        heading: 'A non-fix disposition',
+        surface: 'docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md',
+      }),
+      { taskNumber: '5.99', findingShape: 'non-bug' },
+    );
+    // No subject-vs-body claim — the trailer's effect is independent of placement
+    expect(block).not.toMatch(/Acknowledges [^`]+`\)? in subject\b/);
+    expect(block).not.toMatch(/`Acknowledges [^`]+` in subject\b/);
+  });
+
+  it('non-bug template Step 3 describes Acknowledges as an audit-trail trailer that does NOT trigger an auto-flip (AUDIT-20260603-50/51)', () => {
+    const block = renderFixTaskBlock(
+      finding({
+        findingId: 'AUDIT-20260601-91',
+        heading: 'A non-fix disposition',
+        surface: 'docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md',
+      }),
+      { taskNumber: '5.99', findingShape: 'non-bug' },
+    );
+    const lower = block.toLowerCase();
+    // States the actual auto-flip behavior: Closes triggers, Acknowledges does not
+    expect(lower).toMatch(/audit[- ]trail/);
+    expect(lower).toMatch(/apply[-_]audit[-_]flips/);
+    // States that auto-flip applies to Closes only
+    expect(lower).toMatch(/closes/);
+    // Per AUDIT-20260603-50: the false "trailer-walker finds it" justification
+    // must not appear in the generated Step 3
+    expect(lower).not.toMatch(/trailer[- ]walker (finds|will find|locates)/);
   });
 
   it('defaults to code-defect template when findingShape is omitted (backward-compat)', () => {

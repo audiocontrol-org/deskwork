@@ -114,6 +114,8 @@ When evaluating on a real install, treat the install state as ground truth — n
 
 When dogfooding deskwork, acquire and invoke it the same way a non-privileged adopter would — **no privileged shortcuts** (no pointing at the local source tree, no workspace symlinks, no hand-rolled config the install skill should write). *"No fair using it in ways that other, non-privileged users can't."* Follow the PUBLIC docs verbatim; if it's not pushed, it doesn't exist (uncommitted edits / unpushed branches aren't the contract). If the public path is broken, the only valid response is to **fix it** — edit source, commit, **push** (pushing is the final mile of "fixed"), then re-attempt. Never work around a broken public path with a dev shortcut "just to keep moving" — that hides the friction the dogfood exists to expose.
 
+> The enforcement-specific specialization of this principle lives in `.claude/rules/enforcement-lives-in-skills.md` (Phase 24, 2026-06-03): a discipline that only fires from `.husky/` does not exist for an adopter who follows the public install path. See also the ADR at `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md`.
+
 ## Memory-vs-rule placement: durable lessons go in this file
 
 A recurring agent-failure lesson that would otherwise go to auto-memory goes **here** instead (or in `.claude/CLAUDE.md` for project conventions, or the relevant `SKILL.md` for per-skill behavior). Auto-memory is keyed to the working-directory path and does NOT survive worktree switches or fresh clones. Operator: *"MEMORIES ARE FUCKING USELESS!!! PUT IT IN A SKILL OR A RULE OR CLAUDE.md OR IT DOESN'T EXIST!!!"* Commit the edit so it propagates.

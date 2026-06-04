@@ -21,8 +21,8 @@ import { readCloneDetectorOutput } from './discovery-agents/clone-detector-reade
 import { huntPrdThemes } from './discovery-agents/prd-themed-pattern-hunter.js';
 import { detectRegimeHoldouts } from './discovery-agents/regime-holdout-detector.js';
 import { checkAdopterManifests } from './discovery-agents/adopter-manifest-checker.js';
-import { computeMatrix } from './editor-symmetry-matrix.js';
-import { renderMatrix } from './editor-symmetry-report.js';
+import { computeMatrix } from './module-symmetry-matrix.js';
+import { renderMatrix } from './module-symmetry-report.js';
 import type {
   DiscoveryAgentFinding,
   DiscoveryAgentInput,
@@ -60,7 +60,7 @@ import {
 const PHASE4_GATE_FILES = {
   antiPatterns: '.dw-lifecycle/scope-discovery/anti-patterns.yaml',
   adopterManifests: '.dw-lifecycle/scope-discovery/adopter-manifests.yaml',
-  editorSymmetryArtifact: '.dw-lifecycle/scope-discovery/editor-symmetry.md',
+  moduleSymmetryArtifact: '.dw-lifecycle/scope-discovery/editor-symmetry.md',
 } as const;
 
 // `CliOptions`, `parseCli`, `USAGE`, `FEATURE_SLUG_REGEX`, and
@@ -104,7 +104,7 @@ interface AgentRun {
  */
 interface Phase4Activations {
   readonly regimeHoldout: boolean;
-  readonly editorSymmetry: boolean;
+  readonly moduleSymmetry: boolean;
   readonly adopterManifestChecker: boolean;
 }
 
@@ -121,8 +121,11 @@ interface Phase4Activations {
  * only spares the cost on projects that haven't authored a registry
  * at all.
  *
- * Note: `editor-symmetry.md` is the OUTPUT of the editor-symmetry
- * scanner, not its input. The scanner reads `adopter-manifests.yaml`
+ * Note: `editor-symmetry.md` is the OUTPUT of the module-symmetry
+ * scanner (the artifact filename stays as `editor-symmetry.md` per
+ * the wire-format note in check-module-symmetry.ts:14-18; the verb
+ * name was renamed in Phase 25 Task 5). The scanner reads
+ * `adopter-manifests.yaml`
  * (the input) and produces the .md (the output). Activation is gated
  * on the input file's presence per the Phase 4 pilot map (workplan's
  * phrasing was a mis-description of the input/output relationship).
@@ -132,13 +135,13 @@ function decideActivations(repoRoot: string): Phase4Activations {
   const haveAdopterManifests = existsSync(
     resolve(repoRoot, PHASE4_GATE_FILES.adopterManifests),
   );
-  const haveEditorSymmetryArtifact = existsSync(
-    resolve(repoRoot, PHASE4_GATE_FILES.editorSymmetryArtifact),
+  const haveModuleSymmetryArtifact = existsSync(
+    resolve(repoRoot, PHASE4_GATE_FILES.moduleSymmetryArtifact),
   );
   return {
     regimeHoldout:
-      haveAntiPatterns || haveAdopterManifests || haveEditorSymmetryArtifact,
-    editorSymmetry: haveAdopterManifests,
+      haveAntiPatterns || haveAdopterManifests || haveModuleSymmetryArtifact,
+    moduleSymmetry: haveAdopterManifests,
     adopterManifestChecker: haveAdopterManifests,
   };
 }
@@ -219,13 +222,13 @@ async function runAgents(
  * configured path (default: under the per-run evidence trail). The
  * agent does NOT emit a `DiscoveryAgentFinding` — its output is the
  * markdown file itself; the regime-holdout-detector already consumes
- * the matrix in-process for its `editor-symmetry` source bucket.
+ * the matrix in-process for its `module-symmetry` source bucket.
  *
  * Returns the absolute path of the written artifact, or null when
  * skipped. Failures throw so the orchestrator surfaces them at exit
- * code 2 (matches the standalone `check-editor-symmetry` semantics).
+ * code 2 (matches the standalone `check-module-symmetry` semantics).
  */
-async function writeEditorSymmetryArtifact(args: {
+async function writeModuleSymmetryArtifact(args: {
   readonly repoRoot: string;
   readonly moduleRoot: string;
   readonly outPath: string;
@@ -386,11 +389,12 @@ export async function scopeInventoryMain(
       );
     }
 
-    // Editor-symmetry artifact (Phase 4 Family B): activate when
+    // Module-symmetry artifact (Phase 4 Family B): activate when
     // adopter-manifests.yaml exists. Default output lives under the
-    // per-run evidence trail; explicit --editor-symmetry-out
-    // overrides. Failures throw and exit code 2 (matches the
-    // standalone check-editor-symmetry's contract).
+    // per-run evidence trail; explicit --module-symmetry-out (with
+    // back-compat alias `--editor-symmetry-out`) overrides. Failures
+    // throw and exit code 2 (matches the standalone
+    // check-module-symmetry's contract).
     let runDir: string | null = null;
     if (opts.evidenceTrail) {
       runDir = makeRunDir({
@@ -398,25 +402,25 @@ export async function scopeInventoryMain(
         featureSlug: opts.featureSlug,
       });
     }
-    if (activations.editorSymmetry) {
+    if (activations.moduleSymmetry) {
       const defaultPath =
         runDir !== null
           ? resolve(runDir, 'editor-symmetry.md')
-          : resolve(opts.repoRoot, PHASE4_GATE_FILES.editorSymmetryArtifact);
-      const symmetryOut = opts.editorSymmetryOut ?? defaultPath;
-      const written = await writeEditorSymmetryArtifact({
+          : resolve(opts.repoRoot, PHASE4_GATE_FILES.moduleSymmetryArtifact);
+      const symmetryOut = opts.moduleSymmetryOut ?? defaultPath;
+      const written = await writeModuleSymmetryArtifact({
         repoRoot: opts.repoRoot,
         moduleRoot: opts.moduleRoot,
         outPath: symmetryOut,
       });
       if (!opts.quiet) {
         process.stderr.write(
-          `scope-inventory: editor-symmetry matrix at ${relative(opts.repoRoot, written)}\n`,
+          `scope-inventory: module-symmetry matrix at ${relative(opts.repoRoot, written)}\n`,
         );
       }
     } else {
       emitSkipNote(
-        'skipped editor-symmetry scanner (no adopter-manifests.yaml found ' +
+        'skipped module-symmetry scanner (no adopter-manifests.yaml found ' +
           'under .dw-lifecycle/scope-discovery/)',
       );
     }

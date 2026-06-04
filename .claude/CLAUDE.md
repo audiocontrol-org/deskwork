@@ -166,6 +166,7 @@ Feature work happens in worktrees under `~/work/deskwork-work/`. The worktree di
 - Workspace dev path: when the plugin lives inside this monorepo, `<pluginRoot>/node_modules/@deskwork/<pkg>` is a workspace symlink into `packages/<pkg>`. The bin shim detects the symlink and dispatches directly — never npm-install over a workspace symlink.
 - Studio client assets are built on startup by an in-process esbuild pass; outputs land in `<pluginRoot>/.runtime-cache/` (gitignored). No precompiled bundle is committed.
 - Built-in studio templates and doctor rules are overridable per-project: `<projectRoot>/.deskwork/templates/<name>.ts` (and `.deskwork/doctor/<name>.ts`) are picked up by the runtime override resolver. Operators copy a default into the project via `/deskwork:customize <category> <name>`.
+- **`dw-lifecycle` enforcement lives in skill bodies + CLI verbs, never in `.husky/` or `.git/hooks/`.** See `.claude/rules/enforcement-lives-in-skills.md` for the rule and `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` for the ADR. Adopters get the discipline by installing the plugin; they do not have to wire git hooks.
 
 ## Core Requirements
 

@@ -345,3 +345,4 @@ describe('ancestry collapses — inverse-safety invariant (AUDIT-52)', () => {
     expect(!!gateOnUnknown).not.toBe(!!barrageOnUnknown);
   });
 });
+

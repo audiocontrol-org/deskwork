@@ -486,4 +486,119 @@ describe('computeAutoPosition — renderer-shaped fix-task headings (AUDIT-20260
     // taskLine - 1, but clamped to >= phase heading).
     expect(pos.insertAfterLine).toBeLessThan(taskLine);
   });
+
+  // Phase 26 Task 4 (AUDIT-20260603-86): the auto-positioner must honor
+  // the workplan-archive-ledger's `next-fix-task-id` to avoid colliding
+  // with archived fix-task IDs.
+  describe('ledger-aware floor (Phase 26 Task 4 / AUDIT-86)', () => {
+    it('uses ledger.next-fix-task-id as a floor when the phase matches', () => {
+      const wp = [
+        '# Workplan',
+        '',
+        '<!-- workplan-archive-ledger',
+        'archived-phases: 1-4',
+        'archived-fix-tasks: 5.1-5.123',
+        'archive-file: workplan-archive.md',
+        'next-fix-task-id: 5.124',
+        '-->',
+        '',
+        '## Phase 5: current',
+        '',
+        '### Task 5.5 (fix-finding-AUDIT-X): first',
+        '',
+        '- [ ] Step 1 pending',
+        '',
+      ].join('\n');
+      const pos = computeAutoPosition(wp);
+      // Without the ledger floor, the scan would find Task 5.5 → max=5.
+      // With the ledger floor (next-id=5.124), max should jump to 123 so
+      // the next task is 5.124 — which won't collide with archived range 5.1-5.123.
+      expect(pos.convention).toBe('hierarchical');
+      expect(pos.phaseNumber).toBe(5);
+      expect(pos.currentMaxNumberInPhase).toBe(123);
+    });
+
+    it('ignores ledger when the phase does not match', () => {
+      const wp = [
+        '# Workplan',
+        '',
+        '<!-- workplan-archive-ledger',
+        'archived-phases: 1-4',
+        'archived-fix-tasks: 5.1-5.123',
+        'archive-file: workplan-archive.md',
+        'next-fix-task-id: 5.124',
+        '-->',
+        '',
+        '## Phase 6: different',
+        '',
+        '### Task 6.1 (fix-finding-AUDIT-X): first',
+        '',
+        '- [ ] Step 1 pending',
+        '',
+      ].join('\n');
+      const pos = computeAutoPosition(wp);
+      // Ledger says next-id is 5.124, but we're in Phase 6 → use scan only.
+      expect(pos.phaseNumber).toBe(6);
+      expect(pos.currentMaxNumberInPhase).toBe(1);
+    });
+
+    it('ignores ledger when the workplan has no ledger annotation (back-compat)', () => {
+      const wp = [
+        '# Workplan',
+        '',
+        '## Phase 5: current',
+        '',
+        '### Task 5.3 (fix-finding-AUDIT-X): first',
+        '',
+        '- [ ] Step 1 pending',
+        '',
+      ].join('\n');
+      const pos = computeAutoPosition(wp);
+      // No ledger → fall back to scan-only behavior.
+      expect(pos.currentMaxNumberInPhase).toBe(3);
+    });
+
+    it('uses max(scan, ledger-1) when scan exceeds the ledger floor', () => {
+      const wp = [
+        '# Workplan',
+        '',
+        '<!-- workplan-archive-ledger',
+        'archived-phases: 1',
+        'archived-fix-tasks: 5.1-5.10',
+        'archive-file: workplan-archive.md',
+        'next-fix-task-id: 5.11',
+        '-->',
+        '',
+        '## Phase 5: current',
+        '',
+        '### Task 5.50 (fix-finding-AUDIT-X): later than ledger',
+        '',
+        '- [ ] Step 1 pending',
+        '',
+      ].join('\n');
+      const pos = computeAutoPosition(wp);
+      // Scan finds max=50; ledger floor is 11-1=10; max should be 50.
+      expect(pos.currentMaxNumberInPhase).toBe(50);
+    });
+
+    it('ignores malformed ledger gracefully (back-compat)', () => {
+      const wp = [
+        '# Workplan',
+        '',
+        '<!-- workplan-archive-ledger',
+        'malformed garbage line',
+        '-->',
+        '',
+        '## Phase 5: current',
+        '',
+        '### Task 5.3: first',
+        '',
+        '- [ ] Step 1 pending',
+        '',
+      ].join('\n');
+      const pos = computeAutoPosition(wp);
+      // Malformed ledger → fall back to scan-only behavior; no throw.
+      expect(pos.currentMaxNumberInPhase).toBe(3);
+    });
+  });
 });

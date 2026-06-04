@@ -81,13 +81,15 @@ const META_COMMANDS = [
   'check-clones',
   'check-deprecations',
   'check-disposition-survivor',
+  // Phase 25 Task 5: `check-module-symmetry` is the canonical Phase 25
+  // rename; `check-editor-symmetry` ships alongside as a deprecated
+  // alias for one release cycle (removal target v0.37.0).
   'check-editor-symmetry',
+  'check-module-symmetry',
   'check-refactor-preconditions',
   'detect-clones',
   'dispose-clone',
-  'install-agent-prompts',
   'install-scope-discovery',
-  'install-scope-discovery-hooks',
   'migrate-from-pilot',
   'refresh-clones-baseline',
   'scope-export',
@@ -95,8 +97,21 @@ const META_COMMANDS = [
   'scope-summary',
   'scope-widen',
   'tooling-feedback-import',
-  'uninstall-scope-discovery-hooks',
   'validate-scope-discovery',
+  // Hygiene-family verbs (Phase 11 stale-worktree-discovery + Phase 26
+  // workplan-archive + close-shipped triage): operator-invoked but
+  // outside the 19-command shortcut set. Authored 2026-06-04 commit
+  // 972d8dba to close AUDIT-20260604-29's picker-discoverability gap.
+  'archive-branch',
+  'archive-phases',
+  'close-shipped',
+  'debt-report',
+  'dismantle-worktrees',
+  'promote-deferrals',
+  're-audit-fixed-findings',
+  'triage-issues',
+  'unarchive-phases',
+  'worktree-report',
 ] as const;
 
 describe('COMMANDS canonical list', () => {

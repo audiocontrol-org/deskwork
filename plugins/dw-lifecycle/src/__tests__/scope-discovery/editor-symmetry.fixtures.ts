@@ -14,7 +14,7 @@
  *     file via `fileURLToPath(import.meta.url)`.
  *   - The fixture passes `--module-root modules` because canned source
  *     paths use `modules/<editor>/src/...` (pilot layout); destination's
- *     `discoverEditors` default is `'src'`. Honoring the pilot's path
+ *     `discoverModules` default is `'src'`. Honoring the pilot's path
  *     verbatim keeps the canned YAML payloads valid.
  *   - Editor slugs (`roland-sxx0-editor`, `akai-s3k-editor`,
  *     `jv1080-editor`) stay verbatim — they're payload directory names,

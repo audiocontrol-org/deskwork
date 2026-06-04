@@ -37,7 +37,7 @@
  * # DRY (per .claude/CLAUDE.md)
  *
  * Re-uses the in-process scan APIs of `check-anti-patterns.ts`,
- * `check-adopters.ts`, and `editor-symmetry-matrix.ts` directly — no
+ * `check-adopters.ts`, and `module-symmetry-matrix.ts` directly — no
  * subprocess round-trip, no shape duplication. The shared agent CLI
  * wrapper (`shared.ts`'s `runIfMain` + `runAgentCli`) handles argv
  * parsing and JSON serialization the same way the other four agents
@@ -62,7 +62,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { scan as scanAntiPatterns } from '../check-anti-patterns.js';
 import { scan as scanAdopters } from '../check-adopters.js';
-import { computeMatrix } from '../editor-symmetry-matrix.js';
+import { computeMatrix } from '../module-symmetry-matrix.js';
 import { scan as scanDeprecations } from '../deprecation-scan.js';
 import type {
   DiscoveryAgentInput,
@@ -273,13 +273,13 @@ async function collectEditorSymmetryFindings(
     // enforced entries by `computeMatrix`; assert the invariant.
     if (!isActivelyEnforced(row.status)) {
       throw new Error(
-        `regime-holdout-detector: editor-symmetry matrix surfaced row ` +
+        `regime-holdout-detector: module-symmetry matrix surfaced row ` +
           `'${row.entry.id}' with status '${row.status}'. computeMatrix is ` +
           `expected to filter to blessed/cursed entries; this row should ` +
           `never have surfaced.`,
       );
     }
-    matrix.editors.forEach((editor, idx) => {
+    matrix.modules.forEach((editor, idx) => {
       const cell = row.cells[idx];
       if (cell === undefined) return;
       if (cell.status !== 'partial' && cell.status !== 'missing') return;
@@ -289,7 +289,7 @@ async function collectEditorSymmetryFindings(
           ? `editor '${editor}' targeted by manifest '${row.entry.id}' but has no adopters (expected ${cell.expected}, actual ${cell.actual}, holdouts ${cell.holdouts})`
           : `editor '${editor}' partially adopts manifest '${row.entry.id}' (expected ${cell.expected}, actual ${cell.actual}, holdouts ${cell.holdouts})`;
       out.push({
-        source: 'editor-symmetry',
+        source: 'module-symmetry',
         id: composite,
         file: `${input.moduleRoot}/${editor}/`,
         shape,
@@ -396,7 +396,7 @@ function deriveMeta(findings: readonly RegimeHoldoutFinding[]): RegimeHoldoutMet
       case 'adopter-manifest':
         adopter += 1;
         break;
-      case 'editor-symmetry':
+      case 'module-symmetry':
         symmetry += 1;
         break;
       case 'deprecation':
@@ -416,7 +416,7 @@ function deriveMeta(findings: readonly RegimeHoldoutFinding[]): RegimeHoldoutMet
   return {
     anti_pattern_count: antiPattern,
     adopter_manifest_count: adopter,
-    editor_symmetry_holdout_count: symmetry,
+    module_symmetry_holdout_count: symmetry,
     deprecation_count: deprecation,
     total: findings.length,
     actively_enforced_count: activelyEnforced,

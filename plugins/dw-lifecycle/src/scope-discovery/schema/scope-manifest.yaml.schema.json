@@ -69,10 +69,10 @@
       "items": { "$ref": "#/$defs/module" }
     },
     "regime_holdouts": {
-      "description": "Optional regime-holdout section emitted by the T6.5 regime-holdout-detector agent. Fans the agent's findings into four per-source buckets (anti-pattern matches, adopter-manifest holdouts, editor-symmetry partial/missing cells, deprecation-queue importers) plus a meta summary. Absent when the agent did not contribute findings (existing pre-T6.5 manifests still validate).",
+      "description": "Optional regime-holdout section emitted by the T6.5 regime-holdout-detector agent. Fans the agent's findings into four per-source buckets (anti-pattern matches, adopter-manifest holdouts, module-symmetry partial/missing cells, deprecation-queue importers) plus a meta summary. Absent when the agent did not contribute findings (existing pre-T6.5 manifests still validate).",
       "type": "object",
       "additionalProperties": false,
-      "required": ["anti_patterns", "adopter_manifests", "editor_symmetry", "deprecations", "meta"],
+      "required": ["anti_patterns", "adopter_manifests", "module_symmetry", "deprecations", "meta"],
       "properties": {
         "anti_patterns": {
           "description": "Findings sourced from the T6.1 anti-pattern registry scan.",
@@ -84,8 +84,8 @@
           "type": "array",
           "items": { "$ref": "#/$defs/regime_holdout_entry" }
         },
-        "editor_symmetry": {
-          "description": "Findings sourced from the T6.3 cross-editor symmetry matrix (partial/missing cells).",
+        "module_symmetry": {
+          "description": "Findings sourced from the T6.3 cross-module symmetry matrix (partial/missing cells).",
           "type": "array",
           "items": { "$ref": "#/$defs/regime_holdout_entry" }
         },
@@ -107,11 +107,11 @@
             "by_source": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["anti_pattern", "adopter_manifest", "editor_symmetry", "deprecation"],
+              "required": ["anti_pattern", "adopter_manifest", "module_symmetry", "deprecation"],
               "properties": {
                 "anti_pattern": { "type": "integer", "minimum": 0 },
                 "adopter_manifest": { "type": "integer", "minimum": 0 },
-                "editor_symmetry": { "type": "integer", "minimum": 0 },
+                "module_symmetry": { "type": "integer", "minimum": 0 },
                 "deprecation": { "type": "integer", "minimum": 0 }
               }
             },
@@ -575,18 +575,18 @@
       "required": ["id", "file", "shape", "replacement", "evidence", "status_provenance"],
       "properties": {
         "id": {
-          "description": "Identifier within the source bucket. Anti-pattern id, adopter-manifest id, '<manifest-id>:<editor>' composite, or path of the deprecated file.",
+          "description": "Identifier within the source bucket. Anti-pattern id, adopter-manifest id, '<manifest-id>:<module>' composite, or path of the deprecated file.",
           "type": "string",
           "minLength": 1,
           "maxLength": 300
         },
         "file": {
-          "description": "Repo-relative POSIX path of the offending file (or editor module dir for editor-symmetry rows).",
+          "description": "Repo-relative POSIX path of the offending file (or module dir for module-symmetry rows).",
           "type": "string",
           "minLength": 1
         },
         "line": {
-          "description": "Optional 1-based source line. Omitted for whole-file findings (e.g., adopter-manifest holdouts, editor-symmetry rows).",
+          "description": "Optional 1-based source line. Omitted for whole-file findings (e.g., adopter-manifest holdouts, module-symmetry rows).",
           "type": "integer",
           "minimum": 1
         },

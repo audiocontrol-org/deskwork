@@ -36,16 +36,37 @@ dw-lifecycle journal-append --file <entry.md>
 ```
 
 8. Read `config.session.end.preamble` and display any project-specific wrap-up text.
-9. Commit all documentation changes:
+9. **Closing discipline (refuse-to-end on regressions).** Per `.claude/rules/enforcement-lives-in-skills.md` + the no-git-hook-enforcement ADR (`docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md`), these checks used to live in `.husky/pre-commit` (or, for the open-findings part, run only mid-implement-loop); they now fire as part of session-end so a session cannot wrap with these regressions hidden. When `.dw-lifecycle/scope-discovery/` is present:
+
+   ```bash
+   dw-lifecycle check-disposition-survivor --feature <slug>
+   ```
+
+   STOP session-end on any `keep-with-reason` / `refactor` / `ignore-with-justification` → `pending` transition in `clones.yaml`. Surface the offending IDs verbatim. (The verb has a legacy `--allow-disposition-loss` flag from its .husky-era days, but the skill body does NOT use it at session-end — per `enforcement-lives-in-skills.md` § "a `--no-verify` push by the maintainer is evidence the hook chain is broken," the cure path is reconciling the dispositions, not bypassing the check.)
+
+   Then scan the workplan's session-introduced diff for bare TBD / defer / follow-up / wontfix markers that didn't get scoped into an issue. The hygiene helper in Step 6 already enumerates these; re-surface as a STOP if any markers exist without a paired `#NNN` issue reference. The cure path: file the issue, paste the link inline, then re-run session-end.
+
+   Finally, refuse session-end when audit-log entries remain with `Status: open` AND those entries are NOT scoped into the workplan as the next-N fix-tasks:
+
+   ```bash
+   dw-lifecycle check-open-findings --feature <slug>
+   ```
+
+   Exit 0 (zero open OR scoped-as-next) = continue. Exit 1 = STOP per Step 2's refusal-mode taxonomy in the implement skill.
+
+   When `.dw-lifecycle/scope-discovery/` is absent, Step 9 silently skips (scope-discovery is opt-in).
+
+10. Commit all documentation changes:
 
 ```
 git add <feature-dir> DEVELOPMENT-NOTES.md
 git commit -m "docs: session-end <YYYY-MM-DD> [<slug>]"
 ```
 
-10. Report: commit hash, files changed, journal-entry summary.
+11. Report: commit hash, files changed, journal-entry summary.
 
 ## Error handling
 
 - **Uncommitted code changes outside docs.** Skill warns: "There are non-doc changes uncommitted. Commit those separately first to keep the session-end commit doc-only."
 - **No commits in session range / no workplan markers / no issues filed.** The hygiene block still emits; each section reports an empty result with a parenthetical note. The block is still appended so the next session-start sees an explicit "no prior recommendation" signal.
+- **Closing-discipline refusal (Step 9).** Surface the verb's stderr verbatim; pause session-end until the operator addresses the regression. `check-disposition-survivor` has a legacy `--allow-disposition-loss` flag from its `.husky`-era days, but the skill body does NOT pass it at session-end (per `enforcement-lives-in-skills.md` § "a `--no-verify` push by the maintainer is evidence the hook chain is broken"). The cure path is fixing the underlying state, not bypassing the check. No `--no-verify`-style escape is wired into session-end.

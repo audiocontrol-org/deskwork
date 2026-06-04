@@ -66,7 +66,7 @@ export interface ScopeWidenDelta {
   readonly regimeHoldouts: {
     readonly anti_patterns: ReadonlyArray<ManifestRegimeHoldoutEntry>;
     readonly adopter_manifests: ReadonlyArray<ManifestRegimeHoldoutEntry>;
-    readonly editor_symmetry: ReadonlyArray<ManifestRegimeHoldoutEntry>;
+    readonly module_symmetry: ReadonlyArray<ManifestRegimeHoldoutEntry>;
     readonly deprecations: ReadonlyArray<ManifestRegimeHoldoutEntry>;
   };
   readonly total: number;
@@ -162,8 +162,8 @@ export function computeDelta(
   const priorAdopter = new Set(
     (prior.regime_holdouts?.adopter_manifests ?? []).map(regimeKey),
   );
-  const priorEditor = new Set(
-    (prior.regime_holdouts?.editor_symmetry ?? []).map(regimeKey),
+  const priorModule = new Set(
+    (prior.regime_holdouts?.module_symmetry ?? []).map(regimeKey),
   );
   const priorDepr = new Set(
     (prior.regime_holdouts?.deprecations ?? []).map(regimeKey),
@@ -174,8 +174,8 @@ export function computeDelta(
   const adopter_manifests = (next.regime_holdouts?.adopter_manifests ?? []).filter(
     (e) => !priorAdopter.has(regimeKey(e)),
   );
-  const editor_symmetry = (next.regime_holdouts?.editor_symmetry ?? []).filter(
-    (e) => !priorEditor.has(regimeKey(e)),
+  const module_symmetry = (next.regime_holdouts?.module_symmetry ?? []).filter(
+    (e) => !priorModule.has(regimeKey(e)),
   );
   const deprecations = (next.regime_holdouts?.deprecations ?? []).filter(
     (e) => !priorDepr.has(regimeKey(e)),
@@ -187,13 +187,13 @@ export function computeDelta(
     themes.length +
     anti_patterns.length +
     adopter_manifests.length +
-    editor_symmetry.length +
+    module_symmetry.length +
     deprecations.length;
   return {
     routes,
     modules,
     themes,
-    regimeHoldouts: { anti_patterns, adopter_manifests, editor_symmetry, deprecations },
+    regimeHoldouts: { anti_patterns, adopter_manifests, module_symmetry, deprecations },
     total,
   };
 }
@@ -228,7 +228,7 @@ export function mergeDelta(
   const hasRegimeDelta =
     delta.regimeHoldouts.anti_patterns.length > 0 ||
     delta.regimeHoldouts.adopter_manifests.length > 0 ||
-    delta.regimeHoldouts.editor_symmetry.length > 0 ||
+    delta.regimeHoldouts.module_symmetry.length > 0 ||
     delta.regimeHoldouts.deprecations.length > 0;
   if (mergedRegime !== undefined || hasRegimeDelta) {
     const ap = [
@@ -239,9 +239,9 @@ export function mergeDelta(
       ...(mergedRegime?.adopter_manifests ?? []),
       ...delta.regimeHoldouts.adopter_manifests,
     ];
-    const es = [
-      ...(mergedRegime?.editor_symmetry ?? []),
-      ...delta.regimeHoldouts.editor_symmetry,
+    const ms = [
+      ...(mergedRegime?.module_symmetry ?? []),
+      ...delta.regimeHoldouts.module_symmetry,
     ];
     const dp = [
       ...(mergedRegime?.deprecations ?? []),
@@ -254,7 +254,7 @@ export function mergeDelta(
     // merged manifest see by_status counts regardless of merge path).
     let activelyEnforced = 0;
     let candidate = 0;
-    for (const list of [ap, am, es, dp]) {
+    for (const list of [ap, am, ms, dp]) {
       for (const e of list) {
         const s = e.status_provenance.source_status;
         if (s === 'blessed' || s === 'cursed') activelyEnforced += 1;
@@ -264,14 +264,14 @@ export function mergeDelta(
     mergedRegime = {
       anti_patterns: ap,
       adopter_manifests: am,
-      editor_symmetry: es,
+      module_symmetry: ms,
       deprecations: dp,
       meta: {
-        total: ap.length + am.length + es.length + dp.length,
+        total: ap.length + am.length + ms.length + dp.length,
         by_source: {
           anti_pattern: ap.length,
           adopter_manifest: am.length,
-          editor_symmetry: es.length,
+          module_symmetry: ms.length,
           deprecation: dp.length,
         },
         by_status: {
@@ -304,7 +304,7 @@ export function formatDelta(delta: ScopeWidenDelta): string {
   lines.push(
     `  regime-holdouts:  +${delta.regimeHoldouts.anti_patterns.length} anti-pattern, ` +
       `+${delta.regimeHoldouts.adopter_manifests.length} adopter-manifest, ` +
-      `+${delta.regimeHoldouts.editor_symmetry.length} editor-symmetry, ` +
+      `+${delta.regimeHoldouts.module_symmetry.length} module-symmetry, ` +
       `+${delta.regimeHoldouts.deprecations.length} deprecation`,
   );
   return lines.join('\n');
