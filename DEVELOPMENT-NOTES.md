@@ -4479,3 +4479,62 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Address TBD markers: line 1891: markers: out-of-scope — **Scope adjustment (corrected from original spec):** the original "rewrites legacy YAML cleanly under `--fix`" framing assumed scope-discovery doctor rules supported `--fix` wiring. They do not — per 
 - Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals
 
+
+## 2026-06-04: close-shipped follow-ups + audit-barrage-surfaced bugs
+### Feature: hygiene
+### Worktree: hygiene
+
+**Goal:** Address the two close-shipped bugs from the v0.35.0..v0.36.0 dogfood (#411 + #412) on the hygiene branch. Use the new archive-phases tooling to keep the workplan slim. Ship a follow-up PR.
+
+**Accomplished:**
+
+- Synced feature/hygiene to tip-of-main (v0.36.0) after sitting since 2026-05-30.
+- Archived Phases 0-15 via `dw-lifecycle archive-phases --feature hygiene --phases 0-15 --apply --allow-vestigial`. Active workplan went 588 → 75 lines; 608-line `workplan-archive.md` written. 5 phases used the vestigial path (substantive reason citing the project's pending-verification gate).
+- Scoped Phase 16 (#411) + Phase 17 (#412) into the active workplan with default fix options drawn from the issue bodies; README status table updated.
+- Implemented Phase 16 Task 1 — `preflightLabel` helper + wiring in `applyV2`; auto-creates the label with canonical color + description when absent; throws `InvalidProposalError` BEFORE per-item loop on auto-create failure. Test surface extended 5 → 9 cases.
+- Implemented Phase 17 Task 1 — SKILL.md per-run path scheme; smoke mirrors the convention; `.gitignore` already covered the runs dir via the broader rule.
+- End-of-task audit-barrage surfaced 2 cross-model findings on the new code; both fixed in the same PR before ship:
+  - AUDIT-20260604-01 (medium, cross-model: claude + codex) — pre-flight created the label even when every item was effective-skip. Fixed by gating `preflightLabel` on `args.proposal.items.some(item => effectiveVerdict(item) === 'shipped')`.
+  - AUDIT-20260604-02 (low) — smoke's `CS_RUN_TS` hardcoded `-000Z`. Replaced with portable `python3` expression yielding real millisecond precision (BSD `date` doesn't support `%N`).
+- Audit-flips landed: both findings now `fixed-<sha>` in audit-log.
+- PR #414 opened + merged into main (8-commit history preserved via merge commit `6029365c`).
+
+**Didn't Work:**
+
+- First session-end-hygiene invocation used a stale `--session-start-sha 2dcda6a` (the 2026-05-29 session-end commit), which spanned the entire 18-commit window since that boundary AND inadvertently captured cross-branch commit markers from feature/scope-discovery work that landed via main. Re-running with `a3338e58^` (the boundary right before this session's first commit) produced the correct narrow scope. Lesson: when the worktree has been synced forward across a multi-branch monorepo's merge cycle, the prior session-end SHA is the WRONG boundary — use the parent of the first session commit instead.
+- `dw-lifecycle implement-hook` first invocation outaged with `spawn E2BIG` (argv overflow); second invocation fired successfully and surfaced the 2 findings above. The verb's outage-forwards behavior worked correctly — the loop didn't stall.
+- The `--feature` flag is documented for `check-clones` / `check-anti-patterns` / `check-adopters` in the implement SKILL.md but not accepted by the actual CLI surface at v0.36.0 — had to run without the flag. SKILL.md prose is ahead of CLI.
+
+**Course Corrections:**
+
+- [PROCESS] **Used `Closes #411` / `Closes #412` in commit messages, which auto-closed the issues on PR merge — violating the project's "Issue closure requires verification in a formally-installed release" rule.** Caught at session-end when the hygiene observations rendered both issues as `[CLOSED]`. Re-opened both with explanatory comments naming the verify-in-installed-release gate. Lesson: use `Refs #NNN` or `Tracked at #NNN` (NOT GitHub's auto-close grammar) when the work ships behind a verification gate. The parenthetical `(pending operator verification post-release)` in the commit body did NOT prevent the auto-close.
+- [PROCESS] The `cd plugins/dw-lifecycle && ...` Bash pattern leaves the next invocation's cwd in an unexpected state (persistent shell across calls). Hit this once when a follow-up `git add` failed with `pathspec did not match`. Need to either prefix every plugin-dir command with `cd /Users/orion/work/deskwork-work/hygiene/plugins/dw-lifecycle && ...` to be self-contained, or use absolute paths in vitest invocations.
+
+**Quantitative:**
+
+- Commits this session: 6 task-completion commits + 1 docs-archive commit = 7 (`git log --oneline a3338e58~..HEAD` since the session's first commit landed).
+- Tests: plugin suite 2700/2700 pass post-PR-merge (was 2696 pre-session per the prior journal entry; +4 net from the 5 → 10-case extension in close-shipped-apply-v2.test.ts).
+- Audit findings dispositioned: 2 closed (AUDIT-20260604-01 fixed-7f119181, AUDIT-20260604-02 fixed-19f63100). 0 acknowledged, 0 slushed (the dampener wasn't engaged — most-recent run had 1 MEDIUM which failed the single-run-rule).
+- Issues filed this session: 0 GH issues filed (work was on existing #411 + #412).
+- Workplan reduction: 588 → 75 lines (active) via archive-phases.
+- Sub-agent dispatches: 0 (in-session work throughout; audit-barrage runs out-of-band as its own dispatch surface).
+
+**Insights:**
+
+- **The audit-barrage chain caught a real cross-model bug in the same session it was introduced.** Phase 16's `preflightLabel` was reviewed in-band, passed tests, and shipped to PR. Then the end-of-task hook fired, and BOTH claude and codex independently flagged the "creates label even when all-skip" failure mode. The cross-model agreement converged on the same finding from different framings — exactly the third-audit-surface value-add the Phase 12 self-dogfood predicted. The in-band review missed it because the test cases used `labelExists: true` (which short-circuits the create call). The barrage's adversarial framing was the disambiguator.
+- **The `--allow-vestigial` reason field for `archive-phases` works as intended.** Five phases (10/12/13/14/15) had unchecked items that were genuinely pending-verification per project canon. The substantive-reason validator accepted "All implementation shipped in v0.28.0-v0.28.1; remaining unchecked items are pending-verification acceptance criteria..." — the 40-char floor is the right size to force a real reason without overwhelming the ledger.
+- **Auto-promoted fix-tasks land in the active workplan BEFORE the Task 1 entry that produced them.** The `dw-lifecycle implement-hook` `promote-findings --auto` step inserted Tasks 2 + 3 above the existing Task 1 in Phase 16. The scoped-as-next gate semantic worked correctly (open findings ARE the next-N tasks → proceed). The visual ordering is confusing to read (Task 2/3 appear before Task 1) but the gate logic is right.
+### Hygiene observations
+
+- issue #375 referenced this session: feat(hygiene): Phase 14 walker accuracy + Phase 15 close-shipped redesign (#369 + #374)
+- issue #411 [OPEN] referenced this session: close-shipped apply: pending-verification label must already exist; no pre-flight / auto-create
+- issue #412 [OPEN] referenced this session: close-shipped SKILL.md prescribes bare /tmp/<name> paths that conflict with file-handling rule
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: Live verification against a repo without the label (operator-driven, post-ship walk per the project's verify-in-installed-release rule).
+- Triage: #411 (close-shipped apply: pending-verification label must already exist; no pre-flight / auto-create); #412 (close-shipped SKILL.md prescribes bare /tmp/<name> paths that conflict with file-handling rule)
+- Address TBD markers: (no bare TBD markers introduced this session)
+- Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals
+
