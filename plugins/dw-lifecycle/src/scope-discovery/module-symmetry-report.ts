@@ -67,7 +67,7 @@ export function renderMatrix(matrix: SymmetryMatrix): string {
       'Each refactor commit that PROMOTES a primitive to a shared location ' +
         'SHOULD append an entry to ' +
         '`.dw-lifecycle/scope-discovery/adopter-manifests.yaml`. ' +
-        'Run `dw-lifecycle check-editor-symmetry --write` to refresh this ' +
+        'Run `dw-lifecycle check-module-symmetry --write` to refresh this ' +
         'file from the registry.',
     );
     lines.push('');
@@ -160,7 +160,7 @@ function renderCell(cell: MatrixCell): string {
  * row with at least one ⚠ or ✗ cell. Format mirrors the human-readable
  * holdout output from Family C's adopter-manifests report so operators
  * see a consistent shape across `check-adopters` and
- * `check-editor-symmetry`.
+ * `check-module-symmetry`.
  */
 function renderSuggestions(matrix: SymmetryMatrix): readonly string[] {
   const blocks: string[] = [];

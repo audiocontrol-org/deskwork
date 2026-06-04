@@ -122,7 +122,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
 function printHelp(): void {
   process.stdout.write(
     [
-      'dw-lifecycle check-editor-symmetry [options]',
+      'dw-lifecycle check-module-symmetry [options]',
       '',
       'Options:',
       `  --registry <path>     Override registry path (default: ${DEFAULT_REGISTRY})`,
@@ -142,7 +142,7 @@ export async function main(argv: readonly string[]): Promise<number> {
   try {
     opts = parseCli(argv);
   } catch (err) {
-    process.stderr.write(`editor-symmetry: ${errorMessage(err)}\n`);
+    process.stderr.write(`module-symmetry: ${errorMessage(err)}\n`);
     return 2;
   }
   let matrix: SymmetryMatrix;
@@ -153,7 +153,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       moduleRoot: opts.moduleRoot,
     });
   } catch (err) {
-    process.stderr.write(`editor-symmetry: ${errorMessage(err)}\n`);
+    process.stderr.write(`module-symmetry: ${errorMessage(err)}\n`);
     return 2;
   }
   const rendered = renderMatrix(matrix);
@@ -162,7 +162,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       const dest = resolve(opts.scanRoot, opts.artifactPath);
       await writeFile(dest, rendered, 'utf8');
     } catch (err) {
-      process.stderr.write(`editor-symmetry: write artifact failed: ${errorMessage(err)}\n`);
+      process.stderr.write(`module-symmetry: write artifact failed: ${errorMessage(err)}\n`);
       return 2;
     }
   }
@@ -181,11 +181,11 @@ function formatSummary(
   totals: Record<string, number>,
 ): string {
   if (matrix.rows.length === 0) {
-    return 'editor-symmetry: registry empty; nothing to check.';
+    return 'module-symmetry: registry empty; nothing to check.';
   }
   const cellCount = matrix.rows.length * matrix.modules.length;
   return (
-    `editor-symmetry: ${matrix.rows.length} convention(s) x ${matrix.modules.length} module(s) ` +
+    `module-symmetry: ${matrix.rows.length} convention(s) x ${matrix.modules.length} module(s) ` +
     `= ${cellCount} cells; ` +
     `${totals['ok']} ✓, ${totals['partial']} ⚠, ${totals['missing']} ✗, ${totals['tracked']} ⏳, ${totals['na']} —.`
   );
@@ -202,7 +202,7 @@ if (isCliEntryPoint()) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (err: unknown) => {
-      process.stderr.write(`editor-symmetry: fatal: ${errorMessage(err)}\n`);
+      process.stderr.write(`module-symmetry: fatal: ${errorMessage(err)}\n`);
       process.exit(2);
     },
   );

@@ -1737,12 +1737,14 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 5 — CLI verb rename
 
-- Step 1: Decide whether to ship `check-editor-symmetry` as a deprecated alias OR hard-rename.
-- Step 2: Rename CLI subcommand registration to `check-module-symmetry`.
-- Step 3: If alias: implement deprecation-warning path that stderr-prints the new name + a removal-version pointer.
-- Step 4: Update CLI tests.
+**Complete (2026-06-04).** Canonical `check-module-symmetry` shipped alongside `check-editor-symmetry` as a deprecation-warning alias for one release cycle (removal target v0.37.0). +3 alias-symmetry tests; full plugin suite 2669 → 2672 green; tsc clean.
 
-**Acceptance:** `dw-lifecycle check-module-symmetry` works end-to-end. Alias (if shipped) surfaces deprecation warning.
+- [x] Step 1: Decision = **deprecated alias for one release cycle**. CLI verbs are part of adopter muscle memory (operator lean in Open Decisions #2). Removal target v0.37.0 documented in the alias shim + DEPRECATED_ALIASES table + commands/check-editor-symmetry.md description + skill body.
+- [x] Step 2: CLI subcommand registration added: `'check-module-symmetry': checkModuleSymmetry` in `cli.ts`. Function renamed `checkEditorSymmetry` → `checkModuleSymmetry`. Printed-help banner + stderr/stdout prefix updated `editor-symmetry:` → `module-symmetry:` in `scope-discovery/check-module-symmetry.ts`. Adopter-facing prose in `module-symmetry-report.ts` + `scope-inventory.ts` + `check-deprecations.ts` updated. LAYOUT.md tables in both `plugins/dw-lifecycle/templates/` and `.dw-lifecycle/scope-discovery/` carry the canonical name.
+- [x] Step 3: Alias shim `checkEditorSymmetryDeprecated` stderr-prints `dw-lifecycle: \`check-editor-symmetry\` is deprecated; use \`check-module-symmetry\`. Removal target: v0.37.0.` before dispatching to the same scanner. The alias's lifetime is auditable from the warning string alone.
+- [x] Step 4: New test file `module-symmetry.alias.test.ts` pins three contracts: (a) canonical name runs end-to-end, (b) alias still works AND emits deprecation warning naming the new verb + a removal-version pointer, (c) canonical + alias produce identical exit codes + stdout shape. `commands/check-module-symmetry.md` shipped; `commands/check-editor-symmetry.md` updated to describe the alias. `shortcuts.test.ts` META_COMMANDS records both names; existing 134 shortcuts tests pass unchanged.
+
+**Acceptance:** ✅ `dw-lifecycle check-module-symmetry` works end-to-end. ✅ Alias surfaces deprecation warning naming the canonical verb + removal target. ✅ Full plugin suite 2672/2672 green; tsc clean.
 
 ### Task 6 — Skill prose + skill folder rename
 

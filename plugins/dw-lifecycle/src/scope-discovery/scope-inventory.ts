@@ -223,7 +223,7 @@ async function runAgents(
  *
  * Returns the absolute path of the written artifact, or null when
  * skipped. Failures throw so the orchestrator surfaces them at exit
- * code 2 (matches the standalone `check-editor-symmetry` semantics).
+ * code 2 (matches the standalone `check-module-symmetry` semantics).
  */
 async function writeEditorSymmetryArtifact(args: {
   readonly repoRoot: string;
@@ -390,7 +390,7 @@ export async function scopeInventoryMain(
     // adopter-manifests.yaml exists. Default output lives under the
     // per-run evidence trail; explicit --editor-symmetry-out
     // overrides. Failures throw and exit code 2 (matches the
-    // standalone check-editor-symmetry's contract).
+    // standalone check-module-symmetry's contract).
     let runDir: string | null = null;
     if (opts.evidenceTrail) {
       runDir = makeRunDir({

@@ -19,7 +19,7 @@
  *     the terminal without parsing the markdown.
  *   - `.dw-lifecycle/scope-discovery/deprecation-queue.md` (only with
  *     `--write`): the operator-readable artifact committed to the
- *     repo. Mirrors `check-editor-symmetry --write`'s contract.
+ *     repo. Mirrors `check-module-symmetry --write`'s contract.
  *
  * Exit codes:
  *

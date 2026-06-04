@@ -81,7 +81,11 @@ const META_COMMANDS = [
   'check-clones',
   'check-deprecations',
   'check-disposition-survivor',
+  // Phase 25 Task 5: `check-module-symmetry` is the canonical Phase 25
+  // rename; `check-editor-symmetry` ships alongside as a deprecated
+  // alias for one release cycle (removal target v0.37.0).
   'check-editor-symmetry',
+  'check-module-symmetry',
   'check-refactor-preconditions',
   'detect-clones',
   'dispose-clone',

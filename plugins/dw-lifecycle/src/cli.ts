@@ -10,7 +10,10 @@ import { customize } from './subcommands/customize.js';
 import { checkClones } from './subcommands/check-clones.js';
 import { checkAntiPatterns } from './subcommands/check-anti-patterns.js';
 import { checkAdopters } from './subcommands/check-adopters.js';
-import { checkEditorSymmetry } from './subcommands/check-module-symmetry.js';
+import {
+  checkModuleSymmetry,
+  checkEditorSymmetryDeprecated,
+} from './subcommands/check-module-symmetry.js';
 import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
 import { scopeInventory } from './subcommands/scope-inventory.js';
 import { scopeWiden } from './subcommands/scope-widen.js';
@@ -78,7 +81,14 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'detect-clones': checkClones,
   'check-anti-patterns': checkAntiPatterns,
   'check-adopters': checkAdopters,
-  'check-editor-symmetry': checkEditorSymmetry,
+  // `check-module-symmetry` is the Phase 25 Task 5 canonical name;
+  // `check-editor-symmetry` stays as a deprecation-warning alias for
+  // one release cycle so adopter muscle memory + pre-commit hooks
+  // installed against earlier versions keep working without
+  // re-installing. Removal target is documented in the alias shim
+  // (subcommands/check-module-symmetry.ts).
+  'check-module-symmetry': checkModuleSymmetry,
+  'check-editor-symmetry': checkEditorSymmetryDeprecated,
   'check-refactor-preconditions': checkRefactorPreconditions,
   'scope-inventory': scopeInventory,
   'scope-widen': scopeWiden,
@@ -130,6 +140,8 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 // (registered in SUBCOMMANDS above); the hint is informational only.
 const DEPRECATED_ALIASES: Record<string, string> = {
   'detect-clones': 'alias for `check-clones` (preferred name; alias kept for back-compat)',
+  'check-editor-symmetry':
+    'alias for `check-module-symmetry` (Phase 25 rename; removal target v0.37.0)',
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
