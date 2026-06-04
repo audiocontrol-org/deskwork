@@ -228,6 +228,63 @@ Failure modes to design against:
 
 This section is **the long-term arc**, not committed work. Phase 16 (audit-coverage hole) is the audit-half of *"fully audited"*; that lands first. The autonomous-but-self-interruptible-on-real-ambiguity half is the next frontier, likely a Phase 17/18 after we have feedback from running the autonomous loop end-to-end on a real burndown.
 
+## Design-loop — UX/UI surface-change discipline as a plugin (north star)
+
+*Working name `design-loop`; finalized at `/dw-lifecycle:define`. Full narrative +
+architectural commitments: [`DESIGN-DISCIPLINE-THESIS.md`](./DESIGN-DISCIPLINE-THESIS.md).
+Provenance audit: [`docs/superpowers/specs/audiocontrol-uxui-discipline-session-audit.md`](./docs/superpowers/specs/audiocontrol-uxui-discipline-session-audit.md).*
+
+A new deskwork plugin that reduces a **hard-won UX/UI discipline** to portable practice.
+The discipline was earned in a sibling project (audiocontrol) at real cost — a multi-day,
+screenshot-by-screenshot redesign loop — and is currently trapped there: scattered across
+one repo's `tools/`, docs, and a half-shipped feature branch. Per deskwork's own principle
+(*the discipline does not exist for an adopter who installs the plugin and follows the
+README*), it has to ship as installable skills + CLI verbs + tooling, not stay maintainer
+lore.
+
+**The discipline in one line:** model UI changes with **lo-fi wireframes** (so they can't
+be mistaken for implementation guidance), keep visual identity in a **settled design
+language** (not inside mockups), and verify the realized thing with **device-free
+deterministic screenshots** (visual truth anchored in real components, never a static
+artifact that rots).
+
+### North-star shape
+
+Three stages, each an installable surface:
+
+1. **Design language** — a skill to scaffold + maintain a per-surface design-language
+   spec, and to generate a **living styleguide gallery** from the project's real
+   components (so the gallery can't drift from as-built).
+2. **Lo-fi wireframe kit + inverted-teeth gate** — a portable `sketch-kit.css` + `.sk-*`
+   vocabulary, an authoring skill, and a `check-mockup-lofi`-style gate (CLI verb +
+   skill-body enforcement, **never a git hook** per `.claude/rules/enforcement-lives-in-skills.md`)
+   that keeps explorations *structurally* incapable of impersonating the product.
+3. **Device-free capture + visual baselines** — a fixture-rendered capture engine
+   (surface → deterministic PNG) plus a `visual-compare` / `visual-update-baseline` pair
+   (exact-hash regression + re-bless), framework-agnostic enough for the server-rendered
+   Hono studio *and* an adopter's Astro/Next/React site.
+
+Governance reuses deskwork's existing ACCEPTED/REJECTED exploration archive
+(`DESIGN-STANDARDS.md` + `docs/studio-design/`), extended so each entry's *visual* is a
+lo-fi wireframe, never a hi-fi mockup.
+
+### Why now, and the first dogfood
+
+The sites→lanes clean break forces a redesign of the studio's content-browser and
+scrapbook surfaces. That redesign is the **first dogfood** of the loop — building the loop
+first is what keeps the redesign from repeating the audiocontrol screenshot-loop pain.
+deskwork already carries two legs of the discipline (`.claude/rules/ui-verification.md`
+for "look-don't-deduce / prove-don't-assert"; the design-decision archive); the gaps to
+build are the **lo-fi wireframe kit + inverted-teeth gate** and the **fixture-rendered
+device-free capture + baseline harness**.
+
+### Status
+
+North star, not yet committed work. Kickoff is feature-request [#424](https://github.com/audiocontrol-org/deskwork/issues/424), which seeds
+`/dw-lifecycle:define` → `:setup` → PRD iteration. Composition-first per the project's
+principle: the capture engine, the archive, and the enforcement-in-skills pattern all
+compose existing deskwork primitives rather than introduce parallel infrastructure.
+
 ## Cross-cutting principles
 
 These shape every roadmap item:
