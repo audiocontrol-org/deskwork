@@ -55,6 +55,7 @@
  *   2   I/O, parse, or jscpd-crash error
  */
 
+import { realpathSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import {
@@ -68,6 +69,7 @@ import {
   serializeClonesYaml,
 } from './clones-yaml.js';
 import { JSCPD_REPORT_PATH, parseJscpdReport, runJscpd } from './jscpd-runner.js';
+import { FeatureNotFoundError, resolveFeatureScope } from './resolve-feature-scope.js';
 import { errorMessage, isEnoent } from './util/typeguards.js';
 
 const REPO_ROOT = process.cwd();
@@ -86,6 +88,13 @@ interface Cli {
    * hook-friendly contract), so --gate-mode is a no-op here.
    */
   readonly gateMode: boolean;
+  /**
+   * Phase 18: per-feature narrowing slug. When set, the reported
+   * clone groups are filtered to those where ≥1 member sits in the
+   * feature's scope (per resolveFeatureScope's hybrid
+   * scope-manifest-or-git-diff source). Refs #417.
+   */
+  readonly feature: string | null;
 }
 
 function parseCli(argv: readonly string[]): Cli {
@@ -96,6 +105,7 @@ function parseCli(argv: readonly string[]): Cli {
   let refreshBaseline = false;
   let diff = false;
   let gateMode = false;
+  let feature: string | null = null;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--root') {
@@ -111,9 +121,13 @@ function parseCli(argv: readonly string[]): Cli {
       baselinePath = next;
     } else if (a === '--refresh-baseline') refreshBaseline = true;
     else if (a === '--gate-mode') gateMode = true;
-    else throw new Error(`unknown arg: ${a}`);
+    else if (a === '--feature') {
+      const next = argv[++i];
+      if (next === undefined) throw new Error('--feature requires a slug');
+      feature = next;
+    } else throw new Error(`unknown arg: ${a}`);
   }
-  return { root, quiet, json, baselinePath, refreshBaseline, diff, gateMode };
+  return { root, quiet, json, baselinePath, refreshBaseline, diff, gateMode, feature };
 }
 
 /**
@@ -329,7 +343,77 @@ export async function checkClones(args: string[]): Promise<void> {
     throw err;
   }
   const baselineExisted = baseline !== null;
-  const diff = diffClones(detectedGroups, baseline);
+  let diff = diffClones(detectedGroups, baseline);
+
+  // Phase 18: --feature <slug> narrows the report (detected + diff)
+  // to clone groups whose members include ≥1 file in feature-scope.
+  // Baseline-write modes are NOT filtered — the baseline is the
+  // project-wide source of truth; the filter is presentation-only.
+  // Refs #417.
+  let reportedGroups = detectedGroups;
+  if (cli.feature !== null) {
+    let scope: Awaited<ReturnType<typeof resolveFeatureScope>>;
+    try {
+      scope = await resolveFeatureScope({
+        slug: cli.feature,
+        repoRoot: REPO_ROOT,
+      });
+    } catch (err) {
+      if (err instanceof FeatureNotFoundError) {
+        console.error(err.message);
+        process.exit(2);
+      }
+      throw err;
+    }
+    // Normalize both sides to absolute paths so the set membership
+    // compares correctly across path shapes:
+    //   - real project: scope file = `packages/cli/src/cmd.ts`,
+    //     jscpd member = `packages/cli/src/cmd.ts:78:90` (cwd-relative).
+    //   - fixture: scope file = `in-scope/a.ts`, jscpd member =
+    //     `../../../../var/folders/.../in-scope/a.ts:1:7` (a relative
+    //     path that resolves to the same absolute location).
+    // `resolve(repoRoot, ...)` collapses both into one canonical form,
+    // and `realpathSync` resolves the macOS `/private/var/...` vs
+    // `/var/...` symlink mismatch so both sides agree on the canonical
+    // form.
+    const canonRepo = (() => {
+      try {
+        return realpathSync(REPO_ROOT);
+      } catch {
+        return REPO_ROOT;
+      }
+    })();
+    const canonicalize = (p: string): string => {
+      const abs = resolve(canonRepo, p);
+      try {
+        return realpathSync(abs);
+      } catch {
+        // File may not exist (e.g. scope file deleted but still in
+        // manifest). Use the resolve()d form; the resolve already
+        // anchored against the realpath'd repo root, so prefix
+        // collisions don't survive.
+        return abs;
+      }
+    };
+    const scopeAbs = new Set(scope.files.map(canonicalize));
+    const memberPath = (m: string): string => {
+      // jscpd member shape: `<path>:<start>:<end>` (memberFromFile in
+      // jscpd-runner.ts). Strip the two trailing numeric segments.
+      const lastColon = m.lastIndexOf(':');
+      if (lastColon < 0) return m;
+      const prev = m.lastIndexOf(':', lastColon - 1);
+      const stripped = prev < 0 ? m : m.slice(0, prev);
+      return canonicalize(stripped);
+    };
+    const inScope = (g: CloneGroup): boolean =>
+      g.members.some((m) => scopeAbs.has(memberPath(m)));
+    reportedGroups = detectedGroups.filter(inScope);
+    diff = {
+      ...diff,
+      newGroups: diff.newGroups.filter(inScope),
+      droppedGroups: diff.droppedGroups.filter(inScope),
+    };
+  }
 
   // Baseline-write modes:
   //   - First run (no baseline file): write the baseline with every
@@ -367,11 +451,11 @@ export async function checkClones(args: string[]): Promise<void> {
   }
 
   if (cli.json) {
-    reportJson(detectedGroups, diff);
+    reportJson(reportedGroups, diff);
   } else if (cli.diff) {
     reportDiff(diff);
   } else {
-    reportHuman({ groups: detectedGroups, diff, quiet: cli.quiet, baselineExisted });
+    reportHuman({ groups: reportedGroups, diff, quiet: cli.quiet, baselineExisted });
   }
   const failing = diff.newGroups.length;
   process.exit(failing > 0 ? 1 : 0);
