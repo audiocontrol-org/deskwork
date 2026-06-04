@@ -4430,3 +4430,53 @@ The new test `'resolveFeatureWorkplanPath appends workplan.md to the resolved fe
 ---
 
 What I checked that came back clean: the `process.exit(2)` control flow in the CLI catch is sound (TS treats `process.exit` as `never`, so `workplanPath` is correctly seen as definitely-assigned at the subsequent `readFile`); the exported `resolveFeatureDir` docblock accurately describes the three-status probe and cites AUDIT-18; the `clones.yaml` disposition flips (`52ca2ff2a12b`, `6719db346975`, `ed62c6a325a0` → `keep-with-reason`) carry substantive per-verb-typed-error / argv-boilerplate reasons consistent with the project's keep-with-reason convention; and the audit-log append correctly records AUDIT-18 as `fixed-<sha>`. The `1.0` hardcode persists but AUDIT-18 already accepted that resolveFeatureDir "at least centralizes it," so I did not re-litigate it.
+
+## 2026-06-04 — audit-barrage lift (20260604T035153266Z-scope-discovery)
+
+### AUDIT-20260604-22 — AUDIT-20 is recorded with `Status: fixed-<sha>` but was acknowledged-not-coded — the status overstates the resolution
+
+Finding-ID: AUDIT-20260604-22 (claude-01 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260604-20 block, `Status: fixed-38ad1c2602f3242ef2dca7082d43880032ca8a2c`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 38
+
+The audit-log block for AUDIT-20 carries `Status: fixed-38ad1c26…`, the same `fixed-<sha>` form used for AUDIT-19 and AUDIT-21 which are genuine code fixes. But Task 38 in the workplan is explicit: *"Acknowledges AUDIT-20260604-20 … **Complete (2026-06-04) — acknowledged, not coded.**"* and Step 3 says *"committed with `Acknowledges AUDIT-20260604-20` in subject (NOT `Closes` — this is doc-only disposition, not a code fix)."* The double-derivation AUDIT-20 named is, by the diff's own admission, still present (and AUDIT-21's fix adds another `pathExists` probe on top of it).
+
+A `fixed-<sha>` status implies a behavioral remediation landed; this one didn't. The project's own convention for non-fix dispositions is `acknowledged-slush-pile-<date>` — exactly what AUDIT-16 and AUDIT-17 carry two blocks up. Marking an acknowledged-with-open-substance finding as `fixed` is precisely the slush-pile-context-erasure the project's `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions (AUDIT-03)" warns about: a future reader scanning for `fixed-` will believe the double-derivation was cured. Fix: change AUDIT-20's status to `acknowledged-slush-pile-2026-06-04` (matching the commit's `Acknowledges` verb and Task 38's prose), so the status field, the commit subject, and the workplan agree.
+
+### AUDIT-20260604-23 — AUDIT-21's regression test exercises the library function directly — repeating the exact AUDIT-19 anti-pattern it shipped alongside; the CLI dir-exists-but-no-workplan path has zero end-to-end coverage
+
+Finding-ID: AUDIT-20260604-23
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts:113-129` (AUDIT-21 bug-repro) + the absence of a corresponding case in `archive-phases-cli-all.test.ts`
+
+AUDIT-19's whole lesson — and the reason Task 37 added `archive-phases-cli-all.test.ts` driving the CLI through `tsx` — was that a "bug-repro" test which calls the *library* (`resolveFeatureWorkplanPath`) rather than the *CLI surface* does not lock the contract that was broken. AUDIT-21's new test (`'AUDIT-21 bug-repro: resolveFeatureWorkplanPath throws when the dir exists but workplan.md is missing'`, lines 113-129) does exactly that: it calls `resolveFeatureWorkplanPath(root, 'demo')` directly and asserts the throw. The AUDIT-21 *finding itself* framed the harm at the CLI seam — *"the new CLI catch at lines ~125-130 … never fires … the operator gets a raw-ish ENOENT."* The remedy that matters is "the friendly CLI catch now covers dir-exists-but-no-workplan," yet no test in the new CLI file plants a feature dir without a `workplan.md` and asserts the CLI exits 2 with the friendly message.
+
+The four cases in `archive-phases-cli-all.test.ts` are: feature in 003-COMPLETE, 002-WAITING, 001-IN-PROGRESS, and missing-slug (no dir at all). The missing-slug case exercises `resolveFeatureDir`'s *"feature dir not found"* throw — a different branch from the new `pathExists` throw. So the AUDIT-21 fix has unit coverage of the library but no regression-lock at the surface whose error UX it claims to repair; a future CLI refactor could swallow the `ArchivePhasesError` and emit a raw ENOENT again with every test still green. Fix: add a fifth case to `archive-phases-cli-all.test.ts` that `mkdirSync`s `docs/1.0/003-COMPLETE/demo/` without a `workplan.md`, runs the CLI `--all`, and asserts `code === 2` plus stderr matching `/workplan\.md is missing/`.
+
+### AUDIT-20260604-24 — CLI integration test spawns `tsx` without guarding `result.error`, so a tooling-resolution failure reports as a feature failure
+
+Finding-ID: AUDIT-20260604-24
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases-cli-all.test.ts:42-52` (`runArchivePhasesCli`)
+
+`runArchivePhasesCli` calls `spawnSync('tsx', [CLI_ENTRY, …])` and maps the result with `code: result.status ?? 1`, never inspecting `result.error`. If `tsx` is not resolvable on PATH for the test subprocess (e.g. vitest invoked outside an npm-script context that injects `node_modules/.bin`, or a fresh checkout before install), `spawnSync` returns `status: null` + a populated `error` (ENOENT). The helper collapses that to `code: 1`, and the first assertion fails with `--all should locate the workplan in 003-COMPLETE; stdout=; stderr=` — a message that points the reader at feature logic when the real cause is a missing runner. The acceptance criteria themselves run `npx vitest run …`, which is exactly a context where `.bin` PATH injection is not guaranteed for grandchild processes.
+
+This is hygiene, not a correctness bug in shipped code, but it undermines the regression-lock's diagnostic value — a red test should name its cause. Fix: after `spawnSync`, `if (result.error) throw result.error;` (or assert `result.status !== null` with a message naming the tsx-resolution possibility) so a tooling failure is distinguishable from a `--all` resolver regression.
+
+---
+
+What I checked that came back clean: the `resolveFeatureWorkplanPath` existence-check logic is correct (`pathExists` → throw `ArchivePhasesError` before any consumer `readFile`, with a dir-vs-file message matching the AUDIT-21 library test's `/workplan\.md is missing/` regex); the test-count arithmetic reconciles (2691 → 2696 = +4 CLI + 1 new AUDIT-21 case; the renamed `…appends workplan.md…AND verifies the file exists` test is a modification, not an addition, so it does not inflate the count); the `--all` fixture (`ALL_CHECKED_WORKPLAN`, all steps `[x]`) is correctly constructed so the partial-complete refusal does not trip and the three status-dir cases genuinely exercise the resolver; and the audit-log append records AUDIT-19 and AUDIT-21 as `fixed-<sha>` consistent with their actual code fixes (only AUDIT-20's `fixed-` is the mislabel flagged in finding 01). I would have flagged a hardcoded `1.0` newly introduced in the diff, but the version string is untouched here and AUDIT-18 already accepted the centralized hardcode.
+
+### AUDIT-20260604-25 — `resolveFeatureWorkplanPath` checks existence, not file-ness
+
+Finding-ID: AUDIT-20260604-25
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:431-441
+
+The new resolver docblock says it verifies “the workplan file itself exists,” but the implementation only calls `pathExists(workplanPath)`. If `workplan.md` exists as a directory, symlink to a directory, or another unreadable non-regular path, the resolver returns success and the CLI still falls through to a raw downstream `readFile` failure. That is the same error-surface class AUDIT-21 was meant to close, just narrowed from missing-path to wrong-path-type.
+
+A tighter fix is to stat the path and require `isFile()` before returning, with the same `ArchivePhasesError` style used for the missing-file case. Add a regression test that creates `workplan.md` as a directory and asserts the resolver throws the friendly typed error.
