@@ -1078,13 +1078,15 @@ Operator dispositions at architecture-scale; the orchestrator-agent translates t
 
 The controller can only adjust based on what it measures. These are observable properties of the codebase; their derivatives become drift/correction signals.
 
-- [ ] **Classification completeness**: fraction of distinct shapes that are catalogued (blessed/cursed/ignore) vs uncatalogued.
-- [ ] **Coverage**: per BLESSED pattern, fraction of expected adopters actually adopting.
-- [ ] **Violation density**: per CURSED pattern, hit count + concentration (per-directory).
-- [ ] **Surface uniformity / outlier presence**: variance in shape across sibling files per directory.
-- [ ] **Catalog stability**: edit rate over time.
-- [ ] **Discovered-candidate rate**: new shapes surfacing per unit code change.
-- [ ] **Disposition latency**: time candidates remain `pending` before triage.
+> Shipped — implementation lives at `plugins/dw-lifecycle/src/scope-discovery/discovery-agents/codebase-state-metrics.ts` (~725 lines), with the gather pass at `codebase-state-metrics-gather.ts` (~374 lines) and the type contract at `codebase-state-metrics-types.ts`. Coverage at `plugins/dw-lifecycle/src/__tests__/scope-discovery/codebase-state-metrics.test.ts` (32 vitest scenarios, all green). The `MetricsSnapshot` projection feeding the controller is wired in Task 5; the synthesis pass emits the optional `codebase_state_metrics:` block into the manifest. Per the implementation file's documentation, every metric is exposed via the seven sub-fields of `CodebaseStateMetrics`. The workplan boxes below are mapped 1:1 to the type interfaces.
+
+- [x] **Classification completeness**: fraction of distinct shapes that are catalogued (blessed/cursed/ignore) vs uncatalogued — `ClassificationCompletenessMetric` (codebase-state-metrics-types.ts:76-82); numerator/denominator + ratio; vacuously 1.0 when the regime is empty (`total_distinct_shapes` = 0 is the operator's "nothing-known-yet" signal).
+- [x] **Coverage**: per BLESSED pattern, fraction of expected adopters actually adopting — `CoveragePerBlessedPattern[]` (codebase-state-metrics-types.ts:100-107); per-entry `match_glob` + `files_matching_glob` denominator + `files_with_primitive` numerator + ratio; covers anti-patterns / adopter-manifests / pattern-matrix / clones catalogs.
+- [x] **Violation density**: per CURSED pattern, hit count + concentration (per-directory) — `ViolationDensityPerCursedPattern[]` (codebase-state-metrics-types.ts:128-134); per-entry `total_hits` + `per_directory_hits` sorted desc + Gini-coefficient-style `concentration` score [0,1] (null when `total_hits < 2` per statistical-reliability cutoff).
+- [x] **Surface uniformity / outlier presence**: variance in shape across sibling files per directory — `SurfaceUniformityEntry[]` (codebase-state-metrics-types.ts:153-158); per-directory `outlier_count` + average per-file `variance` from the centroid; sourced from the outlier-handler findings when present, falls back to token-composition variance.
+- [x] **Catalog stability**: edit rate over time — `CatalogStabilityMetric` (codebase-state-metrics-types.ts:183-190); reads last N commits (default 20) touching catalog files; reports `total_catalog_edits` + `edits_per_commit_avg` + `trend` (increasing / decreasing / stable, ±10% threshold); `git_available: false` distinguishes "no history" from "legitimately zero."
+- [x] **Discovered-candidate rate**: new shapes surfacing per unit code change — `DiscoveredCandidateRateMetric` (codebase-state-metrics-types.ts:209-214); `pending_entries_total` + `by_scan_run` bucketing keyed on `provenance.context: scan-run-id-*` + `unattributed_pending` separate bucket + `trend` (most-recent run vs prior-run average; null when N < 2).
+- [x] **Disposition latency**: time candidates remain `pending` before triage — `DispositionLatencyMetric` (codebase-state-metrics-types.ts:237-242); `transitioned_count` population + `median_latency_ms` + `p90_latency_ms` (null when N < 10 per statistical-reliability cutoff) + `slowest_five` entries list for operator drill-in.
 
 ### Task 5: Self-correcting controller
 

@@ -4480,3 +4480,44 @@ Surface:    plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-ph
 The new resolver docblock says it verifies “the workplan file itself exists,” but the implementation only calls `pathExists(workplanPath)`. If `workplan.md` exists as a directory, symlink to a directory, or another unreadable non-regular path, the resolver returns success and the CLI still falls through to a raw downstream `readFile` failure. That is the same error-surface class AUDIT-21 was meant to close, just narrowed from missing-path to wrong-path-type.
 
 A tighter fix is to stat the path and require `isFile()` before returning, with the same `ArchivePhasesError` style used for the missing-file case. Add a regression test that creates `workplan.md` as a directory and asserts the resolver throws the friendly typed error.
+
+## 2026-06-04 — audit-barrage lift (20260604T044128785Z-scope-discovery)
+
+### AUDIT-20260604-26 — Ticked acceptance criteria still carry the literal placeholder `(to be filled in by Step 1 implementer)` and assert a TDD walk the workplan never recorded
+
+Finding-ID: AUDIT-20260604-26 (claude-01 + claude-02 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 9/10/13/14/21 (e.g. line 425, 417-427) — the bug-shaped orphan tasks flipped `[ ]`→`[x]` by the tick commit
+
+The tick commit flips the orphan-scaffolding boxes to `[x]` wholesale. For the bug-shaped tasks (AUDIT-66/67/70/71/84) this produces a self-contradicting record: line 425 now reads `- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)`. The box is checked — asserting the criterion is satisfied — while its body is still the placeholder string. The same shape lands on Tasks 9, 10, 13, 14. The non-bug Step-1 prose two tasks up (line 400/438) explicitly forbids exactly this: *"No placeholders like 'to be filled in' or 'TBD'."*
+
+Worse, ticking Steps 1–5 (`write failing test` / `confirm test fails` / `implement the fix` / `confirm test passes`) asserts a full TDD walk that this workplan task never recorded. The `> Superseded by audit-log Status fixed-<sha> — workplan scaffolding orphaned; fix landed in the named commit` note (line 413, 394, etc.) is candid that the scaffolding was never executed — the fix landed elsewhere. Contrast the genuinely-completed Task 19 (lines 462-465), which cites a real path (`uninstall-everything-hook-related.test.ts:79-105`). Because the orphan tasks never get a real test path filled in, a future reader cannot tell *which* test locks AUDIT-66/67/70/71, and the checkbox state falsely claims they do. The commit set out to cure the "fixed-finding / unchecked-task contradiction" (AUDIT-83/79/72) but trades it for a "checked-task / placeholder-content + unverifiable-TDD-walk" contradiction — same coherence defect, inverted. A cleaner disposition: strike the orphan task bodies (or mark them `~~superseded~~`) rather than ticking placeholder acceptance criteria as satisfied.
+
+---
+
+### AUDIT-20260604-27 — Session-end "6 acknowledged-slush-pile" count is unreconciled with the four same-day slush entries (AUDIT-22..25) added in the same audited range
+
+Finding-ID: AUDIT-20260604-27
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md` (session-end Quantitative block, `Open findings at session end: 0 … 6 acknowledged-slush-pile`) vs. `audit-log.md:4432-4482` (AUDIT-22/23/24/25, all `Status: acknowledged-slush-pile-2026-06-04`)
+
+The session-end Quantitative line reports *"Open findings at session end: 0 …; 6 acknowledged-slush-pile carrying mostly-MED defects (AUDIT-09 + 11 + 12 + 13 + 14 + 15)."* But the audit-log additions in the same audited diff append four more `acknowledged-slush-pile-2026-06-04` findings — AUDIT-22 (MED), AUDIT-23 (MED), AUDIT-24 (LOW), AUDIT-25 (LOW) — none of which appear in the count or its severity breakdown. Within the committed artifact a reader sees "0 open / 6 slushed" prose sitting beside an audit-log carrying ten same-day slush entries, two of them MED with open substance (AUDIT-22's `fixed-`-mislabel, AUDIT-23's missing CLI regression-lock).
+
+This is precisely the form the project's `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions (AUDIT-03)" warns against: the headline slush count is honest only when it includes the full HIGH/MEDIUM breakdown. The likely cause is benign ordering — the audit-barrage lift (timestamped `20260604T035153266Z`) ran *after* the session-end snapshot was authored, so AUDIT-22..25 didn't exist when the count was written — but the two commits land together, leaving the published count stale on arrival. Fix (or note): when the post-session lift adds slush entries, reconcile the session-end count in the same commit, or add a one-line "+4 slushed by the post-session audit-barrage lift (AUDIT-22..25: 2 MED, 2 LOW)" addendum so the headline number isn't read as the final tally.
+
+---
+
+I checked the rest of the diff for additional issues and the following came back clean: the DEVELOPMENT-NOTES test-count arithmetic (2669 → 2696, +27) reconciles against the enumerated per-file additions; the `keep-with-reason` clone dispositions cited in the journal carry substantive per-verb-typed-error / argv-boilerplate reasons consistent with project convention; and the audit-log AUDIT-22..25 bodies are internally well-anchored (correct file:line surfaces, severities matching their described impact). I would have flagged a newly-introduced hardcoded path or a `for now`/`TODO`/`stub` deferral string had one appeared in the diff — none did; the only deferral-shaped text is the pre-existing, faithfully-reported truncated TBD marker at workplan line 1891, which this diff surfaces rather than introduces.
+
+### AUDIT-20260604-28 — Session notes add prohibited postponement language as the recommended next action
+
+Finding-ID: AUDIT-20260604-28
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md:4474-4478`
+
+The added “Next session recommendation” says to resume with “Step 1: write the disposition prose…” and names an incomplete workplan marker at line 1891. That contradicts the same session note’s quantitative claim that “Open findings at session end: 0” and leaves the next operator with generic scaffold text instead of a concrete remaining action.
+
+This is an operator-discipline trap: the note should name the exact outstanding document defect and the specific file edit needed, or omit the resume instruction if there is no open work. The current wording reintroduces unresolved task-scaffold language into the durable journal.
