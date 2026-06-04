@@ -4665,3 +4665,77 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Triage: #411 (close-shipped apply: pending-verification label must already exist; no pre-flight / auto-create); #412 (close-shipped SKILL.md prescribes bare /tmp/<name> paths that conflict with file-handling rule)
 - Address TBD markers: (no bare TBD markers introduced this session)
 - Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals
+
+## 2026-06-04 (cont. 4): Phase 18 — structural verbs accept + scope to --feature; PR #421 merged
+### Feature: hygiene
+### Worktree: hygiene
+
+**Goal:** Close the SKILL ↔ CLI `--feature` drift surfaced 2026-06-04 in the close-shipped follow-up session. Operator picked Path C (real scoping) + hybrid scope-manifest + git-diff narrowing via session-start interview. Scope as Phase 18 in the hygiene workplan; implement all 8 tasks TDD-first; ship PR.
+
+**Accomplished:**
+
+- Filed parent issue [#417](https://github.com/audiocontrol-org/deskwork/issues/417) capturing the drift + the operator-selected Path C + hybrid narrowing source-of-truth.
+- Scoped Phase 18 into `docs/1.0/001-IN-PROGRESS/hygiene/workplan.md` — 8 tasks (shared `resolveFeatureScope` resolver + 6 per-verb `--feature` argv adds + SKILL-chain regression smoke). README status table updated.
+- **Task 1 (e4a44dae)** — `resolveFeatureScope({ slug, repoRoot }): Promise<{ files, source, manifestPath }>` at `plugins/dw-lifecycle/src/scope-discovery/resolve-feature-scope.ts`. Hybrid resolver: parses `docs/<v>/<status>/<slug>/scope-manifest.yaml` `regime_holdouts.*.file` paths when the manifest is present; falls back to `git diff --name-only <baseRef>...HEAD` when absent. Returns `FeatureNotFoundError` when the feature dir doesn't exist. DI-injectable `gitDiffNameOnly` hook for tests.
+- **Tasks 2-7 (615bea13, a0d75c0e, caba29a1, 728d7efd, b5faaf33, 9a061dd1)** — wired `--feature <slug>` into each of the 6 structural-check verbs:
+  - `check-clones` — filters detected groups + diff to those where ≥1 member sits in scope; baseline-write modes intentionally unfiltered. Path canonicalization via `realpathSync(REPO_ROOT)` to bridge macOS `/private/var/...` ↔ `/var/...` symlink mismatch.
+  - `check-anti-patterns` — when `--feature` set, scan walks ONLY feature-scope `.ts/.tsx`. Mutually exclusive with `--root` at parse-time.
+  - `check-adopters` — narrows the holdout check's matched file set to feature-scope (intersection at the absolute-path level). Mutually exclusive with `--root`.
+  - `check-module-symmetry` — filters discovered modules to those touched by feature-scope files via `moduleForPath`. Mutually exclusive with `--root`.
+  - `check-refactor-preconditions` — filters marked clone-group IDs to those with ≥1 member in scope; out-of-scope IDs silently skipped (not a refusal; gate's contract is "verify this feature's refactors"). Unknown IDs pass through so the standard "no entry exists" error still fires.
+  - `check-disposition-survivor` — filters HEAD entries to those with ≥1 member in scope BEFORE the disposition compare.
+- **Task 8 (983874ec)** — `scripts/smoke-task8-feature-flag.sh` invokes every chained verb with `--feature hygiene` against the local source via `npx tsx`; all 6 verbs run without `unknown arg` emission.
+- Merged main into the branch (`9f93b432`) — resolved one journal conflict in `DEVELOPMENT-NOTES.md` (kept both sides' session entries in chronological order); all other files auto-merged (v0.37.0 version bumps + scope-discovery docs).
+- Opened PR [#421](https://github.com/audiocontrol-org/deskwork/pull/421) (`feat(hygiene): structural verbs accept + scope to --feature <slug> (Phase 18)`); operator-authorized merge despite pre-existing `@deskwork/studio` `screenshot-capture.test.ts` CI failure (identical 5-test `SubtleCrypto.digest TypeError` on the v0.37.0 main tip; unrelated to Phase 18's `@deskwork/dw-lifecycle` work which passes 2730/2730 in CI). Merge commit: `36f0f730`.
+
+**Didn't Work:**
+
+- **PR description with the prose word "Closes" auto-closed #417 on merge.** The PR body Summary opened with "Phase 18 of the hygiene feature. Closes the SKILL ↔ CLI `--feature` drift..." — GitHub's parser paired the conceptual-prose "Closes" with `#417` later in the same body, despite the explicit "this PR does NOT auto-close #417 on merge" disclaimer. Same failure mode as last session's #411 / #412 (which fired on `Closes #NNN` in commit subjects). Re-opened #417 with explanatory comment. Lesson: pure-prose "Closes" anywhere near a `#NNN` reference in a PR body or commit body triggers auto-close. The verify-in-installed-release rule demands NO close-grammar in any PR/commit text — including prose that LOOKS like it's just describing the work conceptually. Use "addresses," "ships the fix for," "covers" instead.
+- **Initial test for `check-clones --feature` filtering needed two iterations.** First failure: jscpd member paths come with `:start:end` suffix that needed stripping. Second failure: macOS tmp paths resolve through `/var/...` (symlink) while `process.cwd()` resolves to `/private/var/...` (canonical), causing the path-set comparison to miss every member. Fix: `realpathSync` both sides upfront so the symlink form matches. Without that fix the filter would silently drop everything — exactly the kind of test-passes-but-feature-broken failure the operator's TDD discipline catches.
+- **Initial smoke (`scripts/smoke-task8-feature-flag.sh`) ran from the plugin dir** which has no `docs/`, causing `FeatureNotFoundError` on 4 verbs. Fixed by anchoring the smoke at the repo root (where the real adopter would run from).
+
+**Course Corrections:**
+
+- [PROCESS] **Used prose "Closes" in the PR body — auto-closed #417.** Same shape as last session's commit-subject `Closes` mistake. The disclaimer "this PR does NOT auto-close #417" inside the same body did NOT prevent the close. Lesson tagged + composed forward: NO close-grammar (Closes/Fixes/Resolves) anywhere near a `#NNN` reference in PR body or commit message text, regardless of context. Re-opened #417 with explanatory comment.
+- [PROCESS] **Asked for the merge-conflict + CI-failure decisions rather than auto-deciding.** Both forks (which way to resolve DEVELOPMENT-NOTES.md conflict; whether to merge with red CI from a pre-existing main failure) were operator-owned scope decisions; AskUserQuestion the right call rather than picking unilaterally.
+
+**Quantitative:**
+
+- Commits this session: 11 task-completion + 1 docs-scope-out + 1 merge-from-main = 13 (`git log --oneline 12041172..HEAD`).
+- Tests: plugin suite 2700 → 2730 pass (+30 net; +27 from this session's 7 new test files, +3 from main's audit-barrage spawn-cli work brought in via the merge).
+- Audit findings dispositioned: 0 (audit-barrage chain not fired this session — tasks were driven manually rather than via `/dw-lifecycle:implement`; flagged as optional follow-up in the PR body).
+- Issues filed this session: 1 — [#417](https://github.com/audiocontrol-org/deskwork/issues/417) (PR's parent issue).
+- Workplan delta: +132 lines (Phase 18 scope-out) + 8 task-progression edits. All checkboxes ticked except live-verification gates (operator-driven post-release per project rule).
+- Sub-agent dispatches: 0 (in-session work throughout).
+- PR shipped: [#421](https://github.com/audiocontrol-org/deskwork/pull/421) merged via merge commit `36f0f730`.
+
+**Insights:**
+
+- **The realpathSync canonicalization is load-bearing on macOS.** Without it, the path-set comparison silently mismatched because `/private/var/...` and `/var/...` are the same physical location but different strings. The test surfaced this only because I planted the manifest in a tmp fixture where the symlink form is unavoidable; in a non-tmp dir the issue might not have shown until adopter use. Worth mentioning in the resolver's docstring.
+- **The TDD-first task shape pays off on each task in turn.** Every verb followed the same flow: write the failing test → run it (`unknown arg: --feature`) → implement → green. The bug-repro test step gave a 30-second smoke per verb that the changes did the thing they claimed. No verb shipped to commit without a passing red-then-green cycle.
+- **`Refs #NNN` is not enough — close-grammar in prose ALSO triggers auto-close.** GitHub's parser is greedy enough that "Closes the X drift" + `#417` somewhere in the body counts. The verify-in-installed-release discipline needs PR-body prose to actively AVOID the trigger words entirely. The corollary: a "this PR doesn't auto-close" disclaimer is not load-bearing.
+
+### Hygiene observations
+
+- issue #297 [OPEN] referenced this session (via main-merge): scope-discovery: clone-detector tests flake under full-suite parallel load
+- issue #349 [OPEN] referenced this session (via main-merge): scope-discovery dogfood feedback: Phase 6 graphical-entries
+- issue #350 [OPEN] referenced this session (via main-merge): validate-return: refactor-cue substring match false-positives
+- issue #366 [OPEN] referenced this session (via main-merge): close-shipped commit-log walker matches any #NNN mention as fix-shipped
+- issue #386 [CLOSED] referenced this session (via main-merge): audit-barrage spawn E2BIG on large diffs
+- issue #396 [OPEN] referenced this session (via main-merge): implement-hook audit-barrage-render false-positives on {{var}}-shaped strings
+- issue #397 [CLOSED] referenced this session (via main-merge): audit-barrage spawn E2BIG — prompt overflows ARG_MAX
+- issue #411 [OPEN] referenced this session (carried forward): close-shipped apply: pending-verification label must already exist
+- issue #412 [OPEN] referenced this session (carried forward): close-shipped SKILL.md prescribes bare /tmp paths
+- issue #413 [OPEN] referenced this session (via main-merge): merge-main bookkeeping friction
+- issue #414 referenced this session: feat(hygiene): close-shipped follow-ups (#411 + #412)
+- issue #415 [OPEN] referenced this session (via main-merge): structural-chain SKILL.md prescribes --feature flag that v0.36.0 verbs reject
+- issue #416 referenced this session (via main-merge): fix(audit-barrage): catch E2BIG + flip default to {{prompt-stdin}}
+- issue #417 [OPEN] this session's PARENT — re-opened after auto-close, per the verify-in-installed-release rule
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: **Live verification of #417 (Phase 18) + #411 (Phase 16) + #412 (Phase 17)** against the next-released `dw-lifecycle` binary. The verification protocol: run `/dw-lifecycle:session-start`'s Step 7 structural-chain snapshot with `--feature <slug>` from a clean install + confirm no `unknown arg: --feature` emissions across all 6 chained verbs. If green, close #417 / #411 / #412.
+- Triage: **Phase 18 supersedes #415** (scope-discovery scoped the same drift as Task 50 with Path 1 = accept-but-ignore; this PR shipped Path 3 = real scoping). Close #415 with a "superseded by #417" pointer after live verification confirms Phase 18 works. #297 / #349 / #350 / #366 / #396 / #413 / #386 / #397 are scope-discovery items, parked on this branch.
+- Address TBD markers: none introduced this session.
+- Dismantle stale worktrees: `/Users/orion/work/deskwork-work/graphical-entries` (`feature/graphical-entries`) — 4 of 9 signals; consider `/dw-lifecycle:dismantle-worktrees` if graphical-entries is genuinely paused.
