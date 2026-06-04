@@ -174,16 +174,16 @@ Six structural-check verbs (`check-clones`, `check-anti-patterns`, `check-adopte
 
 **Approach:** Argv accepts `--feature <slug>`. When present, filter the cross-module matrix to modules whose source files appear in feature-scope. When absent, behavior unchanged.
 
-- [ ] Step 1: write failing test — (a) `--feature hygiene` narrows the matrix to feature-touched modules; (b) no flag = full matrix; (c) registry-empty + `--feature` exits 0 silently (current empty-registry behavior preserved).
-- [ ] Step 2: confirm tests fail.
-- [ ] Step 3: implement.
-- [ ] Step 4: confirm tests pass.
-- [ ] Step 5: commit with `Refs #417` in subject.
+- [x] Step 1: wrote 4 failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/module-symmetry.feature-flag.test.ts` — (a) `--feature hygiene` narrows matrix to scope-touched modules (other modules omitted from header row); (b) no flag preserves full matrix; (c) `--feature` + `--root` → exits 2 with mutual-exclusion error; (d) unknown slug → FeatureNotFoundError.
+- [x] Step 2: confirmed 3/4 failed pre-implementation; case (b) passed (baseline preserved).
+- [x] Step 3: implemented — added `--feature <slug>` argv + parse-time mutual exclusion. `computeMatrix` accepts a new `featureScopeFiles?: readonly string[]` option; when set, filters discovered modules via `moduleForPath(file, modules, moduleRoot)`. main() resolves scope (with FeatureNotFoundError → exit 2 + error stderr) and threads the file list in.
+- [x] Step 4: 4/4 tests pass; full plugin suite 2720/2720 green.
+- [x] Step 5: commit with `Refs #417` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] `dw-lifecycle check-module-symmetry --feature hygiene` exits 0.
-- [ ] Test cases pass; plugin suite green.
+- [x] `dw-lifecycle check-module-symmetry --feature hygiene` exits 0 without `unknown arg`.
+- [x] Test cases pass; plugin suite green (2720/2720).
 
 ### Task 6: `check-refactor-preconditions` learns `--feature <slug>`
 
