@@ -170,20 +170,7 @@ export async function spawnCliAgainstModel(
             stdio: ['ignore', 'pipe', 'pipe'],
           });
     } catch (err) {
-      const promptBytes = Buffer.byteLength(input.prompt, 'utf8');
-      const classified = isE2BIG(err)
-        ? classifyE2BIGSpawnError(promptBytes, errorMessage(err))
-        : errorMessage(err);
-      finish({
-        exitCode: -2,
-        durationMs: Date.now() - start,
-        stdoutBytes,
-        stderrBytes,
-        stdoutPath: input.stdoutPath,
-        stderrPath: input.stderrPath,
-        timedOut: false,
-        spawnError: classified,
-      });
+      reportSpawnError(err);
       return;
     }
     if (useStdin && child.stdin !== null) {
@@ -214,7 +201,14 @@ export async function spawnCliAgainstModel(
     // Node versions or platforms may surface it asynchronously.
     // Classify here too so the operator gets the migration cue
     // regardless of which path the OS takes.
-    child.on('error', (err) => {
+    child.on('error', reportSpawnError);
+
+    // Both spawn-error paths (synchronous throw from spawn(), and
+    // async child.on('error') emission) produce a structurally
+    // identical -2 result; classify E2BIG specifically so the
+    // operator gets the {{prompt-stdin}} migration cue regardless
+    // of which path the OS uses to surface the failure.
+    function reportSpawnError(err: unknown): void {
       const classified = isE2BIG(err)
         ? classifyE2BIGSpawnError(Buffer.byteLength(input.prompt, 'utf8'), errorMessage(err))
         : errorMessage(err);
@@ -228,7 +222,7 @@ export async function spawnCliAgainstModel(
         timedOut: false,
         spawnError: classified,
       });
-    });
+    }
 
     child.stdout.on('data', (chunk: Buffer) => {
       stdoutBytes += chunk.length;
