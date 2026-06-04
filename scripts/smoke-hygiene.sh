@@ -412,8 +412,23 @@ g branch -D feature/smoke-wtree >/dev/null 2>&1 || true
 
 # -------- 6. Phase 15: close-shipped scan/propose/apply round-trip --------
 
+# Phase 17 / #412: mirror the SKILL.md's per-run project-local path
+# convention so the smoke documents the canonical adopter path. Bare
+# /tmp/ paths are banned (.claude/rules/file-handling.md); the SKILL.md
+# uses .dw-lifecycle/close-shipped/runs/<timestamp>/{bundles,verdicts}.json.
+#
+# AUDIT-20260604-02: real millisecond precision (python3 strftime '%f'
+# yields microseconds; we slice to milliseconds + append 'Z'). BSD date
+# on macOS doesn't support `%N` so python3 is the portable path. The
+# 3-digit ms precision avoids same-second collisions across rapid runs
+# AND matches the JS `new Date().toISOString().replace(/[:.]/g, '-')`
+# format the SKILL.md prescribes.
+CS_RUN_TS="$(python3 -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S-")+f"{datetime.now(timezone.utc).microsecond//1000:03d}Z")')"
+CS_RUN_DIR="$FIXTURE/.dw-lifecycle/close-shipped/runs/$CS_RUN_TS"
+mkdir -p "$CS_RUN_DIR"
+
 echo "== smoke-hygiene: close-shipped scan =="
-CS_BUNDLES="$FIXTURE/close-shipped-bundles.json"
+CS_BUNDLES="$CS_RUN_DIR/bundles.json"
 "$DW_BIN" close-shipped scan --from-tag v0.1.0 --to-tag v0.2.0 --repo example/repo \
     --output "$CS_BUNDLES" >/dev/null 2>&1 \
   || fail "close-shipped scan failed (non-zero exit)"
@@ -423,7 +438,7 @@ python3 -c "import json,sys; d=json.loads(open('$CS_BUNDLES').read()); assert 'b
   || fail "close-shipped scan emitted malformed BundleSet"
 
 echo "== smoke-hygiene: close-shipped propose (with canned verdicts) =="
-CS_VERDICTS="$FIXTURE/close-shipped-verdicts.json"
+CS_VERDICTS="$CS_RUN_DIR/verdicts.json"
 python3 - "$CS_BUNDLES" "$CS_VERDICTS" <<'PY'
 import json, sys
 from pathlib import Path
