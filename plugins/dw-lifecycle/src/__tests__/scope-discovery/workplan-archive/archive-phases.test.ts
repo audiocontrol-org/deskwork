@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   archivePhases,
+  enumerateAllPhases,
   locatePhaseSection,
   countUncheckedTasks,
   validateVestigialReason,
@@ -39,6 +40,48 @@ describe('locatePhaseSection — pure-fn', () => {
   it('returns null when the phase is absent', () => {
     const lines = ['# Workplan', '## Phase 1: A', '## Phase 3: C'];
     expect(locatePhaseSection(lines, 2)).toBeNull();
+  });
+});
+
+describe('enumerateAllPhases — pure-fn (Phase 26 Task 6 Step 2)', () => {
+  it('returns the sorted-unique list of `## Phase N:` headings in the body', () => {
+    const body = [
+      '# Workplan',
+      '## Phase 1: First',
+      'content',
+      '## Phase 3: Third (Phase 2 archived earlier)',
+      'more',
+      '## Phase 5: Fifth',
+    ].join('\n');
+    expect(enumerateAllPhases(body)).toEqual([1, 3, 5]);
+  });
+
+  it('deduplicates accidental duplicate headings', () => {
+    const body = [
+      '## Phase 1: First',
+      '## Phase 2: Second',
+      '## Phase 1: First (accidental duplicate)',
+    ].join('\n');
+    expect(enumerateAllPhases(body)).toEqual([1, 2]);
+  });
+
+  it('returns [] for a workplan with no Phase headings', () => {
+    const body = ['# Workplan', '## Other section', 'no phases here'].join('\n');
+    expect(enumerateAllPhases(body)).toEqual([]);
+  });
+
+  it('matches the same heading shape as locatePhaseSection (no drift)', () => {
+    // Headings that locatePhaseSection accepts: `^## Phase N:`,
+    // `^## Phase N$`, `^## Phase N\s+...`. enumerateAllPhases must
+    // match the same set so a phase listed here can be located.
+    const body = [
+      '## Phase 1: with colon',
+      '## Phase 2 trailing space',
+      '## Phase 3',
+      '## Phase X (not numeric — skipped)',
+      '##Phase 4 (no space after ## — skipped)',
+    ].join('\n');
+    expect(enumerateAllPhases(body)).toEqual([1, 2, 3]);
   });
 });
 

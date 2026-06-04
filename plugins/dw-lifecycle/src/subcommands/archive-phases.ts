@@ -1,16 +1,25 @@
-import { archivePhases, ArchivePhasesError } from '../scope-discovery/workplan-archive/archive-phases.js';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import {
+  archivePhases,
+  enumerateAllPhases,
+  ArchivePhasesError,
+} from '../scope-discovery/workplan-archive/archive-phases.js';
 
 const USAGE = [
   'Usage: dw-lifecycle archive-phases',
   '    --feature <slug>',
-  '    --phases <range>',
+  '    (--phases <range> | --all)',
   '    [--repo-root <path>]',
   '    [--apply]',
   '    [--allow-vestigial <reason>]',
   '    [--help]',
   '',
   '--feature <slug>      Required. Resolves docs/<v>/<status>/<slug>/.',
-  '--phases <range>      Required. Phase IDs to archive: "1,2,5" or "1-5,7,9-10".',
+  '--phases <range>      Phase IDs to archive: "1,2,5" or "1-5,7,9-10".',
+  '--all                 Archive every `## Phase N:` heading present in',
+  '                      the feature\'s workplan.md. Pre-fills --phases.',
+  '                      Mutually exclusive with --phases.',
   '--repo-root <path>    Project root. Default: cwd.',
   '--apply               Perform the move. Default is dry-run.',
   '--allow-vestigial     ≥40-char reason allowing archive of incomplete',
@@ -52,6 +61,7 @@ export async function archivePhasesCli(args: string[]): Promise<void> {
   let apply = false;
   let allowVestigialReason: string | undefined;
   let help = false;
+  let allFlag = false;
   for (let i = 0; i < args.length; i += 1) {
     const flag = args[i];
     if (flag === '--help' || flag === '-h') {
@@ -60,6 +70,10 @@ export async function archivePhasesCli(args: string[]): Promise<void> {
     }
     if (flag === '--apply') {
       apply = true;
+      continue;
+    }
+    if (flag === '--all') {
+      allFlag = true;
       continue;
     }
     if (flag === '--feature' || flag === '--phases' || flag === '--repo-root' || flag === '--allow-vestigial') {
@@ -86,18 +100,53 @@ export async function archivePhasesCli(args: string[]): Promise<void> {
     process.stderr.write(`--feature required\n${USAGE}`);
     process.exit(2);
   }
-  if (phasesRaw === undefined) {
-    process.stderr.write(`--phases required\n${USAGE}`);
+  if (allFlag && phasesRaw !== undefined) {
+    process.stderr.write(`--all and --phases are mutually exclusive\n${USAGE}`);
     process.exit(2);
   }
-  let phases: number[];
-  try {
-    phases = parsePhaseRange(phasesRaw);
-  } catch (err) {
-    process.stderr.write(`bad --phases value: ${(err as Error).message}\n`);
+  if (!allFlag && phasesRaw === undefined) {
+    process.stderr.write(`--phases or --all required\n${USAGE}`);
     process.exit(2);
   }
   const repoRoot = repoRootOverride ?? process.cwd();
+  let phases: number[];
+  if (allFlag) {
+    const workplanPath = join(
+      repoRoot,
+      'docs',
+      '1.0',
+      '001-IN-PROGRESS',
+      featureSlug,
+      'workplan.md',
+    );
+    let workplanBody: string;
+    try {
+      workplanBody = await readFile(workplanPath, 'utf8');
+    } catch (err) {
+      process.stderr.write(
+        `archive-phases: --all could not read ${workplanPath}: ${(err as Error).message}\n`,
+      );
+      process.exit(2);
+    }
+    phases = enumerateAllPhases(workplanBody);
+    if (phases.length === 0) {
+      process.stderr.write(
+        `archive-phases: --all found 0 \`## Phase N:\` headings in ${workplanPath}. ` +
+          `Nothing to archive.\n`,
+      );
+      process.exit(0);
+    }
+    process.stderr.write(
+      `archive-phases: --all expanded to phases ${phases.join(', ')}\n`,
+    );
+  } else {
+    try {
+      phases = parsePhaseRange(phasesRaw!);
+    } catch (err) {
+      process.stderr.write(`bad --phases value: ${(err as Error).message}\n`);
+      process.exit(2);
+    }
+  }
   try {
     const report = await archivePhases({
       repoRoot,

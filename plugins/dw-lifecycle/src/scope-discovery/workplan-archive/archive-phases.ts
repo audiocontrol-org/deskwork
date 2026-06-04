@@ -108,6 +108,31 @@ export function locatePhaseSection(
 }
 
 /**
+ * Enumerate every `## Phase N:` heading present in the workplan body in
+ * the order they appear. Returns the phase numbers as a sorted unique
+ * array. Used by `archive-phases --all` to pre-fill the phase range
+ * without the operator enumerating each phase by hand.
+ *
+ * The matched shape is `^## Phase <integer>(?::|$|\s)` — identical to
+ * `locatePhaseSection`'s probe so the two functions cannot drift.
+ */
+export function enumerateAllPhases(workplanBody: string): number[] {
+  const lines = workplanBody.split('\n');
+  const anyPhasePattern = /^## Phase (\d+)(?::|$|\s)/;
+  const phases = new Set<number>();
+  for (const line of lines) {
+    const match = anyPhasePattern.exec(line);
+    if (match === null) continue;
+    const raw = match[1];
+    if (typeof raw !== 'string') continue;
+    const num = Number(raw);
+    if (!Number.isInteger(num)) continue;
+    phases.add(num);
+  }
+  return Array.from(phases).sort((a, b) => a - b);
+}
+
+/**
  * Count unchecked task boxes (`- [ ]`) within a section. Used to gate
  * `--allow-vestigial`-less archive.
  */

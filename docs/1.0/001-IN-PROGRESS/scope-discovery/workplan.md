@@ -1936,11 +1936,11 @@ Additional sweeping landed in this commit beyond the explicit task scope (low-ri
 **Complete.**
 
 - [x] Step 1: `/dw-lifecycle:archive-phases` SKILL.md + `/dw-lifecycle:unarchive-phases` SKILL.md shipped under `plugins/dw-lifecycle/skills/archive-phases/` and `unarchive-phases/`. Both cover steps + flags + exit codes + when-to-use + cross-references.
-- [-] Step 2: `/dw-lifecycle:complete` SKILL.md update DEFERRED to a follow-up. The wiring (have `:complete` auto-invoke `archive-phases --all` at feature-complete time) is a thin shim; the verb itself works standalone. Captured as a real TODO.
+- [x] Step 2 (2026-06-04): `/dw-lifecycle:complete` SKILL.md updated to auto-invoke `dw-lifecycle archive-phases --feature <slug> --all --apply` BEFORE the doc-move step. New `--all` flag added to `archive-phases` CLI: pre-fills `--phases` from the workplan's actual `## Phase N:` headings by enumerating via the new `enumerateAllPhases` pure-fn (4 new vitest scenarios at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts`). `--all` is mutually exclusive with `--phases`; reads `docs/1.0/001-IN-PROGRESS/<slug>/workplan.md`; exits 0 when zero `## Phase N:` headings present (silent skip for greenfield single-task work). Verb's existing partial-complete refusal semantics carry through. /complete skill body's steps renumbered (5-10 become 6-11; the archive becomes step 5). Step 11 (report) now includes the workplan compression ratio. Full plugin suite 2682 → 2686 green; tsc clean.
 - [x] Step 3: Doctor rule `workplan-archive-ledger-coherence` at `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.ts`. Walks `docs/<v>/<status>/<slug>/` features; for each with a ledger, compares the declared `archived-phases` range against the actual `## Phase N:` headings in the archive file. Reports three drift modes: (a) ledger declares missing-from-archive; (b) archive has extra-not-declared; (c) archive file path doesn't exist.
 - [x] Step 4: 7/7 doctor-rule tests pass; rule registered in `SCOPE_DISCOVERY_DOCTOR_RULES`.
 
-**Acceptance:** ✅ Skills shipped (archive-phases + unarchive-phases). ✅ Doctor rule catches ledger drift in three modes. The `/dw-lifecycle:complete` wiring is the one remaining TODO (clean, well-scoped, can land in a follow-up).
+**Acceptance:** ✅ Skills shipped (archive-phases + unarchive-phases). ✅ Doctor rule catches ledger drift in three modes. ✅ `/dw-lifecycle:complete` wiring landed (2026-06-04) via `--all` flag + skill body step insertion.
 
 ### Task 6 — Live dogfood verification
 

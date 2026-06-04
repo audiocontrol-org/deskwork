@@ -35,21 +35,29 @@ dw-lifecycle complete-parent-closure apply --from-file <path-from-propose-stdout
 
    The gate is RECOMMENDED, not blocking — if the operator skips it (does not run apply), the skill continues to the doc-move step. Run before the doc-move so the closure trail lands alongside the feature-complete commit.
 
-5. Shell out to the helper to move docs:
+5. **Workplan archive compression (Phase 26 Task 6 Step 2).** Archive every `## Phase N:` heading in the feature's `workplan.md` into the sibling `workplan-archive.md` so the workplan shipped to `003-COMPLETE/` is compact:
+
+```
+dw-lifecycle archive-phases --feature <slug> --all --apply
+```
+
+   The `--all` flag pre-fills `--phases` from the workplan's actual `## Phase N:` headings (no operator enumeration needed). The verb refuses on partial-complete phases (any `- [ ]` unchecked line) — that's the correct gate: `/dw-lifecycle:complete` runs when the feature IS complete. On refusal the operator either finishes the unchecked work OR supplies `--allow-vestigial "<≥40-char reason>"` for retired-vestigial phases (e.g., phases explicitly retired by a later Phase per Phase 24's relocation pattern). Skip the archive step ONLY when the feature has zero phases (greenfield single-task work); silently skip when the workplan has no `## Phase N:` headings.
+
+6. Shell out to the helper to move docs:
 
 ```
 dw-lifecycle transition <slug> --from inProgress --to complete --target <version>
 ```
 
-6. Update `docs/<version>/ROADMAP.md` (if present) — append a row for this feature in the COMPLETE section.
-7. Close any parent + phase GitHub issues NOT already closed by step 4's batched-proposal cycle:
+7. Update `docs/<version>/ROADMAP.md` (if present) — append a row for this feature in the COMPLETE section.
+8. Close any parent + phase GitHub issues NOT already closed by step 4's batched-proposal cycle:
 
 ```
 gh issue close <number> --comment "Completed in feature/<slug>; see <feature-dir>/README.md for the implementation summary."
 ```
 
-8. Commit the doc-tree move, ROADMAP update, and (if the override fired) the journal-override entry.
-9. Report: new docs path, issues closed (including the phase-parent closures from step 4), commit hash, override reason (if any).
+9. Commit the workplan archive (step 5), the doc-tree move (step 6), the ROADMAP update (step 7), and (if the override fired) the journal-override entry.
+10. Report: new docs path, issues closed (including the phase-parent closures from step 4), workplan compression ratio (lines before / lines after step 5), commit hash, override reason (if any).
 
 ## Composed disciplines
 
