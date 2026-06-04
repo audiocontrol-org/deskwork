@@ -74,6 +74,27 @@ function seedEntry(
   mkdirSync(join(root, '.deskwork'), { recursive: true });
   writeCalendar(join(root, '.deskwork', 'calendar.md'), calendar);
   if (entry.id === undefined) throw new Error('entry has no id');
+  // Phase 39c-2b(a): shortform path composition reads the parent entry's
+  // stored `artifactPath` (no slug-template search). Seed a sidecar so
+  // the resolver has the authoritative path to compose the scrapbook
+  // child against.
+  mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
+  writeFileSync(
+    join(root, '.deskwork', 'entries', `${entry.id}.json`),
+    JSON.stringify({
+      uuid: entry.id,
+      slug: entry.slug,
+      title: entry.title,
+      keywords: [],
+      source: 'manual',
+      currentStage: stage,
+      iterationByStage: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      artifactPath: `${cfg.sites.a.contentDir}/${entry.slug}/index.md`,
+    }),
+    'utf-8',
+  );
   return { calendar, slug: entry.slug, entryId: entry.id };
 }
 

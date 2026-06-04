@@ -70,10 +70,15 @@ export function handleStartLongform(
   });
   const entryId = callerEntryId ?? entry?.id;
 
-  const path = resolveLongformFilePath(projectRoot, config, b.site, b.slug, {
-    ...(entryId !== undefined ? { entryId } : {}),
-    ...(entry !== undefined ? { entry } : {}),
-  });
+  let path: string;
+  try {
+    path = resolveLongformFilePath(projectRoot, config, b.site, b.slug, {
+      ...(entryId !== undefined ? { entryId } : {}),
+      ...(entry !== undefined ? { entry } : {}),
+    });
+  } catch (e) {
+    return err(400, e instanceof Error ? e.message : String(e));
+  }
   if (!existsSync(path)) {
     return err(404, `blog draft not found at ${path}`);
   }
@@ -170,7 +175,11 @@ export function handleStartShortform(
   }
   const entryId = callerEntryId ?? entry.id;
 
-  let filePath: string | undefined;
+  // Phase 39c-2b(a): the shortform path is COMPOSED from the parent
+  // entry's stored artifactPath dir (spec AUDIT-35) — always a path when
+  // the parent has artifactPath, else a doctor --fix throw. The old
+  // "undefined → materialize from slug-template" fallback is retired.
+  let filePath: string;
   try {
     filePath = resolveShortformWorkflowFilePath(
       projectRoot,
@@ -186,24 +195,6 @@ export function handleStartShortform(
     );
   } catch (e) {
     return err(400, e instanceof Error ? e.message : String(e));
-  }
-
-  // The shortform path resolver returns undefined when the entry has no
-  // body file scaffolded yet (no entry-dir to anchor against). Shortform
-  // is decoupled from the lifecycle, so we materialize the directory
-  // tree from the slug-template fallback and proceed.
-  if (filePath === undefined) {
-    const fallback = resolveLongformFilePath(
-      projectRoot,
-      config,
-      b.site,
-      b.slug,
-      { ...(entryId !== undefined ? { entryId } : {}), entry },
-    );
-    const entryDir = dirname(fallback);
-    const filename =
-      channel !== undefined ? `${b.platform}-${channel}.md` : `${b.platform}.md`;
-    filePath = `${entryDir}/scrapbook/shortform/${filename}`;
   }
 
   // Scaffold the file when missing. Frontmatter carries the
@@ -266,9 +257,9 @@ export function handleStartShortform(
 
 /**
  * Resolve the on-disk markdown file path for any kind of workflow.
- * Dispatches on `contentKind`. Returns `undefined` only for shortform when
- * the entry directory cannot be derived (no entry id and no body file
- * scaffolded yet).
+ * Dispatches on `contentKind`. Resolves via the entry's stored
+ * `artifactPath` (Phase 39c-2b(a)); throws `doctor --fix` for an
+ * unmigrated entry rather than returning `undefined`.
  */
 export function workflowFilePath(
   projectRoot: string,
@@ -281,7 +272,7 @@ export function workflowFilePath(
     platform?: Platform;
     channel?: string;
   },
-): string | undefined {
+): string {
   if (workflow.contentKind === 'shortform') {
     if (workflow.platform === undefined) {
       throw new Error(

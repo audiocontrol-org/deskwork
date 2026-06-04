@@ -352,9 +352,17 @@ export function handleCreateVersion(
   // where slug != fs path work), with template fallback for legacy
   // / pre-doctor cases. For shortform, the path goes through
   // resolveShortformFilePath (entry-dir + scrapbook/shortform/<…>.md).
-  const targetFile = workflowFilePath(projectRoot, config, workflow);
-  if (targetFile === undefined || !existsSync(targetFile)) {
-    const shown = targetFile ?? '(unresolved)';
+  // Phase 39c-2b(a): workflowFilePath resolves via the entry's stored
+  // artifactPath and throws doctor --fix for an unmigrated entry — surface
+  // that as a save error rather than crashing the route handler.
+  let targetFile: string;
+  try {
+    targetFile = workflowFilePath(projectRoot, config, workflow);
+  } catch (e) {
+    return err(500, e instanceof Error ? e.message : String(e));
+  }
+  if (!existsSync(targetFile)) {
+    const shown = targetFile;
     if (workflow.contentKind === 'shortform') {
       return err(
         500,

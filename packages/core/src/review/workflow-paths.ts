@@ -25,15 +25,14 @@
 import { existsSync } from 'node:fs';
 import type { DeskworkConfig } from '../config.ts';
 import type { ContentIndex } from '../content-index.ts';
-import { buildContentIndex } from '../content-index.ts';
-import {
-  resolveCalendarPath,
-  resolveEntryFilePath,
-  resolveShortformFilePath,
-} from '../paths.ts';
+import { resolveCalendarPath } from '../paths.ts';
 import { readCalendar } from '../calendar.ts';
 import { findEntry, findEntryById } from '../calendar-mutations.ts';
 import type { CalendarEntry, Platform } from '../types.ts';
+import type { Entry } from '../schema/entry.ts';
+import { readSidecarSync } from '../sidecar/read.ts';
+import { resolveArtifactPathOrThrow } from '../entry/resolve-artifact.ts';
+import { composeShortformDraftPath } from '../entry/shortform-path.ts';
 
 /**
  * Read a calendar entry by id or slug for a given site, returning
@@ -74,19 +73,65 @@ export interface LongformPathHint {
 }
 
 /**
+ * Load the entry SIDECAR backing a workflow, resolving its stable id
+ * from the hint or the calendar (Phase 39c-2b(a)).
+ *
+ * Resolution reads the entry's stored `artifactPath` only — so the
+ * sidecar is the input the path resolvers need. The id is taken from
+ * `hint.entryId` / `hint.entry.id`, else derived from the calendar by
+ * slug. An entry with no derivable id, or no sidecar on disk, is an
+ * unmigrated state: this throws with `doctor --fix` guidance rather than
+ * falling back to a slug+stage search (the location-as-key disease this
+ * retirement removes).
+ */
+function loadWorkflowEntrySidecar(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string,
+  slug: string,
+  hint: LongformPathHint,
+): Entry {
+  // Resolution prefers the ACTUAL entry backing the slug (the looked-up
+  // calendar entry) over a caller-supplied `entryId` — the latter is a
+  // provenance override for stamping the workflow, not a resolution key
+  // (a caller can stamp a sibling-calendar id while the file still lives
+  // under the real entry's artifactPath). The save path passes only
+  // `entryId` (no `entry`), where it IS the resolution key.
+  let entryId =
+    hint.entry?.id ??
+    (hint.entryId !== undefined && hint.entryId !== '' ? hint.entryId : undefined);
+  if (entryId === undefined || entryId === '') {
+    entryId = lookupEntry(projectRoot, config, site, { slug })?.id;
+  }
+  if (entryId === undefined || entryId === '') {
+    throw new Error(
+      `Cannot resolve workflow file for slug "${slug}": no entry id could be ` +
+        `derived from the calendar. Resolution reads the stored artifactPath ` +
+        `only — there is no slug+stage fallback. Run \`deskwork doctor --fix\` ` +
+        `to bind the entry, then retry.`,
+    );
+  }
+  try {
+    return readSidecarSync(projectRoot, entryId);
+  } catch {
+    throw new Error(
+      `Cannot resolve workflow file for slug "${slug}" (entry ${entryId}): no ` +
+        `entry sidecar on disk. Resolution reads the stored artifactPath only — ` +
+        `there is no slug+stage fallback. Run \`deskwork doctor --fix\` to ` +
+        `migrate this entry, then retry.`,
+    );
+  }
+}
+
+/**
  * Resolve the absolute path of the markdown file backing a longform or
- * outline workflow.
+ * outline workflow, from the entry's stored `artifactPath` (Phase
+ * 39c-2b(a)). There is NO content-index lookup or slug-template
+ * fallback — an entry without a stored path throws `doctor --fix`.
  *
- * Precedence:
- *   1. Content index — when an entry id is known (passed in or derived
- *      from the workflow's site+slug via the calendar), look up the file
- *      whose frontmatter `deskwork.id:` matches. Refactor-proof.
- *   2. Slug-template fallback — when no entry id is available (legacy
- *      workflow, pre-doctor entry, ad-hoc draft with no calendar record),
- *      fall back to the site's `blogFilenameTemplate`.
- *
- * Always returns a path (the slug-template fallback is unconditional);
- * callers should `existsSync` if they need existence guarantees.
+ * Returns the canonical document path (refined to a sibling `index.md`
+ * when one exists on disk). Callers should `existsSync` if they need an
+ * existence guarantee — the path may name a not-yet-written file.
  */
 export function resolveLongformFilePath(
   projectRoot: string,
@@ -95,37 +140,21 @@ export function resolveLongformFilePath(
   slug: string,
   hint: LongformPathHint,
 ): string {
-  let entry = hint.entry;
-  let entryId = hint.entryId;
-  if (entry === undefined && (entryId === undefined || entryId === '')) {
-    entry = lookupEntry(projectRoot, config, site, { slug });
-    entryId = entry?.id;
-  } else if (entry === undefined && entryId !== undefined) {
-    entry = lookupEntry(projectRoot, config, site, { entryId });
-  } else if (entryId === undefined || entryId === '') {
-    entryId = entry?.id;
-  }
-
-  // Delegate to the top-level helper — same precedence (id-bound path
-  // first, slug-template fallback). The studio passes a per-request
-  // memoized index; the CLI can let it build per call.
-  const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
-  const slugForFallback = entry?.slug ?? slug;
-  return resolveEntryFilePath(
-    projectRoot,
-    config,
-    site,
-    slugForFallback,
-    entryId,
-    idx,
-  );
+  const entry = loadWorkflowEntrySidecar(projectRoot, config, site, slug, hint);
+  return resolveArtifactPathOrThrow(entry, projectRoot);
 }
 
 /**
  * Resolve the absolute path of the markdown file backing a shortform
- * workflow. Returns `undefined` when the entry has no body file
- * scaffolded yet — the entry directory cannot be derived in that case
- * and the caller decides what to do (create the directory tree, or 404).
+ * workflow, COMPOSED from the parent entry's stored `artifactPath`
+ * directory (Phase 39c-2b(a), spec AUDIT-35):
+ *
+ *   <dir-of-parent-artifact>/scrapbook/shortform/<platform>[-<channel>].md
+ *
+ * Always returns a path (the shortform child path is deterministic once
+ * the parent has an `artifactPath`); it does NOT return `undefined` for
+ * an un-scaffolded file — the caller scaffolds it in place. An unmigrated
+ * parent (no `artifactPath`) throws `doctor --fix`.
  */
 export function resolveShortformWorkflowFilePath(
   projectRoot: string,
@@ -135,28 +164,7 @@ export function resolveShortformWorkflowFilePath(
   platform: Platform,
   channel: string | undefined,
   hint: LongformPathHint,
-): string | undefined {
-  let entry = hint.entry;
-  let entryId = hint.entryId;
-  if (entry === undefined && (entryId === undefined || entryId === '')) {
-    entry = lookupEntry(projectRoot, config, site, { slug });
-    entryId = entry?.id;
-  } else if (entry === undefined && entryId !== undefined) {
-    entry = lookupEntry(projectRoot, config, site, { entryId });
-  } else if (entryId === undefined || entryId === '') {
-    entryId = entry?.id;
-  }
-
-  return resolveShortformFilePath(
-    projectRoot,
-    config,
-    site,
-    {
-      ...(entryId !== undefined && entryId !== '' ? { id: entryId } : {}),
-      slug: entry?.slug ?? slug,
-    },
-    platform,
-    channel,
-    hint.index,
-  );
+): string {
+  const entry = loadWorkflowEntrySidecar(projectRoot, config, site, slug, hint);
+  return composeShortformDraftPath(entry, projectRoot, platform, channel);
 }

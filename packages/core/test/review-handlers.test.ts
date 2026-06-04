@@ -13,7 +13,58 @@ import {
   applyLineDiff,
 } from '../src/review/handlers.ts';
 import { createWorkflow } from '../src/review/pipeline.ts';
+import { writeCalendar } from '../src/calendar.ts';
 import type { DeskworkConfig } from '../src/config.ts';
+
+/**
+ * Phase 39c-2b(a): the review handlers resolve the workflow file via the
+ * entry's stored `artifactPath` (no slug-template search). Bind an entry
+ * — calendar row (slug→uuid) + sidecar (uuid → artifactPath) — so the
+ * resolvers have the authoritative path. Returns the entry uuid for
+ * `createWorkflow({ entryId })`. Mirrors the flat `{slug}.md` template
+ * this suite's config declares.
+ */
+let bindCounter = 0;
+function bindEntry(
+  root: string,
+  cfg: DeskworkConfig,
+  slug: string,
+): { entryId: string; artifactPath: string } {
+  const entryId = `00000000-0000-4000-8000-${String(++bindCounter).padStart(12, '0')}`;
+  const artifactPath = `${cfg.sites.a.contentDir}/${slug}.md`;
+  mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
+  writeCalendar(join(root, '.deskwork', 'calendar.md'), {
+    entries: [
+      {
+        id: entryId,
+        slug,
+        title: slug,
+        description: '',
+        stage: 'Drafting',
+        targetKeywords: [],
+        source: 'manual',
+      },
+    ],
+    distributions: [],
+  });
+  writeFileSync(
+    join(root, '.deskwork', 'entries', `${entryId}.json`),
+    JSON.stringify({
+      uuid: entryId,
+      slug,
+      title: slug,
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      artifactPath,
+    }),
+    'utf-8',
+  );
+  return { entryId, artifactPath };
+}
 
 function config(): DeskworkConfig {
   return {
@@ -251,10 +302,12 @@ describe('review handlers', () => {
       );
       mkdirSync(dirname(blogFile), { recursive: true });
       writeFileSync(blogFile, '# v1\n', 'utf-8');
+      const { entryId } = bindEntry(root, cfg, slug);
 
       const w = createWorkflow(root, cfg, {
         site: 'a',
         slug,
+        entryId,
         contentKind: 'longform',
         initialMarkdown: '# v1\n',
       });
@@ -276,7 +329,16 @@ describe('review handlers', () => {
     });
 
     it('returns 500 when the blog file is missing for a longform workflow', () => {
-      const w = seedWorkflow(root, cfg, 'no-file');
+      // Entry is bound (sidecar + artifactPath) but the file itself was
+      // never written — resolution succeeds, existence check fails → 500.
+      const { entryId } = bindEntry(root, cfg, 'no-file');
+      const w = createWorkflow(root, cfg, {
+        site: 'a',
+        slug: 'no-file',
+        entryId,
+        contentKind: 'longform',
+        initialMarkdown: '# v1\n',
+      });
       const r = handleCreateVersion(root, cfg, {
         workflowId: w.id,
         beforeVersion: 1,
@@ -290,9 +352,11 @@ describe('review handlers', () => {
       const blogFile = join(root, 'src/sites/a/content/blog', `${slug}.md`);
       mkdirSync(dirname(blogFile), { recursive: true });
       writeFileSync(blogFile, 'x', 'utf-8');
+      const { entryId } = bindEntry(root, cfg, slug);
       const w = createWorkflow(root, cfg, {
         site: 'a',
         slug,
+        entryId,
         contentKind: 'longform',
         initialMarkdown: 'x',
       });
@@ -311,6 +375,7 @@ describe('review handlers', () => {
       const blogFile = join(root, 'src/sites/a/content/blog', `${slug}.md`);
       mkdirSync(dirname(blogFile), { recursive: true });
       writeFileSync(blogFile, '# Draft body', 'utf-8');
+      bindEntry(root, cfg, slug);
 
       const r = handleStartLongform(root, cfg, { site: 'a', slug });
       expect(r.status).toBe(200);
@@ -320,6 +385,9 @@ describe('review handlers', () => {
     });
 
     it('returns 404 when the blog file does not exist', () => {
+      // Entry is bound (sidecar + artifactPath) but the file is absent —
+      // resolution succeeds, the existence check 404s.
+      bindEntry(root, cfg, 'missing');
       const r = handleStartLongform(root, cfg, { site: 'a', slug: 'missing' });
       expect(r.status).toBe(404);
     });
