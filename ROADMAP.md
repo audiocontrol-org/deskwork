@@ -61,6 +61,25 @@ Serves as the canonical canary for the scope-discovery protocol. Phase 6 dogfood
 
 Parent: [#301](https://github.com/audiocontrol-org/deskwork/issues/301) (still open).
 
+### Pluggable lifecycle providers — toward a provider-agnostic govern-AND-execute control plane
+
+Feature docs at `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/` (PRD `Final`; `design.md` is the technical canon). Branch `feature/pluggable-lifecycle-providers`.
+
+**North star (the ideal end-state — every slice ladders toward this):** deskwork as the provider-agnostic control plane that takes ANY authoring provider's dependency-annotated plan (native, Spec Kit, Kiro, whatever ships next) and — branching only on capabilities, never on provider identity — does two things the providers' own tools do not:
+
+1. **Governs it.** Cross-model audit-barrage, the finding state machine (`open → fixed → verified`), and scope/clone/debt governance run over the plan and the work it produces, regardless of who authored it.
+2. **Executes it better than the provider's own single-agent grinder.** A parallel, multi-CLI, worktree-isolated execution engine drops tranches of independent tasks (read from the provider's dependency map) onto **multiple LLM CLIs concurrently** (e.g. claude + codex), each task in its own git worktree, then merges.
+
+The front half (authoring) is commodity; the differentiated value is govern + execute on top of any plan. The Spec-Kit dogfood (2026-06-04) surfaced the execution half as a second, larger differentiator — and prior-art study (MAQA, Fleet) confirmed **nobody else does cross-CLI execution** (they parallelize via one model's subagents). That gap is deskwork's. See PRD § North Star.
+
+**How we plan to get there (incremental milestones, each shippable):**
+
+- **Slice 1 — governance on a foreign plan (current).** Package deskwork governance (audit-barrage + finding lift) as a Spec Kit `after_implement` extension that fires automatically over whatever `/speckit-implement` produces — cross-model, zero provider branching. Proves the differentiator composes with a provider's native flow. Spec at `specs/001-speckit-backhalf-slice/`.
+- **Slice 2 — the parallel multi-CLI executor (north-star headline).** A deskwork extension that reads the provider's dependency-annotated plan (phases + `[P]` + embedded file paths), forms non-overlapping tranches (validated deterministically from the file paths, since `[P]` is LLM-heuristic), and fans them across multiple LLM CLIs in git-worktree isolation, then merges. Reuses deskwork's existing multi-CLI fan-out primitive (from audit-barrage); the hard part is write coordination (worktree-per-task + merge). Reference architecture: MAQA's worktree-per-feature batch scheduler.
+- **Substrate — the manifest/port/reconcile** (`design.md` § 8). The normalized `lifecycle-manifest.yaml` as the port, the provider port (`detect`/`capabilities`/`author`/`normalize`), `reconcile()` + re-sync, and the tracker capability — the full pluggability layer beneath govern+execute. Sequenced after the slices prove the shape (integration-first: derive the abstraction from real instances, not a single imagined provider).
+
+**Methodology — self-hosting dogfood.** This feature is being built by living inside Spec Kit's own native flow (`constitution → specify → clarify → plan → tasks → implement`), with deskwork as the governing/executing control plane on top. Bootstrap friction is captured one-per-entry in the feature's `tooling-feedback.md` (TF-01..08 so far) — that cumulative log IS the bridge's de-facto requirements doc.
+
 ## Audit-barrage feature shape
 
 Design A — operator-triggered audit-barrage skill — shipped as Phase 12 of scope-discovery (parent [#353](https://github.com/audiocontrol-org/deskwork/issues/353)); see "Recently shipped" above for the primitives and acceptance-signal evidence. This section is the long-term arc; Design B and Design C compose over the v1 primitives.
