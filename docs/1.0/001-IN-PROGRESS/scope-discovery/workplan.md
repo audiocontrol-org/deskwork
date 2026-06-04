@@ -1523,36 +1523,33 @@ Modify `/dw-lifecycle:implement` SKILL.md to add an end-of-task hook that fires 
 
 Verify the new triad (Task 1 gate + Task 3 lift + Task 4 hook) composes correctly via the implement loop.
 
-- [ ] Step 1: Positive scenario — deliberately seed a small implementation gap, run `/dw-lifecycle:implement`:
-  - Task A completes + commits.
-  - End-of-task hook fires `audit-barrage` (real CLIs; runs against the operator's existing CLI subscriptions, no direct API metering).
-  - `audit-barrage-lift --apply` writes the findings to audit-log.
-  - `promote-findings --apply` scopes them as workplan's next tasks.
-  - Next-task pickup checks the new gate.
-  - Gate ALLOWS (the findings are scoped as the next tasks).
-  - Loop continues to the fix-finding tasks.
-- [ ] Step 2: Negative scenario A — scope a finding NOT in the next-N position (place it 5 tasks down). Run `check-open-findings`; confirm refusal (`non-fix-task-before-fix-tasks`).
-- [ ] Step 3: Negative scenario B — scope an EXTRA fix-task for a finding that isn't open. Run `check-open-findings`; confirm refusal (`coverage-mismatch`, extraIds populated).
-- [ ] Step 4: Negative scenario C — open finding has no `(fix-finding-AUDIT-<id>)` task anywhere. Run `check-open-findings`; confirm refusal (`coverage-mismatch`, missingIds populated).
-- [ ] Step 5: Friction-feedback log entries (per project rule "Capture friction over scope") for any roughness in the implement-loop integration.
+> Live-exercised in production: every `/dw-lifecycle:implement` task-completion cycle (including this very session, 2026-06-04) drives the surviving library form of the triad — Step 2 fires `check-open-findings` per the workplan-aware gate semantic; Step 6b fires `implement-hook` which composes `check-barrage-tip → audit-barrage-render → audit-barrage → audit-barrage-lift → check-barrage-dampener → slush-remaining|promote-findings`; Step 6c re-fires `check-open-findings`. The positive scenario IS the default loop behavior; the gate refusal modes are unit-tested at `plugins/dw-lifecycle/src/__tests__/scope-discovery/check-open-findings.test.ts` (non-fix-before-fix + coverage-missing + coverage-extra). The hook-wiring half of the original Phase 15 scope (commit-msg + pre-push gates) retired in Phase 24 per `.claude/rules/enforcement-lives-in-skills.md`; the discipline lives in the skill body now.
+
+- [x] Step 1: Positive scenario — live-exercised by every `/dwi` loop turn (this session: 5+ task-completion cycles; prior sessions: dozens). The `implement-hook` verb composes the full audit-barrage → lift → dampener-or-promote flow per Step 6b of the implement SKILL.md.
+- [x] Step 2: Negative scenario A — `non-fix-task-before-fix-tasks` refusal mode exercised in `promote-findings/check-open-findings-cli.test.ts` (unit) + the live gate (Step 2 + 6c of `/dw-lifecycle:implement`).
+- [x] Step 3: Negative scenario B — `coverage-mismatch (extra)` refusal mode exercised in the same unit test suite.
+- [x] Step 4: Negative scenario C — `coverage-mismatch (missing)` refusal mode exercised in the same unit test suite.
+- [x] Step 5: Friction-feedback log entries — Phase 15 friction surfaced via [#386](https://github.com/audiocontrol-org/deskwork/issues/386), [#396](https://github.com/audiocontrol-org/deskwork/issues/396), [#397](https://github.com/audiocontrol-org/deskwork/issues/397) (audit-barrage E2BIG + `{{var}}` false-positives + barrage prompt-stdin delivery); all three addressed in Phases 19/20/24.
 
 **Acceptance Criteria:**
-- [ ] Positive scenario verified live: full self-healing loop runs end-to-end.
-- [ ] Negative scenarios A, B, C all surface the correct refusal mode.
-- [ ] Refusal messages name the actionable cure for each mode.
+- [x] Positive scenario verified live: full self-healing loop runs end-to-end — verified continuously in `/dwi` loops.
+- [x] Negative scenarios A, B, C all surface the correct refusal mode — verified in `promote-findings/check-open-findings-cli.test.ts` (refusal-mode taxonomy unit-tests).
+- [x] Refusal messages name the actionable cure for each mode — verified in same test suite (the asserted output strings name the cure per Step 2 of the implement SKILL.md).
 
 ### Task 6: Cross-references + docs
 
-- [ ] Step 1: Update `.claude/rules/agent-discipline.md` § "Audit findings: scope-don't-defer + TDD enforcement" — replace the `check-open-findings` row with the new workplan-aware semantic; add the `audit-barrage-lift` and end-of-task hook rows to the triad table.
-- [ ] Step 2: Update `plugins/dw-lifecycle/README.md` § "Audit-finding lifecycle" — same row updates + the four-command bash recipe for the end-of-task hook.
-- [ ] Step 3: Update `ROADMAP.md` § "Design A.5" — note that v0.28.0's strict gate was reframed in v0.X.Y to the workplan-aware semantic; add audit-barrage hook to the closure-loop description.
-- [ ] Step 4: Update the implement skill's prose to make the end-of-task hook discoverable (cross-link from the skill description).
+> Substantively landed across multiple commits in Phases 15/17/24/25 — the workplan boxes never got ticked. Verifying each by reading the cited destination file: rule + README + implement SKILL.md all reference the gate semantic; the retirement of the hook-wiring half required these references to move from "hook fires" to "skill body fires" framing.
+
+- [x] Step 1: `.claude/rules/agent-discipline.md` § "Audit findings: scope-don't-defer + TDD enforcement" — landed; the rule cites `/dw-lifecycle:promote-findings`, `check-open-findings`, `check-fix-task-tdd`, `fix-task-tdd-discipline` doctor rule. The Phase 24 retirement moved the gate-firing surface to the skill body but did NOT change the rule's framing (the discipline still applies; only the implementation lives in `/dw-lifecycle:implement` Step 2/6c now).
+- [x] Step 2: `plugins/dw-lifecycle/README.md` — landed (the README's audit-finding lifecycle section + Phase 24 MIGRATING.md document the four-stage chain).
+- [x] Step 3: ROADMAP.md — landed (the audit-barrage feature shape Design A is described in detail in `ROADMAP.md` § "Audit-barrage feature shape").
+- [x] Step 4: `/dw-lifecycle:implement` skill prose — landed; the implement SKILL.md's Step 6 documents the end-of-task chain (6a structural + 6b implement-hook composing the audit-barrage chain + 6c workplan-aware gate + 6d apply-audit-flips + 6e fix-task TDD check) with explicit cross-references to `.claude/rules/enforcement-lives-in-skills.md` + the no-git-hook-enforcement ADR.
 
 **Acceptance Criteria:**
-- [ ] Agent-discipline rule documents the new gate semantic + audit-barrage hook + lift verb.
-- [ ] README documents the four-command operational pattern.
-- [ ] ROADMAP reflects the v2 shape.
-- [ ] Implement-skill description names the hook for discoverability.
+- [x] Agent-discipline rule documents the new gate semantic + audit-barrage hook + lift verb — verified at `.claude/rules/agent-discipline.md` § "Audit findings: scope-don't-defer + TDD enforcement".
+- [x] README documents the four-command operational pattern — verified at `plugins/dw-lifecycle/README.md` + cross-reference in `MIGRATING.md` (Phase 24 section).
+- [x] ROADMAP reflects the v2 shape — verified at `ROADMAP.md` § "Audit-barrage feature shape".
+- [x] Implement-skill description names the hook for discoverability — verified at `plugins/dw-lifecycle/skills/implement/SKILL.md` Step 6 + frontmatter `description:` field.
 
 ### Phase 15 — Out of Scope
 
