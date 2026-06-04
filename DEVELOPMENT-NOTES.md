@@ -4652,3 +4652,64 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - **Owed before any release:** live studio UI verification of the review-start shortform path (per `.claude/rules/ui-verification.md`); the cross-model audit-barrage on the (a)+dead-code diffs never ran (TF-006 E2BIG).
 - **Tooling:** TF-006 (barrage `spawn E2BIG` on large diffs) — light fix is to pass prompt/diff via stdin not argv.
 - **Optional:** dismantle/archive the stale `graphical-entries` worktree.
+
+## 2026-06-04 (cont.): v0.37.0 E2BIG-fix verification + barrage round-2/3 fixes + config migration
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** (post-session-end, operator-driven) Verify the v0.37.0 deskwork release's claim to fix the audit-barrage `spawn E2BIG` bug; fix our config to actually avoid it; fix the dead code the Phase-39 flip orphaned; handle the findings the now-working barrage surfaced.
+
+**Accomplished:**
+
+- **Verified the v0.37.0 E2BIG fix — real but was inert for us.** Root fix is #386 (the `{{prompt-stdin}}` stdin-delivery mechanism) + #397 (made `{{prompt-stdin}}` the template default), both CLOSED. But the fix only reaches *fresh* template installs; our committed `audit-barrage-config.yaml` (and the installer's "Example override") still used the argv `{{prompt}}`. Filed **#418** for that residual.
+- **Migrated our config to `{{prompt-stdin}}`** (`711449b5`) — #418 surface 1 closed for this repo.
+- **Proved the fix end-to-end.** A/B with a `wc -c` stand-in on the same 2.19 MB prompt (>2× the 1 MB ARG_MAX): argv form → `spawn E2BIG`; stdin form → delivered all 2,186,234 bytes, exit 0. Then a live claude+codex barrage fired clean on the migrated config (no E2BIG, both models exit 0). $0 for the A/B (no model tokens).
+- **Dead-code removal** (Phase-39 flip orphans): `scaffoldBlogPost`/`scaffold.ts`, `resolveEntryFilePath`, `resolveShortformFilePath`, `resolveChannelsPath`, `body-state.ts` (the last via barrage finding AUDIT-01). `findEntryFile`/`resolveBlogPostDir`/`resolveBlogFilePath` correctly KEPT (still consumed by `scrapbook/paths.ts` — corrected an audit-grep miss that `tsc` caught).
+- **Barrage caught + fixed real bugs in this session's own work** (3 rounds, all dispositioned, gate 0-open):
+  - AUDIT-02 (HIGH) — `renameSlug` raw ENOENT → `doctor --fix` guidance (`ef5c0616`).
+  - AUDIT-05 (HIGH) — `renameSlug` bare `catch` misreported a *corrupt* sidecar as missing → distinguish via `existsSync(sidecarPath)` (`f6481bfa`).
+  - AUDIT-01 (med) — removed orphaned `body-state.ts`; AUDIT-06 (med) — dropped the stale `body-state` ref the deletion left in `remark-strip-outline.mjs`.
+  - AUDIT-03 (low, non-bug) — `writeSidecarSync` async/sync sibling (jscpd doesn't flag it; acknowledged).
+  - AUDIT-04 (HIGH) — duplicate `### Task 39.NN` headings from a promote-findings auto-numbering collision; renumbered to dedup, root cause filed.
+- **39c-2b(c) progress:** c0 (dead code) + c1 (`resolveChannelsPath`) landed; c2/c3/c4 found ENTANGLED with the deferred c5 design (content-index model + `workflow.site` semantics + host/redirects-under-lanes), so only c1 was cleanly mechanical.
+- **Issues filed:** #418 (E2BIG residual), #419 (hygiene FR: detect dead code → surface as a sweep-tracked bug report), #420 (promote-findings auto-numbering collision).
+
+**Didn't Work:**
+
+- **Over-claimed dead code once.** A `grep -v paths.ts:` audit filter masked `scrapbook/paths.ts`; I claimed the whole slug-template family was dead and over-removed 3 still-used functions. `tsc` caught it (`TS2305`); restored + re-audited; removed only the 2 genuinely-dead resolvers. Lesson: `tsc`/reference-graph beats grep for deadness.
+- **The barrage couldn't prove E2BIG on the *useful* range.** The session's real work is ~215 KB (under the 1 MB ARG_MAX), so a session-range barrage proves nothing about E2BIG; the only >1 MB range balloons to 2.2 MB of mechanical diff that would choke the models. Hence the separate cheap `wc` A/B proof.
+- **The auto-promote generated bookkeeping churn** — duplicate task IDs on two consecutive promotes (#420). Renumbered by hand; root cause filed rather than per-promote whack-a-mole.
+
+**Course Corrections:**
+
+- [FABRICATION] Self-caught: corrected the "whole slug-template family is dead" overclaim before it shipped.
+- [PROCESS] Operator: "fix our config to avoid the bug" → migrated to `{{prompt-stdin}}` + proved it, rather than assuming the upstream release covered existing configs.
+- [PROCESS] Operator: file dead-code as a hygiene-sweep-tracked bug (#419) instead of relying on ad-hoc discovery — exactly the reactive pattern that caught all 6 dead surfaces this session.
+
+**Quantitative:**
+
+- Commits since the prior session-end: **8** (`d7516e4d`..`5a4ae136`).
+- Suites at end: **core 1009 · cli 454 · studio 1269** — all green. Core moved 1014 → 1009 net (−7 body-state test removal −2 channels test +4 new rename-slug/no-sidecar/corrupt-sidecar cases; reconciles).
+- Open audit findings: **0** (6 barrage findings this session: 4 fixed, 1 acknowledged-non-bug, 1 fixed-by-dedup).
+- Issues filed: **3** (#418, #419, #420). Referenced: #386/#397 (closed root E2BIG fix).
+
+**Insights:**
+
+- The audit-barrage, once unblocked, caught **two real correctness bugs in my own fixes** (AUDIT-02 then AUDIT-05 — a bug in the fix for AUDIT-02). The cross-model audit on new work is worth the cost precisely because the fix author is the wrong party to spot their own fix's flaws.
+- "Fix shipped upstream" ≠ "fix active for existing adopters." A default-changing release (#397) leaves every existing config inert until migrated — worth a doctor rule / fire-time warning (noted in #418).
+- A barrage→promote→fix loop converges, but the promote step's own bugs (#420 dup IDs) add churn; the loop is only as clean as its bookkeeping tooling.
+
+### Hygiene observations
+
+- Issues referenced/filed this session: #418 (OPEN), #419 (OPEN), #420 (OPEN); #397 (CLOSED, root E2BIG fix verified).
+- No bare TBD markers introduced in the workplan this session.
+- Tree clean; all 3 workspaces green; gate 0-open.
+- Stale worktrees flagged: `~/work/deskwork-work/graphical-entries` (4/9), `~/work/deskwork-work/hygiene` (3/9) — dismantle/archive candidates.
+
+### Next session recommendation (hygiene)
+
+- **Resume: 39c-2b(c5) design pass** — content-index/content-tree filesystem model under lanes (no `contentDir` to scan; orphan-detection) + `workflow.site` semantics under a single project + host/redirects-under-lanes; update the spec, THEN implement c2/c3/c4/c5 + the terminal `config.sites`/`SiteConfig`/`resolveSite`/`siteConfig`/`resolveContentDir` deletion. Gate on the "retire sites" headline.
+- **Owed before release:** live studio UI verification of the review-start shortform path (`.claude/rules/ui-verification.md`).
+- **Triage filed issues:** #418 (installer "Example override" still ships `{{prompt}}` — plugin-side), #419 (dead-code hygiene sweep), #420 (promote-findings auto-numbering).
+- **Optional:** dismantle/archive the stale `graphical-entries` + `hygiene` worktrees.
