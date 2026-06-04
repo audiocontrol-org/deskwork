@@ -12,8 +12,8 @@
  * Markdown only (operator decision): `deskwork add` creates markdown
  * entries. `--kind` still parses the four ArtifactKindSchema values
  * (graphical-entries shares the type), but a non-markdown value is
- * rejected loudly pre-write — the verb that materializes the file
- * (scaffoldBlogPost) is markdown-only.
+ * rejected loudly pre-write — deskwork only supports markdown content
+ * today, so a non-markdown entry cannot be materialized.
  *
  * Writes the calendar atomically. Emits a JSON result on stdout:
  *   { "slug": "...", "stage": "Ideas", "site": "...", "calendarPath": "..." }
@@ -129,9 +129,9 @@ export async function run(argv: string[]): Promise<void> {
     flags,
   );
 
-  // Markdown only (operator decision): `deskwork add` materializes the
-  // file via the markdown-only scaffoldBlogPost verb, so a non-markdown
-  // kind cannot be created. Reject it loudly BEFORE any disk mutation —
+  // Markdown only (operator decision): deskwork only supports markdown
+  // content today, so a non-markdown kind cannot be materialized and is
+  // rejected. Reject it loudly BEFORE any disk mutation —
   // same pre-write contract as --type / --source / --stage. (The schema
   // accepts the value; this is an explicit add-side guard.)
   if (artifactKind !== 'markdown') {

@@ -9,9 +9,8 @@
  * point it is authoritative (resolution never recomputes it).
  *
  * MARKDOWN ONLY (operator decision): `deskwork add` supports only
- * markdown entries right now. The verb that actually CREATES the file
- * (scaffoldBlogPost) is markdown-only, so a non-markdown entry can't be
- * materialized. {@link composeAddArtifactPath} therefore throws loudly
+ * markdown entries right now — deskwork has no non-markdown materializer,
+ * so a non-markdown entry can't be created. {@link composeAddArtifactPath} therefore throws loudly
  * for any non-markdown kind rather than composing a path that nothing
  * can fulfill. The `ArtifactKind` TYPE still carries the other kinds for
  * graphical-entries; only the add path gates to markdown.

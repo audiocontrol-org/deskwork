@@ -2,8 +2,8 @@
  * Classify whether a scaffolded blog post's body is still the placeholder
  * or has been replaced with real prose.
  *
- * The scaffold produced by `scaffoldBlogPost` writes an H1, optionally a
- * `## Outline` section, and a `<!-- Write your post here -->` placeholder.
+ * A blog-post scaffold writes an H1, optionally a `## Outline` section,
+ * and a `<!-- Write your post here -->` placeholder.
  * The outline is a legitimate authored artifact during Outlining; its
  * presence must NOT make the body look written. This helper strips the
  * outline and classifies what remains:
@@ -22,7 +22,7 @@ import { existsSync, readFileSync } from 'node:fs';
 
 export type BodyState = 'missing' | 'placeholder' | 'written';
 
-/** The body-placeholder marker written by scaffoldBlogPost. Exact string. */
+/** The body-placeholder marker a blog-post scaffold writes. Exact string. */
 export const PLACEHOLDER_MARKER = '<!-- Write your post here -->';
 
 /**

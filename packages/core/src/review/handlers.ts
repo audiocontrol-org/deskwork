@@ -4,9 +4,9 @@
  * { status, body } results that routes serialize as JSON.
  *
  * Ported from audiocontrol.org's scripts/lib/editorial-review/handlers.ts.
- * Site validation now checks against config.sites rather than a hardcoded
- * SITES array, and the longform blog file path uses resolveBlogFilePath
- * (which honors the site's blogFilenameTemplate config).
+ * Phase 39c-2b(a): the longform + shortform file paths now resolve from
+ * the entry's stored `artifactPath` (via `review/workflow-paths.ts`), not
+ * the slug-template — see that module.
  */
 
 import { existsSync, writeFileSync } from 'node:fs';

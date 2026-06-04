@@ -209,10 +209,6 @@
       "types": "./dist/review/types.d.ts",
       "default": "./dist/review/types.js"
     },
-    "./scaffold": {
-      "types": "./dist/scaffold.d.ts",
-      "default": "./dist/scaffold.js"
-    },
     "./schema/entry": {
       "types": "./dist/schema/entry.d.ts",
       "default": "./dist/schema/entry.js"
