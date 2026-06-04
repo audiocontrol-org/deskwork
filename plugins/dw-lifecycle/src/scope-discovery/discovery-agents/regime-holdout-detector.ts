@@ -153,6 +153,10 @@ async function collectAntiPatternFindings(
     json: true,
     // Internal scan call — `gateMode` only affects the CLI exit code.
     gateMode: false,
+    // Phase 18 added per-feature narrowing as required (#417); the
+    // discovery-agent path scans the configured moduleRoot, not a
+    // feature subset, so pass null.
+    feature: null,
   });
   const out: RegimeHoldoutFinding[] = [];
   for (const f of result.findings) {
@@ -207,6 +211,9 @@ async function collectAdopterManifestFindings(
     json: true,
     // Internal scan call — `gateMode` only affects the CLI exit code.
     gateMode: false,
+    // Phase 18 added per-feature narrowing as required (#417); the
+    // discovery-agent path scans repo-wide, so pass null.
+    feature: null,
   });
   const out: RegimeHoldoutFinding[] = [];
   for (const manifest of result.manifests) {
