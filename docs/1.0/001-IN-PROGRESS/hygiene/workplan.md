@@ -159,16 +159,16 @@ Six structural-check verbs (`check-clones`, `check-anti-patterns`, `check-adopte
 
 **Approach:** Argv accepts `--feature <slug>`. When present, holdout walk runs ONLY against feature-scope files. When absent, behavior unchanged.
 
-- [ ] Step 1: write failing test — (a) `--feature hygiene` reports only holdouts in feature-scope; (b) no flag = project-wide; (c) `--feature` + `--root` errors actionably.
-- [ ] Step 2: confirm tests fail.
-- [ ] Step 3: implement.
-- [ ] Step 4: confirm tests pass.
-- [ ] Step 5: commit with `Refs #417` in subject.
+- [x] Step 1: wrote 4 failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/adopter-manifests.feature-flag.test.ts` — (a) `--feature hygiene` filters holdouts to feature-scope; (b) no flag preserves project-wide; (c) `--feature` + `--root` exits 2 with `mutually exclusive`; (d) unknown slug → FeatureNotFoundError.
+- [x] Step 2: confirmed 3/4 failed pre-implementation; case (b) passed (no flag = baseline).
+- [x] Step 3: implemented — added `--feature <slug>` argv + mutual exclusion gate. `scan()` now accepts an optional `featureScope?: ReadonlySet<string>` of absolute paths. `scanEntry()` filters its `matched` glob results to the scope when set. `main()` resolves scope, realpath-normalizes each path against `realpath(cwd)`, and passes the set in.
+- [x] Step 4: 4/4 tests pass; full plugin suite 2716/2716 green.
+- [x] Step 5: commit with `Refs #417` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] `dw-lifecycle check-adopters --feature hygiene` exits 0.
-- [ ] Test cases pass; plugin suite green.
+- [x] `dw-lifecycle check-adopters --feature hygiene` exits 0 without `unknown arg`.
+- [x] Test cases pass; plugin suite green (2716/2716).
 
 ### Task 5: `check-module-symmetry` learns `--feature <slug>`
 
