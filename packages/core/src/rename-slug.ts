@@ -24,7 +24,7 @@ import { readCalendar, writeCalendar } from './calendar.ts';
 import { readSidecarSync } from './sidecar/read.ts';
 import { writeSidecarSync } from './sidecar/write.ts';
 import { sidecarPath } from './sidecar/paths.ts';
-import { loadLaneConfig } from './lanes/loader.ts';
+import { loadLaneConfig, laneConfigPath } from './lanes/loader.ts';
 
 /**
  * Detect a slug rename's filesystem shape from the entry's stored
@@ -180,6 +180,23 @@ export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
         `\`deskwork doctor --fix\` to backfill it before renaming.`,
     );
   }
+
+  // Resolve the optional 301-redirect target (lane.redirectsPath, spec
+  // Decision #23) BEFORE any filesystem/calendar mutation — AUDIT-20260604-08.
+  // `loadLaneConfig` is a THROWING resolver, so resolving it inline at the
+  // append step (after the artifact move + calendar write) risked a
+  // partial-apply: a sidecar naming an archived/purged/legacy-stale lane
+  // would crash AFTER the rename already mutated disk. Discriminate the
+  // same way the sidecar read does (AUDIT-20260604-05): a MISSING lane
+  // config is tolerated → skip the optional append (a renamed entry whose
+  // lane is gone is still a valid rename); a PRESENT-but-corrupt lane is
+  // operator-actionable → re-throw, but now pre-mutation so no partial state.
+  let redirectsPath: string | undefined;
+  if (sidecar.lane !== undefined) {
+    if (existsSync(laneConfigPath(projectRoot, sidecar.lane))) {
+      redirectsPath = loadLaneConfig(sidecar.lane, projectRoot).redirectsPath;
+    }
+  }
   const move = planArtifactMove(sidecar.artifactPath, newSlug);
   const fromAbs = join(projectRoot, move.fromRel);
   const toAbs = join(projectRoot, move.toRel);
@@ -245,10 +262,7 @@ export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
   //    redirectsPath, the append is SKIPPED — this is optional
   //    website-publishing metadata; skipping is the correct unset
   //    behavior, NOT an error (a collection without a renderer is valid).
-  const redirectsPath =
-    sidecar.lane !== undefined
-      ? loadLaneConfig(sidecar.lane, projectRoot).redirectsPath
-      : undefined;
+  // `redirectsPath` was resolved before the mutation steps (see above).
   if (redirectsPath !== undefined) {
     const redirectsFile = join(projectRoot, redirectsPath);
     const block = buildRedirectBlock(oldSlug, newSlug);

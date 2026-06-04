@@ -64,10 +64,14 @@ export interface SiteConfig {
    */
   blogOutlineSection?: boolean;
   /**
-   * Path to the site's `_redirects` file (Netlify-style), relative to
-   * the project root. The slug-rename helper appends 301 redirects here
-   * when an existing post is renamed. Optional — when unset, slug-rename
-   * skips the redirect-append step.
+   * LEGACY MIGRATION INPUT ONLY (Phase 39c / spec Decision #23). Path to
+   * the site's `_redirects` file (Netlify-style), relative to the project
+   * root. This field is RETIRED for runtime use: `redirectsPath` re-homed
+   * onto `LaneConfig.redirectsPath`, and `renameSlug` now reads
+   * `loadLaneConfig(sidecar.lane).redirectsPath` — it no longer reads this
+   * `SiteConfig` field. Retained solely so the sites-to-lanes migration can
+   * read the legacy value and carry it onto the lane; removed wholesale
+   * with `SiteConfig` in the terminal-deletion step.
    */
   redirectsPath?: string;
 }

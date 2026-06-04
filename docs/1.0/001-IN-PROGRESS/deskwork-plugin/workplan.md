@@ -2157,6 +2157,91 @@ Closes AUDIT-20260603-40. Surface: `packages/core/src/lanes/scaffold-path.ts:29`
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
+
+### Task 39.21 (fix-finding-AUDIT-20260604-08): AUDIT-20260604-08 — `loadLaneConfig(sidecar.lane, …)` throws on a named-but-unre…
+
+Closes AUDIT-20260604-08 (claude-01 + claude-03 + codex-01; cross-model). Surface: `packages/core/src/rename-slug.ts:248-256` (the `sidecar.lane !== undefined ? loadLaneConfig(sidecar.lane, projectRoot).redirectsPath : undefined` block) + the step-4 placement after `writeCalendar` (`:236`). Severity: high.
+
+- [x] Step 0: working-code invariant — c4's redirect-append correctly skips when the lane carries no `redirectsPath`; the fix must preserve that skip while also tolerating an unresolvable lane and never partial-applying.
+- [x] Step 1: write failing test exercising the bug — `packages/core/test/rename-slug.test.ts:289` (sidecar names lane `ghost` with no `lanes/ghost.json` → rename must complete + skip redirect, not throw).
+- [x] Step 1b: regression-lock test — `packages/core/test/rename-slug.test.ts:316` (present-but-corrupt lane → throws BEFORE any mutation; artifact + calendar untouched = no partial-apply).
+- [x] Step 2: confirmed both fail against current code (ghost-lane threw `Lane config "ghost" not found`; corrupt-lane left the artifact already moved — partial-apply proven).
+- [x] Step 3: implemented — lane→redirectsPath resolution moved BEFORE the mutation steps; `existsSync(laneConfigPath(...))` discriminates missing (skip) vs present-but-corrupt (re-throw, pre-mutation).
+- [x] Step 4: all green (core 1018).
+- [x] Step 5: committed with `Closes AUDIT-20260604-08 (claude-01 + claude-03 + codex-01; cross-model)`.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `packages/core/test/rename-slug.test.ts:289`
+- [x] Regression-lock test exists in the same file (`:316`); ≥2 test blocks per Option D discipline
+- [x] `npx vitest run test/rename-slug.test.ts` exits 0 (10 passed)
+- [x] Audit-log Status flipped to `fixed-<sha>` via `apply-audit-flips`
+
+
+### Task 39.22 (fix-finding-AUDIT-20260604-09): AUDIT-20260604-09 — Test suite is blind to the named-but-unresolvable-lane crash…
+
+Closes AUDIT-20260604-09. Surface: `packages/core/test/rename-slug.test.ts:221-280` (the three `39c c4 lane.redirectsPath` cases) — `seedLane('main', …)`, `seedLane('main')`, and no-lane. Severity: medium.
+
+- [x] Step 1: write failing test — `packages/core/test/rename-slug.test.ts:289` (the named-but-unresolvable-lane case the three c4 tests were blind to).
+- [x] Step 2: confirmed it failed (threw against current code).
+- [x] Step 3: fix shared with AUDIT-08 (the tolerant resolution).
+- [x] Step 4: passes (core 1018).
+- [x] Step 5: committed with `Closes AUDIT-20260604-09`.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `packages/core/test/rename-slug.test.ts:289`
+- [x] `npx vitest run test/rename-slug.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via `apply-audit-flips`
+
+
+### Task 39.23 (fix-finding-AUDIT-20260604-10): AUDIT-20260604-10 — Existing lane files skip the new `redirectsPath` migration a…
+
+Closes AUDIT-20260604-10. Surface: `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:306-344`. Severity: medium.
+
+- [x] Step 1: write failing test — `packages/core/test/doctor/sites-to-lanes-migration.test.ts:196` (pre-existing lane lacking redirectsPath + legacy site with one → merge, not drop).
+- [x] Step 2: confirmed it failed (lane.redirectsPath was undefined post-fix → skipped).
+- [x] Step 3: implemented — existing-lane branch merges legacy `redirectsPath` onto the lane (preserving operator fields) instead of `continue`-ing; journals the merge.
+- [x] Step 4: passes (core 1018).
+- [x] Step 5: committed with `Closes AUDIT-20260604-10`.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `packages/core/test/doctor/sites-to-lanes-migration.test.ts:196`
+- [x] `npx vitest run test/doctor/sites-to-lanes-migration.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via `apply-audit-flips`
+
+
+### Task 39.24 (fix-finding-AUDIT-20260604-11): AUDIT-20260604-11 — Invalid legacy `redirectsPath` is silently omitted instead o…
+
+Closes AUDIT-20260604-11. Surface: `packages/core/src/doctor/legacy-config.ts:66-69` and `packages/core/src/doctor/legacy-config.ts:152-159`. Severity: medium.
+
+- [x] Step 1: write failing test — `packages/core/test/doctor/sites-to-lanes-migration.test.ts:244` (`readLegacySites` throws on a present-but-invalid redirectsPath) + `:268` (absent-is-not-invalid guard).
+- [x] Step 2: confirmed `readLegacySites` previously omitted the invalid value silently.
+- [x] Step 3: implemented — `readLegacySites` rejects a present-but-non-string/empty `redirectsPath` (matches live `parseSiteConfig`); absent stays omitted.
+- [x] Step 4: passes (core 1018).
+- [x] Step 5: committed with `Closes AUDIT-20260604-11`.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `packages/core/test/doctor/sites-to-lanes-migration.test.ts:244`
+- [x] `npx vitest run test/doctor/sites-to-lanes-migration.test.ts` exits 0
+- [x] Audit-log Status flipped to `fixed-<sha>` via `apply-audit-flips`
+
+
+### Task 39.25 (fix-finding-AUDIT-20260604-12) (non-bug): AUDIT-20260604-12 — `SiteConfig.redirectsPath` still documents the old runtime o…
+
+Acknowledges AUDIT-20260604-12. Surface: `packages/core/src/config.ts:67-70` (docblock only). Severity: low. **Non-bug / doc-only:** this is a comment reword — no runtime behavior changes, so NO test can exercise it (the TDD-bug shape does not apply; using `Acknowledges` not `Closes` avoids arming a false `fixed-<sha>` flip + a phantom test-citation expectation, per the non-bug-disposition discipline).
+
+- [x] Step 1 (disposition prose): reworded the `SiteConfig.redirectsPath` docblock to mark it LEGACY MIGRATION INPUT ONLY — it states the field is retired for runtime use, that `renameSlug` reads `loadLaneConfig(sidecar.lane).redirectsPath`, and that it is retained solely for the migration read until terminal deletion.
+- [x] Step 2: committed with `Acknowledges AUDIT-20260604-12`.
+
+**Acceptance Criteria:**
+
+- [x] Docblock no longer claims `renameSlug` appends here; points at the lane-owned model + terminal-deletion fate.
+- [x] No test (doc-only change); core suite stays green (1018).
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 39.8 (fix-finding-AUDIT-20260603-41): AUDIT-20260603-41 — `add` stamps a lanes-composed `artifactPath`, but `scaffoldB…
 
 Closes AUDIT-20260603-41. Surface: `packages/cli/src/commands/add.ts:155-167` (compose + stamp) vs. `packages/core/src/scaffold.ts:27` (`import { resolveSite, resolveBlogFilePath } from './paths.ts'`) — still present after the refactor. Severity: medium.

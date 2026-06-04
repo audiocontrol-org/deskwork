@@ -278,4 +278,54 @@ describe('renameSlug — 39c c4 lane.redirectsPath (spec Decision #23)', () => {
     expect(result.actions.some((a) => a.kind === 'redirect-append')).toBe(false);
     expect(existsSync(join(root, '_redirects'))).toBe(false);
   });
+
+  // AUDIT-20260604-08 (HIGH, cross-model) + AUDIT-20260604-09: a sidecar
+  // naming a lane whose config is ABSENT (archived / purged / legacy-stale)
+  // must NOT crash the rename. The redirect append is optional website
+  // metadata; an unresolvable lane skips it. And the rename must COMPLETE
+  // (artifact moved, calendar slug updated) — never a partial-apply where
+  // a post-mutation lane-resolution throw leaves disk + calendar changed
+  // but the command errored.
+  it('completes the rename and skips redirects when the sidecar names a lane with no config on disk (archived/purged)', () => {
+    seed('old-post', 'docs/old-post/index.md', 'ghost'); // lane 'ghost' has no lanes/ghost.json
+    mkdirSync(join(root, 'docs', 'old-post'), { recursive: true });
+    writeFileSync(join(root, 'docs/old-post/index.md'), '# Body\n', 'utf-8');
+
+    const result = renameSlug({
+      projectRoot: root,
+      config: config(),
+      oldSlug: 'old-post',
+      newSlug: 'new-post',
+    });
+
+    // Rename succeeded end-to-end.
+    expect(existsSync(join(root, 'docs/old-post/index.md'))).toBe(false);
+    expect(existsSync(join(root, 'docs/new-post/index.md'))).toBe(true);
+    expect(readSidecarSync(root, UUID).artifactPath).toBe('docs/new-post/index.md');
+    const cal = readCalendar(join(root, '.deskwork', 'calendar.md'));
+    expect(cal.entries.find((e) => e.id === UUID)?.slug).toBe('new-post');
+    // Redirect step skipped (no lane config to read redirectsPath from).
+    expect(result.actions.some((a) => a.kind === 'redirect-append')).toBe(false);
+    expect(existsSync(join(root, '_redirects'))).toBe(false);
+  });
+
+  // AUDIT-20260604-08: a sidecar naming a lane whose config is PRESENT but
+  // CORRUPT is operator-actionable — renameSlug may throw, but it must do
+  // so BEFORE any filesystem/calendar mutation (no partial-apply). The
+  // throw happens at lane-resolution, which now runs before step 1.
+  it('throws on a present-but-corrupt lane config WITHOUT mutating disk or calendar', () => {
+    seed('old-post', 'docs/old-post/index.md', 'broken');
+    mkdirSync(join(root, 'docs', 'old-post'), { recursive: true });
+    writeFileSync(join(root, 'docs/old-post/index.md'), '# Body\n', 'utf-8');
+    writeFileSync(join(root, '.deskwork', 'lanes', 'broken.json'), '{ not valid json', 'utf-8');
+
+    expect(() =>
+      renameSlug({ projectRoot: root, config: config(), oldSlug: 'old-post', newSlug: 'new-post' }),
+    ).toThrow();
+    // No partial-apply: the artifact and calendar are untouched.
+    expect(existsSync(join(root, 'docs/old-post/index.md'))).toBe(true);
+    expect(existsSync(join(root, 'docs/new-post/index.md'))).toBe(false);
+    const cal = readCalendar(join(root, '.deskwork', 'calendar.md'));
+    expect(cal.entries.find((e) => e.id === UUID)?.slug).toBe('old-post');
+  });
 });

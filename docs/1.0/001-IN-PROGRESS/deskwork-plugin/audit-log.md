@@ -1195,3 +1195,62 @@ Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md` (`### Task 39
 The fix for AUDIT-06 is a pure documentation-drift reword: the comment in `remark-strip-outline.mjs` drops the stale `body-state.ts` cross-reference (`Matches the line-based stripper in body-state.ts` → `Uses mdast traversal`). There is no behavioral contract to test — the `.mjs` stripper's runtime behavior is identical before and after. Yet Task 39.19 is scaffolded with the full TDD bug shape: *"Step 1: write failing test exercising the bug,"* *"Step 2: confirm test fails against current code,"* and an acceptance criterion *"Failing test exists at `(to be filled in by Step 1 implementer)`."* These steps are uncheckable for a comment reword, and indeed Step 1's test-path criterion is left `[ ]` while the audit-log Status was flipped to `fixed-f6481bfa`.
 
 This is the identical mismatch that AUDIT-20260603-48 surfaced (a HIGH source change shaped as `(non-bug)`), only inverted: here a doc-only change got the TDD-bug shape instead of the `(non-bug)` disposition shape used correctly for 39.17 (AUDIT-03) and 39.21 (AUDIT-04). The fix is to re-shape Task 39.19 as `(non-bug)` with a disposition-prose step and an `Acknowledges`/`Closes`-with-no-test acceptance criterion, matching how the project handles doc-drift dispositions elsewhere. As written, the workplan claims a failing test should exist for a change that cannot have one — a future implementer or auditor reading the unchecked Step-1 boxes can't tell whether the TDD walk was skipped legitimately (no test possible) or skipped improperly.
+
+## 2026-06-04 — audit-barrage lift (20260604T204822463Z-deskwork-plugin)
+
+### AUDIT-20260604-08 — `loadLaneConfig(sidecar.lane, …)` throws on a named-but-unresolvable lane — rename crashes AFTER the filesystem + calendar are already mutated, and the "skip when unset" contract only covers `lane === undefined`
+
+Finding-ID: AUDIT-20260604-08 (claude-01 + claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/rename-slug.ts:248-256` (the `sidecar.lane !== undefined ? loadLaneConfig(sidecar.lane, projectRoot).redirectsPath : undefined` block) + the step-4 placement after `writeCalendar` (`:236`)
+
+The new redirect resolution guards exactly one unset shape — `sidecar.lane === undefined` → skip. But when `sidecar.lane` IS present, the code calls `loadLaneConfig(sidecar.lane, projectRoot)` unconditionally, and `loadLaneConfig` is a **throwing resolver**: the new test fixture itself seeds a `pipelines/editorial.json` precisely because "loadLaneConfig's pipeline cross-validation resolves" — i.e. it throws when the lane config file is absent OR its pipeline template can't be resolved. So a sidecar that names a lane whose config was archived/purged (there's a `deskwork:lane archive`/`purge` skill), or a legacy sidecar carrying a stale `lane` string, now crashes `renameSlug` with a raw lane/pipeline-resolution error instead of skipping the optional redirect step. This is the identical failure class the project already fixed twice this session for the sidecar read (AUDIT-20260604-02/-05): an *optional* metadata lookup that throws on a drift case it should tolerate.
+
+Worse, the throw lands at **step 4**, after step-3 `writeCalendar` (`:236`) and after the artifact files were already moved on disk. The rename has fully mutated the filesystem and the calendar, then crashes on a redirect-config read that the spec itself calls optional ("skipping is the correct unset behavior, NOT an error"). The operator sees a hard error on a rename that actually succeeded, and a re-run hits "oldSlug not found" — exactly the misleading half-completed state the c4 design tried to avoid.
+
+The fix mirrors the read.ts discrimination the project already adopted: resolve the lane defensively (existence-check the lane config, or catch and only swallow the not-found case) and map an unresolvable lane to a *skip* of the redirect append — never a throw — because a renamed entry whose lane is gone is still a valid rename. Re-throwing only makes sense if the lane is present-but-corrupt AND you decide that's an operator-actionable error; defaulting the whole branch to crash on any lane-resolution failure is the bug.
+
+### AUDIT-20260604-09 — Test suite is blind to the named-but-unresolvable-lane crash — all three new c4 tests seed a fully-valid lane, so the throwing path ships untested
+
+Finding-ID: AUDIT-20260604-09
+Status:     open
+Severity:   medium
+Surface:    `packages/core/test/rename-slug.test.ts:221-280` (the three `39c c4 lane.redirectsPath` cases) — `seedLane('main', …)`, `seedLane('main')`, and no-lane
+
+The three new tests cover exactly the three benign shapes: (a) lane with `redirectsPath` → append, (b) lane without `redirectsPath` → skip, (c) no lane on the sidecar → skip. Every case either seeds a complete on-disk lane (via `seedLane`, which also depends on the seeded `pipelines/editorial.json`) or omits the lane entirely. None exercises the case in AUDIT-BARRAGE-claude-01: `sidecar.lane` set to a lane id with **no** `lanes/<id>.json` on disk, or a lane whose `pipelineTemplate` can't resolve. That is the realistic upgrade/drift scenario (archived lane, purged lane, legacy sidecar), and it is precisely the path that crashes.
+
+This is the same observation prior findings made about the sidecar tests (AUDIT-20260604-02: "seeds the sidecar in every case … so the no-sidecar path is untested"). The redirect-resolution gained a new throwing dependency (`loadLaneConfig`) and the suite added zero coverage for that dependency failing. A regression test that seeds a sidecar with `lane: 'ghost'` and no `lanes/ghost.json`, asserting `renameSlug` completes and merely skips the redirect (not throws), would both pin the intended contract and fail against the current implementation.
+
+### AUDIT-20260604-10 — Existing lane files skip the new `redirectsPath` migration and then the legacy source is dropped
+
+Finding-ID: AUDIT-20260604-10
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/doctor/rules/sites-to-lanes-migration.ts:306-344`
+
+The migration only copies legacy `site.redirectsPath` when creating a brand-new lane. If `.deskwork/lanes/<slug>.json` already exists, `if (existsSync(target)) continue;` at `:307-308` bypasses `laneFromSite`, so the new `redirectsPath` field is never merged into the lane. The rule then proceeds to `dropSitesBlock(ctx.projectRoot)` at `:344`, removing the only remaining copy of the legacy redirect path.
+
+This can happen on a repair rerun or any partially migrated project where lane files exist before this c4 code runs. The new test only exercises fresh lane creation, so it cannot catch this loss path. The migration needs an existing-lane branch that preserves operator-authored lane data while adding `redirectsPath` when the legacy site has one and the lane lacks it, or it must halt instead of dropping `sites`.
+
+### AUDIT-20260604-11 — Invalid legacy `redirectsPath` is silently omitted instead of failing like live config parsing
+
+Finding-ID: AUDIT-20260604-11
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/doctor/legacy-config.ts:66-69` and `packages/core/src/doctor/legacy-config.ts:152-159`
+
+`readLegacySites` reads `redirectsPath` through `readString`, which returns `undefined` for every non-string or empty-string value. That means a present but invalid legacy `sites.<slug>.redirectsPath` is treated exactly like an absent value and omitted from the new lane at `:155-159`. Live config parsing rejects that same shape loudly in `packages/core/src/config.ts:306-313`.
+
+Because the migration later removes the legacy `sites` block, this can silently discard a malformed-but-present redirect configuration instead of telling the operator to repair it. For `redirectsPath`, “present but invalid” should be a migration error, not an omitted optional. The focused fix is to validate `redirectsPath` when the key exists, matching `parseSiteConfig`’s non-empty-string rule.
+
+### AUDIT-20260604-12 — `SiteConfig.redirectsPath` still documents the old runtime owner
+
+Finding-ID: AUDIT-20260604-12
+Status:     acknowledged-2026-06-04 (non-bug doc-only reword; SiteConfig.redirectsPath docblock now marked LEGACY MIGRATION INPUT ONLY — no runtime change, no test possible)
+Severity:   low
+Surface:    missing from diff: `packages/core/src/config.ts:67-70`
+
+The implementation moves rename redirects to `LaneConfig.redirectsPath`, and the workplan explicitly says `SiteConfig.redirectsPath` is kept only for migration read until terminal deletion. But the retained `SiteConfig` comment still says “The slug-rename helper appends 301 redirects here when an existing post is renamed” at `config.ts:67-70`.
+
+That is now false: `renameSlug` reads `loadLaneConfig(sidecar.lane).redirectsPath` instead. This is documentation drift in a live type definition, and it points future maintainers back toward the retired site-owned model. Reword the comment to mark it as legacy migration input only.

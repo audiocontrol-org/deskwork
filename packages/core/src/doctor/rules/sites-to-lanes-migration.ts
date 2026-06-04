@@ -37,7 +37,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { appendJournalEvent } from '../../journal/append.ts';
 import { commitLaneConfig } from '../../lanes/operations/commit.ts';
-import { laneConfigPath, lanesDir } from '../../lanes/loader.ts';
+import { laneConfigPath, lanesDir, loadLaneConfig } from '../../lanes/loader.ts';
 import { LaneConfigSchema, type LaneConfig } from '../../lanes/types.ts';
 import {
   dropSitesBlock,
@@ -305,7 +305,36 @@ const rule: DoctorRule = {
       }
       for (const [slug, site] of sites) {
         const target = laneConfigPath(ctx.projectRoot, slug);
-        if (existsSync(target)) continue;
+        if (existsSync(target)) {
+          // AUDIT-20260604-10: a pre-existing lane file (re-run / partial
+          // migration) was previously skipped wholesale — then Step 3's
+          // dropSitesBlock removed the only remaining copy of the legacy
+          // `redirectsPath`, silently discarding it. Merge the legacy
+          // redirectsPath onto the existing lane when the lane lacks it,
+          // preserving operator-authored fields. Other fields are not
+          // re-derived here (the lane already exists by operator/earlier
+          // intent); only the c4-introduced redirectsPath is reconciled.
+          if (site.redirectsPath !== undefined) {
+            const existing = loadLaneConfig(slug, ctx.projectRoot);
+            if (existing.redirectsPath === undefined) {
+              commitLaneConfig(
+                ctx.projectRoot,
+                slug,
+                { ...existing, redirectsPath: site.redirectsPath },
+                'merge-legacy-redirectsPath',
+              );
+              await appendJournalEvent(ctx.projectRoot, {
+                kind: 'lane-migration',
+                at: new Date().toISOString(),
+                migration: 'merge-redirectsPath-into-existing-lane',
+                source: `sites.${slug}`,
+                target: `lanes.${slug}`,
+                details: { legacySiteId: slug, redirectsPath: site.redirectsPath },
+              });
+            }
+          }
+          continue;
+        }
         const lane = laneFromSite(slug, site);
         const validated = LaneConfigSchema.safeParse(lane);
         if (!validated.success) {

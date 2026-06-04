@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runRepair, yesInteraction } from '@/doctor/runner';
 import { readConfig } from '@/config';
+import { readLegacySites } from '@/doctor/legacy-config';
 import { loadLaneConfig } from '@/lanes/loader';
 import { readSidecar } from '@/sidecar/read';
 import { writeSidecar } from '@/sidecar/write';
@@ -190,6 +191,91 @@ describe('sites-to-lanes-migration doctor rule', () => {
     // (omitted, not an empty string).
     const docsLane = loadLaneConfig('docs', root);
     expect(docsLane.redirectsPath).toBeUndefined();
+  });
+
+  it('merges legacy site.redirectsPath onto a PRE-EXISTING lane that lacks it, instead of dropping it (AUDIT-20260604-10)', async () => {
+    // Re-run / partial-migration shape: the `blog` lane already exists
+    // (e.g. created by an earlier migration pass) but carries NO
+    // redirectsPath, while the legacy site still has one. The old
+    // `if (existsSync(target)) continue;` skipped the merge and then
+    // dropSitesBlock removed the only remaining copy → data loss.
+    await writeFile(
+      join(root, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: {
+          blog: {
+            contentDir: 'src/content/blog',
+            calendarPath: '.deskwork/calendar.md',
+            host: 'blog.example.com',
+            redirectsPath: 'public/_redirects',
+          },
+        },
+        defaultSite: 'blog',
+      }),
+    );
+    // Pre-existing lane file WITHOUT redirectsPath.
+    await mkdir(join(root, '.deskwork', 'lanes'), { recursive: true });
+    await writeFile(
+      join(root, '.deskwork', 'lanes', 'blog.json'),
+      JSON.stringify({
+        id: 'blog',
+        name: 'blog',
+        pipelineTemplate: 'editorial',
+        host: 'blog.example.com',
+        scaffoldDefaults: { markdown: 'src/content/blog' },
+      }),
+    );
+
+    const config = readConfig(root);
+    await runRepair(
+      { projectRoot: root, config, ruleIds: ['sites-to-lanes-migration'] },
+      yesInteraction,
+    );
+
+    // The pre-existing lane gained the legacy redirectsPath rather than losing it.
+    const blogLane = loadLaneConfig('blog', root);
+    expect(blogLane.redirectsPath).toBe('public/_redirects');
+    // Operator-authored fields are preserved.
+    expect(blogLane.scaffoldDefaults?.markdown).toBe('src/content/blog');
+    expect(blogLane.host).toBe('blog.example.com');
+  });
+
+  it('readLegacySites throws on a present-but-invalid redirectsPath instead of silently omitting it (AUDIT-20260604-11)', async () => {
+    // The migration's RAW reader (readLegacySites) bypasses readConfig's
+    // validation. Live config parsing rejects a present-but-non-string
+    // redirectsPath loudly (config.ts:306-313); the raw reader must not
+    // silently treat it as absent and then let dropSitesBlock discard a
+    // malformed-but-present value. Match parseSiteConfig's loud rejection.
+    await writeFile(
+      join(root, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: {
+          blog: {
+            contentDir: 'src/content/blog',
+            calendarPath: '.deskwork/calendar.md',
+            redirectsPath: '', // present but empty — invalid
+          },
+        },
+        defaultSite: 'blog',
+      }),
+    );
+
+    expect(() => readLegacySites(root)).toThrow(/redirectsPath/i);
+  });
+
+  it('readLegacySites omits redirectsPath cleanly when the key is absent (AUDIT-20260604-11 — absent is not invalid)', async () => {
+    await writeFile(
+      join(root, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: { blog: { contentDir: 'src/content/blog', calendarPath: '.deskwork/calendar.md' } },
+        defaultSite: 'blog',
+      }),
+    );
+    const legacy = readLegacySites(root);
+    expect(legacy.sites.get('blog')?.redirectsPath).toBeUndefined();
   });
 
   it('reports the pre-migration shape in audit (sites present)', async () => {
