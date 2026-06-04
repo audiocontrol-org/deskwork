@@ -52,11 +52,12 @@ export function handleStartLongform(
 ): HandlerResult {
   if (!body || typeof body !== 'object') return err(400, 'expected JSON object body');
   const b = body as Partial<StartLongformBody>;
+  // Phase 39c c3 (spec Decision #22): `site` is an opaque recorded label,
+  // no longer validated against `config.sites` (there are no sites to
+  // validate against under entry-owns-location). An unknown/absent entry
+  // is surfaced by the entry-lookup path below (the 404), not a
+  // site-membership 400.
   if (!b.site) return err(400, 'site is required');
-  if (!(b.site in config.sites)) {
-    const known = Object.keys(config.sites).join(', ');
-    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
-  }
   if (!b.slug || typeof b.slug !== 'string') return err(400, 'slug is required');
   if (!SLUG_RE.test(b.slug)) {
     return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
@@ -148,11 +149,10 @@ export function handleStartShortform(
 ): HandlerResult {
   if (!body || typeof body !== 'object') return err(400, 'expected JSON object body');
   const b = body as Partial<StartShortformBody>;
+  // Phase 39c c3 (spec Decision #22): `site` is an opaque recorded label,
+  // no longer validated against `config.sites`. A missing entry surfaces
+  // via the entry-lookup 404 below, not a site-membership 400.
   if (!b.site) return err(400, 'site is required');
-  if (!(b.site in config.sites)) {
-    const known = Object.keys(config.sites).join(', ');
-    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
-  }
   if (!b.slug || typeof b.slug !== 'string') return err(400, 'slug is required');
   if (!SLUG_RE.test(b.slug)) {
     return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);

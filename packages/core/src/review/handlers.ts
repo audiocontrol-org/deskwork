@@ -266,10 +266,9 @@ export function handleGetWorkflow(
   if (!query.entryId && (!query.site || !query.slug)) {
     return err(400, 'either id, entryId, or (site & slug) query params are required');
   }
-  if (query.site && !(query.site in config.sites)) {
-    const known = Object.keys(config.sites).join(', ');
-    return err(400, `unknown site: ${query.site}. Configured: ${known}`);
-  }
+  // Phase 39c c3 (spec Decision #22): `site` is an opaque recorded label,
+  // no longer validated against `config.sites`. An unrecognized site for
+  // which no workflow matches falls through to the existing 404 below.
   const contentKind = (query.contentKind ?? 'longform') as
     | 'longform'
     | 'shortform'
