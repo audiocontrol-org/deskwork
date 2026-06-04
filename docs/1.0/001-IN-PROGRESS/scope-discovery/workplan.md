@@ -943,6 +943,127 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 - [x] `--gate-mode` flag on check-* commands exits non-zero on violations — landed across `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions` (default informational; flag flips to hook-friendly exit 1) and `detect-clones` (already gate-by-default; flag is a no-op for symmetry). 10 new vitest scenarios cover the flag delta.
 - [x] `--json` flag on summary/export commands emits structured output — `scope-summary --json` emits `{ surface, clones, total, pending-touching, pending-intra, dispositioned-touching }`; `scope-export --json` emits the parsed manifest re-serialized via `JSON.stringify`; `check-deprecations --json` emits `{ total, deprecation_count, filesVisited, blocked: [...], safeToDelete: [...] }` (the post-port shape; the pre-port shell's `{ blocked, safeToDelete, deprecation_count, note }` is a superset).
 
+### Task 40 (fix-issue-#411): close-shipped `apply` — `pending-verification` label must already exist; no pre-flight / auto-create ([#411](https://github.com/audiocontrol-org/deskwork/issues/411))
+
+Closes #411. Surface: `plugins/dw-lifecycle/src/subcommands/close-shipped-apply.ts` (or wherever the per-issue dispatch lives), `plugins/dw-lifecycle/skills/close-shipped/SKILL.md`. Severity: medium (first-run adopter friction; comment-already-posted half-state requires manual recovery).
+
+Context: surfaced 2026-06-04 dogfood — first `close-shipped apply` against `audiocontrol-org/deskwork` failed all 10 `gh issue edit --add-label pending-verification` calls because the label didn't exist; comments had already posted, so re-run would duplicate them. Recovery loop ran 10 `gh issue edit` calls by hand.
+
+- [ ] Step 0: working-code invariant — adopters who already have the label keep the current behavior (no double-create, no surprising mutation).
+- [ ] Step 1: bug-repro integration test that stubs `gh label list` returning empty + asserts `close-shipped apply` does NOT post any comment before failing or auto-creating; existing happy-path test still passes.
+- [ ] Step 2: regression-lock — `gh label list` returning the label → behavior unchanged from today (comment + add-label per issue).
+- [ ] Step 3: implementation — pre-flight `gh label list --repo <repo> --search <label>` BEFORE the per-issue loop; if absent, EITHER auto-create with default color `fbca04` + description "Fix shipped in a release; awaiting operator verification before close" OR refuse with an actionable error (operator preference — propose: auto-create as the zero-config default, refusal-with-message under `--no-create-label`). Update SKILL.md to document the new behavior.
+- [ ] Step 4: live-verify against a fresh repo / a repo with the label deleted; full plugin suite green; commit with `Closes #411` trailer.
+
+**Acceptance Criteria:**
+
+- [ ] Bug-repro test exists; was failing on main pre-fix (proved by stubbing `gh label list` returning empty).
+- [ ] Default behavior auto-creates the label (or refuses cleanly per operator pick during implementation).
+- [ ] No comments post on issues if the pre-flight fails — the half-applied state from today's run is structurally impossible after the fix.
+- [ ] SKILL.md documents the pre-flight + auto-create path.
+
+### Task 41 (fix-issue-#412): close-shipped SKILL.md prescribes bare `/tmp/<name>` paths that conflict with file-handling rule ([#412](https://github.com/audiocontrol-org/deskwork/issues/412))
+
+Closes #412. Surface: `plugins/dw-lifecycle/skills/close-shipped/SKILL.md`, agent-side orchestration helper (the per-bundle prompt + verdicts directory paths). Severity: medium (safety-classifier warning today; race-prone path under parallel sessions).
+
+Context: SKILL.md Step 2/Step 6 reference `/tmp/close-shipped-bundles.json` and `/tmp/close-shipped-verdicts.json` verbatim. The Phase A Step 5 instruction to sub-agents to write verdict files at `/tmp/close-shipped-verdicts/<N>.json` likewise. The 2026-06-04 dogfood surfaced a safety-classifier warning on the #406 sub-agent dispatch citing `.claude/rules/file-handling.md` § "no un-namespaced `/tmp/<name>`".
+
+- [ ] Step 0: working-code invariant — the workflow's end-to-end shape (`scan` → agent dispatch → `propose` → operator-edit → `apply`) doesn't change; only the temp-file path scheme changes.
+- [ ] Step 1: bug-repro test — assert that the scan output path is `mktemp`-style OR a project-local `.dw-lifecycle/close-shipped/runs/<timestamp>/bundles.json`; assert the proposal helper accepts an explicit `--bundles <path>` regardless of location.
+- [ ] Step 2: regression-lock — proposals continue to land at `.dw-lifecycle/close-shipped/proposals-<timestamp>.json` (existing convention).
+- [ ] Step 3: implementation — either (a) switch SKILL.md + helpers to `mktemp` (cheap fix; ephemeral cleanup), OR (b) move bundles + verdicts + per-bundle prompts under `.dw-lifecycle/close-shipped/runs/<timestamp>/` (auditable; worktree-safe; consistent with proposals/). Recommend (b) per the issue body. Update SKILL.md Steps 2/5/6 to use the new path scheme.
+- [ ] Step 4: full plugin suite green; commit with `Closes #412` trailer.
+
+**Acceptance Criteria:**
+
+- [ ] No `/tmp/close-shipped-*` paths in SKILL.md or in any helper that runs on the agent's side.
+- [ ] Tests assert the new path scheme.
+- [ ] SKILL.md Step prose updated to match the implementation.
+- [ ] Two parallel sessions running the workflow in different worktrees do NOT clobber each other's bundles / verdicts.
+
+### Task 42 (fix-issue-#366): close-shipped commit-log walker matches any `#NNN` mention as fix-shipped — false-positive comments ([#366](https://github.com/audiocontrol-org/deskwork/issues/366))
+
+Closes #366. Surface: `plugins/dw-lifecycle/src/scope-discovery/close-shipped/scanners/commit-log.ts` (or equivalent), `plugins/dw-lifecycle/skills/close-shipped/SKILL.md` § "Commit-log scan". Severity: medium (Phase 13 narrowing landed for argv-keyword grammar; the operator-curation propose/apply split per Phase 15 is the architectural answer the issue calls out).
+
+Context: Phase 13 dropped bare `#NNN` mentions + `(#NNN)` end-of-subject parens by default. Phase 14 added the `treat_end_of_subject_parens_as_fix_marker` opt-in for projects whose convention uses end-of-subject parens. Phase 15 (Tasks 1-3 of this skill) shipped the propose/apply split with Agent-tool judgment in the middle. The 2026-06-04 dogfood walked the Phase 13/14/15 stack end-to-end and surfaced TWO residual classes:
+
+1. The end-of-subject parens shape catches genuine fixes AND back-fill docs (`docs(scope): back-fill parent issue (#NNN)`) — agents correctly classify these as `not-shipped` but the noise still hits the propose surface.
+2. The Phase 15 Agent dispatch correctly classified all 28 candidates in this run, but the cost (28 parallel general-purpose agents) is high enough to consider a cheaper pre-filter.
+
+- [ ] Step 0: working-code invariant — the Phase 13 + Phase 14 + Phase 15 verbs all keep working; no regression in the apply-step disposition signal.
+- [ ] Step 1: bug-repro test that constructs a commit corpus with both genuine `feat(area): fix (#42)` AND `docs(area): back-fill (#42)` shapes; assert the propose surface marks the docs/back-fill commit as `not-shipped` automatically (without an Agent dispatch) — a cheaper pattern-based pre-filter that downgrades known-noise commits.
+- [ ] Step 2: regression-lock — existing happy-path commits (real `Closes #N` / `Fixes #N` / `Resolves #N`) still surface as shipped candidates; end-of-subject-parens opt-in still works.
+- [ ] Step 3: implementation — add a per-subject classifier that downgrades back-fill / docs-only subject shapes to `auto-skip` BEFORE the Agent dispatch, reducing the dispatch cost and the operator's review burden. Document the classifier rules in SKILL.md.
+- [ ] Step 4: live-verify by re-running close-shipped against v0.35.0..v0.36.0 on this repo; confirm fewer Agent dispatches AND same correct apply set. Commit with `Closes #366` trailer.
+
+**Acceptance Criteria:**
+
+- [ ] Bug-repro test exists asserting docs/back-fill subjects skip Agent dispatch.
+- [ ] Regression-lock tests cover Phase 13 + Phase 14 + Phase 15 happy paths.
+- [ ] Re-run against v0.35.0..v0.36.0 produces ≤ 50% the Agent dispatches of today's run (28 → ≤14) with no change in the apply-set.
+- [ ] SKILL.md documents the new pre-filter classifier.
+
+### Task 43 (fix-issue-#350): `validate-return` refactor-cue substring-match false-positives (canary §3a) ([#350](https://github.com/audiocontrol-org/deskwork/issues/350))
+
+Closes #350. Surface: `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/validate-return.ts` (refactor-cue regex/string-matcher). Severity: medium (orchestrator-loop noise; agents trip the gate on legitimate non-refactor work).
+
+Context: surfaced in canary #349 §3a; ticked-then-untickered during the 2026-06-04 burn-down per AUDIT-32's invented-rule-citation retraction. The workplan row at workplan.md:1249 is the operator's `[ ]` ground-truth pointer.
+
+- [ ] Step 0: working-code invariant — legitimate refactor-cue detections (the original signal) continue to fire correctly; tighten WITHOUT widening the false-negative class.
+- [ ] Step 1: bug-repro test capturing the canary §3a substring shapes — e.g. an agent's normal-prose mention of "refactor" inside a non-refactor message should NOT trip the gate. Assert the gate does NOT classify the message as a refactor-cue match.
+- [ ] Step 2: regression-lock — genuine refactor-cue messages still trip; existing happy-path coverage stays green.
+- [ ] Step 3: implementation — switch from substring match to a context-aware classifier (word-boundary regex + structural cues like quote-context exclusion). Document the classifier shape in `orchestrator-loop/README.md`.
+- [ ] Step 4: full plugin suite green; live-verify the gate against the canary §3a fixture; commit with `Closes #350` trailer.
+
+**Acceptance Criteria:**
+
+- [ ] Bug-repro test from canary §3a was failing on main pre-fix.
+- [ ] Regression-lock tests cover the legitimate refactor-cue detections.
+- [ ] Workplan row at the prior-session sole-unchecked location (now-Task-43 stand-in) ticks once the fix ships in a release.
+
+### Task 44 (fix-issue-#297): `clone-detector` tests flake under full-suite parallel load ([#297](https://github.com/audiocontrol-org/deskwork/issues/297))
+
+Closes #297. Surface: `plugins/dw-lifecycle/src/__tests__/scope-discovery/clone-detector/**` (test isolation), `plugins/dw-lifecycle/src/scope-discovery/clone-detector/index.ts` (shared state, if any). Severity: medium (intermittent CI / local full-suite failures; erodes trust in the test signal).
+
+Context: tests pass in isolation (`npx vitest run clone-detector`) but flake when run as part of the full suite (`npx vitest run`). Suggests shared state (fixture directories, jscpd config caches, tmp paths, working-directory assumptions).
+
+- [ ] Step 0: working-code invariant — the clone-detector itself is correct; this is a test-infra bug, not a detector-logic bug.
+- [ ] Step 1: bug-repro test — re-create the full-suite load conditions deterministically (e.g. wrap a known-flaky test in a `for (let i = 0; i < 100; i++)` style stress-loop running in parallel with sibling tests); assert pass rate ≥ 99/100.
+- [ ] Step 2: regression-lock — isolated-suite runs still pass (existing coverage).
+- [ ] Step 3: implementation — audit for shared-state offenders: `mktemp`-everything (no bare `/tmp` per `.claude/rules/file-handling.md`); confirm jscpd is invoked with unique config paths per-test; confirm no shared mutable module-level state. Document the isolation contract in the test directory README.
+- [ ] Step 4: live-verify: run the full plugin suite 10 times in a row, assert zero failures; commit with `Closes #297` trailer.
+
+**Acceptance Criteria:**
+
+- [ ] Bug-repro stress-loop test exists and is green post-fix.
+- [ ] Full plugin suite (`npx vitest run` from `plugins/dw-lifecycle/`) passes 10/10 consecutive runs.
+- [ ] No bare `/tmp/<name>` paths introduced in clone-detector tests.
+- [ ] Closure transition is operator's call after install + verify.
+
+### Task 45 (fix-issue-#413): merging main into a feature branch produces friction in audit-log / scope-discovery / disposition bookkeeping ([#413](https://github.com/audiocontrol-org/deskwork/issues/413))
+
+Closes #413. Surface: `.gitattributes` (merge drivers), per-file merge-driver scripts under `plugins/dw-lifecycle/scripts/merge-drivers/`, post-merge hygiene helper at `plugins/dw-lifecycle/src/subcommands/merge-from-main.ts` (NEW), plus per-surface doctor-rule extensions. Severity: medium-high (compounds with feature-branch lifespan; growing).
+
+Context: each main → feature-branch resync surfaces conflicts in `.dw-lifecycle/scope-discovery/clones.yaml`, `audit-log.md`, `workplan.md` archive ledger, journal, doctor registries. The cure is a portfolio (merge drivers + post-merge hygiene + workflow change), not a single fix. **Task is investigation-first: enumerate the friction surfaces against a deterministic fixture, then cure in priority order.**
+
+- [ ] Step 0: working-code invariant — none of the existing scope-discovery doctor rules can regress; the existing steady-state semantics for clones.yaml + audit-log.md + workplan.md stay intact.
+- [ ] Step 1: investigation fixture — `plugins/dw-lifecycle/src/__tests__/scope-discovery/merge-from-main/fixtures/` reproduces a parallel-edit scenario: two branches that each (a) advance `clones.yaml` dispositions, (b) append distinct `AUDIT-YYYYMMDD-NN` entries, (c) advance the workplan-archive-ledger, (d) add `### Task N` headings, (e) append journal entries. Merge programmatically; assert each known surface is in the conflict / inconsistency report.
+- [ ] Step 2: enumerate surfaces — emit a markdown report (`docs/1.0/001-IN-PROGRESS/scope-discovery/merge-from-main-friction-inventory.md`) listing each surface, the symptom, the cost, and the proposed cure.
+- [ ] Step 3: cure portfolio in priority order — at least these three, more if the inventory surfaces them:
+   - **3a:** `clones.yaml` merge driver — `.gitattributes` + `plugins/dw-lifecycle/scripts/merge-drivers/clones-yaml.ts` that does a YAML-aware union with per-group disposition reconciliation. Tests cover identical-group both-sides, different-group both-sides, same-group different-disposition both-sides (warn + take operator's curated side).
+   - **3b:** `audit-log.md` merge driver — chronological merge by date heading + AUDIT-ID collision detector. Tests cover same-date-different-ID, same-ID-different-content (loud error).
+   - **3c:** post-merge hygiene helper — `dw-lifecycle merge-from-main --apply` walks a known repair set (archive-ledger reconciliation; duplicate-task-number detection; stale `fixed-pending-sha` resolution). Tests cover each repair.
+- [ ] Step 4: doctor-rule additions for whatever the cure portfolio doesn't structurally prevent — e.g. post-merge duplicate AUDIT-IDs across the merged log. Each rule names the merge-from-main case in its description.
+- [ ] Step 5: live-verify on the next main → `feature/scope-discovery` resync; commit with `Closes #413` trailer.
+
+**Acceptance Criteria:**
+
+- [ ] Investigation fixture exists and reproduces the friction surfaces deterministically.
+- [ ] Friction-inventory report exists at the cited path with a per-surface symptom / cost / cure block.
+- [ ] At least the three cures (3a/3b/3c) land with test coverage for the merge-aware logic.
+- [ ] Next live main → feature-branch merge produces materially less manual reconciliation than the most-recent pre-fix merge (operator-judged; the inventory report provides the falsifiable baseline).
+- [ ] Closure transition is operator's call after install + verify on the next real merge.
+
 ## Phase 7: Slash command skill prose
 
 **Deliverable:** SKILL.md + commands/<name>.md files for each of the ~18 new + 5 updated `/dw-lifecycle:*` skills.
@@ -1384,6 +1505,45 @@ Confirm the three CLIs are installed + authenticated on the operator's machine. 
 - Project override resolution pattern at `.dw-lifecycle/scope-discovery/<file>` — already in use by anti-patterns / adopter-manifests / pattern-matrix overrides.
 - `child_process.spawn` subprocess orchestration — already in use for `gh`, `git`, `npx tsx`, `jscpd` invocations across the plugin.
 - The audit-log entry format — the canonical `Finding-ID` / `Status` / `Severity` / `Surface` shape every audit-barrage finding maps into.
+
+### Task 8 (fix-issue-#397): audit-barrage `spawn E2BIG` — prompt-via-argv overflows ARG_MAX on large diffs ([#397](https://github.com/audiocontrol-org/deskwork/issues/397))
+
+Closes #397. Surface: `plugins/dw-lifecycle/templates/audit-barrage-config.yaml`, `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/spawn-cli.ts`, `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-barrage-cli-notes.md`. Severity: medium (blocks barrage on `HEAD~N`-shaped ranges).
+
+Context: Phase 19 (v0.32.1) added `{{prompt-stdin}}` as an opt-in placeholder for stdin-delivered prompts. The default config still uses `{{prompt}}` (argv), so any adopter who didn't manually flip the placeholder still hits E2BIG on large diffs. Bug stays open.
+
+- [ ] Step 0: working-code invariant — the `{{prompt}}` argv path must keep working for back-compat (small prompts, deterministic test fixtures using `node -e` shims).
+- [ ] Step 1: bug-repro test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.e2big.test.ts` — generate a ~200 KB prompt; assert spawn-against-fake-CLI using `{{prompt-stdin}}` succeeds AND the corresponding `{{prompt}}` invocation fails with a structured E2BIG classifier message pointing at `{{prompt-stdin}}`.
+- [ ] Step 2: regression-lock test asserts `{{prompt}}` small-payload happy path still works end-to-end (existing happy-path tests stay green).
+- [ ] Step 3: implementation — flip default in `templates/audit-barrage-config.yaml` to `{{prompt-stdin}}`; catch spawn-time E2BIG in `spawn-cli.ts` and surface a structured error naming the `{{prompt-stdin}}` migration; update `audit-barrage-cli-notes.md`; add a `MIGRATING.md` note for adopters who customized their config to `{{prompt}}` explicitly.
+- [ ] Step 4: live-verify with a ~200 KB diff on a real branch; full plugin suite green; commit with `Closes #397` trailer.
+
+**Acceptance Criteria:**
+
+- [ ] Bug-repro test exists at the cited path and was failing on main pre-fix.
+- [ ] Regression-lock test asserts existing `{{prompt}}` happy-path still works.
+- [ ] `dw-lifecycle audit-barrage` against a ~200 KB prompt completes without E2BIG (live-verified on a real branch with `HEAD~10`-shaped range).
+- [ ] `audit-barrage-config.yaml` template default flipped to `{{prompt-stdin}}`; `MIGRATING.md` notes the change for adopter configs that customized `{{prompt}}`.
+- [ ] Closure transition (`gh issue close 397`) is the operator's call after install + verify per the project rule.
+
+### Task 9 (fix-issue-#396): implement-hook `audit-barrage-render` false-positives on `{{var}}`-shaped strings inside the diff ([#396](https://github.com/audiocontrol-org/deskwork/issues/396))
+
+Closes #396. Surface: `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/prompt-renderer.ts`. Severity: medium (blocks `/dwi` barrage when the substantive diff contains `{{var}}` literals — e.g. template authoring).
+
+Context: the renderer's unsubstituted-var check fires on `{{x}}` patterns inside variable VALUES (e.g. when the rendered diff contains template syntax), not just inside the template itself. The check fires loud + aborts the barrage instead of substituting first, then post-hoc validating.
+
+- [ ] Step 0: working-code invariant — true unsubstituted-var detection on the TEMPLATE (not on values) must keep firing.
+- [ ] Step 1: bug-repro test at `prompt-renderer.test.ts` — render a template whose `{{diff}}` value contains a literal `{{prompt}}` substring (e.g. the audit-barrage feature's own diff); assert rendering succeeds and the rendered output preserves the inner `{{prompt}}` literal.
+- [ ] Step 2: regression-lock — existing tests for true unsubstituted-vars on the template side stay green; pre-substitution detection of malformed template (e.g. `{{unknown_var}}`) still fires loud.
+- [ ] Step 3: implementation — refactor the check to run ONLY against the post-substitution surface that came from the template, not against substituted values. Use `<!-- {{var_name}} -->` HTML-comment markers in the template + post-substitution scan that excludes value-origin spans.
+- [ ] Step 4: full plugin suite green; live-verify by running `/dwi`-equivalent barrage against a diff containing `{{var}}` literals; commit with `Closes #396` trailer.
+
+**Acceptance Criteria:**
+
+- [ ] Bug-repro test exists; was failing on main pre-fix.
+- [ ] Regression-lock tests still pass: malformed-template `{{unknown_var}}` still fires loud; substantive happy paths unaffected.
+- [ ] Live verification: barrage runs cleanly against a diff containing inline `{{var}}` template literals (e.g. the audit-barrage feature itself).
+- [ ] Closure transition is the operator's call post-install verification.
 
 ## Phase 15: Workplan-aware implement-loop gate + audit-barrage hook + audit-log lift
 
