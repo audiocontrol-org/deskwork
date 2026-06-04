@@ -4486,7 +4486,7 @@ A tighter fix is to stat the path and require `isFile()` before returning, with 
 ### AUDIT-20260604-26 — Ticked acceptance criteria still carry the literal placeholder `(to be filled in by Step 1 implementer)` and assert a TDD walk the workplan never recorded
 
 Finding-ID: AUDIT-20260604-26 (claude-01 + claude-02 + codex-01; cross-model)
-Status:     acknowledged-slush-pile-2026-06-04
+Status:     fixed-972d8dba
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 9/10/13/14/21 (e.g. line 425, 417-427) — the bug-shaped orphan tasks flipped `[ ]`→`[x]` by the tick commit
 
@@ -4527,7 +4527,7 @@ This is an operator-discipline trap: the note should name the exact outstanding 
 ### AUDIT-20260604-29 — "All ~23 skills discoverable via slash-command picker" is ticked `[x]` while its own cited evidence proves it false
 
 Finding-ID: AUDIT-20260604-29 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02 + codex-04; cross-model)
-Status:     acknowledged-slush-pile-2026-06-04
+Status:     fixed-972d8dba
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 7 acceptance criteria (`- [x] All ~23 skills discoverable via slash-command picker — exceeded: 50 skill folders … and 41 entries under commands …`)
 
@@ -4538,10 +4538,23 @@ This is the inverted form of the same coherence defect AUDIT-26 raises two commi
 ### AUDIT-20260604-30 — README Phase 11 row keeps status "In progress" while its body now accounts for all 14 tasks as landed or reconciled
 
 Finding-ID: AUDIT-20260604-30 (claude-04 + claude-05 + codex-03; cross-model)
-Status:     acknowledged-slush-pile-2026-06-04
+Status:     fixed-972d8dba
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` Phase 11 row (status column reads "In progress —" while the body enumerates Tasks 1,2,3,5–14 "landed" and the new prose adds "Task 4 reconciled (2026-06-04)")
 
 The diff removes the trailing "Task 4 remains." and appends "Task 4 reconciled (2026-06-04): all 7 codebase-state metrics land …". The row's task enumeration already lists Tasks 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 as landed — every task **except** 4 — and the appended sentence now accounts for 4. That covers all fourteen tasks, yet the status column still reads **"In progress."** Either the status is stale (all tasks now landed/reconciled → should be Complete, or should name the specific remaining work), or "reconciled" deliberately means "not landed" — in which case the row should say what reconciliation leaves open and why Phase 11 is still in flight.
 
 As written, a reader cannot tell whether Phase 11 has remaining work. Note also that "reconciled" is a weaker word than "landed" (the enumeration's verb for the other 13), and Task 4 is pointedly excluded from the "landed" list — a subtle signal that reconciliation ≠ completion that the "In progress" status neither confirms nor explains. Fix: either flip the status with a one-line "Phase 11 complete pending operator sign-off on Task 5 controller," or state the open item explicitly in the status cell.
+
+## 2026-06-04 — audit-barrage lift (20260604T045827873Z-scope-discovery)
+
+### AUDIT-20260604-31 — AUDIT-29 and AUDIT-30 are appended to the audit-log as `acknowledged-slush-pile` in the same commit that resolves them, leaving the durable record internally contradictory
+
+Finding-ID: AUDIT-20260604-31 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4524-4547` (the appended AUDIT-29/30 blocks) vs. `README.md` Phase 11 row + `workplan.md:983` (the resolving edits) — all in this one commit
+
+The commit subject is *"address AUDIT-26/29/30 substantive critiques."* The diff demonstrably addresses AUDIT-30 (flips the README Phase 11 status "In progress" → "Substantive complete") and AUDIT-29 (rewords the Phase 7 criterion + authors the 10 missing command entries). Yet the audit-log blocks for both are appended with `Status: acknowledged-slush-pile-2026-06-04`. Within a single committed artifact, the audit-log says these findings were parked-without-fix while the README/workplan say they were fixed in this commit.
+
+This is the exact mislabel class the prior-findings clean-check already called out for AUDIT-20 (`fixed-` mislabel) and that the project's closure triad exists to prevent: per `apply-audit-flips`, a finding resolved by a `Closes AUDIT-<id>` commit should carry `Status: fixed-<sha>`, not `acknowledged-slush-pile`. A future reader running the slush-pile reconciliation (DEVELOPMENT-NOTES § "Quantitative reporting conventions") will count AUDIT-29/30 as carrying unfixed MED defects when they are in fact addressed here. Fix: either flip both to `fixed-<thiscommit-sha>` (the honest record if the doc edits are the fix), or — if the project intends slush-until-re-audit — soften the README/workplan claims so they don't assert closure the audit-log denies. The two artifacts must agree.
