@@ -4643,3 +4643,29 @@ Severity:   low
 Surface:    `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml:22-27` (added comment block)
 
 The added comment reads: *"… stdin delivery bypasses the OS per-arg limit. **Phase 19's Phase 19 verb path** supports `{{prompt-stdin}}` since v0.32.1 …"*. "Phase 19's Phase 19" is a copy-paste duplication. Minor, but this comment is the durable explanation for why the project's own active config (claude + codex only) diverges from the 3-model template default, so it's worth getting clean. Fix: "Phase 19's verb path supports `{{prompt-stdin}}` since v0.32.1."
+
+## 2026-06-04 — audit-barrage lift (20260604T161650717Z-scope-discovery)
+
+### AUDIT-20260604-39 — Test comment claims e2e integration coverage that AUDIT-37 explicitly says doesn't exist
+
+Finding-ID: AUDIT-20260604-39 (claude-01 + claude-02 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts:340-351` (the AUDIT-37 test's trailing comment block)
+
+The new test contains two real, passing `buildArgs` assertions (lines 333-339), then a ~10-line comment that narrates an e2e spawn test it never writes, and closes with: *"Verified via integration: the spawn-cli e2big counterfactual (`{{prompt-stdin}}` 5MB → exit 0) already exercises this path through the gemini-shaped argsTemplate `{{prompt-stdin}}`."* This directly contradicts AUDIT-37 itself, whose surface says the e2big test *"only exercises templates where the placeholder is preceded by other tokens (`-p {{prompt-stdin}}`, `-e <eval> {{prompt-stdin}}`); the bare-placeholder shape … has no coverage."* The comment asserts the exact integration coverage the finding was filed to say is absent.
+
+This matters because the comment is now the durable record a future reader trusts: it says the bare-`{{prompt-stdin}}` gemini default is e2e-verified end-to-end, when in fact only the `buildArgs` unit contract is pinned. The `buildArgs` assertions are sufficient to close AUDIT-37's actual ask (`buildArgs("{{prompt-stdin}}") → []`), so the fix is real — but the over-claiming comment reintroduces the false-confidence shape the project's UI-verification rule names ("a passing probe of the wrong assertions is worse than no probe"). Fix: delete the false "Verified via integration" sentence and the narration of the unwritten e2e test; either write the actual spawn assertion or state plainly that coverage is unit-level via `buildArgs` only.
+
+### AUDIT-20260604-40 — Docs commit subject "disposition AUDIT-35/36/38" omits AUDIT-37, which the same range also dispositions
+
+Finding-ID: AUDIT-20260604-40 (claude-03 + codex-01; cross-model)
+Status:     acknowledged-misclassification-trailer-is-the-signal-2026-06-04
+Severity:   medium
+Surface:    commit subject `docs(scope-discovery): disposition AUDIT-35/36/38 from the post-Task-8 barrage` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 48 + `audit-log.md` AUDIT-37 block
+
+**Disposition (2026-06-04, hand-acknowledged):** the finding misreads the project's audit-finding-to-commit signal convention. AUDIT-37's disposition landed in commit `9fb4db0b` (subject "test(audit-barrage): pin bare {{prompt-stdin}} template strips to empty argv"). That subject describes the SUBSTANCE of the disposition (a new regression-lock test); the `Closes AUDIT-20260604-37` git trailer in the message body IS the subject-level signal `apply-audit-flips` parses to flip the audit-log Status. A reader scanning `git log --oneline` finds 9fb4db0b's subject AND running `git log --format='%H %s%n%b' | grep 'Closes AUDIT-37'` finds the trailer. The convention is trailer-as-signal, not subject-as-enumeration. The docs commit `2ffead37` correctly subject-enumerated the three findings (35/36/38) it dispositioned via doc-only `Acknowledges` trailers — the fourth (AUDIT-37) was a separate code-fix commit handled by its own trailer. No fix; the commit subjects are correct.
+
+The audited range dispositions four findings — AUDIT-35, 36, 37, and 38 — adding Task 46/47/48/49 to the workplan and four blocks to the audit-log. AUDIT-37's audit-log block carries `Status: fixed-9fb4db0b…` and Task 48 (`Closes AUDIT-20260604-37`) is a full fix-task. Yet the docs commit subject enumerates only "AUDIT-35/36/38," dropping 37. Whether 37's disposition landed in the docs commit or the test commit (`9fb4db0b`, subject "pin bare {{prompt-stdin}} template strips to empty argv"), no commit subject in the range names "disposition AUDIT-37" — so a reader scanning `git log --oneline` for where 37 was handled finds no subject-level signal.
+
+This is the same subject/content-drift class the prior audit-log already flagged repeatedly (AUDIT-31/33/36: "the commit subject says X while the durable record does Y"). It's cosmetic here — the content reconciles — but the project's own `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions" treats subject-vs-content honesty as load-bearing. Fix: when a single docs commit dispositions four findings, the subject should list all four (or say "AUDIT-35–38"), so the enumerated set matches the blocks the commit actually writes.

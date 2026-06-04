@@ -946,6 +946,8 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 
 ### Task 46 (fix-finding-AUDIT-20260604-35) (non-bug): AUDIT-20260604-35 — `Closes #NNN` trailers prescribed for all 8 new fix-tasks au…
 
+> Superseded by audit-log Status `acknowledged-prose-updated-2026-06-04` — no TDD walk required.
+
 Acknowledges AUDIT-20260604-35. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 40 (`Closes #411`), Task 41 (`Closes #412`), Task 42 (`Closes #366`), Task 43 (`Closes #350`), Task 44 (`Closes #297`), Task 45 (`Closes #413`), Task 8 (`Closes #397`), Task 9 (`Closes #396`).
 
 **Shape**: non-bug (workplan-prose edit). Action taken below; no test pins the change because the affected surface is the workplan's Step 4 trailer prescription, not source code.
@@ -962,6 +964,8 @@ Acknowledges AUDIT-20260604-35. Surface: `docs/1.0/001-IN-PROGRESS/scope-discove
 
 
 ### Task 47 (fix-finding-AUDIT-20260604-36) (non-bug): AUDIT-20260604-36 — AUDIT-34 left `acknowledged-slush-pile` while its substance …
+
+> Superseded by audit-log Status `acknowledged-flipped-audit-34-to-fixed-4d8c083f-2026-06-04` — no TDD walk required.
 
 Acknowledges AUDIT-20260604-36. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-34 block) vs. `workplan-archive.md` Phase 7 acceptance criterion (the reconciled-totals prose, written in commit `4d8c083f`).
 
@@ -996,6 +1000,8 @@ Closes AUDIT-20260604-37 (claude-03 + claude-05 + codex-01 + codex-02; cross-mod
 
 
 ### Task 49 (fix-finding-AUDIT-20260604-38) (non-bug): AUDIT-20260604-38 — Duplicated "Phase 19's Phase 19" in the project-override con…
+
+> Superseded by audit-log Status `acknowledged-typo-fixed-2026-06-04` — no TDD walk required.
 
 Acknowledges AUDIT-20260604-38. Surface: `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` (project-override comment block).
 

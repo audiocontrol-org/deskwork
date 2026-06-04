@@ -329,6 +329,14 @@ describe('Phase 19 (#386) — {{prompt-stdin}} placeholder', () => {
   // no flag). Pin that the stripping logic produces `[]` rather than
   // `['']` so gemini is launched with zero argv, not one empty arg.
   // Cross-model (claude-03 + claude-05 + codex-01 + codex-02).
+  //
+  // Coverage scope (per AUDIT-39 reconciliation): UNIT-level only.
+  // This test pins `buildArgs` against the bare-placeholder shape;
+  // it does NOT exercise an end-to-end spawn against a fake
+  // gemini-shaped CLI. The buildArgs contract is the load-bearing
+  // half of the gemini default's correctness — the spawn-cli's
+  // stdin-vs-argv dispatch reads the placeholder via the same
+  // detection used here.
   it('AUDIT-37: bare {{prompt-stdin}} template strips to empty argv (no stray empty-string arg)', async () => {
     const { buildArgs: ba } = await import(
       '../../../scope-discovery/audit-barrage/spawn-cli.js'
@@ -338,13 +346,5 @@ describe('Phase 19 (#386) — {{prompt-stdin}} placeholder', () => {
     // written with quotes that may collapse with leading/trailing
     // whitespace under YAML parsing).
     expect(ba('  {{prompt-stdin}}  ', 'whatever-prompt')).toEqual([]);
-    // And the corresponding e2e spawn against a fake gemini-shaped CLI
-    // (`node` with no script: prints nothing, exits 0). The bare-arg
-    // shape must not throw or spawn a process with a stray empty argv
-    // element. Use `node -e ''` shape but assert via spawn directly to
-    // avoid the empty-args-tuple-throws guard in fakeCli().
-    // Verified via integration: the spawn-cli e2big counterfactual
-    // (`{{prompt-stdin}}` 5MB → exit 0) already exercises this path
-    // through the gemini-shaped argsTemplate `{{prompt-stdin}}`.
   });
 });
