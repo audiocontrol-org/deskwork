@@ -31,3 +31,10 @@ Append-only friction log for the Spec-Kit-as-management-layer dogfood. One frict
 - **Impact:** committing mixes Spec Kit infra into the deskwork monorepo on the feature branch; ignoring means the management layer isn't reproducible for a fresh clone. Genuine decision, not a default.
 - **Workaround:** TBD — operator decision pending (see open question to operator).
 - **Suggested-fix:** the bridge should define a canonical "what of the provider's scaffolding does deskwork track" policy.
+
+## TF-05 — Spec Kit's mandatory `before_specify` hook forks a numbered git branch, colliding with deskwork worktrees
+
+- **Repro:** `.specify/extensions.yml` registers `before_specify -> speckit.git.feature` as `optional: false` with `auto_execute_hooks: true`. The hook runs `create-new-feature.sh`, which `git checkout -b <NNN>-<short-name>` — creating and switching to a new numbered branch.
+- **Impact:** deskwork runs feature work in a git **worktree pinned to one branch** (`feature/<slug>`). Spec Kit assumes IT owns branch creation. Letting the hook run would switch the worktree off the deskwork branch onto `001-*`, orphaning the pushed feature branch and violating deskwork's "never create a sibling branch in a worktree" convention. This is the core impedance mismatch the feature exists to resolve, surfacing at the very first native step.
+- **Workaround (verified):** set `GIT_BRANCH_NAME=feature/pluggable-lifecycle-providers` + pass `--allow-existing-branch`. Dry-run output: `{"BRANCH_NAME":"feature/pluggable-lifecycle-providers", ...}` — no fork, worktree stays put. The spec dir name is independent of the branch and is still generated as `specs/NNN-<short-name>`.
+- **Suggested-fix (for the bridge):** the deskwork↔spec-kit adapter must pin `GIT_BRANCH_NAME` to the deskwork feature branch (or disable the `git` extension's branch hooks entirely) so Spec Kit never forks the worktree. Branch + worktree ownership stays with deskwork (design.md §2 "deskwork owns physical substrate"); the provider only authors. FEATURE_NUM degrades to the full branch string when the branch has no numeric prefix — cosmetic, harmless.
