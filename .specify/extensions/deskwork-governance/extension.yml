@@ -1,0 +1,28 @@
+schema_version: "1.0"
+
+extension:
+  id: deskwork-governance
+  name: "deskwork Governance"
+  version: "0.1.0"
+  description: "Runs deskwork's cross-model audit-barrage + finding lift after Spec Kit implements"
+  author: deskwork
+
+requires:
+  speckit_version: ">=0.9.0"
+  tools:
+    - name: dw-lifecycle
+      required: true
+    - name: git
+      required: true
+
+provides:
+  commands:
+    - name: speckit.deskwork-governance.govern
+      file: commands/speckit.deskwork-governance.govern.md
+      description: "Govern the just-implemented work: cross-model audit-barrage + lift findings"
+
+hooks:
+  after_implement:
+    command: speckit.deskwork-governance.govern
+    optional: false
+    description: "Run deskwork governance (cross-model audit-barrage + finding lift) over the implemented work"

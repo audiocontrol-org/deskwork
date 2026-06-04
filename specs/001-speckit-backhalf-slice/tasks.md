@@ -1,5 +1,14 @@
 # Tasks: deskwork governance as a Spec Kit `after_implement` extension
 
+> **STATUS: COMPLETE (2026-06-04).** All tasks T001–T014 done. Extension source at `plugins/dw-lifecycle/spec-kit/deskwork-governance/`, installed via `specify extension add … --dev`.
+> **Acceptance evidence:**
+> - SC-001 (fires automatically): demonstrated live — the `after_implement` hook invoked the governance command at `/speckit-implement` close (run `20260604T233543076Z`), slug auto-derived from the branch, zero manual invocation.
+> - SC-002 (findings produced): 5 findings lifted per run into `audit-log.md` (AUDIT-24..28, then 29..33).
+> - SC-003 (no provider branching): T011 neutrality gate PASS — `govern.sh` names no provider/model/tool.
+> - SC-004 (≥2 model lanes): 2/2 (claude + codex) each run.
+> - SC-005 (seam record): `tooling-feedback.md` TF-11.
+> Self-findings from the governance runs dispositioned in `audit-log.md` (5 fixed incl. cross-model HIGH AUDIT-24; 5 acknowledged with reasons). Recursive barrage loop stopped after fixes verified by inspection (convergence + cost discipline).
+
 **Feature**: 001-speckit-backhalf-slice | **Branch**: `feature/pluggable-lifecycle-providers`
 **Inputs**: `plan.md`, `spec.md`, `data-model.md`, `contracts/governance-extension.contract.md`, `research.md`
 
