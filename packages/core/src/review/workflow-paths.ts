@@ -7,19 +7,16 @@
  * the 500-line guideline and to give the shortform path resolver a clean
  * home alongside its longform sibling.
  *
- * Resolution rules:
+ * Resolution rules (Phase 39c-2b(a) — stored artifactPath only):
  *
- *   - `longform` / `outline`: prefer the content index (so writingcontrol-
- *     shaped non-template paths work); fall back to the site's
- *     `blogFilenameTemplate` for legacy / pre-doctor entries.
- *   - `shortform`: defers to `resolveShortformFilePath` in `paths.ts`,
- *     which composes the entry directory (via `findEntryFile`) with
- *     `scrapbook/shortform/<platform>[-<channel>].md`.
+ *   - `longform` / `outline`: `resolveArtifactPathOrThrow` on the entry's
+ *     stored `artifactPath` (refined to a sibling `index.md` when present).
+ *   - `shortform`: `composeShortformDraftPath` — `scrapbook/shortform/
+ *     <platform>[-<channel>].md` under the parent entry's artifactPath dir.
  *
- * The shortform variant returns `undefined` when the entry has no body file
- * scaffolded yet — the caller decides whether to create the entry directory
- * or surface a 404. The longform variant always returns a path because the
- * slug-template fallback is unconditional for it.
+ * Both load the entry sidecar from the workflow's id (or the calendar by
+ * slug). There is NO content-index / slug-template fallback; an entry with
+ * no derivable id or no `artifactPath` throws with `doctor --fix` guidance.
  */
 
 import { existsSync } from 'node:fs';

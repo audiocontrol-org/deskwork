@@ -5,8 +5,8 @@
  * A shortform draft is a NEW file living in the parent entry's
  * scrapbook. Its location is COMPOSED from the parent entry's stored
  * `artifactPath` directory — never searched via the slug-template /
- * `contentDir` (the path the legacy `resolveShortformFilePath` walked
- * through `findEntryFile`). This is the create-verb half of the verb
+ * `contentDir` (the path the retired slug-template shortform resolver
+ * walked). This is the create-verb half of the verb
  * resolution migration: `shortform-start`, plus the shortform branches
  * of `approve` and `iterate`, all compose the same way.
  *

@@ -348,10 +348,6 @@ export function handleCreateVersion(
   // shortform) are disk-backed — Phase 21a removed the shortform special
   // case so the studio's save/iterate/approve handlers see one shape.
   //
-  // Resolve via the content index first (so writingcontrol-shaped layouts
-  // where slug != fs path work), with template fallback for legacy
-  // / pre-doctor cases. For shortform, the path goes through
-  // resolveShortformFilePath (entry-dir + scrapbook/shortform/<…>.md).
   // Phase 39c-2b(a): workflowFilePath resolves via the entry's stored
   // artifactPath and throws doctor --fix for an unmigrated entry — surface
   // that as a save error rather than crashing the route handler.

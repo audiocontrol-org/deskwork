@@ -26,7 +26,6 @@ import {
 import type { DraftWorkflowItem } from '../src/review/types.ts';
 import { writeCalendar } from '../src/calendar.ts';
 import { addEntry, planEntry, outlineEntry, draftEntry, publishEntry } from '../src/calendar-mutations.ts';
-import { resolveShortformFilePath } from '../src/paths.ts';
 import { parseFrontmatter } from '../src/frontmatter.ts';
 import type { DeskworkConfig } from '../src/config.ts';
 import type { EditorialCalendar } from '../src/types.ts';
@@ -280,39 +279,5 @@ describe('handleCreateVersion (shortform)', () => {
     });
     expect(cv.status).toBe(500);
     expect((cv.body as { error: string }).error).toMatch(/shortform file missing/);
-  });
-});
-
-describe('resolveShortformFilePath integration', () => {
-  let root: string;
-  let cfg: DeskworkConfig;
-
-  beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'deskwork-shortform-r-'));
-    cfg = config();
-  });
-  afterEach(() => rmSync(root, { recursive: true, force: true }));
-
-  it('returns the file path for an indexed entry that exists on disk', () => {
-    const { entryId, slug } = seedEntry(root, cfg, 'Indexed Post');
-    // Need an actual content body for findEntryFile to index.
-    const body = join(root, 'src/content/blog', slug, 'index.md');
-    mkdirSync(dirname(body), { recursive: true });
-    writeFileSync(
-      body,
-      `---\ndeskwork:\n  id: ${entryId}\ntitle: Indexed Post\n---\n\n# Body\n`,
-      'utf-8',
-    );
-
-    const out = resolveShortformFilePath(
-      root,
-      cfg,
-      'a',
-      { id: entryId, slug },
-      'linkedin',
-    );
-    expect(out).toBe(
-      join(root, 'src/content/blog', slug, 'scrapbook/shortform/linkedin.md'),
-    );
   });
 });
