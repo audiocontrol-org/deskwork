@@ -4551,10 +4551,49 @@ As written, a reader cannot tell whether Phase 11 has remaining work. Note also 
 ### AUDIT-20260604-31 — AUDIT-29 and AUDIT-30 are appended to the audit-log as `acknowledged-slush-pile` in the same commit that resolves them, leaving the durable record internally contradictory
 
 Finding-ID: AUDIT-20260604-31 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02; cross-model)
-Status:     acknowledged-slush-pile-2026-06-04
+Status:     fixed-c254c1ed
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4524-4547` (the appended AUDIT-29/30 blocks) vs. `README.md` Phase 11 row + `workplan.md:983` (the resolving edits) — all in this one commit
 
 The commit subject is *"address AUDIT-26/29/30 substantive critiques."* The diff demonstrably addresses AUDIT-30 (flips the README Phase 11 status "In progress" → "Substantive complete") and AUDIT-29 (rewords the Phase 7 criterion + authors the 10 missing command entries). Yet the audit-log blocks for both are appended with `Status: acknowledged-slush-pile-2026-06-04`. Within a single committed artifact, the audit-log says these findings were parked-without-fix while the README/workplan say they were fixed in this commit.
 
 This is the exact mislabel class the prior-findings clean-check already called out for AUDIT-20 (`fixed-` mislabel) and that the project's closure triad exists to prevent: per `apply-audit-flips`, a finding resolved by a `Closes AUDIT-<id>` commit should carry `Status: fixed-<sha>`, not `acknowledged-slush-pile`. A future reader running the slush-pile reconciliation (DEVELOPMENT-NOTES § "Quantitative reporting conventions") will count AUDIT-29/30 as carrying unfixed MED defects when they are in fact addressed here. Fix: either flip both to `fixed-<thiscommit-sha>` (the honest record if the doc edits are the fix), or — if the project intends slush-until-re-audit — soften the README/workplan claims so they don't assert closure the audit-log denies. The two artifacts must agree.
+
+## 2026-06-04 — audit-barrage lift (20260604T054304831Z-scope-discovery)
+
+### AUDIT-20260604-32 — AUDIT-BARRAGE-claude-01 — Phase 6 follow-up bug items flipped `[x]` while their GitHub issues remain open and unfixed, justified by a self-cited "project rule" that exists nowhere but this workplan
+
+Finding-ID: AUDIT-20260604-32 (claude-01 + claude-02 + claude-04 + claude-06 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:1249-1252` (Phase 6 follow-up items #350/#351/#352/#318)
+
+The diff flips all four Phase 6 follow-up bug items from `[ ]` to `[x]`. Three of them (`#350`, `#351`, `#352`) are real bugs against shipped surfaces — `validate-return` false-positives, missing helper-subcommand probe, docs-only pre-commit friction — and each disposition string *itself admits the GH issue is still `(open)`* and the bug unfixed. A checked box reads as "done"; these are open, unfixed defects. This is the exact checkbox/evidence contradiction class AUDIT-26/29/30 named, applied to bug-shaped tasks rather than scaffolding.
+
+The justification given is `Per project rule "issue tracking flows through GitHub, not workplan checkboxes."` I grepped the repo: that string appears **only inside workplan.md itself** (lines 1249 and 1609), and **not in any `.claude/rules/*.md` file**. It is a self-citation — a rule invented in the same document that invokes it. Worse, it contradicts the rules that *do* exist: `agent-discipline.md` § "Audit findings: scope-don't-defer" and § "Operator owns scope decisions" both push the opposite direction (don't unilaterally close/defer your own scope; the operator owns the cut). Flipping an open bug to `[x]` is a unilateral "handled" signal the operator never authorized.
+
+A reasonable fix: leave these `[ ]` (the bug is genuinely not done) with a one-line "tracked at #350; not yet fixed" note, OR use the strikethrough-`~~...~~` form the same diff applies to Phase 20 Task 1 so the box visibly does not assert completion. Either way, strike the invented "project rule" citation — if the convention is real, it belongs in `.claude/rules/agent-discipline.md` as an operator-approved rule, not asserted into existence inside the artifact it governs.
+
+### AUDIT-20260604-33 — AUDIT-BARRAGE-claude-03 — AUDIT-31 is left `acknowledged-slush-pile` in the same commit whose subject says it "address[es] AUDIT-31" — recursively the exact mislabel AUDIT-31 names
+
+Finding-ID: AUDIT-20260604-33
+Status:     fixed-pending-sha
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4538-4547` (appended AUDIT-31 block, `Status: acknowledged-slush-pile-2026-06-04`) vs. the commit subject "flip AUDIT-26/29/30 … → fixed-972d8dba — address AUDIT-31's audit-log/commit-message inconsistency critique"
+
+AUDIT-31's substance is: "a finding resolved by a commit should carry `Status: fixed-<sha>`, not `acknowledged-slush-pile`; the two artifacts must agree." This commit acts on that critique — it flips AUDIT-26/29/30 to `fixed-972d8dba` (audit-log.md lines 4489, 4530, 4541 in the diff). The commit subject explicitly claims it *addresses* AUDIT-31. Yet AUDIT-31 itself is appended in this very diff with `Status: acknowledged-slush-pile-2026-06-04`.
+
+So the durable record now says: a finding whose critique was acted upon by this commit is parked-without-fix. That is the identical audit-log/commit-message inconsistency AUDIT-31 was filed to eliminate, reproduced one level up. By `apply-audit-flips` convention (which AUDIT-31 itself cites), a finding a `Closes`/address commit resolves should read `fixed-<thiscommit-sha>`.
+
+There's a defensible counter — AUDIT-31 is *newly filed* in this commit by the audit-barrage lift, so "open at filing time" is arguably correct and a later commit should flip it. If that's the intent, the commit subject overstates by claiming to "address" it. Fix: either flip AUDIT-31 to `fixed-<thiscommit-sha>` in this commit (matching the subject's claim), or soften the subject to "responds to AUDIT-31's critique by flipping 26/29/30; AUDIT-31 itself re-audits next lift." Pick one so the subject and the status agree.
+
+### AUDIT-20260604-34 — AUDIT-BARRAGE-claude-05 — AUDIT-29's "9-skill picker gap" is reconciled by authoring "10" command entries; the off-by-one isn't explained and the skill/command totals still don't close
+
+Finding-ID: AUDIT-20260604-34
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/shortcuts.test.ts:101-111` (the 10 hygiene-family entries added to `META_COMMANDS`) vs. AUDIT-29's cited counts (50 skill folders − 41 command entries = 9-skill gap)
+
+AUDIT-29 (marked `fixed-972d8dba` in this same diff) established the gap arithmetically: **50 skill folders, 41 command entries → 9 skills undiscoverable.** The remediation, per the new test comment (line 101-104), is that commit `972d8dba` "Authored … to close AUDIT-20260604-29's picker-discoverability gap," and this diff adds **10** hygiene-family verbs to the `META_COMMANDS` allowlist. Nine missing, ten added — the numbers don't reconcile, and nothing in the diff explains the off-by-one (was a 10th skill also missing? was one of the 10 already present?). If `commands/` went 41 → 51 against 50 skill folders, there is now either a surplus command entry or the original 50/41 count was itself off.
+
+This matters because AUDIT-29 was flipped to `fixed-<sha>` partly on the strength of these counts; a `fixed-` flip should rest on arithmetic that closes. Per the project's own `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions (AUDIT-04)," derived counts must reconcile or the line should be omitted. Fix: state the post-fix totals explicitly (e.g., "commands/ now 41 → 51; skills 50 → 51 after adding `unarchive-phases`'s command shim" — whatever the real ledger is) so a reader can verify all skills are now picker-resolvable rather than trusting a 9-vs-10 hand-wave.
