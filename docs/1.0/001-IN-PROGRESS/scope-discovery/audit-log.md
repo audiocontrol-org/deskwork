@@ -4669,3 +4669,27 @@ Surface:    commit subject `docs(scope-discovery): disposition AUDIT-35/36/38 fr
 The audited range dispositions four findings — AUDIT-35, 36, 37, and 38 — adding Task 46/47/48/49 to the workplan and four blocks to the audit-log. AUDIT-37's audit-log block carries `Status: fixed-9fb4db0b…` and Task 48 (`Closes AUDIT-20260604-37`) is a full fix-task. Yet the docs commit subject enumerates only "AUDIT-35/36/38," dropping 37. Whether 37's disposition landed in the docs commit or the test commit (`9fb4db0b`, subject "pin bare {{prompt-stdin}} template strips to empty argv"), no commit subject in the range names "disposition AUDIT-37" — so a reader scanning `git log --oneline` for where 37 was handled finds no subject-level signal.
 
 This is the same subject/content-drift class the prior audit-log already flagged repeatedly (AUDIT-31/33/36: "the commit subject says X while the durable record does Y"). It's cosmetic here — the content reconciles — but the project's own `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions" treats subject-vs-content honesty as load-bearing. Fix: when a single docs commit dispositions four findings, the subject should list all four (or say "AUDIT-35–38"), so the enumerated set matches the blocks the commit actually writes.
+
+## 2026-06-04 — audit-barrage lift (20260604T183413186Z-scope-discovery)
+
+### AUDIT-20260604-41 — README marks Phase 12 Task 9 "not started" while the workplan in the same diff marks all of Task 9 complete
+
+Finding-ID: AUDIT-20260604-41 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 12 row, "Task 9 (#396 …) not started") vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 9 (all of Step 0–4 flipped `- [ ]` → `- [x]`)
+
+The README Phase 12 cell edited in this diff states: *"Task 9 (#396 — `audit-barrage-render` `{{var}}` false-positives) not started."* The workplan edit in the same diff range flips every one of Task 9's Step 0–4 boxes to `[x]` and three of four acceptance-criteria boxes to `[x]`, with a state-accounting note asserting the fix "already shipped on this branch + on main." The top commit subject (`5aaf81a9 … tick Phase 12 Task 9 — #396 … fix shipped pre-scoping`) confirms the workplan was ticked in a later commit that did not back-update the README row. The net HEAD state therefore has two canonical feature docs directly contradicting each other on the same task's status.
+
+This is the subject-vs-content drift class the audit-log already flags repeatedly (AUDIT-31/33/36/40). A future reader reconciling "what's left in Phase 12" gets opposite answers from the README and the workplan. Fix: update the README Phase 12 cell to reflect that Task 9's substance shipped pre-scoping (mirroring the Task 8 treatment already in that cell), so the README and workplan agree.
+
+### AUDIT-20260604-42 — AUDIT-39 fix removes the false e2e claim but leaves the bare-`{{prompt-stdin}}` gemini default with no end-to-end spawn coverage
+
+Finding-ID: AUDIT-20260604-42
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts:329-350` (AUDIT-37 test, post-AUDIT-39 edit)
+
+The diff correctly deletes the over-claiming "Verified via integration …" sentence (AUDIT-39's ask) and replaces it with an honest "Coverage scope … UNIT-level only" comment. Good. But the chosen disposition closes the honesty defect by *narrowing the claim*, not by closing the gap AUDIT-37 originally named: the gemini default now ships the bare-token `args_template: "{{prompt-stdin}}"` shape, and the only test pinning it is the `buildArgs('  {{prompt-stdin}}  ', …) === []` unit assertion. No test drives that bare shape through `spawnCli` end-to-end; the new comment itself concedes the spawn path "is NOT" exercised. The e2big counterfactual tests still use placeholder-preceded-by-tokens shapes (`-p {{prompt-stdin}}`, `-e … {{prompt-stdin}}`), exactly as AUDIT-37 said.
+
+This is the highest-risk shape of the new default (a stray empty-string argv element would only manifest at actual spawn), and it remains verified only at the `buildArgs` boundary. The honesty fix is real and sufficient to stop the false record, so this is low severity — but the operator should know the disposition traded coverage for accuracy rather than adding the missing assertion. A genuine close would add one `spawnCli`-level assertion that the bare-placeholder template launches the gemini-shaped fake CLI with zero argv (not `['']`) and exits 0.

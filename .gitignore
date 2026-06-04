@@ -79,6 +79,7 @@ yarn-error.log*
 ## Worktree-local commit-message scratch file (per .claude/rules/file-handling.md).
 ## Subagents write multi-line commit messages here, then 'git commit -F' from it.
 .git-commit-msg.tmp
+.git-issue-body.tmp
 
 ## Claude Code local
 .claude/settings.json

@@ -39,10 +39,23 @@ dw-lifecycle session-start-recommendation --slug <feature-slug>
 
    When `.dw-lifecycle/scope-discovery/` is absent, silently skip Step 7 (scope-discovery is opt-in per project).
 
-8. Run `gh issue list --state open --search <slug>` to surface relevant issues.
-9. Report context to the operator. Do NOT start work until they confirm the session goal.
+8. **Branch-staleness signal (advisory).** Per [#422](https://github.com/audiocontrol-org/deskwork/issues/422), invoke the staleness verb so a long-stale feature branch is surfaced before the operator picks up tasks. Cheap, fires once per session — NOT per implement-loop iteration. Distinct cure-shape from the post-merge bookkeeping portfolio at [#413](https://github.com/audiocontrol-org/deskwork/issues/413): #413 makes each merge cheaper; this signal prompts the merge to happen sooner.
+
+   ```
+   dw-lifecycle branch-staleness-check
+   ```
+
+   Threshold defaults to `5`; override via `config.session.start.branchStalenessThreshold` in `.dw-lifecycle/config.json`. Default upstream ref is `origin/main`; override per invocation with `--remote <remote>/<branch>`. The verb fetches first by default; pass `--no-fetch` for offline sessions.
+
+   Render the verb's output line in the bootstrap report. When the verb prints the `Consider git merge…` nudge, surface it too — that's the signal that the branch is past the staleness threshold and the operator should consider syncing before picking up tasks. **Advisory only** — never refuse to start the session.
+
+   When the installed binary doesn't recognize `branch-staleness-check` (older release), silently skip Step 8; the verb is opt-in per plugin version.
+
+9. Run `gh issue list --state open --search <slug>` to surface relevant issues.
+10. Report context to the operator. Do NOT start work until they confirm the session goal.
 
 ## Error handling
 
 - **Not on a feature branch.** Skill prompts: "Current branch is `main` (or other non-feature branch). Switch to a feature worktree before continuing."
 - **`DEVELOPMENT-NOTES.md` missing.** Treated identically to "no prior recommendation"; surface the friendly message and proceed.
+- **`branch-staleness-check` rejects the invocation** (older plugin binary, git error, detached HEAD). The verb itself prints a one-line `skipped (...)` message and exits 0; surface that line in the bootstrap report. Never refuse to start the session on staleness-detection failure — it's advisory only.
