@@ -3,7 +3,7 @@ slug: pluggable-lifecycle-providers
 title: pluggable-lifecycle-providers
 targetVersion: "1.0"
 date: 2026-06-04
-parentIssue: 
+parentIssue:
 deskwork:
   id: e246b4b1-cd4d-486c-b714-65949263c04e
 ---
