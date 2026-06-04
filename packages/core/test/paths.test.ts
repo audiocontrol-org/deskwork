@@ -11,7 +11,6 @@ import {
   findEntryFile,
   resolveSite,
   resolveCalendarPath,
-  resolveChannelsPath,
   resolveContentDir,
 } from '../src/paths.ts';
 import type { ContentIndex } from '../src/content-index.ts';
@@ -90,20 +89,6 @@ describe('resolveCalendarPath (Phase 39c — single project calendar)', () => {
     expect(resolveCalendarPath('/tmp/project', multiSite, 'nope')).toBe(
       '/tmp/project/.deskwork/calendar.md',
     );
-  });
-});
-
-describe('resolveChannelsPath', () => {
-  it('returns the resolved channels path when the site declares one', () => {
-    expect(
-      resolveChannelsPath('/tmp/project', multiSite, 'audiocontrol'),
-    ).toBe('/tmp/project/docs/editorial-channels-audiocontrol.json');
-  });
-
-  it('returns undefined when the site has no channelsPath', () => {
-    expect(
-      resolveChannelsPath('/tmp/project', multiSite, 'editorialcontrol'),
-    ).toBeUndefined();
   });
 });
 

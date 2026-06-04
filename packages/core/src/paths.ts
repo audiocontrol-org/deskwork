@@ -80,18 +80,6 @@ export function resolveCalendarPath(
   return join(projectRoot, '.deskwork', 'calendar.md');
 }
 
-/** Absolute path to the site's channels file, or undefined when the site declares none. */
-export function resolveChannelsPath(
-  projectRoot: string,
-  config: DeskworkConfig,
-  site?: string | null,
-): string | undefined {
-  const entry = siteConfig(config, site);
-  return entry.channelsPath === undefined
-    ? undefined
-    : join(projectRoot, entry.channelsPath);
-}
-
 /** Absolute path to the site's blog content directory. */
 export function resolveContentDir(
   projectRoot: string,
