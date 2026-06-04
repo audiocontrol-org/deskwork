@@ -12,6 +12,19 @@ deskwork:
 
 > **Canonical technical detail lives in [`design.md`](./design.md)** — architecture, manifest schema, `normalize()` / `reconcile()` contracts, provider port, tracker capability, and the full phasing rationale. The PRD captures problem framing, operator-facing acceptance criteria, scope decisions, and the open questions the operator dispositions during deskwork review.
 
+## North Star — the audacious ideal (do not lose sight of this)
+
+This is the end-state every slice ladders toward. Incremental delivery (governance-on-a-foreign-plan first, parallel execution next) is the *path*; this is the *destination*. No phase should drift from it.
+
+> **deskwork is the provider-agnostic control plane that takes ANY authoring provider's dependency-annotated plan and — branching only on capabilities, never on provider identity — does two things the providers' own tools do not:**
+>
+> 1. **Governs it.** Cross-model audit-barrage, the finding state machine (`open → fixed → verified`), and scope/clone/debt governance run over the plan and the work it produces — regardless of who authored it.
+> 2. **Executes it better than the provider's own single-agent grinder.** A parallel, multi-CLI, worktree-isolated execution engine drops *tranches of independent tasks* (read from the provider's dependency map — phases + `[P]` markers + embedded file paths) onto **multiple LLM CLIs concurrently**, each task in its own git worktree, then merges.
+
+Division of labor at the ideal: the **provider** authors intent *and the dependency map*; **deskwork** owns physical substrate, **parallel multi-CLI execution**, and **governance**. The provider's single-agent execution loop becomes optional — deskwork can run the plan faster and audit it harder than the provider can alone.
+
+**Why this is the ideal and not scope creep:** the front-half (authoring) is commodity; the differentiated value is what deskwork does *on top of* any plan. Governance was the original differentiator; the Spec-Kit dogfood (2026-06-04) surfaced a second, larger one — parallel multi-CLI execution — which the Spec Kit community is independently validating (MAQA's worktree-based multi-agent execution, Fleet Orchestrator, Agent Assign; see `tooling-feedback.md` TF-06/TF-07). Capturing it here as the ideal keeps the incremental slices honest; scoping *which* slice ships *when* remains a separate, explicit, operator-driven decision.
+
 ## Problem Statement
 
 The front half of `dw-lifecycle` (define → setup → issues) is now commodity. Spec-driven tools — GitHub Spec Kit, AWS Kiro, and others arriving on a ~6-month cadence — author feature decompositions at least as well as the native `superpowers:writing-plans` flow, several with more formal acceptance-criteria notation (Kiro's EARS). The operator wants to keep `deskwork` as the single control plane while treating authoring as a swappable layer, so the differentiated back half (audit barrage, finding state machine, scope/clone/debt governance) sits on top of whatever authored the plan.

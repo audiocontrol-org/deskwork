@@ -10,6 +10,8 @@ parentIssue:
 
 Make `dw-lifecycle`'s authoring layer pluggable via a provider port (`native` | `spec-kit` | `kiro` | future), backed by a normalized `lifecycle-manifest.yaml` that the differentiated back half (audit barrage, finding state machine, scope/clone/debt governance) reads regardless of which provider authored the plan. Ports-and-adapters with the manifest as the port; the back half branches on `capabilities()`, never on provider identity.
 
+> **North Star (ideal end-state):** deskwork as the provider-agnostic control plane that takes ANY provider's dependency-annotated plan and both **governs it** (cross-model audit/findings/scope) and **executes it better than the provider's single-agent grinder** — a parallel, multi-CLI, worktree-isolated engine that fans tranches of independent tasks across multiple LLM CLIs. See `prd.md` § North Star. The phases below are the incremental path; this is the destination.
+
 ## Status
 
 | Phase | Description | Status |
