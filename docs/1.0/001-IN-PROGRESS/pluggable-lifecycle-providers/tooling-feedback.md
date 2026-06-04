@@ -58,3 +58,23 @@ Append-only friction log for the Spec-Kit-as-management-layer dogfood. One frict
 - **Shape for deskwork:** a custom extension `provides` an execution command that (1) reads Spec Kit's dependency-annotated `tasks.md` (phases + `[P]` + file paths embedded in task lines — the map already exists), (2) computes tranches (phases serial; `[P]` parallel within a phase), (3) validates non-overlap deterministically via the embedded file paths (Spec Kit's `[P]` is LLM-heuristic, so verify before trusting), (4) dispatches each tranche across multiple LLM CLIs in parallel — reusing deskwork's existing multi-CLI fan-out primitive from audit-barrage — (5) each task in its own git worktree for write isolation, then merges.
 - **The hard part is NOT the fan-out (deskwork has it via audit-barrage); it's WRITE coordination:** audit fan-out is read-only; parallel code-writing mutates a shared tree → needs per-task worktree isolation + a merge/conflict step. This is exactly why MAQA is "worktree-based." `[P]` correctness is heuristic but checkable from the embedded file paths.
 - **Reframes the feature's value prop (upward):** beyond "deskwork governs a foreign plan," deskwork could be a **parallel, multi-CLI, worktree-isolated execution engine + governor on top of any provider's dependency-annotated plan** — something the providers' own single-agent grinders do NOT offer, and which the community is independently validating as a real need.
+
+## TF-08 — Prior-art study (MAQA, Fleet): validates the insertion point, but NONE do cross-CLI fan-out — that's deskwork's differentiator
+
+Studied the two highest-signal community extensions (both discovery-only, 0 downloads, UNPROVEN — reference architectures, not adoptable deps).
+
+**MAQA** (GenieRobot/spec-kit-maqa-ext) — closest to our north star:
+- Integration: registers new slash-commands (`/speckit.maqa.coordinator|.feature|.qa|.setup`) — command registration, not hooks. Confirms TF-07's shape.
+- Parallelism: **Claude Code native subagents** deployed to `.claude/agents/` (one model, multiple sub-agent processes). NOT multiple LLM CLIs.
+- Worktrees: YES — one worktree per feature (`worktree_base`, default `".."`); coordinator spawns N feature agents in parallel worktrees, merges, re-assesses next batch. Validates the worktree-isolation pattern.
+- Scheduling: reads `specs/*/tasks.md`; states todo→in_progress→in_review→done; "a feature only starts when all deps are done" (dependency-respecting batch scheduler). State in `.maqa/state.json`.
+- Flow: coordinator → SPAWN[N] feature agents (worktrees) → SPAWN_QA per completed feature (`qa_cadence: per_feature|batch_end`) → merge → re-assess.
+
+**Fleet Orchestrator** (sharathsatish/spec-kit-fleet):
+- Integration: new commands (`/speckit.fleet.run`, `/speckit.fleet.review`); chains existing speckit phases with Approve/Revise/Skip/Abort human gates.
+- Parallelism: up to 3 **subagents** (single-agent batching), `<!-- parallel-group: N (max 3 concurrent) -->` + `[P]` in tasks.md; file-overlap → sequential. NOT separate CLIs. No worktrees (uses branch-safety + WIP commits).
+- Has `models.primary` / `models.review` config (review can differ) but execution is subagents.
+
+**The decisive gap → deskwork's differentiator:** NEITHER does true cross-CLI / cross-model parallel execution. Both parallelize via one model's subagents (Claude). The operator's north-star ambition — drop tranches onto **multiple different LLM CLIs** (claude code AND codex) concurrently — is NOT in the prior art. deskwork already owns that exact primitive (audit-barrage spawns claude+codex in parallel). So deskwork's parallel executor would be differentiated on two axes neither MAQA nor Fleet has: (a) **cross-CLI/cross-model** task execution, and (b) deskwork's **governance back half as the "QA"** (cross-model audit-barrage + finding state machine + scope/clone/debt) instead of a single QA agent.
+
+**Build-vs-adopt verdict:** LEARN from MAQA's blueprint (worktree-per-task, dependency-batch scheduler, coordinator loop, qa_cadence, state.json), BUILD deskwork's own — the differentiators aren't in any prior art and the prior art is unproven/uninstallable anyway. Worktree-isolation has dedicated reference extensions too (Quratulain-bilal/spec-kit-worktree; dango85 Worktrees) worth a closer read when the parallel-executor slice starts.
