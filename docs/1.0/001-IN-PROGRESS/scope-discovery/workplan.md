@@ -1425,18 +1425,18 @@ Closes #397. Surface: `plugins/dw-lifecycle/templates/audit-barrage-config.yaml`
 
 Context: Phase 19 (v0.32.1) added `{{prompt-stdin}}` as an opt-in placeholder for stdin-delivered prompts. The default config still uses `{{prompt}}` (argv), so any adopter who didn't manually flip the placeholder still hits E2BIG on large diffs. Bug stays open.
 
-- [ ] Step 0: working-code invariant — the `{{prompt}}` argv path must keep working for back-compat (small prompts, deterministic test fixtures using `node -e` shims).
-- [ ] Step 1: bug-repro test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.e2big.test.ts` — generate a ~200 KB prompt; assert spawn-against-fake-CLI using `{{prompt-stdin}}` succeeds AND the corresponding `{{prompt}}` invocation fails with a structured E2BIG classifier message pointing at `{{prompt-stdin}}`.
-- [ ] Step 2: regression-lock test asserts `{{prompt}}` small-payload happy path still works end-to-end (existing happy-path tests stay green).
-- [ ] Step 3: implementation — flip default in `templates/audit-barrage-config.yaml` to `{{prompt-stdin}}`; catch spawn-time E2BIG in `spawn-cli.ts` and surface a structured error naming the `{{prompt-stdin}}` migration; update `audit-barrage-cli-notes.md`; add a `MIGRATING.md` note for adopters who customized their config to `{{prompt}}` explicitly.
-- [ ] Step 4: live-verify with a ~200 KB diff on a real branch; full plugin suite green; commit with `Closes #397` trailer.
+- [x] Step 0: working-code invariant — the `{{prompt}}` argv path must keep working for back-compat (small prompts, deterministic test fixtures using `node -e` shims). Pinned by the existing 17-test `spawn-cli.test.ts` suite which exercises the argv path on small payloads end-to-end.
+- [x] Step 1: bug-repro test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.e2big.test.ts` — 5 MiB prompt (well over macOS's ~256 KB and Linux's ~128 KB MAX_ARG_STRLEN). Asserts `{{prompt-stdin}}` succeeds AND `{{prompt}}` fails with a structured classifier naming `E2BIG`, the byte count, `{{prompt-stdin}}`, and the issue / MIGRATING.md references.
+- [x] Step 2: regression-lock — already covered by existing `spawn-cli.test.ts` (`buildArgs` argv-substitution suite + happy-path `spawnCliAgainstModel` tests with small `{{prompt}}` payloads). Full suite remained green (113/113 audit-barrage tests pre + post; 2696 → 2698 plugin total).
+- [x] Step 3: implementation — `spawn-cli.ts` wraps `spawn()` in try/catch (Node emits E2BIG synchronously, before the async `'error'` handler can fire); `classifyE2BIGSpawnError()` exported helper produces the structured message; defense-in-depth E2BIG classification in the async error handler too. `templates/audit-barrage-config.yaml` defaults all three CLIs to `{{prompt-stdin}}` with a comment block explaining the flip. `audit-barrage-cli-notes.md` adds a "Phase 12 Task 8" section + reframes the Phase 19 section as opt-in → default. `MIGRATING.md` prepends "Migrating to v0.37.0+" with the recommended path + back-compat note.
+- [x] Step 4: full plugin suite green (2698/2698); commit with `Closes #397` trailer. Live-verify against a real `HEAD~10` range with the operator's CLIs is the operator's call per the project's `Issue closure requires verification in a formally-installed release` rule.
 
 **Acceptance Criteria:**
 
-- [ ] Bug-repro test exists at the cited path and was failing on main pre-fix.
-- [ ] Regression-lock test asserts existing `{{prompt}}` happy-path still works.
-- [ ] `dw-lifecycle audit-barrage` against a ~200 KB prompt completes without E2BIG (live-verified on a real branch with `HEAD~10`-shaped range).
-- [ ] `audit-barrage-config.yaml` template default flipped to `{{prompt-stdin}}`; `MIGRATING.md` notes the change for adopter configs that customized `{{prompt}}`.
+- [x] Bug-repro test exists at the cited path and was failing on main pre-fix (verified: pre-fix run of the new test surfaced the synchronous `spawn E2BIG` throw uncaught at `spawn-cli.ts:134`).
+- [x] Regression-lock test asserts existing `{{prompt}}` happy-path still works (113/113 audit-barrage suite green pre and post fix).
+- [ ] `dw-lifecycle audit-barrage` against a ~200 KB prompt completes without E2BIG (live-verified on a real branch with `HEAD~10`-shaped range). Pending operator live-verify with installed CLIs.
+- [x] `audit-barrage-config.yaml` template default flipped to `{{prompt-stdin}}`; `MIGRATING.md` notes the change for adopter configs that customized `{{prompt}}`.
 - [ ] Closure transition (`gh issue close 397`) is the operator's call after install + verify per the project rule.
 
 ### Task 9 (fix-issue-#396): implement-hook `audit-barrage-render` false-positives on `{{var}}`-shaped strings inside the diff ([#396](https://github.com/audiocontrol-org/deskwork/issues/396))

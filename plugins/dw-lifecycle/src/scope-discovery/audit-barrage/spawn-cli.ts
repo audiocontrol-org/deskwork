@@ -48,6 +48,32 @@ import type { ModelConfig, ModelRunResult } from './types.js';
 const SIGKILL_GRACE_MS = 5000;
 
 /**
+ * Build the operator-facing classifier for a spawn-time E2BIG error.
+ * The OS rejects argv+env exceeding ARG_MAX before the child exists;
+ * the only viable cure is moving prompt delivery off argv. Surfacing
+ * `{{prompt-stdin}}` by name (plus the issue + MIGRATING reference)
+ * lets the operator fix the config without reading source. Exported
+ * for tests so the contract is independently pinned.
+ */
+export function classifyE2BIGSpawnError(promptBytes: number, raw: string): string {
+  return (
+    `spawn E2BIG: prompt of ${promptBytes} bytes exceeds OS argv limit (ARG_MAX). ` +
+    `Switch the args_template placeholder from '{{prompt}}' to '{{prompt-stdin}}' ` +
+    `to deliver the prompt via child stdin instead of argv — bypasses the limit ` +
+    `entirely. See https://github.com/audiocontrol-org/deskwork/issues/397 + MIGRATING.md. ` +
+    `Underlying error: ${raw}`
+  );
+}
+
+function isE2BIG(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const candidate = err as { code?: unknown; message?: unknown };
+  if (candidate.code === 'E2BIG') return true;
+  if (typeof candidate.message === 'string' && candidate.message.includes('E2BIG')) return true;
+  return false;
+}
+
+/**
  * Inputs to a single CLI subprocess invocation. The orchestrator
  * constructs one of these per model per run.
  */
@@ -126,14 +152,40 @@ export async function spawnCliAgainstModel(
     // separate `spawn` calls to preserve the literal stdio tuple
     // shape, which lets TypeScript narrow `child.stdout` /
     // `child.stderr` to non-null on both paths.
+    //
+    // Phase 12 Task 8 (#397): wrap spawn in try/catch — when the OS
+    // rejects argv+env before the child is created (E2BIG, EMFILE,
+    // ENAMETOOLONG), `spawn()` throws SYNCHRONOUSLY. The async
+    // `child.on('error', ...)` handler does NOT catch these cases.
+    // For E2BIG specifically we surface a structured classifier that
+    // points adopters at the {{prompt-stdin}} migration path.
     const useStdin = input.model.argsTemplate.includes('{{prompt-stdin}}');
-    const child = useStdin
-      ? spawn(input.model.binary, args, {
-          stdio: ['pipe', 'pipe', 'pipe'],
-        })
-      : spawn(input.model.binary, args, {
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
+    let child;
+    try {
+      child = useStdin
+        ? spawn(input.model.binary, args, {
+            stdio: ['pipe', 'pipe', 'pipe'],
+          })
+        : spawn(input.model.binary, args, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+          });
+    } catch (err) {
+      const promptBytes = Buffer.byteLength(input.prompt, 'utf8');
+      const classified = isE2BIG(err)
+        ? classifyE2BIGSpawnError(promptBytes, errorMessage(err))
+        : errorMessage(err);
+      finish({
+        exitCode: -2,
+        durationMs: Date.now() - start,
+        stdoutBytes,
+        stderrBytes,
+        stdoutPath: input.stdoutPath,
+        stderrPath: input.stderrPath,
+        timedOut: false,
+        spawnError: classified,
+      });
+      return;
+    }
     if (useStdin && child.stdin !== null) {
       // Write the prompt to stdin and close. Per Phase 19 Task 1:
       // back-pressure aware via `write` callback would be more
@@ -156,7 +208,16 @@ export async function spawnCliAgainstModel(
     // on this path; without it, a timeout timer scheduled ~300s out
     // would survive past the result resolution (silent dangling
     // handle).
+    //
+    // Phase 12 Task 8 (#397): defense-in-depth — E2BIG normally
+    // throws synchronously from spawn() (handled above), but some
+    // Node versions or platforms may surface it asynchronously.
+    // Classify here too so the operator gets the migration cue
+    // regardless of which path the OS takes.
     child.on('error', (err) => {
+      const classified = isE2BIG(err)
+        ? classifyE2BIGSpawnError(Buffer.byteLength(input.prompt, 'utf8'), errorMessage(err))
+        : errorMessage(err);
       finish({
         exitCode: -2,
         durationMs: Date.now() - start,
@@ -165,7 +226,7 @@ export async function spawnCliAgainstModel(
         stdoutPath: input.stdoutPath,
         stderrPath: input.stderrPath,
         timedOut: false,
-        spawnError: errorMessage(err),
+        spawnError: classified,
       });
     });
 

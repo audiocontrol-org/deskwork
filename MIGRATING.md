@@ -1,3 +1,27 @@
+## Migrating to v0.37.0+ (Phase 12 — audit-barrage default flips to `{{prompt-stdin}}`)
+
+v0.37.0 ships a structural fix for [#397](https://github.com/audiocontrol-org/deskwork/issues/397) (`spawn E2BIG: prompt passed via argv overflows ARG_MAX on large diffs`). The plugin-shipped `audit-barrage-config.yaml` now uses `{{prompt-stdin}}` for all three default models (`claude`, `codex`, `gemini`); the audit prompt is delivered via child stdin instead of an argv element. Bypasses the OS per-arg limit (~256KB on macOS, ~128KB MAX_ARG_STRLEN on Linux) so bootstrap `HEAD~10` ranges with hundreds of KB of diff no longer fail at spawn time with a silent `barrage-outage` forward-progression.
+
+### What changed
+
+- `plugins/dw-lifecycle/templates/audit-barrage-config.yaml` defaults: `"-p {{prompt-stdin}}"` (claude), `"exec {{prompt-stdin}}"` (codex), `"{{prompt-stdin}}"` (gemini). Both placeholders remain valid in `args_template`; the spawn helper picks the delivery path off the placeholder. The two are mutually exclusive per entry.
+- `spawn-cli.ts` now catches synchronous `spawn E2BIG` and surfaces a structured classifier naming `{{prompt-stdin}}` + the issue + this file. The argv (`{{prompt}}`) path is unchanged for small payloads — only the failure-mode reporting is upgraded.
+
+### Adopters who customized to `{{prompt}}` explicitly
+
+If you copied the v1 config into `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` and customized — or if you've left the override file un-customized and rely on the plugin default — you have two paths:
+
+1. **Recommended — switch to `{{prompt-stdin}}`.** Replace each `{{prompt}}` placeholder in your `args_template:` lines with `{{prompt-stdin}}`. All three default CLIs (`claude -p`, `codex exec`, `gemini`) read prompts from stdin without additional flags. Live-verify by running `dw-lifecycle audit-barrage` against a feature's recent work; the run-dir's INDEX.md will show all models exited cleanly even on multi-MB diffs.
+2. **Stay on argv (`{{prompt}}`) with explicit acknowledgment.** Acceptable when your diffs are bounded small. Re-running against a large diff will now fail loud with the structured classifier (instead of a silent barrage-outage) — the message names this migration path so future-you can flip when the friction shows up.
+
+### When to expect a `spawn E2BIG` classifier in practice
+
+- Fresh scope-discovery opt-in where `last-hook-run.json` is absent and `implement-hook` defaults the range to `HEAD~10..HEAD`.
+- Any `--from <ref>` with a large merge commit in the included range.
+- Feature branches whose substantive diff alone exceeds your platform's per-arg limit.
+
+The classifier message includes the exact prompt byte count, so cross-referencing your `audit-runs/<timestamp>-<feature>/` to find the offending payload is mechanical.
+
 ## Migrating to v0.36.0+ (Phase 25 — `editor-symmetry` → `module-symmetry` rename)
 
 v0.36.0 also lands Phase 25's terminology cleanup: every adopter-facing `editor-symmetry` surface in the `dw-lifecycle` plugin is renamed to `module-symmetry`. The audiocontrol pilot named the parallel-top-level-module concept `editor` because its modules are Roland-sampler editor packages; every non-audiocontrol adopter mentally translates `editor` → `module`. Phase 25 pays the schema-stability cost so the plugin reads project-neutral out of the box.
