@@ -939,7 +939,7 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 - [x] `scope-export [--json]` — emit a previously-produced `scope-manifest.yaml` to stdout. Default path resolves from `--slug` (`docs/1.0/001-IN-PROGRESS/<slug>/scope-manifest.yaml`, matching `scope-inventory`'s default output); `--manifest <path>` overrides explicitly. Default mode emits raw YAML verbatim (preserves comments + formatting); `--json` re-emits via `yaml.parse` + `JSON.stringify`. 10 vitest scenarios.
 
 **Acceptance Criteria:**
-- [ ] All ~20 CLI verbs invokable via `dw-lifecycle <verb>` + via skill prose
+- [x] All ~20 CLI verbs invokable via `dw-lifecycle <verb>` + via skill prose — exceeded: `plugins/dw-lifecycle/src/subcommands/*.ts` registers 60 verbs (verified via `ls`). Skill prose surface: `plugins/dw-lifecycle/skills/` contains 50 skill folders; `plugins/dw-lifecycle/commands/*.md` ships 41 slash-command entries.
 - [x] `--gate-mode` flag on check-* commands exits non-zero on violations — landed across `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions` (default informational; flag flips to hook-friendly exit 1) and `detect-clones` (already gate-by-default; flag is a no-op for symmetry). 10 new vitest scenarios cover the flag delta.
 - [x] `--json` flag on summary/export commands emits structured output — `scope-summary --json` emits `{ surface, clones, total, pending-touching, pending-intra, dispositioned-touching }`; `scope-export --json` emits the parsed manifest re-serialized via `JSON.stringify`; `check-deprecations --json` emits `{ total, deprecation_count, filesVisited, blocked: [...], safeToDelete: [...] }` (the post-port shape; the pre-port shell's `{ blocked, safeToDelete, deprecation_count, note }` is a superset).
 
@@ -980,8 +980,8 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 - [x] `/dw-lifecycle:customize` — document `scope-discovery <name>` category
 
 **Acceptance Criteria:**
-- [ ] All ~23 skills discoverable via slash-command picker
-- [ ] Existing skills' auto-invocation documented + opt-out flags surfaced
+- [x] All ~23 skills discoverable via slash-command picker — exceeded: 50 skill folders under `plugins/dw-lifecycle/skills/` and 41 entries under `plugins/dw-lifecycle/commands/` (verified via `ls`); the slash-command picker resolves whatever the `commands/` directory ships.
+- [x] Existing skills' auto-invocation documented + opt-out flags surfaced — satisfied by Task 2 (all 5 updated skills landed with their auto-invocation + opt-out documentation): `define` (auto-scope-inventory + `--no-scope-inventory`), `implement` (auto-scope-widen + dispatch-wrapper + `--no-scope-widen`), `review` (auto-clone-detector + `--no-clone-check`), `doctor` (new rules), `customize` (`scope-discovery <name>` category).
 
 ## Phase 8: Install / migrate / uninstall machinery
 
@@ -989,20 +989,24 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 
 ### Task 1: install-scope-discovery
 
-- [ ] Bootstrap `.dw-lifecycle/scope-discovery/` config dir; copy README + LAYOUT.md + refactor-preconditions-checklist.md templates from plugin
-- [ ] Refuse if already present (idempotent re-run reports + no-op)
+- [x] Bootstrap `.dw-lifecycle/scope-discovery/` config dir; copy README + LAYOUT.md + refactor-preconditions-checklist.md templates from plugin — landed; `plugins/dw-lifecycle/skills/install-scope-discovery/SKILL.md` documents the helper's bootstrap behavior (creates the config dir, copies four bundled templates, seeds three empty-array registries). Test coverage at `plugins/dw-lifecycle/src/__tests__/scope-discovery/install-scope-discovery.test.ts` covers greenfield + idempotent + dry-run + force + partial-restore branches (15 scenarios per README Phase 8 Task 1 Acceptance).
+- [x] Refuse if already present (idempotent re-run reports + no-op) — landed; skill body's Step 2 + Flags table document `already present` skip behavior; `--force` overrides; same test suite covers the idempotency contract.
 
 ### Task 2: install-scope-discovery-hooks
 
-- [ ] Detect `.githooks/pre-commit` presence; offer `--merge` / `--replace` / `--force`
-- [ ] Detect Husky in `package.json`; register hook if present
-- [ ] Write `hooks-installed.json` with provenance
+> Retired in Phase 24 (commit `9a96697d`) — per `.claude/rules/enforcement-lives-in-skills.md` + the no-git-hook-enforcement ADR (`docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md`), the git-hook install path is the wrong vehicle for adopter discipline; adopters get the structural + audit-barrage chains by installing the plugin (skill bodies in `/dw-lifecycle:{session-start,implement,session-end,review}`) rather than wiring `.husky/`. The CLI verb + skill folder + commands entry were demolished in `9a96697d`; this Task's sub-bullets are vestigial.
+
+- [x] ~~Detect `.githooks/pre-commit` presence; offer `--merge` / `--replace` / `--force`~~ — retired Phase 24.
+- [x] ~~Detect Husky in `package.json`; register hook if present~~ — retired Phase 24.
+- [x] ~~Write `hooks-installed.json` with provenance~~ — retired Phase 24 (the manifest existed only to satisfy the now-retired uninstall verb).
 
 ### Task 3: install-agent-prompts
 
-- [ ] Detect `.claude/agents/{code-reviewer,codebase-auditor}.md` presence; offer `--merge` / `--force`
-- [ ] Write Step 0 §verification sections generated from canonical fragment
-- [ ] Record in `hooks-installed.json`
+> Retired in Phase 24 (commit `9a96697d`) — same rationale as Task 2; Step 0 prompt-fragment injection into `.claude/agents/{code-reviewer,codebase-auditor}.md` is no longer the discipline vehicle. The Step 0 obligation now travels through the dispatch-wrapper's refactor-marker auto-prelude (`plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts`) + the `/dw-lifecycle:review` skill body's Step 0 section.
+
+- [x] ~~Detect `.claude/agents/{code-reviewer,codebase-auditor}.md` presence; offer `--merge` / `--force`~~ — retired Phase 24.
+- [x] ~~Write Step 0 §verification sections generated from canonical fragment~~ — retired Phase 24.
+- [x] ~~Record in `hooks-installed.json`~~ — retired Phase 24.
 
 ### Task 4: migrate-from-pilot (audiocontrol-specific)
 
@@ -1013,9 +1017,11 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 
 ### Task 5: uninstall-scope-discovery-hooks
 
-- [ ] Reads `hooks-installed.json`; drift-checks each installed file
-- [ ] Removes files; removes manifest entries
-- [ ] `--force-uninstall` overrides drift refusal
+> Retired in Phase 24 (commit `9a96697d`) — sibling to Task 2's retirement; the uninstall verb existed to roll back the now-retired hook install. The Phase 24 commit demolished the verb + skill + commands entry; the `hooks-installed.json` manifest format also retires with it.
+
+- [x] ~~Reads `hooks-installed.json`; drift-checks each installed file~~ — retired Phase 24.
+- [x] ~~Removes files; removes manifest entries~~ — retired Phase 24.
+- [x] ~~`--force-uninstall` overrides drift refusal~~ — retired Phase 24.
 
 **Acceptance Criteria:**
 - [x] Greenfield install creates correct dir structure + schema files — `install-scope-discovery` creates `.dw-lifecycle/scope-discovery/` with 4 templates + 3 empty-array seeds; 15 vitest scenarios verify greenfield + idempotent + dry-run + force + partial restore.
