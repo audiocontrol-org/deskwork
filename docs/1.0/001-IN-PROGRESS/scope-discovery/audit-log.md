@@ -3040,3 +3040,1560 @@ Lower-stakes than the duplicated-constant finding, but it compounds with it: the
 ---
 
 I checked and found clean: the `computeAuditedDiff` short-circuit ordering and the new `too-large` early-returns (range → staged → unstaged, each overflow returning immediately with the correct `tooLargeLayer`) are correct and well-covered by the new tests, including the no-collapse regression-lock pinning `too-large` ≠ `empty`; the `isMaxBufferError` classifier handles the `ENOBUFS` / `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` code paths plus the message fallback and rejects `null`/`undefined`/string/number/`{}` cleanly; the `runImplementHook` wiring refuses with exit 1 + the layer-specific cure and preserves the separate `empty` refusal; the `DiffCallResult` discriminated-union threading is type-consistent across the DI bag and the three call sites; and the audit-log appends (the four AUDIT-20260603-0x blocks + the AUDIT-39 status flip to `acknowledged-partial-fix`) are internally consistent with the commit subjects. My four findings are the missing/false integration-smoke claim plus untested `runGitDiff` (-01), the `ok:true` mislabeling of caught git errors (-02), and two coupled cure-message hygiene issues — duplicated 50 MB constant (-03) and a stale file-path pointer the same refactor invalidated (-04). I did not re-report the already-slushed `catch`-swallow framing (AUDIT-39 body), the `IsAncestorOfHeadOptions` stale name (AUDIT-51), or the divergence-notice dead-code / upstream-base plumbing already captured as AUDIT-20260603-01/-02.
+
+## 2026-06-03 — audit-barrage lift (20260603T004921144Z-scope-discovery)
+
+### AUDIT-20260603-09 — AUDIT-39 + AUDIT-03 flipped to `fixed-f6b70b67` while the SAME commit appends a finding documenting the unresolved half of AUDIT-39's complaint
+
+Finding-ID: AUDIT-20260603-09
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — AUDIT-20260602-39 status line (`+Status: fixed-f6b70b67`) and AUDIT-20260603-03 status line (`+Status: fixed-f6b70b67`), vs. the AUDIT-20260603-06 block appended in the same diff.
+
+AUDIT-39's own body (quoted earlier in this same file) names **two** conflations in the pre-fix `catch { return ''; }`: (a) maxBuffer-overflow vs. empty-tree, and (b) "not a git repo" / "bad ref" vs. empty-tree. The `f6b70b67` fix resolves only (a) by surfacing `too-large`. This very diff *also* appends AUDIT-20260603-06, whose heading is literally *"reintroduces the other half of AUDIT-39's complaint"* and whose body states (b) "is untouched and is now arguably *more* misleading." So the diff simultaneously (1) marks AUDIT-39 fully `fixed-f6b70b67` and (2) documents, in the adjacent block, that AUDIT-39's named mechanism is half-unaddressed. That is exactly the closure-vs-coverage inconsistency shape AUDIT-52 named and that AUDIT-20260603-03 itself was filed to call out — recurring in the act of closing AUDIT-03.
+
+The honest status is `acknowledged-partial-fix` (which is in fact what `da52fcee` set the day before: `acknowledged-partial-fix-81875d74-...`). Flipping straight to `fixed` regresses that more-accurate status. A reasonable fix: keep AUDIT-39 (and AUDIT-03, which trailers the same `f6b70b67`) at `acknowledged-partial-fix-f6b70b67-maxbuffer-classified-pending-git-error-distinction`, with the residual (b) tracked by the open AUDIT-20260603-06, until the `{ ok: false, kind: 'git-error' }` variant AUDIT-06 prescribes lands.
+
+### AUDIT-20260603-10 — Appended barrage's "checked clean" paragraph claims AUDIT-39 was flipped to `acknowledged-partial-fix` — but the same diff flips it to `fixed-f6b70b67`
+
+Finding-ID: AUDIT-20260603-10
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — the closing "I checked and found clean" paragraph of the `20260603T002818476Z` barrage block: *"the AUDIT-39 status flip to `acknowledged-partial-fix`) are internally consistent with the commit subjects."*
+
+The closing paragraph of the appended barrage asserts that AUDIT-39 was flipped to `acknowledged-partial-fix` and that this is "internally consistent with the commit subjects." But the AUDIT-20260602-39 status line *in the same diff* reads `+Status: fixed-f6b70b67`. The file now self-contradicts: one line says `fixed-f6b70b67`, the summary paragraph says `acknowledged-partial-fix`. This is a timing artifact — the barrage ran against `f6b70b67` (when da52fcee had set `acknowledged-partial-fix`), then the later `9e67e90d` flip to `fixed-f6b70b67` was committed alongside the barrage text without reconciling the summary — but the committed result is a document that describes a status different from the one it records. It also compounds AUDIT-BARRAGE-claude-01: the summary paragraph's own value (`acknowledged-partial-fix`) is the *correct* one, which is itself evidence the `fixed-f6b70b67` flip overclaimed. Minimal fix: reconcile the summary sentence to the status actually committed (`fixed-f6b70b67`), or — preferred per finding -01 — restore the status line to `acknowledged-partial-fix` so both agree on the accurate value.
+
+### AUDIT-20260603-11 — The v0.35.0 release HEAD commit has no `hook-run-log.jsonl` entry — the exact Phase 23 bypass shape recurred live at this release
+
+Finding-ID: AUDIT-20260603-11
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (last appended `tip` is `9e67e90d…`) vs. the release HEAD `chore: release v0.35.0` (`50731723`, the commit carrying every version bump in this diff).
+
+The three appended log entries cover `da52fcee` (no-new-diff-skip), `f6b70b67` (fired-and-slushed), and `9e67e90d` (no-new-diff-skip). The chore-release commit `50731723` — which is HEAD and the actual carrier of the marketplace + package.json version bumps in this diff — has **no** per-SHA entry. Under the pre-push gate's per-SHA coverage check, an unlogged commit is flagged as uncovered, so this release was necessarily pushed with `--no-verify` (the gate Phase 17 Task 5 set out to make unbypassable). This is the precise bookkeeping-skip bypass that the feature's own Phase 23 scope (Task 2 — *"a release-bump-style commit pushes cleanly without --no-verify after this lands"*) exists to close, recurring live at v0.35.0.
+
+This finding is anchored evidence that the gap is not hypothetical: the diff under audit is itself the artifact of the bypass. Phase 23 is not implemented in this diff (no `enumerateCommitsInRange`, no per-SHA loop at the append call sites — the only code change is version-string bumps), so the recurrence is expected — but it should be recorded that the v0.35.0 release added another `--no-verify` push to the same tally as the morning's merge-from-main bypass, reinforcing the Phase 23 priority. No fix is appropriate in a release commit; the disposition is to ensure Phase 23 lands before the next release rather than accruing another bypassed tip.
+
+## 2026-06-03 — audit-barrage lift (20260603T010215769Z-scope-discovery)
+
+### AUDIT-20260603-12 — Silent single-entry fallback on enumeration-empty re-opens the exact `--no-verify` gap Phase 23 closes
+
+Finding-ID: AUDIT-20260603-12
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` — `writeMarkerSafe`, the `tipsToLog.length > 0 ? … : []` branch and its `else` single-entry fallback (~lines 711–740); `git-ancestry.ts` `enumerateCommitsInRange` catch (~lines 198–205).
+
+`enumerateCommitsInRange` returns `[]` on *any* git error (`catch { return []; }`), and `writeMarkerSafe` then falls back to a single HEAD-only entry whenever `tipsToLog` is empty. The comment itself conflates the cases: *"Used when priorTip is null OR when enumeration returned empty (bad range / git error / truly empty range)."* But for a **non-null, ancestry-validated** `priorTip`, the range `priorTip..HEAD` is guaranteed to contain at least HEAD — so an empty result there can *only* mean a git error (GC'd ref, spawn failure, corrupt object), never a legitimately-empty range. In that case the code silently logs only HEAD, leaving every intermediate commit in the range uncovered. The pre-push gate then refuses those commits and the operator is back to `--no-verify` — the precise failure Phase 23 exists to eliminate, now reachable silently with zero diagnostic on stderr.
+
+This is the recurring AUDIT-39 / AUDIT-20260603-06 shape (a `catch`-to-empty that hides a real git failure behind a benign-looking value) reappearing on the write side. The feature's own Step 0 invariant says the defense must be preserved; a silent degrade defeats it. A reasonable fix: when `priorTip !== null` and enumeration returns empty, write to `args.stderr` (the gate-relevant warning) before falling back, or distinguish "git errored" from "truly empty" so the non-null-priorTip-but-empty case is treated as the anomaly it is rather than swallowed.
+
+### AUDIT-20260603-13 — The production seam introduced by this diff — `writeMarkerSafe`'s range logic — has no test; the "load-bearing" test exercises only the leaf helper
+
+Finding-ID: AUDIT-20260603-13
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/hook-run-log.test.ts` (the `Phase 23 load-bearing` test, ~lines 240–262); absent: any test driving `runImplementHook` → `writeMarkerSafe` with a multi-commit range.
+
+Task 1's own acceptance criterion reads: *"Per-SHA append verified in a test that drives the full `runImplementHook` with a 3-commit synthetic range."* No such test is in the diff. The two new helpers (`enumerateCommitsInRange`, `appendHookRunLogEntriesForRange`) are each tested in isolation, but the actual new production logic — `writeMarkerSafe`'s `priorTip` computation, the ancestry-safety gate on the skip path, and the `enumerateCommitsInRange → appendHookRunLogEntriesForRange` wiring — is unexercised. The test labeled `Phase 23 load-bearing: 3-commit batch → 3 log entries (the v0.35.0 shape)` feeds a hand-built SHA array directly to `appendHookRunLogEntriesForRange`; it never calls `enumerateCommitsInRange` and never touches `runImplementHook`. So it does not test the v0.35.0 *shape* — it tests that a loop appends N entries, which the simpler `writes one entry per SHA` test already covers. This is exactly the "suite is green while the DI seam is unexercised" pattern prior findings (AUDIT-43) named and the diff reintroduces. The integration acceptance criterion checkbox is correctly left `[ ]`, but the workplan marks Step 5 GREEN at "495/495", which overstates coverage of the seam. Fix: add a `runImplementHook` test with a real tmp-git 3-commit batch asserting three per-SHA log entries land, OR rename the "load-bearing" test to scope what it actually verifies (the append loop, not the v0.35.0 path).
+
+### AUDIT-20260603-14 — Workplan marks Task 2's acceptance criterion "VERIFIED by Phase 23 Task 3 live repro" while Task 3 is entirely unexecuted
+
+Finding-ID: AUDIT-20260603-14
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 2 Acceptance Criteria (`A release-bump-style commit … pushes cleanly without --no-verify after this lands. **VERIFIED by Phase 23 Task 3 live repro.**`) vs. Task 3, whose Steps 1–4 and all three acceptance criteria are unchecked `[ ]`.
+
+Task 2's release-bump acceptance line carries a bold **VERIFIED by Phase 23 Task 3 live repro** annotation, but Task 3 ("Live verification — re-run the v0.35.0 release shape without `--no-verify`") has not been run: every step and every acceptance criterion under it is an open `[ ]`, including "Live repro on a synthetic branch succeeds without `--no-verify`" and "SKILL.md documents the per-SHA log-write semantic." A criterion cannot be "verified by" a task that hasn't executed. This is the closure-overclaim shape the prior audit cycle repeatedly flagged (AUDIT-20260603-09/-10): a status annotation asserting verification that the referenced evidence does not yet provide. Per the project's "agent posts evidence; operator decides closure" rule, the honest state is: Task 2's per-SHA append behavior is implemented and unit-covered, but the *release-bump-pushes-cleanly* claim is pending Task 3's live repro. Fix: strike the **VERIFIED by Task 3** annotation (or downgrade it to "pending Task 3 live repro") until Task 3 actually runs and the synthetic-branch push exits 0 without bypass.
+
+### AUDIT-20260603-15 — Per-SHA entries are appended newest-first, breaking the log's append-chronological invariant within a batch
+
+Finding-ID: AUDIT-20260603-15
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/hook-run-log.ts` — `appendHookRunLogEntriesForRange` (~lines 134–143); fed by `enumerateCommitsInRange`'s `git rev-list` output (newest-first).
+
+`enumerateCommitsInRange` documents and returns SHAs in `git rev-list`'s default **newest-first** order, and `appendHookRunLogEntriesForRange` iterates that list as-is, appending HEAD's entry *before* its ancestors'. Until now the log was append-chronological (each single append = the latest run, last line = most recent). After Phase 23, a multi-commit batch writes entries in reverse-chronological order within the batch, so the file is no longer monotonically ordered by commit recency. The pre-push gate is set-membership-based so it is unaffected, and `readLatestBarrageTip` appears to read the marker rather than the log's last line — but the file is described in-repo as "durable history," and any future consumer (log analysis, "find the most recent run," a doctor rule walking the tail) that assumes chronological append order will read the oldest commit of the last batch as "latest." The new tests assert membership (`toContain`) and the explicit-tips ordering test pins the *input* order, so neither would catch a recency-ordering regression. Low-cost fix: `[...tips].reverse()` before the loop (oldest-first), or document explicitly that the log is not chronologically ordered and that consumers must use the marker for recency.
+
+### AUDIT-20260603-16 — `pickFallbackBaseline`'s JSDoc is orphaned — `enumerateCommitsInRange` was inserted between the docstring and the function it documents
+
+Finding-ID: AUDIT-20260603-16
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts` — insertion at ~line 165: the existing `/** … Pure function over the DI bag. */` block, then the new `enumerateCommitsInRange` interface+function, then `export function pickFallbackBaseline(...)`.
+
+The pre-existing `/** … * Pure function over the DI bag. */` block-comment documented `pickFallbackBaseline` (it directly preceded it). The diff inserts the new `// Phase 23 …` line comment, `EnumerateCommitsInRangeOptions`, and `enumerateCommitsInRange` *between* that docstring and `pickFallbackBaseline`. The result: `pickFallbackBaseline` now has no adjacent docstring, and the orphaned `/** … Pure function over the DI bag. */` floats above an unrelated line comment for `enumerateCommitsInRange`. This is a names-don't-reveal-intent / doc-drift hygiene issue — IDEs and readers will now attribute the stale docstring to the wrong symbol or show `pickFallbackBaseline` as undocumented. Fix: move the new function below `pickFallbackBaseline` (preserving its docstring adjacency), or relocate the orphaned `/** */` block back down to immediately precede `pickFallbackBaseline`.
+
+### AUDIT-20260603-17 — Asymmetric ancestry validation across the three `writeMarkerSafe` call sites
+
+Finding-ID: AUDIT-20260603-17
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` — skip-path call site (~lines 286–321, computes `priorTip` via `readLatestBarrageTip` + `checkAncestry` + `ancestryAsBarrageTip`) vs. barrage-outage (~line 506) and happy-path (~line 634) call sites, which both pass `priorTip: lastBarrageTip` directly.
+
+The no-new-diff-skip path carefully re-derives `priorTip` and runs it through the ancestry-safety gate ("only trust the prior tip when it's still reachable from HEAD; a diverged tip would enumerate the wrong history"). The other two call sites pass `lastBarrageTip` raw. If `lastBarrageTip` is already ancestry-validated upstream (i.e., the same value used to compute the barrage range earlier in the main flow), this is correct and consistent — but the diff doesn't show that derivation, and the asymmetry is a latent trap: should `lastBarrageTip` ever be a diverged/raw value at those sites, `enumerateCommitsInRange(diverged..HEAD)` would enumerate commits reachable from HEAD but not the diverged tip (over-logging already-covered SHAs, or — on a force-pushed/rewritten history — a misleading range). Worth confirming `lastBarrageTip` carries the same ancestry guarantee the skip path enforces; if so, a one-line comment at the happy-path call site stating "lastBarrageTip is ancestry-validated at <site>" would make the asymmetry intentional rather than accidental. If not, the same `checkAncestry`/`ancestryAsBarrageTip` treatment belongs at all three sites.
+
+---
+
+Checked and clean: `appendHookRunLogEntriesForRange` correctly delegates per-entry to `appendHookRunLogEntry` (preserving `O_APPEND` atomicity and the first-append sentinel side-effect), the empty-tips no-op is covered, and schema validation propagates from the base entry; `enumerateCommitsInRange`'s real-git fixture tests cover the 1/3/empty/bad-range/non-git matrix as the acceptance criterion requires; the `MarkerWriteArgs.priorTip: string | null` threading is type-consistent across all three call sites; and the fallback-to-single-entry is type-safe. My findings concentrate on the silent-degrade fallback (-01, the strongest), the untested integration seam plus mislabeled "load-bearing" test (-02), and the premature Task-3 verification claim in the workplan (-03).
+
+## 2026-06-03 — audit-barrage lift (20260603T010657327Z-scope-discovery)
+
+### AUDIT-20260603-18 — Skip-path runs don't advance the barrage tip, so the next fired barrage re-logs already-logged commits — contradictory dispositions and quadratic log growth
+
+Finding-ID: AUDIT-20260603-18
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (the new `d42cd022…` entries, appended twice); root cause in `plugins/dw-lifecycle/src/subcommands/implement-hook.ts` — `writeMarkerSafe` range enumeration (lines 719-745) + `readLatestBarrageTip` (lines 753-773).
+
+The diff appends `d42cd02271…` to the log **twice with conflicting dispositions**: once as `no-new-diff-skip` at `01:00:49` (`runDir:null`) and again as `fired-and-slushed` at `01:04:54` (`runDir:…20260603T010215769Z`). I traced why. `readLatestBarrageTip` derives the prior tip from the newest `audit-runs/*/tip.sha`, but the `no-new-diff-skip` path passes `runDir: null` and never creates an audit-runs directory — so a skip run does **not** advance the barrage tip. The next *fired* run therefore re-reads the same prior tip (`50731723`) and `enumerateCommitsInRange('50731723..f183b746')` re-walks `d42cd022`, which an earlier skip run already logged. The log now records `d42cd022` as both "skipped, not audited" and "audited in a barrage" — a self-contradiction in what the file header (hook-run-log.ts:11-15) calls append-only durable history. For the set-membership pre-push gate this is harmless, but any consumer that asks "what disposition did this commit get?" gets two answers.
+
+Worse, the re-walk is unbounded across a streak of skip runs. Because the prior tip stays pinned at the last *fired* barrage for the whole skip streak, skip-at-B logs `[B]`, skip-at-C logs `[C,B]`, skip-at-D logs `[D,C,B]` — O(N²) appends and N duplicate entries for the earliest commit across N consecutive bookkeeping commits. A reasonable fix: dedup against already-logged tips before appending (read the log, skip SHAs already present), or advance a skip-aware "last covered tip" marker that `readLatestBarrageTip`/the range computation respects so each commit is logged exactly once.
+
+---
+
+### AUDIT-20260603-19 — Task 3 marked `[LIVE-VERIFIED]`, but the push it cites covered "1 unpushed commit" — not the multi-commit batch shape the task exists to verify
+
+Finding-ID: AUDIT-20260603-19
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 3 Step 2 and its three now-checked acceptance criteria.
+
+Task 3's title is "re-run the **v0.35.0 release shape** without `--no-verify`," and v0.35.0's failure was a **multi-commit batch** where intermediate commits lacked log entries. The new Step 2 evidence quotes the gate's own stdout: *"check-implement-hook-coverage: All **1 unpushed commit(s)** have matching hook-run entries."* A single unpushed commit does not reproduce the multi-commit-batch gate path — the gate validated exactly one SHA, which is the case that worked *before* Phase 23 too. The per-SHA entries were written, but the push that was supposed to prove the fix only exercised the one-commit path. So the `[x] Live repro on this branch succeeds without --no-verify` criterion is checked off against evidence that doesn't cover the scenario the task names.
+
+Per the project's verification-rigor rules ("agent posts evidence; operator decides closure" and the spec-compliance-probe lesson — assert the *claim*, not the mechanism), the honest state is: per-SHA writing is implemented and the gate passed for a single commit; the *multi-commit batch pushes cleanly* claim is not yet demonstrated. A fix: stage ≥2 unpushed commits (a fix commit + a bookkeeping commit covered by one hook run), push them together, and capture `All N unpushed commit(s)` with N>1 — or downgrade the `[LIVE-VERIFIED]` tag to "pending multi-commit repro" until that exists.
+
+---
+
+### AUDIT-20260603-20 — Task 2's release-bump criterion stays `[ ]` yet carries a bold "VERIFIED by Task 3" annotation that Task 3's single-commit evidence doesn't support
+
+Finding-ID: AUDIT-20260603-20
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 2 Acceptance Criteria: *"A release-bump-style commit (chore: release vX.Y.Z) pushes cleanly without --no-verify after this lands. **VERIFIED by Phase 23 Task 3 live repro.**"*
+
+This is the prior AUDIT-20260603-14 shape persisting after Task 3 was marked done. The annotation asserts the release-bump-pushes-cleanly behavior was verified by Task 3, but (per AUDIT-BARRAGE-claude-02) Task 3's actual evidence is a one-commit push, and a `chore: release` commit is specifically a *bookkeeping* commit that historically rode in a multi-commit batch. No push in the cited evidence demonstrates a release-bump commit clearing the gate as part of a batch. The criterion box is correctly left unchecked, which is good — but the bold "VERIFIED" annotation contradicts the unchecked box and overstates what the evidence shows. Fix: either strike the annotation or rephrase to "implemented + unit-covered; release-bump batch push pending Task 3 multi-commit repro."
+
+---
+
+### AUDIT-20260603-21 — SKILL.md Phase 23 note claims per-SHA entries "all sharing disposition" — silent on cross-run re-coverage that gives one SHA conflicting dispositions
+
+Finding-ID: AUDIT-20260603-21
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/skills/implement/SKILL.md:140` (the new "Phase 23: per-SHA log writes." paragraph).
+
+The doc states: *"the verb appends ONE entry per SHA in the audited range, all sharing disposition + timestamp + runDir."* That is accurate *within a single run*, but the live artifact in this same diff shows it is not the whole story across runs: `d42cd022` carries `no-new-diff-skip` from one run and `fired-and-slushed` from a later run (see AUDIT-BARRAGE-claude-01). An operator reading "one entry per SHA, all sharing disposition" will reasonably expect each SHA to have a single, stable disposition; the implementation re-logs commits across runs with whatever disposition the later run had. If claude-01 is fixed by dedup, this paragraph becomes correct as written; if not, the doc should add a sentence noting a SHA may receive multiple entries with differing dispositions across runs and that the gate treats coverage as set-membership (latest disposition is not authoritative).
+
+---
+
+**Checked and clean:** `appendHookRunLogEntriesForRange` (hook-run-log.ts:137-145) correctly delegates per-entry to `appendHookRunLogEntry`, preserving `O_APPEND` atomicity and the first-append sentinel side-effect; the no-new-diff-skip path's ancestry guard (implement-hook.ts:301-305) mirrors the main path; the SKILL.md implementation pointers name the right files. My findings concentrate on the strongest new signal — the skip-path-doesn't-advance-tip re-coverage that produces contradictory dispositions and quadratic growth (claude-01) — plus the Task 3 live-verification overclaim where the cited push covered one commit, not the multi-commit batch the task exists to prove (claude-02).
+
+## 2026-06-03 — audit-barrage lift (20260603T152047254Z-scope-discovery)
+
+### AUDIT-20260603-22 — README + journal + commit-subject all claim the audit range "09..18", but the audit-log committed in the same diff actually records 09..21 — and the omitted AUDIT-19 is the finding that refutes this session's headline claim
+
+Finding-ID: AUDIT-20260603-22
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (blocks `20260603T010657327Z` appending AUDIT-20260603-18/-19/-20/-21) vs. the second commit subject ("record AUDIT-20260603-09..18") and `DEVELOPMENT-NOTES.md` ("slushed … AUDIT-20260603-04..18" and "AUDIT-20260603-09..18 are real follow-ups") and `README.md` Phase 23 cell ("AUDIT-20260603-09..18 slushed by dampener").
+
+The audit-log hunk in this diff appends **thirteen** findings, AUDIT-20260603-09 through -21 (the final block `20260603T010657327Z` carries -18, -19, -20, -21). But three separate summary artifacts in the same commit all cap the range at -18: the commit subject says "record AUDIT-20260603-09..18", the journal's slush tally says "AUDIT-20260603-04..18", and the journal's follow-up line says "AUDIT-20260603-09..18 are real follow-ups." AUDIT-19, -20, and -21 are recorded in the file but excluded from every summary. The likely mechanism is benign (the 01:10 barrage run produced -19/-20/-21 after the journal prose was drafted, then both got committed together) — but the committed result is a journal that under-counts the audit-log it ships with.
+
+The omission is not neutral. AUDIT-20260603-19 (medium) states that Task 3's `[LIVE-VERIFIED]` evidence covered "1 unpushed commit," not the multi-commit batch the task exists to verify — i.e. it directly refutes the journal's own "Live-verified the post-fix push succeeded without `--no-verify`" claim and its "honest accounting" self-congratulation ("The session-end report names what's NOT closed alongside what IS"). The one finding the journal drops is the one that contradicts the session's headline. A reasonable fix: extend the commit subject and both journal lines to "09..21", and add AUDIT-19 to the "real follow-ups, not closure" list so the accounting actually names the finding that undercuts the verification claim.
+
+### AUDIT-20260603-23 — README marks Phase 23 "Complete" and asserts "multi-commit + bookkeeping shapes" were live-verified, contradicting the workplan's unchecked acceptance criteria and AUDIT-19 in the same diff
+
+Finding-ID: AUDIT-20260603-23
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` — Phase 23 status cell ("Complete — Tasks 1 + 2 + 3 shipped … Live-verified on this branch … `git push` succeeds without `--no-verify` on multi-commit + bookkeeping shapes") vs. the workplan acceptance criteria (Task 1: "Per-SHA append verified in a test that drives the full `runImplementHook` with a 3-commit synthetic range" `[ ]`; "Pre-push gate exit 0 for a synthetic 3-commit batch" `[ ]`; Task 3 Step 4 `[ ]`) and AUDIT-20260603-19 appended in the same commit.
+
+The feature README — the canonical phase-status surface — declares Phase 23 "Complete" and specifically claims `git push` was verified "on multi-commit + bookkeeping shapes." The workplan, which is the source of truth for acceptance, leaves the two acceptance criteria that would substantiate a *multi-commit* verification unchecked: the full-`runImplementHook` 3-commit integration test (the AUDIT-13 gap) and the "pre-push gate exit 0 for a synthetic 3-commit batch" criterion (the AUDIT-19 gap). The live evidence the workplan actually records is a one-commit push ("All 1 unpushed commit(s) have matching hook-run entries"), which is the path that worked *before* Phase 23 too. So "multi-commit shapes verified" is asserted in the README with no evidence behind it, and the same diff's audit-log (AUDIT-19/-20) says so explicitly.
+
+This is the closure-overclaim shape the project's verification rules name ("agent posts evidence; operator decides closure"): a status surface asserting a verification the cited evidence does not provide, while the contradicting finding sits in the same commit. The README is more authoritative to a future reader than a slushed audit entry, so the overclaim outranks its own refutation. A reasonable fix: change the Phase 23 cell from "Complete" to "Implemented; multi-commit gate repro pending" and strike "on multi-commit + bookkeeping shapes" from the live-verified clause until a push of ≥2 unpushed commits (a fix commit + a bookkeeping commit under one hook run) exits 0 without `--no-verify`, matching the unchecked workplan criteria.
+
+---
+
+**Checked and clean:** the `hook-run-log.jsonl` append (the `0df6e0bc` fired-and-slushed entry + the `3100130b` no-new-diff-skip entry with `runDir:null`) is a fresh live instance of the already-slushed AUDIT-20260603-18 skip-path-doesn't-advance-tip shape — I confirmed it matches that finding's predicted artifact (the next fired barrage will re-walk `3100130b`) and did **not** re-file it, since the shape is unchanged from its triaged disposition. The journal's "Course corrections" and "Didn't work" sections are candid about the weasel/TDD-compression patterns and don't overclaim there. The README Phase 21/22 cells describe shipped v0.35.0 behavior backward-lookingly and don't rot. The audit-log blocks AUDIT-09 through -21 are internally well-formed and correctly anchored. My two findings are both documentation-accounting drift created by this commit — the audit-range undercount that drops the contradicting finding (-01) and the README "Complete"/multi-commit-verified overclaim against unchecked workplan criteria (-02) — not code defects, of which this diff contains none.
+
+## 2026-06-03 — audit-barrage lift (20260603T171135839Z-scope-discovery)
+
+### AUDIT-20260603-24 — Phase 24 ↔ Phase 25 are not "independent" — Phase 24 adds new `check-editor-symmetry` call sites that Phase 25's scope-time inventory cannot see
+
+Finding-ID: AUDIT-20260603-24
+Status:     fixed-38b7bc16
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` (Phase 24 "Relocation" bullet; Phase 25 extension "Independent of Phase 24") and `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Phase 24 Task 4 Step 2, Task 7 Step 1; Phase 25 Task 1).
+
+Both the PRD ("Independent of Phase 24; lean ship-after-24") and the workplan Phase 25 header ("Independent — Phase 25 can land before, after, or alongside Phase 24") assert the two phases are independent. They are not. Phase 24's Relocation movement explicitly *creates new references* to `check-editor-symmetry`: workplan Task 4 Step 2 wires it into `/dw-lifecycle:session-start`, and Task 7 Step 1 wires it into `/dw-lifecycle:review` as a fleet snapshot (PRD echoes both: "`check-editor-symmetry` composes into `/dw-lifecycle:session-start`" and "`check-editor-symmetry` runs as a fleet snapshot"). Phase 25 Task 1's inventory enumerates the rename surface, and the Phase 25 acceptance criteria freeze a *specific list* of identifiers ("All references to `editor`, `editors`, … `editor-symmetry-*` enumerated"). If Phase 24 lands first (the recommended order), it introduces skill-body call sites that did not exist when Phase 25's inventory list was drafted — so a Phase 25 inventory run against the scope-time list undercounts the live surface.
+
+This is the same KeygroupSummary / inventory-≠-discovery failure mode the project's own agent-discipline rule names: a frozen catalog read as complete when the codebase moved underneath it. The fix is to either (a) drop the "independent" framing and state explicitly that Phase 25 Task 1's grep must run *after* Phase 24 lands (and the acceptance-criteria identifier list is illustrative, not exhaustive), or (b) sequence Phase 25 strictly after Phase 24 with a re-inventory gate. As written, a future agent reading "independent" could run Phase 25 first or trust the scope-time list, and ship a rename that misses the call sites Phase 24 just added.
+
+### AUDIT-20260603-25 — Entry sidecar carries `currentStage: Final` while retaining `datePublished` — a contradictory current-state the induct-from-Published codepath did not reconcile
+
+Finding-ID: AUDIT-20260603-25
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `.deskwork/entries/4e4d6912-3edf-4aeb-b6ed-ba455f362f14.json` + the two `review-journal/history/` transitions in the same diff.
+
+The sidecar changes `currentStage` from `Published` to `Final` but keeps `"datePublished": "2026-05-26T00:00:00.000Z"`. The review-journal shows why: the entry was inducted `Published → Drafting` (16:50, reason "Review Phase 24 + 25 extensions") then `Drafting → Final` (17:00). Per `DESKWORK-STATE-MACHINE.md` the linear pipeline is `… → Final → Published`, and `datePublished` is the publish-event stamp. An entry whose `currentStage` is `Final` but which carries a `datePublished` is in a contradictory *current* state — it asserts both "not yet published (at Final)" and "published on 2026-05-26" simultaneously.
+
+I'm flagging it medium, not as a clear bug, because the project's preserve-history rule ("Content-management databases preserve, they don't delete") could justify retaining the publish date as a historical fact. But two things are unaddressed by the diff: (1) no codepath cleared or quarantined `datePublished` when the entry left `Published`, and (2) no doctor rule is cited that catches `currentStage !== 'Published' && datePublished != null`. If a studio surface or doctor rule reads `datePublished` as the signal for "this entry is published," this entry now mis-renders. The reasonable fix is a decision recorded in the spec: either the induct-out-of-Published transition moves `datePublished` into a historical field, or a doctor rule flags the inconsistent pair so re-publish overwrites it cleanly rather than silently keeping a stale stamp.
+
+### AUDIT-20260603-26 — PRD § Out of Scope still asserts "v1 ships pre-commit gates as the default," directly contradicting the Phase 24 zero-git-hook thesis added in the same diff
+
+Finding-ID: AUDIT-20260603-26
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` — § Out of Scope "CI integration for adopter projects" row ("v1 ships pre-commit gates as the default.") vs. the Phase 24 extension paragraph ("zero git-hook reliance, full discipline composed into skill bodies").
+
+This diff promotes the PRD entry to `currentStage: Final` (re-approved this commit) while leaving it internally contradictory: the newly-added Phase 24 extension argues the *core architectural mistake* was wiring enforcement into git and commits to "zero git-hook reliance," yet the unchanged Out of Scope row still states "v1 ships pre-commit gates as the default." Phase 24's own acceptance criteria acknowledge this ("PRD § Out of Scope row … reconciled to reflect the no-git-hook-enforcement contract"), so the reconciliation is captured as future work — but the document as committed-and-approved gives a reader two opposite answers to "does v1 ship git hooks?"
+
+This is low severity because it's flagged for reconciliation, not silently wrong. But a `Final`-stage PRD is the authoritative spec a future implementer reads; an internal contradiction in it is a trap regardless of whether a downstream task promises to fix it. A one-line edit now (annotate the Out of Scope row as "superseded by Phase 24; reconciliation tracked there") would remove the contradiction without waiting for Phase 24 to land.
+
+### AUDIT-20260603-27 — README Phase 23 cell edit added a "vestigial / retires in Phase 24" NOTE but left the unsubstantiated "multi-commit + bookkeeping shapes" verification claim that same-diff AUDIT-23 refutes
+
+Finding-ID: AUDIT-20260603-27
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` — Phase 23 status cell.
+
+AUDIT-20260603-23 (appended to `audit-log.md` *in this same commit*, slushed) flags that the Phase 23 cell's claim — "`git push` succeeds without `--no-verify` on multi-commit + bookkeeping shapes" — is not supported by the cited one-commit evidence. I am not re-litigating that slushed disposition. The new observation is about the *edit this diff made to that exact line*: it appended a NOTE ("retroactively superseded by Phase 24 … the per-SHA log writes that Phase 23 added are vestigial … Code retires as part of Phase 24 Task 2") without correcting the overclaim it sits beside. The cell now asserts three things that don't cohere: Phase 23 is "Complete," was "Live-verified … on multi-commit + bookkeeping shapes," AND is "vestigial" code being deleted unverified-against-its-acceptance-criteria.
+
+When a diff edits the precise line a finding names, that's the moment to resolve the finding, not to layer a second annotation on top of it. The compounding matters because the README is the canonical phase-status surface (more authoritative to a future reader than a slushed audit entry). A reasonable fix in this same class of edit: when adding the retirement NOTE, also strike "on multi-commit + bookkeeping shapes" or downgrade "Complete" to "Implemented; superseded before multi-commit repro was completed" — so the cell stops asserting a verification its own audit-log entry, committed alongside it, contradicts.
+
+## 2026-06-03 — Phase 24/25 PRD + workplan audit
+
+### AUDIT-20260603-28 — Phase 24 relocates audit-barrage but omits the lift/promote/open-findings chain that turns findings into enforceable work
+
+Finding-ID: AUDIT-20260603-28
+Status:     fixed-81bba0f2
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` Phase 24 Relocation + Phase 24 acceptance; `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 24 Task 5
+
+Phase 24 says Phase 13's audit-finding lifecycle "ships unchanged in CONCEPT" and only changes where the gates fire from. But the actual Phase 24 relocation text only folds `apply-audit-flips` into `/dw-lifecycle:implement`; it does not name `audit-barrage-lift`, `promote-findings --auto`, or `check-open-findings`, which are the Phase 15 chain that converts raw barrage output into audit-log entries, scopes those entries as workplan tasks, and then gates the next pickup.
+
+The inconsistency shows up inside the new text itself: the Phase 24 acceptance criterion for `/dw-lifecycle:implement` requires an "end-of-task open-HIGH-finding refusal," and the workplan's Task 5 Step 1 asks for that failing test. But Task 5 Step 2 composes "structural chain + audit-barrage + apply-audit-flips + (advisory) `check-fix-task-tdd`" and never says how the barrage findings become `Status: open`, how they get promoted into the workplan, or which gate refuses advancement. `apply-audit-flips` closes already-fixed findings; it does not lift new model output or scope new work.
+
+Evidence:
+
+- PRD Phase 24 Relocation lists structural-chain relocation, session-end checks, review Step 0, `check-fix-task-tdd`, and `apply-audit-flips`, but not `audit-barrage-lift`, `promote-findings`, or `check-open-findings`.
+- PRD Phase 24 acceptance requires `/dw-lifecycle:implement` to verify "end-of-task open-HIGH-finding refusal."
+- Workplan Phase 24 Task 5 Step 1 requires a HIGH-finding refusal test.
+- Workplan Phase 24 Task 5 Step 2 omits the lift/promote/open-findings chain.
+- Existing PRD Phase 15 context explicitly names the missing chain: `audit-barrage --output-run-dir` -> `audit-barrage-lift --apply` -> `promote-findings --apply` -> `check-open-findings`.
+
+Expected vs actual:
+
+- Expected: Phase 24 preserves the Phase 13/15 finding lifecycle concept by relocating the full end-of-task chain into the skill body.
+- Actual: Phase 24 relocates only raw barrage firing plus `apply-audit-flips`, leaving the high-finding refusal acceptance criterion without a defined mechanism.
+
+Fix guidance:
+
+- Amend Phase 24 PRD/workplan Task 5 to name the full chain, likely `audit-barrage-render` -> `audit-barrage --output-run-dir` -> `audit-barrage-lift --apply` -> `promote-findings --auto` -> `check-open-findings`, plus `apply-audit-flips` at the correct point for already-fixed findings.
+- Make the HIGH-finding refusal test assert the actual gate result, not just the presence of raw model output.
+
+### AUDIT-20260603-29 — Phase 24 says demolition and relocation must land together, but the workplan commits demolition before replacement gates exist
+
+Finding-ID: AUDIT-20260603-29
+Status:     fixed-81bba0f2
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 24 scope shape and Tasks 2-7
+
+The Phase 24 scope statement is explicit: "Demolition + relocation must land together. Shipping 'no gates' without the skill-body discipline replacing them leaves the project unenforced for a release window." The task order then instructs the implementer to commit demolition in Task 2, commit install-machinery demolition in Task 3, and only afterward implement the replacement skill-body enforcement in Tasks 4-7.
+
+This creates the exact gap the scope statement says must not exist. Even if the branch is not released until Phase 24 completes, the workplan's commit-by-commit path removes `.husky/commit-msg`, pre-push audit gates, pre-commit structural gates, hook install machinery, marker logic, and log logic before session-start/implement/session-end/review have replacement discipline. A future agent following the workplan mechanically can produce a branch state where the old enforcement is gone and the new enforcement is not yet present.
+
+Evidence:
+
+- Phase 24 scope shape says demolition and relocation must land together.
+- Task 2 Step 9 says to commit audit-finding gate demolition.
+- Task 3 Step 6 says to commit install-machinery and structural-chain hook demolition.
+- Tasks 4-7, which add the replacement skill-body enforcement surfaces, come later.
+
+Expected vs actual:
+
+- Expected: the workplan either relocates first, or batches demolition + relocation into a single integration commit / no-release gate so there is no intermediate "no gates" state.
+- Actual: the workplan orders and commits demolition before the replacement gates.
+
+Fix guidance:
+
+- Reorder Phase 24 so replacement skill-body behavior lands first behind existing hooks, then remove hook enforcement after equivalent coverage exists; OR explicitly mark Tasks 2-7 as one atomic integration batch that cannot be committed/pushed/released piecemeal.
+- Add an acceptance check that no intermediate commit on the Phase 24 branch has both old hooks removed and replacement skill-body checks absent.
+
+### AUDIT-20260603-30 — Phase 25's feature-doc sweep tells implementers to rewrite audit-log terminology, conflicting with audit-log preservation rules
+
+Finding-ID: AUDIT-20260603-30
+Status:     fixed-81bba0f2
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 25 Task 9; `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` operating rules
+
+Phase 25 Task 9 says to "Update every reference to `editor-symmetry` / `editor_symmetry` / `editor symmetry` in the scope-discovery feature docs (PRD, workplan, README, audit-log, design-spec where applicable)." That instruction includes the feature audit log. The audit log's own operating rules say it is the source of truth, findings are never deleted, and entries are updated in place under stable IDs. Bulk-renaming historical finding bodies risks corrupting the evidence trail: an old finding that originally cited `check-editor-symmetry` or `editor_symmetry` should continue to describe the historical surface it audited.
+
+The acceptance criterion partially softens this by allowing historical context, but the step itself is broader and easier for an implementer to follow literally. Given this repo's recurring audit-log accounting failures, the safe rule should be explicit: do not rewrite historical finding bodies for terminology cleanup; only update prospective docs and add resolution notes when a finding's current disposition changes.
+
+Evidence:
+
+- Workplan Phase 25 Task 9 Step 1 explicitly lists `audit-log` in the feature-doc sweep.
+- Workplan Phase 25 Task 9 acceptance allows historical context but does not state that historical audit-log finding bodies must be preserved.
+- The audit-log header says the log is the source of truth and findings are never deleted; status transitions happen under stable IDs.
+
+Expected vs actual:
+
+- Expected: Phase 25 distinguishes mutable product docs from historical audit evidence and preserves the latter except for explicit status/resolution notes.
+- Actual: the workplan's first instruction can be read as a bulk rewrite of audit-log historical terminology.
+
+Fix guidance:
+
+- Amend Task 9 to exclude historical audit-log finding bodies from bulk rename. Suggested shape: "Do not rewrite historical audit-log entries; update only current docs, prospective references, and add resolution notes under stable IDs if needed."
+- Keep the acceptance criterion's "historical context" carve-out, but make it operational rather than parenthetical.
+
+### AUDIT-20260603-31 — Phase 24 issue-accounting text has stale or mismatched counts
+
+Finding-ID: AUDIT-20260603-31
+Status:     fixed-81bba0f2
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 24 Task 3, Task 8, Open decisions
+
+The Phase 24 workplan has several issue-accounting mismatches that will confuse closure:
+
+- Task 3 Step 6 names three issues (`#293`, `#294`, `#295`), while Task 3 acceptance says the audit-trail commit names "the four issues retired."
+- Task 8 Step 3 names six issues to close (`#293`, `#294`, `#295`, `#352`, `#373`, `#374`), while Task 3 scopes only the install-hook subset.
+- Open decision 8 still says "GitHub issue numbers for Phase 24 parent + per-task sub-issues — TBD by `/dwe` filing step," even though parent issue `#404` is already filed and linked in the Phase 24 header.
+- Phase 25 has the same stale parent-issue wording even though `#405` is already filed and linked.
+
+This is low severity because it is documentation bookkeeping, not a functional design flaw. But Phase 24's reconciliation task depends on clean issue disposition, and stale counts tend to become either missed closures or duplicate comments.
+
+Expected vs actual:
+
+- Expected: the task-level issue disposition list, acceptance text, and open-decision list agree on which issues are parent issues, which are per-task follow-ups, and how many items are retired.
+- Actual: the section mixes filed parent issues with TBD per-task issues and has a three-vs-four issue count mismatch.
+
+Fix guidance:
+
+- Replace "parent + per-task sub-issues TBD" with "per-task sub-issues TBD; parent is #404/#405" in the relevant open-decision lists.
+- Fix Task 3's "four issues" wording or name the fourth issue explicitly.
+- Decide whether `#352`, `#373`, and `#374` close in Task 8 only, and keep Task 3 scoped to the three install-hook frictions.
+
+## 2026-06-03 — audit-barrage lift (20260603T173433056Z-scope-discovery)
+
+### AUDIT-20260603-32 — Journal "Open findings at session end: 0" undercounts the slush pile its own commit creates (2 medium findings omitted)
+
+Finding-ID: AUDIT-20260603-32
+Status:     fixed-6e8d1d81
+Severity:   medium
+Surface:    `DEVELOPMENT-NOTES.md` "Quantitative" block (the new 2026-06-03 cont. entry) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-20260603-24..-27 — both added in the same commit.
+
+The journal's Quantitative line reads: *"Open findings at session end: 0 (AUDIT-20260603-22/-23 acknowledged-slush-pile-2026-06-03 carry medium-severity concerns…)."* But this exact commit appends four more findings to `audit-log.md` — AUDIT-20260603-**24** (medium), **-25** (medium), **-26** (low), **-27** (low) — all stamped `acknowledged-slush-pile-2026-06-03`. So the 2026-06-03 slush pile actually carries at least six entries (−22, −23, −24, −25, −26, −27) with **four** medium findings, not the two the journal names. The headline "0 open" plus a slush-pile callout that omits −24/−25 is precisely the misleading shape the project's own CLAUDE.md AUDIT-03 convention forbids: *"'0 open' alone is misleading… ALSO report the slush-pile count and HIGH/MEDIUM severity breakdown of slushed entries."*
+
+The root cause is visible in the same entry: *"dampener disposition pending at the time of journal-append."* The journal was written before −24..−27 were dispositioned, then those findings were appended to `audit-log.md` in the same commit without the Quantitative line being re-derived. A future reader auditing closure trusts "0 open / 2 slushed medium" and silently misses −24 (a real design-coupling correction) and −25 (the `datePublished`/`Final` state-machine contradiction). Fix: re-derive the slush count from the audit-log content actually committed — "Open findings: 0; acknowledged-slush-pile-2026-06-03 = 6 (4 medium: −22, −23, −24, −25; 2 low: −26, −27)."
+
+### AUDIT-20260603-33 — AUDIT-20260603-24 is stamped `acknowledged-slush-pile` (parked) while its fix is applied in the same commit — incoherent disposition
+
+Finding-ID: AUDIT-20260603-33
+Status:     fixed-6e8d1d81
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-20260603-24 (`Status: acknowledged-slush-pile-2026-06-03`) vs. `prd.md` line ~79 and `workplan.md` line ~4429 — both edited in the same commit.
+
+AUDIT-24's body argues Phase 25 is not independent of Phase 24 and must re-inventory after Phase 24 lands. The same commit acts on it: the PRD now reads *"Phase 25 MUST ship after Phase 24 (correction per AUDIT-20260603-24)"* and the workplan's "Relationship to Phase 24" section is rewritten *"(corrected per AUDIT-20260603-24)."* The fix shipped — yet the audit-log entry is filed as `acknowledged-slush-pile` (the dampener's "parked, unresolved" status), not `closed`/`resolved`.
+
+A finding cannot honestly be both *fixed in this commit* and *parked as slush*. The incoherence has a concrete cost given this repo's audit-log accounting history: `/dw-lifecycle:promote-findings` walks `Status: open`-class entries and scopes them into the workplan; a future run that sees −24 still slushed will re-propose work the PRD and workplan already incorporate, generating duplicate scoping. Because the audit-log's own rule is "status transitions happen in place under stable IDs," the correct shape is to transition −24 to a closed/resolved status with a one-line resolution note citing the PRD+workplan edits that landed alongside it — not to leave the slush label asserting the correction is still pending.
+
+### AUDIT-20260603-34 — Journal commits accounting numbers it states are stale-by-construction, with no follow-up to reconcile
+
+Finding-ID: AUDIT-20260603-34
+Status:     fixed-6e8d1d81
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md` 2026-06-03 (cont.) entry — "Audit-barrage runs this session: 1 … dampener disposition **pending at the time of journal-append**" and "Open findings at session end: 0".
+
+The journal explicitly flags that it is recording barrage accounting *before* the dampener has dispositioned the run, then commits that accounting as final without any in-entry note that the numbers are provisional or a pointer to where they'll be reconciled. This is a process trap independent of finding-01's specific undercount: any session that appends the journal before its own barrage settles will bake a stale count into the permanent record, and the "(cont.)" capture pattern used here makes that ordering routine rather than exceptional. The honest move when disposition is genuinely pending is to either (a) hold the Quantitative findings line until the barrage settles, or (b) write it as a range/provisional value with an explicit "reconcile in next entry" marker. Committing "0 open" with a parenthetical admission that the disposition was still pending presents a settled number the author already knew was unsettled.
+
+---
+
+I checked the `prd.md`/`workplan.md` correction text itself (the AUDIT-24 fix is internally consistent and the cross-references resolve), the single `hook-run-log.jsonl` append (well-formed JSON, `runDir`/`tip` match the audit-log header `20260603T171135839Z` / `c1c8c804`), and the four folded audit findings for internal anchoring (they correctly describe the prior commit `c1c8c804`'s surfaces, which is expected for a barrage-lag append). The remaining findings are documentation-accounting drift, not code defects — this diff contains no executable code. I did **not** re-file AUDIT-26 (PRD Out-of-Scope contradiction) or AUDIT-27 (README Phase 23 cell) since those surfaces aren't touched in this diff and their slush dispositions stand.
+
+### AUDIT-20260603-35 — Deprecated alias path conflicts with the grep-zero acceptance criteria
+
+Finding-ID: AUDIT-20260603-35
+Status:     fixed-6e8d1d81
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4471-4476`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4480-4484`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4528-4530`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4537-4538`
+
+Task 5 explicitly permits shipping `check-editor-symmetry` as a deprecated alias, and Task 6 permits keeping the old skill folder as a deprecated stub. Those choices require old-name literals in command registration, tests, help text, or skill prose. The Phase 25 acceptance criteria then require all `editor` references in the scope-discovery layer to be renamed and require no grep hit for `editor` in scope-discovery code outside the etymology paragraph.
+
+This makes one sanctioned implementation path fail the phase’s own acceptance criteria. A reasonable fix is to either make hard-rename the only accepted path, or add explicit carve-outs for deprecated alias/stub surfaces with bounded tests and removal metadata.
+
+### AUDIT-20260603-36 — Newly added notes include postponed-work wording that violates the audit prompt’s discipline rule
+
+Finding-ID: AUDIT-20260603-36
+Status:     fixed-6e8d1d81
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md:4074-4075`, `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:4541`
+
+The diff adds process notes that push unresolved work out of the current unit: the Phase 11 dogfood observation is recorded as a forward pointer, the PRD iteration-counter drift is called out as a separate sweep, and Phase 25 sub-issue splitting is postponed to the implementation session. The audit prompt’s hard constraint says to surface deferral wording in the diff because this project treats that shape as a recurring bug source.
+
+This is low severity because these are planning and hygiene notes, not shipped code. Still, the wording creates an easy escape hatch for work that should either be scoped into the current workplan with a clear owner/acceptance shape or explicitly dispositioned as out of scope with rationale.
+
+## 2026-06-03 — audit-barrage lift (20260603T185249284Z-scope-discovery)
+
+### AUDIT-20260603-37 — Phase 26's "refuse partial-complete phases" contract contradicts the very archive operation it productizes
+
+Finding-ID: AUDIT-20260603-37 (claude-01 + claude-02 + claude-03 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-allow-vestigial-flag-added-2026-06-03
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 26 Task 2 Step 6 + Phase 26 acceptance ("refuses partial-complete phases"); `docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md` Phase 26 extension ("refuse archiving phases with ANY unchecked task"); `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan-archive.md` header + Phases 13/17/22/23
+
+Phase 26 Task 2 Step 6 and the Phase 26 acceptance criteria both state the `archive-phases` verb "Refuses archiving a phase with ANY unchecked task." The PRD extension repeats it: *"The verbs refuse archiving phases with ANY unchecked task."* But the manual operation this verb is meant to productize archived **incomplete** phases. In `workplan-archive.md`, Phase 17 has every Task 1–8 step `[ ]`; Phase 22 carries unchecked Steps (Task 1 Step 5, Task 2 Step 2/5, Task 3 Step 2/6); Phase 23 has unchecked Task 1 Step 6 + acceptance criteria; Phase 13 Task 1's acceptance block is entirely `[ ]`. The archive-file header explicitly sanctions this: sections move *"once their tasks were complete (**or once they became vestigial** per a later phase's retirement decision)."* So the header and the verb contract directly disagree: vestigial-but-incomplete phases (17/22/23, retired by Phase 24) have unchecked tasks by construction, yet they were archived.
+
+The concrete failure: Phase 26 Task 6 ("Live dogfood verification") runs `archive-phases --apply` against *this feature's own workplan* and round-trips a live phase. Against a vestigial phase that still carries `[ ]` steps, the verb as specified will refuse — the dogfood cannot reproduce the manual operation. Fix: either add an explicit `--vestigial`/`--allow-unchecked` escape with a documented reason (mirroring how the manual op was justified), or reconcile the header so it stops claiming vestigial-incomplete archiving is supported. The contradiction should be resolved before Task 2 is implemented, since the acceptance criterion as written would make the dogfood fail against the workplan it ships with.
+
+### AUDIT-20260603-38 — DEVELOPMENT-NOTES finding-count arithmetic is internally inconsistent (10 vs 12 listed vs 15 in the cited range)
+
+Finding-ID: AUDIT-20260603-38
+Status:     acknowledged-journal-counts-reconciled-2026-06-03
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 2) entry — "Accomplished" ("AUDIT-finding triage (10 findings). Reviewed AUDIT-20260603-22..36") and "Quantitative" ("Audit findings dispositioned at source: 10 (AUDIT-20260603-24/26/27/28/29/30/31/32/33/34/35/36 — addressed; AUDIT-22/23 partially; AUDIT-25 filed as deskwork issue)")
+
+The same journal entry reports three different finding counts for the same work. The Accomplished bullet says "10 findings" while citing the range `22..36` (which is 15 IDs: 22–36). The Quantitative line says "10" but then enumerates **12** addressed IDs (24, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36) *plus* 22/23 partial *plus* 25. None of "10 / 12 / 15" reconcile. This is exactly the failure mode the project's own `CLAUDE.md` AUDIT-04 convention names: *"re-derive the numbers … verify the arithmetic … skip the line entirely if the arithmetic isn't reconciled — false precision erodes trust more than absence."* The same entry also calls the 16 archived phases "16 **completed** phases" while 17/22/23 are vestigial-not-completed (the README archive note states the more careful "completed work … or vestigial" framing).
+
+Low severity because it is journal bookkeeping, not code — but the entry is the permanent record a future reader will trust for "what got dispositioned this session," and the headline count understates the actual addressed set by two. Fix: re-derive from the audit-log entries actually committed and state one reconciled number, or drop the count and list the IDs only.
+
+## 2026-06-03 — audit-barrage lift (20260603T190136975Z-scope-discovery)
+
+### AUDIT-20260603-39 — Auto-positioned fix-finding tasks are numbered "Task 6"/"Task 7" — ignoring the ledger's `next-fix-task-id: 5.124` and colliding with Phase 26's own "Task 6"
+
+Finding-ID: AUDIT-20260603-39
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` inserted blocks at the `@@ -54,6 +54,40 @@` hunk — `### Task 6 (fix-finding-AUDIT-20260603-37)` and `### Task 7 (fix-finding-AUDIT-20260603-38)`
+
+The two `promote-findings`-generated disposition tasks for AUDIT-37/-38 were numbered **Task 6** and **Task 7**. But the active workplan's own ledger (cited verbatim in this same session's journal) declares `next-fix-task-id: 5.124` with `archived-fix-tasks: 5.1-5.123`. The fix-task ID scheme is `5.x`; the next allocation should have been `Task 5.124`/`Task 5.125`. Instead the auto-positioner scanned the local section max (`Task 5`) and produced `6`/`7`. This is the *exact* defect Phase 26 Task 4 ("Auto-positioner ledger awareness") productizes a fix for — now manifest in the live workplan, demonstrating that the ledger annotation does nothing until Phase 26 ships, contradicting the journal's claim that the ledger "so the auto-positioner doesn't collide on future promotes."
+
+Worse, `Task 6` now **collides** with Phase 26's existing `### Task 6 — Live dogfood verification` (visible later in this same diff at the `@@ -1100,15 +1136,16 @@` hunk). The workplan now contains two distinct "Task 6" blocks. Any tooling that references a task by number, any operator grepping for "Task 6", and the next promote run all inherit ambiguity. A reasonable fix: re-number these two blocks to `Task 5.124`/`Task 5.125` per the ledger (the operation Phase 26 Task 4 will automate), or at minimum to non-colliding values, before this lands.
+
+### AUDIT-20260603-40 — Fix-finding blocks inserted *before* "Task 5" — document order inverts numeric order and lands Phase-26 dispositions inside the Phase 8 task list
+
+Finding-ID: AUDIT-20260603-40
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — inserted Task 6/Task 7 blocks sit between `uninstall-scope-discovery-hooks` and `### Task 5: Validator + export commands`
+
+In document order the diff now reads: `migrate-from-pilot [x]` → `uninstall-scope-discovery-hooks [x]` → **Task 6 (fix-finding)** → **Task 7 (fix-finding)** → `### Task 5: Validator + export commands`. The auto-positioner anchored the new blocks *immediately before* Task 5, so a reader scanning top-to-bottom encounters Task 6, Task 7, then Task 5 — numeric order inverted. The surrounding tasks (`migrate-from-pilot`, `uninstall-scope-discovery-hooks`, `Task 5: Validator + export commands`) are scope-discovery CLI tooling (Phase 8 region), yet the dispositions concern AUDIT-37 (a *Phase 26* spec contradiction) and AUDIT-38 (a journal-bookkeeping correction). Neither belongs adjacent to the Phase 8 validator task.
+
+This compounds finding-01: the wrong anchor is *why* the numbers came out `6`/`7`. The fix is the same — give the auto-positioner the correct insertion point (and the ledger-aware ID), so disposition tasks append in numeric order rather than wedging in before a lower-numbered sibling.
+
+### AUDIT-20260603-41 — Task 7's title says `Closes AUDIT-20260603-38` but its Step 3 says commit with `Acknowledges` — and the actual commit uses neither trailer, so `apply-audit-flips` can't auto-flip it
+
+Finding-ID: AUDIT-20260603-41
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 7 block ("Closes AUDIT-20260603-38" header vs. "committing with `Acknowledges AUDIT-20260603-38` in subject") and the audited commit subject
+
+The Task 7 block opens with `Closes AUDIT-20260603-38` but its Step 3 reads *"committing with `Acknowledges AUDIT-20260603-38` in subject"*. Task 6's block is internally consistent (`Acknowledges` in both places); Task 7 contradicts itself. The journal records that `dw-lifecycle apply-audit-flips` *"reads `Closes AUDIT-X` commit trailers and flips audit-log entries."* The single commit in the audited range is `docs(scope-discovery): AUDIT-37 + AUDIT-38 — archive-phases vestigial escape + journal counts reconciled` — it carries **neither** a `Closes AUDIT-38` nor an `Acknowledges AUDIT-38` trailer. So `apply-audit-flips` would not have auto-flipped these; the statuses in `audit-log.md` were hand-set (`acknowledged-...-2026-06-03`). The header/step mismatch plus the missing trailer means the auto-flip path is silently bypassed for both findings, and a future `apply-audit-flips` dry-run will report these as un-flipped-by-trailer. Reconcile Task 7's header verb with its step, and if auto-flip is intended, the commit must carry the matching trailer.
+
+### AUDIT-20260603-42 — Free-form `acknowledged-<custom>-<date>` status strings risk being treated as open-class by `promote-findings`/`check-open-findings`
+
+Finding-ID: AUDIT-20260603-42
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-37 (`Status: acknowledged-allow-vestigial-flag-added-2026-06-03`) and AUDIT-38 (`Status: acknowledged-journal-counts-reconciled-2026-06-03`)
+
+Both new findings use bespoke status strings invented for this commit. Prior triaged entries used a small recognized vocabulary — `open`, `fixed-<sha>`, `acknowledged-slush-pile-<date>`. AUDIT-33 (status `fixed-6e8d1d81` in the prior excerpt) established the concrete cost: *"`/dw-lifecycle:promote-findings` walks `Status: open`-class entries… a future run that sees [it] still slushed will re-propose work the PRD and workplan already incorporate, generating duplicate scoping."* If `promote-findings`/`check-open-findings` classify status by an allow-list of known-closed values (rather than "anything not literally `open`"), these two ad-hoc strings may be bucketed as open-class and re-promoted on the next run — re-generating the very Task 6/Task 7 blocks just landed. Conversely, if the new doctor rule `workplan-archive-ledger-coherence` or any audit-log validator enforces a status enum, these free-form values may fail validation. The safe shape is the one AUDIT-33 asked for: a recognized closed/resolved status with a one-line resolution note, not a new per-finding string. This needs verification against the actual status-class matcher in `promote-findings`/`check-open-findings` before relying on "0 open."
+
+### AUDIT-20260603-43 — Phase 26 Task 6 Step 2 (vestigial-allowed dogfood) may have no live target — all known vestigial phases (17/22/23) were already manually archived this session
+
+Finding-ID: AUDIT-20260603-43
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 26 Task 6 Step 2 (`@@ -1100,15 +1136,16 @@`)
+
+The newly added Step 2 says: run `archive-phases … --allow-vestigial` *"against a real retired phase (e.g., one of Phases 17/22/23 if it hasn't already been manually archived; otherwise a future-retired phase)."* But this same session's journal (edited in this diff) records that Phases 17/22/23 were **already** moved to `workplan-archive.md` by the manual operation. So the parenthetical's first branch is already foreclosed, and the fallback — *"a future-retired phase"* — has no concrete referent: there is no currently-live vestigial phase to exercise the `--allow-vestigial` path against. The acceptance criterion *"Round-trip preserves content for both paths"* therefore cannot be satisfied on this branch's own workplan without first manufacturing a vestigial phase. This mirrors AUDIT-37's original concern (the dogfood couldn't reproduce the manual op) but for the *vestigial* path specifically: the escape hatch was added, yet the dogfood target it needs was consumed by the manual archive. The fix is to name a concrete, still-live target (or to roundtrip one of 17/22/23 *out* of the archive and back via `unarchive-phases` → `archive-phases --allow-vestigial`), rather than leaving "otherwise a future-retired phase" as an unbound placeholder.
+
+---
+
+I checked the DEVELOPMENT-NOTES count reconciliation (12 + 2 + 1 = 15 over range 22..36 — now internally consistent, AUDIT-38 genuinely addressed), the AUDIT-37 `--allow-vestigial` spec edits across prd.md + workplan.md Task 2/Task 6/acceptance (the spec text is mutually consistent and the ≥40-char-reason requirement is uniformly stated), and the hook-run-log.jsonl append (well-formed JSON; `runDir`/`tip` match the audit-log header `20260603T185249284Z` / `465ccac9`). The five findings above are the concrete ones; the strongest signal is finding-01/02 — the auto-positioner produced ledger-ignoring, order-inverted, colliding task numbers, which is the live manifestation of the exact defect Phase 26 Task 4 is meant to fix.
+
+## 2026-06-03 — audit-barrage lift (20260603T190549797Z-scope-discovery)
+
+### AUDIT-20260603-44 — Deferral phrase committed into the workplan — "Empirical verification deferred to Phase 24 Task 10" — with no in-diff proof Task 10 contains that work
+
+Finding-ID: AUDIT-20260603-44 (claude-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 4 header (`**Complete — … Empirical verification deferred to Phase 24 Task 10 (live dogfood).**`) + Step 1 + Step 5
+
+The Task 4 completion block introduces the literal phrase *"Empirical verification deferred to Phase 24 Task 10 (live dogfood)"* and repeats the deferral in Step 1 (*"empirical verification happens in Phase 24 Task 10's live dogfood"*) and Step 5 (*"N/A per Step 1"*). This is exactly the string class the project's own `agent-discipline.md` § "Just for now is bullshit" tells the agent to grep its diffs for and refuse (`deferred`, `until F`, `TODO`), and the audit dispatch's own hard constraint forbids deferral phrases in the work product.
+
+The rule permits a deferral *only* when it points at a downstream task whose plan you have **read and verified** contains the deferred work. This diff marks Task 4 `[x] Complete` on the strength of "Phase 24 Task 10 will verify it," but Task 10 is not in the diff, so a reviewer cannot confirm Task 10 (a) exists and (b) actually scopes empirical verification of the session-start structural snapshot. If Task 10 does not enumerate this verification, the SKILL.md edit ships unverified behind a checked box — the precise IOU-becomes-canon failure mode the rule names. A reasonable fix: either quote the Task 10 acceptance line that covers this (so the cross-reference is auditable), or drop the word "deferred" and state the verification step is part of Task 10's existing acceptance criteria with a citation.
+
+### AUDIT-20260603-45 — Snapshot report template labels (`holdouts`, `symmetry-deltas`) don't map transparently to the four verbs, and Step 7 never specifies which stderr line is the count
+
+Finding-ID: AUDIT-20260603-45 (claude-02 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/session-start/SKILL.md` Step 7 — the four `… 2>&1 | tail -3` invocations and the render line `Structural snapshot: clones=N anti-patterns=N holdouts=N symmetry-deltas=N`
+
+Step 7 instructs the agent to run four verbs and "surface the count line from stderr," then render `clones=N anti-patterns=N holdouts=N symmetry-deltas=N`. Two problems make this under-specified as a contract:
+
+1. **Verb→field mapping is non-obvious.** `check-clones`→`clones` and `check-anti-patterns`→`anti-patterns` are transparent, but `check-adopters`→`holdouts` and `check-editor-symmetry`→`symmetry-deltas` require the agent to already know each verb's domain vocabulary. Nothing in Step 7 states that `check-adopters` reports "holdouts" or that `check-editor-symmetry` reports "symmetry-deltas." An agent reading only this skill cannot reliably fill the template, and a future rename of any verb's stderr label silently breaks the render with no test (Task 4 Step 1 was waived as non-testable).
+
+2. **`tail -3` ≠ "the count line."** The instruction captures the last three stderr lines but never says which of them carries the integer N. If a verb prints a multi-line summary, the agent is left to guess. The result is a snapshot whose numbers are produced by an unspecified extraction step.
+
+Because the snapshot is advisory, a wrong or empty N degrades silently into the bootstrap report with no signal that it's wrong. Fix: have Step 7 name, per verb, the exact stderr token to read (or point at a single helper that emits the four counts in a stable `key=value` form), so the render is deterministic rather than relying on the agent inferring the mapping.
+
+## 2026-06-03 — audit-barrage lift (20260603T190926867Z-scope-discovery)
+
+### AUDIT-20260603-46 — Deferral phrase regressed into Task 5's completion header — same `"deferred to Phase 24 Task 10"` shape AUDIT-44 flagged on Task 4, now on the diff's actual subject task
+
+Finding-ID: AUDIT-20260603-46 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     acknowledged-deferral-replaced-with-task-10-citation-2026-06-03
+Severity:   high
+Surface:    docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md — Task 5 completion line (replacing the old Step 1–6 list)
+
+```
+
+The Task 5 block is marked complete with: `**Complete — SKILL.md Step 6 rewritten as Steps 6a–6e … Empirical verification deferred to Phase 24 Task 10 (live dogfood).**`, and Step 5 reads `[x] Step 5: Confirm tests pass — N/A per Step 1.` This is a verbatim repeat of the deferral shape AUDIT-20260603-44 already triaged on Task 4 — now manifest on Task 5, which IS the subject of this diff. The dispatch's hard constraint is explicit: *"If you spot a deferral phrase IN the diff, surface it as a finding"*; the project's own `agent-discipline.md` § "Just for now is bullshit" lists `deferred` among the strings to grep-and-refuse, permitting a forward-pointer **only** when the downstream task's plan has been read and verified to contain the deferred work. Phase 24 Task 10 is not in this diff, so a reviewer cannot confirm Task 10 (a) exists and (b) scopes empirical verification of the Step 6a–6e chain. The box is checked `[x] Complete` on the strength of an unverifiable cross-reference — the precise IOU-becomes-canon failure mode. Fix: quote Task 10's acceptance line that covers this verification, or drop "deferred" and cite Task 10's existing acceptance criteria.
+
+## 2026-06-03 — audit-barrage lift (20260603T191453476Z-scope-discovery)
+
+### AUDIT-20260603-47 — Step 9 offers `--allow-disposition-loss` as an escape, but the same step's error-handling note says "no escape flag exists" — direct internal contradiction
+
+Finding-ID: AUDIT-20260603-47 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     acknowledged-session-end-step9-contradiction-resolved-2026-06-03
+Severity:   high
+Surface:    `plugins/dw-lifecycle/skills/session-end/SKILL.md` — new Step 9 body vs. the "Closing-discipline refusal (Step 9)" error-handling bullet
+
+Step 9's disposition-survivor clause reads: *"STOP session-end on any `keep-with-reason` / `refactor` / `ignore-with-justification` → `pending` transition in `clones.yaml` **unless the operator passes `--allow-disposition-loss`** (the verb's existing flag)."* But the error-handling section added in the same hunk states: *"**Closing-discipline refusal (Step 9).** … Per Phase 24, **no `--no-verify` / no escape flag exists** — the cure path is fixing the underlying state, not bypassing the check."*
+
+These two sentences contradict each other inside one diff. One names a concrete escape flag for the first of the three checks; the other categorically asserts no escape exists. A reader following the error-handling guidance will tell the operator there is no bypass; a reader of Step 9 will reach for `--allow-disposition-loss`. Worse, the existence of the escape is itself in tension with the Phase 24 / `enforcement-lives-in-skills.md` principle the step cites (*"a `--no-verify` push by the maintainer is evidence the hook chain is broken… The fix is reshaping the chain, not normalizing the bypass"*). Fix: decide whether the disposition-survivor escape is permitted at session-end, then make both passages say the same thing — either document `--allow-disposition-loss` consistently (and reconcile it with the no-bypass principle) or drop it from Step 9.
+
+---
+
+## 2026-06-03 — audit-barrage lift (20260603T191854254Z-scope-discovery)
+
+### AUDIT-20260603-48 — AUDIT-47 fix edited only Step 9's body — the "Closing-discipline refusal" error-handling bullet still asserts "no escape flag exists," literally contradicting the new admission that the verb HAS the flag
+
+Finding-ID: AUDIT-20260603-48
+Status:     acknowledged-error-handling-bullet-reconciled-2026-06-03
+Severity:   high
+Surface:    `plugins/dw-lifecycle/skills/session-end/SKILL.md` — Step 9 disposition-survivor clause (changed in diff) vs. the "Closing-discipline refusal (Step 9)" error-handling bullet (NOT in diff)
+
+AUDIT-47's own disposition (workplan Task 6, Step 1) promised to *"make both passages say the same thing."* The diff edits exactly one passage. The new Step 9 body now reads: *"The verb has a legacy `--allow-disposition-loss` flag from its .husky-era days, but the skill body does NOT use it at session-end."* But the error-handling bullet that AUDIT-47 quoted as the other half of the contradiction — *"Per Phase 24, no `--no-verify` / no escape flag exists"* — is **not** in this diff, so it stands unchanged.
+
+The *behavioral* contradiction (does session-end stop unconditionally?) is genuinely resolved: both passages now steer the operator to "reconcile dispositions, don't bypass." But the *factual* claim is now inconsistent in the opposite direction — one passage says the flag exists (just unused), the other says "no escape flag exists" at all. A reader of the error-handling section is told the flag does not exist; a reader of Step 9 is told it does. That is the same surface-contradiction shape AUDIT-47 was filed to kill, only narrowed from "may I use it?" to "does it exist?". Because the audit-log status was flipped to `...-contradiction-resolved-2026-06-03` and the workplan box checked `[x] Complete`, the branch now records a resolution that the source only half-delivers. Fix: edit the error-handling bullet in the same file to say "the verb has the flag; the skill body does not pass it" — matching Step 9's wording — rather than "no escape flag exists."
+
+---
+
+### AUDIT-20260603-49 — Workplan Step 3 claims the commit carries an `Acknowledges AUDIT-20260603-47` subject trailer, but the actual commit subject is `AUDIT-47 — resolve…` with no such trailer — `apply-audit-flips` auto-flip is silently bypassed
+
+Finding-ID: AUDIT-20260603-49 (claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-step-3-trailer-location-corrected-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 6 block, Step 3 (`committing with `Acknowledges AUDIT-20260603-47` in subject`) vs. the audited commit subject
+
+Step 3 of the new Task 6 block asserts: *"committing with `Acknowledges AUDIT-20260603-47` in subject."* The single commit in the audited range is `docs(scope-discovery): AUDIT-47 — resolve session-end Step 9 self-contradiction`. That subject contains neither the literal `Acknowledges` verb nor the full `AUDIT-20260603-47` ID — it uses the short form `AUDIT-47`. (Correction per AUDIT-20260603-52: `apply-audit-flips` reads `Closes AUDIT-X` trailers ONLY — `Acknowledges` and `Defers` are non-flipping audit-trail trailers per `auto-flip-from-commit.ts:43`'s `CLOSES_VERB_RE`. The original paraphrase that named both verbs as flip-triggers was factually wrong.) The mismatch the finding names is still real: the workplan claimed the Acknowledges trailer was in the subject when the audit-trail trailer actually lives in the body; the audit-log status is hand-set by the operator at non-fix-disposition time, not tool-flipped, regardless of trailer location.
+
+This is the exact header/step/trailer-mismatch shape flagged on Task 7 in the prior excerpt, now recurring on Task 6. The cost is the same: the workplan's claimed action diverges from the commit that actually landed, and a future reader can't reconcile the documentation against the source. Fix: change Step 3 to accurately describe the actual commit subject + body-trailer structure (short-form `AUDIT-NN` in the subject for readability, full-ID `Acknowledges AUDIT-YYYYMMDD-NN` trailer in the body as the audit-trail), and state that the audit-log status was hand-set in the same commit (no auto-flip is possible for `Acknowledges` regardless of placement).
+
+---
+
+## 2026-06-03 — audit-barrage lift (20260603T192308187Z-scope-discovery)
+
+### AUDIT-20260603-50 — AUDIT-49's "fix" replaces a wrong claim with another wrong claim — `apply-audit-flips` parses ONLY `Closes`, never `Acknowledges`, so the body-trailer rationale is false
+
+Finding-ID: AUDIT-20260603-50
+Status:     acknowledged-template-rewritten-fix-task-block-corrected-2026-06-03
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new Task 6 Step 3 (the `+- [x] Step 3: committed (\`f679a201\`)…` line) vs. `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-flip-from-commit.ts:43` and `plugins/dw-lifecycle/src/subcommands/apply-audit-flips.ts:15,84,362,413`
+
+The new Step 3 asserts: *"the full-ID `Acknowledges AUDIT-20260603-47` trailer lives in the body **so a trailer-walker (apply-audit-flips and successors) finds it**."* I read the trailer-walker. `auto-flip-from-commit.ts:43` is `CLOSES_VERB_RE = /\bcloses\b[\s:]+/gi` — the **only** verb the parser anchors on. `apply-audit-flips.ts` documents itself (line 15) as parsing *"`Closes AUDIT-<id>` and `Closes: AUDIT-X, AUDIT-Y` references"*, its proposal builder calls `parseClosesAuditTrailers` (line 362→84), and its stderr literally reports *"found N Closes-AUDIT reference(s)"* (line 413). **`apply-audit-flips` never reads `Acknowledges` in subject OR body.** It is structurally blind to that verb.
+
+So the corrective rationale is false on its own terms: whether the `Acknowledges` trailer sits in the subject or the body is *irrelevant* to `apply-audit-flips` — the tool ignores the verb entirely. The same Step 3 sentence even contradicts itself: it says the trailer lives in the body *"so a trailer-walker finds it"* and then says *"the trailer is the audit-trail, **not the flip mechanism**."* Both can't be the point of the body placement. Worse, the codebase's own canonical note (`workplan-task-renderer.ts:152`, citing AUDIT-20260602-01) states plainly that *"`apply-audit-flips` parses `Closes` trailers"* and that `Acknowledges` is the deliberately-**non**-flipping verb for doc-only dispositions. AUDIT-49 was filed because Step 3 made an unverifiable trailer claim; the fix replaced *"in subject"* with *"in body so the walker finds it,"* which is equally untrue, then flipped the audit-log to `…-trailer-location-corrected-2026-06-03` and checked the box `[x] Complete`. The branch now records a correction that the source contradicts. Fix: state that `Acknowledges` is an audit-trail trailer with **no** machine effect (apply-audit-flips acts on `Closes` only), and drop the "so a trailer-walker finds it" justification entirely — the audit-log status for an acknowledged finding is hand-set by design, not tool-flipped.
+
+---
+
+### AUDIT-20260603-51 — Root cause of AUDIT-49 left unfixed: the generator `workplan-task-renderer.ts:152` still emits `Acknowledges … in subject`, so the defect regenerates on every promote-findings run
+
+Finding-ID: AUDIT-20260603-51
+Status:     fixed-f9b939e8
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:152` (not in the diff) vs. the workplan Step 3 hand-edit that IS in the diff
+
+AUDIT-49 patched a single hand-written workplan instance (Task 6 Step 3) but never touched the template that **produces** Step 3 lines. `workplan-task-renderer.ts:152` hardcodes: ``Step 3: commit with `Acknowledges ${id}` in subject (…)``. The AUDIT-49 fix establishes the opposite as the "established pattern" — short-form id in the subject, full-id `Acknowledges` trailer in the **body**. The generator and the just-blessed pattern now disagree, and because the generator is the source of every future fix-task's Step 3, the *exact* "Acknowledges … in subject" wording AUDIT-49 was filed to correct will be regenerated verbatim on the next `promote-findings` run. This is precisely the recurring-shape failure the prior audit excerpt flagged (*"the exact header/step/trailer-mismatch shape … now recurring on Task 6"*): each occurrence gets hand-patched, the template that mints them is never addressed, so the audit-log accrues a new AUDIT-NN every cycle.
+
+The diff doesn't mention the renderer at all, so a reviewer reading only this commit would believe the trailer-location problem is closed. It isn't — it's closed for one frozen instance and armed to recur. A real fix updates `workplan-task-renderer.ts:152` so the generated Step 3 either (a) says nothing about subject-vs-body (since location is immaterial to the tooling per Finding-01) or (b) matches whatever the operator decides the canonical pattern is, with a test asserting the generated line. Until the template is changed, marking AUDIT-49 `corrected` overstates the fix.
+
+---
+
+### AUDIT-20260603-52 — This diff cements a false capability claim into the durable audit-log: "apply-audit-flips reads `Acknowledges AUDIT-X` commit trailers"
+
+Finding-ID: AUDIT-20260603-52
+Status:     acknowledged-paraphrase-corrected-in-AUDIT-49-entry-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — the AUDIT-20260603-49 entry body added in this diff (*"the journal records that `dw-lifecycle apply-audit-flips` reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers and flips audit-log entries"*)
+
+The audit-log is the project's durable record, and this diff appends an entry that states `apply-audit-flips` *"reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers."* Per Finding-01, the implementation reads `Closes` only (`auto-flip-from-commit.ts:43`); `Acknowledges` is never parsed for a flip. The entry attributes the claim to "the journal," but capturing the inaccuracy verbatim into `audit-log.md` propagates it into a second canonical surface, where a future reader (or a future "successor" tool author who treats the audit-log as a spec) will design against a capability that doesn't exist. This is the documentation-drift bug-factory the project's own rules warn about — a stated behavior that the code contradicts. The cheap fix: when recording the finding, correct the paraphrase to *"apply-audit-flips reads `Closes AUDIT-X` trailers; `Acknowledges`/`Defers` are non-flipping audit-trail trailers"* so the durable record matches the source. (If the DEVELOPMENT-NOTES journal genuinely contains the wrong claim, that's a third surface worth correcting, but it's outside this diff.)
+
+---
+
+### AUDIT-20260603-53 — Verified clean: AUDIT-48 (the SKILL.md two-passage reconciliation) genuinely landed
+
+Finding-ID: AUDIT-20260603-53
+Status:     acknowledged-informational-2026-06-03
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/skills/session-end/SKILL.md:45` (Step 9 body) and `:72` (Closing-discipline error-handling bullet)
+
+Confirming the positive signal so the operator can weigh it against the negatives above. AUDIT-48's complaint was that the AUDIT-47 fix edited Step 9's body but left the error-handling bullet asserting *"no escape flag exists."* I read both passages post-diff: Step 9 body (line 45) and the error-handling bullet (line 72) now say the same thing — the verb retains a legacy `--allow-disposition-loss` flag from its `.husky` era, the skill body does NOT pass it at session-end, and *"No `--no-verify`-style escape is wired into session-end."* The factual claim ("the flag exists, just unused") and the behavioral claim ("session-end stops unconditionally") are consistent across both passages. The commit-trailer claims also check out: I ran `git log -1 --format=%B` on `f679a201` and `d51696d4` — the `Acknowledges` trailers the workplan cites are genuinely present in those commit bodies (the *existence* claim is true; only the *purpose* claim, Finding-01, is wrong). AUDIT-48 is a real, complete fix.
+
+---
+
+**Summary for triage:** AUDIT-48 is genuinely resolved. AUDIT-49 is not — its corrective rationale (`apply-audit-flips` "finds" the body `Acknowledges` trailer) is factually false (the walker parses `Closes` only), the claim is internally self-contradictory, the generator that produces the defect is untouched so it will recur, and the false capability claim is now cemented into the audit-log. The strongest signal is the cross-check that the codebase's *own* note (`workplan-task-renderer.ts:152`) already documents the correct behavior the AUDIT-49 hand-edit contradicts.
+
+## 2026-06-03 — audit-barrage lift (20260603T193220124Z-scope-discovery)
+
+### AUDIT-20260603-54 — Asymmetric fix — the code-defect template Step 5 still says "`Closes ${id}` in subject," reproducing the exact "location-specific" framing the AUDIT-50/51 fix was filed to remove
+
+Finding-ID: AUDIT-20260603-54 (claude-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:193` (NOT in the diff) vs. the changed line 152 (in the diff) and `auto-flip-from-commit.ts:13`
+
+The AUDIT-50/51 fix changed the **non-bug** Step 3 from "`Acknowledges ${id}` in subject" to "an `Acknowledges ${id}` trailer in the commit message," on the stated logic that *subject-vs-body location is immaterial to `apply-audit-flips`* (it matches the verb "anywhere in subject or body," per `auto-flip-from-commit.ts:13`). That same `renderFixTaskBlock` function emits the **code-defect** template, whose Step 5 (line 193) still reads `commit with \`Closes ${id}\` in subject`. The renderer now teaches two different placement conventions for two trailer verbs the tool treats identically.
+
+This is precisely the recurring partial-fix shape AUDIT-51 itself named ("each occurrence gets hand-patched … the template that mints them is never addressed, so the defect recurs"). The fix touched one of two parallel "in subject" template lines in the same function. Either "in subject" is the intended convention (in which case the non-bug change diverged from it and from `SKILL.md:96`/`:119`, which still document "`Closes … in subject`"), or location is genuinely immaterial (in which case line 193 should also drop "in subject"). The diff resolves neither — it leaves the function internally inconsistent and the code-defect path un-tested for the same property the two new non-bug tests now assert. A reasonable fix: make both lines say "trailer in the commit message" (or both prescribe subject), and extend the new tests at `workplan-task-renderer.test.ts` to cover the code-defect template's Step 5 the same way they cover the non-bug Step 3.
+
+---
+
+### AUDIT-20260603-55 — New negative-assertion test regex cannot match the documented offending phrase — it gives false confidence against the "trailer-walker finds it" regression
+
+Finding-ID: AUDIT-20260603-55 (claude-02 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/workplan-task-renderer.test.ts:282`
+
+The test added for AUDIT-50/51 asserts `expect(lower).not.toMatch(/trailer[- ]walker (finds|will find|locates)/)` and the preceding comment claims it guards against *"the false 'trailer-walker finds it' justification."* But the actual phrasing the hand-edit used (quoted in AUDIT-50's own body) is **"trailer-walker (apply-audit-flips and successors) finds it"** — the parenthetical sits between "walker" and "finds." The regex requires `trailer-walker ` to be immediately followed by `finds|will find|locates`, so it does **not** match that phrase. If a future regression reintroduced exactly that wording into the generator, this assertion would still pass.
+
+The other assertions in the same test (must contain `audit-trail`, `apply-audit-flips`, `closes`) do meaningfully constrain the contract, so the test is not worthless — but the one assertion specifically named after the AUDIT-50 defect is the one that can't catch it. Fix: loosen to `/trailer[- ]walker\b.*\b(finds|will find|locates|reads)\b/` (with the `.*` spanning the parenthetical) or assert the absence of the literal substring `"finds it"` in proximity to `"trailer-walker"`, so the regex matches the documented form it claims to forbid.
+
+---
+
+### AUDIT-20260603-56 — AUDIT-52's own entry re-embeds the false-capability string verbatim into the durable audit-log — the exact propagation risk the finding names
+
+Finding-ID: AUDIT-20260603-56
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` — AUDIT-20260603-52 entry (Surface line + body, both in the diff)
+
+AUDIT-52's thesis is that capturing the false paraphrase *"`apply-audit-flips` reads `Closes AUDIT-X` / `Acknowledges AUDIT-X` commit trailers"* into `audit-log.md` "propagates it into a second canonical surface, where a future reader (or a future 'successor' tool author who treats the audit-log as a spec) will design against a capability that doesn't exist." The AUDIT-52 entry then reproduces that exact false string **twice** — once in its `Surface:` line and once in its body — as the quoted-wrong claim. A grep of the durable audit-log for `reads .* Acknowledges AUDIT` still returns these hits; only the surrounding prose marks them as erroneous.
+
+Quote-to-correct is defensible and the AUDIT-49 entry body itself was genuinely fixed (the false sentence was removed there). This is informational, not a defect: the safer pattern, by AUDIT-52's own argument, is to paraphrase the quoted-wrong claim (e.g. *"a paraphrase that incorrectly attributed `Acknowledges`-trailer parsing to `apply-audit-flips`"*) rather than reproduce the literal false string in a surface a tool author might scrape. Worth weighing only if the audit-log is ever consumed mechanically.
+
+## 2026-06-03 — audit-barrage lift (20260603T193734377Z-scope-discovery)
+
+### AUDIT-20260603-57 — `--no-clone-check` flag now silently suppresses the entire PR-readiness chain while its name still promises only clone-detection skip
+
+Finding-ID: AUDIT-20260603-57 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/review/SKILL.md:107` (the "Skipping is the exception" paragraph) + Step 3 chain at `:16-41`
+
+The diff repurposes `--no-clone-check` so that it now suppresses "the full Step 3 chain (Step 0 refactor-preconditions + structural chain + fleet symmetry), not just the clone detector." The flag name describes one of five checks but now gates all of them. This is a footgun cemented directly into the skill contract: an operator (or scripted caller) who learned `--no-clone-check` as "skip clone detection" — its literal, pre-Phase-24 meaning, still documented at `SKILL.md` and in the `/dw-lifecycle:review` skill-list description ("auto-runs check-clones unless --no-clone-check") — will now silently disable `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions`, and the fleet-symmetry snapshot as well. The loss of enforcement is exactly the kind the name actively conceals.
+
+The diff acknowledges the drift in prose ("named `--no-clone-check` for back-compat … it suppresses the full Step 3 chain"), but acknowledging a footgun in a parenthetical is not the same as removing it. A reasonable fix: introduce a distinct flag (`--no-readiness-gate` or `--skip-structural-chain`) for the new whole-chain suppression and either retire `--no-clone-check` or scope it back to clones only; if back-compat truly forces the broad behavior, the skip clause must lead with a bold warning that this flag disables the entire PR-readiness gate, not just clones — and the `/dw-lifecycle:review` skill-list description must be updated in the same change, since it still says the flag only governs `check-clones`.
+
+### AUDIT-20260603-58 — Workplan Task 7 marked `[x] Complete` with verification delegated to a different task (Task 10) whose state isn't confirmable from the diff
+
+Finding-ID: AUDIT-20260603-58
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:1018-1026` (Task 7 completion block)
+
+Task 7 is rewritten from an unchecked TODO list to all-`[x]` with the completion claim: "Empirical verification: Task 10 Step 3 (deliberate clone-group regression) exercises Step 3b's structural chain; Task 10's reviewer-driven PR-readiness run exercises Steps 3a + 3c via the operator's own review pass." The verification that justifies marking Task 7 complete is sourced entirely from another task (Task 10), and the diff gives no evidence that Task 10 has actually run — the cited "deliberate clone-group regression" and "reviewer-driven PR-readiness run" are described as the proof but not shown. Marking Step 1/Step 4 as "N/A per `testing.md`" is consistent with the project's skill-prose convention and not a problem; the concern is narrower: a completion checkbox whose only verification is a forward reference to a sibling task's not-yet-evidenced run.
+
+If Task 10 has demonstrably executed those steps, cite the concrete artifact (the audit-log Finding-ID the regression produced, or the commit/run that exercised the chain) so the completion claim is falsifiable. If Task 10 hasn't run yet, the "Complete" marking on Task 7 is premature — the skill body changed, but the claim that the new Step 3a/3b/3c actually fire correctly is asserted, not shown.
+
+## 2026-06-03 — audit-barrage lift (20260603T194345756Z-scope-discovery)
+
+### AUDIT-20260603-59 — Phase 22 archive header says blanket "RETIRED" but the README row enumerates survivors — a dead-code-cleanup hazard between two canonical surfaces
+
+Finding-ID: AUDIT-20260603-59 (claude-01 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan-archive.md:3326` (Phase 22 header) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` row 22
+
+The workplan-archive.md Phase 22 header leads with the bold blanket claim **"RETIRED in Phase 24 (2026-06-03)."** Its body then scopes the retirement narrowly ("the `last-hook-run.json` marker logic + boot-case guards … are vestigial"). But the README row 22 — the other canonical surface this same commit edits — is explicit that *most* of Phase 22 survives: "Friction (2) and (3) are general-purpose `implement-hook` improvements that survive; Friction (1) retires with the marker. … AUDIT-41/42/43/44 (`git-ancestry` helper) and AUDIT-45/46/47/48/52 (tri-state collapse arrows) all survive as general infrastructure."
+
+A maintainer reading only the archive's bold "Phase 22: RETIRED" header — exactly the skim path a future dead-code sweep would take — could delete the h3-heading auto-positioner (Friction 3), the `git-ancestry` helper, and the tri-state arrows, all of which the README says survive. The archive header should mirror the README's survivor list (e.g. "RETIRED-IN-PART: marker logic + Friction (1) boot-case guard retire; Friction (2)/(3), `git-ancestry` helper, tri-state arrows survive as general infrastructure"). This is the documentation-drift-between-canonical-surfaces failure the project's own rules name; the commit edited both surfaces but left them disagreeing on scope.
+
+### AUDIT-20260603-60 — Phase 20 Task 2 marks `[x] GH #387 closed` while Task 8 Step 3 in the SAME commit defers all issue closure to the operator — and #387 isn't in the closure queue
+
+Finding-ID: AUDIT-20260603-60 (claude-02 + claude-04 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 20 Task 2 acceptance block (`- [x] GH #387 — closed as reframed-by-Phase-24`) vs. Task 8 Step 3 (`- [-] Step 3: GH issue closure DEFERRED to operator post-release`)
+
+Within this one commit two statements contradict. Task 8 Step 3 invokes `agent-discipline.md` § "Issue closure requires verification in a formally-installed release" — "the agent posts evidence; the operator … makes the closing transition" — and explicitly defers closure to the operator's release-verification queue. Yet the reframed Phase 20 Task 2 acceptance checkbox is marked `[x]` with "GH #387 — closed as reframed-by-Phase-24 (not retired; elevated)." Either #387 is closed (which the agent is not permitted to do per the very rule Task 8 cites) or it isn't (and the `[x]` is a false completion claim).
+
+Compounding it: Task 8 Step 3's operator-closure disposition list is `#293 / #294 / #295 / #352 / #373 / #374` — **#387 is absent**. So #387 is claimed-closed by Task 2 but is not tracked in the operator's closure queue, meaning if the Task 2 `[x]` is wrong (it almost certainly is, since closure is the operator's call) the omission means no surface will catch the un-closed issue at release time. Fix: change the Task 2 acceptance line from `[x] closed` to evidence-posted-pending-operator-closure, and add #387 to Task 8 Step 3's queue with the "reframed/elevated, close on verification" disposition.
+
+## 2026-06-03 — audit-barrage lift (20260603T195852568Z-scope-discovery)
+
+### AUDIT-20260603-61 — Skill body still documents the retired marker/log/pre-push machinery as live — and references two functions this commit deletes
+
+Finding-ID: AUDIT-20260603-61
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/implement/SKILL.md:167,169,171`
+
+This commit retires the marker write (`last-hook-run.json`), the per-run log (`hook-run-log.jsonl`), the pre-push coverage gate, and the helpers `enumerateCommitsInRange` + `appendHookRunLogEntriesForRange`. But `implement/SKILL.md` still makes present-tense claims that all of this is live: line 169 — *"The verb writes `last-hook-run.json` after every legitimate exit (success + skip + outage) and appends to `hook-run-log.jsonl` so the pre-push gate can walk a multi-commit range"* — is now entirely false (the verb writes neither; the gate is gone). Line 171's whole "Phase 23: per-SHA log writes" paragraph describes behavior the verb no longer has and names its implementation as *"`enumerateCommitsInRange` in `scope-discovery/util/git-ancestry.ts` + `appendHookRunLogEntriesForRange` in `scope-discovery/promote-findings/hook-run-log.ts`"* — both functions and the second file are deleted in this very diff. Line 167's `gate result` report field (`allowed: open-findings-scoped-as-next` etc.) likewise documents a gate this chain dismantles.
+
+This matters more here than ordinary doc drift because of the project's own `enforcement-lives-in-skills.md` rule: the skill body *is* the contract adopters get. The commit moved the workplan checkbox to "Complete" and acknowledged the relocation at `SKILL.md:40` (backward-looking, correct), but left the operational prose at 167/169/171 asserting a machine that no longer exists. An agent reading lines 169–171 will believe `implement-hook` is recording coverage that the next push depends on. Fix: rewrite 167/169/171 in the same commit to state that no marker/log is written and the verb forward-progresses without a pre-push coverage gate (mirroring the new `implement-hook.ts` comments at the no-new-diff / outage / happy paths).
+
+### AUDIT-20260603-62 — Orphaned one-time backfill script writes to the retired log path
+
+Finding-ID: AUDIT-20260603-62
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `scripts/backfill-hook-run-log.mjs:1-23`
+
+`scripts/backfill-hook-run-log.mjs` exists solely to *"write synthetic hook-run-log entries"* into `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (line 23) so the (now-retired) pre-push gate would accept already-landed commits. With the log file deleted, both reader libraries (`hook-run-log.ts`, `check-implement-hook-coverage.ts`) gone, and the pre-push gate retired, this script is dead: running it would recreate a file nothing reads. Per the project's hygiene rules (no dead code; "just for now" one-time scripts become canon if not swept), the demolition commit that retired the log should also delete its backfill helper. Leaving it invites a future maintainer to run it and conclude the log is still load-bearing. Fix: `git rm scripts/backfill-hook-run-log.mjs` as part of this retirement.
+
+### AUDIT-20260603-63 — `.gitignore` still carries (and previously also tracked) the retired marker artifacts
+
+Finding-ID: AUDIT-20260603-63
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `.gitignore:47-48`
+
+`.gitignore` lines 47–48 still ignore `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` and `.../last-hook-run.json`. Both are now retired artifacts that nothing in the source tree writes — dead ignore rules. Worth noting the contradictory prior state this commit half-resolves: `hook-run-log.jsonl` was simultaneously listed in `.gitignore` AND tracked at `HEAD~1` (it had been force-added past the ignore), which is exactly the confusing dual state a cleanup should eliminate. This commit deletes the tracked file but leaves the stale ignore lines, so the contradiction's residue persists. `last-hook-run.json` was never tracked, so workplan Step 8's "working-tree `last-hook-run.json` deleted" claim is about a purely-local untracked file (fine, but unverifiable from the commit). Fix: drop both lines from `.gitignore` in the retirement commit.
+
+### AUDIT-20260603-64 — Stale doc comments name the deleted gate verbs as live consumers
+
+Finding-ID: AUDIT-20260603-64 (claude-04 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/implement-hook.ts:33-34`, `plugins/dw-lifecycle/src/scope-discovery/util/git-ancestry.ts:4,35,72`
+
+The header comment in `implement-hook.ts:33-34` still describes the verb as composing *"with the commit-msg gate (`check-implement-hook-ran`) and pre-push gate (`check-implement-hook-coverage`)"* — both deleted in this diff. `git-ancestry.ts` doc comments (lines 4, 35, 72) describe `checkAncestry`/`ancestryAsGateBoolean` as the collapse arrow *"used by `check-implement-hook-ran`"* and *"Collapse arrow for the commit-msg gate (`check-implement-hook-ran`)"* — that named consumer no longer exists (the helper survives only because `pickFallbackBaseline`/`ancestryAsBarrageTip` still use it via `implement-hook`). These comments will mislead the next reader into grepping for a verb that was removed. Fix: update the comments to reflect the surviving consumer (the audit-barrage diff-range computation) and drop the retired-verb references.
+
+### AUDIT-20260603-65 — Dead classification branches in workplan-task-renderer for now-deleted artifact surfaces
+
+Finding-ID: AUDIT-20260603-65
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   informational
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts:64,87-88`
+
+`workplan-task-renderer.ts:87-88` classify any audit-finding whose surface matches `/last-hook-run\.json/` or `/hook-run-log\.jsonl/` as a `'non-bug'` (config/marker artifact), with the rationale comment at lines 63-64 naming those exact files. With both artifacts retired and removed from the tree, no future finding will ever cite those surfaces, so these branches are dead. This is harmless (the regexes simply never match) and arguably defensible to keep for back-compat with historical audit-log entries that reference the old paths — but it's residue worth a deliberate keep/drop decision rather than silent survival. No fix required; flagging so the operator can decide whether to prune alongside the rest of the retirement.
+
+## 2026-06-03 — audit-barrage lift (20260603T201034135Z-scope-discovery)
+
+### AUDIT-20260603-66 — Orphaned canonical template `agent-step-0-fragment.md` survives the retirement of both its readers
+
+Finding-ID: AUDIT-20260603-66
+Status:     fixed-db630841
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/templates/scope-discovery/agent-step-0-fragment.md` (not in diff — should be) vs. the two deleted readers
+
+This commit deletes the only two files that read the Step 0 fragment template. `install-agent-prompts.ts` resolved it as `FRAGMENT_PATH = join(__dirname, '..', '..', 'templates', 'scope-discovery', 'agent-step-0-fragment.md')`, and the `agent-prompt-mirror-drift.ts` doctor rule resolved the same path as `CANONICAL_FRAGMENT_PATH`. Both are removed in this diff. Workplan Step 4 states the Step 0 discipline was *relocated* into `/dw-lifecycle:review` SKILL.md "as Step 3a (`dw-lifecycle check-refactor-preconditions --gate-mode`)" — i.e. as inline skill prose that invokes a verb, **not** by reading this template. So nothing in the source tree reads `agent-step-0-fragment.md` any longer.
+
+This is the same dead-content shape as AUDIT-20260603-62 (the orphaned backfill script), but on the canonical *content* file rather than a one-time script — arguably more hazardous because a future maintainer grepping for "Step 0 fragment" will find a pristine-looking template and conclude the install-agent-prompts mechanism is still live, exactly the conclusion this whole phase is trying to retire. The retirement commit that removed both readers should `git rm plugins/dw-lifecycle/templates/scope-discovery/agent-step-0-fragment.md` (and prune the now-empty `templates/scope-discovery/` dir if the fragment was its only occupant). If the relocated `/dw-lifecycle:review` Step 3a is meant to draw its canonical wording from this file, that linkage is missing and should be made explicit instead — but the diff shows no such reader, so deletion is the consistent action.
+
+### AUDIT-20260603-67 — Reciprocal skill cross-references to the three retired verbs are not updated in this commit
+
+Finding-ID: AUDIT-20260603-67 (claude-02 + codex-03; cross-model)
+Status:     fixed-db630841
+Severity:   medium
+Surface:    sibling skill bodies that point at the deleted verbs — e.g. `plugins/dw-lifecycle/skills/install-scope-discovery/SKILL.md`, `plugins/dw-lifecycle/skills/complete/SKILL.md` (neither in this diff)
+
+The deleted `install-agent-prompts/SKILL.md` "When to use" section read: *"Run once during onboarding after `/dw-lifecycle:install-scope-discovery` and ideally before `/dw-lifecycle:install-scope-discovery-hooks`."* That reciprocity is strong evidence the surviving `install-scope-discovery` SKILL.md (not deleted, not touched here) carries a forward pointer to the now-retired hooks/agent-prompts install steps — and similarly the deleted `uninstall` SKILL.md cross-named both install verbs, implying an onboarding doc chain that this commit half-dismantles. The diff removes the three skill folders but updates none of the sibling skills, READMEs, or onboarding prose that route operators *into* them.
+
+Per the project's own `enforcement-lives-in-skills.md` rule, "the skill body *is* the contract adopters get" — a surviving skill that tells an operator to run `/dw-lifecycle:install-scope-discovery-hooks` as their next onboarding step now points at a command that no longer exists, which is an adopter-facing dead end. This is the documentation-drift-between-canonical-surfaces failure the project names repeatedly (cf. AUDIT-20260603-59). Fix: grep the plugin's skill bodies + READMEs for `install-scope-discovery-hooks`, `install-agent-prompts`, and `uninstall-scope-discovery-hooks`, and update or remove each onboarding reference in the same retirement commit. The diff gives no evidence this sweep was done.
+
+### AUDIT-20260603-68 — Build-integrity: the diff removes all *visible* importers of the deleted modules' exports, but the audited slice can't prove no others remain
+
+Finding-ID: AUDIT-20260603-68
+Status:     acknowledged-tsc-clean-confirms-no-dangling-importers-2026-06-03
+Severity:   low
+Surface:    deleted exports in `install-scope-discovery-hooks.ts` / `install-agent-prompts.ts` / `husky-bootstrap.ts`
+
+`install-scope-discovery-hooks.ts` exported a cluster of symbols reused beyond its own command: `readExistingManifest`, `mergeFileRecords`, `filterRecordsUnderTarget`, `HookFileRecord`, `HooksManifest`, `HOOK_BEGIN_MARKER`/`HOOK_END_MARKER`. `install-agent-prompts.ts` exported `STEP_0_BEGIN_MARKER`/`STEP_0_END_MARKER`/`TARGET_AGENTS`/`isAgentFilePath`. `husky-bootstrap.ts` exported `detectMissingHuskyDispatcher` and friends. Within this diff, every importer of these symbols (`uninstall-scope-discovery-hooks.ts`, `hooks-installed-missing.ts`, `agent-prompt-mirror-drift.ts`, the test files) is deleted in lockstep, which is the correct shape. But the audited slice is the demolition itself — it cannot demonstrate that no surviving file outside the slice still imports any of these now-gone symbols (e.g. a shared manifest reader, an `install-scope-discovery` library that reused `readExistingManifest`, or a doctor-rule sibling referencing the markers).
+
+This is a verification gap rather than a confirmed defect: a single `grep -r` for each exported identifier across `plugins/dw-lifecycle/src/` (excluding the deleted paths) would confirm zero dangling importers and that `tsc`/`vitest` still compile. The project's testing rule requires `npm --workspace @deskwork/<pkg> test` green before shipping; the commit message should cite that the full workspace build passed post-deletion so the "no remaining reader logic (verified via grep)" claim in workplan Step 3 extends to *importers of exports*, not just the artifact paths it currently scopes.
+
+### AUDIT-20260603-69 — `install-agent-prompts` retirement is attributed only to the Phase 24 parent, with no dedicated issue in the audit-trail line
+
+Finding-ID: AUDIT-20260603-69
+Status:     acknowledged-step-4-tracked-under-phase-24-parent-by-design-2026-06-03
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 3 Step 6 + Acceptance block
+
+Step 6 now reads "Commit lands with `Refs #293 #294 #295`" and the Acceptance line claims "✅ Audit-trail commit names the three issues retired (#293/#294/#295 + Phase 24 parent #404)." But Task 3 retires *four* surfaces: install-hooks (Step 1), uninstall-hooks (Step 2), the `hooks-installed.json` machinery (Step 3), **and** `install-agent-prompts` (Step 4). The three numbered issues map to the first three (the original acceptance text before this edit said "names the four issues retired" against a four-step Step 1–4 list). The `install-agent-prompts` retirement — a substantive removal of a subcommand + library + doctor rule + tests — is folded under the parent #404 only, with no issue of its own in the `Refs` trailer.
+
+This isn't a correctness bug, but it means the most consequential deletion in Step 4 (the one that required the Phase 24 Task 7 relocation rationale to justify it) has the weakest audit trail of the four. If an operator later searches issues for "why was install-agent-prompts removed," they land on a 400-comment parent rather than a scoped record. Worth either filing/citing a discrete issue for the agent-prompts retirement or making the Acceptance line explicit that Step 4's retirement is intentionally tracked only under #404 with the Task-7 relocation as its written justification — so the asymmetry is a documented choice, not an omission.
+
+### AUDIT-20260603-70 — Retired slash commands still ship and point at deleted skill folders
+
+Finding-ID: AUDIT-20260603-70
+Status:     fixed-db630841
+Severity:   high
+Surface:    `plugins/dw-lifecycle/commands/install-agent-prompts.md:1-5`, `plugins/dw-lifecycle/commands/install-scope-discovery-hooks.md:1-5`, `plugins/dw-lifecycle/commands/uninstall-scope-discovery-hooks.md:1-5`, `plugins/dw-lifecycle/src/__tests__/shortcuts.test.ts:88-98`
+
+The diff deletes all three skill folders and CLI handlers, but the plugin still ships command files for those same verbs. Each command tells the runtime to invoke a skill whose `SKILL.md` was deleted in this diff, so `/dw-lifecycle:install-agent-prompts`, `/dw-lifecycle:install-scope-discovery-hooks`, and `/dw-lifecycle:uninstall-scope-discovery-hooks` remain advertised as runnable plugin surfaces but resolve to missing procedures.
+
+The shortcuts test makes this worse by keeping the retired command names in `META_COMMANDS` at lines 88, 90, and 98, so the test suite treats these stale command files as expected on-disk artifacts instead of catching them. Fix: delete the three `commands/*.md` files and remove the retired names from the shortcut/meta-command expectations, or replace them with explicit migration/error commands if the plugin must keep a compatibility surface.
+
+### AUDIT-20260603-71 — Doctor skill documents deleted rules and repair commands as live
+
+Finding-ID: AUDIT-20260603-71
+Status:     fixed-db630841
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/doctor/SKILL.md:31-44`, `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/index.ts:26-35`
+
+`doctor/SKILL.md` still says the helper runs “eight” scope-discovery rules and lists `agent-prompt-mirror-drift` plus `hooks-installed-missing` with repair hints that call `/dw-lifecycle:install-agent-prompts`, `/dw-lifecycle:install-scope-discovery-hooks`, and `/dw-lifecycle:uninstall-scope-discovery-hooks`. This diff deletes both rule implementations and removes them from `SCOPE_DISCOVERY_DOCTOR_RULES`; the exported rule array now contains neither deleted rule.
+
+This is active operator-facing prose, not historical notes. An operator following `/dw-lifecycle:doctor` will expect findings and repair paths that cannot occur or run. Fix: update the rule count/table to match `doctor-rules/index.ts` and remove the deleted rule rows and retired repair commands.
+
+## 2026-06-03 — audit-barrage lift (20260603T201656729Z-scope-discovery)
+
+### AUDIT-20260603-72 — Workplan Tasks 9–14 are fully unchecked while the same commit marks their findings `fixed`/`acknowledged` — internal contradiction within the audited range
+
+Finding-ID: AUDIT-20260603-72 (claude-01 + claude-02 + claude-04 + codex-04; cross-model)
+Status:     fixed-b178bdd0
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:228-332` (Tasks 9–14) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:3790-3854` (AUDIT-66…71)
+
+The audited range adds the six findings to the audit-log with terminal statuses (`fixed-db630841` for 66/67/70/71, `acknowledged-…` for 68/69) AND adds Tasks 9–14 to the workplan with **every** checkbox unchecked — including "Step 1: write failing test", "Step 3: implement the fix", "Step 5: commit with `Closes …`", and "Audit-log Status flipped to `fixed-<sha>`". So one commit range simultaneously asserts "these are resolved" (audit-log SSOT) and "here are open, not-yet-started TDD tasks to resolve them" (workplan). A reader running `/dw-lifecycle:pickup` against this workplan will see six in-flight fix tasks for work the audit-log already calls done.
+
+This is precisely the canonical-surface drift the project repeatedly names (cf. AUDIT-20260603-59, the doctor-rule philosophy, the quantitative-reporting conventions). The two surfaces must agree: if the findings are fixed in db630841, Tasks 9–14 should be checked off (or never created), with their "flipped to fixed-<sha>" acceptance line satisfied. As-is, the workplan's open-findings/uncompleted-task signal contradicts the audit-log's closure signal. Fix: reconcile — either mark Tasks 9–14 complete with the db630841 SHA recorded, or, if these were promote-findings proposals superseded by the already-landed fix, remove them rather than leaving unchecked TDD scaffolds for completed work.
+
+### AUDIT-20260603-73 — Doctor `SKILL.md` rule-count claim ("eight") is not reconciled in the diff that removed two rule rows — AUDIT-71's required count update appears unmade despite `fixed-db630841`
+
+Finding-ID: AUDIT-20260603-73 (claude-03 + codex-03; cross-model)
+Status:     fixed-b178bdd0
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/skills/doctor/SKILL.md` (single hunk `@@ -39,9 +39,7 @@`) vs. AUDIT-20260603-71 requirement "update the rule count/table to match"
+
+AUDIT-71's fix has two explicit parts: (a) remove the deleted rule rows from the table, and (b) "update the rule count… `doctor/SKILL.md` still says the helper runs 'eight' scope-discovery rules." The diff under audit shows only **one** hunk for `doctor/SKILL.md` — the removal of the `agent-prompt-mirror-drift` and `hooks-installed-missing` table rows at the line-39 region. The "eight" count claim the finding locates at SKILL.md:31 is *above* the shown hunk and is not touched (a change there would surface as a second hunk; none appears). So part (b) of the required fix is not visible in the range that marks AUDIT-71 `fixed-db630841`.
+
+If the count text still reads "eight" while the table now lists fewer rules, the operator-facing prose is internally inconsistent and the finding is only partially resolved despite its `fixed` status. This is the same "fixed claim outruns the actual edit" pattern the project's verification rules guard against. Fix: confirm SKILL.md's rule-count number was decremented to match the surviving rows; if it wasn't, the count update still needs to land and AUDIT-71's `fixed-db630841` is premature.
+
+### AUDIT-20260603-74 — `migrate-from-pilot` still routes operators to retired commands
+
+Finding-ID: AUDIT-20260603-74
+Status:     fixed-b178bdd0
+Severity:   high
+Surface:    `plugins/dw-lifecycle/skills/migrate-from-pilot/SKILL.md:71-75` (missing from this diff, but should be)
+
+The diff fixes one AUDIT-67 surface by updating `install-scope-discovery/SKILL.md`, but the adopter-facing migration skill still says to “Wire the hooks + agent prompts” and tells operators to run `/dw-lifecycle:install-scope-discovery-hooks` and `/dw-lifecycle:install-agent-prompts` at line 75. Those command files and skill folders are deleted in this same audited range, so a pilot adopter following the migration procedure is sent directly to missing plugin surfaces.
+
+This is not a re-litigation of AUDIT-67; it is an unhandled instance of the exact grep sweep that AUDIT-67 required across skill bodies and READMEs. Fix by rewriting the post-migration step to match the Phase 24 no-git-hook-enforcement contract, probably mirroring the new `install-scope-discovery` prose: registries are migrated, enforcement lives in the lifecycle skills, and the retired install verbs are no longer part of onboarding.
+
+### AUDIT-20260603-75 — Scope-discovery template README still installs a retired hook manifest contract
+
+Finding-ID: AUDIT-20260603-75
+Status:     fixed-b178bdd0
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/templates/scope-discovery/README.md:21-30` (missing from this diff, but should be)
+
+The project-side scope-discovery template still documents `hooks-installed.json` as a shipped file with “Provenance for `install-scope-discovery-hooks` (do not hand-edit)” at line 30. The audited diff removes the install/uninstall hook command surfaces and resolves AUDIT-70, but this template remains an adopter-facing artifact that preserves the retired installer’s data model as if it still exists.
+
+This matters because `install-scope-discovery` copies these templates into adopting projects; stale template prose becomes durable local documentation. Fix by removing the `hooks-installed.json` row, and if the file is no longer emitted anywhere, ensure the template payload and installer tests no longer expect it.
+
+## 2026-06-03 — audit-barrage lift (20260603T202405320Z-scope-discovery)
+
+### AUDIT-20260603-76 — Tasks 16/17/18 reproduce the exact "fixed-finding with an open, wrong-shaped task" contradiction that AUDIT-72 named — within the same commit that claims to fix it
+
+Finding-ID: AUDIT-20260603-76 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     fixed-3fb376f1
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 16/17/18 (diff hunks `@@ -226,15 +226,33 @@` and `@@ -259,39 +297,76 @@`) vs. `audit-log.md` AUDIT-73/74/75 (`Status: fixed-b178bdd0`)
+
+AUDIT-72's whole point was: don't leave unchecked, bug-shaped TDD tasks in the workplan for findings the audit-log already marks `fixed`. This diff resolves AUDIT-72 — and then commits the identical defect for AUDIT-73/74/75. Tasks 16 (AUDIT-73), 17 (AUDIT-74), and 18 (AUDIT-75) are added with **every** checkbox unchecked, including "Step 1: write failing test", "Step 3: implement the fix", and "Audit-log Status flipped to `fixed-<sha>`". Yet all three findings already carry `Status: fixed-b178bdd0` in the audit-log. Compare the treatment of Tasks 9/10/13/14 in this same diff, whose "Audit-log Status flipped to `fixed-<sha>`" boxes ARE flipped to `[x]`. The asymmetry is internal to one commit range: four findings are fixed, four of their tasks get reconciled, three do not.
+
+A reader running `/dw-lifecycle:pickup` sees three in-flight fix tasks for work the audit-log calls done — the precise drift AUDIT-72 (and AUDIT-59 before it) called out. Fix: reconcile Tasks 16/17/18 the same way Tasks 9/10/13/14 were reconciled in this diff — flip their status boxes / mark complete with the `b178bdd0` SHA — or remove them as promote-findings scaffolds superseded by the already-landed fix.
+
+## 2026-06-03 — audit-barrage lift (20260603T204515331Z-scope-discovery)
+
+### AUDIT-20260603-77 — Task 10 Step 3 marked complete while its actual acceptance test was never run — substituted with "verified-by-extension" plus explicit deferral language
+
+Finding-ID: AUDIT-20260603-77 (claude-01 + claude-02 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-f966d6ee
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 10 Step 3 (hunk `@@ -1233,26 +1250,31 @@`) + `DEVELOPMENT-NOTES.md` Phase 24 Task 10 measurements block
+
+Task 10 Step 3 is checked `[x]` but its body admits the step's stated acceptance was not performed. The original Step 3 read: *"Confirm the structural chain (running via skill bodies, not hooks) still catches the regressions it caught when wired as a hook. Run a deliberate regression (e.g., introduce a clone group) and verify `/dw-lifecycle:implement` end-of-task gates surface it."* The rewritten Step 3 says: *"A deliberate clone-group regression test … was NOT run this session … captured here as 'verified-by-extension' via the AUDIT-72 round-trip but not formally executed,"* and the journal restates this as *"Deliberate clone-group test deferred to a later session"* and *"would be a useful follow-up dispatch."*
+
+This is the load-bearing claim of the entire Phase 24 reframe: the whole architectural bet is *"enforcement relocated from `.husky/` to skill bodies still catches the regressions the hooks caught."* The AUDIT-72 renderer-template round-trip exercises a *prose/template* regression, not the *structural clone-group gate* the step names — they are different firing paths, so "verified-by-extension" is not the same test. Marking the step `[x]` while the only test that proves the core thesis went unrun (and is explicitly deferred) is the precise "fixed claim outruns the actual work" pattern `ui-verification.md` and the "Just for now is bullshit" rule guard against. Fix: either run the deliberate clone-group regression against `/dw-lifecycle:implement`'s end-of-task gate and record the before/after, or un-check Step 3 and the dependent Phase 24 acceptance line ("Confirm the structural chain … still catches the regressions") and scope the test as an open workplan task rather than a deferred-and-checked one.
+
+### AUDIT-20260603-78 — Journal quantitative section counts do not reconcile — violates the project's AUDIT-04 re-derive-and-verify convention
+
+Finding-ID: AUDIT-20260603-78
+Status:     fixed-f966d6ee
+Severity:   medium
+Surface:    `DEVELOPMENT-NOTES.md` 2026-06-03 (cont. 3) "Quantitative" + "Phase 24 Task 10 measurements" blocks
+
+Several counts in the journal contradict their own enumerations, which the project's quantitative-reporting convention (CLAUDE.md, AUDIT-20260602-04) explicitly requires be re-derived and verified:
+
+- **Commits:** "Commits: 20 total" in Quantitative, but Task 10 Step 2 and the bookkeeping-ratio line say "10 substantive + 12 follow-up commits across 20 total" — 10 + 12 = 22, not 20. The 1.2:1 ratio is derived from these unreconciled numbers.
+- **Dispositioned findings:** "Audit findings dispositioned: 13" followed by an enumeration of 18 IDs (37/38/46/47/48/49/50/51/52/66/67/70/71/72/73/74/75/76), then a sub-tally "16 fully addressed … AUDIT-68/69 acknowledged … AUDIT-38/52 informational" (16+2+2 = 20, and 68/69 don't appear in the first list at all).
+- **Single-model findings:** Task 10 Step 4 says "5 single-model MED/LOW findings" but lists 8 IDs (38/51/52/66/67/68/69/71).
+
+The convention says: *"If the arithmetic isn't reconciled … skip the line entirely; false precision erodes trust more than absence."* As written, three separate headline numbers (20, 13, 5) are contradicted by their own parenthetical enumerations in the same paragraphs. Fix: re-derive each count from the actual source (`git log` for commits, the audit-log for dispositions), make the headline match the enumeration, or drop the headline number.
+
+## 2026-06-03 — audit-barrage lift (20260603T205127054Z-scope-discovery)
+
+### AUDIT-20260603-79 — Same fixed-finding-with-open-unchecked-task contradiction recurs for Tasks 19/20 — the exact shape AUDIT-72/76 named, regressed again in the commit that closes them
+
+Finding-ID: AUDIT-20260603-79 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-299e57f9
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -206,6 +206,40 @@`) vs. `audit-log.md` AUDIT-77/78 (`Status: fixed-f966d6ee`)
+
+This diff resolves AUDIT-76 (which named the "fixed finding + all-unchecked task" drift for Tasks 16/17/18) and then commits the identical defect for AUDIT-77/78. Tasks 19 and 20 are added with **every** checkbox unchecked — `[ ] Step 1: write the disposition prose`, `[ ] Step 2: apply the action`, `[ ] Step 3: commit`, and all three Acceptance Criteria boxes including `[ ] Audit-log Status flipped to fixed-<sha>`. Yet both AUDIT-77 and AUDIT-78 are written into the audit-log in this same diff carrying `Status: fixed-f966d6ee`. So the SSOT says "resolved" while the workplan presents two not-yet-started TDD/disposition tasks for that same resolved work.
+
+This is the third recurrence of the shape (AUDIT-59 → AUDIT-72 → AUDIT-76 → now), and it regressed inside the very commit range that claims to fix the prior instance — the test for "surface a new instance only if the shape regressed" is met. A reader running `/dw-lifecycle:pickup` sees two in-flight fix tasks for work the audit-log calls done. Fix: reconcile Tasks 19/20 the same way Tasks 9/10/13/14 were reconciled (flip the boxes / mark complete with `f966d6ee`), or remove them as promote-findings scaffolds superseded by the already-landed disposition.
+
+### AUDIT-20260603-80 — Doc-only dispositions for AUDIT-77/78 are recorded as `fixed-<sha>` while the Task 19/20 templates explicitly steer non-bug dispositions to `Acknowledges`/`acknowledged-<reason>`
+
+Finding-ID: AUDIT-20260603-80
+Status:     acknowledged-closes-is-correct-for-substantive-doc-fixes-not-only-acknowledgements-2026-06-03
+Severity:   low
+Surface:    `audit-log.md` AUDIT-77/78 `Status: fixed-f966d6ee` vs. `workplan.md` Task 19/20 Step 3 trailer guidance (hunk `@@ -206,6 +206,40 @@`)
+
+Tasks 19 and 20 are both tagged `(non-bug)` and their Step 3 prose is explicit: "commit with `Acknowledges AUDIT-…`" and "use `Closes` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges` … Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened." The dispositions here are doc-only (scrubbing journal numbers; downgrading a checkbox) — exactly the non-bug shape the template warns about. Yet the audit-log records both as `fixed-f966d6ee` (the `Closes`/`fixed-<sha>` form), not `acknowledged-<reason>`.
+
+This may be defensible (a doc that contained a defect was edited, so "fixed" is arguably literal), but it directly contradicts the task templates the same commit authored, and per AUDIT-20260602-01 it arms exactly the "false flip on re-open" hazard the template cites. At minimum the inconsistency between the recorded status and the task's own disposition guidance should be resolved so the two don't contradict. Fix: either record these as `acknowledged-<reason>` consistent with the non-bug template, or amend the Task 19/20 Step 3 guidance to state that corrective doc-edits legitimately use `fixed-<sha>` — don't ship both stances in one commit.
+
+## 2026-06-03 — audit-barrage lift (20260603T210059311Z-scope-discovery)
+
+### AUDIT-20260603-81 — Global newline-collapse regex rewrites operator content outside the managed block, contradicting the "preserved verbatim" contract
+
+Finding-ID: AUDIT-20260603-81 (claude-01 + claude-02 + claude-04 + codex-03 + codex-04; cross-model)
+Status:     fixed-2e962b59
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/uninstall-everything-hook-related.ts:117` (the `return` line of `removeManagedBlock`)
+
+`removeManagedBlock` ends with `return \`${trimmedBefore}${trimmedAfter}\`.replace(/\n{3,}/g, '\n\n');`. The `/\n{3,}/g` is **global** and unanchored — it collapses every run of 3+ newlines *anywhere* in the file, not just at the splice point where the block was removed. Both `MIGRATING.md` ("Operator-authored content outside the managed blocks is preserved verbatim") and this file's own docstring ("Everything else in the hook file is operator-authored and MUST be preserved") promise verbatim preservation. An adopter whose `.husky/pre-commit` legitimately contains a blank-line gap of 3+ newlines (a deliberate visual separator between operator command groups) will have that spacing silently rewritten by the migration, even when the gap is nowhere near the managed block.
+
+The local boundary cleanup (`trimmedBefore` / `trimmedAfter` stripping a single newline each) already handles the only newline artifact the removal itself creates. The global regex is over-broad belt-and-suspenders that violates the stated contract. The test "preserves operator-authored content outside the managed block" uses `toContain` assertions and therefore cannot catch this — it never checks byte-for-byte preservation of operator whitespace. Fix: drop the global `.replace` and instead collapse only at the join (e.g., only when `trimmedBefore.endsWith('\n')` *and* `trimmedAfter.startsWith('\n')`), and add a test asserting exact preservation of an operator-authored multi-blank-line gap far from the block.
+
+### AUDIT-20260603-82 — Unreconciled "1.2:1 / down from ~3:1" bookkeeping-ratio claim — scrubbed from the journal per AUDIT-78 — is restated as fact in the adopter-facing MIGRATING.md
+
+Finding-ID: AUDIT-20260603-82 (claude-03 + codex-01 + codex-02; cross-model)
+Status:     fixed-2e962b59
+Severity:   high
+Surface:    `MIGRATING.md:60` ("Issues defused" paragraph) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 20 (AUDIT-78 disposition) + Task 10 acceptance line
+
+The MIGRATING.md "Issues defused" section asserts: *"Live dogfood (Phase 24 Task 10) measured bookkeeping ratio down from #403's ~3:1 baseline; 0 `--no-verify` invocations needed across the Phase 24 implementation itself."* AUDIT-78 (resolved in this same branch as `fixed-f966d6ee`) found exactly this ratio family of numbers unreconciled, and Task 20's disposition says the unreconciled count lines were *removed* from the journal per the AUDIT-04 convention ("Skip the line entirely if the arithmetic isn't reconciled — false precision erodes trust more than absence"). So the disposition scrubbed the claim from the internal journal, yet the identical "down from ~3:1" framing now lives in the **adopter-facing** migration doc — a more durable and more public surface than the journal it was removed from.
+
+Compounding this: AUDIT-77 (`fixed-f966d6ee`) established that the core Phase 24 thesis test (clone-group regression against `/dw-lifecycle:implement`'s end-of-task gate) was *not actually run* — Task 10 Step 3 was downgraded to `[~]` partial-completion. The MIGRATING.md "Issues defused" prose presents the dogfood result as settled fact without that caveat. Meanwhile workplan Task 10 still carries `[x] Live dogfood verification documents the bookkeeping ratio reduction (1.2:1, down from ~3:1)` referencing a number the journal no longer contains. Fix: bring MIGRATING.md in line with the AUDIT-77/78 dispositions — either drop the unreconciled ratio claim and the "0 --no-verify" precision, or qualify it to match the honest `[~]` partial-verification state, and reconcile the Task 10 acceptance line so it doesn't cite a scrubbed number.
+
+## 2026-06-03 — audit-barrage lift (20260603T210505136Z-scope-discovery)
+
+### AUDIT-20260603-83 — Fixed-finding / all-unchecked-task contradiction regresses AGAIN for Tasks 19/20 — inside the range that resolves AUDIT-79 about this exact shape
+
+Finding-ID: AUDIT-20260603-83 (claude-01 + claude-02 + codex-01 + codex-03; cross-model)
+Status:     fixed-9f9f640c
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 19/20 (hunk `@@ -46,6 +46,43 @@`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` AUDIT-81/82 (`Status: fixed-2e962b59`)
+
+This diff adds **Task 19 (fix-finding-AUDIT-20260603-81)** and **Task 20 (fix-finding-AUDIT-20260603-82)** with every checkbox unchecked — Steps 0–5, all three Task-19 Acceptance boxes (including `[ ] Audit-log Status flipped to fixed-<sha>`), and all three Task-20 Acceptance boxes. Yet in the *same diff* the audit-log records both AUDIT-81 and AUDIT-82 as `Status: fixed-2e962b59`. So the SSOT says "resolved" while the workplan presents two not-yet-started fix/disposition tasks for that same resolved work.
+
+This is the fourth recurrence of the shape the audit-log keeps flagging (AUDIT-59 → AUDIT-72 → AUDIT-76 → AUDIT-79), and it regressed *inside the commit range whose stated job is resolving AUDIT-79* (`299e57f9` is the immediately-prior commit; AUDIT-79 named the identical Tasks-19/20-unchecked-vs-fixed contradiction). The "surface a new instance only if the shape regressed" test is met. A reader running `/dw-lifecycle:pickup` sees two in-flight fix tasks for work the audit-log calls done. Fix: reconcile Tasks 19/20 the same way Tasks 9/10/13/14 were (flip the boxes / mark complete with `2e962b59`), or remove them as promote-findings scaffolds superseded by the already-landed fix.
+
+### AUDIT-20260603-84 — AUDIT-82's MIGRATING.md rewrite leaks internal audit scaffolding into an adopter-facing doc and retains the unverified claims it was meant to remove
+
+Finding-ID: AUDIT-20260603-84 (claude-03 + codex-02; cross-model)
+Status:     fixed-9f9f640c
+Severity:   medium
+Surface:    `MIGRATING.md:60` ("Issues defused" paragraph)
+
+The rewrite swaps a clean (if unreconciled) sentence for a parenthetical that dumps internal process vocabulary into a **public migration guide**: `per the project's AUDIT-04 convention + AUDIT-20260603-78 + AUDIT-20260603-82, ratio claims need reconciled arithmetic … the v0.36.0 dogfood numbers … didn't reconcile cleanly across` `fixed-<sha>` `vs` `acknowledged-<reason>` `status forms`. An adopter following MIGRATING.md has no model for `AUDIT-20260603-78`, `AUDIT-04`, or the `fixed-<sha>`/`acknowledged-<reason>` audit-status taxonomy — these are internal audit-log artifacts, exactly the kind of scaffolding the documentation rule keeps out of adopter surfaces. The honest move AUDIT-82 offered was to *drop* the ratio claim, not to footnote it with the reason it can't be substantiated.
+
+Two substantive claims also survive that AUDIT-77/82 flagged: (1) the text still asserts the ratio "dropped from the level that motivated #403" — a directional claim resting on the same numbers AUDIT-78 found unreconciled and AUDIT-82 said were scrubbed; de-quantifying it doesn't make the direction verified. (2) It still states ``0`` `--no-verify` invocations "across the Phase 24 implementation itself" as settled, with no nod to AUDIT-77's finding that the core clone-group thesis test was never run (Task 10 Step 3 was downgraded to `[~]`). Fix: cut the directional ratio claim and the internal-jargon parenthetical entirely (leave only the verifiable `0 --no-verify` observation, or qualify it against the `[~]` partial state), rather than relocating the unreconciliation into a doc adopters read.
+
+### AUDIT-20260603-85 — Option D test-count not met — single added test is the bug-repro; no regression-lock pins the splice-point cleanup the fix touches
+
+Finding-ID: AUDIT-20260603-85
+Status:     fixed-9f9f640c
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/uninstall-everything-hook-related.test.ts:78-108` vs. `workplan.md` Task 19 Acceptance ("test block count for this finding is ≥2 per Option D discipline")
+
+Task 19's own acceptance requires two test blocks: Step 1 (bug-repro at the cited surface) **and** Step 1b (a regression-lock pinning the Step 0 working-code invariant — the behavior the fix would break if wrong). The diff adds exactly one `it(...)` block, "preserves operator-authored 3+ newline runs OUTSIDE the splice point". Despite the comment labeling it "regression-lock," this block *is* the bug-repro: it fails against the old global-collapse code and passes against the fix. There is no second test pinning what the fix's working-code invariant actually is — that removing the managed block still produces a clean single-blank-line join at the splice point.
+
+That gap matters because the fix *reduces* normalization: it deletes the only mechanism that previously guaranteed the splice point wouldn't leave 3+ blank lines. The new test asserts behavior *far from* the splice but verifies nothing *at* it — e.g., that a block flanked by blank lines on both sides collapses to one blank line, or that an unflanked block doesn't fuse `command_a` and `command_b` with no newline. With only `toContain` assertions on a far-from-splice run, the contract the fix changed is untested. Fix: add the second test block asserting the exact splice-point output (e.g., `removeManagedBlock` of `before\n\n<BLOCK>\n\nafter` yields `before\n\nafter`), satisfying both the ≥2-block acceptance and the genuine coverage hole.
+
+## 2026-06-03 — audit-barrage lift (20260603T211005240Z-scope-discovery)
+
+### AUDIT-20260603-86 — Duplicate `Task 20` heading — two distinct tasks now share the same number
+
+Finding-ID: AUDIT-20260603-86 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-phase-26-task-4-addresses-ledger-case-non-ledger-collision-tracked-separately-2026-06-03
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 20 (fix-finding-AUDIT-20260603-83)` (hunk `@@ -47,35 +47,50 @@`) vs. `### Task 20 (fix-finding-AUDIT-20260603-82)` (hunk `@@ -83,6 +98,40 @@`)
+
+After this diff the workplan contains **two headings literally numbered `### Task 20`**: one for AUDIT-83 (non-bug, all-unchecked) added in the first hunk, and one for AUDIT-82 (`**Complete in 2e962b59.**`, all-checked) appended in the second hunk. The final ordering is also scrambled: Task 20 (AUDIT-83) → Task 21 (AUDIT-84) → Task 22 (AUDIT-85) → Task 19 (AUDIT-81, complete) → Task 20 (AUDIT-82, complete).
+
+The root cause is an off-by-one in whatever assigned the new numbers. The pre-diff workplan already had Task 19 (AUDIT-81) and Task 20 (AUDIT-82); a correct auto-positioner (scan-of-workplan-max **+ 1**) should have numbered the three new findings 21/22/23. Instead they were numbered 20/21/22 — i.e. `next-id == max` rather than `max + 1` — colliding with the existing Task 20. This is precisely the off-by-one that Phase 26 Task 4's `computeAutoPosition` (`max(ledger.next-fix-task-id, scan-of-workplan-max + 1)`) is specced to prevent; the diff exhibits the bug live. Any tooling that keys a finding to a task number (`/dw-lifecycle:pickup`, `promote-findings` re-runs, the future ledger) now has an ambiguous `Task 20`. Fix: renumber the new tasks to 21/22/23 (or whatever `scan-of-workplan-max + 1` yields counting the completed tasks), and keep numbering monotonic.
+
+### AUDIT-20260603-87 — MIGRATING.md still leaks dev-branch framing ("Phase 24 implementation … on this branch") into an adopter-facing doc
+
+Finding-ID: AUDIT-20260603-87
+Status:     fixed-37666598
+Severity:   low
+Surface:    `MIGRATING.md:60` ("Issues defused" paragraph, hunk `@@ -57,7 +57,7 @@`)
+
+The rewrite correctly strips the `AUDIT-04`/`AUDIT-20260603-78`/`fixed-<sha>` taxonomy jargon AUDIT-84 flagged, but the replacement sentence — "*The Phase 24 implementation itself shipped with `0` `--no-verify` invocations on this branch*" — retains two internal-dev referents an adopter has no model for: "Phase 24" (a deskwork-internal workplan phase) and "this branch" (the deskwork feature branch). MIGRATING.md is read by adopters who have neither a Phase 24 nor "this branch"; the claim's verifiable content ("the gate removal meant no `--no-verify` bypasses were needed") survives without the dev-context anchors.
+
+This is the residual tail of the exact problem AUDIT-84 named — internal scaffolding in an adopter surface — just at lower amplitude than the parenthetical that was removed. Fix: reframe the observation in adopter terms (e.g. "removing the gate surfaces eliminated the `--no-verify` bypasses they had previously forced"), dropping "Phase 24" and "on this branch."
+
+---
+
+I checked the test-file change (a comment relabel only — bug-repro vs regression-lock; correct and matches the AUDIT-85 disposition), the audit-log additions (well-formed, statuses consistent), and the MIGRATING.md de-jargoning (the worst offender removed). The strong signals are the **duplicate `Task 20`** (off-by-one numbering, claude-01) and the **fifth recurrence of the fixed-vs-unchecked shape** (claude-02) — both are structural defects committed by the very diff that claims to resolve the prior instance.
+
+## 2026-06-03 — audit-barrage lift (20260603T222750928Z-scope-discovery)
+
+### AUDIT-20260603-88 — Duplicate `Task 22` heading — the disposition task created for AUDIT-86 reintroduces the exact duplicate-task-number bug it is meant to dispose
+
+Finding-ID: AUDIT-20260603-88
+Status:     acknowledged-orphaned-scaffolding-removed-AUDIT-86-already-acknowledged-2026-06-03
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — new `### Task 22 (fix-finding-AUDIT-20260603-86)` (hunk `@@ -39,6 +39,40 @@`)
+
+The diff adds `### Task 22 (fix-finding-AUDIT-20260603-86) (non-bug)` to the workplan. But AUDIT-86 — restated verbatim in this same diff's audit-log addition — documents that the workplan already contains `Task 22 (AUDIT-85)` (the prior off-by-one assigned the three findings 20/21/22 instead of 21/22/23). So after this diff the workplan now has **two headings numbered `### Task 22`**: the pre-existing AUDIT-85 task and the new AUDIT-86 disposition task. The very task whose job is to *disposition the duplicate-number finding* commits a fresh instance of the duplicate-number defect. This is now the sixth recurrence of the family the audit-log keeps flagging (AUDIT-59→72→76→79→83→86), and it regressed inside the commit that claims to acknowledge AUDIT-86.
+
+Compounding: the new Task 22/Task 23 blocks are inserted near the top of the workplan (between the archived-phase note at line ~39 and `### Task 3: Disposition + baseline commands`), so they are wildly out of numeric order rather than appended after the highest existing task. Any tooling that keys a finding to a task number (`/dw-lifecycle:pickup`, `promote-findings` re-runs, the ledger's `next-fix-task-id` contract) now has an ambiguous `Task 22`. Fix: renumber the two new tasks to the next monotonic free integers (counting the already-present Task 22 (AUDIT-85)), and place them in numeric order. The auto-positioner that produced these integer-keyed numbers is the non-hierarchical case Phase 26 Task 4 explicitly does *not* cover — see AUDIT-BARRAGE-claude-02.
+
+### AUDIT-20260603-89 — `archive-phases` never scans moved fix-task headings — `archived-fix-tasks` and `next-fix-task-id` are never computed, so the AUDIT-86 read-side fix has no write-side that maintains the field it depends on
+
+Finding-ID: AUDIT-20260603-89 (claude-02 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     fixed-55e15b84dce66df356798ffbdd76695f9a97286c
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:258-272` (`newLedger` construction in `archivePhases`)
+
+The entire AUDIT-86 protection chain is: `archive-phases` records the highest archived fix-task ID in the ledger's `next-fix-task-id` → the auto-positioner reads that field as a floor (Phase 26 Task 4). But `archivePhases` never computes either ledger field. When it builds the updated ledger it does `archivedFixTasks: previousLedger?.archivedFixTasks ?? []` and `nextFixTaskId: previousLedger?.nextFixTaskId ?? '1.1'` — it only *preserves* the prior values (or defaults to `1.1`). It never walks the moved `## Phase N:` section for `### Task N.M` headings, so archiving a phase that contains fix-tasks 5.1–5.123 records **none** of them in `archived-fix-tasks` and leaves `next-fix-task-id` untouched. Task 2 Step 5's own acceptance text says "recompute `next-fix-task-id` as max(union) + 1," yet the step is marked `[x]` and the implementation does not do this.
+
+This means the read-side floor the Task 4 fix relies on is fed by a field the write-side never populates. Combined with Task 4 Step 4 being explicitly deferred ("ledger's `next-fix-task-id` update after promote — DEFERRED"), there is **no code path** that ever advances `next-fix-task-id` from archived fix-tasks. The end-to-end AUDIT-86 guard is therefore inert for the realistic case: archive a phase full of fix-tasks, then promote a new finding into that phase — the auto-positioner reads a stale/default ledger and can still collide. The test suite masks this: `preserves an existing ledger when merging new ranges` (archive-phases.test.ts:225-262) only archives a *content-free* Phase 4 and asserts the prior `archived-fix-tasks: 5.1-5.10` / `next-fix-task-id: 5.11` are passed through unchanged — there is no test that archives a section containing `### Task` headings and asserts the ledger's fix-task fields update. Fix: scan each moved section for fix-task headings, merge them into `archivedFixTasks`, and set `next-fix-task-id` to `max(union)+1`; add a test that archives a fix-task-bearing phase and asserts both fields advance.
+
+### AUDIT-20260603-90 — Task 23 (AUDIT-87) carries the impossible TDD-bug template for a doc-only finding that is already `fixed-37666598`
+
+Finding-ID: AUDIT-20260603-90
+Status:     acknowledged-orphaned-scaffolding-removed-AUDIT-87-already-fixed-37666598-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — `### Task 23 (fix-finding-AUDIT-20260603-87)` (hunk `@@ -39,6 +39,40 @@`)
+
+Task 23 is rendered with the **bug** task template: "Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)" … "Step 2: confirm test fails against current code." But AUDIT-87's Surface is `MIGRATING.md:60` — a prose paragraph in an adopter doc. There is no vitest that can "anchor at" a Markdown line and "fail against current code"; the finding is a wording/jargon issue, not a behavior the code can be made to violate. This is exactly the non-bug-surface misclassification the journal says Phase 24's AUDIT-72 allowlist extension was supposed to close (`inferFindingShape` should recognize doc surfaces as non-bug). Task 22 (AUDIT-86) correctly got the `(non-bug)` template in the same hunk; Task 23 did not — so the classifier is inconsistent within a single promote run.
+
+Worse, the audit-log entry added in this very diff records AUDIT-87 as `Status: fixed-37666598`, and `MIGRATING.md:60` was rewritten by this diff to drop "Phase 24 … on this branch." So Task 23 presents already-completed, already-fixed work as a not-started task with an unsatisfiable acceptance criterion (`Failing test exists at (to be filled in by Step 1 implementer)` — a literal placeholder the project's own substantive-reason discipline rejects). Fix: either delete Task 23 as superseded scaffolding (the fix already landed in 37666598), or convert it to the non-bug disposition template and mark it complete with that SHA.
+
+### AUDIT-20260603-91 — Doctor rule crashes on malformed ledgers instead of reporting or skipping
+
+Finding-ID: AUDIT-20260603-91
+Status:     fixed-d2e74086724b5b418f0a78b09ec4ffdc38b38c40
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.ts:109-110`
+
+`workplan-archive-ledger-coherence` calls `parseLedgerFromWorkplan(workplanBody)` without a `try/catch`. The parser intentionally throws for malformed ledger content, so one malformed ledger aborts the entire doctor rule instead of yielding a finding or continuing to other features. That is especially brittle because the new auto-positioner explicitly treats malformed ledgers as a graceful fallback case.
+
+Doctor rules should surface actionable state, not crash the whole scan on a document annotation error. A reasonable fix is to catch parser errors, emit a warning finding naming the affected feature and parse error, then continue walking the remaining feature directories.
+
+## 2026-06-03 — audit-barrage lift (20260603T224841482Z-scope-discovery)
+
+### AUDIT-20260603-92 — `archivePhases` gains a new uncaught-throw path on malformed/cross-phase ledger ranges — the exact class AUDIT-91 just hardened against, but in the opposite direction
+
+Finding-ID: AUDIT-20260603-92
+Status:     fixed-208afa91bbba53854beb82b4a4cc02eb92050eb7
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` (private helper, ~line 250-280) called from `mergeFixTaskIds` (~line 290-300); reached from `archive-phases.ts:276-292`
+
+`mergeFixTaskIds` expands every range in its `existing` argument via `expandRange`:
+
+```ts
+for (const r of existing) {
+  for (const id of expandRange(r)) flat.push(id);
+}
+```
+
+`expandRange` `throw`s on three malformed-but-parseable inputs: cross-phase endpoints (`5.10-6.3` → "range endpoints span phase boundaries"), mismatched dotted length (`5.1-5` → "range endpoints differ in dotted length"), and non-numeric endpoints. The `existing` list is `previousLedger?.archivedFixTasks`, which comes straight from `parseLedgerFromWorkplan` — i.e. whatever a human (or a legacy pre-this-code ledger) wrote into `archived-fix-tasks`. The parser accepts `5.10-6.3` as a well-formed `IdRange`; nothing rejects it at parse time. So a hand-edited or legacy ledger with a single cross-phase range makes `archivePhases` throw mid-operation and abort.
+
+This is notable because the *sibling* finding in this very diff (AUDIT-91, `workplan-archive-ledger-coherence.ts:114-130`) wraps `parseLedgerFromWorkplan` in `try/catch` precisely so "a malformed ledger in one feature must NOT abort." The archive path takes the opposite posture: it introduces a *new* hard-crash path on the same malformed-ledger class. Worse, if the workplan/archive file writes happen before this ledger computation (not visible in the diff), a throw here leaves the workplan partially migrated — sections moved out but the ledger never updated. The tests never exercise this: every `mergeFixTaskIds`/`archivePhases` test starts `existing` with a same-phase range (`5.1-5.10`), so the throw paths are uncovered. Fix: have `expandRange` (or `mergeFixTaskIds`) tolerate cross-phase/odd ranges by splitting them rather than throwing, and add a test that archives with a pre-existing cross-phase `archived-fix-tasks` range.
+
+### AUDIT-20260603-93 — Task 25 (AUDIT-89) disposition state is internally inconsistent: audit-log `Status: open` + unchecked acceptance with a `<test-file-path>` placeholder, despite the fix being committed (55e15b84) and tests claimed green
+
+Finding-ID: AUDIT-20260603-93 (claude-02 + codex-02; cross-model)
+Status:     acknowledged-template-residue-cleaned-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260603-89 entry, `Status: open`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 25 acceptance block
+
+The diff adds the AUDIT-89 audit-log entry with `Status: open`, but the same workplan Task 25 marks Step 5 `[x] commit with Closes AUDIT-20260603-89 ... in subject` and Step 4 `[x] all tests green — archive-phases.test.ts 20/20, ledger.test.ts 30/30, full plugin suite 2659/2659`, and commit `55e15b84` ("Closes AUDIT-...-89") is already in the branch history. So the fix has landed while the canonical audit-log Status still reads `open` — the recurring audit-log/workplan drift this feature keeps flagging.
+
+Compounding it, two Task 25 acceptance criteria remain unchecked AND carry template residue:
+
+```
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+```
+
+The `<test-file-path>` placeholder was never filled in even though Step 1's acceptance lines above it were resolved to concrete paths (`archive-phases.test.ts:246-289`), and the "tests pass" box is unchecked while Step 4 prose asserts 20/20 + 2659/2659. Either the verification genuinely ran (then check the box and fill the path) or it didn't (then the `[x]` step claims overstate). Per the project's own substantive-reason discipline, a shipped `<test-file-path>` placeholder is the exact non-substantive residue the workplan template is supposed to reject. Fix: flip the audit-log Status to `fixed-55e15b84`, fill the acceptance path, and reconcile the checkboxes with the actual verification state.
+
+### AUDIT-20260603-94 — `scanFixTaskIds` indiscriminately captures every `### Task N` heading into `archived-fix-tasks` — the field's "fix-task" semantics are not enforced
+
+Finding-ID: AUDIT-20260603-94 (claude-03 + codex-01; cross-model)
+Status:     fixed-208afa91bbba53854beb82b4a4cc02eb92050eb7
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:130-145` (`scanFixTaskIds`, regex `/^### Task (\d+)(?::|\s|\(|$)/`)
+
+`scanFixTaskIds` matches *any* `### Task <int>` heading in a moved phase section and folds it into the ledger's `archived-fix-tasks`. The field name and AUDIT-89's own framing ("scan each moved section for **fix-task** headings") imply only fix-finding tasks (`### Task N (fix-finding-AUDIT-...)`) should be recorded, but the regex also captures plain implementation tasks like `### Task 1: Setup`. This is defensible *if* the convention is that impl-tasks and fix-tasks share one integer sequence per phase (the live workplan does interleave them — Task 2/3/6 impl, Task 19/20/21 fix), in which case capturing all of them is correct for collision-avoidance. But that contract is nowhere asserted: nothing in the scanner, the ledger schema, or a test pins "the integer namespace is shared, therefore over-capture is intended."
+
+The risk is silent: if any adopter phase ever numbers fix-tasks in a separate namespace from impl-tasks, `next-fix-task-id` will jump past impl-task numbers and the auto-positioner's floor will be wrong in a direction no test catches (every test uses headings that are unambiguously fix-tasks or generic `### Task N`). Fix: either tighten the regex to match the fix-task heading shape the auto-positioner actually emits (`### Task N (fix-finding-...)`), or add a one-line code comment + a test asserting that plain impl-task headings are intentionally captured because the per-phase integer namespace is shared.
+
+---
+
+I verified the AUDIT-91 doctor-rule `try/catch` + `continue` is correct and its two new tests genuinely exercise the per-feature isolation (malformed feature doesn't suppress the sibling's finding). I checked `incrementId`/`findMaxId`/`mergeFixTaskIds` arithmetic against the three new `archive-phases` scenarios and the "never-shrink" floor logic — the happy paths and the regression-lock (content-free passthrough) are sound. The strongest signal is **claude-01**: this diff adds a hard-crash path for malformed ledger ranges in the same commit family that hardened a different surface against exactly that, and the throw is untested.
+
+## 2026-06-04 — audit-barrage lift (20260604T004947330Z-scope-discovery)
+
+### AUDIT-20260604-01 — Rename invalidated three operator-curated `keep-with-reason` clone dispositions — silently reset to `pending`/`null`
+
+Finding-ID: AUDIT-20260604-01 (claude-01 + codex-03; cross-model)
+Status:     acknowledged-3-keep-with-reasons-restored-409-tracks-structural-fix-2026-06-04
+Severity:   high
+Surface:    `.dw-lifecycle/scope-discovery/clones.yaml` — groups `9e85fb0f675e`→`a381419e0f31`, `d47a3cfe0d81`→`0654d2d673cf`, `afeee722255a`→`fa93705e149f`
+
+The Task 4 file rename (`editor-symmetry-*.ts`/`check-editor-symmetry.ts` → `module-*`) changed the member paths of three clone groups. Because the clone id is content/shape-derived, each got a NEW id, and `refresh-clones-baseline`'s carry-forward — which keys on the *old* id — failed to match. The result, visible directly in this diff: three groups that were `disposition: keep-with-reason` with substantive operator rationale ("intentional shared scaffolding across sibling scope-discovery scanners…") were silently rewritten to `disposition: pending` / `reason: null`. The clone *shape* is unchanged — only the filename moved — yet the curation is gone.
+
+This is exactly the non-pending→pending transition `check-disposition-survivor` exists to catch, but it slipped through because the rename minted new ids the survivor diff can't pair with the old ones. The consequence is concrete churn: the next `check-clones` / Step-6a structural-chain run will surface these three as NEW undispositioned groups, forcing the operator to re-litigate curation they already settled — the precise failure mode the cont. 5 journal entry complains about ("pre-existing NEW clones … the structural chain refused"). A correct fix is for the carry-forward to match on member *shape* (line-span + normalized content) rather than exact id, so a pure file rename preserves the disposition; failing that, the rename pass must re-apply the three `keep-with-reason` reasons in the same commit. As shipped, three curated reasons are lost and no test or gate flagged it.
+
+---
+
+### AUDIT-20260604-02 — `ledger.ts` comment claims the doctor rule surfaces tolerated-malformed ranges — it provably does not
+
+Finding-ID: AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     fixed-b6e1f660
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` docblock (the AUDIT-92 fallback comment)
+
+The new `expandRange` docblock justifies swallowing malformed ranges with: *"The doctor rule `workplan-archive-ledger-coherence` is the operator-facing surface for notifying about the malformed input."* I read that rule (`doctor-rules/workplan-archive-ledger-coherence.ts`). The claim is false on two counts. (1) The rule's own header explicitly lists fix-task coherence as a **non-scenario**: lines 16–21, *"Ledger fix-task ID coherence — a separate rule (future work) could validate `archived-fix-tasks`…"* It never inspects `archivedFixTasks` at all — only `archivedPhases` (line 144). (2) The only malformed-input path the rule reports is when `parseLedgerFromWorkplan` *throws* (lines 122–131). But the whole premise of AUDIT-92 is that the parser *accepts* a cross-phase range like `5.10-6.3` as a well-formed `IdRange` — so it does not throw, and the doctor rule reaches it via the happy path and ignores it.
+
+The net effect: the AUDIT-92 fix tolerates malformed `archived-fix-tasks` ranges silently, and the comment points the operator at a surface that will never notify them. This is the IOU-comment / unsupported-claim pattern the project rules name as a bug-factory — a comment asserting a safety net that isn't wired up. Fix: either delete the false sentence, or actually extend `workplan-archive-ledger-coherence` to validate `archivedFixTasks` for cross-phase / mismatched-dotted / non-numeric shapes and cite *that* code in the comment.
+
+---
+
+### AUDIT-20260604-03 — README Phase 25 row says "Tasks 4–11 remain" while the same audited range marks Task 4 complete — status drift
+
+Finding-ID: AUDIT-20260604-03
+Status:     acknowledged-readme-phase-25-row-advanced-to-tasks-3-4-shipped-2026-06-04
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 25 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 4 block)
+
+The README's plugin-status table is updated in this diff to read *"Task 3 shipped (2026-06-03 cont. 5); Tasks 4–11 remain. … Tasks 4–11 are file/identifier renames + CLI verb + skill folder + doctor rule + sweeps."* But the same audited commit range includes `refactor(scope-discovery): Phase 25 Task 4 — source identifier rename`, and the workplan Task 4 block is marked **Complete (2026-06-03 cont. 6)** with every step `[x]` and tsc/test green. So at the tip of this range the README tells an operator Task 4 is outstanding while the workplan and code say it shipped.
+
+Compounding the timeline confusion: the DEVELOPMENT-NOTES entry added here is "cont. 5" and lists Task 4 as the *next-session handoff* ("Resume: Phase 25 Task 4"), yet the workplan records Task 4 done in "cont. 6." Three artifacts in one diff disagree about whether Task 4 is done. Per the project's documentation rule (status tables drift when not bumped with the work), the README row should advance to reflect Task 4's completion in the same commit that lands the rename. Fix: update the Phase 25 README cell to "Tasks 3–4 shipped; Tasks 5–11 remain" so the adopter-facing status matches the workplan.
+
+## 2026-06-04 — audit-barrage lift (20260604T010447799Z-scope-discovery)
+
+### AUDIT-20260604-04 — Re-implements `expandRange`'s fallback-trigger logic in a parallel function with no shared source and no correspondence test — same comment-asserts-an-unenforced-relationship shape the fix was meant to retire
+
+Finding-ID: AUDIT-20260604-04 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)
+Status:     fixed-aa208ee8
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `classifyFixTaskRange` (new, lines ~354-396) vs. `expandRange` (lines ~280+)
+
+The fix adds `classifyFixTaskRange` whose docstring states its three malformed shapes "match `expandRange`'s fallback triggers **exactly**." But the two functions encode that classification *independently*: `expandRange` decides whether to take its singleton-pair fallback by its own internal checks, and `classifyFixTaskRange` re-derives prefix-equality / dotted-length / numeric-endpoint checks from scratch. Nothing makes them share a predicate, and no test pins the correspondence. The contract is exactly the kind of relationship AUDIT-20260604-02 itself was filed about: a comment asserting a guarantee ("matches exactly") that no code or test enforces.
+
+The drift is concrete and silent. If a future change alters `expandRange`'s fallback condition (e.g. it starts numerically expanding `5.1-5.10` differently, or tolerates a new shape), `classifyFixTaskRange` won't follow — and the doctor rule will then either warn about ranges `expandRange` actually expanded cleanly (false positives) or stay quiet about ranges `expandRange` fell back on (the original AUDIT-92/02 hole reopens). The new tests (`workplan-archive-ledger-coherence.test.ts:215-279`) only assert the *doctor rule's* selectivity against hand-written ledgers; the existing `ledger.test.ts` AUDIT-92 block only pins `expandRange`'s passthrough. No test asserts the join — `classifyFixTaskRange(r) === 'well-formed'` iff `expandRange(r)` fully enumerates. Fix: extract one shared `isWellFormedFixTaskRange(range)` predicate that both `expandRange`'s fallback branch and `classifyFixTaskRange` call, and add a property-style test iterating a fixture of ranges asserting the two agree.
+
+---
+
+### AUDIT-20260604-05 — README Phase 26 row test count (2664) is now stale vs. workplan Task 32 (2666) and omits the AUDIT-20260604-02 fix — reproducing the exact status-drift shape this diff corrects for Phase 25
+
+Finding-ID: AUDIT-20260604-05
+Status:     acknowledged-readme-phase-26-row-drops-absolute-count-2026-06-04
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 26 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 32 Step 4)
+
+This same diff advances the Phase 25 README cell to fix AUDIT-20260604-03's drift, but leaves the Phase 26 cell reading "+23 net new test blocks (2641 → 2664)" and enumerating only the four cont. 5 fixes (AUDIT-89/91/92/94). The workplan Task 32 added this commit family's AUDIT-20260604-02 fix with "+2 new tests ... 2666/2666 (was 2664)". So at the tip of this range the Phase 26 row's count is off by 2 and silently omits a fifth shipped audit fix to the same phase's surface (the doctor rule). The diff under audit physically adds exactly +2 test blocks to `workplan-archive-ledger-coherence.test.ts`, so the workplan's 2664→2666 is the corroborated number and the README's 2664 is the stale one.
+
+It's low severity — the figure is internal-progress metadata, not adopter-facing API — but it's the identical "status table not bumped with the work" pattern the project's documentation rule names and that AUDIT-03 just penalized one row up. Fix: bump the Phase 26 cell to note the AUDIT-20260604-02 doctor-rule extension and the 2664 → 2666 count, or drop the absolute count in favor of "see workplan" per the no-rot-prone-specifics rule so the row stops needing per-fix maintenance.
+
+## 2026-06-04 — audit-barrage lift (20260604T011631866Z-scope-discovery)
+
+### AUDIT-20260604-06 — `isWellFormedFixTaskRange` returns `true` for numerically-reversed closed ranges, but `expandRange` returns `[]` for them — the docblock's "iff enumerates fully" join is false, and the doctor rule's well-formed branch silently passes them
+
+Finding-ID: AUDIT-20260604-06 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `isWellFormedFixTaskRange` (new, ~289-310) / `expandRange` (~312-326); test fixture `ledger.test.ts:300-343`
+
+The new predicate's docblock asserts it returns `true` *"iff `expandRange(range)` will enumerate the range fully."* That join does not hold for a reversed closed range such as `{ start: '5.5', end: '5.3' }`. `isWellFormedFixTaskRange` returns `true` (same dotted-length, identical prefix `5`, both endpoints numeric), but `expandRange`'s loop `for (i = startLast; i <= endLast; ...)` with `startLast=5, endLast=3` never executes and returns `[]` — zero elements, not a full enumeration. So the predicate claims well-formed while `expandRange` produces nothing.
+
+The fixture deliberately sidesteps this: the comment at `ledger.test.ts:308-310` says closed-range fixtures *"must have end > start so the enumeration has length >= 2"*, and the correspondence test then asserts `expect(expanded.length).toBeGreaterThanOrEqual(2)` for every well-formed range. A reversed range would fail that very assertion, so the authors constrained the fixture around the gap instead of making the predicate handle it. This is the same unenforced-relationship shape AUDIT-04 was filed to retire — the "iff" is asserted in a docblock the code doesn't honor.
+
+The downstream consequence is concrete: `classifyFixTaskRange` routes its well-formed branch through this predicate, so a hand-edited ledger range `5.5-5.3` classifies as `well-formed` → the `workplan-archive-ledger-coherence` doctor rule emits no warning, and any consumer that derives `next-fix-task-id` from `expandRange` sees an empty expansion (max-id floor too low) — exactly the AUDIT-86 collision the ledger awareness exists to prevent. A correct fix either rejects `endLast < startLast` in the predicate (so a reversed range classifies as a malformed shape and the operator is warned) or adds a `reversed` shape to `FixTaskRangeShape`; and the fixture should include a reversed range so the join is actually pinned.
+
+## 2026-06-04 — audit-barrage lift (20260604T025059420Z-scope-discovery)
+
+### AUDIT-20260604-07 — Task 5's command markdown files route both slash-commands to a `check-module-symmetry` skill that does not exist at this commit — breaking the renamed command AND the formerly-working alias
+
+Finding-ID: AUDIT-20260604-07 (claude-01 + codex-01; cross-model)
+Status:     fixed-d0aa9a5fab36f765ec1be120c385218499082d27
+Severity:   high
+Surface:    `plugins/dw-lifecycle/commands/check-module-symmetry.md` (new) + `plugins/dw-lifecycle/commands/check-editor-symmetry.md` (rewritten) vs. committed skill `plugins/dw-lifecycle/skills/check-editor-symmetry/SKILL.md`
+
+The diff ships two command definitions that both say *"Invoke the `check-module-symmetry` skill from the `dw-lifecycle` plugin via the Skill tool."* I verified the committed HEAD tree (`git ls-tree HEAD:plugins/dw-lifecycle/skills/`): the only skill present is **`check-editor-symmetry`**, whose `SKILL.md` frontmatter is `name: check-editor-symmetry`. There is no skill named or directoried `check-module-symmetry` in the commit. Claude Code resolves skills by their frontmatter `name:` (the session-start skills list confirms only `dw-lifecycle:check-editor-symmetry` is registered), so a body that says *"invoke the `check-module-symmetry` skill"* fails to resolve.
+
+The blast radius is two commands, not one. The new `/dw-lifecycle:check-module-symmetry` command is dead on arrival. Worse, the diff also **rewrote** the previously-working `commands/check-editor-symmetry.md` — which used to say *"Invoke the `check-editor-symmetry` skill"* (resolvable) — to point at `check-module-symmetry` (unresolvable). So the deprecated-alias slash command, the one thing the alias exists to keep working for adopter muscle memory, is now broken by the same diff that justifies itself as preserving back-compat. The CLI-verb path (`dw-lifecycle check-module-symmetry`) is fine — that's the `cli.ts` dispatcher, which the new test covers — but the slash-command path is regressed and no test exercises it. This is the cross-task ordering failure the workplan set up by parking the skill rename in Task 6: the command-file edits belong in Task 6 alongside the skill rename, not in Task 5. Note: the working tree has a *staged-but-uncommitted* directory rename (`R check-editor-symmetry/SKILL.md -> check-module-symmetry/SKILL.md`), but it is (a) not in this commit and (b) insufficient even when committed — it moves the directory without changing the `name: check-editor-symmetry` frontmatter, so `check-module-symmetry` still won't resolve. The correct fix updates the SKILL.md `name:` field (and `# /dw-lifecycle:check-editor-symmetry` heading + body self-references) to `check-module-symmetry`, lands it in the same commit as the command-file edits, and adds a registration assertion so a command pointing at a nonexistent skill is caught.
+
+---
+
+### AUDIT-20260604-08 — `scope-inventory.ts` comment was advanced to the new verb name while the surviving `--editor-symmetry-out` flag, `editorSymmetryOut` option, and `writeEditorSymmetryArtifact` function keep the retired "editor" term — the exact comment-vs-code drift this phase exists to retire
+
+Finding-ID: AUDIT-20260604-08
+Status:     fixed-0433442f8105c24640d23e650090c4b073a851cc
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:228,391,406,407` (comment touched by diff at the `check-module-symmetry` lines; identifiers/flag unchanged)
+
+This diff updated two comments in `scope-inventory.ts` to read *"matches the standalone `check-module-symmetry` semantics/contract"* (the `writeEditorSymmetryArtifact` docblock at line ~226 and the inline comment near line ~391). But `git grep` confirms the surrounding code still carries the retired terminology: the function is still `writeEditorSymmetryArtifact` (line 228), the option field is still `opts.editorSymmetryOut` (line 406), and — most importantly — there is a **user-facing CLI flag `--editor-symmetry-out`** referenced at line 391 that the diff left untouched. So a comment now says "check-module-symmetry" two lines above a flag the operator still types as `--editor-symmetry-out`.
+
+This is precisely the "status table / comment not bumped with the code" pattern AUDIT-20260604-02/03/05 penalized one surface over: a comment asserting a name the adjacent code doesn't honor. Phase 25's stated goal (issue #405) is *"adopt project-neutral `module` everywhere"* — a surviving `--editor-symmetry-out` flag directly contradicts that goal and will itself need its own deprecated-alias treatment (the same alias dance Task 5 just did for the subcommand), which is now harder to spot because the comment already reads as if the rename is done. A reasonable fix: either leave the comments referencing the old names until the flag/identifier rename lands as one atomic change, or rename `--editor-symmetry-out`→`--module-symmetry-out` (with a back-compat alias matching the subcommand precedent), `editorSymmetryOut`→`moduleSymmetryOut`, and `writeEditorSymmetryArtifact`→`writeModuleSymmetryArtifact` in the same commit so comment and code agree. Selectively updating only the comment is the worst of both — it hides the remaining work.
+
+## 2026-06-04 — audit-barrage lift (20260604T030450931Z-scope-discovery)
+
+### AUDIT-20260604-09 — Deprecation stderr warning is the load-bearing half of the alias contract but has zero test coverage
+
+Finding-ID: AUDIT-20260604-09
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/scope-inventory-cli.ts:129-139` (warning emit) vs. `plugins/dw-lifecycle/src/__tests__/scope-discovery/scope-inventory-cli.module-symmetry-out.test.ts` (no assertion)
+
+The AUDIT-08 fix's whole point is that `--editor-symmetry-out` survives as a *deprecation-warning* alias — the commit message and the inline comment at `scope-inventory-cli.ts:120-125` both promise "emit a one-line deprecation note on stderr naming the canonical flag + the removal target." The actual emit is `scope-inventory-cli.ts:129-139`:
+
+```
+if (moduleSymmetryOutRaw === undefined && editorSymmetryOutRaw !== undefined) {
+  process.stderr.write('scope-inventory: `--editor-symmetry-out` is deprecated; ...Removal target: v0.37.0.\n');
+}
+```
+
+The new test file pins three things — canonical parses, alias parses, alias-resolves-to-same-value — but `grep` for `deprecat`/`stderr` in the test returns only a comment and an `it()` title; **no assertion captures the stderr write**. So the suite stays green if the warning regresses to silence, fires on the canonical flag by mistake, or names the wrong removal version. This is exactly the `feedback_spec_test_blind_spots` failure mode the project flags: passing the parse-contract tests ≠ the deprecation contract is verified. A correct fix spies on `process.stderr.write` and asserts (a) it fires once with the canonical-flag name + `v0.37.0` when only the alias is passed, AND (b) it does NOT fire when `--module-symmetry-out` is passed (the suppression branch — the part most likely to silently break). Without (b) the test can't distinguish "warns correctly" from "warns always."
+
+---
+
+### AUDIT-20260604-10 — `parseCli` is now impure — it writes operator-facing stderr from inside a parse function, and the new regression-lock test triggers that I/O without asserting it
+
+Finding-ID: AUDIT-20260604-10 (claude-02 + claude-03 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/scope-inventory-cli.ts:129-139`
+
+The deprecation warning was placed *inside* `parseCli`, which until this diff was a pure argv→`CliOptions` transform. Now any caller that parses an argv containing `--editor-symmetry-out` emits a user-facing stderr line as a side effect of *parsing*. Two concrete consequences: (1) the third test block ("regression-lock: no `--editor-symmetry-out` usage is silently dropped") calls `parseCli([... '--editor-symmetry-out' ...])` purely to compare resolved values, but as a side effect dumps the deprecation banner into the test runner's stderr — noise that reads as a real warning during CI. (2) Any future internal reuse of `parseCli` (programmatic invocation, a wrapper verb, a dry-run) inherits the stderr emission whether or not presentation is wanted. Presentation belongs at the dispatch boundary, not in the parser. A cleaner shape returns a `deprecatedAliasUsed: boolean` (or a `warnings: string[]`) on `CliOptions` and lets `scopeInventoryMain` decide whether to write to stderr — which also makes Finding-01's assertion trivial (check the returned flag instead of spying on global I/O). Matches the project's own "no fallbacks/side-effects buried where they're hard to see" posture.
+
+---
+
+### AUDIT-20260604-11 — Partial rename residue in `scope-inventory.ts`: the `haveEditorSymmetryArtifact` local now reads a constant named `moduleSymmetryArtifact`, reproducing the name-vs-referent drift AUDIT-08 was filed to retire
+
+Finding-ID: AUDIT-20260604-11 (claude-04 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:135-140`
+
+The Task 35 commit message asserts the fix "updates every consumer (function name, activations field, gate-files constant, comment)." It renamed the constant (`editorSymmetryArtifact`→`moduleSymmetryArtifact`, line 63) and the activations field (`editorSymmetry`→`moduleSymmetry`), but left the local that bridges them on the old name:
+
+```
+const haveEditorSymmetryArtifact = existsSync(
+  resolve(repoRoot, PHASE4_GATE_FILES.moduleSymmetryArtifact),   // const renamed
+);
+return { regimeHoldout: ... || haveEditorSymmetryArtifact, moduleSymmetry: ... };  // field renamed, var not
+```
+
+So a reader at line 135-140 sees `haveEditorSymmetryArtifact` feeding `moduleSymmetry` — the precise comment/identifier-vs-referent mismatch this phase exists to eliminate, just one scope deeper than the flag AUDIT-08 caught. It's low severity (purely internal, no behavior change, and the on-disk `editor-symmetry.md` filename references at lines 63/124/196/405/415/420 are intentional wire-format per the SKILL.md note). But "updates every consumer" overstates what landed; either rename the local to `haveModuleSymmetryArtifact` (and the doc-comment at line 222 referring to the "editor-symmetry source bucket," which the matching SKILL.md change already advanced to "module-symmetry") or scope the remaining wire-format-vs-identifier split explicitly so the next reviewer doesn't re-file it.
+
+## 2026-06-04 — audit-barrage lift (20260604T031855664Z-scope-discovery)
+
+### AUDIT-20260604-12 — Strict schema rejects the legacy key *before* the new doctor rule's migration hint is reachable — adopters with legacy manifests hit an opaque ajv hard-fail, and the rule that's positioned as "the migration path" is detection-only with no `--fix`
+
+Finding-ID: AUDIT-20260604-12 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/legacy-editor-symmetry-field-rename.ts:155-170` (message) vs. `plugins/dw-lifecycle/src/scope-discovery/schema/scope-manifest.yaml.schema.json:74-75`
+
+The new doctor rule's message asserts *"The strict scope-manifest schema validator now rejects the legacy name; existing files must migrate."* I verified this is true — and that it's the problem. `scope-manifest.yaml.schema.json:74-75` sets `regime_holdouts` to `"additionalProperties": false` with `"required": [..., "module_symmetry", ...]`. So an adopter manifest still carrying `editor_symmetry:` (and lacking `module_symmetry:`) fails validation on **two** counts simultaneously: the legacy key is an additional property, and the required `module_symmetry` key is absent. Any verb that *validates* the manifest (`scope-inventory`, `scope-export`, the synthesis path) throws a raw ajv error before the operator ever sees this rule's friendly guidance.
+
+The workplan (Task 8 "Scope adjustment") frames the detection-only doctor rule as the migration path that replaces the original `--fix` rewrite: *"the absent-ledger fallback... IS the migration."* But a detection-only rule the operator must remember to run is not reachable in the normal upgrade flow — the strict validator fires first on the next ordinary scope-inventory invocation. The net adopter experience on upgrade-with-legacy-manifest is: opaque schema crash, no `--fix`, manual edit required. The rule's message text is itself correct and sufficient (rename the key, value unchanged, satisfies both constraints in one edit) — the gap is purely reachability/ordering. A reasonable fix: either (a) make the manifest *loader* catch the specific missing-`module_symmetry`/extra-`editor_symmetry` validation shape and re-throw with the doctor rule's migration sentence, or (b) wire `--fix` for this one rule so `dw-lifecycle doctor --fix` does the rename. Shipping a detection-only rule while strict validation hard-fails ahead of it leaves no graceful upgrade.
+
+## 2026-06-04 — audit-barrage lift (20260604T032527668Z-scope-discovery)
+
+### AUDIT-20260604-13 — README Phase 25 cell says Tasks 9–11 "partial / pending" while the workplan in the SAME commit marks all three "Complete"
+
+Finding-ID: AUDIT-20260604-13 (claude-01 + claude-03 + codex-01 + codex-03; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md:43` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:1826,1838,1851`
+
+The two status surfaces this single commit edits directly contradict each other. The README's rewritten Phase 25 cell reads **"Tasks 3–8 shipped; Tasks 9–11 partial / pending"** and spells it out: *"Task 9 (PRD + workplan + feature-doc sweep) and Task 11 (release notes) remain; Task 10 (audiocontrol pilot coordination) is operator-driven."* But the workplan diff in the same commit marks **Task 9 → "Complete (2026-06-04)"**, **Task 10 → "Complete (2026-06-04)"** with all steps `[x]` and acceptance `✅`, and **Task 11 → "Complete (2026-06-04)"** with all steps `[x]`.
+
+This is exactly the "status table not bumped with the code" pattern AUDIT-20260604-02/03/05 penalized — except here it's worse than stale, it's self-contradicting inside one diff. A future reader (or the operator deciding whether Phase 25 can ship) cannot tell from these two adopter-facing surfaces whether Tasks 9 and 11 are done or open. The commit subject ("Phase 25 Tasks 9 + 10 + 11") asserts they were done; the workplan agrees; the README says they "remain." Fix: advance the README cell to match the workplan ("Tasks 3–11 shipped"), or — if the README's "partial / pending" framing is the honest one — back the `[x]`/`✅` markers out of the workplan. The two must agree in the commit that touches both.
+
+### AUDIT-20260604-14 — MIGRATING.md sells a graceful `doctor`-driven migration while the same commit files AUDIT-12 documenting that ordinary verbs ajv-crash *before* the rule is reachable
+
+Finding-ID: AUDIT-20260604-14
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `MIGRATING.md:24-37` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4313-4321` (AUDIT-20260604-12, added in this same commit)
+
+The new MIGRATING.md § "Migration: existing `scope-manifest.yaml` files" presents a calm, leisurely upgrade flow: *"Phase 25 ships a new doctor rule … that detects the legacy field on `dw-lifecycle doctor` runs … `dw-lifecycle doctor` → edit YAML → re-run `dw-lifecycle doctor` to confirm zero findings."* The hook-wiring section reinforces this: *"Update at your leisure … the alias's stderr warning will prompt the rename on every invocation."* But **this same commit adds AUDIT-20260604-12** (cross-model, 7 models: claude-01..05 + codex-01..02) which establishes that the strict schema (`additionalProperties:false` + `required:[module_symmetry]`) makes any verb that *validates* the manifest — `scope-inventory`, `scope-export`, the synthesis path — throw a raw ajv error **before the operator ever reaches the friendly doctor guidance.** I confirmed the rule is detection-only with no `--fix` (`legacy-editor-symmetry-field-rename.ts:24-34`).
+
+So the adopter who follows MIGRATING.md verbatim — upgrade, plan to run doctor "at their leisure" — hits an opaque schema crash on their next ordinary `scope-inventory` run, not the documented graceful path. The author *knew* this when writing the doc (they filed AUDIT-12 in the same commit) yet MIGRATING.md neither warns that legacy manifests hard-fail on first non-doctor invocation nor tells the adopter to run the rename *immediately* rather than at leisure. This is the documentation-vs-known-defect drift the project's documentation rule exists to prevent. Fix: either add a "migrate before your next scope-inventory run — the validator rejects legacy keys hard" warning to MIGRATING.md § Migration, or hold the "migrate at your leisure" framing until AUDIT-12's reachability gap (loader catches the shape and re-throws the migration sentence, or `--fix` wiring) is closed.
+
+### AUDIT-20260604-15 — MIGRATING.md (adopter-facing) hardcodes an internal source path + line range that will rot on the next refactor
+
+Finding-ID: AUDIT-20260604-15
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `MIGRATING.md:11`
+
+The new "What stays unchanged" bullet writes: *"PRESERVED verbatim (wire-format; travels on its own deprecation arc per the comment in `plugins/dw-lifecycle/src/scope-discovery/check-module-symmetry.ts:14-18`)."* I verified the reference is *currently* accurate — the comment is at lines 14-18 of that file. But this is precisely the rot vector `.claude/rules/documentation.md` § "No rot-prone specifics in adopter-facing docs" names: an internal source-file path with a pinned line range, embedded in a release-notes doc adopters read. The next time anyone edits the top-of-file docblock in `check-module-symmetry.ts` (entirely plausible — it still carries Phase 25 rename commentary), the `:14-18` anchor silently goes stale, and an adopter who clicks through lands on the wrong lines or a moved comment.
+
+Adopters don't need an internal implementation pointer at all to understand "the `editor-symmetry.md` filename is preserved." Fix: drop the file-path-and-line-range reference and state the wire-format rationale inline (one sentence), or point at a stable anchor (the MIGRATING.md § "What stays unchanged" list itself) rather than a line range in a churning source file.
+
+### AUDIT-20260604-16 — The in-repo "`scope-manifest.yaml` migration" the README/workplan credit to Task 8 actually migrated `scope-inventory-graphical-entries.yaml`, which the new doctor rule does not walk — so the doctor rule's detection path was never exercised against a real in-repo target
+
+Finding-ID: AUDIT-20260604-16
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/scope-inventory-graphical-entries.yaml:432,439` + `README.md:43` ("in-repo `scope-manifest.yaml` migration (graphical-entries)") + `workplan.md:1834`
+
+The README Phase 25 cell describes Task 8 as *"new `legacy-editor-symmetry-field-rename` doctor rule + in-repo `scope-manifest.yaml` migration (graphical-entries)"*, and workplan Task 9 Step 2 records the migrated file as `scope-inventory-graphical-entries.yaml` (the two `editor_symmetry:` → `module_symmetry:` edits at lines 432 and 439 of the diff). But the doctor rule itself (`legacy-editor-symmetry-field-rename.ts:9-11`) walks **only files literally named `scope-manifest.yaml`** (`docs/<v>/<status>/<slug>/scope-manifest.yaml` and `.dw-lifecycle/scope-discovery/scope-manifest.yaml`). `scope-inventory-graphical-entries.yaml` is a paper-test inventory fixture, not named `scope-manifest.yaml`, so the rule would never have flagged it.
+
+Two consequences worth surfacing: (1) calling this a "`scope-manifest.yaml` migration" is inaccurate — the file migrated is not a `scope-manifest.yaml` and is not a target of the rule that supposedly drives the migration; the naming overstates coupling between the rule and the edit. (2) The in-repo migration therefore did *not* exercise the doctor rule against any real detection target — the rule shipped with unit tests but its claimed in-repo dogfood landed on a file outside its glob. If the intent was to prove the doctor-rule → manual-edit → re-run-doctor loop on this repo's own manifests, that proof didn't happen. Fix: either correct the README/workplan wording to "migrated a paper-test inventory fixture (not a `scope-manifest.yaml`; outside the doctor rule's walk set)", or run the rename against an actual `scope-manifest.yaml` the rule walks so the detection path is genuinely dogfooded.
+
+### AUDIT-20260604-17 — MIGRATING says the YAML field rename is additive even though the same section says the legacy YAML field is rejected
+
+Finding-ID: AUDIT-20260604-17
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `MIGRATING.md:10,42`
+
+`MIGRATING.md:10` correctly says the strict schema rejects `regime_holdouts.editor_symmetry` and there is “no alias on the YAML side.” But `MIGRATING.md:42` then says “All `module-symmetry`-canonical surfaces named above are additive (CLI + slash-command + flag + field name); the legacy names continue to function via deprecation aliases.” Including “field name” in that sentence is false for the schema surface.
+
+This is adopter-facing release guidance, so the contradiction can cause a failed upgrade expectation: CLI and flag aliases survive, but YAML does not. The fix is to split the statement: CLI/slash-command/flag are additive aliases for one release cycle; the YAML field is a breaking rename requiring manual migration.
+
+## 2026-06-04 — audit-barrage lift (20260604T033206580Z-scope-discovery)
+
+### AUDIT-20260604-18 — Path resolution for `--all` is hardcoded to `001-IN-PROGRESS`, diverging from `archivePhases`'s own three-status resolver
+
+Finding-ID: AUDIT-20260604-18 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-1a6130ef40d854801bfc47e6492aa30208e007d6
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:113-121` vs. `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:399-409`
+
+The `--all` branch reads the workplan from a hardcoded path: `join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', featureSlug, 'workplan.md')`. But the very next call — `archivePhases(...)` — resolves the feature dir through `resolveFeatureDir`, which probes **three** candidates: `docs/1.0/001-IN-PROGRESS`, `docs/1.0/002-WAITING`, and `docs/1.0/003-COMPLETE`. The two path resolutions disagree.
+
+Consequences: (1) `archive-phases --all --feature <slug>` against a feature in `002-WAITING` or `003-COMPLETE` fails at line 124 with an opaque `--all could not read .../001-IN-PROGRESS/...` exit-2, while `archive-phases --phases 1-5 --feature <slug>` for the *same* feature succeeds — two modes of one command resolve paths inconsistently. The workplan claims "the verb itself works standalone"; for non-in-progress features the `--all` mode does not. (2) Even in the happy `001-IN-PROGRESS` case, the workplan is read twice (once in the CLI to enumerate, once inside `archivePhases`), and the hardcoded `1.0` version string is a rot vector the moment the docs tree ever advances past `1.0` — `resolveFeatureDir` carries the same `1.0` hardcode but at least centralizes it.
+
+Fix: export `resolveFeatureDir` from `archive-phases.ts` and have the CLi's `--all` branch resolve the workplan path through it (then read `join(featureDir, 'workplan.md')`), eliminating both the divergence and the double-derivation. A single resolver is the contract; two copies that disagree on which statuses exist is the bug.
+
+## 2026-06-04 — audit-barrage lift (20260604T034153434Z-scope-discovery)
+
+### AUDIT-20260604-19 — The "AUDIT-18 bug-repro" test exercises the library resolver, not the buggy CLI `--all` surface — it would pass against the pre-fix logic
+
+Finding-ID: AUDIT-20260604-19
+Status:     fixed-38ad1c2602f3242ef2dca7082d43880032ca8a2c
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts:48-124` vs. `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:113-130`
+
+AUDIT-18's bug lived entirely in the **CLI shim** — `subcommands/archive-phases.ts`'s `--all` branch hardcoded `join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', ...)`. The library's `resolveFeatureDir` already walked all three status dirs correctly *before* this commit (the diff only changes `async function` → `export async function` plus a docblock; the loop body is untouched). Every new test added here calls `resolveFeatureDir` / `resolveFeatureWorkplanPath` **directly** — including the one labeled `'AUDIT-18 bug-repro: resolveFeatureDir locates a feature in 003-COMPLETE (the case the hardcoded path missed)'`. But `resolveFeatureDir` never missed that case; the *CLI* missed it by not calling the resolver at all.
+
+The consequence: the "bug-repro" test does not reproduce the bug. Run against pre-fix code, it fails only because `resolveFeatureWorkplanPath` didn't exist yet (an import/compile failure — which Step 2 of the workplan literally admits: *"tests fail against current code (the new … exports don't exist pre-fix)"*). A missing-export failure is not a behavioral regression test. No test in this commit invokes `archivePhasesCli(['--all', '--feature', <slug>, ...])` against a fixture feature in `002-WAITING` or `003-COMPLETE` and asserts it succeeds — which is the exact contract AUDIT-18 said was broken. This is the "tests that don't test the contract they claim to test" trap (project testing rule; cf. the spec-test-blind-spots memory). A genuine regression-lock would drive the CLI entrypoint end-to-end against a non-in-progress fixture; the current suite would let a future refactor re-hardcode the CLI path without any test going red.
+
+### AUDIT-20260604-20 — AUDIT-18's double-derivation of the feature dir was not eliminated — the fix arguably adds a third resolution pass
+
+Finding-ID: AUDIT-20260604-20
+Status:     fixed-38ad1c2602f3242ef2dca7082d43880032ca8a2c
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:118-135` + `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:418-431`
+
+AUDIT-18's recommended fix was explicit: *"route the workplan path through [resolveFeatureDir] … eliminating both the divergence **and the double-derivation**."* The committed fix closes the divergence but leaves the double-derivation in place — and adds to it. The CLI `--all` branch now calls `resolveFeatureWorkplanPath` (which calls `resolveFeatureDir`, up to three `stat`/access probes), then `readFile(workplanPath)`, then hands off to `archivePhases(...)`, which internally calls `resolveFeatureDir` **again** (another up-to-three probes) and reads the workplan body a second time. Net effect versus pre-fix: one *additional* feature-dir resolution pass was introduced, and the redundant workplan read AUDIT-18 named is untouched.
+
+This is low-cost at runtime (a handful of `stat` calls + a small file read), so it's not a correctness defect — but it's a partial close of a finding whose stated scope included the redundancy, and the divergence-class risk persists in a softer form: `resolveFeatureWorkplanPath`'s probe and `archivePhases`'s internal probe can in principle disagree if the tree changes between them (the result of the CLI's resolution is discarded; only `workplanBody` is forwarded, so `archivePhases` re-resolves from scratch). A cleaner shape is to resolve once and thread the resolved `featureDir` (or the workplan body) into `archivePhases` so a single resolution is the contract. At minimum, the workplan's Acceptance for Task 36 should not be checked as fully closing AUDIT-18 while the double-derivation half remains open.
+
+### AUDIT-20260604-21 — `resolveFeatureWorkplanPath` returns a path without confirming `workplan.md` exists — the dir-exists-but-no-workplan case bypasses the friendly resolver error
+
+Finding-ID: AUDIT-20260604-21
+Status:     fixed-38ad1c2602f3242ef2dca7082d43880032ca8a2c
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:422-431` + `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:118-135`
+
+`resolveFeatureDir` probes for **directory** existence and `resolveFeatureWorkplanPath` then blindly appends `workplan.md` without checking the file is there. So for a feature whose status dir exists (e.g. `docs/1.0/002-WAITING/<slug>/`) but which has no `workplan.md`, the resolver succeeds and the new CLI catch at lines ~125-130 — the one that emits the helpful `"--all could not resolve feature dir for slug …"` message — never fires. Control falls through to the subsequent `readFile(workplanPath)`, and the operator gets whatever that path's error handling produces (a raw-ish ENOENT against the workplan path) rather than guidance tied to feature resolution.
+
+The new test `'resolveFeatureWorkplanPath appends workplan.md to the resolved feature dir'` (lines ~96-106) deliberately creates the dir **without** a `workplan.md` and asserts the returned path — codifying that the function does not validate file existence. That's a defensible contract, but it means the function's name (`...WorkplanPath`) over-promises: it returns a *candidate* workplan path, existence unverified. Worth either (a) documenting in the docblock that the returned path is not guaranteed to exist (callers must handle a downstream read failure), or (b) checking for the file and folding the missing-workplan case into the `ArchivePhasesError` so the single friendly CLI catch covers both "no feature dir" and "feature dir but no workplan." Not a correctness bug — the readFile still fails safely — but the error-surface seam is inconsistent with the resolver's stated purpose.
+
+---
+
+What I checked that came back clean: the `process.exit(2)` control flow in the CLI catch is sound (TS treats `process.exit` as `never`, so `workplanPath` is correctly seen as definitely-assigned at the subsequent `readFile`); the exported `resolveFeatureDir` docblock accurately describes the three-status probe and cites AUDIT-18; the `clones.yaml` disposition flips (`52ca2ff2a12b`, `6719db346975`, `ed62c6a325a0` → `keep-with-reason`) carry substantive per-verb-typed-error / argv-boilerplate reasons consistent with the project's keep-with-reason convention; and the audit-log append correctly records AUDIT-18 as `fixed-<sha>`. The `1.0` hardcode persists but AUDIT-18 already accepted that resolveFeatureDir "at least centralizes it," so I did not re-litigate it.
+
+## 2026-06-04 — audit-barrage lift (20260604T035153266Z-scope-discovery)
+
+### AUDIT-20260604-22 — AUDIT-20 is recorded with `Status: fixed-<sha>` but was acknowledged-not-coded — the status overstates the resolution
+
+Finding-ID: AUDIT-20260604-22 (claude-01 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-20260604-20 block, `Status: fixed-38ad1c2602f3242ef2dca7082d43880032ca8a2c`) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 38
+
+The audit-log block for AUDIT-20 carries `Status: fixed-38ad1c26…`, the same `fixed-<sha>` form used for AUDIT-19 and AUDIT-21 which are genuine code fixes. But Task 38 in the workplan is explicit: *"Acknowledges AUDIT-20260604-20 … **Complete (2026-06-04) — acknowledged, not coded.**"* and Step 3 says *"committed with `Acknowledges AUDIT-20260604-20` in subject (NOT `Closes` — this is doc-only disposition, not a code fix)."* The double-derivation AUDIT-20 named is, by the diff's own admission, still present (and AUDIT-21's fix adds another `pathExists` probe on top of it).
+
+A `fixed-<sha>` status implies a behavioral remediation landed; this one didn't. The project's own convention for non-fix dispositions is `acknowledged-slush-pile-<date>` — exactly what AUDIT-16 and AUDIT-17 carry two blocks up. Marking an acknowledged-with-open-substance finding as `fixed` is precisely the slush-pile-context-erasure the project's `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions (AUDIT-03)" warns about: a future reader scanning for `fixed-` will believe the double-derivation was cured. Fix: change AUDIT-20's status to `acknowledged-slush-pile-2026-06-04` (matching the commit's `Acknowledges` verb and Task 38's prose), so the status field, the commit subject, and the workplan agree.
+
+### AUDIT-20260604-23 — AUDIT-21's regression test exercises the library function directly — repeating the exact AUDIT-19 anti-pattern it shipped alongside; the CLI dir-exists-but-no-workplan path has zero end-to-end coverage
+
+Finding-ID: AUDIT-20260604-23
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts:113-129` (AUDIT-21 bug-repro) + the absence of a corresponding case in `archive-phases-cli-all.test.ts`
+
+AUDIT-19's whole lesson — and the reason Task 37 added `archive-phases-cli-all.test.ts` driving the CLI through `tsx` — was that a "bug-repro" test which calls the *library* (`resolveFeatureWorkplanPath`) rather than the *CLI surface* does not lock the contract that was broken. AUDIT-21's new test (`'AUDIT-21 bug-repro: resolveFeatureWorkplanPath throws when the dir exists but workplan.md is missing'`, lines 113-129) does exactly that: it calls `resolveFeatureWorkplanPath(root, 'demo')` directly and asserts the throw. The AUDIT-21 *finding itself* framed the harm at the CLI seam — *"the new CLI catch at lines ~125-130 … never fires … the operator gets a raw-ish ENOENT."* The remedy that matters is "the friendly CLI catch now covers dir-exists-but-no-workplan," yet no test in the new CLI file plants a feature dir without a `workplan.md` and asserts the CLI exits 2 with the friendly message.
+
+The four cases in `archive-phases-cli-all.test.ts` are: feature in 003-COMPLETE, 002-WAITING, 001-IN-PROGRESS, and missing-slug (no dir at all). The missing-slug case exercises `resolveFeatureDir`'s *"feature dir not found"* throw — a different branch from the new `pathExists` throw. So the AUDIT-21 fix has unit coverage of the library but no regression-lock at the surface whose error UX it claims to repair; a future CLI refactor could swallow the `ArchivePhasesError` and emit a raw ENOENT again with every test still green. Fix: add a fifth case to `archive-phases-cli-all.test.ts` that `mkdirSync`s `docs/1.0/003-COMPLETE/demo/` without a `workplan.md`, runs the CLI `--all`, and asserts `code === 2` plus stderr matching `/workplan\.md is missing/`.
+
+### AUDIT-20260604-24 — CLI integration test spawns `tsx` without guarding `result.error`, so a tooling-resolution failure reports as a feature failure
+
+Finding-ID: AUDIT-20260604-24
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases-cli-all.test.ts:42-52` (`runArchivePhasesCli`)
+
+`runArchivePhasesCli` calls `spawnSync('tsx', [CLI_ENTRY, …])` and maps the result with `code: result.status ?? 1`, never inspecting `result.error`. If `tsx` is not resolvable on PATH for the test subprocess (e.g. vitest invoked outside an npm-script context that injects `node_modules/.bin`, or a fresh checkout before install), `spawnSync` returns `status: null` + a populated `error` (ENOENT). The helper collapses that to `code: 1`, and the first assertion fails with `--all should locate the workplan in 003-COMPLETE; stdout=; stderr=` — a message that points the reader at feature logic when the real cause is a missing runner. The acceptance criteria themselves run `npx vitest run …`, which is exactly a context where `.bin` PATH injection is not guaranteed for grandchild processes.
+
+This is hygiene, not a correctness bug in shipped code, but it undermines the regression-lock's diagnostic value — a red test should name its cause. Fix: after `spawnSync`, `if (result.error) throw result.error;` (or assert `result.status !== null` with a message naming the tsx-resolution possibility) so a tooling failure is distinguishable from a `--all` resolver regression.
+
+---
+
+What I checked that came back clean: the `resolveFeatureWorkplanPath` existence-check logic is correct (`pathExists` → throw `ArchivePhasesError` before any consumer `readFile`, with a dir-vs-file message matching the AUDIT-21 library test's `/workplan\.md is missing/` regex); the test-count arithmetic reconciles (2691 → 2696 = +4 CLI + 1 new AUDIT-21 case; the renamed `…appends workplan.md…AND verifies the file exists` test is a modification, not an addition, so it does not inflate the count); the `--all` fixture (`ALL_CHECKED_WORKPLAN`, all steps `[x]`) is correctly constructed so the partial-complete refusal does not trip and the three status-dir cases genuinely exercise the resolver; and the audit-log append records AUDIT-19 and AUDIT-21 as `fixed-<sha>` consistent with their actual code fixes (only AUDIT-20's `fixed-` is the mislabel flagged in finding 01). I would have flagged a hardcoded `1.0` newly introduced in the diff, but the version string is untouched here and AUDIT-18 already accepted the centralized hardcode.
+
+### AUDIT-20260604-25 — `resolveFeatureWorkplanPath` checks existence, not file-ness
+
+Finding-ID: AUDIT-20260604-25
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:431-441
+
+The new resolver docblock says it verifies “the workplan file itself exists,” but the implementation only calls `pathExists(workplanPath)`. If `workplan.md` exists as a directory, symlink to a directory, or another unreadable non-regular path, the resolver returns success and the CLI still falls through to a raw downstream `readFile` failure. That is the same error-surface class AUDIT-21 was meant to close, just narrowed from missing-path to wrong-path-type.
+
+A tighter fix is to stat the path and require `isFile()` before returning, with the same `ArchivePhasesError` style used for the missing-file case. Add a regression test that creates `workplan.md` as a directory and asserts the resolver throws the friendly typed error.
+
+## 2026-06-04 — audit-barrage lift (20260604T044128785Z-scope-discovery)
+
+### AUDIT-20260604-26 — Ticked acceptance criteria still carry the literal placeholder `(to be filled in by Step 1 implementer)` and assert a TDD walk the workplan never recorded
+
+Finding-ID: AUDIT-20260604-26 (claude-01 + claude-02 + codex-01; cross-model)
+Status:     fixed-972d8dba
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Tasks 9/10/13/14/21 (e.g. line 425, 417-427) — the bug-shaped orphan tasks flipped `[ ]`→`[x]` by the tick commit
+
+The tick commit flips the orphan-scaffolding boxes to `[x]` wholesale. For the bug-shaped tasks (AUDIT-66/67/70/71/84) this produces a self-contradicting record: line 425 now reads `- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)`. The box is checked — asserting the criterion is satisfied — while its body is still the placeholder string. The same shape lands on Tasks 9, 10, 13, 14. The non-bug Step-1 prose two tasks up (line 400/438) explicitly forbids exactly this: *"No placeholders like 'to be filled in' or 'TBD'."*
+
+Worse, ticking Steps 1–5 (`write failing test` / `confirm test fails` / `implement the fix` / `confirm test passes`) asserts a full TDD walk that this workplan task never recorded. The `> Superseded by audit-log Status fixed-<sha> — workplan scaffolding orphaned; fix landed in the named commit` note (line 413, 394, etc.) is candid that the scaffolding was never executed — the fix landed elsewhere. Contrast the genuinely-completed Task 19 (lines 462-465), which cites a real path (`uninstall-everything-hook-related.test.ts:79-105`). Because the orphan tasks never get a real test path filled in, a future reader cannot tell *which* test locks AUDIT-66/67/70/71, and the checkbox state falsely claims they do. The commit set out to cure the "fixed-finding / unchecked-task contradiction" (AUDIT-83/79/72) but trades it for a "checked-task / placeholder-content + unverifiable-TDD-walk" contradiction — same coherence defect, inverted. A cleaner disposition: strike the orphan task bodies (or mark them `~~superseded~~`) rather than ticking placeholder acceptance criteria as satisfied.
+
+---
+
+### AUDIT-20260604-27 — Session-end "6 acknowledged-slush-pile" count is unreconciled with the four same-day slush entries (AUDIT-22..25) added in the same audited range
+
+Finding-ID: AUDIT-20260604-27
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md` (session-end Quantitative block, `Open findings at session end: 0 … 6 acknowledged-slush-pile`) vs. `audit-log.md:4432-4482` (AUDIT-22/23/24/25, all `Status: acknowledged-slush-pile-2026-06-04`)
+
+The session-end Quantitative line reports *"Open findings at session end: 0 …; 6 acknowledged-slush-pile carrying mostly-MED defects (AUDIT-09 + 11 + 12 + 13 + 14 + 15)."* But the audit-log additions in the same audited diff append four more `acknowledged-slush-pile-2026-06-04` findings — AUDIT-22 (MED), AUDIT-23 (MED), AUDIT-24 (LOW), AUDIT-25 (LOW) — none of which appear in the count or its severity breakdown. Within the committed artifact a reader sees "0 open / 6 slushed" prose sitting beside an audit-log carrying ten same-day slush entries, two of them MED with open substance (AUDIT-22's `fixed-`-mislabel, AUDIT-23's missing CLI regression-lock).
+
+This is precisely the form the project's `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions (AUDIT-03)" warns against: the headline slush count is honest only when it includes the full HIGH/MEDIUM breakdown. The likely cause is benign ordering — the audit-barrage lift (timestamped `20260604T035153266Z`) ran *after* the session-end snapshot was authored, so AUDIT-22..25 didn't exist when the count was written — but the two commits land together, leaving the published count stale on arrival. Fix (or note): when the post-session lift adds slush entries, reconcile the session-end count in the same commit, or add a one-line "+4 slushed by the post-session audit-barrage lift (AUDIT-22..25: 2 MED, 2 LOW)" addendum so the headline number isn't read as the final tally.
+
+---
+
+I checked the rest of the diff for additional issues and the following came back clean: the DEVELOPMENT-NOTES test-count arithmetic (2669 → 2696, +27) reconciles against the enumerated per-file additions; the `keep-with-reason` clone dispositions cited in the journal carry substantive per-verb-typed-error / argv-boilerplate reasons consistent with project convention; and the audit-log AUDIT-22..25 bodies are internally well-anchored (correct file:line surfaces, severities matching their described impact). I would have flagged a newly-introduced hardcoded path or a `for now`/`TODO`/`stub` deferral string had one appeared in the diff — none did; the only deferral-shaped text is the pre-existing, faithfully-reported truncated TBD marker at workplan line 1891, which this diff surfaces rather than introduces.
+
+### AUDIT-20260604-28 — Session notes add prohibited postponement language as the recommended next action
+
+Finding-ID: AUDIT-20260604-28
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `DEVELOPMENT-NOTES.md:4474-4478`
+
+The added “Next session recommendation” says to resume with “Step 1: write the disposition prose…” and names an incomplete workplan marker at line 1891. That contradicts the same session note’s quantitative claim that “Open findings at session end: 0” and leaves the next operator with generic scaffold text instead of a concrete remaining action.
+
+This is an operator-discipline trap: the note should name the exact outstanding document defect and the specific file edit needed, or omit the resume instruction if there is no open work. The current wording reintroduces unresolved task-scaffold language into the durable journal.
+
+## 2026-06-04 — audit-barrage lift (20260604T045057194Z-scope-discovery)
+
+### AUDIT-20260604-29 — "All ~23 skills discoverable via slash-command picker" is ticked `[x]` while its own cited evidence proves it false
+
+Finding-ID: AUDIT-20260604-29 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02 + codex-04; cross-model)
+Status:     fixed-972d8dba
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 7 acceptance criteria (`- [x] All ~23 skills discoverable via slash-command picker — exceeded: 50 skill folders … and 41 entries under commands …`)
+
+The reconciliation flips this box to `[x]` and supplies its own falsifying evidence in the same line: **50 skill folders** under `plugins/dw-lifecycle/skills/` but only **41 entries** under `plugins/dw-lifecycle/commands/`, with the explicit admission that *"the slash-command picker resolves whatever the `commands/` directory ships."* By the workplan's own logic, only the 41 commands entries are picker-resolvable — which means **9 skill folders have no commands entry and are therefore NOT discoverable via the picker.** The criterion says "**All** … skills discoverable," and the cited numbers establish that not all of them are. The checkmark and its evidence are internally contradictory: a reader who trusts the `[x]` believes full picker coverage; a reader who reads the numbers sees a 9-skill gap.
+
+This is the inverted form of the same coherence defect AUDIT-26 raises two commits over (ticking a box whose body undercuts the tick). A correct disposition is either (a) leave the box `[ ]` and file the 9-skill picker gap as a task, or (b) reword the criterion to "≥23 of 50 skills have commands entries" and state the 9 missing ones explicitly. Verify by diffing the basenames of `commands/*.md` against `skills/*/` — the 9 deltas are the undiscoverable skills the `[x]` currently hides.
+
+### AUDIT-20260604-30 — README Phase 11 row keeps status "In progress" while its body now accounts for all 14 tasks as landed or reconciled
+
+Finding-ID: AUDIT-20260604-30 (claude-04 + claude-05 + codex-03; cross-model)
+Status:     fixed-972d8dba
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` Phase 11 row (status column reads "In progress —" while the body enumerates Tasks 1,2,3,5–14 "landed" and the new prose adds "Task 4 reconciled (2026-06-04)")
+
+The diff removes the trailing "Task 4 remains." and appends "Task 4 reconciled (2026-06-04): all 7 codebase-state metrics land …". The row's task enumeration already lists Tasks 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 as landed — every task **except** 4 — and the appended sentence now accounts for 4. That covers all fourteen tasks, yet the status column still reads **"In progress."** Either the status is stale (all tasks now landed/reconciled → should be Complete, or should name the specific remaining work), or "reconciled" deliberately means "not landed" — in which case the row should say what reconciliation leaves open and why Phase 11 is still in flight.
+
+As written, a reader cannot tell whether Phase 11 has remaining work. Note also that "reconciled" is a weaker word than "landed" (the enumeration's verb for the other 13), and Task 4 is pointedly excluded from the "landed" list — a subtle signal that reconciliation ≠ completion that the "In progress" status neither confirms nor explains. Fix: either flip the status with a one-line "Phase 11 complete pending operator sign-off on Task 5 controller," or state the open item explicitly in the status cell.
+
+## 2026-06-04 — audit-barrage lift (20260604T045827873Z-scope-discovery)
+
+### AUDIT-20260604-31 — AUDIT-29 and AUDIT-30 are appended to the audit-log as `acknowledged-slush-pile` in the same commit that resolves them, leaving the durable record internally contradictory
+
+Finding-ID: AUDIT-20260604-31 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     fixed-c254c1ed
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4524-4547` (the appended AUDIT-29/30 blocks) vs. `README.md` Phase 11 row + `workplan.md:983` (the resolving edits) — all in this one commit
+
+The commit subject is *"address AUDIT-26/29/30 substantive critiques."* The diff demonstrably addresses AUDIT-30 (flips the README Phase 11 status "In progress" → "Substantive complete") and AUDIT-29 (rewords the Phase 7 criterion + authors the 10 missing command entries). Yet the audit-log blocks for both are appended with `Status: acknowledged-slush-pile-2026-06-04`. Within a single committed artifact, the audit-log says these findings were parked-without-fix while the README/workplan say they were fixed in this commit.
+
+This is the exact mislabel class the prior-findings clean-check already called out for AUDIT-20 (`fixed-` mislabel) and that the project's closure triad exists to prevent: per `apply-audit-flips`, a finding resolved by a `Closes AUDIT-<id>` commit should carry `Status: fixed-<sha>`, not `acknowledged-slush-pile`. A future reader running the slush-pile reconciliation (DEVELOPMENT-NOTES § "Quantitative reporting conventions") will count AUDIT-29/30 as carrying unfixed MED defects when they are in fact addressed here. Fix: either flip both to `fixed-<thiscommit-sha>` (the honest record if the doc edits are the fix), or — if the project intends slush-until-re-audit — soften the README/workplan claims so they don't assert closure the audit-log denies. The two artifacts must agree.
+
+## 2026-06-04 — audit-barrage lift (20260604T054304831Z-scope-discovery)
+
+### AUDIT-20260604-32 — AUDIT-BARRAGE-claude-01 — Phase 6 follow-up bug items flipped `[x]` while their GitHub issues remain open and unfixed, justified by a self-cited "project rule" that exists nowhere but this workplan
+
+Finding-ID: AUDIT-20260604-32 (claude-01 + claude-02 + claude-04 + claude-06 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-e6d1fe99
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:1249-1252` (Phase 6 follow-up items #350/#351/#352/#318)
+
+The diff flips all four Phase 6 follow-up bug items from `[ ]` to `[x]`. Three of them (`#350`, `#351`, `#352`) are real bugs against shipped surfaces — `validate-return` false-positives, missing helper-subcommand probe, docs-only pre-commit friction — and each disposition string *itself admits the GH issue is still `(open)`* and the bug unfixed. A checked box reads as "done"; these are open, unfixed defects. This is the exact checkbox/evidence contradiction class AUDIT-26/29/30 named, applied to bug-shaped tasks rather than scaffolding.
+
+The justification given is `Per project rule "issue tracking flows through GitHub, not workplan checkboxes."` I grepped the repo: that string appears **only inside workplan.md itself** (lines 1249 and 1609), and **not in any `.claude/rules/*.md` file**. It is a self-citation — a rule invented in the same document that invokes it. Worse, it contradicts the rules that *do* exist: `agent-discipline.md` § "Audit findings: scope-don't-defer" and § "Operator owns scope decisions" both push the opposite direction (don't unilaterally close/defer your own scope; the operator owns the cut). Flipping an open bug to `[x]` is a unilateral "handled" signal the operator never authorized.
+
+A reasonable fix: leave these `[ ]` (the bug is genuinely not done) with a one-line "tracked at #350; not yet fixed" note, OR use the strikethrough-`~~...~~` form the same diff applies to Phase 20 Task 1 so the box visibly does not assert completion. Either way, strike the invented "project rule" citation — if the convention is real, it belongs in `.claude/rules/agent-discipline.md` as an operator-approved rule, not asserted into existence inside the artifact it governs.
+
+### AUDIT-20260604-33 — AUDIT-BARRAGE-claude-03 — AUDIT-31 is left `acknowledged-slush-pile` in the same commit whose subject says it "address[es] AUDIT-31" — recursively the exact mislabel AUDIT-31 names
+
+Finding-ID: AUDIT-20260604-33
+Status:     fixed-e6d1fe99
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4538-4547` (appended AUDIT-31 block, `Status: acknowledged-slush-pile-2026-06-04`) vs. the commit subject "flip AUDIT-26/29/30 … → fixed-972d8dba — address AUDIT-31's audit-log/commit-message inconsistency critique"
+
+AUDIT-31's substance is: "a finding resolved by a commit should carry `Status: fixed-<sha>`, not `acknowledged-slush-pile`; the two artifacts must agree." This commit acts on that critique — it flips AUDIT-26/29/30 to `fixed-972d8dba` (audit-log.md lines 4489, 4530, 4541 in the diff). The commit subject explicitly claims it *addresses* AUDIT-31. Yet AUDIT-31 itself is appended in this very diff with `Status: acknowledged-slush-pile-2026-06-04`.
+
+So the durable record now says: a finding whose critique was acted upon by this commit is parked-without-fix. That is the identical audit-log/commit-message inconsistency AUDIT-31 was filed to eliminate, reproduced one level up. By `apply-audit-flips` convention (which AUDIT-31 itself cites), a finding a `Closes`/address commit resolves should read `fixed-<thiscommit-sha>`.
+
+There's a defensible counter — AUDIT-31 is *newly filed* in this commit by the audit-barrage lift, so "open at filing time" is arguably correct and a later commit should flip it. If that's the intent, the commit subject overstates by claiming to "address" it. Fix: either flip AUDIT-31 to `fixed-<thiscommit-sha>` in this commit (matching the subject's claim), or soften the subject to "responds to AUDIT-31's critique by flipping 26/29/30; AUDIT-31 itself re-audits next lift." Pick one so the subject and the status agree.
+
+### AUDIT-20260604-34 — AUDIT-BARRAGE-claude-05 — AUDIT-29's "9-skill picker gap" is reconciled by authoring "10" command entries; the off-by-one isn't explained and the skill/command totals still don't close
+
+Finding-ID: AUDIT-20260604-34
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/shortcuts.test.ts:101-111` (the 10 hygiene-family entries added to `META_COMMANDS`) vs. AUDIT-29's cited counts (50 skill folders − 41 command entries = 9-skill gap)
+
+AUDIT-29 (marked `fixed-972d8dba` in this same diff) established the gap arithmetically: **50 skill folders, 41 command entries → 9 skills undiscoverable.** The remediation, per the new test comment (line 101-104), is that commit `972d8dba` "Authored … to close AUDIT-20260604-29's picker-discoverability gap," and this diff adds **10** hygiene-family verbs to the `META_COMMANDS` allowlist. Nine missing, ten added — the numbers don't reconcile, and nothing in the diff explains the off-by-one (was a 10th skill also missing? was one of the 10 already present?). If `commands/` went 41 → 51 against 50 skill folders, there is now either a surplus command entry or the original 50/41 count was itself off.
+
+This matters because AUDIT-29 was flipped to `fixed-<sha>` partly on the strength of these counts; a `fixed-` flip should rest on arithmetic that closes. Per the project's own `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions (AUDIT-04)," derived counts must reconcile or the line should be omitted. Fix: state the post-fix totals explicitly (e.g., "commands/ now 41 → 51; skills 50 → 51 after adding `unarchive-phases`'s command shim" — whatever the real ledger is) so a reader can verify all skills are now picker-resolvable rather than trusting a 9-vs-10 hand-wave.

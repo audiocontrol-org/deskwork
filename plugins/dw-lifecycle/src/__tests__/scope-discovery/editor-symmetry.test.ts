@@ -281,7 +281,7 @@ describe('check-editor-symmetry — core scenarios', () => {
       const artifactBody = await readFile(join(fixture.scanRoot, artifactPath), 'utf8');
       // The artifact header was renamed from the pilot's "Cross-editor"
       // to the destination's "Cross-module" to drop the audiocontrol-
-      // specific connotation (see editor-symmetry-report.ts intro).
+      // specific connotation (see module-symmetry-report.ts intro).
       expect(
         artifactBody.startsWith('# Cross-module symmetry matrix') ||
           artifactBody.startsWith('# Cross-editor symmetry matrix'),

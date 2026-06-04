@@ -50,7 +50,7 @@ export function deriveRegimeHoldouts(
   const buckets: Record<RegimeHoldoutSource, ManifestRegimeHoldoutEntry[]> = {
     'anti-pattern': [],
     'adopter-manifest': [],
-    'editor-symmetry': [],
+    'module-symmetry': [],
     deprecation: [],
   };
   // Dedup key for adopter-manifest entries: same (file, manifest id)
@@ -109,7 +109,7 @@ export function deriveRegimeHoldouts(
   const total =
     buckets['anti-pattern'].length +
     buckets['adopter-manifest'].length +
-    buckets['editor-symmetry'].length +
+    buckets['module-symmetry'].length +
     buckets.deprecation.length;
   // per-status rollup across the entire
   // post-merge manifest section. We re-derive this from the materi-
@@ -128,14 +128,14 @@ export function deriveRegimeHoldouts(
   return {
     anti_patterns: buckets['anti-pattern'],
     adopter_manifests: buckets['adopter-manifest'],
-    editor_symmetry: buckets['editor-symmetry'],
+    module_symmetry: buckets['module-symmetry'],
     deprecations: buckets.deprecation,
     meta: {
       total,
       by_source: {
         anti_pattern: buckets['anti-pattern'].length,
         adopter_manifest: buckets['adopter-manifest'].length,
-        editor_symmetry: buckets['editor-symmetry'].length,
+        module_symmetry: buckets['module-symmetry'].length,
         deprecation: buckets.deprecation.length,
       },
       by_status: {

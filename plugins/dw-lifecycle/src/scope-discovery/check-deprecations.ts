@@ -19,7 +19,7 @@
  *     the terminal without parsing the markdown.
  *   - `.dw-lifecycle/scope-discovery/deprecation-queue.md` (only with
  *     `--write`): the operator-readable artifact committed to the
- *     repo. Mirrors `check-editor-symmetry --write`'s contract.
+ *     repo. Mirrors `check-module-symmetry --write`'s contract.
  *
  * Exit codes:
  *
@@ -29,7 +29,7 @@
  *   2   scanner internal / IO error.
  *
  * Note: this gate intentionally does NOT exit 1 when importers exist.
- * The other Phase 6 gates (anti-patterns, adopters, editor-symmetry)
+ * The other Phase 6 gates (anti-patterns, adopters, module-symmetry)
  * DO block commits because they surface "you regressed the regime"
  * conditions. Deprecation is the dual — "someone marked this for
  * deletion; here's who's still holding it in place" — which is
@@ -40,7 +40,7 @@
  *
  * Re-uses the walker (`util/glob.ts`'s `listFilesMatching`) via
  * `deprecation-scan.ts`, mirrors the CLI shape of
- * `check-editor-symmetry.ts` for parity, and shares the `errorMessage`
+ * `check-module-symmetry.ts` for parity, and shares the `errorMessage`
  * type-guard from `util/typeguards.ts`. No copy-paste of subprocess /
  * glob / regex utilities.
  *

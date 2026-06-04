@@ -82,14 +82,14 @@ describe('synthesis-report — categorizeFindings', () => {
           }),
         ],
         adopter_manifests: [],
-        editor_symmetry: [],
+        module_symmetry: [],
         deprecations: [],
         meta: {
           total: 1,
           by_source: {
             anti_pattern: 1,
             adopter_manifest: 0,
-            editor_symmetry: 0,
+            module_symmetry: 0,
             deprecation: 0,
           },
           by_status: { actively_enforced: 1, candidate: 0 },
@@ -114,14 +114,14 @@ describe('synthesis-report — categorizeFindings', () => {
             provenance_source: 'orchestrator-agent',
           }),
         ],
-        editor_symmetry: [],
+        module_symmetry: [],
         deprecations: [],
         meta: {
           total: 1,
           by_source: {
             anti_pattern: 0,
             adopter_manifest: 1,
-            editor_symmetry: 0,
+            module_symmetry: 0,
             deprecation: 0,
           },
           by_status: { actively_enforced: 1, candidate: 0 },
@@ -146,14 +146,14 @@ describe('synthesis-report — categorizeFindings', () => {
           }),
         ],
         adopter_manifests: [],
-        editor_symmetry: [],
+        module_symmetry: [],
         deprecations: [],
         meta: {
           total: 1,
           by_source: {
             anti_pattern: 1,
             adopter_manifest: 0,
-            editor_symmetry: 0,
+            module_symmetry: 0,
             deprecation: 0,
           },
           by_status: { actively_enforced: 0, candidate: 1 },
@@ -172,7 +172,7 @@ describe('synthesis-report — categorizeFindings', () => {
       regime_holdouts: {
         anti_patterns: [],
         adopter_manifests: [],
-        editor_symmetry: [],
+        module_symmetry: [],
         deprecations: [
           makeRegimeEntry({
             source_status: 'cursed',
@@ -184,7 +184,7 @@ describe('synthesis-report — categorizeFindings', () => {
           by_source: {
             anti_pattern: 0,
             adopter_manifest: 0,
-            editor_symmetry: 0,
+            module_symmetry: 0,
             deprecation: 1,
           },
           by_status: { actively_enforced: 1, candidate: 0 },
@@ -247,14 +247,14 @@ describe('synthesis-report — renderFindingCategoryReport', () => {
           }),
         ],
         adopter_manifests: [],
-        editor_symmetry: [],
+        module_symmetry: [],
         deprecations: [],
         meta: {
           total: 2,
           by_source: {
             anti_pattern: 2,
             adopter_manifest: 0,
-            editor_symmetry: 0,
+            module_symmetry: 0,
             deprecation: 0,
           },
           by_status: { actively_enforced: 1, candidate: 1 },
@@ -288,14 +288,14 @@ describe('synthesis-report — renderFindingCategoryReport', () => {
           }),
         ],
         adopter_manifests: [],
-        editor_symmetry: [],
+        module_symmetry: [],
         deprecations: [],
         meta: {
           total: 1,
           by_source: {
             anti_pattern: 1,
             adopter_manifest: 0,
-            editor_symmetry: 0,
+            module_symmetry: 0,
             deprecation: 0,
           },
           by_status: { actively_enforced: 1, candidate: 0 },
@@ -324,14 +324,14 @@ describe('synthesis-report — renderFindingCategoryReport', () => {
             provenance_source: 'install-seed',
           }),
         ],
-        editor_symmetry: [],
+        module_symmetry: [],
         deprecations: [],
         meta: {
           total: 2,
           by_source: {
             anti_pattern: 1,
             adopter_manifest: 1,
-            editor_symmetry: 0,
+            module_symmetry: 0,
             deprecation: 0,
           },
           by_status: { actively_enforced: 2, candidate: 0 },

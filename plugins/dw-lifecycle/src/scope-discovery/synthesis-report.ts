@@ -53,7 +53,7 @@ export interface FindingCategoryCounts {
 export interface PerBucketCategoryCounts {
   readonly anti_patterns: FindingCategoryCounts;
   readonly adopter_manifests: FindingCategoryCounts;
-  readonly editor_symmetry: FindingCategoryCounts;
+  readonly module_symmetry: FindingCategoryCounts;
   readonly deprecations: FindingCategoryCounts;
 }
 
@@ -118,7 +118,7 @@ export function categorizeFindings(manifest: ScopeManifest): FindingCategoryBrea
   const totals = emptyMutable();
   const antiPatterns = emptyMutable();
   const adopterManifests = emptyMutable();
-  const editorSymmetry = emptyMutable();
+  const moduleSymmetry = emptyMutable();
   const deprecations = emptyMutable();
 
   const rh = manifest.regime_holdouts;
@@ -133,10 +133,10 @@ export function categorizeFindings(manifest: ScopeManifest): FindingCategoryBrea
       bumpRegisteredOrNovel(totals, cat);
       bumpRegisteredOrNovel(adopterManifests, cat);
     }
-    for (const e of rh.editor_symmetry) {
+    for (const e of rh.module_symmetry) {
       const cat = categoryFor(e);
       bumpRegisteredOrNovel(totals, cat);
-      bumpRegisteredOrNovel(editorSymmetry, cat);
+      bumpRegisteredOrNovel(moduleSymmetry, cat);
     }
     for (const e of rh.deprecations) {
       const cat = categoryFor(e);
@@ -159,7 +159,7 @@ export function categorizeFindings(manifest: ScopeManifest): FindingCategoryBrea
     perBucket: {
       anti_patterns: freezeCounts(antiPatterns),
       adopter_manifests: freezeCounts(adopterManifests),
-      editor_symmetry: freezeCounts(editorSymmetry),
+      module_symmetry: freezeCounts(moduleSymmetry),
       deprecations: freezeCounts(deprecations),
     },
     discoveredCandidatesClusterCount,
@@ -266,7 +266,7 @@ export function renderFindingCategoryReport(
       `- adopter-manifests: ${b.adopter_manifests.registeredPattern} / ${b.adopter_manifests.novelShapeCandidate}`,
     );
     lines.push(
-      `- editor-symmetry: ${b.editor_symmetry.registeredPattern} / ${b.editor_symmetry.novelShapeCandidate}`,
+      `- module-symmetry: ${b.module_symmetry.registeredPattern} / ${b.module_symmetry.novelShapeCandidate}`,
     );
     lines.push(
       `- deprecations: ${b.deprecations.registeredPattern} / ${b.deprecations.novelShapeCandidate}`,

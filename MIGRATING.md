@@ -1,3 +1,115 @@
+## Migrating to v0.36.0+ (Phase 25 — `editor-symmetry` → `module-symmetry` rename)
+
+v0.36.0 also lands Phase 25's terminology cleanup: every adopter-facing `editor-symmetry` surface in the `dw-lifecycle` plugin is renamed to `module-symmetry`. The audiocontrol pilot named the parallel-top-level-module concept `editor` because its modules are Roland-sampler editor packages; every non-audiocontrol adopter mentally translates `editor` → `module`. Phase 25 pays the schema-stability cost so the plugin reads project-neutral out of the box.
+
+### What changed (load-bearing surfaces)
+
+- **CLI verb:** `dw-lifecycle check-module-symmetry` is the canonical name. `dw-lifecycle check-editor-symmetry` survives as a deprecation-warning alias for ONE release cycle. The alias's stderr line names the canonical verb + the removal target (v0.37.0). Adopter pre-commit hooks + muscle memory keep working.
+- **Slash-command:** `/dw-lifecycle:check-module-symmetry` is the canonical name. `/dw-lifecycle:check-editor-symmetry` survives as a deprecation alias command file that routes the same skill.
+- **Scope-inventory flag:** `dw-lifecycle scope-inventory --module-symmetry-out` is the canonical flag. `--editor-symmetry-out` survives as a deprecation alias; same removal target.
+- **scope-manifest.yaml schema field:** `regime_holdouts.editor_symmetry:` → `regime_holdouts.module_symmetry:`. The strict scope-manifest schema validator now rejects the legacy field name (no alias on the YAML side — Task 2 chose single-rename over alias for the schema surface). Existing YAMLs need migration; see below.
+- **Source identifiers + file names:** internal `EditorSymmetry*` types, `discoverEditors` / `editorsTargetedByGlob` / `editorForPath` functions, and `editor-symmetry-{matrix,report}.ts` / `util/editors.ts` source files renamed to `Module*` / `discover*` / `module*` / `util/modules.ts` equivalents. The etymology paragraph in `util/modules.ts` preserves the rename's history.
+- **`editor-symmetry.md` artifact filename:** PRESERVED verbatim (wire-format; travels on its own deprecation arc per the comment in `plugins/dw-lifecycle/src/scope-discovery/check-module-symmetry.ts:14-18`). Adopter `--write` paths and committed artifact paths are unaffected.
+
+### Migration: existing `scope-manifest.yaml` files
+
+Phase 25 ships a new doctor rule `legacy-editor-symmetry-field-rename` that detects the legacy field on `dw-lifecycle doctor` runs. The rule walks BOTH `docs/<v>/<status>/<slug>/scope-manifest.yaml` (per-feature) AND `.dw-lifecycle/scope-discovery/scope-manifest.yaml` (per-project root) and reports each affected file with the line numbers + the literal key-replacement instruction. The migration is mechanical:
+
+```bash
+dw-lifecycle doctor                          # detects legacy editor_symmetry: keys; reports paths + lines
+# Then, for each affected file, edit the YAML and replace:
+#   regime_holdouts.editor_symmetry:         → regime_holdouts.module_symmetry:
+#   regime_holdouts.<summary>.by_source.editor_symmetry:  → ...by_source.module_symmetry:
+# The field VALUES (list + integer) are unchanged — only the key name moves.
+dw-lifecycle doctor                          # re-run to confirm zero legacy-editor-symmetry-field-rename findings
+```
+
+`--fix` wiring for scope-discovery doctor rules is NOT YET available; the operator runs the rewrite manually (one key-replacement per file). Adopters who want the auto-rewrite can pipe the doctor's path list through `sed -i`-equivalent rewrites locally; the rule's repair-hint message contains the exact key-replacement instruction.
+
+### Migration: pre-commit hook wiring + skill bodies that called `check-editor-symmetry`
+
+Adopters who hand-wired `dw-lifecycle check-editor-symmetry` into a `.husky/` hook OR project-local skill body: leave it; the deprecation-alias path keeps working for one release cycle, and the alias's stderr warning will prompt the rename on every invocation. Update at your leisure (canonical name + removal target are both named in the warning). Removal target v0.37.0.
+
+### Audiocontrol pilot
+
+Per Phase 25 Task 2's strategic decision, the audiocontrol pilot project (the protocol's original implementation, source-of-truth at `~/work/audiocontrol-work/audiocontrol-scope-discovery-protocol/`) renames in lockstep — same migration path as any other adopter. The pilot's tracker issue is separately coordinated; the deskwork plugin's behavior is identical for the pilot and for any other adopter.
+
+### What stays unchanged
+
+- The `editor-symmetry.md` written artifact filename (wire-format; separate deprecation arc).
+- The `editor-symmetry-matrix.yaml` catalog filename path (wire-format).
+- Historical references in PRDs, workplans, audit-logs, journal entries, and DEVELOPMENT-NOTES.md (preserved per the audit-log preservation rule — they describe the historical surface they audited).
+- All `module-symmetry`-canonical surfaces named above are additive (CLI + slash-command + flag + field name); the legacy names continue to function via deprecation aliases through one full release cycle.
+
+### Why
+
+Per the leaked-domain-terminology pathology that scope-discovery itself exists to surface: a CONFIG primitive named for the audiocontrol pilot's Roland-sampler-editor modules forces every other adopter to mentally translate `editor` → `module` on every read. Phase 25 pays the schema-stability cost (single-rename + doctor-rule migration; CLI verb + flag aliases for one release cycle; skill folder retires entirely; etymology preserved in `util/modules.ts`).
+
+---
+
+## Migrating to v0.36.0+ (Phase 24 — no git-hook enforcement)
+
+v0.36.0 retires the `dw-lifecycle` plugin's git-hook enforcement chain. Adopters who ran `dw-lifecycle install-scope-discovery-hooks` (or `install-agent-prompts`) in v0.35.0 or earlier need to clean up the installed artifacts.
+
+### What changed
+
+Per the no-git-hook-enforcement architectural decision (ADR at `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` + operational rule at `.claude/rules/enforcement-lives-in-skills.md`), `dw-lifecycle` enforcement now lives in skill bodies + CLI verbs that adopters get from `claude plugin install`. The discipline that used to fire from `.husky/{pre-commit,pre-push,commit-msg}` is gone; the equivalent checks now fire from:
+
+- `/dw-lifecycle:session-start` — advisory structural snapshot (clones / anti-patterns / adopter holdouts / module-symmetry deltas) at session boot.
+- `/dw-lifecycle:implement` — enforcing end-of-task chain (structural + audit-barrage + workplan-aware open-findings gate + apply-flips + fix-task TDD advisory).
+- `/dw-lifecycle:session-end` — closing discipline (disposition-survivor + no-bare-TBDs + no-open-findings-without-disposition).
+- `/dw-lifecycle:review` — primary PR-readiness surface (Step 0 refactor preconditions + structural chain + fleet symmetry).
+
+### Retired surfaces
+
+The following CLI verbs + skills + doctor rules + artifacts are RETIRED:
+
+- `dw-lifecycle install-scope-discovery-hooks` (subcommand + skill folder)
+- `dw-lifecycle uninstall-scope-discovery-hooks` (subcommand + skill folder)
+- `dw-lifecycle install-agent-prompts` (subcommand + skill folder)
+- `dw-lifecycle check-implement-hook-ran` (commit-msg gate)
+- `dw-lifecycle check-implement-hook-coverage` (pre-push gate)
+- `dw-lifecycle check-implement-hook-coverage --upstream-base-ref` flag
+- `hooks-installed-missing` doctor rule
+- `agent-prompt-mirror-drift` doctor rule
+- `.dw-lifecycle/scope-discovery/{hooks-installed.json,last-hook-run.json,hook-run-log.jsonl}` working-tree artifacts
+
+### Migration: one-shot adopter cleanup
+
+Run the migration helper:
+
+```bash
+dw-lifecycle uninstall-everything-hook-related              # dry-run; reports what would change
+dw-lifecycle uninstall-everything-hook-related --apply      # performs the removals
+```
+
+The helper:
+
+- Removes `dw-lifecycle`-managed blocks (bounded by `# >>> dw-lifecycle scope-discovery hook >>>` / `# <<< dw-lifecycle scope-discovery hook <<<`) from `.husky/{pre-commit,pre-push,commit-msg}`. Operator-authored content outside the managed blocks is preserved verbatim.
+- Deletes `.dw-lifecycle/scope-discovery/hooks-installed.json` (the install manifest), `.dw-lifecycle/scope-discovery/last-hook-run.json` (Phase 22 marker), and `.dw-lifecycle/scope-discovery/hook-run-log.jsonl` (Phase 23 per-SHA log) when present.
+
+If your `.husky/` files contained ONLY the managed block (no operator content), the helper leaves the file with just the shebang line. You can delete the file manually if husky doesn't need the hook present; otherwise the file works as a no-op stub.
+
+If you customized the managed block (e.g., added extra checks INSIDE the marker pair), the helper still removes the entire block — the markers are the contract. Copy your customizations OUT of the managed-block markers BEFORE running the migration if you want to keep them.
+
+### What stays
+
+The CLI verbs that DO the underlying checks — `check-clones`, `check-anti-patterns`, `check-adopters`, `check-disposition-survivor`, `check-module-symmetry` (Phase 25 rename; `check-editor-symmetry` alias preserved one release cycle, removal target v0.37.0), `check-refactor-preconditions`, `check-deprecations`, `audit-barrage`, `audit-barrage-lift`, `promote-findings`, `check-open-findings`, `apply-audit-flips`, `implement-hook`, etc. — all stay. The plugin ships them; the skill bodies invoke them. If you want a project-specific git hook, wire any of them into your own `.husky/<hook>` manually; we don't ship the install machinery anymore.
+
+`install-scope-discovery` (the basic config-dir bootstrap that creates `.dw-lifecycle/scope-discovery/` + seeds empty registries) is preserved — adopters still need it on first install.
+
+`migrate-from-pilot` (audiocontrol-pilot-to-plugin migration) is preserved + updated to skip the retired hook-install step.
+
+### Why
+
+Per the ADR: a discipline that only fires from `.husky/` doesn't exist for an adopter who follows the public install path. Wiring discipline into git hooks distorted our perception of what works (we experienced the gates via our own hand-rolled `.husky/`; adopters experienced nothing). The Phase 24 reframe makes the discipline travel with the plugin install, not as a separate `install-*-hooks` invocation.
+
+### Issues defused
+
+GH [#401](https://github.com/audiocontrol-org/deskwork/issues/401) (over-build pathology), [#402](https://github.com/audiocontrol-org/deskwork/issues/402) (bookkeeping ratchet), [#403](https://github.com/audiocontrol-org/deskwork/issues/403) (gate-amplified scope errors) — all dispositioned by removing the gate surfaces that caused them. Removing those surfaces eliminated the `--no-verify` bypasses they had previously forced on bookkeeping commits.
+
+---
+
 ## Migrating to v0.16.0 (open-issue tranche cleanup)
 
 v0.16.0 ships the open-issue-tranche-cleanup feature. The behavior changes adopters should know about:

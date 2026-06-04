@@ -37,23 +37,54 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    - If a step is independent of others, consider `superpowers:dispatching-parallel-agents` to fan out.
    - Every sub-agent dispatched in this loop (implementer, reviewer, code-explorer, code-architect, etc.) MUST be routed through the dispatch wrapper — see "Dispatch-wrapper engagement" below.
    - When the task body is complete, mark its checkboxes and commit.
-6. **End-of-task audit-barrage hook.** After every task-completion commit, run:
+6. **End-of-task chain (full Phase 24 composition).** After every task-completion commit, run the full chain in this order. Per `.claude/rules/enforcement-lives-in-skills.md` + the no-git-hook-enforcement ADR (`docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md`), this is the *enforcing* counterpart to the *advisory* snapshot at session-start. The discipline that used to live in `.husky/commit-msg` + `.husky/pre-push` (`check-implement-hook-ran`, `check-implement-hook-coverage`) and `.husky/pre-commit` (structural chain) now lives here in the skill body — adopters get it by installing the plugin, not by wiring git hooks.
+
+   **Step 6a — Structural chain (refuse-to-advance on new findings).** When `.dw-lifecycle/scope-discovery/` is present:
+
+   ```bash
+   dw-lifecycle check-clones --feature <slug> --gate-mode
+   dw-lifecycle check-anti-patterns --feature <slug> --gate-mode
+   dw-lifecycle check-adopters --feature <slug> --gate-mode
+   dw-lifecycle check-module-symmetry --feature <slug>
+   ```
+
+   Any non-zero exit code (new clone group, new anti-pattern hit, new holdout, or symmetry delta the surface doesn't sanction) STOPS the loop. The agent surfaces the verb's stderr report verbatim and pauses until the operator decides how to disposition. The structural chain at end-of-implement-task is enforcing because the pathology that motivated `Just for now is bullshit` was the *audit-finding* chain (high volume, bookkeeping-heavy), not the structural one (low volume, real defects). When `.dw-lifecycle/scope-discovery/` is absent, Step 6a silently skips.
+
+   **Step 6b — Audit-barrage chain.** After Step 6a passes:
 
    ```bash
    dw-lifecycle implement-hook --feature <slug>
    ```
 
-   This single verb is the entire hook. It composes the new-diff guard (`check-barrage-tip`), prompt rendering (`audit-barrage-render`), parallel CLI fan-out (`audit-barrage`), finding extraction (`audit-barrage-lift`), dampener evaluation (`check-barrage-dampener`), and disposition (either `slush-remaining --apply` when the dampener is engaged or `promote-findings --auto` when it isn't), then writes a marker file the commit-msg gate verifies. Exit 0 = hook ran cleanly OR new-diff guard skipped; exit 1 = mid-flight failure; exit 2 = config error.
+   This single verb composes the audit-barrage half of the chain: new-diff guard (`check-barrage-tip`), prompt rendering (`audit-barrage-render`), parallel CLI fan-out (`audit-barrage`), finding extraction (`audit-barrage-lift`), dampener evaluation (`check-barrage-dampener`), and disposition (either `slush-remaining --apply` when the dampener is engaged or `promote-findings --auto` when it isn't). Exit 0 = hook ran cleanly OR new-diff guard skipped; exit 1 = mid-flight failure; exit 2 = config error.
 
-   **The hook is mechanized with teeth (Phase 17).** The agent has no discretion at the firing decision:
+   When `.dw-lifecycle/scope-discovery/` is absent in the project, the verb silently allows (scope-discovery is opt-in).
 
-   - **Layer 1 — single verb (this step).** No bash composition to forget; one verb either runs or it doesn't.
-   - **Layer 2 — commit-msg gate (`check-implement-hook-ran`).** Refuses the next commit if `last-hook-run.json` doesn't show a run since the parent commit. Wired into the project's `commit-msg` hook chain. Cure message names the verb literally.
-   - **Layer 3 — pre-push gate (`check-implement-hook-coverage`).** Walks `<remote>/<branch>..HEAD`; refuses the push if any unpushed commit lacks a matching `hook-run-log.jsonl` entry. Catches `--no-verify` bypasses of Layer 2.
+   **Step 6c — Workplan-aware gate (refuse-to-advance on open findings unscoped or non-next).**
 
-   When `.dw-lifecycle/scope-discovery/` is absent in the project, all three layers silently allow (scope-discovery is opt-in).
+   ```bash
+   dw-lifecycle check-open-findings --feature <slug>
+   ```
 
-   **See the "Audit-barrage hook behavior reference" section below** for the disposition rules, operator-acknowledged trade-offs, failure-path policy, and per-task report shape. Step 6 itself is mechanically simple now; the semantic detail is documented separately.
+   Exit 0 (zero open findings OR open findings are scoped as the next-N workplan tasks) = continue to Step 7. Exit 1 = STOP per Step 2's refusal-mode taxonomy (the gate refusal IS the cure path).
+
+   **Step 6d — Apply audit-flips.** Walk recent commits for `Closes AUDIT-X` trailers and apply the corresponding `open → fixed-<sha>` flips to the audit-log. Folded into the end-of-task step (no separate manual call):
+
+   ```bash
+   dw-lifecycle apply-audit-flips --feature <slug> --apply
+   ```
+
+   When the working-tree is clean post-flip, no commit is needed; when the flip-write modifies the audit-log, stage + commit as part of the next task's commit (small bookkeeping batched with substantive work, not a separate bookkeeping commit).
+
+   **Step 6e — Fix-task TDD check (in-skill advisory).** When the just-completed task is a fix-task (`(fix-finding-AUDIT-<id>)` shape), verify the commit body cites a test file + line range under `**/__tests__/**`:
+
+   ```bash
+   dw-lifecycle check-fix-task-tdd --feature <slug>
+   ```
+
+   Advisory only — the verb surfaces missing-citation as a warning rather than refusing. The fix-task discipline is encoded in the skill's instruction to the agent, not as a separate hook the agent could `--no-verify` past.
+
+   **No git-hook fallback.** Per Phase 24, the layered-with-teeth Phase 17 model (commit-msg gate + pre-push coverage gate) is RETIRED. There is no `.husky/` enforcement supplementing this skill body. The discipline lives here; an agent who skips Step 6 ships a bug; the only correction is operator review.
 
 7. Auto-invoke scope-widen between tasks (default behavior) unless `--no-scope-widen` was passed:
    - Runs after the task-completion commit lands and BEFORE the next task starts.
@@ -115,9 +146,9 @@ The `implement-hook` verb maps internal failures to one of three outcomes:
 
 Inside the chain, the per-step semantics are:
 
-- `check-barrage-tip` no-new-diff (exit 1) → write marker with disposition=`no-new-diff-skip`; exit 0.
+- `check-barrage-tip` no-new-diff (exit 1) → verb exits 0 with stderr `no new diff since last barrage; skip without firing.`
 - `audit-barrage-render` non-zero → exit 1; the vars JSON is malformed or the template has unsubstituted markers. Fix and re-run.
-- `audit-barrage` exit 1 (every CLI failed) → write marker with disposition=`barrage-outage`; exit 0. The hook forward-progresses (per *"barrage was an outage, NOT a finding"*); the operator investigates.
+- `audit-barrage` exit 1 (every CLI failed) → verb exits 0 with stderr `audit-barrage all-models-failed (outage); hook complete.` The hook forward-progresses (per *"barrage was an outage, NOT a finding"*); the operator investigates.
 - `audit-barrage` exit 0 but partial spawn failures → proceed with healthy models (degraded barrage; cross-model agreement weaker but findings still emit).
 - `audit-barrage-lift` exit 0 with zero findings → proceed to Step 7 (scope-widen) without firing disposition (nothing to dispose).
 - `audit-barrage-lift` non-zero → exit 1; write to audit-log failed (drift/permissions/parser).
@@ -127,15 +158,15 @@ Inside the chain, the per-step semantics are:
 
 ### Per-task report shape
 
-After every `implement-hook` invocation, the per-task report includes:
+After every `implement-hook` invocation, the per-task report includes (stderr only, no persisted artifact):
 
 - `new-diff` — commit count since last barrage (0 = skip case).
-- `barrage status` — e.g. `2/3 models healthy`.
-- `findings extracted` — total count.
-- `disposition` — `slushed: N` / `promoted: N` / `nothing-to-dispose` / `no-new-diff-skip`.
-- `gate result` — `allowed: open-findings-scoped-as-next` / `allowed: no-open-findings` / `refused: <mode>`.
+- `barrage status` — e.g. `2/3 models healthy` (printed by the barrage verb).
+- `dampener result` — `Dampened: ...` or `Not dampened: ...` (printed by `check-barrage-dampener`).
+- `disposition` — `fired-and-slushed`, `fired-and-promoted`, or the verb exits early with `no new diff` or `outage` text.
+- `findings`/`promoted`/`slushed` counts.
 
-The verb writes `last-hook-run.json` after every legitimate exit (success + skip + outage) and appends to `hook-run-log.jsonl` so the pre-push gate can walk a multi-commit range.
+When the barrage fires, the run directory at `.dw-lifecycle/scope-discovery/audit-runs/<timestamp>-<feature>/` is the durable record (INDEX.md + per-model output + tip.sha). Per Phase 24's no-git-hook-enforcement contract, the verb no longer writes `last-hook-run.json` or appends to `hook-run-log.jsonl` — those artifacts existed only to satisfy the retired commit-msg + pre-push gates. No-new-diff-skip and barrage-outage outcomes consequently leave only stderr text behind (an operator-acknowledged trade-off per the dampener slush logic that already accepts MED/LOW losses).
 
 ## Dispatch-wrapper engagement
 

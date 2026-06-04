@@ -1,0 +1,8 @@
+{
+  "kind": "stage-transition",
+  "at": "2026-06-03T16:50:04.158Z",
+  "entryId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+  "from": "Published",
+  "to": "Drafting",
+  "reason": "Review Phase 24 + 25 extensions before extending PRD prose"
+}

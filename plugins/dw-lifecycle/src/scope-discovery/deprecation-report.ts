@@ -48,7 +48,7 @@ import type {
 
 /**
  * Default destination path for the committed artifact (relative to
- * the scan root). Mirrors `editor-symmetry-report.ts`'s placement under
+ * the scan root). Mirrors `module-symmetry-report.ts`'s placement under
  * `.dw-lifecycle/scope-discovery/` per the project's canonical config
  * directory (Finding AUDIT-20260525-03).
  */

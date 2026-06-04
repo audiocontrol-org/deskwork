@@ -60,6 +60,8 @@ const TASK_HEADING_RE =
   /^###\s+Task\s+(\d+)(?:\.(\d+))?\s*(?:\([^)]*(?:\([^)]*\)[^)]*)*\))?\s*:/i;
 const UNCHECKED_CHECKBOX_RE = /^- \[ \]/;
 
+import { parseLedgerFromWorkplan } from '../workplan-archive/ledger.js';
+
 export class AutoPositionError extends Error {
   override name = 'AutoPositionError';
 }
@@ -179,6 +181,12 @@ function taskHasUncheckedCheckbox(
  * Compute the auto-position anchor for inserting new fix-finding task
  * blocks. Throws `AutoPositionError` if the workplan has no parseable
  * phase headings.
+ *
+ * Per Phase 26 Task 4 (AUDIT-86): when the workplan carries a
+ * `<!-- workplan-archive-ledger -->` annotation with a `next-fix-task-id`
+ * field matching the chosen phase, the computed `currentMaxNumberInPhase`
+ * is `max(scan-of-workplan, ledger.next-fix-task-id - 1)` so the next
+ * fix-task ID can't collide with an archived range.
  */
 export function computeAutoPosition(workplanText: string): AutoPosition {
   const lines = workplanText.split('\n');
@@ -234,6 +242,38 @@ export function computeAutoPosition(workplanText: string): AutoPosition {
     for (const t of tasksInPhase) {
       if (t.major > currentMaxNumberInPhase) currentMaxNumberInPhase = t.major;
     }
+  }
+
+  // Phase 26 Task 4 (AUDIT-86): if the workplan carries a ledger with
+  // `next-fix-task-id` matching the chosen phase, use the ledger's
+  // recorded next-ID as a floor for `currentMaxNumberInPhase`. The
+  // ledger captures the highest fix-task ID ever allocated in this
+  // phase (including ones now archived); the auto-positioner picks
+  // `max(scan, ledger.next-fix-task-id - 1)` so new fix-tasks can't
+  // collide with archived ranges.
+  try {
+    const ledger = parseLedgerFromWorkplan(workplanText);
+    if (ledger !== null) {
+      const ledgerNextId = ledger.nextFixTaskId;
+      const dotIdx = ledgerNextId.indexOf('.');
+      if (dotIdx !== -1) {
+        const ledgerPhase = Number(ledgerNextId.slice(0, dotIdx));
+        const ledgerMinor = Number(ledgerNextId.slice(dotIdx + 1));
+        if (
+          Number.isFinite(ledgerPhase) &&
+          Number.isFinite(ledgerMinor) &&
+          ledgerPhase === phaseSpan.phaseNumber &&
+          convention === 'hierarchical' &&
+          ledgerMinor - 1 > currentMaxNumberInPhase
+        ) {
+          currentMaxNumberInPhase = ledgerMinor - 1;
+        }
+      }
+    }
+  } catch {
+    // Malformed ledger: ignore + fall through to scan-only behavior.
+    // The workplan-archive-ledger-coherence doctor rule (Phase 26 Task 5)
+    // surfaces the malformed state separately.
   }
 
   return {

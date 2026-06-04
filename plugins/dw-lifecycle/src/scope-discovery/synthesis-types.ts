@@ -142,7 +142,7 @@ export interface ManifestRegimeHoldoutMeta {
   readonly by_source: {
     readonly anti_pattern: number;
     readonly adopter_manifest: number;
-    readonly editor_symmetry: number;
+    readonly module_symmetry: number;
     readonly deprecation: number;
   };
   /**
@@ -167,7 +167,7 @@ export interface ManifestRegimeHoldoutMeta {
 export interface ManifestRegimeHoldouts {
   readonly anti_patterns: ReadonlyArray<ManifestRegimeHoldoutEntry>;
   readonly adopter_manifests: ReadonlyArray<ManifestRegimeHoldoutEntry>;
-  readonly editor_symmetry: ReadonlyArray<ManifestRegimeHoldoutEntry>;
+  readonly module_symmetry: ReadonlyArray<ManifestRegimeHoldoutEntry>;
   readonly deprecations: ReadonlyArray<ManifestRegimeHoldoutEntry>;
   readonly meta: ManifestRegimeHoldoutMeta;
 }

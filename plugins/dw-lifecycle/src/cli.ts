@@ -10,7 +10,10 @@ import { customize } from './subcommands/customize.js';
 import { checkClones } from './subcommands/check-clones.js';
 import { checkAntiPatterns } from './subcommands/check-anti-patterns.js';
 import { checkAdopters } from './subcommands/check-adopters.js';
-import { checkEditorSymmetry } from './subcommands/check-editor-symmetry.js';
+import {
+  checkModuleSymmetry,
+  checkEditorSymmetryDeprecated,
+} from './subcommands/check-module-symmetry.js';
 import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
 import { scopeInventory } from './subcommands/scope-inventory.js';
 import { scopeWiden } from './subcommands/scope-widen.js';
@@ -23,10 +26,10 @@ import { scopeExport } from './subcommands/scope-export.js';
 import { refreshClonesBaseline } from './subcommands/refresh-clones-baseline.js';
 import { disposeClone } from './subcommands/dispose-clone.js';
 import { installScopeDiscovery } from './subcommands/install-scope-discovery.js';
-import { installScopeDiscoveryHooks } from './subcommands/install-scope-discovery-hooks.js';
-import { installAgentPrompts } from './subcommands/install-agent-prompts.js';
 import { migrateFromPilot } from './subcommands/migrate-from-pilot.js';
-import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-discovery-hooks.js';
+import { uninstallEverythingHookRelatedCli } from './subcommands/uninstall-everything-hook-related.js';
+import { archivePhasesCli } from './subcommands/archive-phases.js';
+import { unarchivePhasesCli } from './subcommands/unarchive-phases.js';
 import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
 import { auditBarrage } from './subcommands/audit-barrage.js';
 import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
@@ -40,8 +43,6 @@ import { promoteFindings } from './subcommands/promote-findings.js';
 import { checkOpenFindingsCli } from './subcommands/check-open-findings.js';
 import { checkBarrageDampenerCli } from './subcommands/check-barrage-dampener.js';
 import { checkBarrageTipCli } from './subcommands/check-barrage-tip.js';
-import { checkImplementHookRanCli } from './subcommands/check-implement-hook-ran.js';
-import { checkImplementHookCoverageCli } from './subcommands/check-implement-hook-coverage.js';
 import { implementHookCli } from './subcommands/implement-hook.js';
 import { slushRemainingCli } from './subcommands/slush-remaining.js';
 import { applyAuditFlipsCli } from './subcommands/apply-audit-flips.js';
@@ -80,7 +81,14 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'detect-clones': checkClones,
   'check-anti-patterns': checkAntiPatterns,
   'check-adopters': checkAdopters,
-  'check-editor-symmetry': checkEditorSymmetry,
+  // `check-module-symmetry` is the Phase 25 Task 5 canonical name;
+  // `check-editor-symmetry` stays as a deprecation-warning alias for
+  // one release cycle so adopter muscle memory + pre-commit hooks
+  // installed against earlier versions keep working without
+  // re-installing. Removal target is documented in the alias shim
+  // (subcommands/check-module-symmetry.ts).
+  'check-module-symmetry': checkModuleSymmetry,
+  'check-editor-symmetry': checkEditorSymmetryDeprecated,
   'check-refactor-preconditions': checkRefactorPreconditions,
   'scope-inventory': scopeInventory,
   'scope-widen': scopeWiden,
@@ -93,10 +101,10 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'refresh-clones-baseline': refreshClonesBaseline,
   'dispose-clone': disposeClone,
   'install-scope-discovery': installScopeDiscovery,
-  'install-scope-discovery-hooks': installScopeDiscoveryHooks,
-  'install-agent-prompts': installAgentPrompts,
   'migrate-from-pilot': migrateFromPilot,
-  'uninstall-scope-discovery-hooks': uninstallScopeDiscoveryHooks,
+  'uninstall-everything-hook-related': uninstallEverythingHookRelatedCli,
+  'archive-phases': archivePhasesCli,
+  'unarchive-phases': unarchivePhasesCli,
   'orchestrator-turn': orchestratorTurn,
   'audit-barrage': auditBarrage,
   'audit-barrage-render': auditBarrageRender,
@@ -110,8 +118,6 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'check-open-findings': checkOpenFindingsCli,
   'check-barrage-dampener': checkBarrageDampenerCli,
   'check-barrage-tip': checkBarrageTipCli,
-  'check-implement-hook-ran': checkImplementHookRanCli,
-  'check-implement-hook-coverage': checkImplementHookCoverageCli,
   'implement-hook': implementHookCli,
   'slush-remaining': slushRemainingCli,
   'apply-audit-flips': applyAuditFlipsCli,
@@ -134,6 +140,8 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 // (registered in SUBCOMMANDS above); the hint is informational only.
 const DEPRECATED_ALIASES: Record<string, string> = {
   'detect-clones': 'alias for `check-clones` (preferred name; alias kept for back-compat)',
+  'check-editor-symmetry':
+    'alias for `check-module-symmetry` (Phase 25 rename; removal target v0.37.0)',
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

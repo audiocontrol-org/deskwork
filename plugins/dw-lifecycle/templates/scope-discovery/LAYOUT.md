@@ -50,7 +50,7 @@ override path. The complete list:
 | `check-anti-patterns` | `--root <path>` | `src/` |
 | `check-adopters` | `--root <path>` | `src/` |
 | `check-refactor-preconditions` | (operates on `clones.yaml` directly) | n/a |
-| `check-editor-symmetry` | `--module-root <path>` | `src/` |
+| `check-module-symmetry` | `--module-root <path>` | `src/` |
 | `scope-inventory` | `--module-root <path>` | `src/` |
 
 The CLI defaults are intentionally project-friendly: `--root src/`

@@ -86,6 +86,15 @@ export function inferFindingShape(finding: OpenFinding): FindingShape {
   if (/\.dw-lifecycle\//.test(surface)) return 'non-bug';
   if (/last-hook-run\.json/.test(surface)) return 'non-bug';
   if (/hook-run-log\.jsonl/.test(surface)) return 'non-bug';
+  // Plugin skill bodies, templates, and slash-command shim files are
+  // doc prose, not source code. Per AUDIT-20260603-72: without these
+  // entries the renderer mints unsatisfiable vitest acceptance criteria
+  // for skill/template/command findings (the same shape AUDIT-20260602-05
+  // closed for DEVELOPMENT-NOTES.md and AUDIT-20260602-07 closed for
+  // .claude/rules/*.md).
+  if (/plugins\/[^/]+\/skills\//.test(surface)) return 'non-bug';
+  if (/plugins\/[^/]+\/templates\//.test(surface)) return 'non-bug';
+  if (/plugins\/[^/]+\/commands\/[^/]+\.md/.test(surface)) return 'non-bug';
   // Commit-history findings — "commit <sha>" or "subject" framings
   if (/\bcommit\b.*\b[0-9a-f]{7,40}\b/i.test(surface)) return 'non-bug';
   // Process findings explicitly naming "missing surface" or "no surface"
@@ -149,7 +158,7 @@ export function renderFixTaskBlock(
       '',
       `- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".`,
       `- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).`,
-      `- [ ] Step 3: commit with \`Acknowledges ${id}\` in subject (use \`Closes ${id}\` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use \`Acknowledges\`; for deferrals use \`Defers\`). Per AUDIT-20260602-01: \`apply-audit-flips\` parses \`Closes\` trailers as \`fixed-<sha>\` proposals — using \`Closes\` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.`,
+      `- [ ] Step 3: commit with an \`Acknowledges ${id}\` trailer in the commit message (use \`Closes ${id}\` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use \`Acknowledges\`; for deferrals use \`Defers\`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: \`apply-audit-flips\` parses \`Closes\` trailers ONLY — \`Acknowledges\` and \`Defers\` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using \`Closes\` on a non-fix disposition arms a false \`fixed-<sha>\` flip when the audit-log entry is later re-opened.`,
       '',
       '**Acceptance Criteria:**',
       '',

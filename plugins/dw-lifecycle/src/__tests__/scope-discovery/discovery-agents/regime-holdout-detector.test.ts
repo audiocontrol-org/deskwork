@@ -139,13 +139,13 @@ describe('regime-holdout-detector — core scenarios', () => {
       expect(isRegimeHoldoutFindings(payload)).toBe(true);
       if (!isRegimeHoldoutFindings(payload)) return;
       expect(
-        payload.meta.editor_symmetry_holdout_count,
-        `expected at least 1 editor-symmetry finding; got ${payload.meta.editor_symmetry_holdout_count}`,
+        payload.meta.module_symmetry_holdout_count,
+        `expected at least 1 module-symmetry finding; got ${payload.meta.module_symmetry_holdout_count}`,
       ).toBeGreaterThanOrEqual(1);
       const f = payload.findings.find(
-        (x) => x.source === 'editor-symmetry' && x.id.includes('bar-editor'),
+        (x) => x.source === 'module-symmetry' && x.id.includes('bar-editor'),
       );
-      expect(f, 'expected an editor-symmetry finding naming bar-editor').toBeDefined();
+      expect(f, 'expected a module-symmetry finding naming bar-editor').toBeDefined();
     } finally {
       await cleanup(fixture);
     }
@@ -229,7 +229,7 @@ describe('regime-holdout-detector — core scenarios', () => {
       const expectedTotal =
         payload.meta.anti_pattern_count +
         payload.meta.adopter_manifest_count +
-        payload.meta.editor_symmetry_holdout_count +
+        payload.meta.module_symmetry_holdout_count +
         payload.meta.deprecation_count;
       expect(payload.meta.total).toBe(expectedTotal);
       expect(payload.findings.length).toBe(expectedTotal);
@@ -308,7 +308,7 @@ describe('regime-holdout-detector — gutted-stub self-check', () => {
         meta: {
           anti_pattern_count: 0,
           adopter_manifest_count: 0,
-          editor_symmetry_holdout_count: 0,
+          module_symmetry_holdout_count: 0,
           deprecation_count: 0,
           total: 0,
         },

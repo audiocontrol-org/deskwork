@@ -27,7 +27,6 @@ left untouched unless `--force` is passed.
 | `clones.yaml` | The clone-detector baseline. Operator-curated dispositions. |
 | `anti-patterns.yaml` | Registry of LEGACY shapes the project has retired. |
 | `adopter-manifests.yaml` | Registry of canonical primitives that adopters MUST use. |
-| `hooks-installed.json` | Provenance for `install-scope-discovery-hooks` (do not hand-edit). |
 
 Optional override files (created by `dw-lifecycle customize` when the
 operator needs to deviate from plugin defaults):
