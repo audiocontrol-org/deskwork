@@ -301,7 +301,7 @@ formally-installed release" rule.
 ### AUDIT-20260604-01 — All-skip apply still creates the `pending-verification` label in the target repo
 
 Finding-ID: AUDIT-20260604-01 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-7f119181d95b64fcc3274533455034d41b5059c2
 Severity:   medium
 Surface:    plugins/dw-lifecycle/src/close-shipped/apply-v2.ts:185-203 (the `applyV2` body) + test `close-shipped-apply-v2.test.ts:` "pre-flight: label absent → label create runs"
 
@@ -312,7 +312,7 @@ The fix is to gate the pre-flight on there being at least one effectively-shippe
 ### AUDIT-20260604-02 — smoke-hygiene per-run timestamp hardcodes `-000Z` and diverges from the SKILL.md format it claims to mirror
 
 Finding-ID: AUDIT-20260604-02
-Status:     open
+Status:     fixed-19f6310095640ac506fefe47d7e3697b8ed89bd9
 Severity:   low
 Surface:    scripts/smoke-hygiene.sh:415-420 (`CS_RUN_TS="$(date -u +%Y-%m-%dT%H-%M-%S-000Z)"`)
 
