@@ -4382,7 +4382,7 @@ This is adopter-facing release guidance, so the contradiction can cause a failed
 ### AUDIT-20260604-18 — Path resolution for `--all` is hardcoded to `001-IN-PROGRESS`, diverging from `archivePhases`'s own three-status resolver
 
 Finding-ID: AUDIT-20260604-18 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model)
-Status:     open
+Status:     fixed-1a6130ef40d854801bfc47e6492aa30208e007d6
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:113-121` vs. `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:399-409`
 

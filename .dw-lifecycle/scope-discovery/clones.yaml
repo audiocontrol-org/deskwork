@@ -1,4 +1,4 @@
-generated_at: 2026-06-04T03:33:22.391Z
+generated_at: 2026-06-04T03:41:24.668Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -1338,13 +1338,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/workplan-archive/unarchive-phases.ts:90:97
     disposition: pending
     reason: null
-  - id: 215deda84f52
-    lines: 13
+  - id: 52ca2ff2a12b
+    lines: 10
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:396:408
-      - plugins/dw-lifecycle/src/scope-discovery/workplan-archive/unarchive-phases.ts:120:132
-    disposition: pending
-    reason: null
+      - plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:408:417
+      - plugins/dw-lifecycle/src/scope-discovery/workplan-archive/unarchive-phases.ts:123:132
+    disposition: keep-with-reason
+    reason: Each verb's resolveFeatureDir throws its own typed error (ArchivePhasesError vs UnarchivePhasesError); the per-verb error type is part of each library's public API. Extracting a shared resolver would introduce an error-translation layer for a 10-line pattern; the verbatim duplication is the lower-friction shape given the typed-error contract.
   - id: 11a36455541f
     lines: 9
     members:
