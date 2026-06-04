@@ -217,6 +217,8 @@ Closes AUDIT-20260604-01 (claude-01 + codex-03; cross-model). Surface: `.dw-life
 
 ### Task 33 (fix-finding-AUDIT-20260604-03) (non-bug): AUDIT-20260604-03 — README Phase 25 row says "Tasks 4–11 remain" while the same …
 
+> Superseded by audit-log Status `acknowledged-readme-phase-25-row-advanced-to-tasks-3-4-shipped-2026-06-04` — no TDD walk required.
+
 **Complete (2026-06-04).** Closes AUDIT-20260604-03. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 25 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 4 block).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
@@ -253,6 +255,8 @@ Closes AUDIT-20260604-01 (claude-01 + codex-03; cross-model). Surface: `.dw-life
 
 
 ### Task 34 (fix-finding-AUDIT-20260604-05) (non-bug): AUDIT-20260604-05 — README Phase 26 row test count (2664) is now stale vs. workp…
+
+> Superseded by audit-log Status `acknowledged-readme-phase-26-row-drops-absolute-count-2026-06-04` — no TDD walk required.
 
 **Complete (2026-06-04).** Closes AUDIT-20260604-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 26 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 32 Step 4).
 
