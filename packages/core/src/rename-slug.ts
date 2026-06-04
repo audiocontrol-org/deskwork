@@ -24,7 +24,7 @@ import { readCalendar, writeCalendar } from './calendar.ts';
 import { readSidecarSync } from './sidecar/read.ts';
 import { writeSidecarSync } from './sidecar/write.ts';
 import { sidecarPath } from './sidecar/paths.ts';
-import { loadLaneConfig } from './lanes/loader.ts';
+import { loadLaneConfig, laneConfigPath } from './lanes/loader.ts';
 
 /**
  * Detect a slug rename's filesystem shape from the entry's stored
@@ -183,27 +183,35 @@ export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
 
   // Resolve the optional 301-redirect target (lane.redirectsPath, spec
   // Decision #23) BEFORE any filesystem/calendar mutation — AUDIT-20260604-08.
-  // `loadLaneConfig` is a THROWING resolver (it fails on a missing file AND
-  // on a present-but-unresolvable lane, e.g. a purged/archived pipeline
-  // template or corrupt JSON — loader.ts), so resolving it at the append
+  // `loadLaneConfig` is a THROWING resolver, so resolving it at the append
   // step risked a partial-apply: a sidecar naming an unresolvable lane would
   // crash AFTER the rename already mutated disk.
   //
-  // Resolving redirectsPath is BEST-EFFORT optional website metadata
-  // (AUDIT-20260604-08, refined by the cross-model follow-up): a renamed
-  // entry whose lane is gone OR whose lane is otherwise unresolvable is
-  // still a valid rename. ANY lane-resolution failure → skip the optional
-  // append (NOT a partial-apply, NOT a hard error). An `existsSync` guard
-  // alone was asymmetric — it tolerated a missing file but still crashed on
-  // a present-but-pipeline-purged lane. A corrupt/unresolvable lane is a
-  // real problem, but renameSlug is not where it is surfaced: the lane-config
-  // doctor rules flag it. Done pre-mutation, so the swallowed failure can
-  // never leave partial state.
+  // Resolving redirectsPath is BEST-EFFORT optional website metadata: a
+  // renamed entry whose lane is gone OR unresolvable is still a valid rename.
+  // The common case — the lane config file is simply ABSENT (archived/purged/
+  // legacy-stale) — is handled by an explicit existence check, NOT a catch
+  // (AUDIT-20260604-13/-cross-model-followup: a catch-all that also swallowed
+  // the missing-file case was overbroad). The residual try/catch is scoped to
+  // the present-but-won't-load shapes ONLY (unresolvable pipeline template,
+  // corrupt JSON, schema-invalid) — every one of which means "this lane is
+  // unusable", so skipping the optional append is correct; the broken lane is
+  // surfaced by the lane-config doctor rules, not by crashing a valid rename.
+  // The unexpected error `err` is bound (not silently dropped) so the failure
+  // is attributable in a stack trace if it is ever something other than a
+  // lane-resolution error. Done pre-mutation → never partial state.
   let redirectsPath: string | undefined;
-  if (sidecar.lane !== undefined) {
+  if (
+    sidecar.lane !== undefined &&
+    existsSync(laneConfigPath(projectRoot, sidecar.lane))
+  ) {
     try {
       redirectsPath = loadLaneConfig(sidecar.lane, projectRoot).redirectsPath;
-    } catch {
+    } catch (err) {
+      // Present-but-unusable lane (bad pipeline ref / corrupt JSON). The
+      // optional redirect cannot be resolved; skip it. `err` is bound for
+      // attributability; doctor's lane-config rules surface the bad lane.
+      void err;
       redirectsPath = undefined;
     }
   }
