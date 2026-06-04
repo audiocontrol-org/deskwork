@@ -295,19 +295,19 @@ Closes AUDIT-20260604-07 (claude-01 + codex-01; cross-model). Surface: `plugins/
 
 ### Task 35 (fix-finding-AUDIT-20260604-08): AUDIT-20260604-08 — `scope-inventory.ts` comment was advanced to the new verb na…
 
-Closes AUDIT-20260604-08. Surface: `plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:228,391,406,407` (comment touched by diff at the `check-module-symmetry` lines; identifiers/flag unchanged). Severity: medium.
+Closes AUDIT-20260604-08. Surface: `plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:228,391,406,407` (comment touched by diff at the `check-module-symmetry` lines; identifiers/flag unchanged). Severity: medium. **Complete (2026-06-04).** Fix renames the surviving "editor" identifiers/flag to match the Phase 25 Task 5 verb-rename motif: `--module-symmetry-out` is canonical, `--editor-symmetry-out` is a deprecation-warning alias for one release cycle (removal target v0.37.0); internal field `editorSymmetryOut` → `moduleSymmetryOut`; function `writeEditorSymmetryArtifact` → `writeModuleSymmetryArtifact`; `activations.editorSymmetry` → `activations.moduleSymmetry`; `PHASE4_GATE_FILES.editorSymmetryArtifact` → `moduleSymmetryArtifact` (value preserves the wire-format filename `editor-symmetry.md` per check-module-symmetry.ts:14-18).
 
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 2: confirm test fails against current code (verify the bug repros)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm test passes
-- [ ] Step 5: commit with `Closes AUDIT-20260604-08` in subject
+- [x] Step 1: failing test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/scope-inventory-cli.module-symmetry-out.test.ts` — three blocks pinning canonical-flag parse, alias parse, alias-symmetry of resolved value.
+- [x] Step 2: tests fail pre-fix (`unknown arg: --module-symmetry-out` thrown by parseCli; no `moduleSymmetryOut` field on CliOptions).
+- [x] Step 3: implemented — `scope-inventory-cli.ts` adds `--module-symmetry-out` to SCALAR_FLAGS + USAGE, keeps `--editor-symmetry-out` as alias with stderr deprecation warning, renames the option field to `moduleSymmetryOut`; `scope-inventory.ts` updates every consumer (function name, activations field, gate-files constant, comment).
+- [x] Step 4: 3/3 new tests pass; full plugin suite 2677/2677 green; tsc clean.
+- [x] Step 5: committed with `Closes AUDIT-20260604-08` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/scope-inventory-cli.module-symmetry-out.test.ts` (cited in Step 1)
+- [x] `npx vitest run src/__tests__/scope-discovery/scope-inventory-cli.module-symmetry-out.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 3: Disposition + baseline commands
 

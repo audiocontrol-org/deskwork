@@ -60,7 +60,7 @@ import {
 const PHASE4_GATE_FILES = {
   antiPatterns: '.dw-lifecycle/scope-discovery/anti-patterns.yaml',
   adopterManifests: '.dw-lifecycle/scope-discovery/adopter-manifests.yaml',
-  editorSymmetryArtifact: '.dw-lifecycle/scope-discovery/editor-symmetry.md',
+  moduleSymmetryArtifact: '.dw-lifecycle/scope-discovery/editor-symmetry.md',
 } as const;
 
 // `CliOptions`, `parseCli`, `USAGE`, `FEATURE_SLUG_REGEX`, and
@@ -104,7 +104,7 @@ interface AgentRun {
  */
 interface Phase4Activations {
   readonly regimeHoldout: boolean;
-  readonly editorSymmetry: boolean;
+  readonly moduleSymmetry: boolean;
   readonly adopterManifestChecker: boolean;
 }
 
@@ -133,12 +133,12 @@ function decideActivations(repoRoot: string): Phase4Activations {
     resolve(repoRoot, PHASE4_GATE_FILES.adopterManifests),
   );
   const haveEditorSymmetryArtifact = existsSync(
-    resolve(repoRoot, PHASE4_GATE_FILES.editorSymmetryArtifact),
+    resolve(repoRoot, PHASE4_GATE_FILES.moduleSymmetryArtifact),
   );
   return {
     regimeHoldout:
       haveAntiPatterns || haveAdopterManifests || haveEditorSymmetryArtifact,
-    editorSymmetry: haveAdopterManifests,
+    moduleSymmetry: haveAdopterManifests,
     adopterManifestChecker: haveAdopterManifests,
   };
 }
@@ -225,7 +225,7 @@ async function runAgents(
  * skipped. Failures throw so the orchestrator surfaces them at exit
  * code 2 (matches the standalone `check-module-symmetry` semantics).
  */
-async function writeEditorSymmetryArtifact(args: {
+async function writeModuleSymmetryArtifact(args: {
   readonly repoRoot: string;
   readonly moduleRoot: string;
   readonly outPath: string;
@@ -386,11 +386,12 @@ export async function scopeInventoryMain(
       );
     }
 
-    // Editor-symmetry artifact (Phase 4 Family B): activate when
+    // Module-symmetry artifact (Phase 4 Family B): activate when
     // adopter-manifests.yaml exists. Default output lives under the
-    // per-run evidence trail; explicit --editor-symmetry-out
-    // overrides. Failures throw and exit code 2 (matches the
-    // standalone check-module-symmetry's contract).
+    // per-run evidence trail; explicit --module-symmetry-out (with
+    // back-compat alias `--editor-symmetry-out`) overrides. Failures
+    // throw and exit code 2 (matches the standalone
+    // check-module-symmetry's contract).
     let runDir: string | null = null;
     if (opts.evidenceTrail) {
       runDir = makeRunDir({
@@ -398,13 +399,13 @@ export async function scopeInventoryMain(
         featureSlug: opts.featureSlug,
       });
     }
-    if (activations.editorSymmetry) {
+    if (activations.moduleSymmetry) {
       const defaultPath =
         runDir !== null
           ? resolve(runDir, 'editor-symmetry.md')
-          : resolve(opts.repoRoot, PHASE4_GATE_FILES.editorSymmetryArtifact);
-      const symmetryOut = opts.editorSymmetryOut ?? defaultPath;
-      const written = await writeEditorSymmetryArtifact({
+          : resolve(opts.repoRoot, PHASE4_GATE_FILES.moduleSymmetryArtifact);
+      const symmetryOut = opts.moduleSymmetryOut ?? defaultPath;
+      const written = await writeModuleSymmetryArtifact({
         repoRoot: opts.repoRoot,
         moduleRoot: opts.moduleRoot,
         outPath: symmetryOut,

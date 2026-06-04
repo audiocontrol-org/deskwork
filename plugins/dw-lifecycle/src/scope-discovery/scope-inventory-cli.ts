@@ -22,7 +22,11 @@ export interface CliOptions {
   readonly moduleRoot: string;
   readonly evidenceTrail: boolean;
   readonly quiet: boolean;
-  readonly editorSymmetryOut: string | null;
+  // Phase 25 Task 5 rename: was `editorSymmetryOut`. The CLI surface
+  // still accepts `--editor-symmetry-out` as a back-compat alias (one
+  // release cycle; removal target v0.37.0) — same shape as the verb
+  // alias landed in Phase 25 Task 5.
+  readonly moduleSymmetryOut: string | null;
   /**
    * LLM ensemble opt-out flags. Default behavior is
    * "engage the audit-log read at the start of the run + fire the
@@ -51,7 +55,7 @@ export const USAGE =
   '    [--repo-root <repo-root>] \\\n' +
   '    [--module-root <module-root>] \\\n' +
   '    [--evidence-trail on|off] \\\n' +
-  '    [--editor-symmetry-out <path>] \\\n' +
+  '    [--module-symmetry-out <path>] \\\n' +
   '    [--no-audit-read] [--no-audit-fire] \\\n' +
   '    [--no-require-modules] \\\n' +
   '    [--quiet]\n';
@@ -65,6 +69,10 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     '--repo-root',
     '--module-root',
     '--evidence-trail',
+    // `--module-symmetry-out` is the Phase 25 Task 5 canonical name;
+    // `--editor-symmetry-out` stays as a deprecation-warning alias for
+    // one release cycle (removal target v0.37.0).
+    '--module-symmetry-out',
     '--editor-symmetry-out',
   ]);
   let quiet = false;
@@ -118,13 +126,26 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
   if (evidenceFlag !== 'on' && evidenceFlag !== 'off') {
     throw new Error(`--evidence-trail must be 'on' or 'off' (got '${evidenceFlag}')`);
   }
+  // Resolve `--module-symmetry-out` (canonical) and fall back to the
+  // legacy `--editor-symmetry-out` alias. When the alias is used, emit
+  // a one-line deprecation note on stderr naming the canonical flag +
+  // the removal target — same shape as the subcommand alias landed in
+  // Phase 25 Task 5.
+  const moduleSymmetryOutRaw = scalars.get('--module-symmetry-out');
   const editorSymmetryOutRaw = scalars.get('--editor-symmetry-out');
-  const editorSymmetryOut =
-    editorSymmetryOutRaw === undefined
+  if (moduleSymmetryOutRaw === undefined && editorSymmetryOutRaw !== undefined) {
+    process.stderr.write(
+      'scope-inventory: `--editor-symmetry-out` is deprecated; ' +
+        'use `--module-symmetry-out`. Removal target: v0.37.0.\n',
+    );
+  }
+  const symmetryOutRaw = moduleSymmetryOutRaw ?? editorSymmetryOutRaw;
+  const moduleSymmetryOut =
+    symmetryOutRaw === undefined
       ? null
-      : isAbsolute(editorSymmetryOutRaw)
-        ? editorSymmetryOutRaw
-        : resolve(root, editorSymmetryOutRaw);
+      : isAbsolute(symmetryOutRaw)
+        ? symmetryOutRaw
+        : resolve(root, symmetryOutRaw);
   return {
     featureSlug: slug,
     prdPath,
@@ -133,7 +154,7 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     moduleRoot: scalars.get('--module-root') ?? DEFAULT_MODULE_ROOT,
     evidenceTrail: evidenceFlag === 'on',
     quiet,
-    editorSymmetryOut,
+    moduleSymmetryOut,
     noAuditRead,
     noAuditFire,
     noRequireModules,
