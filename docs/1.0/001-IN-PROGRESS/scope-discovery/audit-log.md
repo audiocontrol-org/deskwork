@@ -4376,3 +4376,18 @@ Surface:    `MIGRATING.md:10,42`
 `MIGRATING.md:10` correctly says the strict schema rejects `regime_holdouts.editor_symmetry` and there is “no alias on the YAML side.” But `MIGRATING.md:42` then says “All `module-symmetry`-canonical surfaces named above are additive (CLI + slash-command + flag + field name); the legacy names continue to function via deprecation aliases.” Including “field name” in that sentence is false for the schema surface.
 
 This is adopter-facing release guidance, so the contradiction can cause a failed upgrade expectation: CLI and flag aliases survive, but YAML does not. The fix is to split the statement: CLI/slash-command/flag are additive aliases for one release cycle; the YAML field is a breaking rename requiring manual migration.
+
+## 2026-06-04 — audit-barrage lift (20260604T033206580Z-scope-discovery)
+
+### AUDIT-20260604-18 — Path resolution for `--all` is hardcoded to `001-IN-PROGRESS`, diverging from `archivePhases`'s own three-status resolver
+
+Finding-ID: AUDIT-20260604-18 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:113-121` vs. `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:399-409`
+
+The `--all` branch reads the workplan from a hardcoded path: `join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', featureSlug, 'workplan.md')`. But the very next call — `archivePhases(...)` — resolves the feature dir through `resolveFeatureDir`, which probes **three** candidates: `docs/1.0/001-IN-PROGRESS`, `docs/1.0/002-WAITING`, and `docs/1.0/003-COMPLETE`. The two path resolutions disagree.
+
+Consequences: (1) `archive-phases --all --feature <slug>` against a feature in `002-WAITING` or `003-COMPLETE` fails at line 124 with an opaque `--all could not read .../001-IN-PROGRESS/...` exit-2, while `archive-phases --phases 1-5 --feature <slug>` for the *same* feature succeeds — two modes of one command resolve paths inconsistently. The workplan claims "the verb itself works standalone"; for non-in-progress features the `--all` mode does not. (2) Even in the happy `001-IN-PROGRESS` case, the workplan is read twice (once in the CLI to enumerate, once inside `archivePhases`), and the hardcoded `1.0` version string is a rot vector the moment the docs tree ever advances past `1.0` — `resolveFeatureDir` carries the same `1.0` hardcode but at least centralizes it.
+
+Fix: export `resolveFeatureDir` from `archive-phases.ts` and have the CLi's `--all` branch resolve the workplan path through it (then read `join(featureDir, 'workplan.md')`), eliminating both the divergence and the double-derivation. A single resolver is the contract; two copies that disagree on which statuses exist is the bug.

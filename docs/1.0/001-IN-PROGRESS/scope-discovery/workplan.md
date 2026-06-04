@@ -309,6 +309,26 @@ Closes AUDIT-20260604-08. Surface: `plugins/dw-lifecycle/src/scope-discovery/sco
 - [x] `npx vitest run src/__tests__/scope-discovery/scope-inventory-cli.module-symmetry-out.test.ts` exits 0 (passes against the fix)
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
+
+### Task 36 (fix-finding-AUDIT-20260604-18): AUDIT-20260604-18 — Path resolution for `--all` is hardcoded to `001-IN-PROGRESS…
+
+Closes AUDIT-20260604-18 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model). Surface: `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:113-121` vs. `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:399-409`. Severity: high. **Complete (2026-06-04).** Router exported + CLI shim routes through it.
+
+- [x] Step 0: working-code invariant — the library's `archivePhases` correctly probes all three status dirs (`001-IN-PROGRESS`, `002-WAITING`, `003-COMPLETE`) via the private `resolveFeatureDir` helper. The fix preserves this three-status walk for the library and lifts the same helper to the CLI shim.
+- [x] Step 1: failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts` — `'AUDIT-18 bug-repro: resolveFeatureDir locates a feature in 003-COMPLETE (the case the hardcoded path missed)'` is the bug-repro; would FAIL against the pre-fix hardcoded `001-IN-PROGRESS` path.
+- [x] Step 1b: regression-lock tests in the same file — `'resolveFeatureDir locates a feature in 001-IN-PROGRESS'` + `'resolveFeatureDir locates a feature in 002-WAITING'` pin the contract that the resolver walks all three status dirs (so a future refactor that drops the multi-status walk gets caught). Plus `'resolveFeatureDir throws ArchivePhasesError when no candidate exists'` guards against silent fallback. 5 total new test blocks (exceeds Option D ≥2).
+- [x] Step 2: tests fail against current code (the new `resolveFeatureDir` / `resolveFeatureWorkplanPath` exports don't exist pre-fix).
+- [x] Step 3: implemented — `resolveFeatureDir` exported (added a docblock naming AUDIT-18 as the motivation); new `resolveFeatureWorkplanPath` convenience that appends `workplan.md`. CLI shim's `--all` branch routes through `resolveFeatureWorkplanPath` instead of the hardcoded `join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', ...)` path.
+- [x] Step 4: 31/31 archive-phases tests pass; full plugin suite 2691/2691 green; tsc clean.
+- [x] Step 5: committed with `Closes AUDIT-20260604-18 (claude-01..05 + codex-01..03; cross-model)` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts` (cited in Step 1)
+- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is 5 ≥2 per Option D discipline
+- [x] `npx vitest run src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts` exits 0 (passes against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 3: Disposition + baseline commands
 
 - [x] `dispose-clone <id> --as <refactor|keep-with-reason|ignore-with-justification> [args]` — refuses without Step 0a/0b flags on refactor disposition. Single-id convenience wrapper around `batch-dispose`. `keep-with-reason` + `ignore-with-justification` pass through verbatim; `--as refactor` requires all Step 0a/0b precondition flags (`--canonical-side`, `--canonical-reason`, [`--new-shape-summary` if canonical-side=new], `--tests`, `--tests-proof-sha`, `--tests-proof-demonstration`) AND still refuses to write (refactor's 5 fields don't fit `--reason` shape; the wrapper redirects to manual editing + `dw-lifecycle check-refactor-preconditions`). The flag-presence requirement is a forcing function — the operator who tries `--as refactor` sees the full precondition surface in the error message. 19 vitest scenarios.

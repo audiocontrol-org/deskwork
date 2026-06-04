@@ -396,7 +396,16 @@ function createArchiveFileHeader(slug: string): string {
   ].join('\n');
 }
 
-async function resolveFeatureDir(repoRoot: string, slug: string): Promise<string> {
+/**
+ * Probes `docs/1.0/{001-IN-PROGRESS,002-WAITING,003-COMPLETE}/<slug>/`
+ * in order and returns the first that exists. Exported so callers
+ * outside this module (e.g., the `--all` flag's pre-read of the
+ * workplan in the CLI shim) can resolve through the same three-status
+ * lookup the library uses internally — AUDIT-20260604-18 caught the
+ * `--all` flag hardcoding `001-IN-PROGRESS` while the library walked
+ * all three.
+ */
+export async function resolveFeatureDir(repoRoot: string, slug: string): Promise<string> {
   const candidates = [
     join(repoRoot, 'docs/1.0/001-IN-PROGRESS', slug),
     join(repoRoot, 'docs/1.0/002-WAITING', slug),
@@ -406,4 +415,17 @@ async function resolveFeatureDir(repoRoot: string, slug: string): Promise<string
     if (await pathExists(candidate)) return candidate;
   }
   throw new ArchivePhasesError(`feature dir not found for slug "${slug}"`);
+}
+
+/**
+ * Convenience for the `--all` flag's pre-read step in the CLI shim.
+ * Returns the absolute path of the feature's `workplan.md` after
+ * resolving through `resolveFeatureDir`.
+ */
+export async function resolveFeatureWorkplanPath(
+  repoRoot: string,
+  slug: string,
+): Promise<string> {
+  const dir = await resolveFeatureDir(repoRoot, slug);
+  return join(dir, 'workplan.md');
 }

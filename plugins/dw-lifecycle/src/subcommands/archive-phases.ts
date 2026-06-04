@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import {
   archivePhases,
   enumerateAllPhases,
+  resolveFeatureWorkplanPath,
   ArchivePhasesError,
 } from '../scope-discovery/workplan-archive/archive-phases.js';
 
@@ -111,14 +111,20 @@ export async function archivePhasesCli(args: string[]): Promise<void> {
   const repoRoot = repoRootOverride ?? process.cwd();
   let phases: number[];
   if (allFlag) {
-    const workplanPath = join(
-      repoRoot,
-      'docs',
-      '1.0',
-      '001-IN-PROGRESS',
-      featureSlug,
-      'workplan.md',
-    );
+    // AUDIT-20260604-18: route through the same 3-status resolver
+    // (001-IN-PROGRESS / 002-WAITING / 003-COMPLETE) the library uses
+    // internally. The earlier hardcoded `001-IN-PROGRESS` mismatched
+    // the library's `resolveFeatureDir` and broke `--all` for any
+    // feature not in the in-progress status dir.
+    let workplanPath: string;
+    try {
+      workplanPath = await resolveFeatureWorkplanPath(repoRoot, featureSlug);
+    } catch (err) {
+      process.stderr.write(
+        `archive-phases: --all could not resolve feature dir for slug "${featureSlug}": ${(err as Error).message}\n`,
+      );
+      process.exit(2);
+    }
     let workplanBody: string;
     try {
       workplanBody = await readFile(workplanPath, 'utf8');

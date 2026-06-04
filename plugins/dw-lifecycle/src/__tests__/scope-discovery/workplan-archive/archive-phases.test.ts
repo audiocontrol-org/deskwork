@@ -9,6 +9,8 @@ import {
   countUncheckedTasks,
   validateVestigialReason,
   scanFixTaskIds,
+  resolveFeatureDir,
+  resolveFeatureWorkplanPath,
   ArchivePhasesError,
 } from '../../../scope-discovery/workplan-archive/archive-phases.js';
 
@@ -40,6 +42,83 @@ describe('locatePhaseSection — pure-fn', () => {
   it('returns null when the phase is absent', () => {
     const lines = ['# Workplan', '## Phase 1: A', '## Phase 3: C'];
     expect(locatePhaseSection(lines, 2)).toBeNull();
+  });
+});
+
+describe('resolveFeatureDir + resolveFeatureWorkplanPath — three-status resolver (AUDIT-20260604-18)', () => {
+  // AUDIT-18 bug-repro: the `--all` CLI shim previously hardcoded
+  // `001-IN-PROGRESS` while the library walked all three status dirs.
+  // These tests pin the contract that both the library helper and the
+  // CLI's exposed resolver walk the same `{001-IN-PROGRESS, 002-
+  // WAITING, 003-COMPLETE}` candidate set, returning the first that
+  // exists.
+
+  async function fixture(label: string): Promise<string> {
+    const { mkdtemp } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    return mkdtemp(join(tmpdir(), `audit-18-${label}-`));
+  }
+
+  it('resolveFeatureDir locates a feature in 001-IN-PROGRESS', async () => {
+    const root = await fixture('in-progress');
+    try {
+      mkdirSync(join(root, 'docs/1.0/001-IN-PROGRESS/demo'), { recursive: true });
+      writeFileSync(join(root, 'docs/1.0/001-IN-PROGRESS/demo/workplan.md'), 'x');
+      const dir = await resolveFeatureDir(root, 'demo');
+      expect(dir).toBe(join(root, 'docs/1.0/001-IN-PROGRESS/demo'));
+    } finally {
+      const { rm } = await import('node:fs/promises');
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('resolveFeatureDir locates a feature in 002-WAITING', async () => {
+    const root = await fixture('waiting');
+    try {
+      mkdirSync(join(root, 'docs/1.0/002-WAITING/demo'), { recursive: true });
+      const dir = await resolveFeatureDir(root, 'demo');
+      expect(dir).toBe(join(root, 'docs/1.0/002-WAITING/demo'));
+    } finally {
+      const { rm } = await import('node:fs/promises');
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('AUDIT-18 bug-repro: resolveFeatureDir locates a feature in 003-COMPLETE (the case the hardcoded path missed)', async () => {
+    const root = await fixture('complete');
+    try {
+      mkdirSync(join(root, 'docs/1.0/003-COMPLETE/demo'), { recursive: true });
+      const dir = await resolveFeatureDir(root, 'demo');
+      expect(dir).toBe(join(root, 'docs/1.0/003-COMPLETE/demo'));
+    } finally {
+      const { rm } = await import('node:fs/promises');
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('resolveFeatureWorkplanPath appends workplan.md to the resolved feature dir', async () => {
+    const root = await fixture('workplan-path');
+    try {
+      mkdirSync(join(root, 'docs/1.0/003-COMPLETE/demo'), { recursive: true });
+      const path = await resolveFeatureWorkplanPath(root, 'demo');
+      expect(path).toBe(join(root, 'docs/1.0/003-COMPLETE/demo/workplan.md'));
+    } finally {
+      const { rm } = await import('node:fs/promises');
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('resolveFeatureDir throws ArchivePhasesError when no candidate exists (regression-lock against silent fallback)', async () => {
+    const root = await fixture('missing');
+    try {
+      await expect(resolveFeatureDir(root, 'nonexistent-slug')).rejects.toThrow(
+        ArchivePhasesError,
+      );
+    } finally {
+      const { rm } = await import('node:fs/promises');
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
