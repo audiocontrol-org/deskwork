@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   loadLaneConfig,
+  loadLaneConfigSchemaOnly,
   listLaneConfigs,
   laneConfigPath,
   lanesDir,
@@ -168,6 +169,40 @@ describe('loadLaneConfig', () => {
     });
     const lane = loadLaneConfig('mockups', projectRoot);
     expect(lane.pipelineTemplate).toBe('visual');
+  });
+});
+
+describe('loadLaneConfigSchemaOnly (AUDIT-20260604-19)', () => {
+  let projectRoot: string;
+  beforeEach(() => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'deskwork-lanes-schemaonly-'));
+  });
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('reads a lane WITHOUT cross-validating the pipeline template — an unresolvable pipeline does NOT throw', () => {
+    writeLane(projectRoot, 'pub', {
+      id: 'pub',
+      name: 'pub',
+      pipelineTemplate: 'no-such-template',
+      redirectsPath: 'public/_redirects',
+    });
+    // loadLaneConfig throws on the unresolvable pipeline…
+    expect(() => loadLaneConfig('pub', projectRoot)).toThrow(/pipelineTemplate|resolve/i);
+    // …but the schema-only reader returns the stored fields, pipeline ignored.
+    const lane = loadLaneConfigSchemaOnly('pub', projectRoot);
+    expect(lane.redirectsPath).toBe('public/_redirects');
+    expect(lane.pipelineTemplate).toBe('no-such-template');
+  });
+
+  it('still throws on a missing file, invalid JSON, schema violation, and unsafe id', () => {
+    expect(() => loadLaneConfigSchemaOnly('absent', projectRoot)).toThrow(/not found/i);
+    mkdirSync(lanesDir(projectRoot), { recursive: true });
+    writeFileSync(join(lanesDir(projectRoot), 'bad.json'), '{ not json', 'utf8');
+    expect(() => loadLaneConfigSchemaOnly('bad', projectRoot)).toThrow(/JSON/i);
+    expect(() => loadLaneConfigSchemaOnly('', projectRoot)).toThrow(/non-empty/i);
+    expect(() => loadLaneConfigSchemaOnly('../escape', projectRoot)).toThrow();
   });
 });
 

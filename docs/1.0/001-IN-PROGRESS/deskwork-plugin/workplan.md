@@ -1953,7 +1953,7 @@ Tasks (TDD-shaped; map to spec § Scope a–e):
         - [x] **(c1) `resolveChannelsPath` removal** ✅ `1f17e008` — zero live consumers. The ONLY cleanly-mechanical sub-part.
         - [x] **(c5-design) DESIGN PASS DONE (2026-06-04).** Resolved the three entangled design questions in the spec (§"39c-2b(c5) terminal-deletion design pass", Decisions #21/#22/#23). Key correction from the orienting map: the doctor's orphan/duplicate detection is **already migrated** (`doctor/runner.ts` → `buildContentIndexFromSidecars` + `collectLaneScaffoldDirs`) — NOT part of the gap. The remaining gap is the studio content **browser** (c5), review-workflow **keying** (c3), and **redirects** (c4). All three now have spec decisions; c2/c3/c4/c5-impl below are unblocked.
         - [ ] **(c2) scrapbook migration.** `scrapbookDirForEntry` (entry-aware) migrates to `artifactPath`; `scrapbookDirAtPath` re-bases its arbitrary fs-relative path on the owning content root from `collectContentRoots(...)` (per c5 Decision #21) instead of `resolveContentDir`. Drop the slug-template read helpers (`_scrapbookDirSlug`→`resolveBlogPostDir`) once the c5 walk lands.
-        - [ ] **(c3) review-workflow keying — DESIGN RESOLVED (Decision #22).** Workflows are scoped to `entryId` (grouping axis), but the **full dedup key is `(entryId, kind, channel?)`** — an entry owns longform + per-platform shortform workflows, so bare `entryId` equality would shadow co-resident workflows (AUDIT-BARRAGE-claude-03). Remove the `site in config.sites` validation (`start-handlers.ts`/`handlers.ts`); switch the `(site, slug)` match expressions (`pipeline.ts:147`, `start-handlers.ts:92,227`) to the composite key (preserve the kind/channel discriminator — match on the workflow's own `id` where known); re-home `workflow.site` → `workflow.lane` for the `report.ts` breakdown (`bySite`→`byLane`); read legacy `site`-bearing workflows tolerantly. `block`/`cancel`/`induct`/`distribute` remain pure-echo (terminal-deletion only).
+        - [x] **(c3) review-workflow keying — DONE (2026-06-04, `17c9bb6b`, TDD).** Removed both `site in config.sites` 400 checks (start-handlers/handlers) — unknown entry now surfaces via the existing 404; `report.ts` `bySite`→`byLane` via new `resolveWorkflowLane` (entryId-preferred, slug-fallback, `(unknown)` bucket on orphan); `matchesKey` discriminator (`entryId||(site,slug)`+kind+platform+channel) preserved with a regression test (AUDIT-BARRAGE-claude-03 invariant). `site`/`slug` kept as tolerated recorded fields; `config.sites`/`SiteConfig`/`resolveSite` deletion is terminal-unit scope. core 1027 · studio 1269 · cli 454 green.
         - [x] **(c4) `rename-slug` redirects — DONE (2026-06-04, TDD).** `LaneConfig.redirectsPath?` added (sibling of `host`); `rename-slug` resolves `loadLaneConfig(sidecar.lane).redirectsPath`, skips append when no lane / unset; `siteEntry()` + the `site` param deleted; migration carries legacy `site.redirectsPath` → `lane.redirectsPath`. core 1013 green, source build clean. `SiteConfig.redirectsPath` kept (migration read; terminal-deletion removes it).
         - [ ] **(c5-impl) content browser re-root + terminal deletion — DESIGN RESOLVED (Decision #21).** New `collectContentRoots(projectRoot)` = de-duped union of every lane's `scaffoldDefaults` dirs. `buildContentTree`/`defaultFsWalk` drop the `site` param and walk those roots (projectRoot-relative base). Studio routes collapse `/dev/content/:site/...` → single-project tree; display-only `resolveContentDir` callers re-base on the owning content root. `ingest` scrapbook-skip walks each root. THEN the terminal `config.sites`/`SiteConfig`/`resolveSite`/`siteConfig`/`resolveContentDir` deletion (completion check: spec §"Terminal-deletion completion check (updated)"). Unblocks the "retire sites" headline.
 - [x] **39d — Doctor resolution reads `entry.artifactPath` only.** ✅ — `resolveArtifactPath` delegates to `resolveStoredArtifactPath` (no heuristic); deleted `artifactPathForStage` from validate.ts + repair.ts runtime; iterate.ts + studio entry-resolver throw `doctor --fix` on absent path; #394 regression fixture (2 sites/same slug → 0 findings) green; 3 fixtures stamped; shared `refineToIndexDoc` extracted. core 1014 + studio 681 pass. `file-presence` / `frontmatter-sidecar` / `missing-artifact-path` resolve via the stored path; no base search. Confirm `#394`-class multi-site false-positives cannot recur (regression fixture). Remove the dropped #394 search code.
@@ -2243,6 +2243,45 @@ Acknowledges AUDIT-20260604-12. Surface: `packages/core/src/config.ts:67-70` (do
 - [x] Docblock no longer claims `renameSlug` appends here; points at the lane-owned model + terminal-deletion fate.
 - [x] No test (doc-only change); core suite stays green (1018).
 - [x] Audit-log Status is `acknowledged-2026-06-04` (NON-bug doc-only — NOT a `fixed-<sha>` flip; AUDIT-BARRAGE-codex-01 caught this criterion mis-stating the expected status as `fixed-<sha>`).
+
+
+### Task 39.27 (fix-finding-AUDIT-20260604-19): AUDIT-20260604-19 — `renameSlug` still silently drops a valid 301 redirect when the lane's pipeline is unresolvable
+
+(Renumbered 39.25 → 39.27 to resolve a promote-findings auto-numbering collision with the AUDIT-12 task that already held 39.25 — the recurring #420 bug.)
+
+Closes AUDIT-20260604-19 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01; cross-model). Surface: `packages/core/src/rename-slug.ts` redirect-resolution block + `packages/core/src/lanes/loader.ts` pipeline cross-validation. Severity: high.
+
+- [x] Step 0: working-code invariant — c4 correctly appends a 301 when the entry's lane carries a `redirectsPath`; the fix must PRESERVE that append while also (a) not losing it when an orthogonal field (pipelineTemplate) is unresolvable and (b) surfacing any skip.
+- [x] Step 1: failing test — `packages/core/test/rename-slug.test.ts` "appends the 301 even when the lane pipeline template is unresolvable, as long as redirectsPath is valid" (the HIGH: valid redirect + broken pipeline → must append) + a loader test that `loadLaneConfigSchemaOnly` does NOT cross-validate the pipeline (`packages/core/test/lanes/loader.test.ts`).
+- [x] Step 1b: regression-lock — the existing happy-path append test (`rename-slug.test.ts`) stays green (a valid lane+redirect still appends), and the new `redirect-skipped`-visibility tests pin that missing/corrupt lanes skip VISIBLY (not silently, not crashing).
+- [x] Step 2: confirmed the HIGH test failed pre-fix (`loadLaneConfig` threw on the unresolvable pipeline → redirect lost).
+- [x] Step 3: implemented — new exported `loadLaneConfigSchemaOnly` (read + schema, NO pipeline cross-validation); `renameSlug` resolves `redirectsPath` via it, so a valid redirect survives a broken pipeline; a `redirect-skipped` action (with reason) surfaces every skip path; removed the false `void err`-attributability comment.
+- [x] Step 4: all green (core 1029).
+- [x] Step 5: committed with `Closes AUDIT-20260604-19 (...cross-model)`.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `packages/core/test/rename-slug.test.ts` (HIGH regression) + `packages/core/test/lanes/loader.test.ts` (schema-only loader)
+- [x] Regression-lock: happy-path append + redirect-skipped-visibility tests; ≥2 test blocks per Option D
+- [x] `npx vitest run` exits 0 (core 1029)
+- [x] Audit-log Status flipped to `fixed-<sha>` via `apply-audit-flips`
+
+
+### Task 39.26 (fix-finding-AUDIT-20260604-20): AUDIT-20260604-20 — Behavior-changing fix lands with no accompanying test in the diff
+
+Closes AUDIT-20260604-20. Surface: diff scope (no `packages/core/test/rename-slug.test.ts` hunk) + audit-log addendum "AUDIT-18 — OBSOLETE-by-design". Severity: low.
+
+- [x] Step 1: the AUDIT-19 fix lands WITH tests in the same diff (HIGH regression + redirect-skipped visibility + the new loader-schema-only test) — addressing the "behavior-changing fix with no test" gap directly.
+- [x] Step 2: confirmed the new tests fail pre-fix (HIGH test) / are new coverage (visibility + loader).
+- [x] Step 3 (AUDIT-18 ordering concern): the pre-mutation-ordering lock is moot now — lane resolution is NON-throwing (best-effort skip → `redirect-skipped` action), so a partial-apply from this path is structurally impossible; the skip tests assert the rename COMPLETES in every unresolvable case, which is the throw-independent invariant AUDIT-18 wanted.
+- [x] Step 4: all green (core 1029).
+- [x] Step 5: committed with `Closes AUDIT-20260604-20`.
+
+**Acceptance Criteria:**
+
+- [x] Failing/coverage tests exist at `packages/core/test/rename-slug.test.ts` + `packages/core/test/lanes/loader.test.ts`
+- [x] `npx vitest run` exits 0 (core 1029)
+- [x] Audit-log Status flipped to `fixed-<sha>` via `apply-audit-flips`
 
 ### Task 39.8 (fix-finding-AUDIT-20260603-41): AUDIT-20260603-41 — `add` stamps a lanes-composed `artifactPath`, but `scaffoldB…
 

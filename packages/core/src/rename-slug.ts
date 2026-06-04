@@ -24,7 +24,7 @@ import { readCalendar, writeCalendar } from './calendar.ts';
 import { readSidecarSync } from './sidecar/read.ts';
 import { writeSidecarSync } from './sidecar/write.ts';
 import { sidecarPath } from './sidecar/paths.ts';
-import { loadLaneConfig, laneConfigPath } from './lanes/loader.ts';
+import { loadLaneConfigSchemaOnly } from './lanes/loader.ts';
 
 /**
  * Detect a slug rename's filesystem shape from the entry's stored
@@ -77,7 +77,8 @@ export interface RenameSlugPlanAction {
     | 'dir-rename'
     | 'calendar-slug-change'
     | 'distribution-slug-sync'
-    | 'redirect-append';
+    | 'redirect-append'
+    | 'redirect-skipped';
   summary: string;
   details?: string;
 }
@@ -182,36 +183,35 @@ export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
   }
 
   // Resolve the optional 301-redirect target (lane.redirectsPath, spec
-  // Decision #23) BEFORE any filesystem/calendar mutation — AUDIT-20260604-08.
-  // `loadLaneConfig` is a THROWING resolver, so resolving it at the append
-  // step risked a partial-apply: a sidecar naming an unresolvable lane would
-  // crash AFTER the rename already mutated disk.
+  // Decision #23) BEFORE any filesystem/calendar mutation (AUDIT-20260604-08
+  // — resolving here, not at the append step, means a resolution failure can
+  // never leave a half-applied rename).
   //
-  // Resolving redirectsPath is BEST-EFFORT optional website metadata: a
-  // renamed entry whose lane is gone OR unresolvable is still a valid rename.
-  // The common case — the lane config file is simply ABSENT (archived/purged/
-  // legacy-stale) — is handled by an explicit existence check, NOT a catch
-  // (AUDIT-20260604-13/-cross-model-followup: a catch-all that also swallowed
-  // the missing-file case was overbroad). The residual try/catch is scoped to
-  // the present-but-won't-load shapes ONLY (unresolvable pipeline template,
-  // corrupt JSON, schema-invalid) — every one of which means "this lane is
-  // unusable", so skipping the optional append is correct; the broken lane is
-  // surfaced by the lane-config doctor rules, not by crashing a valid rename.
-  // The unexpected error `err` is bound (not silently dropped) so the failure
-  // is attributable in a stack trace if it is ever something other than a
-  // lane-resolution error. Done pre-mutation → never partial state.
+  // The redirect lives on the lane, but the pipeline template is ORTHOGONAL
+  // to it: read the lane SCHEMA-ONLY (AUDIT-20260604-19) so a valid
+  // `redirectsPath` still appends when the lane's pipeline is mid-edit /
+  // renamed / deleted. `loadLaneConfig` would cross-validate the pipeline and
+  // throw — silently dropping a perfectly valid redirect because an unrelated
+  // field didn't resolve (the SEO regression AUDIT-17/19 filed).
+  //
+  // When the lane cannot be consulted at all — config absent (archived /
+  // purged / legacy-stale) or unreadable/corrupt — the optional redirect is
+  // skipped, but VISIBLY: a `redirect-skipped` action records the reason so
+  // the omission surfaces in the result the caller renders (AUDIT-20260604-19
+  // — no silent drop, no phantom "attributability"). A renamed entry whose
+  // lane is gone is still a valid rename; the broken lane is surfaced by the
+  // lane-config doctor rules, not by crashing the rename.
   let redirectsPath: string | undefined;
-  if (
-    sidecar.lane !== undefined &&
-    existsSync(laneConfigPath(projectRoot, sidecar.lane))
-  ) {
+  if (sidecar.lane !== undefined) {
     try {
-      redirectsPath = loadLaneConfig(sidecar.lane, projectRoot).redirectsPath;
+      redirectsPath = loadLaneConfigSchemaOnly(sidecar.lane, projectRoot).redirectsPath;
     } catch (err) {
-      // Present-but-unusable lane (bad pipeline ref / corrupt JSON). The
-      // optional redirect cannot be resolved; skip it. `err` is bound for
-      // attributability; doctor's lane-config rules surface the bad lane.
-      void err;
+      const reason = err instanceof Error ? err.message : String(err);
+      actions.push({
+        kind: 'redirect-skipped',
+        summary: `skipped 301 redirect — lane "${sidecar.lane}" could not be read`,
+        details: reason,
+      });
       redirectsPath = undefined;
     }
   }

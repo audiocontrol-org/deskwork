@@ -279,14 +279,11 @@ describe('renameSlug — 39c c4 lane.redirectsPath (spec Decision #23)', () => {
     expect(existsSync(join(root, '_redirects'))).toBe(false);
   });
 
-  // AUDIT-20260604-08 (HIGH, cross-model) + AUDIT-20260604-09: a sidecar
-  // naming a lane whose config is ABSENT (archived / purged / legacy-stale)
-  // must NOT crash the rename. The redirect append is optional website
-  // metadata; an unresolvable lane skips it. And the rename must COMPLETE
-  // (artifact moved, calendar slug updated) — never a partial-apply where
-  // a post-mutation lane-resolution throw leaves disk + calendar changed
-  // but the command errored.
-  it('completes the rename and skips redirects when the sidecar names a lane with no config on disk (archived/purged)', () => {
+  // AUDIT-20260604-08/09: a sidecar naming a lane whose config is ABSENT
+  // (archived / purged / legacy-stale) must NOT crash the rename. The
+  // rename COMPLETES, and the skip is VISIBLE via a `redirect-skipped`
+  // action (AUDIT-20260604-19 — no silent drop).
+  it('completes the rename and emits redirect-skipped when the lane config is missing (archived/purged)', () => {
     seed('old-post', 'docs/old-post/index.md', 'ghost'); // lane 'ghost' has no lanes/ghost.json
     mkdirSync(join(root, 'docs', 'old-post'), { recursive: true });
     writeFileSync(join(root, 'docs/old-post/index.md'), '# Body\n', 'utf-8');
@@ -304,29 +301,32 @@ describe('renameSlug — 39c c4 lane.redirectsPath (spec Decision #23)', () => {
     expect(readSidecarSync(root, UUID).artifactPath).toBe('docs/new-post/index.md');
     const cal = readCalendar(join(root, '.deskwork', 'calendar.md'));
     expect(cal.entries.find((e) => e.id === UUID)?.slug).toBe('new-post');
-    // Redirect step skipped (no lane config to read redirectsPath from).
+    // No append, but the skip is SURFACED (not silent).
     expect(result.actions.some((a) => a.kind === 'redirect-append')).toBe(false);
+    expect(result.actions.some((a) => a.kind === 'redirect-skipped')).toBe(true);
     expect(existsSync(join(root, '_redirects'))).toBe(false);
   });
 
-  // AUDIT-20260604-08 (cross-model follow-up): resolving the optional
-  // redirectsPath is BEST-EFFORT. ANY lane-resolution failure — missing
-  // file, purged/archived pipeline template, OR corrupt JSON — skips the
-  // optional redirect; the rename still completes. A corrupt lane is a real
-  // problem, but it is surfaced by the lane-config doctor rules, not by
-  // crashing an otherwise-valid rename. (An `existsSync`-only guard was
-  // asymmetric: it tolerated a missing file but crashed on a present-but-
-  // unresolvable lane.) Resolution runs pre-mutation, so a swallowed failure
-  // can never leave partial state.
-  it('completes the rename and skips redirects when the sidecar names a lane whose pipeline template is purged (present file, unresolvable)', () => {
-    seed('old-post', 'docs/old-post/index.md', 'orphan-lane');
+  // AUDIT-20260604-19 (HIGH, cross-model): the pipeline template is ORTHOGONAL
+  // to the redirect. A lane carrying a VALID redirectsPath whose pipeline
+  // template is unresolvable (mid-edit / renamed / deleted) must STILL append
+  // its 301 — the redirect must not be lost because an unrelated field didn't
+  // resolve. Resolution reads the lane SCHEMA-ONLY (no pipeline cross-check).
+  it('appends the 301 even when the lane pipeline template is unresolvable, as long as redirectsPath is valid', () => {
+    seed('old-post', 'docs/old-post/index.md', 'pub-lane');
     mkdirSync(join(root, 'docs', 'old-post'), { recursive: true });
     writeFileSync(join(root, 'docs/old-post/index.md'), '# Body\n', 'utf-8');
-    // Lane file is PRESENT but references a pipeline template that does not
-    // resolve — loadLaneConfig throws, existsSync(laneConfigPath) is true.
+    mkdirSync(join(root, 'public'), { recursive: true });
+    // Lane is schema-valid AND carries a valid redirectsPath, but its
+    // pipelineTemplate does not resolve.
     writeFileSync(
-      join(root, '.deskwork', 'lanes', 'orphan-lane.json'),
-      JSON.stringify({ id: 'orphan-lane', name: 'orphan-lane', pipelineTemplate: 'no-such-template' }),
+      join(root, '.deskwork', 'lanes', 'pub-lane.json'),
+      JSON.stringify({
+        id: 'pub-lane',
+        name: 'pub-lane',
+        pipelineTemplate: 'no-such-template',
+        redirectsPath: 'public/_redirects',
+      }),
       'utf-8',
     );
 
@@ -337,12 +337,18 @@ describe('renameSlug — 39c c4 lane.redirectsPath (spec Decision #23)', () => {
       newSlug: 'new-post',
     });
 
-    expect(existsSync(join(root, 'docs/new-post/index.md'))).toBe(true);
-    expect(result.actions.some((a) => a.kind === 'redirect-append')).toBe(false);
-    expect(existsSync(join(root, '_redirects'))).toBe(false);
+    // The valid redirect SURVIVES the unresolvable pipeline.
+    expect(result.actions.some((a) => a.kind === 'redirect-append')).toBe(true);
+    expect(result.actions.some((a) => a.kind === 'redirect-skipped')).toBe(false);
+    const redirectsFile = join(root, 'public', '_redirects');
+    expect(existsSync(redirectsFile)).toBe(true);
+    expect(readFileSync(redirectsFile, 'utf-8')).toContain(buildRedirectBlock('old-post', 'new-post'));
   });
 
-  it('completes the rename and skips redirects when the sidecar names a lane with corrupt JSON (best-effort resolution)', () => {
+  // AUDIT-20260604-19: a present-but-corrupt lane config cannot be read; the
+  // rename still completes and the skip is VISIBLE via redirect-skipped
+  // carrying the reason — not a silent drop, not a crash.
+  it('completes the rename and emits redirect-skipped with a reason when the lane JSON is corrupt', () => {
     seed('old-post', 'docs/old-post/index.md', 'broken');
     mkdirSync(join(root, 'docs', 'old-post'), { recursive: true });
     writeFileSync(join(root, 'docs/old-post/index.md'), '# Body\n', 'utf-8');
@@ -355,11 +361,14 @@ describe('renameSlug — 39c c4 lane.redirectsPath (spec Decision #23)', () => {
       newSlug: 'new-post',
     });
 
-    // Rename completes; the optional redirect is skipped (lane unresolvable).
+    // Rename completes; the optional redirect is skipped VISIBLY with a reason.
     expect(existsSync(join(root, 'docs/old-post/index.md'))).toBe(false);
     expect(existsSync(join(root, 'docs/new-post/index.md'))).toBe(true);
     const cal = readCalendar(join(root, '.deskwork', 'calendar.md'));
     expect(cal.entries.find((e) => e.id === UUID)?.slug).toBe('new-post');
     expect(result.actions.some((a) => a.kind === 'redirect-append')).toBe(false);
+    const skipped = result.actions.find((a) => a.kind === 'redirect-skipped');
+    expect(skipped).toBeDefined();
+    expect(skipped?.details).toBeTruthy(); // carries the underlying reason
   });
 });

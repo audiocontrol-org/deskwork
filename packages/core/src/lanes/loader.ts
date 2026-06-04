@@ -201,6 +201,36 @@ export function loadLaneConfig(id: string, projectRoot: string): LaneConfig {
 }
 
 /**
+ * Load a lane config by id WITHOUT cross-validating its pipeline template
+ * (AUDIT-20260604-19). Same read + safe-id + schema + id-match checks as
+ * `loadLaneConfig`, but it does NOT require the referenced `pipelineTemplate`
+ * to resolve.
+ *
+ * Use this when a caller needs a lane's STORED fields (e.g. the optional
+ * `redirectsPath`) and the pipeline template is orthogonal to that need.
+ * `loadLaneConfig` rejects a lane whose pipeline is mid-edit / renamed /
+ * deleted — correct when you are about to run that pipeline, but wrong when
+ * you only want a published-website field: it would discard a perfectly
+ * valid `redirectsPath` because an unrelated field didn't resolve.
+ *
+ * Throws on: empty id, unsafe id (path-traversal / bad charset), missing
+ * file, invalid JSON, schema violation, or id/filename mismatch. Does NOT
+ * throw on an unresolvable pipeline template.
+ *
+ * @param id - The lane id (matches the JSON filename basename).
+ * @param projectRoot - Absolute path to the project root.
+ */
+export function loadLaneConfigSchemaOnly(id: string, projectRoot: string): LaneConfig {
+  if (id.trim().length === 0) {
+    throw new Error(
+      `loadLaneConfigSchemaOnly requires a non-empty id; received ${JSON.stringify(id)}`,
+    );
+  }
+  assertSafeLaneId(projectRoot, id);
+  return readAndValidate(laneConfigPath(projectRoot, id), id);
+}
+
+/**
  * Options accepted by `listLaneConfigs`.
  *
  * - `includeArchived` — when `false` (the default), lanes carrying a
