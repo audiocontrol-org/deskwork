@@ -15,7 +15,6 @@ export * from './calendar.ts';
 export * from './calendar-mutations.ts';
 export * from './frontmatter.ts';
 export * from './journal.ts';
-export * from './body-state.ts';
 export * from './entry/resolve-artifact.ts';
 export * from './ingest.ts';
 export * as scrapbook from './scrapbook.ts';

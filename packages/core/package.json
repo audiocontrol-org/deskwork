@@ -29,10 +29,6 @@
       "default": "./dist/index.js"
     },
     "./package.json": "./package.json",
-    "./body-state": {
-      "types": "./dist/body-state.d.ts",
-      "default": "./dist/body-state.js"
-    },
     "./calendar": {
       "types": "./dist/calendar.d.ts",
       "default": "./dist/calendar.js"
