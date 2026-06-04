@@ -4236,7 +4236,7 @@ The downstream consequence is concrete: `classifyFixTaskRange` routes its well-f
 ### AUDIT-20260604-07 — Task 5's command markdown files route both slash-commands to a `check-module-symmetry` skill that does not exist at this commit — breaking the renamed command AND the formerly-working alias
 
 Finding-ID: AUDIT-20260604-07 (claude-01 + codex-01; cross-model)
-Status:     open
+Status:     fixed-d0aa9a5fab36f765ec1be120c385218499082d27
 Severity:   high
 Surface:    `plugins/dw-lifecycle/commands/check-module-symmetry.md` (new) + `plugins/dw-lifecycle/commands/check-editor-symmetry.md` (rewritten) vs. committed skill `plugins/dw-lifecycle/skills/check-editor-symmetry/SKILL.md`
 
@@ -4249,10 +4249,60 @@ The blast radius is two commands, not one. The new `/dw-lifecycle:check-module-s
 ### AUDIT-20260604-08 — `scope-inventory.ts` comment was advanced to the new verb name while the surviving `--editor-symmetry-out` flag, `editorSymmetryOut` option, and `writeEditorSymmetryArtifact` function keep the retired "editor" term — the exact comment-vs-code drift this phase exists to retire
 
 Finding-ID: AUDIT-20260604-08
-Status:     open
+Status:     fixed-0433442f8105c24640d23e650090c4b073a851cc
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:228,391,406,407` (comment touched by diff at the `check-module-symmetry` lines; identifiers/flag unchanged)
 
 This diff updated two comments in `scope-inventory.ts` to read *"matches the standalone `check-module-symmetry` semantics/contract"* (the `writeEditorSymmetryArtifact` docblock at line ~226 and the inline comment near line ~391). But `git grep` confirms the surrounding code still carries the retired terminology: the function is still `writeEditorSymmetryArtifact` (line 228), the option field is still `opts.editorSymmetryOut` (line 406), and — most importantly — there is a **user-facing CLI flag `--editor-symmetry-out`** referenced at line 391 that the diff left untouched. So a comment now says "check-module-symmetry" two lines above a flag the operator still types as `--editor-symmetry-out`.
 
 This is precisely the "status table / comment not bumped with the code" pattern AUDIT-20260604-02/03/05 penalized one surface over: a comment asserting a name the adjacent code doesn't honor. Phase 25's stated goal (issue #405) is *"adopt project-neutral `module` everywhere"* — a surviving `--editor-symmetry-out` flag directly contradicts that goal and will itself need its own deprecated-alias treatment (the same alias dance Task 5 just did for the subcommand), which is now harder to spot because the comment already reads as if the rename is done. A reasonable fix: either leave the comments referencing the old names until the flag/identifier rename lands as one atomic change, or rename `--editor-symmetry-out`→`--module-symmetry-out` (with a back-compat alias matching the subcommand precedent), `editorSymmetryOut`→`moduleSymmetryOut`, and `writeEditorSymmetryArtifact`→`writeModuleSymmetryArtifact` in the same commit so comment and code agree. Selectively updating only the comment is the worst of both — it hides the remaining work.
+
+## 2026-06-04 — audit-barrage lift (20260604T030450931Z-scope-discovery)
+
+### AUDIT-20260604-09 — Deprecation stderr warning is the load-bearing half of the alias contract but has zero test coverage
+
+Finding-ID: AUDIT-20260604-09
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/scope-inventory-cli.ts:129-139` (warning emit) vs. `plugins/dw-lifecycle/src/__tests__/scope-discovery/scope-inventory-cli.module-symmetry-out.test.ts` (no assertion)
+
+The AUDIT-08 fix's whole point is that `--editor-symmetry-out` survives as a *deprecation-warning* alias — the commit message and the inline comment at `scope-inventory-cli.ts:120-125` both promise "emit a one-line deprecation note on stderr naming the canonical flag + the removal target." The actual emit is `scope-inventory-cli.ts:129-139`:
+
+```
+if (moduleSymmetryOutRaw === undefined && editorSymmetryOutRaw !== undefined) {
+  process.stderr.write('scope-inventory: `--editor-symmetry-out` is deprecated; ...Removal target: v0.37.0.\n');
+}
+```
+
+The new test file pins three things — canonical parses, alias parses, alias-resolves-to-same-value — but `grep` for `deprecat`/`stderr` in the test returns only a comment and an `it()` title; **no assertion captures the stderr write**. So the suite stays green if the warning regresses to silence, fires on the canonical flag by mistake, or names the wrong removal version. This is exactly the `feedback_spec_test_blind_spots` failure mode the project flags: passing the parse-contract tests ≠ the deprecation contract is verified. A correct fix spies on `process.stderr.write` and asserts (a) it fires once with the canonical-flag name + `v0.37.0` when only the alias is passed, AND (b) it does NOT fire when `--module-symmetry-out` is passed (the suppression branch — the part most likely to silently break). Without (b) the test can't distinguish "warns correctly" from "warns always."
+
+---
+
+### AUDIT-20260604-10 — `parseCli` is now impure — it writes operator-facing stderr from inside a parse function, and the new regression-lock test triggers that I/O without asserting it
+
+Finding-ID: AUDIT-20260604-10 (claude-02 + claude-03 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/scope-inventory-cli.ts:129-139`
+
+The deprecation warning was placed *inside* `parseCli`, which until this diff was a pure argv→`CliOptions` transform. Now any caller that parses an argv containing `--editor-symmetry-out` emits a user-facing stderr line as a side effect of *parsing*. Two concrete consequences: (1) the third test block ("regression-lock: no `--editor-symmetry-out` usage is silently dropped") calls `parseCli([... '--editor-symmetry-out' ...])` purely to compare resolved values, but as a side effect dumps the deprecation banner into the test runner's stderr — noise that reads as a real warning during CI. (2) Any future internal reuse of `parseCli` (programmatic invocation, a wrapper verb, a dry-run) inherits the stderr emission whether or not presentation is wanted. Presentation belongs at the dispatch boundary, not in the parser. A cleaner shape returns a `deprecatedAliasUsed: boolean` (or a `warnings: string[]`) on `CliOptions` and lets `scopeInventoryMain` decide whether to write to stderr — which also makes Finding-01's assertion trivial (check the returned flag instead of spying on global I/O). Matches the project's own "no fallbacks/side-effects buried where they're hard to see" posture.
+
+---
+
+### AUDIT-20260604-11 — Partial rename residue in `scope-inventory.ts`: the `haveEditorSymmetryArtifact` local now reads a constant named `moduleSymmetryArtifact`, reproducing the name-vs-referent drift AUDIT-08 was filed to retire
+
+Finding-ID: AUDIT-20260604-11 (claude-04 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:135-140`
+
+The Task 35 commit message asserts the fix "updates every consumer (function name, activations field, gate-files constant, comment)." It renamed the constant (`editorSymmetryArtifact`→`moduleSymmetryArtifact`, line 63) and the activations field (`editorSymmetry`→`moduleSymmetry`), but left the local that bridges them on the old name:
+
+```
+const haveEditorSymmetryArtifact = existsSync(
+  resolve(repoRoot, PHASE4_GATE_FILES.moduleSymmetryArtifact),   // const renamed
+);
+return { regimeHoldout: ... || haveEditorSymmetryArtifact, moduleSymmetry: ... };  // field renamed, var not
+```
+
+So a reader at line 135-140 sees `haveEditorSymmetryArtifact` feeding `moduleSymmetry` — the precise comment/identifier-vs-referent mismatch this phase exists to eliminate, just one scope deeper than the flag AUDIT-08 caught. It's low severity (purely internal, no behavior change, and the on-disk `editor-symmetry.md` filename references at lines 63/124/196/405/415/420 are intentional wire-format per the SKILL.md note). But "updates every consumer" overstates what landed; either rename the local to `haveModuleSymmetryArtifact` (and the doc-comment at line 222 referring to the "editor-symmetry source bucket," which the matching SKILL.md change already advanced to "module-symmetry") or scope the remaining wire-format-vs-identifier split explicitly so the next reviewer doesn't re-file it.

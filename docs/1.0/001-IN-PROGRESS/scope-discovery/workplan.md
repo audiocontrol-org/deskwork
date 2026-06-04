@@ -1810,12 +1810,16 @@ Additional sweeping landed in this commit beyond the explicit task scope (low-ri
 
 ### Task 8 — Doctor-rule migration for adopter YAML
 
-- Step 1: Write a doctor rule `legacy-editor-symmetry-field-rename` that detects the legacy `editor_symmetry:` field in adopter YAML and rewrites it to `module_symmetry:` under `--fix`.
-- Step 2: Test the migration end-to-end against a fixture project with the old field name.
-- Step 3: Document the migration in the rename release notes.
-- Step 4: Confirm tests pass.
+**Complete (2026-06-04).** Doctor rule `legacy-editor-symmetry-field-rename` shipped at `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/legacy-editor-symmetry-field-rename.ts` + 5 vitest scenarios. Registered in `SCOPE_DISCOVERY_DOCTOR_RULES`. In-repo migration applied to `docs/1.0/001-IN-PROGRESS/scope-discovery/scope-manifest.yaml` + `docs/1.0/001-IN-PROGRESS/graphical-entries/scope-manifest.yaml` (both files had legacy `editor_symmetry:` keys; both now use `module_symmetry:`). Full plugin suite 2677 → 2682 green; tsc clean.
 
-**Acceptance:** `dw-lifecycle doctor --fix` rewrites legacy YAML cleanly. Existing adopter configs migrate without manual edit.
+- [x] Step 1: doctor rule writes a structured warning per scope-manifest YAML still carrying the legacy `editor_symmetry:` key. Walks BOTH `docs/<v>/<status>/<slug>/scope-manifest.yaml` AND `.dw-lifecycle/scope-discovery/scope-manifest.yaml` (per-project root). Detection is line-anchored to the literal YAML key shape `[ \t]*editor_symmetry\s*:` so prose / comments / value-strings that mention the term don't false-positive (regression-lock test pins this).
+- [x] Step 2: migration tested end-to-end via 5 vitest scenarios at `plugins/dw-lifecycle/src/__tests__/scope-discovery/doctor-rules/legacy-editor-symmetry-field-rename.test.ts` — empty repo / legacy field in feature-doc manifest / legacy field in project-root manifest / already-migrated manifest / regression-lock with sibling fields.
+- [x] Step 3: migration documented in this workplan + Phase 25 Task 11 release notes (separate commit per Phase 25 Task 11).
+- [x] Step 4: full plugin suite 2682/2682 green; tsc clean.
+
+**Scope adjustment (corrected from original spec):** the original "rewrites legacy YAML cleanly under `--fix`" framing assumed scope-discovery doctor rules supported `--fix` wiring. They do not — per `plugins/dw-lifecycle/skills/doctor/SKILL.md` § Error handling, *"Scope-discovery rules are read-only in the current cut. `--fix=<scope-discovery-rule>` is not yet wired; the operator runs the named install / uninstall command from the repair hint manually."* The rule's repair-hint message gives the operator the literal key-replacement instruction (`editor_symmetry:` → `module_symmetry:`) so a one-line edit per file completes the migration. Re-introducing `--fix` wiring for scope-discovery rules is a separate piece of work, captured here for the release notes but out of scope for Phase 25.
+
+**Acceptance:** ✅ Doctor rule detects legacy field cleanly. ✅ Repair-hint message names the exact key-replacement instruction. ✅ This project's two scope-manifest YAMLs migrated as part of the rule's dogfood (deskwork-work + graphical-entries feature docs). ✅ Adopter projects with legacy YAMLs get the warning + the migration instruction on `dw-lifecycle doctor` runs.
 
 ### Task 9 — PRD + workplan + feature-doc sweep
 

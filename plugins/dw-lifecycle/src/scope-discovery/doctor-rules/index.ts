@@ -22,6 +22,7 @@ import { check as catalogEntryMissingStatus } from './catalog-entry-missing-stat
 import { check as provenanceOrphanedEntries } from './provenance-orphaned-entries.js';
 import { check as fixTaskTddDiscipline } from './fix-task-tdd-discipline.js';
 import { check as workplanArchiveLedgerCoherence } from './workplan-archive-ledger-coherence.js';
+import { check as legacyEditorSymmetryFieldRename } from './legacy-editor-symmetry-field-rename.js';
 import type { DoctorRuleCheck } from './types.js';
 
 export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
@@ -35,6 +36,7 @@ export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
   provenanceOrphanedEntries,
   fixTaskTddDiscipline,
   workplanArchiveLedgerCoherence,
+  legacyEditorSymmetryFieldRename,
 ];
 
 export type { DoctorRuleCheck, DoctorRuleOptions, ScopeDoctorFinding } from './types.js';

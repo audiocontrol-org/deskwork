@@ -28,7 +28,7 @@ modules: []
 regime_holdouts:
   anti_patterns: []
   adopter_manifests: []
-  editor_symmetry: []
+  module_symmetry: []
   deprecations:
     - id: plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts
       file: plugins/dw-lifecycle/src/__tests__/scope-discovery/check-deprecations.test.ts
@@ -80,7 +80,7 @@ regime_holdouts:
     by_source:
       anti_pattern: 0
       adopter_manifest: 0
-      editor_symmetry: 0
+      module_symmetry: 0
       deprecation: 3
     by_status:
       actively_enforced: 3
