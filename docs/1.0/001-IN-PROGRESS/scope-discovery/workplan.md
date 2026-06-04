@@ -1795,11 +1795,18 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 7 — Doctor rules + agent-discipline + design-standards sweep
 
-- Step 1: Update doctor rule messages that reference `editor-symmetry` / `editor_symmetry`.
-- Step 2: Update `.claude/rules/agent-discipline.md` references.
-- Step 3: Update any other `.claude/rules/*.md` that mention editor-symmetry.
+**Complete (2026-06-04).** `.claude/rules/` and adopter-facing log lines + comments in scope-inventory.ts + check-deprecations.ts swept; one intentional deprecated-alias mention remains in `.claude/rules/enforcement-lives-in-skills.md` for documentation. Full plugin suite 2677/2677 green; tsc clean.
 
-**Acceptance:** Grep for `editor-symmetry` or `editor_symmetry` in `.claude/rules/` returns zero hits.
+- [x] Step 1: doctor rule messages — searched `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/`; zero `editor-symmetry`/`editor_symmetry` hits to update. (Pre-existing doctor rules don't reference the verb by name.) Done by omission.
+- [x] Step 2: `.claude/rules/agent-discipline.md` — searched; zero hits. Done by omission.
+- [x] Step 3: other `.claude/rules/*.md` — `.claude/rules/enforcement-lives-in-skills.md` line 16 (CLI-verb list) updated to `check-module-symmetry` with a trailing parenthetical naming the deprecated alias + its removal-target pointer. The alias-name mention is the only remaining hit, and it is intentional per Phase 25 Acceptance Criterion #3 ("alias surfaces subtracted").
+
+Additional sweeping landed in this commit beyond the explicit task scope (low-risk hygiene):
+
+- `scope-inventory.ts` — operator-facing log lines `editor-symmetry matrix at …` → `module-symmetry matrix at …`; `skipped editor-symmetry scanner` → `skipped module-symmetry scanner`; activation-decision comment updated; matrix-source comment updated; gate-files boolean `haveEditorSymmetryArtifact` → `haveModuleSymmetryArtifact`. The `editor-symmetry.md` filename references are preserved verbatim (wire-format per check-module-symmetry.ts:14-18).
+- `check-deprecations.ts` — sibling-verb-list comment `editor-symmetry` → `module-symmetry`.
+
+**Acceptance:** ✅ Grep for `editor-symmetry` or `editor_symmetry` in `.claude/rules/` returns one hit (the intentional deprecated-alias mention with its removal-target pointer); per Phase 25 Acceptance Criterion #3, alias-name mentions in deprecation documentation are subtracted from the zero-hit goal. ✅ Doctor-rule + agent-discipline.md sweeps confirmed clean by grep.
 
 ### Task 8 — Doctor-rule migration for adopter YAML
 
