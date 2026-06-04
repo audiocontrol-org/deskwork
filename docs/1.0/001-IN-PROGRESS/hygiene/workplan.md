@@ -144,16 +144,16 @@ Six structural-check verbs (`check-clones`, `check-anti-patterns`, `check-adopte
 
 **Approach:** Argv accepts `--feature <slug>`. When present, the scan walks ONLY feature-scope files (overrides `--root`). When absent, behavior unchanged.
 
-- [ ] Step 1: write failing test — (a) `--feature hygiene` finds only anti-pattern hits in feature-scope; (b) no flag = project-wide scan; (c) `--feature` + `--root` errors with actionable message.
-- [ ] Step 2: confirm tests fail.
-- [ ] Step 3: implement.
-- [ ] Step 4: confirm tests pass.
-- [ ] Step 5: commit with `Refs #417` in subject.
+- [x] Step 1: wrote 4 failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/anti-patterns.feature-flag.test.ts` — (a) `--feature hygiene` narrows scan to manifest-listed files (out-of-scope match filtered out); (b) no flag preserves project-wide scan; (c) `--feature` + `--root` exits 2 with `mutually exclusive` error; (d) `--feature unknown-slug` exits 2 with FeatureNotFoundError.
+- [x] Step 2: confirmed 3/4 failed against current code (case b passed pre-implementation, as expected).
+- [x] Step 3: implemented — added `--feature <slug>` to argv parser + parse-time mutual exclusion check against `--root`. In `main()`, when feature is set, call `resolveFeatureScope`, filter to .ts/.tsx, resolve against `realpath(cwd)`, and existsSync-filter to skip manifest-listed-but-deleted paths. `scan()` accepts a pre-resolved file list via the new optional second arg.
+- [x] Step 4: 4/4 tests pass; full plugin suite 2712/2712 green.
+- [x] Step 5: commit with `Refs #417` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] `dw-lifecycle check-anti-patterns --feature hygiene` exits 0.
-- [ ] Test cases pass; plugin suite green.
+- [x] `dw-lifecycle check-anti-patterns --feature hygiene` exits 0 without `unknown arg`.
+- [x] Test cases pass; plugin suite green (2712/2712).
 
 ### Task 4: `check-adopters` learns `--feature <slug>`
 
