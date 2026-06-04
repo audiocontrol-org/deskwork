@@ -135,13 +135,10 @@ describe('applyV2', () => {
 
   it('pre-flight: label exists → single gh label list call, no label create', () => {
     const { runGh, calls } = stubRunGh({ labelExists: true });
-    const skipOnly: Proposal = {
-      ...baseProposal,
-      items: baseProposal.items.map((i) => ({ ...i, decision: 'skip' as const })),
-    };
-    const result = applyV2({ proposal: skipOnly, runGh });
-    expect(result.applied.length).toBe(0);
-    // Only the pre-flight call ran; no per-item dispatch.
+    // baseProposal has one shipped item (#361) — pre-flight runs because
+    // there's actual per-item dispatch downstream.
+    const result = applyV2({ proposal: baseProposal, runGh });
+    expect(result.applied.length).toBe(1);
     const labelListCalls = calls.filter((c) => c[0] === 'label' && c[1] === 'list');
     const labelCreateCalls = calls.filter((c) => c[0] === 'label' && c[1] === 'create');
     expect(labelListCalls.length).toBe(1);
@@ -151,11 +148,9 @@ describe('applyV2', () => {
 
   it('pre-flight: label absent → label create runs, "created" note surfaces in result', () => {
     const { runGh, calls } = stubRunGh({ labelExists: false });
-    const skipOnly: Proposal = {
-      ...baseProposal,
-      items: baseProposal.items.map((i) => ({ ...i, decision: 'skip' as const })),
-    };
-    const result = applyV2({ proposal: skipOnly, runGh });
+    // baseProposal has one shipped item — pre-flight runs because actual
+    // dispatch will follow.
+    const result = applyV2({ proposal: baseProposal, runGh });
     const labelListCalls = calls.filter((c) => c[0] === 'label' && c[1] === 'list');
     const labelCreateCalls = calls.filter((c) => c[0] === 'label' && c[1] === 'create');
     expect(labelListCalls.length).toBe(1);
@@ -183,6 +178,25 @@ describe('applyV2', () => {
       expect((err as Error).message).toContain('pending-verification');
       expect((err as Error).message).toContain('gh label create');
     }
+  });
+
+  it('pre-flight: skips label list + create when every item is effective-skip (AUDIT-20260604-01)', () => {
+    // Cross-model finding: when all items resolve to effective-skip, the
+    // apply call has no per-item dispatch and therefore should not touch
+    // the repo at all. Creating a label preemptively is an unwanted
+    // side-effect when nothing was actually shipped.
+    const { runGh, calls } = stubRunGh({ labelExists: false });
+    const skipOnly: Proposal = {
+      ...baseProposal,
+      items: baseProposal.items.map((i) => ({ ...i, decision: 'skip' as const })),
+    };
+    const result = applyV2({ proposal: skipOnly, runGh });
+    const labelListCalls = calls.filter((c) => c[0] === 'label' && c[1] === 'list');
+    const labelCreateCalls = calls.filter((c) => c[0] === 'label' && c[1] === 'create');
+    expect(labelListCalls.length).toBe(0);
+    expect(labelCreateCalls.length).toBe(0);
+    expect(result.applied.length).toBe(0);
+    expect(result.notes).toEqual([]);
   });
 
   it('pre-flight: aborts BEFORE the per-item loop when label create fails', () => {

@@ -22,6 +22,40 @@ next-fix-task-id: 15.2
 
 The Phase 15 redesign's `apply` step posts a `pending-verification` comment + adds the label via two separate `gh` calls. When the label doesn't exist in the target repo, the label-add fails AFTER the comment has already posted. Result is the half-applied state #411 documents: 10 comments posted, 0 labels added, 0 dedupe-gate engagement on re-run. Surfaced during the 2026-06-04 dogfood run against v0.35.0..v0.36.0 in `feature/scope-discovery`.
 
+
+### Task 2 (fix-finding-AUDIT-20260604-01): AUDIT-20260604-01 — All-skip apply still creates the `pending-verification` labe…
+
+Closes AUDIT-20260604-01 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model). Surface: plugins/dw-lifecycle/src/close-shipped/apply-v2.ts:185-203 (the `applyV2` body) + test `close-shipped-apply-v2.test.ts:` "pre-flight: label absent → label create runs". Severity: medium.
+
+- [x] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [x] Step 2: confirm test fails against current code (verify the bug repros)
+- [x] Step 3: implement the fix
+- [x] Step 4: confirm test passes
+- [x] Step 5: commit with `Closes AUDIT-20260604-01 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/close-shipped-apply-v2.test.ts:179-196` ("pre-flight: skips label list + create when every item is effective-skip (AUDIT-20260604-01)")
+- [x] `npx vitest run src/__tests__/close-shipped-apply-v2.test.ts` exits 0 (10/10 pass against the fix)
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step (auto-flip on next end-of-task chain via `apply-audit-flips --apply`)
+
+
+### Task 3 (fix-finding-AUDIT-20260604-02): AUDIT-20260604-02 — smoke-hygiene per-run timestamp hardcodes `-000Z` and diverg…
+
+Closes AUDIT-20260604-02. Surface: scripts/smoke-hygiene.sh:415-420 (`CS_RUN_TS="$(date -u +%Y-%m-%dT%H-%M-%S-000Z)"`). Severity: low.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260604-02` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 1: Pre-flight + auto-create the label in `apply-v2.ts`
 
 **Approach:** Option 1 from the issue body (operator-recommended) — pre-flight via `gh label list`; auto-create if absent. Surface a one-line "created pending-verification label" message on first run; silent on subsequent runs.

@@ -170,18 +170,28 @@ export function applyV2(args: ApplyV2Args): ApplyV2Result {
   const color = args.labelColor ?? DEFAULT_LABEL_COLOR;
   const description = args.labelDescription ?? DEFAULT_LABEL_DESCRIPTION;
 
+  // AUDIT-20260604-01: only pre-flight the label when at least one item
+  // will actually dispatch. An all-skip apply has no per-item gh calls,
+  // so creating a label is an unwanted side-effect (nothing was actually
+  // shipped to verify against).
+  const willDispatch = args.proposal.items.some(
+    (item) => effectiveVerdict(item) === 'shipped',
+  );
+
   const notes: string[] = [];
-  const result = preflightLabel({
-    runGh: args.runGh,
-    repo: args.proposal.repo,
-    label: LABEL,
-    color,
-    description,
-  });
-  if (result === 'created') {
-    notes.push(
-      `created '${LABEL}' label on ${args.proposal.repo} (color ${color})`,
-    );
+  if (willDispatch) {
+    const result = preflightLabel({
+      runGh: args.runGh,
+      repo: args.proposal.repo,
+      label: LABEL,
+      color,
+      description,
+    });
+    if (result === 'created') {
+      notes.push(
+        `created '${LABEL}' label on ${args.proposal.repo} (color ${color})`,
+      );
+    }
   }
 
   const applied: PerItemOutcome[] = [];
