@@ -98,6 +98,20 @@ const META_COMMANDS = [
   'scope-widen',
   'tooling-feedback-import',
   'validate-scope-discovery',
+  // Hygiene-family verbs (Phase 11 stale-worktree-discovery + Phase 26
+  // workplan-archive + close-shipped triage): operator-invoked but
+  // outside the 19-command shortcut set. Authored 2026-06-04 commit
+  // 972d8dba to close AUDIT-20260604-29's picker-discoverability gap.
+  'archive-branch',
+  'archive-phases',
+  'close-shipped',
+  'debt-report',
+  'dismantle-worktrees',
+  'promote-deferrals',
+  're-audit-fixed-findings',
+  'triage-issues',
+  'unarchive-phases',
+  'worktree-report',
 ] as const;
 
 describe('COMMANDS canonical list', () => {
