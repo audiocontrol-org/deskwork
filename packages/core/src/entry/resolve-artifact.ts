@@ -74,3 +74,41 @@ export function refineToIndexDoc(absArtifact: string): string {
   if (existsSync(indexPath)) return indexPath;
   return absArtifact;
 }
+
+/**
+ * Resolve an existing entry's canonical document path from its STORED
+ * `artifactPath`, THROWING a `doctor --fix`-pointing error when the
+ * path is absent (Phase 39c-2b(a) — the "act on an existing entry"
+ * resolution contract for CLI verbs + studio).
+ *
+ * This is the throw-on-absent + read-side-refinement composition the
+ * studio's `resolveIndexPath` (39d) inlined. Promoting it to core lets
+ * the CLI verbs (publish, iterate longform) and the studio review
+ * surface share ONE resolver — the throw message lives in one place
+ * rather than being copy-pasted into each verb (a clones.yaml group).
+ *
+ * Resolution reads the stored path only — there is NO slug+stage
+ * fallback (that heuristic was retired in 39d). An entry whose sidecar
+ * lacks `artifactPath` is a `doctor --fix`-able state (39b backfills
+ * it); this helper throws with that guidance rather than guessing.
+ *
+ * @param entry       the entry sidecar (the SSOT — see Phase 30)
+ * @param projectRoot absolute project root the relative path resolves against
+ * @returns the absolute canonical document path (refined to a sibling
+ *          `index.md` when one exists on disk — the index.md-canonical case)
+ * @throws when `entry.artifactPath` is absent
+ */
+export function resolveArtifactPathOrThrow(
+  entry: Entry,
+  projectRoot: string,
+): string {
+  const absArtifact = resolveStoredArtifactPath(entry, projectRoot);
+  if (absArtifact === null) {
+    throw new Error(
+      `Cannot resolve entry ${entry.uuid} (slug "${entry.slug}"): the sidecar has no ` +
+        `artifactPath. Resolution reads the stored path only — there is no slug+stage ` +
+        `fallback. Run \`deskwork doctor --fix\` to backfill artifactPath, then retry.`,
+    );
+  }
+  return refineToIndexDoc(absArtifact);
+}

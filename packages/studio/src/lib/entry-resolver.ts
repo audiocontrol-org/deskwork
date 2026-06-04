@@ -29,7 +29,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { readSidecar } from '@deskwork/core/sidecar';
-import { refineToIndexDoc, resolveStoredArtifactPath } from '@deskwork/core/entry/resolve-artifact';
+import { resolveArtifactPathOrThrow } from '@deskwork/core/entry/resolve-artifact';
 import type { Entry } from '@deskwork/core/schema/entry';
 
 interface ResolveResult {
@@ -49,15 +49,11 @@ interface ResolveResult {
  * them drift.
  */
 export function resolveIndexPath(projectRoot: string, entry: Entry): string {
-  const absArtifact = resolveStoredArtifactPath(entry, projectRoot);
-  if (absArtifact === null) {
-    throw new Error(
-      `Cannot resolve entry ${entry.uuid} (slug "${entry.slug}"): the sidecar has no ` +
-        `artifactPath. Resolution reads the stored path only — there is no slug+stage ` +
-        `fallback. Run \`deskwork doctor --fix\` to backfill artifactPath, then retry.`,
-    );
-  }
-  return refineToIndexDoc(absArtifact);
+  // Phase 39c-2b(a): the resolve-stored-path + throw-on-absent + index.md
+  // refinement now lives in the shared core helper so the CLI verbs
+  // (publish / iterate longform) resolve identically — see
+  // `@deskwork/core/entry/resolve-artifact#resolveArtifactPathOrThrow`.
+  return resolveArtifactPathOrThrow(entry, projectRoot);
 }
 
 export async function resolveEntry(projectRoot: string, uuid: string): Promise<ResolveResult> {
