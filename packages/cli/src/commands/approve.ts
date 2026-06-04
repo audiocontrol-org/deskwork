@@ -22,8 +22,7 @@ import {
   resolveSite,
   resolveCalendarPath,
 } from '@deskwork/core/paths';
-import { composeShortformDraftPath } from '@deskwork/core/entry/shortform-path';
-import type { Entry } from '@deskwork/core/schema/entry';
+import { composeShortformFileForWorkflow } from '../lib/shortform-file.ts';
 import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
 import { parseFrontmatter } from '@deskwork/core/frontmatter';
 import { handleGetWorkflow } from '@deskwork/core/review/handlers';
@@ -41,7 +40,7 @@ import { isPlatform } from '@deskwork/core/types';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 import { approveEntryStage } from '@deskwork/core/entry/approve';
-import { resolveEntryUuid, readSidecar } from '@deskwork/core/sidecar';
+import { resolveEntryUuid } from '@deskwork/core/sidecar';
 
 const KNOWN_FLAGS = ['site', 'platform', 'channel'] as const;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
@@ -194,24 +193,17 @@ async function runShortformApprove(
   // calendar's `## Shortform Copy` section captures the body only.
   // Phase 39c-2b(a): the file path is COMPOSED from the parent entry's
   // stored artifactPath dir (spec AUDIT-35) — no slug-template search.
-  if (workflow.entryId === undefined || workflow.entryId === '') {
-    fail(
-      `Cannot resolve shortform file for ${site}/${slug}: the workflow has no ` +
-        `entryId binding. Run \`deskwork doctor --fix\` to bind the entry, then retry.`,
-    );
-  }
-  let parentEntry: Entry;
+  let filePath: string;
   try {
-    parentEntry = await readSidecar(projectRoot, workflow.entryId);
+    filePath = await composeShortformFileForWorkflow(
+      projectRoot,
+      workflow,
+      platform,
+      flags.channel,
+    );
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
   }
-  const filePath = composeShortformDraftPath(
-    parentEntry,
-    projectRoot,
-    platform,
-    flags.channel,
-  );
   if (!existsSync(filePath)) {
     fail(
       `Shortform file missing at ${filePath}. ` +

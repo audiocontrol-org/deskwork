@@ -1,4 +1,4 @@
-generated_at: 2026-06-04T11:37:14.384Z
+generated_at: 2026-06-04T14:43:20.089Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -18,7 +18,7 @@ clones:
     lines: 12
     members:
       - packages/cli/src/commands/approve.ts:121:132
-      - packages/cli/src/commands/publish.ts:111:122
+      - packages/cli/src/commands/publish.ts:109:120
     disposition: pending
     reason: null
   - id: 62a9f3c52a49
@@ -31,7 +31,7 @@ clones:
   - id: fed80612d9af
     lines: 11
     members:
-      - packages/cli/src/commands/approve.ts:259:269
+      - packages/cli/src/commands/approve.ts:264:274
       - packages/studio/src/pages/shortform-review.ts:62:72
     disposition: pending
     reason: null
@@ -40,7 +40,7 @@ clones:
     members:
       - packages/cli/src/commands/approve.ts:46:60
       - packages/cli/src/commands/induct.ts:54:68
-      - packages/cli/src/commands/publish.ts:51:65
+      - packages/cli/src/commands/publish.ts:49:63
     disposition: ignore-with-justification
     reason: Pre-existing CLI command boilerplate (parseArgs + projectRoot + readConfig + resolveSite) re-keyed when AUDIT-20260530-20 fix shifted induct.ts line ranges; identical shape was previously dispositioned across approve/publish/block. Not a NEW clone; extracting a shared helper is a cross-CLI refactor out of scope for the audit-finding fix.
   - id: 24450692261b
@@ -54,7 +54,7 @@ clones:
     lines: 15
     members:
       - packages/cli/src/commands/block.ts:21:35
-      - packages/cli/src/commands/induct.ts:54:65
+      - packages/cli/src/commands/induct.ts:54:63
     disposition: ignore-with-justification
     reason: Pre-existing CLI command boilerplate (parseArgs + projectRoot + readConfig + resolveSite) re-keyed when AUDIT-20260530-20 fix shifted induct.ts line ranges; identical shape was previously dispositioned across approve/publish/block. Not a NEW clone; extracting a shared helper is a cross-CLI refactor out of scope for the audit-finding fix.
   - id: 341413173fdd
@@ -96,7 +96,7 @@ clones:
     lines: 14
     members:
       - packages/cli/src/commands/cancel.ts:81:94
-      - packages/cli/src/commands/publish.ts:110:185
+      - packages/cli/src/commands/publish.ts:108:185
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 4b85626d608b
@@ -131,14 +131,14 @@ clones:
     lines: 13
     members:
       - packages/cli/src/commands/induct.ts:172:184
-      - packages/cli/src/commands/publish.ts:110:122
+      - packages/cli/src/commands/publish.ts:108:120
     disposition: pending
     reason: null
   - id: 039be133bac2
     lines: 13
     members:
-      - packages/cli/src/commands/iterate.ts:77:89
-      - packages/cli/src/commands/publish.ts:53:65
+      - packages/cli/src/commands/iterate.ts:74:86
+      - packages/cli/src/commands/publish.ts:51:63
     disposition: pending
     reason: null
   - id: 99d2afe73b96
@@ -403,36 +403,29 @@ clones:
   - id: 68e3966349bd
     lines: 11
     members:
-      - packages/core/src/review/start-handlers.ts:145:155
+      - packages/core/src/review/start-handlers.ts:150:160
       - packages/core/src/review/start-handlers.ts:54:65
     disposition: pending
     reason: null
   - id: 1884e3dfff81
     lines: 7
     members:
-      - packages/core/src/review/start-handlers.ts:162:168
+      - packages/core/src/review/start-handlers.ts:167:173
       - packages/core/src/review/start-handlers.ts:65:71
     disposition: pending
     reason: null
   - id: 0b03898d0cc8
     lines: 8
     members:
-      - packages/core/src/review/start-handlers.ts:232:239
-      - packages/core/src/review/start-handlers.ts:83:90
+      - packages/core/src/review/start-handlers.ts:223:230
+      - packages/core/src/review/start-handlers.ts:88:95
     disposition: pending
     reason: null
   - id: 0e85f4a2e968
     lines: 10
     members:
-      - packages/core/src/review/start-handlers.ts:241:250
-      - packages/core/src/review/start-handlers.ts:90:99
-    disposition: pending
-    reason: null
-  - id: b59c3f6b4e1b
-    lines: 13
-    members:
-      - packages/core/src/review/workflow-paths.ts:138:150
-      - packages/core/src/review/workflow-paths.ts:97:109
+      - packages/core/src/review/start-handlers.ts:232:241
+      - packages/core/src/review/start-handlers.ts:95:104
     disposition: pending
     reason: null
   - id: e3dffdccdd78
@@ -488,9 +481,16 @@ clones:
     lines: 11
     members:
       - packages/core/src/sidecar/read-all.ts:43:53
-      - packages/core/src/sidecar/read.ts:17:27
+      - packages/core/src/sidecar/read.ts:8:18
     disposition: pending
     reason: null
+  - id: f2aa9e0ff153
+    lines: 10
+    members:
+      - packages/core/src/sidecar/read.ts:25:34
+      - packages/core/src/sidecar/read.ts:47:56
+    disposition: keep-with-reason
+    reason: readSidecar/readSidecarSync async-sync siblings; JSON+schema parse already factored into parseSidecar; residual readFile-vs-readFileSync + ENOENT mapping cannot share a call across the async/sync boundary (39c-2b a)
   - id: 9dddadfc374d
     lines: 12
     members:

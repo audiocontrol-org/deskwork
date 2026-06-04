@@ -28,9 +28,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { readConfig } from '@deskwork/core/config';
 import { resolveSite } from '@deskwork/core/paths';
-import { readSidecar } from '@deskwork/core/sidecar';
-import { composeShortformDraftPath } from '@deskwork/core/entry/shortform-path';
-import type { Entry } from '@deskwork/core/schema/entry';
+import { composeShortformFileForWorkflow } from '../lib/shortform-file.ts';
 import {
   appendAnnotation,
   appendVersion,
@@ -363,24 +361,17 @@ async function runShortformIterate(
   if (platform === undefined || !isPlatform(platform)) {
     fail('--platform is required when --kind=shortform.');
   }
-  if (workflow.entryId === undefined || workflow.entryId === '') {
-    fail(
-      `Cannot resolve shortform file for ${site}/${slug}: the workflow has no ` +
-        `entryId binding. Run \`deskwork doctor --fix\` to bind the entry, then retry.`,
-    );
-  }
-  let parentEntry: Entry;
+  let file: string;
   try {
-    parentEntry = await readSidecar(projectRoot, workflow.entryId);
+    file = await composeShortformFileForWorkflow(
+      projectRoot,
+      workflow,
+      platform,
+      flags.channel,
+    );
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
   }
-  const file = composeShortformDraftPath(
-    parentEntry,
-    projectRoot,
-    platform,
-    flags.channel,
-  );
 
   if (!existsSync(file)) {
     fail(`No shortform file at ${file}. Run /deskwork:shortform-start first.`);
