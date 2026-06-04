@@ -10,7 +10,11 @@ import {
   incrementId,
   mergeFixTaskIds,
   findMaxId,
+  classifyFixTaskRange,
+  isWellFormedFixTaskRange,
+  expandRange,
   type Ledger,
+  type IdRange,
 } from '../../../scope-discovery/workplan-archive/ledger.js';
 
 describe('findLedger — locator', () => {
@@ -289,6 +293,83 @@ describe('mergeFixTaskIds (AUDIT-89)', () => {
 
   it('AUDIT-92: tolerates non-numeric endpoints (5.x-5.y fallback)', () => {
     expect(() => mergeFixTaskIds([{ start: '5.x', end: '5.y' }], [])).not.toThrow();
+  });
+});
+
+describe('isWellFormedFixTaskRange / classifyFixTaskRange correspondence (AUDIT-20260604-04)', () => {
+  // AUDIT-04: the audit named the bug pattern of two functions independently
+  // encoding the same well-formedness predicate with no shared source — the
+  // exact comment-asserts-an-unenforced-relationship shape AUDIT-02 retired.
+  // The cure (per the audit) is to extract one shared
+  // `isWellFormedFixTaskRange(range)` predicate that both `expandRange`'s
+  // fallback branch and `classifyFixTaskRange`'s well-formed branch consult.
+  // This describe-block pins the agreement via a property-style fixture +
+  // explicit per-shape assertions, so future drift between the two functions
+  // surfaces as a failing test instead of a silent bug.
+
+  const FIXTURES: ReadonlyArray<{ readonly range: IdRange; readonly shape: 'well-formed' | 'cross-phase' | 'mismatched-dotted' | 'non-numeric' }> = [
+    // Well-formed singletons.
+    { range: { start: '5.3' }, shape: 'well-formed' },
+    { range: { start: '5' }, shape: 'well-formed' },
+    // Well-formed closed ranges (must have end > start so the enumeration
+    // has length >= 2 — same-endpoint ranges are also well-formed but
+    // exercised in the AUDIT-92 block above).
+    { range: { start: '5.1', end: '5.10' }, shape: 'well-formed' },
+    { range: { start: '11.3', end: '11.5' }, shape: 'well-formed' },
+    // Cross-phase closed ranges.
+    { range: { start: '5.10', end: '6.3' }, shape: 'cross-phase' },
+    { range: { start: '1.1', end: '2.1' }, shape: 'cross-phase' },
+    // Mismatched-dotted closed ranges.
+    { range: { start: '5.1', end: '5' }, shape: 'mismatched-dotted' },
+    { range: { start: '5', end: '5.1' }, shape: 'mismatched-dotted' },
+    // Non-numeric closed ranges.
+    { range: { start: '5.x', end: '5.y' }, shape: 'non-numeric' },
+    { range: { start: '5.1', end: '5.y' }, shape: 'non-numeric' },
+    // Non-numeric singleton.
+    { range: { start: '5.x' }, shape: 'non-numeric' },
+  ];
+
+  it('AUDIT-20260604-04: isWellFormedFixTaskRange returns true iff classifyFixTaskRange returns "well-formed"', () => {
+    for (const { range, shape } of FIXTURES) {
+      const wellFormedPredicate = isWellFormedFixTaskRange(range);
+      const classification = classifyFixTaskRange(range);
+      expect(classification === 'well-formed').toBe(wellFormedPredicate);
+      expect(classification).toBe(shape);
+    }
+  });
+
+  it('AUDIT-20260604-04: expandRange falls back to singleton-pair iff !isWellFormedFixTaskRange AND closed range', () => {
+    for (const { range } of FIXTURES) {
+      const wellFormed = isWellFormedFixTaskRange(range);
+      const expanded = expandRange(range);
+      if (range.end === undefined) {
+        // Singletons always return the start verbatim — no fallback semantics.
+        expect(expanded).toEqual([range.start]);
+        continue;
+      }
+      if (wellFormed) {
+        // Well-formed closed range: expandRange enumerates fully.
+        expect(expanded[0]).toBe(range.start);
+        expect(expanded[expanded.length - 1]).toBe(range.end);
+        expect(expanded.length).toBeGreaterThanOrEqual(2);
+      } else {
+        // Not well-formed closed range: fallback to [start, end] verbatim.
+        expect(expanded).toEqual([range.start, range.end]);
+      }
+    }
+  });
+
+  it('AUDIT-20260604-04 regression-lock: a future ledger.ts edit that diverges the two functions fails this suite', () => {
+    // Explicit pin of the join. If a maintainer later changes
+    // `classifyFixTaskRange`'s tolerance without updating
+    // `isWellFormedFixTaskRange` (or vice-versa), the line below fails.
+    // The regression-lock complements the property-style block above by
+    // asserting that the boolean predicate IS the source of truth.
+    for (const { range } of FIXTURES) {
+      expect(classifyFixTaskRange(range) === 'well-formed').toBe(
+        isWellFormedFixTaskRange(range),
+      );
+    }
   });
 });
 

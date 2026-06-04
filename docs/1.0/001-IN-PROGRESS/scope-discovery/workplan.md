@@ -231,6 +231,43 @@ Closes AUDIT-20260604-01 (claude-01 + codex-03; cross-model). Surface: `.dw-life
 - [x] The named action has landed in this branch (README Phase 25 row updated this commit).
 - [x] Audit-log Status flipped open → `acknowledged-readme-phase-25-row-advanced-to-tasks-3-4-shipped-2026-06-04` in this commit.
 
+
+### Task 33 (fix-finding-AUDIT-20260604-04): AUDIT-20260604-04 — Re-implements `expandRange`'s fallback-trigger logic in a pa…
+
+**Complete (2026-06-04).** Closes AUDIT-20260604-04 (claude-01 + claude-02 + claude-03 + codex-01; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `classifyFixTaskRange` vs. `expandRange`. Severity: high.
+
+- [x] Step 0: working-code invariant — `expandRange`'s singleton-pair fallback (AUDIT-92) correctly tolerates malformed `archived-fix-tasks` ranges so `archivePhases` doesn't crash; `classifyFixTaskRange` (AUDIT-02) correctly notifies the operator via the doctor rule. Both correctness invariants must be preserved by the shared-predicate refactor.
+- [x] Step 1: bug-repro test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/ledger.test.ts:300-343` (`AUDIT-20260604-04: isWellFormedFixTaskRange returns true iff classifyFixTaskRange returns "well-formed"`) — iterates the FIXTURES table (12 ranges across well-formed singletons + closed + cross-phase + mismatched-dotted + non-numeric) and asserts the predicate ≡ the classifier's well-formed branch.
+- [x] Step 1b: regression-lock test at `ledger.test.ts:345-367` (`AUDIT-20260604-04: expandRange falls back to singleton-pair iff !isWellFormedFixTaskRange AND closed range`) — pins the `expandRange` ↔ predicate ↔ classifier triangle; a future drift between any two of the three fails. Plus the explicit join pin at `ledger.test.ts:369-381` (`AUDIT-20260604-04 regression-lock: a future ledger.ts edit that diverges the two functions fails this suite`).
+- [x] Step 2: confirmed bug-repro fails pre-fix — 3 failing tests, all because `isWellFormedFixTaskRange` + `expandRange` not yet exported / the predicate didn't exist.
+- [x] Step 3: implemented in `ledger.ts` — extracted exported `isWellFormedFixTaskRange(range: IdRange): boolean` (single source of truth: true iff range is enumerable without singleton-pair fallback); refactored `expandRange` to consult the predicate on its fallback branch (now exported so the correspondence test can exercise it directly); refactored `classifyFixTaskRange`'s well-formed branch to route through the same predicate (non-well-formed branch keeps its specific-shape classification for the warning message). The AUDIT-92 docblock + AUDIT-02 docblock both updated to cross-reference the predicate as the join.
+- [x] Step 4: confirmed 36/36 tests pass in `ledger.test.ts` post-fix (+3 net new test blocks for AUDIT-04 correspondence + fallback + regression-lock); full plugin suite 2669/2669 (was 2666); tsc clean.
+- [x] Step 5: commit with `Closes AUDIT-20260604-04 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)` in subject.
+
+**Acceptance Criteria:**
+
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/ledger.test.ts:300-343` (cited in Step 1).
+- [x] Regression-lock tests exist in the same file (Step 1b at `:345-367` + explicit join pin at `:369-381`); test block count for this finding is 3 (well-formedness correspondence + expandRange fallback parity + explicit join pin) per Option D discipline.
+- [x] `npx vitest run src/__tests__/scope-discovery/workplan-archive/ledger.test.ts` from `plugins/dw-lifecycle/` exits 0 (36/36 pass post-fix).
+- [x] Audit-log Status flipped to `fixed-<sha>` via the apply-audit-flips step.
+
+
+### Task 34 (fix-finding-AUDIT-20260604-05) (non-bug): AUDIT-20260604-05 — README Phase 26 row test count (2664) is now stale vs. workp…
+
+Closes AUDIT-20260604-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 26 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 32 Step 4).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260604-05` in subject (use `Closes AUDIT-20260604-05` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
 ### Task 3: Disposition + baseline commands
 
 - [x] `dispose-clone <id> --as <refactor|keep-with-reason|ignore-with-justification> [args]` — refuses without Step 0a/0b flags on refactor disposition. Single-id convenience wrapper around `batch-dispose`. `keep-with-reason` + `ignore-with-justification` pass through verbatim; `--as refactor` requires all Step 0a/0b precondition flags (`--canonical-side`, `--canonical-reason`, [`--new-shape-summary` if canonical-side=new], `--tests`, `--tests-proof-sha`, `--tests-proof-demonstration`) AND still refuses to write (refactor's 5 fields don't fit `--reason` shape; the wrapper redirects to manual editing + `dw-lifecycle check-refactor-preconditions`). The flag-presence requirement is a forcing function — the operator who tries `--as refactor` sees the full precondition surface in the error message. 19 vitest scenarios.

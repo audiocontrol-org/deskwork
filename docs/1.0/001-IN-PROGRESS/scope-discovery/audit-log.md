@@ -4189,3 +4189,29 @@ Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 25 row) 
 The README's plugin-status table is updated in this diff to read *"Task 3 shipped (2026-06-03 cont. 5); Tasks 4–11 remain. … Tasks 4–11 are file/identifier renames + CLI verb + skill folder + doctor rule + sweeps."* But the same audited commit range includes `refactor(scope-discovery): Phase 25 Task 4 — source identifier rename`, and the workplan Task 4 block is marked **Complete (2026-06-03 cont. 6)** with every step `[x]` and tsc/test green. So at the tip of this range the README tells an operator Task 4 is outstanding while the workplan and code say it shipped.
 
 Compounding the timeline confusion: the DEVELOPMENT-NOTES entry added here is "cont. 5" and lists Task 4 as the *next-session handoff* ("Resume: Phase 25 Task 4"), yet the workplan records Task 4 done in "cont. 6." Three artifacts in one diff disagree about whether Task 4 is done. Per the project's documentation rule (status tables drift when not bumped with the work), the README row should advance to reflect Task 4's completion in the same commit that lands the rename. Fix: update the Phase 25 README cell to "Tasks 3–4 shipped; Tasks 5–11 remain" so the adopter-facing status matches the workplan.
+
+## 2026-06-04 — audit-barrage lift (20260604T010447799Z-scope-discovery)
+
+### AUDIT-20260604-04 — Re-implements `expandRange`'s fallback-trigger logic in a parallel function with no shared source and no correspondence test — same comment-asserts-an-unenforced-relationship shape the fix was meant to retire
+
+Finding-ID: AUDIT-20260604-04 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)
+Status:     fixed-PENDING-SHA
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `classifyFixTaskRange` (new, lines ~354-396) vs. `expandRange` (lines ~280+)
+
+The fix adds `classifyFixTaskRange` whose docstring states its three malformed shapes "match `expandRange`'s fallback triggers **exactly**." But the two functions encode that classification *independently*: `expandRange` decides whether to take its singleton-pair fallback by its own internal checks, and `classifyFixTaskRange` re-derives prefix-equality / dotted-length / numeric-endpoint checks from scratch. Nothing makes them share a predicate, and no test pins the correspondence. The contract is exactly the kind of relationship AUDIT-20260604-02 itself was filed about: a comment asserting a guarantee ("matches exactly") that no code or test enforces.
+
+The drift is concrete and silent. If a future change alters `expandRange`'s fallback condition (e.g. it starts numerically expanding `5.1-5.10` differently, or tolerates a new shape), `classifyFixTaskRange` won't follow — and the doctor rule will then either warn about ranges `expandRange` actually expanded cleanly (false positives) or stay quiet about ranges `expandRange` fell back on (the original AUDIT-92/02 hole reopens). The new tests (`workplan-archive-ledger-coherence.test.ts:215-279`) only assert the *doctor rule's* selectivity against hand-written ledgers; the existing `ledger.test.ts` AUDIT-92 block only pins `expandRange`'s passthrough. No test asserts the join — `classifyFixTaskRange(r) === 'well-formed'` iff `expandRange(r)` fully enumerates. Fix: extract one shared `isWellFormedFixTaskRange(range)` predicate that both `expandRange`'s fallback branch and `classifyFixTaskRange` call, and add a property-style test iterating a fixture of ranges asserting the two agree.
+
+---
+
+### AUDIT-20260604-05 — README Phase 26 row test count (2664) is now stale vs. workplan Task 32 (2666) and omits the AUDIT-20260604-02 fix — reproducing the exact status-drift shape this diff corrects for Phase 25
+
+Finding-ID: AUDIT-20260604-05
+Status:     open
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 26 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 32 Step 4)
+
+This same diff advances the Phase 25 README cell to fix AUDIT-20260604-03's drift, but leaves the Phase 26 cell reading "+23 net new test blocks (2641 → 2664)" and enumerating only the four cont. 5 fixes (AUDIT-89/91/92/94). The workplan Task 32 added this commit family's AUDIT-20260604-02 fix with "+2 new tests ... 2666/2666 (was 2664)". So at the tip of this range the Phase 26 row's count is off by 2 and silently omits a fifth shipped audit fix to the same phase's surface (the doctor rule). The diff under audit physically adds exactly +2 test blocks to `workplan-archive-ledger-coherence.test.ts`, so the workplan's 2664→2666 is the corroborated number and the README's 2664 is the stale one.
+
+It's low severity — the figure is internal-progress metadata, not adopter-facing API — but it's the identical "status table not bumped with the work" pattern the project's documentation rule names and that AUDIT-03 just penalized one row up. Fix: bump the Phase 26 cell to note the AUDIT-20260604-02 doctor-rule extension and the 2664 → 2666 count, or drop the absolute count in favor of "see workplan" per the no-rot-prone-specifics rule so the row stops needing per-fix maintenance.

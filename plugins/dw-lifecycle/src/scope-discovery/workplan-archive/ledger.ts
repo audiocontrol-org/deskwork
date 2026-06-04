@@ -276,24 +276,44 @@ export function incrementId(id: string): string {
  * claim was false until the doctor rule was extended to walk fix-task
  * ranges).
  */
-function expandRange(range: IdRange): string[] {
-  if (range.end === undefined) return [range.start];
+/**
+ * Per AUDIT-20260604-04: shared predicate consumed by BOTH `expandRange`'s
+ * fallback branch AND `classifyFixTaskRange`'s well-formed branch — single
+ * source of truth so the two can never drift. Returns `true` iff
+ * `expandRange(range)` will enumerate the range fully (singletons with a
+ * numeric last component, OR closed ranges with matching dotted-length,
+ * identical prefix, and numeric endpoints). Returns `false` for any of the
+ * three malformed shapes (`cross-phase`, `mismatched-dotted`, `non-numeric`).
+ *
+ * The companion correspondence test pins the join — a future drift between
+ * the two consumers fails CI.
+ */
+export function isWellFormedFixTaskRange(range: IdRange): boolean {
+  const lastIsNumeric = (id: string): boolean => {
+    const parts = id.split('.');
+    const last = parts[parts.length - 1];
+    return last !== undefined && Number.isFinite(Number(last));
+  };
+  if (range.end === undefined) {
+    return lastIsNumeric(range.start);
+  }
   const startParts = range.start.split('.');
   const endParts = range.end.split('.');
-  if (startParts.length !== endParts.length) {
-    return [range.start, range.end];
-  }
+  if (startParts.length !== endParts.length) return false;
   for (let i = 0; i < startParts.length - 1; i += 1) {
-    if (startParts[i] !== endParts[i]) {
-      return [range.start, range.end];
-    }
+    if (startParts[i] !== endParts[i]) return false;
   }
+  return lastIsNumeric(range.start) && lastIsNumeric(range.end);
+}
+
+export function expandRange(range: IdRange): string[] {
+  if (range.end === undefined) return [range.start];
+  if (!isWellFormedFixTaskRange(range)) return [range.start, range.end];
+  const startParts = range.start.split('.');
+  const endParts = range.end.split('.');
   const prefix = startParts.slice(0, -1);
   const startLast = Number(startParts[startParts.length - 1]);
   const endLast = Number(endParts[endParts.length - 1]);
-  if (!Number.isFinite(startLast) || !Number.isFinite(endLast)) {
-    return [range.start, range.end];
-  }
   const out: string[] = [];
   for (let i = startLast; i <= endLast; i += 1) {
     out.push([...prefix, String(i)].join('.'));
@@ -359,17 +379,22 @@ export function mergeFixTaskIds(
  * a warning per non-well-formed shape — so an operator sees the
  * malformed-input notification that `expandRange`'s singleton-pair
  * fallback would otherwise swallow silently. The three malformed
- * shapes match `expandRange`'s fallback triggers exactly:
+ * shapes:
  *
  *   - cross-phase: start prefix differs from end prefix
  *     (`5.10-6.3` → cross-phase).
  *   - mismatched-dotted: start and end have different dot-component
  *     counts (`5.1-5` → mismatched-dotted).
  *   - non-numeric: at least one endpoint's last component is not
- *     a finite number (`5.x-5.y` → non-numeric).
+ *     a finite number (`5.x-5.y` → non-numeric; `5.x` singleton →
+ *     non-numeric).
  *
- * Singletons (no `end`) are always well-formed; non-numeric singletons
- * surface as a separate `non-numeric` classification.
+ * Per AUDIT-20260604-04: the well-formed branch routes through the
+ * shared `isWellFormedFixTaskRange` predicate (single source of truth
+ * with `expandRange`'s fallback decision). The non-well-formed branch
+ * separately classifies WHICH malformed shape the range has — that
+ * classification is purely cosmetic for the operator-facing warning
+ * message and is independent of `expandRange`'s behavior.
  */
 export type FixTaskRangeShape =
   | 'well-formed'
@@ -378,11 +403,11 @@ export type FixTaskRangeShape =
   | 'non-numeric';
 
 export function classifyFixTaskRange(range: IdRange): FixTaskRangeShape {
+  if (isWellFormedFixTaskRange(range)) return 'well-formed';
+  // Not well-formed — classify the specific shape for the warning message.
   if (range.end === undefined) {
-    const singleParts = range.start.split('.');
-    const lastRaw = singleParts[singleParts.length - 1];
-    if (lastRaw === undefined || !Number.isFinite(Number(lastRaw))) return 'non-numeric';
-    return 'well-formed';
+    // Singletons reach here only when their last component is non-numeric.
+    return 'non-numeric';
   }
   const startParts = range.start.split('.');
   const endParts = range.end.split('.');
@@ -390,10 +415,7 @@ export function classifyFixTaskRange(range: IdRange): FixTaskRangeShape {
   for (let i = 0; i < startParts.length - 1; i += 1) {
     if (startParts[i] !== endParts[i]) return 'cross-phase';
   }
-  const startLast = Number(startParts[startParts.length - 1]);
-  const endLast = Number(endParts[endParts.length - 1]);
-  if (!Number.isFinite(startLast) || !Number.isFinite(endLast)) return 'non-numeric';
-  return 'well-formed';
+  return 'non-numeric';
 }
 
 /**
