@@ -104,3 +104,134 @@ The Phase 15 SKILL.md prescribes `/tmp/close-shipped-bundles.json`, `/tmp/close-
 
 - Surfaced 2026-06-04 in [#412](https://github.com/audiocontrol-org/deskwork/issues/412) during dogfood of `/dw-lifecycle:close-shipped` against v0.35.0..v0.36.0. Safety classifier emitted "SECURITY WARNING: writes to bare /tmp/close-shipped-verdicts/406.json" on the #406 sub-agent dispatch (and possibly others; the classifier may sample).
 - Issue body lists two fix options: (1) `mktemp` paths (cheaper fix, doesn't change disk layout); (2) project-local cache dir under `.dw-lifecycle/close-shipped/runs/<timestamp>/` (recommended; consistent with existing proposal dir; auditable). This Phase scopes option (2); the operator can redirect at implement time if they prefer (1).
+
+## Phase 18: structural-check verbs accept + scope to `--feature <slug>`  ·  [#417](https://github.com/audiocontrol-org/deskwork/issues/417)
+
+Six structural-check verbs (`check-clones`, `check-anti-patterns`, `check-adopters`, `check-module-symmetry`, `check-refactor-preconditions`, `check-disposition-survivor`) reject `--feature` at runtime. Every implement / review / session-start chain in the dw-lifecycle SKILL prose pipes that flag in — operators following the SKILL verbatim hit `unknown arg: --feature` errors. The structural chain runs project-wide today; that's correct for what the verbs DO but the chain has no concept of "this feature's surface," so structural debt three modules over surfaces inside the wrong feature's review noise. Operator picked Path C (real scoping, not silent-accept or prose-drop) on 2026-06-04 via session-start interview. Narrowing source-of-truth: hybrid — prefer `docs/<v>/<status>/<slug>/scope-manifest.yaml`'s regime_holdouts + modules when present, fall back to `git diff --name-only main...HEAD` when absent.
+
+### Task 1: Shared `resolveFeatureScope(slug)` helper
+
+**Approach:** Single source of truth for the manifest-vs-git-diff decision. New module under `plugins/dw-lifecycle/src/scope-discovery/resolve-feature-scope.ts` exporting `resolveFeatureScope({ slug, repoRoot, baseRef }): Promise<{ files: string[]; source: 'scope-manifest' | 'git-diff'; }>`. Each downstream verb in Tasks 2-7 consumes the file list.
+
+- [ ] Step 1: write failing tests against the resolver — (a) manifest-present path returns regime_holdouts + modules files; (b) manifest-absent path runs `git diff --name-only <baseRef>...HEAD` and returns the changed files; (c) slug-resolves-to-no-feature-doc throws `FeatureNotFoundError`; (d) both-empty returns `[]` with `source: 'git-diff'`.
+- [ ] Step 2: confirm tests fail against current code (the module doesn't exist yet).
+- [ ] Step 3: implement the resolver — read `docs/<v>/<status>/<slug>/scope-manifest.yaml` via the existing scope-discovery loader; when absent, shell out to `git diff --name-only <baseRef>...HEAD`. `baseRef` defaults to `main` but is an arg so tests can pin it.
+- [ ] Step 4: confirm tests pass.
+- [ ] Step 5: commit with `Refs #417` in subject (NOT `Closes #417` — Phase 18 ships behind the verify-in-installed-release gate per project canon).
+
+**Acceptance Criteria:**
+
+- [ ] `plugins/dw-lifecycle/src/scope-discovery/resolve-feature-scope.ts` exists, exports `resolveFeatureScope` + `FeatureNotFoundError`.
+- [ ] `plugins/dw-lifecycle/src/__tests__/scope-discovery/resolve-feature-scope.test.ts` covers all four cases above; full plugin suite green.
+- [ ] No verb wired yet — Tasks 2-7 consume this resolver.
+
+### Task 2: `check-clones` learns `--feature <slug>`
+
+**Approach:** Argv accepts `--feature <slug>`. When present, post-jscpd output filters to clone groups where ≥1 occurrence's `sourceId` matches a path in `resolveFeatureScope(slug).files`. When absent, behavior unchanged.
+
+- [ ] Step 1: write failing test exercising — (a) `--feature hygiene` filters reported clone groups to feature-scope occurrences; (b) no `--feature` flag preserves current project-wide output; (c) `--feature unknown-slug` exits with the resolver's `FeatureNotFoundError` message.
+- [ ] Step 2: confirm tests fail (argv rejects `--feature` today).
+- [ ] Step 3: implement — add `--feature` to the argv parser; thread to the post-jscpd filter step.
+- [ ] Step 4: confirm tests pass.
+- [ ] Step 5: commit with `Refs #417` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] `dw-lifecycle check-clones --feature hygiene` exits 0 without `unknown arg` error.
+- [ ] Test cases above pass; plugin suite green.
+
+### Task 3: `check-anti-patterns` learns `--feature <slug>`
+
+**Approach:** Argv accepts `--feature <slug>`. When present, the scan walks ONLY feature-scope files (overrides `--root`). When absent, behavior unchanged.
+
+- [ ] Step 1: write failing test — (a) `--feature hygiene` finds only anti-pattern hits in feature-scope; (b) no flag = project-wide scan; (c) `--feature` + `--root` errors with actionable message.
+- [ ] Step 2: confirm tests fail.
+- [ ] Step 3: implement.
+- [ ] Step 4: confirm tests pass.
+- [ ] Step 5: commit with `Refs #417` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] `dw-lifecycle check-anti-patterns --feature hygiene` exits 0.
+- [ ] Test cases pass; plugin suite green.
+
+### Task 4: `check-adopters` learns `--feature <slug>`
+
+**Approach:** Argv accepts `--feature <slug>`. When present, holdout walk runs ONLY against feature-scope files. When absent, behavior unchanged.
+
+- [ ] Step 1: write failing test — (a) `--feature hygiene` reports only holdouts in feature-scope; (b) no flag = project-wide; (c) `--feature` + `--root` errors actionably.
+- [ ] Step 2: confirm tests fail.
+- [ ] Step 3: implement.
+- [ ] Step 4: confirm tests pass.
+- [ ] Step 5: commit with `Refs #417` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] `dw-lifecycle check-adopters --feature hygiene` exits 0.
+- [ ] Test cases pass; plugin suite green.
+
+### Task 5: `check-module-symmetry` learns `--feature <slug>`
+
+**Approach:** Argv accepts `--feature <slug>`. When present, filter the cross-module matrix to modules whose source files appear in feature-scope. When absent, behavior unchanged.
+
+- [ ] Step 1: write failing test — (a) `--feature hygiene` narrows the matrix to feature-touched modules; (b) no flag = full matrix; (c) registry-empty + `--feature` exits 0 silently (current empty-registry behavior preserved).
+- [ ] Step 2: confirm tests fail.
+- [ ] Step 3: implement.
+- [ ] Step 4: confirm tests pass.
+- [ ] Step 5: commit with `Refs #417` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] `dw-lifecycle check-module-symmetry --feature hygiene` exits 0.
+- [ ] Test cases pass; plugin suite green.
+
+### Task 6: `check-refactor-preconditions` learns `--feature <slug>`
+
+**Approach:** Argv accepts `--feature <slug>`. When present, only validate `Closes clones.yaml <id>` claims whose surfaces fall in feature-scope. When absent, behavior unchanged.
+
+- [ ] Step 1: write failing test — (a) `--feature hygiene` validates only feature-scope clone claims; (b) no flag = all `Closes clones.yaml <id>` claims validated; (c) clone-id-not-in-feature-scope is silently skipped (not a refusal).
+- [ ] Step 2: confirm tests fail.
+- [ ] Step 3: implement.
+- [ ] Step 4: confirm tests pass.
+- [ ] Step 5: commit with `Refs #417` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] `dw-lifecycle check-refactor-preconditions --feature hygiene --commit-msg-file <path>` exits 0 without `unknown arg`.
+- [ ] Test cases pass; plugin suite green.
+
+### Task 7: `check-disposition-survivor` learns `--feature <slug>`
+
+**Approach:** Argv accepts `--feature <slug>`. When present, only check clones whose surfaces fall in feature-scope for silent disposition reversion. When absent, behavior unchanged.
+
+- [ ] Step 1: write failing test — (a) `--feature hygiene` flags only feature-scope disposition losses; (b) no flag = full check.
+- [ ] Step 2: confirm tests fail.
+- [ ] Step 3: implement.
+- [ ] Step 4: confirm tests pass.
+- [ ] Step 5: commit with `Refs #417` in subject.
+
+**Acceptance Criteria:**
+
+- [ ] `dw-lifecycle check-disposition-survivor --feature hygiene` exits 0.
+- [ ] Test cases pass; plugin suite green.
+
+### Task 8: Verify SKILL-prose chains run clean against the new binary
+
+**Approach:** Smoke pass — invoke every SKILL-documented chain that uses `--feature` and confirm no verb emits `unknown arg: --feature`. No SKILL prose edits expected (prose already uses `--feature`); this task is a regression check + audit log.
+
+- [ ] Step 1: enumerate every SKILL chain that uses `--feature` (`grep -rn "dw-lifecycle.*--feature" plugins/dw-lifecycle/skills/`).
+- [ ] Step 2: invoke each verb with `--feature hygiene` against this worktree; record exit codes.
+- [ ] Step 3: if any verb still rejects, file the gap; if all pass, append a confirmation note in the workplan.
+- [ ] Step 4: commit with `Refs #417` in subject (chore/test commit).
+
+**Acceptance Criteria:**
+
+- [ ] All 6 structural-check verbs from Phase 18 accept `--feature hygiene` without `unknown arg`.
+- [ ] No SKILL-prose chain emits `unknown arg: --feature` end-to-end.
+- [ ] Plugin test suite green at session end.
+
+**Provenance:**
+
+- Surfaced 2026-06-04 in the close-shipped follow-up session journal entry: "The `--feature` flag is documented for `check-clones` / `check-anti-patterns` / `check-adopters` in the implement SKILL.md but not accepted by the actual CLI surface at v0.36.0 — had to run without the flag. SKILL.md prose is ahead of CLI."
+- Operator selected Path C (real scoping) + hybrid narrowing source + Phase-18-in-hygiene-workplan on 2026-06-04 via session-start interview.
+- All 8 tasks ship behind the verify-in-installed-release gate per project canon. Each commit uses `Refs #417` (NOT `Closes #417`) — the 2026-06-04 session corrected this mistake on #411 + #412 (auto-close via PR merge violates the gate).
