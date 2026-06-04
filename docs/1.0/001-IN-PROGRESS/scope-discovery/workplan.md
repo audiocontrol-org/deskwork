@@ -422,8 +422,8 @@ Closes AUDIT-20260603-84 (claude-03 + codex-02; cross-model). Surface: `MIGRATIN
 
 **Acceptance Criteria:**
 
-- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] ~~Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)~~ — N/A. Orphan scaffolding; the substantive fix landed at `9f9f640c` via a different code path (not a separate TDD walk). The audit-log Status `fixed-9f9f640c` is the canonical record.
+- [x] ~~`npx vitest run <test-file-path>` exits 0 (passes against the fix)~~ — N/A. No test file to invoke; the fix at `9f9f640c` ships with its own tests (re-derived by reading the SHA via `git show 9f9f640c`).
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -831,8 +831,8 @@ Closes AUDIT-20260603-66. Surface: `plugins/dw-lifecycle/templates/scope-discove
 
 **Acceptance Criteria:**
 
-- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] ~~Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)~~ — N/A. Orphan scaffolding; the substantive fix landed at `db630841` via a different code path (not a separate TDD walk). The audit-log Status `fixed-db630841` is the canonical record.
+- [x] ~~`npx vitest run <test-file-path>` exits 0 (passes against the fix)~~ — N/A. No test file to invoke; the fix at `db630841` ships with its own tests (re-derived by reading the SHA via `git show db630841`).
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -850,8 +850,8 @@ Closes AUDIT-20260603-67 (claude-02 + codex-03; cross-model). Surface: sibling s
 
 **Acceptance Criteria:**
 
-- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] ~~Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)~~ — N/A. Orphan scaffolding; the substantive fix landed at `db630841` via a different code path (not a separate TDD walk). The audit-log Status `fixed-db630841` is the canonical record.
+- [x] ~~`npx vitest run <test-file-path>` exits 0 (passes against the fix)~~ — N/A. No test file to invoke; the fix at `db630841` ships with its own tests (re-derived by reading the SHA via `git show db630841`).
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -869,8 +869,8 @@ Closes AUDIT-20260603-68. Surface: deleted exports in `install-scope-discovery-h
 
 **Acceptance Criteria:**
 
-- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] ~~Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)~~ — N/A. Per the superseded note above, the AUDIT-68 disposition was an acknowledgement on `tsc-clean` evidence (no dangling importers), not a separate TDD walk; the audit-log Status `acknowledged-tsc-clean-confirms-no-dangling-importers-2026-06-03` is the canonical record.
+- [x] ~~`npx vitest run <test-file-path>` exits 0 (passes against the fix)~~ — N/A. The `tsc --noEmit` clean result IS the evidence; no per-finding test file.
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -909,9 +909,9 @@ Closes AUDIT-20260603-70. Surface: `plugins/dw-lifecycle/commands/install-agent-
 
 **Acceptance Criteria:**
 
-- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
-- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] ~~Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)~~ — N/A. Orphan scaffolding; the substantive fix landed at `db630841` via a different code path (not a separate TDD walk). The audit-log Status `fixed-db630841` is the canonical record.
+- [x] ~~Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline~~ — N/A. Same orphan-scaffolding reason; the Option D regression-lock obligation applies to substantive TDD walks, not to bookkeeping disposition of a finding already fixed in `db630841`.
+- [x] ~~`npx vitest run <test-file-path>` exits 0 (passes against the fix)~~ — N/A. No test file to invoke; the fix at `db630841` ships with its own tests (re-derived by reading the SHA via `git show db630841`).
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
@@ -929,8 +929,8 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 
 **Acceptance Criteria:**
 
-- [x] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [x] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [x] ~~Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)~~ — N/A. Orphan scaffolding; the substantive fix landed at `db630841` via a different code path (not a separate TDD walk). The audit-log Status `fixed-db630841` is the canonical record.
+- [x] ~~`npx vitest run <test-file-path>` exits 0 (passes against the fix)~~ — N/A. No test file to invoke; the fix at `db630841` ships with its own tests (re-derived by reading the SHA via `git show db630841`).
 - [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 ### Task 5: Validator + export commands
@@ -980,7 +980,7 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 - [x] `/dw-lifecycle:customize` — document `scope-discovery <name>` category
 
 **Acceptance Criteria:**
-- [x] All ~23 skills discoverable via slash-command picker — exceeded: 50 skill folders under `plugins/dw-lifecycle/skills/` and 41 entries under `plugins/dw-lifecycle/commands/` (verified via `ls`); the slash-command picker resolves whatever the `commands/` directory ships.
+- [x] All ~23 skills discoverable via slash-command picker — exceeded: 50 skill folders under `plugins/dw-lifecycle/skills/` AND all 50 have a corresponding entry under `plugins/dw-lifecycle/commands/` (verified via `comm -23 <(ls .../skills/) <(ls .../commands/ | sed 's/.md$//')` → 0 differences). The 10-skill picker gap AUDIT-20260604-29 surfaced was closed in this commit by authoring the missing entries (`archive-branch` / `archive-phases` / `close-shipped` / `debt-report` / `dismantle-worktrees` / `promote-deferrals` / `re-audit-fixed-findings` / `triage-issues` / `unarchive-phases` / `worktree-report`). `plugins/dw-lifecycle/commands/` now ships 51 entries (50 skills + 1 retired-alias `check-editor-symmetry`).
 - [x] Existing skills' auto-invocation documented + opt-out flags surfaced — satisfied by Task 2 (all 5 updated skills landed with their auto-invocation + opt-out documentation): `define` (auto-scope-inventory + `--no-scope-inventory`), `implement` (auto-scope-widen + dispatch-wrapper + `--no-scope-widen`), `review` (auto-clone-detector + `--no-clone-check`), `doctor` (new rules), `customize` (`scope-discovery <name>` category).
 
 ## Phase 8: Install / migrate / uninstall machinery

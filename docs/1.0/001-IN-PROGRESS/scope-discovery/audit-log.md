@@ -4521,3 +4521,27 @@ Surface:    `DEVELOPMENT-NOTES.md:4474-4478`
 The added “Next session recommendation” says to resume with “Step 1: write the disposition prose…” and names an incomplete workplan marker at line 1891. That contradicts the same session note’s quantitative claim that “Open findings at session end: 0” and leaves the next operator with generic scaffold text instead of a concrete remaining action.
 
 This is an operator-discipline trap: the note should name the exact outstanding document defect and the specific file edit needed, or omit the resume instruction if there is no open work. The current wording reintroduces unresolved task-scaffold language into the durable journal.
+
+## 2026-06-04 — audit-barrage lift (20260604T045057194Z-scope-discovery)
+
+### AUDIT-20260604-29 — "All ~23 skills discoverable via slash-command picker" is ticked `[x]` while its own cited evidence proves it false
+
+Finding-ID: AUDIT-20260604-29 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02 + codex-04; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Phase 7 acceptance criteria (`- [x] All ~23 skills discoverable via slash-command picker — exceeded: 50 skill folders … and 41 entries under commands …`)
+
+The reconciliation flips this box to `[x]` and supplies its own falsifying evidence in the same line: **50 skill folders** under `plugins/dw-lifecycle/skills/` but only **41 entries** under `plugins/dw-lifecycle/commands/`, with the explicit admission that *"the slash-command picker resolves whatever the `commands/` directory ships."* By the workplan's own logic, only the 41 commands entries are picker-resolvable — which means **9 skill folders have no commands entry and are therefore NOT discoverable via the picker.** The criterion says "**All** … skills discoverable," and the cited numbers establish that not all of them are. The checkmark and its evidence are internally contradictory: a reader who trusts the `[x]` believes full picker coverage; a reader who reads the numbers sees a 9-skill gap.
+
+This is the inverted form of the same coherence defect AUDIT-26 raises two commits over (ticking a box whose body undercuts the tick). A correct disposition is either (a) leave the box `[ ]` and file the 9-skill picker gap as a task, or (b) reword the criterion to "≥23 of 50 skills have commands entries" and state the 9 missing ones explicitly. Verify by diffing the basenames of `commands/*.md` against `skills/*/` — the 9 deltas are the undiscoverable skills the `[x]` currently hides.
+
+### AUDIT-20260604-30 — README Phase 11 row keeps status "In progress" while its body now accounts for all 14 tasks as landed or reconciled
+
+Finding-ID: AUDIT-20260604-30 (claude-04 + claude-05 + codex-03; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` Phase 11 row (status column reads "In progress —" while the body enumerates Tasks 1,2,3,5–14 "landed" and the new prose adds "Task 4 reconciled (2026-06-04)")
+
+The diff removes the trailing "Task 4 remains." and appends "Task 4 reconciled (2026-06-04): all 7 codebase-state metrics land …". The row's task enumeration already lists Tasks 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 as landed — every task **except** 4 — and the appended sentence now accounts for 4. That covers all fourteen tasks, yet the status column still reads **"In progress."** Either the status is stale (all tasks now landed/reconciled → should be Complete, or should name the specific remaining work), or "reconciled" deliberately means "not landed" — in which case the row should say what reconciliation leaves open and why Phase 11 is still in flight.
+
+As written, a reader cannot tell whether Phase 11 has remaining work. Note also that "reconciled" is a weaker word than "landed" (the enumeration's verb for the other 13), and Task 4 is pointedly excluded from the "landed" list — a subtle signal that reconciliation ≠ completion that the "In progress" status neither confirms nor explains. Fix: either flip the status with a one-line "Phase 11 complete pending operator sign-off on Task 5 controller," or state the open item explicitly in the status cell.
