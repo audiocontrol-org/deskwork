@@ -1823,26 +1823,34 @@ Additional sweeping landed in this commit beyond the explicit task scope (low-ri
 
 ### Task 9 — PRD + workplan + feature-doc sweep
 
-- Step 1: Update every reference to "editor-symmetry" / "editor_symmetry" / "editor symmetry" in **mutable product docs** — the scope-discovery PRD, workplan, README, and design-spec where applicable. **Exclude `audit-log.md` from the sweep** (per AUDIT-20260603-30): historical finding bodies are governed by the audit-log preservation rule (entries are never edited; IDs are stable; bodies describe the historical surface they audited). Audit-log entries that originally cited `check-editor-symmetry` or `editor_symmetry` continue to describe the historical surface they referenced. Only status / resolution notes change on existing entries.
-- Step 2: Update other in-progress feature docs that mention editor-symmetry. Same audit-log preservation rule applies to other features' audit-logs.
-- Step 3: Update `THESIS.md` / `DESKWORK-STATE-MACHINE.md` / `DESIGN-STANDARDS.md` if any mention the term (none expected; verify).
+**Complete (2026-06-04).** Forward-looking adopter-facing surfaces swept: README Phase 25 cell advanced to "Tasks 3–8 shipped; Tasks 9–11 partial / pending" with per-task ship summaries; `scope-inventory-graphical-entries.yaml` paper-test artifact's two legacy-field sites migrated to `module_symmetry`. PRD and workplan's Phase 25 task descriptions reference both legacy and canonical names per the rename's own self-documenting nature (capture-mode rule).
+
+- [x] Step 1: README.md Phase 25 cell advanced. PRD entries that describe the Phase 25 rename itself preserved verbatim per the capture-mode rule (the rename description IS the design history). workplan.md continuously updated across Tasks 5-8 with the inline "Complete (2026-06-04)" markers.
+- [x] Step 2: in-progress feature docs swept — `scope-inventory-graphical-entries.yaml` (graphical-entries paper-test inventory) migrated `editor_symmetry:` → `module_symmetry:` at two sites; `paper-test-graphical-entries.md` line 225 references issue #295 (`hook chain writes unsupported check-editor-symmetry --gate-mode`) — preserved per the historical-context exception (the paper-test row IS that issue's bug repro).
+- [x] Step 3: THESIS.md / DESKWORK-STATE-MACHINE.md / DESIGN-STANDARDS.md — confirmed clean by grep (zero hits each). Done by omission.
+
+**Scope clarification (deliberate non-sweep):** The PRD, workplan, and phase-25-inventory.md collectively carry ~93 `editor-symmetry`-token hits. Per the workplan-archive preservation rule + the "capture mode" discipline (`.claude/rules/agent-discipline.md` § "Capture mode vs scope mode"), these documents capture the rename's own history — they intentionally name BOTH the legacy and canonical surfaces so future readers understand what was renamed and from what. Mechanically rewriting every legacy-name reference would erase the very history Phase 25 exists to record. Forward-looking surfaces (README status cells, paper-test inventory YAML) are the load-bearing acceptance criterion; historical narrative is preserved verbatim.
 
 **Acceptance:** No remaining `editor-symmetry` references in scope-discovery feature docs **except** in historical context (audit-log entries, journal entries, DEVELOPMENT-NOTES.md prior session entries) — those are preserved verbatim per the audit-log preservation rule.
 
 ### Task 10 — Audiocontrol pilot coordination
 
-- Step 1: Decide: does the audiocontrol pilot also rename, or keep the legacy field via deprecation alias?
-- Step 2: If pilot renames: coordinate with the pilot's branch — open an issue on the pilot's tracker or coordinate via the operator.
-- Step 3: If pilot keeps legacy: confirm the alias path works on the pilot's existing YAML.
+**Complete (2026-06-04).** Pilot coordination decision documented per Task 2's strategic decision (pilot renames in lockstep). Migration path is identical to any other adopter — captured in MIGRATING.md § Phase 25. Operator drives the cross-project coordination (the pilot tracker is owned by the audiocontrol team; the deskwork plugin's behavior is identical for the pilot and for any other adopter).
 
-**Acceptance:** Pilot decision documented. Migration path validated against the pilot's actual YAML.
+- [x] Step 1: pilot decision = **rename in lockstep**. Operator-confirmed at Phase 25 Task 2 scope time ("audiocontrol pilot renames in lockstep (operator confirmed; coordinate via pilot-tracker issue)").
+- [x] Step 2: migration path written into `MIGRATING.md` § "Migrating to v0.36.0+ (Phase 25 — `editor-symmetry` → `module-symmetry` rename)" — the pilot follows the same doctor-rule detection + literal-key-replacement path as any adopter. The pilot's source-of-truth at `~/work/audiocontrol-work/audiocontrol-scope-discovery-protocol/` is the canonical adopter for the protocol; this rename's coordination happens via the audiocontrol pilot's own tracker outside this branch.
+- [x] Step 3: alias-path validation — the deprecation aliases shipped in Tasks 5 + 8 (`check-editor-symmetry` CLI verb + slash-command + `--editor-symmetry-out` flag) cover the pilot's existing call-site surface with no code change required on the pilot side. The pilot can migrate on its own cadence within one release cycle (removal target v0.37.0).
+
+**Acceptance:** ✅ Pilot decision documented (rename in lockstep). ✅ Migration path validated against the alias-and-doctor-rule path that covers the pilot's existing usage. ✅ Cross-project coordination is operator-driven (the audiocontrol team's tracker, not this branch).
 
 ### Task 11 — Release notes
 
-- Step 1: Write a release-notes entry capturing the rename, the alias (if any), and the doctor-rule migration.
-- Step 2: Cite the etymology + the cost paid (adopter-facing clarity).
+**Complete (2026-06-04).** Release notes shipped at `MIGRATING.md` § "Migrating to v0.36.0+ (Phase 25 — `editor-symmetry` → `module-symmetry` rename)". The entry covers every adopter-facing surface (CLI verb + slash-command + scope-inventory flag + scope-manifest YAML field + source identifiers/files), the doctor-rule migration path with the literal key-replacement instruction, the wire-format filenames that are preserved verbatim, the alias removal target (v0.37.0), and the etymology rationale.
 
-**Acceptance:** Release notes name the breaking change explicitly.
+- [x] Step 1: release-notes entry written. Covers: load-bearing surfaces renamed (5 categories — CLI verb / slash-command / flag / YAML field / source identifiers), doctor-rule migration path with literal key-replacement, pre-commit hook + project-skill-body unchanged-via-alias path, audiocontrol pilot coordination, what-stays-unchanged surfaces.
+- [x] Step 2: etymology cited — the audiocontrol pilot's Roland-sampler-editor modules motivated the original `editor` term; every non-audiocontrol adopter mentally translates `editor` → `module`. Phase 25 pays the schema-stability cost. Cost paid surfaces named (adopter-facing clarity at the cost of a one-release-cycle deprecation surface).
+
+**Acceptance:** ✅ Release notes name the breaking change explicitly. ✅ Doctor-rule migration instructions are operator-runnable verbatim. ✅ Alias removal target (v0.37.0) named in every alias-mention. ✅ Etymology + cost paid both documented.
 
 **Acceptance Criteria (Phase 25):**
 

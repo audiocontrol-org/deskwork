@@ -429,14 +429,14 @@ regime_holdouts:
         registry_path: .dw-lifecycle/scope-discovery/anti-patterns.yaml
         registry_id: hardcoded-stage-name-array
   adopter_manifests: []
-  editor_symmetry: []
+  module_symmetry: []
   deprecations: []
   meta:
     total: 5
     by_source:
       anti_pattern: 5
       adopter_manifest: 0
-      editor_symmetry: 0
+      module_symmetry: 0
       deprecation: 0
 notes: Strawman synthesized from 6 discovery agent(s) (adopter-manifest-checker,
   ast-grep-matrix, clone-detector-reader, prd-themed-pattern-hunter,
