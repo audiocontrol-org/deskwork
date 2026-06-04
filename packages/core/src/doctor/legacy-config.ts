@@ -34,9 +34,9 @@ import { configPath } from '../config.ts';
 
 /**
  * The legacy per-site fields the migration consumes. A subset of the
- * full `SiteConfig` — only what lanes-from-sites + the host re-home
- * need. Other legacy fields (`blogLayout`, `redirectsPath`, …) are not
- * read by the migration and are intentionally not surfaced here.
+ * full `SiteConfig` — only what lanes-from-sites + the host/redirects
+ * re-home need. Other legacy fields (`blogLayout`, …) are not read by
+ * the migration and are intentionally not surfaced here.
  */
 export interface LegacySite {
   /** Content directory, relative to the project root (or absolute). */
@@ -45,6 +45,12 @@ export interface LegacySite {
   readonly calendarPath?: string;
   /** Bare public hostname — re-homed onto the lane's `host`. */
   readonly host?: string;
+  /**
+   * Netlify-style `_redirects` file path — re-homed onto the lane's
+   * `redirectsPath` (Phase 39c, spec Decision #23). Website-publishing
+   * metadata; carried forward only when present on the legacy site.
+   */
+  readonly redirectsPath?: string;
 }
 
 /** A legacy site keyed by its slug (the lane id the migration creates). */
@@ -81,8 +87,8 @@ function readString(obj: Record<string, unknown>, key: string): string | undefin
  *     returns an empty map. This is the idempotency signal: nothing to
  *     migrate.
  *   - `sites` present → returns each site's `{ contentDir, calendarPath,
- *     host }`. A site missing a non-empty `contentDir` throws (the
- *     migration cannot derive `scaffoldDefaults` without it).
+ *     host, redirectsPath }`. A site missing a non-empty `contentDir`
+ *     throws (the migration cannot derive `scaffoldDefaults` without it).
  *
  * @throws when a PRESENT config is unreadable / not JSON, or a declared
  *   site lacks a non-empty `contentDir`.
@@ -145,10 +151,12 @@ export function readLegacySites(projectRoot: string): LegacySites {
     }
     const calendarPath = readString(siteObj, 'calendarPath');
     const host = readString(siteObj, 'host');
+    const redirectsPath = readString(siteObj, 'redirectsPath');
     const site: LegacySite = {
       contentDir,
       ...(calendarPath !== undefined ? { calendarPath } : {}),
       ...(host !== undefined ? { host } : {}),
+      ...(redirectsPath !== undefined ? { redirectsPath } : {}),
     };
     sites.set(slug, site);
   }

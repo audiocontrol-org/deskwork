@@ -4,7 +4,8 @@
  * Renames the per-post directory at `<contentDir>/<slug>/` to its new
  * name, updates the calendar entry's slug, syncs slug on matching
  * distribution records, and (optionally) appends a 301 redirect block
- * to the site's `_redirects` file. UUID identity keeps workflows,
+ * to the `_redirects` file named by the entry's lane (`lane.redirectsPath`,
+ * Phase 39c c4). UUID identity keeps workflows,
  * distribution records, and journal history joined through `entry.id`
  * across the rename.
  *
@@ -23,6 +24,7 @@ import { readCalendar, writeCalendar } from './calendar.ts';
 import { readSidecarSync } from './sidecar/read.ts';
 import { writeSidecarSync } from './sidecar/write.ts';
 import { sidecarPath } from './sidecar/paths.ts';
+import { loadLaneConfig } from './lanes/loader.ts';
 
 /**
  * Detect a slug rename's filesystem shape from the entry's stored
@@ -65,7 +67,6 @@ function planArtifactMove(
 export interface RenameSlugOptions {
   projectRoot: string;
   config: DeskworkConfig;
-  site: string;
   oldSlug: string;
   newSlug: string;
   dryRun?: boolean;
@@ -113,33 +114,22 @@ export function buildRedirectBlock(oldSlug: string, newSlug: string): string {
   ].join('\n');
 }
 
-function siteEntry(config: DeskworkConfig, site: string) {
-  if (!(site in config.sites)) {
-    const known = Object.keys(config.sites).join(', ');
-    throw new Error(`unknown site "${site}". Configured sites: ${known}`);
-  }
-  return config.sites[site];
-}
-
 /**
  * Execute (or dry-run) a slug rename.
  */
 export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
-  const { projectRoot, config, site, oldSlug, newSlug, dryRun = false } = options;
+  const { projectRoot, config, oldSlug, newSlug, dryRun = false } = options;
   validateSlug(oldSlug);
   validateSlug(newSlug);
   if (oldSlug === newSlug) {
     throw new Error('oldSlug and newSlug are identical — nothing to do');
   }
 
-  const siteCfg = siteEntry(config, site);
-  const calendarPath = resolveCalendarPath(projectRoot, config, site);
+  const calendarPath = resolveCalendarPath(projectRoot, config);
   const calendar = readCalendar(calendarPath);
   const entry = calendar.entries.find((e) => e.slug === oldSlug);
   if (!entry) {
-    throw new Error(
-      `no calendar entry with slug "${oldSlug}" on site "${site}"`,
-    );
+    throw new Error(`no calendar entry with slug "${oldSlug}"`);
   }
   if (!entry.id) {
     throw new Error(
@@ -246,9 +236,21 @@ export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
     writeCalendar(calendarPath, calendar);
   }
 
-  // 4. _redirects append (when site has redirectsPath configured)
-  if (siteCfg.redirectsPath) {
-    const redirectsFile = join(projectRoot, siteCfg.redirectsPath);
+  // 4. _redirects append (when the entry's LANE has redirectsPath
+  //    configured). Phase 39c (c4 / spec Decision #23): `redirectsPath`
+  //    re-homed from the retired `SiteConfig` onto the lane (an optional
+  //    sibling of `lane.host`), mirroring Decision #2's `host` re-home.
+  //    The renamed entry's lane is resolved from its sidecar's `lane`
+  //    field. When the sidecar carries no lane, or the lane declares no
+  //    redirectsPath, the append is SKIPPED — this is optional
+  //    website-publishing metadata; skipping is the correct unset
+  //    behavior, NOT an error (a collection without a renderer is valid).
+  const redirectsPath =
+    sidecar.lane !== undefined
+      ? loadLaneConfig(sidecar.lane, projectRoot).redirectsPath
+      : undefined;
+  if (redirectsPath !== undefined) {
+    const redirectsFile = join(projectRoot, redirectsPath);
     const block = buildRedirectBlock(oldSlug, newSlug);
     actions.push({
       kind: 'redirect-append',

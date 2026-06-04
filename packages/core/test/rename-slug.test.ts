@@ -11,6 +11,13 @@
  * In every case the entry's sidecar `artifactPath` is rewritten to the
  * new location, and the calendar entry's slug is updated. UUID identity
  * is preserved.
+ *
+ * Phase 39c (c4 — spec Decision #23): the 301 `_redirects` append no
+ * longer reads `SiteConfig.redirectsPath`. `redirectsPath` re-homed onto
+ * the lane (`LaneConfig.redirectsPath`, sibling of `host`). renameSlug
+ * resolves the renamed entry's lane (`sidecar.lane`) and reads
+ * `lane.redirectsPath`. No lane / no redirectsPath → the redirect-append
+ * step is skipped (optional website metadata, NOT an error).
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -24,10 +31,11 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renameSlug } from '../src/rename-slug.ts';
+import { renameSlug, buildRedirectBlock } from '../src/rename-slug.ts';
 import { writeCalendar, readCalendar } from '../src/calendar.ts';
 import { readSidecarSync } from '../src/sidecar/read.ts';
 import type { DeskworkConfig } from '../src/config.ts';
+import type { LaneConfig } from '../src/lanes/types.ts';
 
 function config(): DeskworkConfig {
   return {
@@ -43,10 +51,44 @@ const UUID = '44444444-4444-4444-4444-444444444444';
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'dw-rename-'));
   mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
+  mkdirSync(join(root, '.deskwork', 'lanes'), { recursive: true });
+  // Minimal editorial pipeline template so loadLaneConfig's pipeline
+  // cross-validation resolves for the on-disk lane fixtures below.
+  mkdirSync(join(root, '.deskwork', 'pipelines'), { recursive: true });
+  writeFileSync(
+    join(root, '.deskwork', 'pipelines', 'editorial.json'),
+    JSON.stringify({
+      id: 'editorial',
+      name: 'Editorial',
+      description: 'Editorial pipeline',
+      linearStages: ['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published'],
+      offPipelineStages: ['Blocked', 'Cancelled'],
+    }),
+    'utf-8',
+  );
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-function seed(slug: string, artifactPath: string): void {
+/**
+ * Write a lane config to disk so `loadLaneConfig(id, root)` resolves.
+ * `id` defaults to `main`; pass `redirectsPath` to exercise the redirect
+ * step.
+ */
+function seedLane(id: string, overrides: Partial<LaneConfig> = {}): void {
+  const lane: LaneConfig = {
+    id,
+    name: id,
+    pipelineTemplate: 'editorial',
+    ...overrides,
+  };
+  writeFileSync(
+    join(root, '.deskwork', 'lanes', `${id}.json`),
+    JSON.stringify(lane),
+    'utf-8',
+  );
+}
+
+function seed(slug: string, artifactPath: string, lane?: string): void {
   writeCalendar(join(root, '.deskwork', 'calendar.md'), {
     entries: [
       {
@@ -74,6 +116,7 @@ function seed(slug: string, artifactPath: string): void {
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
       artifactPath,
+      ...(lane !== undefined ? { lane } : {}),
     }),
     'utf-8',
   );
@@ -86,7 +129,7 @@ describe('renameSlug — 39c-2b(a) artifactPath layout detection (AUDIT-36)', ()
     writeFileSync(join(root, 'docs/old-post/index.md'), '# Body\n', 'utf-8');
     writeFileSync(join(root, 'docs/old-post/cover.png'), 'x', 'utf-8');
 
-    renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'old-post', newSlug: 'new-post' });
+    renameSlug({ projectRoot: root, config: config(), oldSlug: 'old-post', newSlug: 'new-post' });
 
     expect(existsSync(join(root, 'docs/old-post'))).toBe(false);
     expect(existsSync(join(root, 'docs/new-post/index.md'))).toBe(true);
@@ -101,7 +144,7 @@ describe('renameSlug — 39c-2b(a) artifactPath layout detection (AUDIT-36)', ()
     mkdirSync(join(root, 'docs'), { recursive: true });
     writeFileSync(join(root, 'docs', 'old-flat.md'), '# Flat\n', 'utf-8');
 
-    renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'old-flat', newSlug: 'new-flat' });
+    renameSlug({ projectRoot: root, config: config(), oldSlug: 'old-flat', newSlug: 'new-flat' });
 
     expect(existsSync(join(root, 'docs/old-flat.md'))).toBe(false);
     expect(existsSync(join(root, 'docs/new-flat.md'))).toBe(true);
@@ -115,7 +158,7 @@ describe('renameSlug — 39c-2b(a) artifactPath layout detection (AUDIT-36)', ()
     mkdirSync(join(root, 'content/blog/blog'), { recursive: true });
     writeFileSync(join(root, 'content/blog/blog/index.md'), '# B\n', 'utf-8');
 
-    renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'blog', newSlug: 'notes' });
+    renameSlug({ projectRoot: root, config: config(), oldSlug: 'blog', newSlug: 'notes' });
 
     expect(readSidecarSync(root, UUID).artifactPath).toBe('content/blog/notes/index.md');
     expect(existsSync(join(root, 'content/blog/notes/index.md'))).toBe(true);
@@ -141,7 +184,7 @@ describe('renameSlug — 39c-2b(a) artifactPath layout detection (AUDIT-36)', ()
     });
 
     expect(() =>
-      renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'no-sidecar', newSlug: 'renamed' }),
+      renameSlug({ projectRoot: root, config: config(), oldSlug: 'no-sidecar', newSlug: 'renamed' }),
     ).toThrow(/doctor --fix/);
   });
 
@@ -166,10 +209,73 @@ describe('renameSlug — 39c-2b(a) artifactPath layout detection (AUDIT-36)', ()
     writeFileSync(join(root, '.deskwork', 'entries', `${UUID}.json`), '{ not valid json', 'utf-8');
 
     expect(() =>
-      renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'corrupt', newSlug: 'renamed' }),
+      renameSlug({ projectRoot: root, config: config(), oldSlug: 'corrupt', newSlug: 'renamed' }),
     ).toThrow(/invalid/i);
     expect(() =>
-      renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'corrupt', newSlug: 'renamed' }),
+      renameSlug({ projectRoot: root, config: config(), oldSlug: 'corrupt', newSlug: 'renamed' }),
     ).not.toThrow(/no sidecar on disk/);
+  });
+});
+
+describe('renameSlug — 39c c4 lane.redirectsPath (spec Decision #23)', () => {
+  it('appends the 301 block to the file named by the entry lane\'s redirectsPath', () => {
+    seed('old-post', 'docs/old-post/index.md', 'main');
+    seedLane('main', { redirectsPath: 'public/_redirects' });
+    mkdirSync(join(root, 'docs', 'old-post'), { recursive: true });
+    writeFileSync(join(root, 'docs/old-post/index.md'), '# Body\n', 'utf-8');
+    // The _redirects publish dir exists (Netlify deploy dir); the file
+    // itself may or may not — renameSlug creates it when absent, appends
+    // when present.
+    mkdirSync(join(root, 'public'), { recursive: true });
+
+    const result = renameSlug({
+      projectRoot: root,
+      config: config(),
+      oldSlug: 'old-post',
+      newSlug: 'new-post',
+    });
+
+    // The redirect-append action is planned…
+    expect(result.actions.some((a) => a.kind === 'redirect-append')).toBe(true);
+    // …and the file contains the exact 301 block the helper builds.
+    const redirectsFile = join(root, 'public', '_redirects');
+    expect(existsSync(redirectsFile)).toBe(true);
+    const block = buildRedirectBlock('old-post', 'new-post');
+    expect(readFileSync(redirectsFile, 'utf-8')).toContain(block);
+  });
+
+  it('skips the redirect step when the entry lane has no redirectsPath', () => {
+    seed('old-post', 'docs/old-post/index.md', 'main');
+    seedLane('main'); // lane exists but carries no redirectsPath
+    mkdirSync(join(root, 'docs', 'old-post'), { recursive: true });
+    writeFileSync(join(root, 'docs/old-post/index.md'), '# Body\n', 'utf-8');
+
+    const result = renameSlug({
+      projectRoot: root,
+      config: config(),
+      oldSlug: 'old-post',
+      newSlug: 'new-post',
+    });
+
+    // No redirect-append action, no _redirects file written anywhere.
+    expect(result.actions.some((a) => a.kind === 'redirect-append')).toBe(false);
+    expect(existsSync(join(root, 'public', '_redirects'))).toBe(false);
+    expect(existsSync(join(root, '_redirects'))).toBe(false);
+  });
+
+  it('skips the redirect step when the entry has no lane', () => {
+    seed('old-post', 'docs/old-post/index.md'); // no lane on the sidecar
+    mkdirSync(join(root, 'docs', 'old-post'), { recursive: true });
+    writeFileSync(join(root, 'docs/old-post/index.md'), '# Body\n', 'utf-8');
+
+    const result = renameSlug({
+      projectRoot: root,
+      config: config(),
+      oldSlug: 'old-post',
+      newSlug: 'new-post',
+    });
+
+    expect(result.actions.some((a) => a.kind === 'redirect-append')).toBe(false);
+    expect(existsSync(join(root, '_redirects'))).toBe(false);
   });
 });

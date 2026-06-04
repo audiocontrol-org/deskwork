@@ -108,7 +108,15 @@ async function anyEntryMissingArtifactPath(projectRoot: string): Promise<boolean
   );
 }
 
-/** Build the per-site lane config (id = slug; host + scaffoldDefaults). */
+/**
+ * Build the per-site lane config (id = slug). Carries the site's
+ * website-publishing metadata forward when present: `host` (Decision #2)
+ * and `redirectsPath` (Decision #23 / c4) re-home onto the lane as
+ * optional siblings; each is omitted entirely when the legacy site did
+ * not declare it (no empty-string writes). `scaffoldDefaults.markdown`
+ * captures the legacy contentDir as the add-time default — never
+ * identity or resolution.
+ */
 function laneFromSite(slug: string, site: LegacySite): LaneConfig {
   const lane: LaneConfig = {
     id: slug,
@@ -120,6 +128,9 @@ function laneFromSite(slug: string, site: LegacySite): LaneConfig {
     // Location info is the ENTRY's `artifactPath`, never the lane.
     scaffoldDefaults: { markdown: site.contentDir },
     ...(site.host !== undefined ? { host: site.host } : {}),
+    ...(site.redirectsPath !== undefined
+      ? { redirectsPath: site.redirectsPath }
+      : {}),
   };
   return lane;
 }
@@ -318,6 +329,9 @@ const rule: DoctorRule = {
             legacySiteId: slug,
             scaffoldMarkdown: site.contentDir,
             ...(site.host !== undefined ? { host: site.host } : {}),
+            ...(site.redirectsPath !== undefined
+              ? { redirectsPath: site.redirectsPath }
+              : {}),
           },
         });
         lanesCreated.push(slug);

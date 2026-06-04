@@ -144,6 +144,54 @@ describe('sites-to-lanes-migration doctor rule', () => {
     expect(afterDocs.lane).toBe('docs');
   });
 
+  it('carries legacy site.redirectsPath onto the created lane when present, omits it otherwise (spec Decision #23 / c4)', async () => {
+    // Rewrite the config: `blog` carries redirectsPath, `docs` does not.
+    await writeFile(
+      join(root, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: {
+          blog: {
+            contentDir: 'src/content/blog',
+            calendarPath: '.deskwork/calendar.md',
+            host: 'blog.example.com',
+            redirectsPath: 'public/_redirects',
+          },
+          docs: {
+            contentDir: 'docs',
+            calendarPath: '.deskwork/calendar.md',
+            host: 'docs.example.com',
+          },
+        },
+        defaultSite: 'blog',
+      }),
+    );
+
+    const uBlog = '11111111-1111-4111-8111-111111111111';
+    const uDocs = '22222222-2222-4222-8222-222222222222';
+    await mkdir(join(root, 'src', 'content', 'blog', 'hello-post'), { recursive: true });
+    await writeFile(join(root, 'src', 'content', 'blog', 'hello-post', 'index.md'), '# Hello');
+    await mkdir(join(root, 'docs', 'getting-started'), { recursive: true });
+    await writeFile(join(root, 'docs', 'getting-started', 'index.md'), '# Start');
+    await writeSidecar(root, entry(uBlog, 'hello-post'));
+    await writeSidecar(root, entry(uDocs, 'getting-started'));
+
+    const config = readConfig(root);
+    await runRepair(
+      { projectRoot: root, config, ruleIds: ['sites-to-lanes-migration'] },
+      yesInteraction,
+    );
+
+    // blog site had a redirectsPath → carried onto the lane verbatim.
+    const blogLane = loadLaneConfig('blog', root);
+    expect(blogLane.redirectsPath).toBe('public/_redirects');
+
+    // docs site had none → the lane has no redirectsPath key at all
+    // (omitted, not an empty string).
+    const docsLane = loadLaneConfig('docs', root);
+    expect(docsLane.redirectsPath).toBeUndefined();
+  });
+
   it('reports the pre-migration shape in audit (sites present)', async () => {
     const config = readConfig(root);
     const report = await runRepair(

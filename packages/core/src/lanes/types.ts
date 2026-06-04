@@ -126,6 +126,15 @@ export const LaneConfigSchema = z.object({
   // unknown-key error; the doctor migration cleans it.
   // Optional — present only when this lane publishes to a website.
   host: z.string().min(1, 'host must be a non-empty string when present').optional(),
+  // Optional — website-publishing metadata, a sibling of `host`. Path
+  // (relative to the project root, or absolute) to a Netlify-style
+  // `_redirects` file; `rename-slug` appends a 301 block here when the
+  // lane is configured to publish to a website. Only meaningful when the
+  // lane publishes a website — a lane without it is fully valid and the
+  // redirect-append step is simply skipped. Re-homed from the retired
+  // `SiteConfig.redirectsPath` in Phase 39c (sites→lanes retirement,
+  // spec Decision #23 — mirrors how `host` re-homed under Decision #2).
+  redirectsPath: z.string().min(1, 'redirectsPath must be a non-empty string when present').optional(),
   // Optional, PARTIAL-by-construction map from ArtifactKind → scaffold
   // directory. A single-kind map validates; unknown keys are rejected
   // because the key schema is the ArtifactKind enum. Used solely at
