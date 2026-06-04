@@ -21,6 +21,10 @@ fail() { echo "SMOKE FAIL: $1" >&2; exit 1; }
 
 [ -f "$GOVERN" ] || fail "govern.sh not found at $GOVERN"
 
+# Snapshot existing run-dirs so we can assert a NEW one was created (AUDIT-20260604-32),
+# which also gives RUNS_DIR a purpose (AUDIT-20260604-29).
+before="$(find "$RUNS_DIR" -maxdepth 1 -type d 2>/dev/null | sort)"
+
 echo "smoke: invoking govern.sh (base=${GOVERN_DIFF_BASE:-HEAD~1})..."
 # Capture govern.sh's stdout; its final line is the authoritative run-dir path
 # (AUDIT-20260604-26) — do NOT re-derive it by globbing the runs directory.
@@ -29,6 +33,10 @@ out="$(GOVERN_DIFF_BASE="${GOVERN_DIFF_BASE:-HEAD~1}" bash "$GOVERN")" \
 latest="$(printf '%s\n' "$out" | tail -1)"
 [ -n "$latest" ] && [ -d "$latest" ] \
   || fail "govern.sh did not print a valid run-dir as its final stdout line (got: '$latest')"
+# The echoed run-dir must be NEW — a stale/pre-existing path must not pass (AUDIT-20260604-32).
+if printf '%s\n' "$before" | grep -qxF "$latest"; then
+  fail "govern.sh echoed a pre-existing run-dir ($latest); no new run created"
+fi
 
 # Count model lanes = *.md in the run-dir excluding INDEX.md / PROMPT.md, with >0 bytes.
 lanes=0

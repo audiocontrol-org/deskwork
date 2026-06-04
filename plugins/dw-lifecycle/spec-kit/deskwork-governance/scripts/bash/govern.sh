@@ -33,6 +33,13 @@ else
       exit 2 ;;
   esac
 fi
+# Guard the empty-slug case (AUDIT-20260604-30): `feature/` (or a trailing-slash
+# branch) strips to "", which would silently target the wrong feature — the exact
+# failure the FATAL branch exists to prevent.
+[ -n "${SLUG}" ] || {
+  echo "govern.sh: FATAL — derived an empty feature slug (branch '${_branch:-}'); set GOVERN_FEATURE_SLUG explicitly." >&2
+  exit 2
+}
 BASE="${GOVERN_DIFF_BASE:-HEAD~1}"
 FEATURE_DOCS="docs/1.0/001-IN-PROGRESS/${SLUG}"
 AUDIT_LOG="${FEATURE_DOCS}/audit-log.md"
