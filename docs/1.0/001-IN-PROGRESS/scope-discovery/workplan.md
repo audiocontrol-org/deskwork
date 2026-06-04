@@ -943,6 +943,74 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 - [x] `--gate-mode` flag on check-* commands exits non-zero on violations — landed across `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions` (default informational; flag flips to hook-friendly exit 1) and `detect-clones` (already gate-by-default; flag is a no-op for symmetry). 10 new vitest scenarios cover the flag delta.
 - [x] `--json` flag on summary/export commands emits structured output — `scope-summary --json` emits `{ surface, clones, total, pending-touching, pending-intra, dispositioned-touching }`; `scope-export --json` emits the parsed manifest re-serialized via `JSON.stringify`; `check-deprecations --json` emits `{ total, deprecation_count, filesVisited, blocked: [...], safeToDelete: [...] }` (the post-port shape; the pre-port shell's `{ blocked, safeToDelete, deprecation_count, note }` is a superset).
 
+
+### Task 46 (fix-finding-AUDIT-20260604-35) (non-bug): AUDIT-20260604-35 — `Closes #NNN` trailers prescribed for all 8 new fix-tasks au…
+
+Closes AUDIT-20260604-35. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 40 ("commit with `Closes #411` trailer"), Task 41 (`Closes #412`), Task 42 (`Closes #366`), Task 43 (`Closes #350`), Task 44 (`Closes #297`), Task 45 (`Closes #413`), Task 8 (`Closes #397`), Task 9 (`Closes #396`).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with an `Acknowledges AUDIT-20260604-35` trailer in the commit message (use `Closes AUDIT-20260604-35` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: `apply-audit-flips` parses `Closes` trailers ONLY — `Acknowledges` and `Defers` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using `Closes` on a non-fix disposition arms a false `fixed-<sha>` flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 47 (fix-finding-AUDIT-20260604-36) (non-bug): AUDIT-20260604-36 — AUDIT-34 left `acknowledged-slush-pile` while its substance …
+
+Closes AUDIT-20260604-36. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4589-4599` (AUDIT-34 block, `Status: acknowledged-slush-pile-2026-06-04`) vs. `workplan-archive.md` Phase 7 acceptance criterion (the reconciled-totals prose).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with an `Acknowledges AUDIT-20260604-36` trailer in the commit message (use `Closes AUDIT-20260604-36` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: `apply-audit-flips` parses `Closes` trailers ONLY — `Acknowledges` and `Defers` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using `Closes` on a non-fix disposition arms a false `fixed-<sha>` flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 48 (fix-finding-AUDIT-20260604-37): AUDIT-20260604-37 — Template default flips gemini to bare `{{prompt-stdin}}` wit…
+
+Closes AUDIT-20260604-37 (claude-03 + claude-05 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/templates/audit-barrage-config.yaml:48` (`args_template: "{{prompt-stdin}}"` for gemini) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts`.
+
+**Reclassified to bug**: the finding was promoted with the default "non-bug" shape, but adding the missing regression test IS a code change verifiable by test. The `Closes` trailer is correct on this commit.
+
+- [x] Step 1: bug-repro / regression-lock — added `buildArgs('{{prompt-stdin}}', 'X') → []` assertion in `spawn-cli.test.ts` ("AUDIT-37: bare {{prompt-stdin}} template strips to empty argv"). Pins both the bare shape AND the whitespace-padded shape. Verifies the existing stripping logic produces `[]` rather than `['']`. Pre-test, the bare-placeholder shape had no coverage; post-test, the gemini default ships with explicit pinning.
+- [x] Step 2: verified — 18/18 spawn-cli.test.ts passing; bare-arg test passes against the existing implementation (the code was correct; the test was missing).
+- [x] Step 3: commit with `Closes AUDIT-20260604-37 (claude-03 + claude-05 + codex-01 + codex-02; cross-model)` trailer.
+
+**Acceptance Criteria:**
+
+- [x] Step 1 regression-lock test exists and pins the bare-`{{prompt-stdin}}` shape.
+- [x] `npx vitest run src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts` exits 0 (18/18 pass).
+- [x] Audit-log Status flipped to `fixed-<sha>` via the apply-audit-flips step (post-commit).
+
+
+### Task 49 (fix-finding-AUDIT-20260604-38) (non-bug): AUDIT-20260604-38 — Duplicated "Phase 19's Phase 19" in the project-override con…
+
+Closes AUDIT-20260604-38. Surface: `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml:22-27` (added comment block).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with an `Acknowledges AUDIT-20260604-38` trailer in the commit message (use `Closes AUDIT-20260604-38` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: `apply-audit-flips` parses `Closes` trailers ONLY — `Acknowledges` and `Defers` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using `Closes` on a non-fix disposition arms a false `fixed-<sha>` flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
 ### Task 40 (fix-issue-#411): close-shipped `apply` — `pending-verification` label must already exist; no pre-flight / auto-create ([#411](https://github.com/audiocontrol-org/deskwork/issues/411))
 
 Closes #411. Surface: `plugins/dw-lifecycle/src/subcommands/close-shipped-apply.ts` (or wherever the per-issue dispatch lives), `plugins/dw-lifecycle/skills/close-shipped/SKILL.md`. Severity: medium (first-run adopter friction; comment-already-posted half-state requires manual recovery).
