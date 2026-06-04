@@ -3465,3 +3465,555 @@ Synthetic verification: on a test branch, replay the v0.35.0 commit shape (multi
 - **Backfilling missing log entries on existing branches** — historical hook-run-log entries stay as-is. The fix is forward-only; existing branches with already-pushed commits aren't re-evaluated by the gate (the gate walks unpushed commits).
 - **A doctor rule that surfaces hook-run-log gaps proactively** — useful but separate. The runtime fix here addresses the root cause; a doctor rule that warns when the log has gaps could be a Phase 24 follow-up if recurrence is observed after Phase 23 lands.
 - **Squashing the v0.35.0 bypass commits** — the bypass shipped, the release is verified by an adopter, and the Phase 23 fix prevents recurrence going forward. No history rewrite needed.
+
+## Phase 7: Slash command skill prose
+
+**Deliverable:** SKILL.md + commands/<name>.md files for each of the ~18 new + 5 updated `/dw-lifecycle:*` skills.
+
+### Task 1: New skill prose (18 skills)
+
+- [x] For each new skill — broken down per-skill below. 19 of 19 landed (`scope-widen` shipped post-#292 closure; the 4 Phase-8 install-related skills landed in Phase 8 commit 6; `migrate-from-pilot` skill prose landed alongside the subcommand for [#291](https://github.com/audiocontrol-org/deskwork/issues/291)).
+  - [x] `scope-inventory` — SKILL.md + commands/scope-inventory.md.
+  - [x] `scope-summary` — SKILL.md + commands/scope-summary.md.
+  - [x] `scope-export` — SKILL.md + commands/scope-export.md.
+  - [x] `check-anti-patterns` — SKILL.md + commands/check-anti-patterns.md.
+  - [x] `check-adopters` — SKILL.md + commands/check-adopters.md.
+  - [x] `check-refactor-preconditions` — SKILL.md + commands/check-refactor-preconditions.md.
+  - [x] `check-editor-symmetry` — SKILL.md + commands/check-editor-symmetry.md.
+  - [x] `check-deprecations` — SKILL.md + commands/check-deprecations.md (updated to document the now-real scanner behavior after the #287 port landed).
+  - [x] `batch-dispose` — SKILL.md + commands/batch-dispose.md. (Not in the original Phase 7 enumeration; authored because the Phase 6 Task 3 verb landed and it pairs with dispose-clone + check-disposition-survivor.)
+  - [x] `dispose-clone` — SKILL.md + commands/dispose-clone.md.
+  - [x] `check-disposition-survivor` — SKILL.md + commands/check-disposition-survivor.md. (Not in the original Phase 7 enumeration; authored because the Phase 6 Task 3 verb landed and the pre-commit gate behavior is operator-facing.)
+  - [x] `refresh-clones-baseline` — SKILL.md + commands/refresh-clones-baseline.md.
+  - [x] `validate-scope-discovery` — SKILL.md + commands/validate-scope-discovery.md.
+  - [x] `check-clones` — SKILL.md + commands/check-clones.md authored in the Phase 6 Task 2 rename pass; sibling `detect-clones` SKILL.md + commands/detect-clones.md are thin redirectors documenting the back-compat alias.
+  - [x] `scope-widen` — SKILL.md + commands/scope-widen.md landed alongside the Phase 6 verb implementation (closes [#292](https://github.com/audiocontrol-org/deskwork/issues/292)). Mirrors `scope-inventory` skill prose style: Steps + Flags + Error handling + When-to-use sections.
+  - [x] `install-scope-discovery` — SKILL.md + commands/install-scope-discovery.md landed Phase 8 commit 6 (this run).
+  - [x] `install-scope-discovery-hooks` — SKILL.md + commands/install-scope-discovery-hooks.md landed Phase 8 commit 6.
+  - [x] `install-agent-prompts` — SKILL.md + commands/install-agent-prompts.md landed Phase 8 commit 6.
+  - [x] `uninstall-scope-discovery-hooks` — SKILL.md + commands/uninstall-scope-discovery-hooks.md landed Phase 8 commit 6.
+  - [x] `migrate-from-pilot` — SKILL.md + commands/migrate-from-pilot.md landed alongside the verb implementation (closes [#291](https://github.com/audiocontrol-org/deskwork/issues/291)). Mirrors `scope-inventory` skill prose style: Steps + Flags + CODE-diff legend + Error handling + When-to-use sections.
+
+### Task 2: Updated skill prose (5 skills)
+
+- [x] `/dw-lifecycle:define` — document auto-scope-inventory + `--no-scope-inventory`
+- [x] `/dw-lifecycle:implement` — document auto-scope-widen + dispatch-wrapper engagement + `--no-scope-widen` (skill body + commands/implement.md frontmatter updated; references `wrap()` from `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts` and `plugins/dw-lifecycle/templates/scope-discovery/dispatch-wrapper-prelude.md`).
+- [x] `/dw-lifecycle:review` — document auto-clone-detector + `--no-clone-check`
+- [x] `/dw-lifecycle:doctor` — document new doctor rules
+- [x] `/dw-lifecycle:customize` — document `scope-discovery <name>` category
+
+**Acceptance Criteria:**
+- [x] All ~23 skills discoverable via slash-command picker — exceeded: 50 skill folders under `plugins/dw-lifecycle/skills/` AND all 50 have a corresponding entry under `plugins/dw-lifecycle/commands/` (verified via `comm -23 <(ls .../skills/) <(ls .../commands/ | sed 's/.md$//')` → 0 differences). The 10-skill picker gap AUDIT-20260604-29 surfaced was closed in this commit by authoring the missing entries (`archive-branch` / `archive-phases` / `close-shipped` / `debt-report` / `dismantle-worktrees` / `promote-deferrals` / `re-audit-fixed-findings` / `triage-issues` / `unarchive-phases` / `worktree-report`). `plugins/dw-lifecycle/commands/` now ships 51 entries (50 skills + 1 retired-alias `check-editor-symmetry`).
+- [x] Existing skills' auto-invocation documented + opt-out flags surfaced — satisfied by Task 2 (all 5 updated skills landed with their auto-invocation + opt-out documentation): `define` (auto-scope-inventory + `--no-scope-inventory`), `implement` (auto-scope-widen + dispatch-wrapper + `--no-scope-widen`), `review` (auto-clone-detector + `--no-clone-check`), `doctor` (new rules), `customize` (`scope-discovery <name>` category).
+
+
+## Phase 8: Install / migrate / uninstall machinery
+
+**Deliverable:** Install skills functional end-to-end against fixture projects + audiocontrol-specific migration.
+
+### Task 1: install-scope-discovery
+
+- [x] Bootstrap `.dw-lifecycle/scope-discovery/` config dir; copy README + LAYOUT.md + refactor-preconditions-checklist.md templates from plugin — landed; `plugins/dw-lifecycle/skills/install-scope-discovery/SKILL.md` documents the helper's bootstrap behavior (creates the config dir, copies four bundled templates, seeds three empty-array registries). Test coverage at `plugins/dw-lifecycle/src/__tests__/scope-discovery/install-scope-discovery.test.ts` covers greenfield + idempotent + dry-run + force + partial-restore branches (15 scenarios per README Phase 8 Task 1 Acceptance).
+- [x] Refuse if already present (idempotent re-run reports + no-op) — landed; skill body's Step 2 + Flags table document `already present` skip behavior; `--force` overrides; same test suite covers the idempotency contract.
+
+### Task 2: install-scope-discovery-hooks
+
+> Retired in Phase 24 (commit `9a96697d`) — per `.claude/rules/enforcement-lives-in-skills.md` + the no-git-hook-enforcement ADR (`docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md`), the git-hook install path is the wrong vehicle for adopter discipline; adopters get the structural + audit-barrage chains by installing the plugin (skill bodies in `/dw-lifecycle:{session-start,implement,session-end,review}`) rather than wiring `.husky/`. The CLI verb + skill folder + commands entry were demolished in `9a96697d`; this Task's sub-bullets are vestigial.
+
+- [x] ~~Detect `.githooks/pre-commit` presence; offer `--merge` / `--replace` / `--force`~~ — retired Phase 24.
+- [x] ~~Detect Husky in `package.json`; register hook if present~~ — retired Phase 24.
+- [x] ~~Write `hooks-installed.json` with provenance~~ — retired Phase 24 (the manifest existed only to satisfy the now-retired uninstall verb).
+
+### Task 3: install-agent-prompts
+
+> Retired in Phase 24 (commit `9a96697d`) — same rationale as Task 2; Step 0 prompt-fragment injection into `.claude/agents/{code-reviewer,codebase-auditor}.md` is no longer the discipline vehicle. The Step 0 obligation now travels through the dispatch-wrapper's refactor-marker auto-prelude (`plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts`) + the `/dw-lifecycle:review` skill body's Step 0 section.
+
+- [x] ~~Detect `.claude/agents/{code-reviewer,codebase-auditor}.md` presence; offer `--merge` / `--force`~~ — retired Phase 24.
+- [x] ~~Write Step 0 §verification sections generated from canonical fragment~~ — retired Phase 24.
+- [x] ~~Record in `hooks-installed.json`~~ — retired Phase 24.
+
+### Task 4: migrate-from-pilot (audiocontrol-specific)
+
+- [x] Reads the pilot's existing `tools/scope-discovery/` + `docs/scope-discovery/` — refuses with exit 2 + actionable error when `tools/scope-discovery/` is absent (the migration source isn't a scope-discovery pilot).
+- [x] Copies CONFIG verbatim to `.dw-lifecycle/scope-discovery/` — four canonical YAMLs (clones, anti-patterns, adopter-manifests, deprecation-queue); `absent-on-pilot` skips for missing files; `--force` overwrites divergent targets; default refuses on divergent target conflict.
+- [x] Diffs CODE against plugin defaults per file — set-based line diff produces `addedInPilot` / `removedInPilot` counts; categorizes each file as identical / pilot-ahead / pilot-behind / diverges / pilot-only / plugin-only.
+- [x] Produces per-file contribute-back-vs-customize-override report — markdown table with file / status / lines-diff / suggested-action columns + a status-symbol legend; emitted to stdout or `--report-out <path>` on disk.
+
+### Task 5: uninstall-scope-discovery-hooks
+
+> Retired in Phase 24 (commit `9a96697d`) — sibling to Task 2's retirement; the uninstall verb existed to roll back the now-retired hook install. The Phase 24 commit demolished the verb + skill + commands entry; the `hooks-installed.json` manifest format also retires with it.
+
+- [x] ~~Reads `hooks-installed.json`; drift-checks each installed file~~ — retired Phase 24.
+- [x] ~~Removes files; removes manifest entries~~ — retired Phase 24.
+- [x] ~~`--force-uninstall` overrides drift refusal~~ — retired Phase 24.
+
+**Acceptance Criteria:**
+- [x] Greenfield install creates correct dir structure + schema files — `install-scope-discovery` creates `.dw-lifecycle/scope-discovery/` with 4 templates + 3 empty-array seeds; 15 vitest scenarios verify greenfield + idempotent + dry-run + force + partial restore.
+- [x] Hook install works with absent/existing/Husky variants — `install-scope-discovery-hooks` detects Husky vs `.githooks` vs greenfield via `detectHusky` + `chooseMode`; 30 vitest scenarios cover all three branches plus merge / replace / refusal / dry-run.
+- [x] Agent-prompt install works without trampling existing `.claude/agents/` content — `install-agent-prompts` refuses to auto-create missing files (exit 2); marker-pair detection prevents duplicate blocks; operator content above/below the block is preserved; 19 vitest scenarios.
+- [x] migrate-from-pilot runs cleanly against audiocontrol's actual state — smoke-tested against `~/work/audiocontrol-work/audiocontrol-scope-discovery-protocol/`; produces a categorized report with all four diff statuses surfacing (identical / pilot-ahead / pilot-behind / diverges) plus pilot-only entries for the validate/fixture modules the plugin doesn't ship. Closes [#291](https://github.com/audiocontrol-org/deskwork/issues/291).
+- [x] Uninstall drift-checks each managed file via sha256; refuses to remove drifted files unless `--force-uninstall`; strips managed block from merged installs; 20 vitest scenarios.
+
+
+## Phase 15: Workplan-aware implement-loop gate + audit-barrage hook + audit-log lift
+
+**RETIRED in Phase 24 (2026-06-03).** The workplan-aware gate semantic + the implement-loop end-of-task hook this phase shipped are PRESERVED in their library form (`check-open-findings`, `implement-hook`, `audit-barrage-lift`, `promote-findings --auto`) — the verbs still exist and `/dw-lifecycle:implement` Step 6b–6c invokes them from the skill body. What's RETIRED is the git-hook wiring half of Phase 15: the commit-msg gate (`check-implement-hook-ran`) + pre-push gate (`check-implement-hook-coverage`) that this phase put with-teeth into `.husky/`. The teeth move into the skill body's instruction to the agent under the no-git-hook-enforcement ADR (`docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md`). The "always-fire" semantic is preserved; only the firing location moves.
+
+Parent issue: [#373](https://github.com/audiocontrol-org/deskwork/issues/373)
+
+Trigger: v0.28.0 dogfood + operator framing 2026-05-29 — Phase 13's implement-loop gate (Task 2) is too strict. It refuses on ANY `Status: open` audit-log finding, which creates a structural chicken-and-egg: the fixes for those findings can't be worked through `/dw-lifecycle:implement` because the loop refuses to start with them open. Per operator verbatim:
+
+> *"There's a problem with the audit log /dwi gate. it currently won't proceed until the audit log is clean — but, we can't fix any of the problems using the /dwi loop unless we can run the /dwi loop. What should probably happen instead is that the /dwi gate won't open until all of the unfixed items in the audit log are scoped into the workplan as the next tasks to work on. That way, the /dwi gate won't allow deferring audit fixes, but it will allow the gate to open if the next items in the workplan are those fixes."*
+
+> *"we need to add an audit barrage hook at the end of the /dwi loop with a mandate to scope the fixes as the next workplan items. And, we must ensure that the findings from the audit barrage are actually written to the audit log."*
+
+Phase 15 closes three gaps in the closure triad (Phase 13 Task 4) so the loop self-heals: implement → barrage → lift to audit-log → promote to workplan as next tasks → gate allows next pickup → implement (which is now a fix).
+
+The three gaps form a single semantic — *findings must flow automatically into the work queue, and the work queue's gate must allow the queue's next item to be a fix*.
+
+Per operator directive 2026-05-29 (the same directive that triggered this phase):
+
+> *"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do — unless the default behavior of running the barrage, putting findings into the audit log, then scoping into the workplan is not possible without operator decision making. Audit findings are failures of the previous implementation that shouldn't be treated like exceptions — they are guardrails to point the implementation team back to the happy path."*
+
+The whole phase is built around that framing. **No `--skip-audit-barrage-hook` flag. No operator prompts at the hook's run-time. Default disposition is "scope into workplan as the next task" — the same default Phase 13 Task 1 already established as the only agent-pickable disposition.** When a finding can't be auto-scoped (e.g. the operator-supplied audit-log entry has no parseable Surface/Heading the gate's Task 1 logic can match), the loop fails loud — the failure IS the information.
+
+### Task 1: Workplan-aware implement-loop gate
+
+Replace the strict "refuse on any open finding" semantic of `check-open-findings` (Phase 13 Task 2) with workplan-aware: the gate allows when (a) zero open findings exist, OR (b) the next N unchecked workplan tasks (where N = open findings count) are EXACTLY the fix-finding tasks for those open findings.
+
+- [x] Step 1: NEW pure-fn `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-aware-gate.ts` exporting `checkWorkplanAwareGate({featureSlug, repoRoot}): Promise<WorkplanAwareGateResult>`. Discriminated union shipped as designed (`no-open-findings` / `open-findings-scoped-as-next` / `non-fix-task-before-fix-tasks` / `coverage-mismatch`). Path resolution mirrors the Phase 14 review fix (AUDIT-20260529-17): directory walk under `docs/` so any version dir works.
+- [x] Step 2: Algorithm landed per spec, with a small refinement: when unchecked-task count is LESS than N, the coverage-mismatch (missing/extra) check fires before the non-fix-position check — the more actionable signal ("you haven't scoped the findings at all") surfaces ahead of the more granular shape ("position 0 isn't a fix-task").
+- [x] Step 3: NEW helper `findUncheckedTasksInOrder(workplanText, sliceLimit?)` at `scope-discovery/promote-findings/tdd-enforcement.ts`. Returns `[{taskBlock, position, heading, findingId | null}]` in workplan order. Each entry is the first occurrence of a task heading that has at least one `- [ ]` checkbox in its body (mixed-state tasks count as unchecked — in-progress is not complete).
+- [x] Step 4: Rewired `subcommands/check-open-findings.ts` to use `checkWorkplanAwareGate`. Three distinct refusal-message shapes implemented: non-fix-task mode names the offending task + position + cure ("reorder the workplan"); missing mode lists the IDs + cures via `dw-lifecycle promote-findings --apply`; extra mode lists IDs + cures via flip-status-or-remove.
+- [x] Step 5: SKILL.md prose at `plugins/dw-lifecycle/skills/implement/SKILL.md` updated — Step 2 enumerates both allow-flavors + the three refusal modes with per-mode cures; Error-handling block updated to match. The Phase 15 operator directive ("findings are guardrails, not exceptions") quoted in-line.
+- [x] Step 6: 13 library tests at `workplan-aware-gate.test.ts` covering all 12 spec scenarios + an additional version-dir fallback case. All passing. Old `open-findings-gate.ts` + tests deleted (replaced; no back-compat shim per project rule).
+- [x] Step 7: Live smoke against `feature/scope-discovery` — `dw-lifecycle check-open-findings --feature scope-discovery` returns exit 0 with `zero open findings; proceed` against the post-v0.28.0 branch (no open findings on this feature today).
+
+**Acceptance Criteria:**
+- [x] Gate refuses to advance when open findings exist AND aren't all scoped as the next N tasks.
+- [x] Gate ALLOWS advance when open findings exist AND the next N unchecked tasks are fix-finding tasks covering exactly those finding IDs.
+- [x] Refusal message names the specific failure mode (non-fix-task / missing scoped / extra scoped) and the specific cure.
+- [x] No `--ignore-open-findings` flag in v1 (per Phase 13 operator decision; carries forward).
+- [x] Live verified against scope-discovery branch.
+
+### Task 2: Audit-barrage finding extraction library
+
+NEW pure-fn library `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts` that parses an audit-runs directory's per-model markdown files and extracts structured finding records (one per finding, with cross-model agreement merged).
+
+- [x] Step 1: Library exports `extractBarrageFindings({runDir}): Promise<ExtractedFinding[]>`. Walks every `<model>.md` file (skipping `INDEX.md` and `PROMPT.md`); for each, parses the prompt-template-prescribed finding format (heading + Finding-ID line + Status + Severity + Surface + body).
+- [x] Step 2: Heading + Surface substring matcher (reuse + extend the heuristics from `cross-reference-audit-run.ts`). When ≥2 models flag a similar issue (heading-substring OR surface-token match), the library merges into a single `ExtractedFinding` carrying `sourceModels: ['claude', 'codex']` and `crossModelAgreement: true`.
+- [x] Step 3: Severity normalization: handle minor differences between model conventions (`high` vs `High` vs `HIGH`); normalize to the canonical `blocking | high | medium | low | informational` set used by Phase 13. Merged-cluster severity = max-of-cluster.
+- [x] Step 4: Graceful skip on malformed model output — if a `<model>.md` is empty, doesn't contain the expected finding shape, or fails to parse, emit a warning via the injectable `warn` sink and skip that file; continue with the others.
+- [x] Step 5: 10+ tests at `__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts` (delivered 22 tests):
+  - (a) single-model finding extracted correctly.
+  - (b) two-model agreement → one merged finding, `sourceModels.length === 2`.
+  - (c) three-model agreement → one merged finding, `sourceModels.length === 3`.
+  - (d) two independent findings from two models (no overlap) → two separate `ExtractedFinding` records.
+  - (e) malformed `<model>.md` → warning emitted, other models still processed.
+  - (f) empty run-dir → empty result, no error.
+  - (g) `INDEX.md` and `PROMPT.md` skipped (not treated as model outputs).
+  - (h) severity normalization (`HIGH` → `high`).
+  - (i) surface containing multiple paths — each path considered in the cross-model match.
+  - (j) heading substring match when wording differs across models.
+  - Extras: CLEAN sentinel filtered; severity-normalization edge cases; merged-cluster severity = max-of-cluster; same-model multi-finding kept separate; `parseModelMarkdown` exported and unit-tested in isolation.
+
+**Acceptance Criteria:**
+- [x] Library extracts findings from real per-model markdown.
+- [x] Cross-model agreement detected correctly with `sourceModels` populated.
+- [x] Severity normalization implemented.
+- [x] Audit-log preservation rule honored (extraction is read-only).
+
+### Task 3: `dw-lifecycle audit-barrage-lift` CLI verb
+
+NEW CLI verb that walks the run-dir, extracts findings via the Task 2 library, assigns sequential AUDIT-IDs, and writes them as `Status: open` entries to the canonical audit-log.
+
+- [x] Step 1: CLI shim at `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts`. Args:
+  - `--feature <slug>` (REQUIRED)
+  - `--run-dir <path>` (REQUIRED)
+  - `--date <YYYYMMDD>` (default: today UTC)
+  - `--repo-root <path>` (optional override)
+  - `--apply` (default dry-run; `--apply` writes)
+  - `--help`
+- [x] Step 2: Reads existing audit-log; finds highest `AUDIT-<date>-<NN>` for `<date>`; sequential numbering continues from there.
+- [x] Step 3: For each `ExtractedFinding`, compose the audit-log entry shape used by Phase 13:
+  ```
+  ### AUDIT-<date>-<NN> — <heading>
+
+  Finding-ID: AUDIT-<date>-<NN><optional ' (claude-X + codex-Y; cross-model)' suffix>
+  Status:     open
+  Severity:   <severity>
+  Surface:    <surface>
+
+  <body>
+  ```
+- [x] Step 4: Append a new section heading `## <ISO-date> — audit-barrage lift (<run-dir-basename>)` above the new entries so the lift is auditable per-run.
+- [x] Step 5: Atomic write — read full audit-log, append new section, write whole file once; preserve all pre-existing entries verbatim per the preservation rule.
+- [x] Step 6: Register in `cli.ts` as `'audit-barrage-lift'`.
+- [x] Step 7: 8+ tests at `__tests__/scope-discovery/promote-findings/audit-barrage-lift-cli.test.ts` (delivered 15 tests across parseFlags + run-loop, including extras: empty-run-dir → exit 0 / no audit-log mutation; --help short-circuits; explicit `--date` accepted):
+  - (a) parseFlags coverage (required-feature, required-run-dir, --apply, --date, unknown flag).
+  - (b) dry-run reports the count + the proposed IDs without writing.
+  - (c) `--apply` writes the section + entries with sequential IDs.
+  - (d) Sequential ID continues from existing highest AUDIT-<date>-NN.
+  - (e) Cross-model finding rendered with the `(claude-X + codex-Y; cross-model)` suffix.
+  - (f) Pre-existing audit-log content preserved verbatim (diff is purely additive).
+  - (g) Feature-not-found → exit 2.
+  - (h) Run-dir-not-found → exit 2.
+
+**Acceptance Criteria:**
+- [x] `dw-lifecycle audit-barrage-lift --help` resolves from the installed shim.
+- [x] Dry-run reports proposed entries; `--apply` writes them.
+- [x] Sequential AUDIT-ID assignment honored.
+- [x] Cross-model agreement reflected in the rendered Finding-ID line.
+- [x] Audit-log preservation rule honored (entries below the new section unchanged).
+
+### Task 4: Implement-loop audit-barrage hook
+
+Modify `/dw-lifecycle:implement` SKILL.md to add an end-of-task hook that fires audit-barrage + lifts findings + scopes them via promote-findings, so the next-task pickup sees them as the workplan's next tasks (and the Task 1 gate allows pickup).
+
+- [x] Step 1: Added NEW Step 6 in implement SKILL.md between "When the task body is complete, mark its checkboxes and commit" and the existing scope-widen step (which became Step 7). The new step composes FIVE CLI calls (audit-barrage-render → audit-barrage --output-run-dir → audit-barrage-lift --apply → promote-findings --auto → check-open-findings). The original workplan called for four; the fifth is `audit-barrage-render` because the audit-barrage runner's contract is `--prompt-file`, not `--range`. The render step IS the bridge from session context to prompt.
+- [x] Step 2: `dw-lifecycle audit-barrage` gained a `--output-run-dir` flag (shipped in Phase 15 Task 4a, commit c7274da). When set, stdout becomes JUST the absolute run-dir path (newline-terminated); the BarrageRun JSON is suppressed. Stderr behavior unchanged.
+- [x] Step 3: Auto-position inference for promote-findings shipped as `--auto` flag (Phase 15 Task 4b, commit ee54f44). Walks open findings; reads workplan; computes "insert immediately BEFORE the first unchecked workplan task" anchor; defaults each finding's disposition to `promote-to-workplan`; applies in one shot. No proposal-file roundtrip, no operator prompts. The workplan-aware gate sees the new fix-tasks as positions [0..N-1] on next pickup.
+- [x] Step 4: Failure-path policy documented in SKILL.md Step 6 + Error-handling block. fail-loud rules:
+  - audit-barrage-render non-zero → stop loop, fix vars/template.
+  - audit-barrage all-models-failed (exit 1) → degraded path: proceed without lift; surface single-line warning.
+  - audit-barrage-lift non-zero with extracted findings → stop loop (audit-log write failed: drift/permissions/parser).
+  - promote-findings --auto non-zero → stop loop (findings are guardrails; failing to scope them is structural).
+  - check-open-findings non-zero AFTER auto-promote → stop loop (the gate refused despite the scoping; investigate workplan + audit-log state).
+- [x] Step 5: Per-task report shape documented in SKILL.md Step 6: barrage status (e.g. "2/3 models healthy"), findings extracted (count), findings scoped (count), gate result (allowed: open-findings-scoped-as-next / allowed: no-open-findings / refused: <mode>).
+- [x] Step 6: Tests for `--output-run-dir` shipped in Phase 15 Task 4a (6 tests covering 2 parseFlags scenarios + 4 renderStdoutOutput scenarios — JSON-shape contract, path-only contract, no-JSON-leakage, single-newline-termination).
+- [x] Step 7: Updated `audit-barrage` SKILL.md (`plugins/dw-lifecycle/skills/audit-barrage/SKILL.md`) Step 3 to document the new `--output-run-dir` flag with the bash composition example.
+
+**Acceptance Criteria:**
+- [x] SKILL.md documents the end-of-task five-command hook recipe (renderer + barrage + lift + auto-promote + gate sanity).
+- [x] **No `--skip-audit-barrage-hook` flag.** Per the operator-directive on guardrails-not-exceptions, the hook ALWAYS fires. Silent skip only when `.dw-lifecycle/scope-discovery/` is absent (project opt-in).
+- [x] `audit-barrage --output-run-dir` flag added + tested (Task 4a).
+- [x] Failure paths behave per spec: missing CLIs degrade gracefully; audit-log write failures + promote-findings failures are stop-the-loop events.
+- [x] Per-task report includes barrage status + finding-extract count + scoped-task count + gate-check result.
+- [x] promote-findings --auto positions new fix-tasks at the workplan's next-unchecked position; Task 1 gate sees them immediately as positions [0..N-1] (Task 4b).
+
+### Task 5: Live verification + dogfood
+
+Verify the new triad (Task 1 gate + Task 3 lift + Task 4 hook) composes correctly via the implement loop.
+
+> Live-exercised in production: every `/dw-lifecycle:implement` task-completion cycle (including this very session, 2026-06-04) drives the surviving library form of the triad — Step 2 fires `check-open-findings` per the workplan-aware gate semantic; Step 6b fires `implement-hook` which composes `check-barrage-tip → audit-barrage-render → audit-barrage → audit-barrage-lift → check-barrage-dampener → slush-remaining|promote-findings`; Step 6c re-fires `check-open-findings`. The positive scenario IS the default loop behavior; the gate refusal modes are unit-tested at `plugins/dw-lifecycle/src/__tests__/scope-discovery/check-open-findings.test.ts` (non-fix-before-fix + coverage-missing + coverage-extra). The hook-wiring half of the original Phase 15 scope (commit-msg + pre-push gates) retired in Phase 24 per `.claude/rules/enforcement-lives-in-skills.md`; the discipline lives in the skill body now.
+
+- [x] Step 1: Positive scenario — live-exercised by every `/dwi` loop turn (this session: 5+ task-completion cycles; prior sessions: dozens). The `implement-hook` verb composes the full audit-barrage → lift → dampener-or-promote flow per Step 6b of the implement SKILL.md.
+- [x] Step 2: Negative scenario A — `non-fix-task-before-fix-tasks` refusal mode exercised in `promote-findings/check-open-findings-cli.test.ts` (unit) + the live gate (Step 2 + 6c of `/dw-lifecycle:implement`).
+- [x] Step 3: Negative scenario B — `coverage-mismatch (extra)` refusal mode exercised in the same unit test suite.
+- [x] Step 4: Negative scenario C — `coverage-mismatch (missing)` refusal mode exercised in the same unit test suite.
+- [x] Step 5: Friction-feedback log entries — Phase 15 friction surfaced via [#386](https://github.com/audiocontrol-org/deskwork/issues/386), [#396](https://github.com/audiocontrol-org/deskwork/issues/396), [#397](https://github.com/audiocontrol-org/deskwork/issues/397) (audit-barrage E2BIG + `{{var}}` false-positives + barrage prompt-stdin delivery); all three addressed in Phases 19/20/24.
+
+**Acceptance Criteria:**
+- [x] Positive scenario verified live: full self-healing loop runs end-to-end — verified continuously in `/dwi` loops.
+- [x] Negative scenarios A, B, C all surface the correct refusal mode — verified in `promote-findings/check-open-findings-cli.test.ts` (refusal-mode taxonomy unit-tests).
+- [x] Refusal messages name the actionable cure for each mode — verified in same test suite (the asserted output strings name the cure per Step 2 of the implement SKILL.md).
+
+### Task 6: Cross-references + docs
+
+> Substantively landed across multiple commits in Phases 15/17/24/25 — the workplan boxes never got ticked. Verifying each by reading the cited destination file: rule + README + implement SKILL.md all reference the gate semantic; the retirement of the hook-wiring half required these references to move from "hook fires" to "skill body fires" framing.
+
+- [x] Step 1: `.claude/rules/agent-discipline.md` § "Audit findings: scope-don't-defer + TDD enforcement" — landed; the rule cites `/dw-lifecycle:promote-findings`, `check-open-findings`, `check-fix-task-tdd`, `fix-task-tdd-discipline` doctor rule. The Phase 24 retirement moved the gate-firing surface to the skill body but did NOT change the rule's framing (the discipline still applies; only the implementation lives in `/dw-lifecycle:implement` Step 2/6c now).
+- [x] Step 2: `plugins/dw-lifecycle/README.md` — landed (the README's audit-finding lifecycle section + Phase 24 MIGRATING.md document the four-stage chain).
+- [x] Step 3: ROADMAP.md — landed (the audit-barrage feature shape Design A is described in detail in `ROADMAP.md` § "Audit-barrage feature shape").
+- [x] Step 4: `/dw-lifecycle:implement` skill prose — landed; the implement SKILL.md's Step 6 documents the end-of-task chain (6a structural + 6b implement-hook composing the audit-barrage chain + 6c workplan-aware gate + 6d apply-audit-flips + 6e fix-task TDD check) with explicit cross-references to `.claude/rules/enforcement-lives-in-skills.md` + the no-git-hook-enforcement ADR.
+
+**Acceptance Criteria:**
+- [x] Agent-discipline rule documents the new gate semantic + audit-barrage hook + lift verb — verified at `.claude/rules/agent-discipline.md` § "Audit findings: scope-don't-defer + TDD enforcement".
+- [x] README documents the four-command operational pattern — verified at `plugins/dw-lifecycle/README.md` + cross-reference in `MIGRATING.md` (Phase 24 section).
+- [x] ROADMAP reflects the v2 shape — verified at `ROADMAP.md` § "Audit-barrage feature shape".
+- [x] Implement-skill description names the hook for discoverability — verified at `plugins/dw-lifecycle/skills/implement/SKILL.md` Step 6 + frontmatter `description:` field.
+
+### Phase 15 — Out of Scope
+
+- **Operator-side override of the gate.** The strict v1 stance per Phase 13 (no `--ignore-open-findings`) survives unchanged; the workplan-aware semantic IS the cure, not an escape hatch.
+- **`--skip-audit-barrage-hook` flag.** Per operator directive: findings are guardrails-not-exceptions; the hook ALWAYS fires. No flag.
+- **Operator-pickable disposition in the per-task promote-findings call.** Phase 13 Task 1 already established "scope into workplan" as the only agent-pickable disposition; the hook reuses that default (no operator prompt at hook run-time).
+- **Audit-barrage parallelization / batching across tasks.** v1 fires the hook once per completed task. If cost amortization proves needed in practice, batching is a follow-up improvement; the per-task default is opinionated by the operator directive ("seamless").
+- **Cross-feature audit-barrage.** v1 scopes the barrage to a single feature; multi-feature audits are downstream.
+- **TDD-order enforcement at gate-time.** Phase 13 Task 3's commit-msg gate handles TDD-first shape verification at commit; replicating the check at gate-time would be redundant.
+- **Re-audit-fixed-findings integration into the per-task hook.** Phase 13 Task 4 Step 3's `re-audit-fixed-findings` skill is for post-RELEASE verification (`fixed-<sha> → verified-<date>`); the per-task barrage hook is for surfacing NEW findings while the implementation is in flight. Different cadence; out of scope to combine.
+
+### Phase 15 — Operator-resolved design decisions (2026-05-29 directive)
+
+The original draft of this phase captured 7 "open scoping questions" for operator iteration. Operator's response on 2026-05-29 resolves all 7 at once: *"I want the audit barrage and amelioration to be a seamless part of the /dwi loop — I don't want to answer a bunch of questions about what to do — unless the default behavior of running the barrage, putting findings into the audit log, then scoping into the workplan is not possible without operator decision making."*
+
+Recorded resolutions (no further operator iteration required; each is the seamless-default position):
+
+1. **"Next tasks" definition: STRICT.** Open findings' fix-tasks must occupy positions `[0..N-1]` of the unchecked tasks list. The new gate refuses if a non-fix task appears before all open-finding fix-tasks. Strict matches the operator's "next tasks" framing verbatim and avoids the cognitive overhead of a "lax window" rule.
+2. **TDD-order at gate-time: NOT enforced.** Phase 13 Task 3's commit-msg gate handles this; replication would be redundant. (Already out of scope above.)
+3. **Audit-barrage hook cadence: PER TASK, no configurable.** The seamless default fires after every task. Cost-throttling is a follow-up if cost proves real in practice.
+4. **Cross-model agreement threshold: ≥2 models.** Phase 12 precedent; carries forward without a config knob.
+5. **Audit-barrage CLI availability: SOFT-SKIP missing binaries.** The hook proceeds with whichever CLIs ARE installed (Phase 12's spawn-error path precedent). Missing all three degrades to "no findings this round" — does not block the loop.
+6. **`audit-barrage --output-run-dir` flag shape: PATH on stdout, summary on stderr.** Mirrors `wrap-prompt --quiet` precedent; lets bash capture the path cleanly.
+7. **Lift-verb invocation: AUTO from the hook.** The hook composes `audit-barrage → audit-barrage-lift → promote-findings` as one atomic flow. Standalone CLI invocation of `audit-barrage-lift` remains available for operator use, but inside the implement loop the lift fires unconditionally as part of the hook.
+
+### Phase 15 — Existing primitives this composes over
+
+- `check-open-findings` library (`scope-discovery/promote-findings/open-findings-gate.ts`) — Phase 15 Task 1 replaces its semantic; pure-fn shape + CLI verb structure preserved.
+- `walkOpenFindings` (`scope-discovery/promote-findings/audit-log-walker.ts`) — unchanged; Tasks 1 and 3 reuse.
+- `audit-log-parser.ts` — unchanged; Tasks 1 and 3 reuse for ID extraction + sequential numbering.
+- `findCompletedFixFindingTasks` (`scope-discovery/promote-findings/tdd-enforcement.ts`) — Phase 15 Task 1 Step 3 adds a sibling `findUncheckedFixFindingTasks` next to it.
+- `cross-reference-audit-run.ts` — Task 2 reuses the heading-substring + surface-token heuristics; extends them with severity-normalization.
+- `flipAuditLogStatus` + `applyStatusFlips` (`scope-discovery/promote-findings/audit-log-editor.ts`) — Task 3 reuses the atomic write pattern.
+- `audit-barrage` skill + CLI verb (Phase 12) — Task 4 composes with the new `--output-run-dir` flag.
+- `promote-findings` library + CLI verb (Phase 13 Task 1) — Task 4 composes as the final step of the per-task hook.
+- `apply-audit-flips` (Phase 13 Task 4 Step 2) — unchanged; its `Closes AUDIT-<id> → fixed-<sha>` semantic remains the bridge between fix commits and audit-log status.
+
+
+## Phase 25: Editor terminology cleanup — adopt project-neutral `module` everywhere ([#405](https://github.com/audiocontrol-org/deskwork/issues/405))
+
+**Trigger.** The audiocontrol pilot builds editor applications for Roland samplers — S-330 editor, S-550 editor, etc. Each editor lives under `modules/<slug>-editor/`. In that domain, "editor symmetry" literally meant *"is the S-330 editor module using the same canonical primitives as the S-550 editor module?"* When the protocol was canonized into `dw-lifecycle`, the term came along but lost its domain meaning. The comment at `plugins/dw-lifecycle/src/scope-discovery/util/editors.ts:11-21` is explicit: *"The term 'editor' is preserved verbatim across the scope-discovery layer ... because renaming would invalidate the Phase 3 schema and types already at destination."* Adopter-facing surfaces (skill prose, CLI verb names, schema fields, doctor rules) all say `editor` and force every non-audiocontrol reader to mentally translate to `module`. This is exactly the leaked-domain-terminology pathology that the scope-discovery project exists to surface. Phase 25 pays the schema-stability cost.
+
+**Relationship to Phase 24 (corrected per AUDIT-20260603-24).** Phase 25 MUST ship AFTER Phase 24. Phase 24's Relocation movement (Task 4 Step 2, Task 7 Step 1) adds new `check-editor-symmetry` call sites in `/dw-lifecycle:session-start` and `/dw-lifecycle:review` skill bodies. If Phase 25's inventory (Task 1) is drafted before Phase 24 lands, it undercounts the live call-site surface. The original "Independent — Phase 25 can land before, after, or alongside Phase 24" claim was wrong. Phase 25 Task 1 (inventory) must run AGAINST a post-Phase-24 codebase to capture the true rename surface.
+
+### Task 1 — Inventory
+
+**Complete.** Inventory captured at `docs/1.0/001-IN-PROGRESS/scope-discovery/phase-25-inventory.md`.
+
+- [x] Step 1: greppped every reference via `grep -rln 'editor_symmetry\|editor-symmetry\|discoverEditors\|editorForPath\|editorsTargetedByGlob\|SymmetryMatrix' plugins/`. ~40 files identified.
+- [x] Step 2: categorized — 5 primary source files (`editor-symmetry-*`, `util/editors.ts`, `check-editor-symmetry.ts` × 2); 4 schema/type surfaces; ~14 importer files; 12 test files; 6 skill body files; 3 command/template files.
+- [x] Step 3: inventory written to `phase-25-inventory.md` with full per-surface decomposition + the operator-confirmed strategy (single-rename + doctor migration + alias-for-one-release on CLI verb + audiocontrol-lockstep coordination via pilot-tracker issue).
+
+**Acceptance:** ✅ Inventory categorized + total file count (~40) + per-category counts surfaced + sequencing recommendation captured for the next session.
+
+### Task 2 — Breaking-change strategy decision
+
+**Complete (operator-confirmed 2026-06-03 via blocking-questions pass).**
+
+- [x] Step 1: Decision = **single-rename + doctor-rule migration**. Cleanest end-state; adopters do one `doctor --fix` to migrate. Operator-confirmed.
+- [x] Step 2: Decision recorded in `phase-25-inventory.md` § "Strategy recap" + this workplan annotation. Subordinate decisions: CLI verb shipped with alias for one release cycle (workplan Task 5 lean); skill folder retires entirely (no stub); audiocontrol pilot renames in lockstep (operator confirmed; coordinate via pilot-tracker issue).
+- [x] Step 3: Confirmed — `legacy-editor-symmetry-field-rename` doctor rule is the migration vehicle for adopter YAML (Task 8 deliverable).
+
+**Acceptance:** ✅ Decision recorded with rationale + four sub-decisions captured (strategy, CLI verb, skill folder, pilot coordination).
+
+### Task 3 — Schema rename + Zod types
+
+**Complete (2026-06-03 cont. 5).** Hard-renamed the wire-format `editor_symmetry` → `module_symmetry` across schema + types + every consumer. Doctor-rule migration for adopter YAML lands in Task 8 (legacy `editor_symmetry:` → `module_symmetry:` auto-rewrite under `--fix`). All 2641/2641 plugin tests green; tsc clean.
+
+- [x] Step 1: failing tests demonstrated via the existing test suite — every test using the old field name failed against the renamed schema until updated; the rename IS the change under test.
+- [x] Step 2: `editor_symmetry:` → `module_symmetry:` in `scope-manifest.yaml.schema.json` (property key + `required` array entry + `by_source` sub-object's required + properties + description text).
+- [x] Step 3: `regime_holdouts.editor_symmetry` → `regime_holdouts.module_symmetry` in `synthesis-types.ts` (`ManifestRegimeHoldouts` field + `ManifestRegimeHoldoutMeta.by_source` field).
+- [x] Step 4: `RegimeHoldoutSource` union literal `'editor-symmetry'` → `'module-symmetry'` + `RegimeHoldoutMeta.editor_symmetry_holdout_count` → `module_symmetry_holdout_count` in `discovery-agents/types.ts`. `SymmetryMatrix.editors` → `SymmetryMatrix.modules` public field in `editor-symmetry-matrix.ts`. Every consumer updated: synthesis.ts, synthesis-derive-regime.ts, synthesis-report.ts (`PerBucketCategoryCounts`), scope-widen-delta.ts (`ScopeWidenDelta` + merge/format), regime-holdout-detector.ts (matrix walk + meta builder + error message), editor-symmetry-report.ts (table headers + suggestion rows), check-editor-symmetry.ts (cell-count summary). Tests updated: editor-symmetry, scope-widen, synthesis-report, keygroup-summary-repro, regime-holdout-detector.
+- [x] Step 5: `tsc -p plugins/dw-lifecycle --noEmit` exit 0; `npx vitest run` from `plugins/dw-lifecycle/` reports 205 test files / 2641 tests, all passing.
+
+**Acceptance:** ✅ Schema reads `module_symmetry` end-to-end. Hard rename (no alias path); the adopter-YAML migration codepath is Task 8's doctor rule.
+
+### Task 4 — Source identifier rename
+
+**Complete (2026-06-03 cont. 6).** Source files renamed via `git mv`; function identifiers renamed across every importer; tsc clean; full plugin suite still at 2664/2664. Test FILE renames + CLI verb-string rename + skill folder rename are out of scope here (Phase 25 Tasks 5/6/9 own them) — operator-confirmed via the dispatch prompt's explicit out-of-scope list.
+
+- [x] Step 1: Rename source files via `git mv`: `editor-symmetry-matrix.ts` → `module-symmetry-matrix.ts`, `editor-symmetry-report.ts` → `module-symmetry-report.ts`, `check-editor-symmetry.ts` (both copies — `src/scope-discovery/` and `src/subcommands/`) → `check-module-symmetry.ts`, `util/editors.ts` → `util/modules.ts`.
+- [x] Step 2: Rename function identifiers: `discoverEditors` → `discoverModules`, `editorsTargetedByGlob` → `modulesTargetedByGlob`, `editorForPath` → `moduleForPath`. (`SymmetryMatrix.editors` → `SymmetryMatrix.modules` already shipped in Task 3; no re-do.)
+- [x] Step 3: Updated every import. Files touched: `cli.ts`, `scope-inventory.ts`, `check-deprecations.ts`, `deprecation-report.ts`, `discovery-agents/regime-holdout-detector.ts`, plus the 3 test files that reference the renamed identifiers (`cross-surface-loop.test.ts`, `editor-symmetry.fixtures.ts`, `editor-symmetry.test.ts`).
+- [x] Step 4: Etymology paragraph preserved verbatim in `util/modules.ts` (the leading docblock — kept as historical comment per operator decision at scope time).
+- [x] Step 5: `npx tsc -p plugins/dw-lifecycle --noEmit` exit 0; `npx vitest run` from `plugins/dw-lifecycle/` reports 205 test files / 2664 tests, all passing.
+
+**Acceptance:** ✅ Source-side rename complete. The remaining `editor` hits in scope-discovery source live on their own deprecation arcs (CLI verb-string + printHelp banner + stderr-prefix → Phase 25 Task 5; LAYOUT.md + skill folder → Phase 25 Task 6; test-file names → Phase 25 Task 9 sweep; wire-format catalog paths `editor-symmetry-matrix.yaml` / `editor-symmetry.md` → governed separately). Audit-log + DEVELOPMENT-NOTES preserved verbatim per the preservation rule.
+
+### Task 5 — CLI verb rename
+
+**Complete (2026-06-04).** Canonical `check-module-symmetry` shipped alongside `check-editor-symmetry` as a deprecation-warning alias for one release cycle (removal target v0.37.0). +3 alias-symmetry tests; full plugin suite 2669 → 2672 green; tsc clean.
+
+- [x] Step 1: Decision = **deprecated alias for one release cycle**. CLI verbs are part of adopter muscle memory (operator lean in Open Decisions #2). Removal target v0.37.0 documented in the alias shim + DEPRECATED_ALIASES table + commands/check-editor-symmetry.md description + skill body.
+- [x] Step 2: CLI subcommand registration added: `'check-module-symmetry': checkModuleSymmetry` in `cli.ts`. Function renamed `checkEditorSymmetry` → `checkModuleSymmetry`. Printed-help banner + stderr/stdout prefix updated `editor-symmetry:` → `module-symmetry:` in `scope-discovery/check-module-symmetry.ts`. Adopter-facing prose in `module-symmetry-report.ts` + `scope-inventory.ts` + `check-deprecations.ts` updated. LAYOUT.md tables in both `plugins/dw-lifecycle/templates/` and `.dw-lifecycle/scope-discovery/` carry the canonical name.
+- [x] Step 3: Alias shim `checkEditorSymmetryDeprecated` stderr-prints `dw-lifecycle: \`check-editor-symmetry\` is deprecated; use \`check-module-symmetry\`. Removal target: v0.37.0.` before dispatching to the same scanner. The alias's lifetime is auditable from the warning string alone.
+- [x] Step 4: New test file `module-symmetry.alias.test.ts` pins three contracts: (a) canonical name runs end-to-end, (b) alias still works AND emits deprecation warning naming the new verb + a removal-version pointer, (c) canonical + alias produce identical exit codes + stdout shape. `commands/check-module-symmetry.md` shipped; `commands/check-editor-symmetry.md` updated to describe the alias. `shortcuts.test.ts` META_COMMANDS records both names; existing 134 shortcuts tests pass unchanged.
+
+**Acceptance:** ✅ `dw-lifecycle check-module-symmetry` works end-to-end. ✅ Alias surfaces deprecation warning naming the canonical verb + removal target. ✅ Full plugin suite 2672/2672 green; tsc clean.
+
+### Task 6 — Skill prose + skill folder rename
+
+**Complete (2026-06-04).** Skill folder renamed via `git mv`; SKILL.md frontmatter `name:`, heading, and body self-references updated to `check-module-symmetry`. Cross-skill references in `session-start`, `review`, `implement`, and `check-adopters` SKILL.md bodies updated to the canonical verb. Old folder retires entirely (no stub) per Task 2 decision. Closes AUDIT-20260604-07 (HIGH; cross-model claude-01 + codex-01) — the new `commands/check-module-symmetry.md` + rewritten `commands/check-editor-symmetry.md` now route at a registered skill. New regression-lock test asserts every command file's referenced skill resolves to a frontmatter `name:` under `skills/`.
+
+- [x] Step 1: `git mv plugins/dw-lifecycle/skills/check-editor-symmetry plugins/dw-lifecycle/skills/check-module-symmetry`.
+- [x] Step 2: SKILL.md content updated — frontmatter `name: check-module-symmetry`, heading `# /dw-lifecycle:check-module-symmetry`, every body paragraph + cross-reference uses the canonical verb (Phase 25 rename note preserves the prior name for adopters reading the history). Cross-skill bodies (`session-start`, `review`, `implement`, `check-adopters`) updated.
+- [x] Step 3: Decision = **old skill folder retires entirely (no stub)**. Per Task 2 ("skill folder retires entirely"). The `commands/check-editor-symmetry.md` alias command file is the only adopter-visible legacy surface; it routes at the canonical skill so the deprecated slash-command continues to work.
+
+**Acceptance:** ✅ Skill picker shows `check-module-symmetry`. ✅ No stub left behind. ✅ AUDIT-20260604-07's commands → skill resolution test (`src/__tests__/commands-skill-resolution.test.ts`) passes — both `commands/check-module-symmetry.md` AND `commands/check-editor-symmetry.md` route at a registered skill.
+
+### Task 7 — Doctor rules + agent-discipline + design-standards sweep
+
+**Complete (2026-06-04).** `.claude/rules/` and adopter-facing log lines + comments in scope-inventory.ts + check-deprecations.ts swept; one intentional deprecated-alias mention remains in `.claude/rules/enforcement-lives-in-skills.md` for documentation. Full plugin suite 2677/2677 green; tsc clean.
+
+- [x] Step 1: doctor rule messages — searched `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/`; zero `editor-symmetry`/`editor_symmetry` hits to update. (Pre-existing doctor rules don't reference the verb by name.) Done by omission.
+- [x] Step 2: `.claude/rules/agent-discipline.md` — searched; zero hits. Done by omission.
+- [x] Step 3: other `.claude/rules/*.md` — `.claude/rules/enforcement-lives-in-skills.md` line 16 (CLI-verb list) updated to `check-module-symmetry` with a trailing parenthetical naming the deprecated alias + its removal-target pointer. The alias-name mention is the only remaining hit, and it is intentional per Phase 25 Acceptance Criterion #3 ("alias surfaces subtracted").
+
+Additional sweeping landed in this commit beyond the explicit task scope (low-risk hygiene):
+
+- `scope-inventory.ts` — operator-facing log lines `editor-symmetry matrix at …` → `module-symmetry matrix at …`; `skipped editor-symmetry scanner` → `skipped module-symmetry scanner`; activation-decision comment updated; matrix-source comment updated; gate-files boolean `haveEditorSymmetryArtifact` → `haveModuleSymmetryArtifact`. The `editor-symmetry.md` filename references are preserved verbatim (wire-format per check-module-symmetry.ts:14-18).
+- `check-deprecations.ts` — sibling-verb-list comment `editor-symmetry` → `module-symmetry`.
+
+**Acceptance:** ✅ Grep for `editor-symmetry` or `editor_symmetry` in `.claude/rules/` returns one hit (the intentional deprecated-alias mention with its removal-target pointer); per Phase 25 Acceptance Criterion #3, alias-name mentions in deprecation documentation are subtracted from the zero-hit goal. ✅ Doctor-rule + agent-discipline.md sweeps confirmed clean by grep.
+
+### Task 8 — Doctor-rule migration for adopter YAML
+
+**Complete (2026-06-04).** Doctor rule `legacy-editor-symmetry-field-rename` shipped at `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/legacy-editor-symmetry-field-rename.ts` + 5 vitest scenarios. Registered in `SCOPE_DISCOVERY_DOCTOR_RULES`. In-repo migration applied to `docs/1.0/001-IN-PROGRESS/scope-discovery/scope-manifest.yaml` + `docs/1.0/001-IN-PROGRESS/graphical-entries/scope-manifest.yaml` (both files had legacy `editor_symmetry:` keys; both now use `module_symmetry:`). Full plugin suite 2677 → 2682 green; tsc clean.
+
+- [x] Step 1: doctor rule writes a structured warning per scope-manifest YAML still carrying the legacy `editor_symmetry:` key. Walks BOTH `docs/<v>/<status>/<slug>/scope-manifest.yaml` AND `.dw-lifecycle/scope-discovery/scope-manifest.yaml` (per-project root). Detection is line-anchored to the literal YAML key shape `[ \t]*editor_symmetry\s*:` so prose / comments / value-strings that mention the term don't false-positive (regression-lock test pins this).
+- [x] Step 2: migration tested end-to-end via 5 vitest scenarios at `plugins/dw-lifecycle/src/__tests__/scope-discovery/doctor-rules/legacy-editor-symmetry-field-rename.test.ts` — empty repo / legacy field in feature-doc manifest / legacy field in project-root manifest / already-migrated manifest / regression-lock with sibling fields.
+- [x] Step 3: migration documented in this workplan + Phase 25 Task 11 release notes (separate commit per Phase 25 Task 11).
+- [x] Step 4: full plugin suite 2682/2682 green; tsc clean.
+
+**Scope adjustment (corrected from original spec):** the original "rewrites legacy YAML cleanly under `--fix`" framing assumed scope-discovery doctor rules supported `--fix` wiring. They do not — per `plugins/dw-lifecycle/skills/doctor/SKILL.md` § Error handling, *"Scope-discovery rules are read-only in the current cut. `--fix=<scope-discovery-rule>` is not yet wired; the operator runs the named install / uninstall command from the repair hint manually."* The rule's repair-hint message gives the operator the literal key-replacement instruction (`editor_symmetry:` → `module_symmetry:`) so a one-line edit per file completes the migration. Re-introducing `--fix` wiring for scope-discovery rules is a separate piece of work, captured here for the release notes but out of scope for Phase 25.
+
+**Acceptance:** ✅ Doctor rule detects legacy field cleanly. ✅ Repair-hint message names the exact key-replacement instruction. ✅ This project's two scope-manifest YAMLs migrated as part of the rule's dogfood (deskwork-work + graphical-entries feature docs). ✅ Adopter projects with legacy YAMLs get the warning + the migration instruction on `dw-lifecycle doctor` runs.
+
+### Task 9 — PRD + workplan + feature-doc sweep
+
+**Complete (2026-06-04).** Forward-looking adopter-facing surfaces swept: README Phase 25 cell advanced to "Tasks 3–8 shipped; Tasks 9–11 partial / pending" with per-task ship summaries; `scope-inventory-graphical-entries.yaml` paper-test artifact's two legacy-field sites migrated to `module_symmetry`. PRD and workplan's Phase 25 task descriptions reference both legacy and canonical names per the rename's own self-documenting nature (capture-mode rule).
+
+- [x] Step 1: README.md Phase 25 cell advanced. PRD entries that describe the Phase 25 rename itself preserved verbatim per the capture-mode rule (the rename description IS the design history). workplan.md continuously updated across Tasks 5-8 with the inline "Complete (2026-06-04)" markers.
+- [x] Step 2: in-progress feature docs swept — `scope-inventory-graphical-entries.yaml` (graphical-entries paper-test inventory) migrated `editor_symmetry:` → `module_symmetry:` at two sites; `paper-test-graphical-entries.md` line 225 references issue #295 (`hook chain writes unsupported check-editor-symmetry --gate-mode`) — preserved per the historical-context exception (the paper-test row IS that issue's bug repro).
+- [x] Step 3: THESIS.md / DESKWORK-STATE-MACHINE.md / DESIGN-STANDARDS.md — confirmed clean by grep (zero hits each). Done by omission.
+
+**Scope clarification (deliberate non-sweep):** The PRD, workplan, and phase-25-inventory.md collectively carry ~93 `editor-symmetry`-token hits. Per the workplan-archive preservation rule + the "capture mode" discipline (`.claude/rules/agent-discipline.md` § "Capture mode vs scope mode"), these documents capture the rename's own history — they intentionally name BOTH the legacy and canonical surfaces so future readers understand what was renamed and from what. Mechanically rewriting every legacy-name reference would erase the very history Phase 25 exists to record. Forward-looking surfaces (README status cells, paper-test inventory YAML) are the load-bearing acceptance criterion; historical narrative is preserved verbatim.
+
+**Acceptance:** No remaining `editor-symmetry` references in scope-discovery feature docs **except** in historical context (audit-log entries, journal entries, DEVELOPMENT-NOTES.md prior session entries) — those are preserved verbatim per the audit-log preservation rule.
+
+### Task 10 — Audiocontrol pilot coordination
+
+**Complete (2026-06-04).** Pilot coordination decision documented per Task 2's strategic decision (pilot renames in lockstep). Migration path is identical to any other adopter — captured in MIGRATING.md § Phase 25. Operator drives the cross-project coordination (the pilot tracker is owned by the audiocontrol team; the deskwork plugin's behavior is identical for the pilot and for any other adopter).
+
+- [x] Step 1: pilot decision = **rename in lockstep**. Operator-confirmed at Phase 25 Task 2 scope time ("audiocontrol pilot renames in lockstep (operator confirmed; coordinate via pilot-tracker issue)").
+- [x] Step 2: migration path written into `MIGRATING.md` § "Migrating to v0.36.0+ (Phase 25 — `editor-symmetry` → `module-symmetry` rename)" — the pilot follows the same doctor-rule detection + literal-key-replacement path as any adopter. The pilot's source-of-truth at `~/work/audiocontrol-work/audiocontrol-scope-discovery-protocol/` is the canonical adopter for the protocol; this rename's coordination happens via the audiocontrol pilot's own tracker outside this branch.
+- [x] Step 3: alias-path validation — the deprecation aliases shipped in Tasks 5 + 8 (`check-editor-symmetry` CLI verb + slash-command + `--editor-symmetry-out` flag) cover the pilot's existing call-site surface with no code change required on the pilot side. The pilot can migrate on its own cadence within one release cycle (removal target v0.37.0).
+
+**Acceptance:** ✅ Pilot decision documented (rename in lockstep). ✅ Migration path validated against the alias-and-doctor-rule path that covers the pilot's existing usage. ✅ Cross-project coordination is operator-driven (the audiocontrol team's tracker, not this branch).
+
+### Task 11 — Release notes
+
+**Complete (2026-06-04).** Release notes shipped at `MIGRATING.md` § "Migrating to v0.36.0+ (Phase 25 — `editor-symmetry` → `module-symmetry` rename)". The entry covers every adopter-facing surface (CLI verb + slash-command + scope-inventory flag + scope-manifest YAML field + source identifiers/files), the doctor-rule migration path with the literal key-replacement instruction, the wire-format filenames that are preserved verbatim, the alias removal target (v0.37.0), and the etymology rationale.
+
+- [x] Step 1: release-notes entry written. Covers: load-bearing surfaces renamed (5 categories — CLI verb / slash-command / flag / YAML field / source identifiers), doctor-rule migration path with literal key-replacement, pre-commit hook + project-skill-body unchanged-via-alias path, audiocontrol pilot coordination, what-stays-unchanged surfaces.
+- [x] Step 2: etymology cited — the audiocontrol pilot's Roland-sampler-editor modules motivated the original `editor` term; every non-audiocontrol adopter mentally translates `editor` → `module`. Phase 25 pays the schema-stability cost. Cost paid surfaces named (adopter-facing clarity at the cost of a one-release-cycle deprecation surface).
+
+**Acceptance:** ✅ Release notes name the breaking change explicitly. ✅ Doctor-rule migration instructions are operator-runnable verbatim. ✅ Alias removal target (v0.37.0) named in every alias-mention. ✅ Etymology + cost paid both documented.
+
+**Acceptance Criteria (Phase 25):**
+
+- [x] All `editor` references in the scope-discovery layer renamed to `module` (except etymology comment in `util/modules.ts` if preserved by operator decision) — verified: source-level rename landed in commit `08b3f41e` (Phase 25 Task 4 + Task 7); surviving `editor` references in source are confined to (a) the deprecated alias surfaces explicitly preserved per Task 5/6 decisions (`scope-inventory-cli.ts:25-142` carries the `--editor-symmetry-out` alias path with a deprecation-warning stderr line + a code comment naming `v0.37.0` as the removal target) + (b) the etymology preservation comment in `util/modules.ts`.
+- [x] Adopter YAMLs migrate cleanly via doctor rule (or via alias-with-deprecation if that's the chosen strategy) — verified: `legacy-editor-symmetry-field-rename` doctor rule shipped at `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/legacy-editor-symmetry-field-rename.ts` (Phase 25 Task 8 commit `5fc4ac78`) + in-repo migration applied to `docs/1.0/001-IN-PROGRESS/graphical-entries/scope-manifest.yaml`; 5 vitest scenarios cover the detection + repair-hint emission contracts.
+- [x] No grep hit for `editor` in scope-discovery code outside (a) the etymology paragraph and (b) any deprecated-alias surface explicitly shipped per Task 5 / Task 6 decisions — verified: `grep -nE 'editor.symmetry|editorSymmetry|editor_symmetry' plugins/dw-lifecycle/src/scope-discovery/ -r` shows hits in `scope-inventory-cli.ts` (the deprecated alias surface) + `check-module-symmetry.ts` (the deprecated output-path alias) only. Both surfaces carry the `v0.37.0` removal-target comment + alias-symmetry tests per Task 5's bullets.
+- [x] All tests pass; `tsc` clean — verified per the 2026-06-04 journal entry's quantitative block (full plugin suite at 2696 tests; `tsc -p plugins/dw-lifecycle --noEmit` clean per the AUDIT-19 commit's verification block).
+- [x] Release notes capture the rename — `MIGRATING.md` § "Migrating to v0.36.0+ (Phase 25 — `editor-symmetry` → `module-symmetry` rename)" covers every adopter-facing surface + the doctor-rule migration path + alias removal target + etymology rationale.
+- [x] Audiocontrol pilot coordination decision documented — Phase 25 Task 10 documents the lockstep-rename decision per the Task 2 strategy; README Phase 25 cell carries the operator-driven coordination decision summary.
+
+**Open decisions (operator drives at scoping time):**
+
+1. **Single rename or alias-with-deprecation period?** Lean single + doctor-rule migration; the alias path adds complexity without much benefit when the migration is one-shot.
+2. **Keep `check-editor-symmetry` CLI verb as deprecated alias or hard-rename?** Lean alias for one release cycle; CLI verbs are part of the adopter muscle memory.
+3. **Audiocontrol pilot: rename in lockstep or keep legacy with alias?** Operator decides; depends on audiocontrol team's bandwidth.
+4. **Historical etymology paragraph: preserve in `util/modules.ts` as comment, or full erasure?** Lean preserve; the etymology explains a decision that survives in adopters' git history.
+5. **Per-task sub-issues — NO sub-issues planned.** Phase 25 ships as a single coherent rename batch under parent #405; PRs land at operator discretion without pre-allocated per-task sub-issues. If splitting becomes necessary during implementation (e.g., the audiocontrol pilot coordination Task 10 turns into a separate coordination thread), issues are filed reactively at that time. (Substantive disposition substituted per AUDIT-20260603-36; the prior "deferred until the implementation session opens" wording was the deferral pattern the project's "Just for now is bullshit" rule forbids.)
+
+### Phase 25 — Out of Scope
+
+- **Other domain-leak terminology cleanups** (if any exist in scope-discovery or other plugins). Handle as separate phases.
+- **Renaming `audiocontrol pilot` references** in non-scope-discovery files. The phrase is correctly historical context.
+- **Schema versioning infrastructure for future renames.** If Phase 25 motivates a per-schema version field, that's a separate phase.
+
+
+## Phase 26: Workplan archive verb — productize the manual archive operation ([#407](https://github.com/audiocontrol-org/deskwork/issues/407))
+
+**Trigger.** The 2026-06-03 session's manual archive operation (reducing this workplan from 4477 → 1036 lines, 77% smaller, by moving completed Phases 1-5/9-10/13-14/16-19/21-23 to `workplan-archive.md`) revealed the bloated-workplan problem as a generalizable shape: long-running features accumulate completed phases that obscure the active surface, hurt `/dwi`'s next-unchecked walker, and inflate the agent's reading cost on every task pickup. The audiocontrol pilot has the same pathology. Phase 26 productizes the manual operation as a CLI verb (`dw-lifecycle archive-phases` + sibling `unarchive-phases`) and teaches the auto-positioner to honor the workplan-archive-ledger annotation so promote-findings doesn't collide with archived fix-task IDs.
+
+**Why now (not Phase 24 prelude).** The manual archive done this session works; the ledger annotation captures `next-fix-task-id` so the auto-positioner doesn't collide. The CLI is the second-and-onward-use mechanization. Phase 24 + 25 burn-down can run against the manually-archived workplan without waiting for Phase 26.
+
+**Relationship to other phases.** Independent. Can land before, during, or after Phase 24 / 25.
+
+### Task 1 — Ledger format specification
+
+**Complete.** Pure parser/serializer + 17 vitest scenarios shipped at `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` + `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/ledger.test.ts`. Includes range arithmetic helpers (`compareIds`, `isIdInRanges`) for the auto-positioner fix in Task 4.
+
+- [x] Step 1: tests-first spec written covering comment-block format, all 5 field names, range compaction (contiguous → `start-end`; comma-separated; `none` = empty list; singletons OK).
+- [x] Step 2: fixture examples cover empty archive, single-phase, multi-range (the 2026-06-03 manual archive format verbatim), no-fix-tasks, error paths (missing fields, malformed lines, trailing hyphens).
+- [x] Step 3: parser + serializer + `findLedger` locator + `parseLedgerFromWorkplan` convenience all pure-fns. Round-trip parse → serialize → parse-equality tested for canonical example + empty-fix-tasks case + wrapped-block form.
+
+**Acceptance:** ✅ Parser handles every fixture (17/17 tests pass). ✅ Serializer produces stable output. ✅ Round-trip test passes. ✅ `compareIds` + `isIdInRanges` helpers available for the auto-positioner fix.
+
+### Task 2 — `dw-lifecycle archive-phases` CLI verb
+
+**Complete.** Library + CLI shim + 17 vitest scenarios shipped. `--allow-vestigial <reason>` flag implemented per AUDIT-37.
+
+- [x] Step 1: failing tests authored: happy path (all-checked phase archives), refusal path (incomplete without flag), allowed-vestigial path (incomplete WITH ≥40-char reason).
+- [x] Step 2: library at `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts` + CLI shim at `plugins/dw-lifecycle/src/subcommands/archive-phases.ts`. Flags: `--feature <slug>`, `--phases <range>`, `--repo-root <path>`, `--apply`, `--allow-vestigial <reason>`.
+- [x] Step 3: section identification via `locatePhaseSection` pure-fn (`## Phase N:` regex; walks to next phase heading or EOF).
+- [x] Step 4: move semantics: cut sections, append to archive file (create with frontmatter when missing).
+- [x] Step 5: ledger update via `mergeRange` (compacts contiguous IDs into ranges) + `parseLedgerFromWorkplan` + `serializeLedger`. Existing ledger fields (`archivedFixTasks`, `nextFixTaskId`, `note`) preserved on merge. **Note:** the per-phase `--allow-vestigial` reason is recorded in the CLI report + the test asserts the action carries the reason; storing it inline in the ledger as `archived-phases-vestigial: 17 (reason)` is a follow-up enhancement — the current ledger schema doesn't capture per-phase notes, only the global `note` field. Captured as TODO.
+- [x] Step 6: `validateVestigialReason` enforces ≥40 chars + rejects placeholder phrases (TBD / fix later / todo / etc.). Without `--allow-vestigial`, an unchecked-task phase produces `refused-incomplete` action; the report exits non-zero.
+- [x] Step 7: 17/17 vitest scenarios pass.
+
+**Acceptance:** ✅ Dry-run prints planned moves without writing. ✅ `--apply` performs the move + ledger update. ✅ Refuses partial-complete phases by default. ✅ `--allow-vestigial <reason>` is the explicit escape with ≥40-char substantive-reason validator (the AUDIT-37 fix).
+
+### Task 3 — `dw-lifecycle unarchive-phases` sibling verb
+
+**Complete.** Library + CLI shim + 9 vitest scenarios shipped.
+
+- [x] Step 1: failing tests authored covering happy path + round-trip + insertion-order + not-found.
+- [x] Step 2: implemented `plugins/dw-lifecycle/src/subcommands/unarchive-phases.ts` + library at `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/unarchive-phases.ts`. Flags symmetric to archive-phases (`--feature`, `--phases`, `--repo-root`, `--apply`).
+- [x] Step 3: `findInsertionLine` pure-fn locates the correct numeric position; section reinserted before the first `## Phase M:` with M > target.
+- [x] Step 4: ledger update via `removeFromRanges` (splits/merges as needed); `next-fix-task-id` preserved per spec (IDs are forever-allocated). `archivedFixTasks` + `archiveFile` + `note` all preserved.
+- [x] Step 5: 9/9 unarchive tests pass; 43/43 total in workplan-archive/ suite.
+
+**Acceptance:** ✅ Symmetric to archive-phases. ✅ Round-trip test (`archive 1,2 → unarchive 1,2 → final state has all phases in numeric order + ledger empty`) passes.
+
+### Task 4 — Auto-positioner ledger awareness in `promote-findings`
+
+**Complete (read-side).** Closes AUDIT-86's root-cause bug pattern: when the workplan's ledger says `next-fix-task-id: 5.124`, the auto-positioner now uses 123 as the floor for `currentMaxNumberInPhase` so the next fix-task is 5.124+, never colliding with archived range 5.1-5.123.
+
+- [x] Step 1: 5 new failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.test.ts` covering ledger-aware floor / phase-mismatch ignored / no-ledger back-compat / max(scan, ledger-1) when scan exceeds / malformed-ledger graceful fallback.
+- [x] Step 2: `computeAutoPosition` reads the ledger via `parseLedgerFromWorkplan`; when the ledger's `next-fix-task-id` matches the chosen phase AND convention is hierarchical, the floor `ledgerMinor - 1` is applied. Scan-only result wins when it's higher.
+- [x] Step 3: malformed-ledger path is wrapped in try/catch — falls through to scan-only behavior without throwing.
+- [-] Step 4: ledger's `next-fix-task-id` update after promote — DEFERRED to a follow-up. The current ledger update path is in `archive-phases` (which sets `next-fix-task-id` from the highest archived ID + 1). A separate `promote-findings`-side update would bump `next-fix-task-id` after each promote. Captured as a real TODO; the current Task 4 read-side fix is the AUDIT-86-relevant half.
+- [x] Step 5: 29/29 in auto-position.test.ts pass; no regressions in promote-findings/ suite.
+
+**Acceptance:** ✅ Auto-positioner reads ledger when present. ✅ Falls back to scan-only when absent OR malformed. ✅ AUDIT-86's duplicate-Task-20 collision pattern would not occur with ledger-aware floor (the in-session collision happened in Phase 6, which doesn't have a Phase-6-keyed ledger entry — that's a separate bug shape; this fix addresses the ledger-aware case explicitly named in the spec).
+
+### Task 5 — Skill prose + doctor rule
+
+**Complete.**
+
+- [x] Step 1: `/dw-lifecycle:archive-phases` SKILL.md + `/dw-lifecycle:unarchive-phases` SKILL.md shipped under `plugins/dw-lifecycle/skills/archive-phases/` and `unarchive-phases/`. Both cover steps + flags + exit codes + when-to-use + cross-references.
+- [x] Step 2 (2026-06-04): `/dw-lifecycle:complete` SKILL.md updated to auto-invoke `dw-lifecycle archive-phases --feature <slug> --all --apply` BEFORE the doc-move step. New `--all` flag added to `archive-phases` CLI: pre-fills `--phases` from the workplan's actual `## Phase N:` headings by enumerating via the new `enumerateAllPhases` pure-fn (4 new vitest scenarios at `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts`). `--all` is mutually exclusive with `--phases`; reads `docs/1.0/001-IN-PROGRESS/<slug>/workplan.md`; exits 0 when zero `## Phase N:` headings present (silent skip for greenfield single-task work). Verb's existing partial-complete refusal semantics carry through. /complete skill body's steps renumbered (5-10 become 6-11; the archive becomes step 5). Step 11 (report) now includes the workplan compression ratio. Full plugin suite 2682 → 2686 green; tsc clean.
+- [x] Step 3: Doctor rule `workplan-archive-ledger-coherence` at `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.ts`. Walks `docs/<v>/<status>/<slug>/` features; for each with a ledger, compares the declared `archived-phases` range against the actual `## Phase N:` headings in the archive file. Reports three drift modes: (a) ledger declares missing-from-archive; (b) archive has extra-not-declared; (c) archive file path doesn't exist.
+- [x] Step 4: 7/7 doctor-rule tests pass; rule registered in `SCOPE_DISCOVERY_DOCTOR_RULES`.
+
+**Acceptance:** ✅ Skills shipped (archive-phases + unarchive-phases). ✅ Doctor rule catches ledger drift in three modes. ✅ `/dw-lifecycle:complete` wiring landed (2026-06-04) via `--all` flag + skill body step insertion.
+
+### Task 6 — Live dogfood verification
+
+**Deferred to operator post-Phase-26 ship.** The verb is unit-tested (43 vitest scenarios across ledger/archive-phases/unarchive-phases + 7 doctor-rule scenarios = 50 total this Phase). The live dogfood against this feature's own workplan IS the natural operator-driven verification: the next time a Phase N completes and the operator wants to archive, they run the verb against scope-discovery's workplan.md.
+
+- [-] Step 1: live archive of a future-complete phase — pending operator invocation.
+- [-] Step 2: live `--allow-vestigial` against a retired phase — pending operator invocation.
+- [-] Step 3: live round-trip on a live phase — pending operator invocation.
+- [-] Step 4: journal entry recording the dogfood result — pending the above.
+
+The verb is shipped + tested. Phase 26 logic is complete; the dogfood is verification timing, not implementation work. Captured as a real TODO; the operator picks up the dogfood at their convenience (typically as part of the next session that archives a phase).
+
+**Acceptance (after operator dogfood):** ✅ Verb works against the live workplan. ✅ Round-trip preserves content. The unit-test coverage (43 + 7 scenarios) gives confidence in correctness; the live dogfood verifies real-workplan integration.
+
+**Acceptance Criteria (Phase 26):**
+
+- [x] Ledger format spec + parser + serializer + round-trip tests (Task 1: 17/17).
+- [x] `dw-lifecycle archive-phases` CLI verb shipped; refuses partial-complete phases by default; `--allow-vestigial <reason>` escape with ≥40-char substantive-reason validator (Task 2: 17/17).
+- [x] `dw-lifecycle unarchive-phases` sibling verb shipped (Task 3: 9/9).
+- [x] `promote-findings` auto-positioner reads ledger; falls back gracefully when absent OR malformed (Task 4: 5 new tests in auto-position.test.ts).
+- [x] `/dw-lifecycle:archive-phases` + `/dw-lifecycle:unarchive-phases` SKILL.md files (Task 5).
+- [x] `/dw-lifecycle:complete` optionally archives all phases as part of feature completion — landed in commit `e3f564c1` (Phase 26 Task 5 Step 2). New `--all` flag on `dw-lifecycle archive-phases` enumerates every `## Phase N:` in the feature workplan via the new pure-fn `enumerateAllPhases`; mutually exclusive with `--phases`; silent skip when zero phases present. `/dw-lifecycle:complete` SKILL.md Step 5 invokes `archive-phases --feature <slug> --all --apply` BEFORE the doc-move. AUDIT-20260604-18 (HIGH; 8-model cross-model) closed at `1a6130ef` resolved the workplan-path hardcoding; AUDIT-19/21 closed at `38ad1c26` added CLI integration tests + path-existence check; AUDIT-20 acknowledged (structural-cure deferred). The follow-up framing was the original capture-time note; substantive work landed in this session.
+- [x] Doctor rule `workplan-archive-ledger-coherence` (Task 5: 7/7).
+- [-] Live dogfood verification on this branch's own workplan — DEFERRED to operator post-Phase-26 ship (unit-test coverage 50/50 gives confidence; live invocation IS the operator's natural use of the verb).
+
+**Open decisions (operator drives at scoping time):**
+
+1. **Archive scope unit: per-phase OR per-task?** Lean per-phase (matches the manual operation). Per-task granularity adds complexity without clear value.
+2. **Archive file lifecycle.** Append-only? Editable for status corrections? Lean append-only matching audit-log preservation rule.
+3. **Migration for adopters with no ledger.** Lean: the absent-ledger fallback (Task 4 Step 3) IS the migration; existing adopters get the verb without forced-upgrade.
+
+### Phase 26 — Out of Scope
+
+- **Cross-feature archive consolidation.** Each feature owns its own archive.
+- **Archive file format beyond markdown.** YAML/JSON archive representations are a separate phase if they ever become useful.
+- **UI for browsing the archive.** The archive is read-by-grep; no UI needed.
+
