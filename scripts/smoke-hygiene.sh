@@ -412,8 +412,16 @@ g branch -D feature/smoke-wtree >/dev/null 2>&1 || true
 
 # -------- 6. Phase 15: close-shipped scan/propose/apply round-trip --------
 
+# Phase 17 / #412: mirror the SKILL.md's per-run project-local path
+# convention so the smoke documents the canonical adopter path. Bare
+# /tmp/ paths are banned (.claude/rules/file-handling.md); the SKILL.md
+# uses .dw-lifecycle/close-shipped/runs/<timestamp>/{bundles,verdicts}.json.
+CS_RUN_TS="$(date -u +%Y-%m-%dT%H-%M-%S-000Z)"
+CS_RUN_DIR="$FIXTURE/.dw-lifecycle/close-shipped/runs/$CS_RUN_TS"
+mkdir -p "$CS_RUN_DIR"
+
 echo "== smoke-hygiene: close-shipped scan =="
-CS_BUNDLES="$FIXTURE/close-shipped-bundles.json"
+CS_BUNDLES="$CS_RUN_DIR/bundles.json"
 "$DW_BIN" close-shipped scan --from-tag v0.1.0 --to-tag v0.2.0 --repo example/repo \
     --output "$CS_BUNDLES" >/dev/null 2>&1 \
   || fail "close-shipped scan failed (non-zero exit)"
@@ -423,7 +431,7 @@ python3 -c "import json,sys; d=json.loads(open('$CS_BUNDLES').read()); assert 'b
   || fail "close-shipped scan emitted malformed BundleSet"
 
 echo "== smoke-hygiene: close-shipped propose (with canned verdicts) =="
-CS_VERDICTS="$FIXTURE/close-shipped-verdicts.json"
+CS_VERDICTS="$CS_RUN_DIR/verdicts.json"
 python3 - "$CS_BUNDLES" "$CS_VERDICTS" <<'PY'
 import json, sys
 from pathlib import Path

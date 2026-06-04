@@ -52,19 +52,19 @@ The Phase 15 SKILL.md prescribes `/tmp/close-shipped-bundles.json`, `/tmp/close-
 
 **Approach:** Option 2 from the issue body (operator-recommended) — project-local cache dir keyed by run timestamp. Consistent with the proposal output's existing `.dw-lifecycle/close-shipped/proposals-<timestamp>.json` scheme; worktree-isolated; auditable post-hoc.
 
-- [ ] Step 1: Update `SKILL.md` Phase A Steps 2, 5, 6 to use `.dw-lifecycle/close-shipped/runs/<timestamp>/{bundles.json,verdicts.json,verdicts/<N>.json}`. The agent computes the timestamp ONCE per run (ISO-8601 with `:` and `.` replaced for filesystem safety, mirror of `proposals-<timestamp>.json`'s format) and threads it through all three writes.
-- [ ] Step 2: Update the prose to explain WHY the path scheme matters (`.claude/rules/file-handling.md` § "Never use bare `/tmp/<name>` paths"; concurrency hazards across worktrees / sessions / sub-agents; auditability).
-- [ ] Step 3: Update the sub-agent prompt template's `Write` instruction (currently embedded inline in SKILL.md Phase A Step 4) so dispatched agents write to the per-run dir instead of bare `/tmp/`. The orchestrator passes the resolved per-N path as a templated variable; the agent doesn't compute it.
-- [ ] Step 4: Add `.dw-lifecycle/close-shipped/runs/` to `.gitignore` (the proposal output dir is already gitignored; the runs dir is the same per-worktree artifact shape).
-- [ ] Step 5: Extend `scripts/smoke-hygiene.sh` to use the new path scheme (the current smoke uses `$FIXTURE/close-shipped-bundles.json` — fixture-local, not bare /tmp — so the smoke itself is fine, but it should mirror the SKILL.md's path convention so the smoke documents the canonical adopter path).
+- [x] Step 1: Updated `SKILL.md` Phase A Steps 1, 2, 6, 7 to use `.dw-lifecycle/close-shipped/runs/<timestamp>/{bundles,verdicts}.json`. Step 1 now opens by computing the per-run timestamp once and threading it through every artifact path.
+- [x] Step 2: Added a "Why a per-run project-local dir, not `/tmp/`" paragraph in Step 1 citing `.claude/rules/file-handling.md` § "Never use bare `/tmp/<name>` paths" + the concurrency hazards.
+- [x] Step 3: Re-scoped during implementation — the SKILL.md's Step 4 prompt template returns JSON via tool response (no Write instruction in template prose); the orchestrator parses responses and writes the collected verdicts file. Step 6 now explicitly documents that the sub-agents don't write to disk, the orchestrator does the collection in-session.
+- [x] Step 4: `.gitignore` already covers `.dw-lifecycle/close-shipped/` (line 145) which matches `.dw-lifecycle/close-shipped/runs/<timestamp>/` via prefix. No additional entry needed.
+- [x] Step 5: Updated `scripts/smoke-hygiene.sh` to mirror the SKILL.md path scheme — added `CS_RUN_TS` + `CS_RUN_DIR` setup with `mkdir -p`, then `CS_BUNDLES`/`CS_VERDICTS` point inside that dir.
 
 **Acceptance Criteria:**
 
-- [ ] `SKILL.md` Phase A prose names no bare `/tmp/<name>` paths. All scratch artifacts land under `.dw-lifecycle/close-shipped/runs/<timestamp>/`.
-- [ ] The sub-agent prompt template's `Write` instruction names the per-run path explicitly (no `/tmp/`).
-- [ ] `.gitignore` excludes `.dw-lifecycle/close-shipped/runs/`.
-- [ ] Smoke-hygiene still passes (the path scheme works in the fixture's `$FIXTURE/.dw-lifecycle/close-shipped/` shadow root).
-- [ ] Live verification: a `/dw-lifecycle:close-shipped` dispatch against an installed release does NOT trigger the safety classifier's "shared-namespace path" warning.
+- [x] `SKILL.md` Phase A prose names no bare `/tmp/<name>` paths. All scratch artifacts land under `.dw-lifecycle/close-shipped/runs/<timestamp>/`. (Verified via `grep -n "/tmp/close-shipped" SKILL.md` — no matches post-edit.)
+- [x] The sub-agent prompt template's `Write` instruction names the per-run path explicitly (no `/tmp/`). (Resolved by re-scoping: the template returns JSON via tool response; no Write instruction exists. Step 6 documents the orchestrator collection model.)
+- [x] `.gitignore` excludes `.dw-lifecycle/close-shipped/runs/` (via the broader `.dw-lifecycle/close-shipped/` rule at line 145).
+- [x] Smoke-hygiene still passes (the path scheme works in the fixture's `$FIXTURE/.dw-lifecycle/close-shipped/` shadow root). (15/15 sections OK on the post-edit smoke run.)
+- [ ] Live verification: a `/dw-lifecycle:close-shipped` dispatch against an installed release does NOT trigger the safety classifier's "shared-namespace path" warning. (Operator-driven, post-ship walk per the project's verify-in-installed-release rule.)
 
 **Provenance:**
 
