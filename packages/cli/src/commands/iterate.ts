@@ -27,11 +27,10 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { readConfig } from '@deskwork/core/config';
-import {
-  resolveSite,
-  resolveEntryFilePath,
-  resolveShortformFilePath,
-} from '@deskwork/core/paths';
+import { resolveSite } from '@deskwork/core/paths';
+import { readSidecar } from '@deskwork/core/sidecar';
+import { composeShortformDraftPath } from '@deskwork/core/entry/shortform-path';
+import type { Entry } from '@deskwork/core/schema/entry';
 import {
   appendAnnotation,
   appendVersion,
@@ -357,42 +356,34 @@ async function runShortformIterate(
     );
   }
 
-  let file: string;
-  if (kind === 'shortform' && flags.platform !== undefined && isPlatform(flags.platform)) {
-    const channel = flags.channel;
-    const resolved = resolveShortformFilePath(
-      projectRoot,
-      config,
-      site,
-      workflow.entryId !== undefined && workflow.entryId !== ''
-        ? { id: workflow.entryId, slug }
-        : { slug },
-      flags.platform,
-      channel,
-    );
-    if (resolved === undefined) {
-      fail(
-        `Cannot resolve shortform file for site=${site} slug=${slug} platform=${flags.platform}. ` +
-          `Run /deskwork:shortform-start to scaffold it first.`,
-      );
-    }
-    file = resolved;
-  } else {
-    file = resolveEntryFilePath(
-      projectRoot,
-      config,
-      site,
-      slug,
-      workflow.entryId,
+  // Phase 39c-2b(a): the shortform file is COMPOSED from the parent
+  // entry's stored artifactPath dir (spec AUDIT-35) — no slug-template
+  // search. (This function only ever runs for kind === 'shortform'.)
+  const platform = flags.platform;
+  if (platform === undefined || !isPlatform(platform)) {
+    fail('--platform is required when --kind=shortform.');
+  }
+  if (workflow.entryId === undefined || workflow.entryId === '') {
+    fail(
+      `Cannot resolve shortform file for ${site}/${slug}: the workflow has no ` +
+        `entryId binding. Run \`deskwork doctor --fix\` to bind the entry, then retry.`,
     );
   }
+  let parentEntry: Entry;
+  try {
+    parentEntry = await readSidecar(projectRoot, workflow.entryId);
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+  const file = composeShortformDraftPath(
+    parentEntry,
+    projectRoot,
+    platform,
+    flags.channel,
+  );
 
   if (!existsSync(file)) {
-    fail(
-      kind === 'shortform'
-        ? `No shortform file at ${file}. Run /deskwork:shortform-start first.`
-        : `No blog file at ${file}.`,
-    );
+    fail(`No shortform file at ${file}. Run /deskwork:shortform-start first.`);
   }
 
   const diskMarkdown = readFileSync(file, 'utf8');

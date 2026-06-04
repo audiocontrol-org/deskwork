@@ -137,6 +137,10 @@
       "types": "./dist/entry/resolve-artifact.d.ts",
       "default": "./dist/entry/resolve-artifact.js"
     },
+    "./entry/shortform-path": {
+      "types": "./dist/entry/shortform-path.d.ts",
+      "default": "./dist/entry/shortform-path.js"
+    },
     "./entry/publish": {
       "types": "./dist/entry/publish.d.ts",
       "default": "./dist/entry/publish.js"

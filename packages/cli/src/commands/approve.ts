@@ -21,8 +21,9 @@ import { readConfig } from '@deskwork/core/config';
 import {
   resolveSite,
   resolveCalendarPath,
-  resolveShortformFilePath,
 } from '@deskwork/core/paths';
+import { composeShortformDraftPath } from '@deskwork/core/entry/shortform-path';
+import type { Entry } from '@deskwork/core/schema/entry';
 import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
 import { parseFrontmatter } from '@deskwork/core/frontmatter';
 import { handleGetWorkflow } from '@deskwork/core/review/handlers';
@@ -40,7 +41,7 @@ import { isPlatform } from '@deskwork/core/types';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 import { approveEntryStage } from '@deskwork/core/entry/approve';
-import { resolveEntryUuid } from '@deskwork/core/sidecar';
+import { resolveEntryUuid, readSidecar } from '@deskwork/core/sidecar';
 
 const KNOWN_FLAGS = ['site', 'platform', 'channel'] as const;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
@@ -183,25 +184,37 @@ async function runShortformApprove(
   const approveAnn = latestApprove(annotations);
   const approvedVersion = approveAnn?.version ?? workflow.currentVersion;
 
-  if (!flags.platform) fail('--platform is required for shortform workflows');
-  if (!isPlatform(flags.platform)) fail(`Invalid --platform "${flags.platform}".`);
+  const platform = flags.platform;
+  if (platform === undefined) fail('--platform is required for shortform workflows');
+  if (!isPlatform(platform)) fail(`Invalid --platform "${platform}".`);
 
   // Phase 21a: shortform is now disk-backed. Read the on-disk file as
   // the SSOT — the journal version is just the latest snapshot, but
   // every save writes to disk first. Strip the frontmatter so the
   // calendar's `## Shortform Copy` section captures the body only.
-  const filePath = resolveShortformFilePath(
+  // Phase 39c-2b(a): the file path is COMPOSED from the parent entry's
+  // stored artifactPath dir (spec AUDIT-35) — no slug-template search.
+  if (workflow.entryId === undefined || workflow.entryId === '') {
+    fail(
+      `Cannot resolve shortform file for ${site}/${slug}: the workflow has no ` +
+        `entryId binding. Run \`deskwork doctor --fix\` to bind the entry, then retry.`,
+    );
+  }
+  let parentEntry: Entry;
+  try {
+    parentEntry = await readSidecar(projectRoot, workflow.entryId);
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+  const filePath = composeShortformDraftPath(
+    parentEntry,
     projectRoot,
-    config,
-    site,
-    { slug },
-    flags.platform,
+    platform,
     flags.channel,
   );
-  if (filePath === undefined || !existsSync(filePath)) {
-    const shown = filePath ?? '(unresolved)';
+  if (!existsSync(filePath)) {
     fail(
-      `Shortform file missing at ${shown}. ` +
+      `Shortform file missing at ${filePath}. ` +
         `The file is the SSOT — re-run /deskwork:shortform-start if needed.`,
     );
   }
