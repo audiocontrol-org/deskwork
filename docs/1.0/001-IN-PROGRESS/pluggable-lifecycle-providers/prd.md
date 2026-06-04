@@ -52,12 +52,12 @@ The disposition column is the agent's first-pass leaning per design.md § 8; ope
 
 | OQ | Summary | Design's leaning | Operator disposition |
 |---|---|---|---|
-| OQ-1 | Does `scope-inventory` tolerate a single synthetic phase, or should it key evidence on tasks rather than phases? | Re-key onto tasks if synthetic-phase tolerance is fragile | TBD |
-| OQ-2 | Kiro importer trigger ergonomics — explicit `--import-from` vs watched path? | Explicit `--import-from` (importer-tier, not driver-tier) | TBD |
-| OQ-3 | Material-change detection for `drifted` in re-sync — normalized-text equality vs similarity threshold? | Start with normalized-exact; revisit if over-flags | TBD |
-| OQ-4 | Should `provenance.capabilities` be re-snapshotted on every reconcile or frozen at first projection? | Re-snapshot — provider upgrade that adds EARS upgrades the gate | TBD |
+| OQ-1 | Does `scope-inventory` tolerate a single synthetic phase, or should it key evidence on tasks rather than phases? | Re-key onto tasks if synthetic-phase tolerance is fragile | **Accepted** — re-key `scope-inventory` evidence onto tasks |
+| OQ-2 | Kiro importer trigger ergonomics — explicit `--import-from` vs watched path? | Explicit `--import-from` (importer-tier, not driver-tier) | **Accepted** — explicit `--import-from` |
+| OQ-3 | Material-change detection for `drifted` in re-sync — normalized-text equality vs similarity threshold? | Start with normalized-exact; revisit if over-flags | **Accepted** — normalized-exact, revisit if over-flags |
+| OQ-4 | Should `provenance.capabilities` be re-snapshotted on every reconcile or frozen at first projection? | Re-snapshot — provider upgrade that adds EARS upgrades the gate | **Accepted** — re-snapshot on every reconcile |
 
-**Operator review question:** confirm each disposition, or overturn with margin notes. Phase 2+ implementation depends on these resolutions.
+Dispositions accepted at PRD approval (2026-06-04): the operator approved the PRD adopting design.md's documented leanings as the resolutions. OQ-1 unblocks Phase 2; OQ-2/3/4 govern Phases 3–5.
 
 ## Acceptance Criteria
 
@@ -82,12 +82,6 @@ The disposition column is the agent's first-pass leaning per design.md § 8; ope
 
 ## How this PRD evolves
 
-This is a deskwork-managed PRD. The workplan's Phase 1 walks the standard iteration loop:
+This is a deskwork-managed PRD. It graduated through the deskwork stage pipeline and was **approved to `Final` on 2026-06-04** (`/deskwork:approve`). Per the project's stage model (`DESKWORK-STATE-MACHINE.md`), `Final` is the approved, stable-for-implementation state — the legacy `applied` review-workflow state is retired and no longer gates this feature. Further revisions, if needed, run `/deskwork:iterate` against the entry.
 
-1. Operator opens the studio review surface.
-2. Operator leaves margin notes on the phase-ordering table, OQ dispositions, Acceptance Criteria, or Out-of-Scope list.
-3. Operator requests iteration.
-4. Agent runs `/deskwork:iterate` to address comments, snapshot the new revision, and report.
-5. Cycle until operator clicks Approve and the workflow state becomes `applied`.
-
-Per the strict per-CLAUDE.md gate: **no Phase 2 (implementation) work begins until the PRD's deskwork workflow state is `applied`.** This feature does not get an exception.
+Implementation (Phase 2 onward) is unblocked: the PRD is `Final` and the OQ dispositions above are accepted.

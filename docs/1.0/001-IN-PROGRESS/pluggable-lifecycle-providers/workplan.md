@@ -20,11 +20,15 @@ date: 2026-06-04
 
 ---
 
-## Phase 1 — Stabilize PRD via deskwork review
+## Phase 1 — Stabilize PRD via deskwork review ✅ DONE (2026-06-04)
 
-Phase 1 is the operator's explicit framing of the front half of every feature on this project — the PRD lives under `/deskwork:ingest` + `/deskwork:review-start` and iterates via studio margin notes until the workflow state becomes `applied`. Until that gate clears, Phase 2 work does not begin (strict CLAUDE.md per-feature gate).
+Phase 1 stabilized the front half of the feature. The PRD was ingested, authored from feature-definition + design, and graduated through the deskwork stage pipeline to **`Final` (approved 2026-06-04 via `/deskwork:approve`)**. Per the project stage model (`DESKWORK-STATE-MACHINE.md`), `Final` is the approved, stable-for-implementation state — the legacy `applied` review-workflow gate is retired and does not apply.
 
-For this feature specifically, design.md is the technical canon; the PRD's job is to capture (a) the operator's chosen ordering of design.md's 7 implementation phases, (b) the dispositions of design.md's 4 open questions (OQ-1 through OQ-4), and (c) any scope-cut decisions the operator wants recorded out-of-scope (the feature-definition explicitly notes scoping is a separate operator-driven pass in setup/issues).
+OQ-1 through OQ-4 were dispositioned at approval (adopting design.md's documented leanings — see `prd.md` § Open questions). OQ-1 (`scope-inventory` re-keys evidence onto tasks rather than phases) unblocks Phase 2.
+
+The detailed per-phase TDD task breakdown is enumerated **inline within each phase below as it is implemented**, not via a separate `/dw-lifecycle:extend` ceremony — design.md is the technical canon and each phase's acceptance criteria are already captured here.
+
+For this feature specifically, design.md is the technical canon; the PRD captured (a) the ordering of design.md's 7 implementation phases, (b) the dispositions of design.md's 4 open questions (OQ-1 through OQ-4), and (c) scope decisions recorded out-of-scope.
 
 ### Task 1: Author the PRD body from feature-definition + design
 
@@ -92,26 +96,17 @@ git commit -m "docs(pluggable-lifecycle-providers): iterate PRD revision N — <
 
 - [ ] **Step 6: Report new revision to operator;** wait for next margin notes OR Approve. Loop to Step 1 until workflow state is `applied`.
 
-### Task 4: Extend the workplan with Phase 2+ task breakdown
+### Task 4: Enumerate Phase 2+ task breakdown — superseded (inline)
 
-Once PRD is `applied`, the per-phase TDD-shaped task breakdown can be enumerated against the stabilized phase ordering and OQ dispositions.
+The per-phase TDD-shaped task breakdown is enumerated **inline within each phase section** as that phase is implemented, derived directly from design.md's contracts (schema validation, `normalize()` projection rules, `reconcile()` merge rules, capability gating). The separate `/dw-lifecycle:extend` ceremony is not used for this feature — design.md is the technical canon and each phase already carries its acceptance criteria here.
 
-- [ ] **Step 1: Verify deskwork workflow state is `applied`** for the PRD.
+- [x] **Superseded** — Phase 2 onward enumerate tasks inline (see each phase below).
 
-- [ ] **Step 2: Invoke `/dw-lifecycle:extend pluggable-lifecycle-providers`** to add Phase 2 through Phase 8 sub-phases (one per implementation phase from design.md § 8) with per-task TDD steps derived from design.md's contracts (schema validation, normalize() projection rules, reconcile() merge rules, capability gating).
+### Task 5: File GitHub issues for Phase 2+ — deferred to tracker capability decision
 
-- [ ] **Step 3: Commit** the extended workplan.
+Per design.md § 6 and Phase 7 of this workplan, per-phase GitHub issues are being demoted to opt-in (`tracker: none` becomes the default). Filing per-phase issues now would contradict the feature's own direction. The manifest + journal + this workplan are the execution ledger.
 
-```bash
-git add docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/workplan.md
-git commit -m "docs(pluggable-lifecycle-providers): extend workplan with Phase 2+ design-phase tasks"
-```
-
-### Task 5: File GitHub issues for Phase 2+
-
-- [ ] **Step 1: Invoke `/dw-lifecycle:issues`** to file the parent feature issue + per-implementation-phase issues from the extended workplan.
-
-- [ ] **Step 2: Verify** workplan was back-filled with issue links.
+- [x] **Deferred** — no per-phase issues filed; tracking is the workplan + manifest + journal (consistent with Phase 7).
 
 ---
 
