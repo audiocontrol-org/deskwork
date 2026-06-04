@@ -4537,3 +4537,56 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Address TBD markers: line 1891: markers: out-of-scope — **Scope adjustment (corrected from original spec):** the original "rewrites legacy YAML cleanly under `--fix`" framing assumed scope-discovery doctor rules supported `--fix` wiring. They do not — per 
 - Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals
 
+
+## 2026-06-03 → 2026-06-04: Phase 39 sub-task 39c-2b(b) — markdown add-time path stamping; over-build detour + correction; sync to main v0.36.0
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Resume Phase 39 at 39c-2b (operator drove design decisions interactively), implement the add-time scaffold model, then sync the branch with main.
+
+**Accomplished:**
+
+- **39c-2b design pass.** Operator chose Option 1 (lane `scaffoldDefaults[kind]` = directory only; layout separate, default `index`). Captured in spec § "`add`-time path composition" + "CLI-verb resolution migration"; decisions-log rows 11–14. (Caught + flagged that the prior session's hygiene note recommended `/deskwork:iterate` on a NON-ingested spec — incoherent; corrected.)
+- **39c-2b(b) implemented (markdown-only).** `add` composes + stamps a markdown `artifactPath` from `lane.scaffoldDefaults['markdown']` + layout (default `index`, POSIX forward-slash); fail-loud on missing default; **non-markdown `--kind` rejected** (exit 2, no disk mutation). `composeAddArtifactPath` in `packages/core/src/lanes/scaffold-path.ts`. All 3 workspaces green (core 1041 · cli 453 · studio 1269).
+- **Merged `origin/main` (v0.36.0).** 15 ahead / 97 behind. No code conflicts (main's 97 commits were almost all dw-lifecycle tooling — Phase 24/25/26 — low overlap with the deskwork packages). 3 bookkeeping conflicts resolved: `hook-run-log.jsonl` (accept main's deletion), `clones.yaml` (take main's, then refreshed), `DEVELOPMENT-NOTES.md` (kept both blocks). Verified green post-merge.
+- **Issue hygiene:** filed #400 (code-architect Write/Edit durability), #401 (over-build friction), #402 (bookkeeping ratchet + proliferation), #403 (friction synthesis). **Closed #402** — verified fixed in main: Phase 24 retired the coverage/ran/fix-task-TDD gates + `hook-run-log.jsonl` (shipped v0.36.0). Commented #401/#403 (partially addressed; left open). #400 left open (not fixed in main).
+- **Refreshed `clones.yaml` baseline** post-merge (252 groups, net −4; all dispositions carried forward) — manual now that Phase 24 retired the commit hooks.
+
+**Didn't Work:**
+
+- **The over-build detour (the session's main failure).** A barrage finding ("`add` stamps `.md` for non-markdown kinds") was misread as "add support for those kinds" instead of "reject them." Built kind-aware composition + an `--artifact-path` image flag + a per-kind legal-layout matrix — for types the product doesn't support and whose materializer is markdown-only. Each commit re-fired the per-commit barrage, which found nits in the just-written docs → more findings → ~5 commits + 3 barrage rounds (AUDIT-20260603-35..48). Operator collapsed it with one question ("we only support markdown — why expand?"). Reverted to a markdown-only gate (net −288 lines over the detour).
+
+**Course Corrections:**
+
+- [PROCESS] Operator: a finding "you mishandle X" means *reject X*, not *support X*. Scope expansion needs explicit approval. (→ #401, #403.)
+- [PROCESS] Operator: when the design references a non-ingested doc, `/deskwork:iterate` doesn't apply — edit the file directly. (Caught the prior session's incoherent recommendation before acting on it.)
+- [PROCESS] Operator: push early and often (pushed at each clean boundary once main's coverage-ratchet gate was gone).
+- [COMPLEXITY] The gate chain enforces local correctness but neither prevented nor surfaced the scope error, and its busyness masked it (→ #403). Main's Phase 24 independently retired much of the amplifying machinery.
+
+**Quantitative:**
+
+- Commits this session: ~11 (92f99b29 add-time stamp → 1908f56b lockfile), including the merge (75bde467) + clones refresh (336bac36).
+- Issues: filed 4 (#400/#401/#402/#403); closed 1 (#402, verified fixed in main).
+- Suites at session end: core 1041 · cli 453 · studio 1269 — all green.
+- Open audit findings at session end: 0 (AUDIT-20260603-35..48 all resolved; most by removal in the markdown-only correction).
+
+**Insights:**
+
+- The audit-barrage caught 3 real bugs on actual code (the HIGH `.md`-for-non-markdown stamp, Windows path separators, an unvalidated verbatim path) — genuine signal. The cost was the over-build feeding it, not the audit itself.
+- Merging from main is a high-leverage de-bookkeeping move here: main's Phase 24 retired exactly the gates this session struggled with. Sync-early would have avoided the coverage ratchet entirely.
+
+### Hygiene observations
+
+(Hand-written — `session-end-hygiene` output was polluted by the main merge pulling 97 commits + their issue refs into the session range; that merge-from-main range bug is main's #351.)
+
+- Issues this session: **#400** (open — code-architect durability), **#401** (open — over-build friction), **#402** (CLOSED — fixed by main Phase 24/v0.36.0), **#403** (open — friction synthesis).
+- No bare TBD markers introduced this session.
+- Branch synced with `origin/main` (v0.36.0); pushed clean at each boundary; all 3 workspaces green.
+- Stale worktrees flagged (unchanged from prior session): `~/work/deskwork-work/graphical-entries` (4/9 signals; merged as v0.34.0) and `~/work/deskwork-work/scope-discovery` (3/9 signals) — candidates for `/dw-lifecycle:archive-branch` or dismantle.
+
+### Next session recommendation (hygiene)
+
+- **Resume: Phase 39 sub-task 39c-2b(a)** — migrate the existing-entry verbs (publish / iterate / shortform-start / rename-slug) to resolve via `entry.artifactPath` only, per spec § "CLI-verb resolution migration". Then **(c)** delete `resolveSite`/`siteConfig`/`config.sites`/`SiteConfig`, then **39e** (MIGRATING.md + doc `sites` refs).
+- **No release** until the full Phase 39 lands; `config.sites` is a tolerated schema field until 39c-2b(c).
+- **Optional cleanup:** dismantle/archive the two stale worktrees above.
