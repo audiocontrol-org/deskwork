@@ -4564,7 +4564,7 @@ This is the exact mislabel class the prior-findings clean-check already called o
 ### AUDIT-20260604-32 — AUDIT-BARRAGE-claude-01 — Phase 6 follow-up bug items flipped `[x]` while their GitHub issues remain open and unfixed, justified by a self-cited "project rule" that exists nowhere but this workplan
 
 Finding-ID: AUDIT-20260604-32 (claude-01 + claude-02 + claude-04 + claude-06 + codex-01 + codex-02 + codex-03; cross-model)
-Status:     fixed-pending-sha
+Status:     fixed-e6d1fe99
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:1249-1252` (Phase 6 follow-up items #350/#351/#352/#318)
 
@@ -4577,7 +4577,7 @@ A reasonable fix: leave these `[ ]` (the bug is genuinely not done) with a one-l
 ### AUDIT-20260604-33 — AUDIT-BARRAGE-claude-03 — AUDIT-31 is left `acknowledged-slush-pile` in the same commit whose subject says it "address[es] AUDIT-31" — recursively the exact mislabel AUDIT-31 names
 
 Finding-ID: AUDIT-20260604-33
-Status:     fixed-pending-sha
+Status:     fixed-e6d1fe99
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4538-4547` (appended AUDIT-31 block, `Status: acknowledged-slush-pile-2026-06-04`) vs. the commit subject "flip AUDIT-26/29/30 … → fixed-972d8dba — address AUDIT-31's audit-log/commit-message inconsistency critique"
 
