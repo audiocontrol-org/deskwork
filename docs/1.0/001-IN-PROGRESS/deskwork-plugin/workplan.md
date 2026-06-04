@@ -2175,7 +2175,7 @@ Closes AUDIT-20260603-41. Surface: `packages/cli/src/commands/add.ts:155-167` (c
 
 
 
-### Task 39.17 (fix-finding-AUDIT-20260604-04) (non-bug): AUDIT-20260604-04 — Duplicate Task ID — two `### Task 39.15` headings now coexis…
+### Task 39.21 (fix-finding-AUDIT-20260604-04) (non-bug): AUDIT-20260604-04 — Duplicate Task ID — two `### Task 39.15` headings now coexis…
 
 Closes AUDIT-20260604-04 (claude-01 + claude-04 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md:2177` (`Task 39.15 (fix-finding-AUDIT-20260604-01)`) collides with `:2267` (`Task 39.15 (fix-finding-AUDIT-20260603-48)`).
 
@@ -2209,7 +2209,7 @@ Closes AUDIT-20260604-05 (claude-02 + codex-01; cross-model). Surface: `packages
 - [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
 - [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
 - [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 39.19 (fix-finding-AUDIT-20260604-06): AUDIT-20260604-06 — The fix that deletes `body-state.ts` leaves a stale cross-re…
@@ -2226,9 +2226,9 @@ Closes AUDIT-20260604-06. Surface: `packages/core/src/remark-strip-outline.mjs:1
 
 - [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
 - [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
-### Task 39.15 (fix-finding-AUDIT-20260604-01): AUDIT-20260604-01 — body-state.ts's `PLACEHOLDER_MARKER` contract is now orphane…
+### Task 39.20 (fix-finding-AUDIT-20260604-01): AUDIT-20260604-01 — body-state.ts's `PLACEHOLDER_MARKER` contract is now orphane…
 
 Closes AUDIT-20260604-01 (claude-01 + codex-02; cross-model). Surface: `packages/core/src/body-state.ts:5-7,25,49` (comment rewordings + `PLACEHOLDER_MARKER` + `bodyState()`) vs. the deleted `packages/core/src/scaffold.ts`. Severity: medium.
 
@@ -2266,6 +2266,8 @@ Closes AUDIT-20260604-02 (claude-02 + claude-03 + claude-04 + claude-05 + codex-
 
 
 ### Task 39.17 (fix-finding-AUDIT-20260604-03) (non-bug): AUDIT-20260604-03 — The new sync `writeSidecarSync` duplicates `writeSidecar` (a…
+
+> Superseded by audit-log Status `acknowledged-non-bug-2026-06-04 — jscpd does NOT detect the write.ts async/sync pair (verified: `check-clones` reports 0 NEW; the pair is below jscpd's match threshold), so there is no clone-id to disposition in clones.yaml. The asymmetry with the read.ts pair (`f2aa9e0ff153`) is benign: read.ts tripped jscpd, write.ts didn't. Added a docstring hedge on `writeSidecarSync` cross-referencing the read.ts disposition so a future `refresh-clones-baseline` that surfaces it has the rationale. Non-bug; no code defect.` — no TDD walk required.
 
 Closes AUDIT-20260604-03. Surface: `packages/core/src/sidecar/write.ts:18-34` (`writeSidecarSync`) vs. `writeSidecar` (`:8-16`); `.dw-lifecycle/scope-discovery/clones.yaml` (added `f2aa9e0ff153` for `sidecar/read.ts:25-34 ↔ :47-56`, no write.ts sibling).
 
