@@ -178,6 +178,8 @@ Closes AUDIT-20260603-91. Surface: `plugins/dw-lifecycle/src/scope-discovery/doc
 
 ### Task 31 (fix-finding-AUDIT-20260604-01) (non-bug): AUDIT-20260604-01 — Rename invalidated three operator-curated `keep-with-reason`…
 
+> Superseded by audit-log Status `acknowledged-3-keep-with-reasons-restored-409-tracks-structural-fix-2026-06-04` — no TDD walk required.
+
 Closes AUDIT-20260604-01 (claude-01 + codex-03; cross-model). Surface: `.dw-lifecycle/scope-discovery/clones.yaml` — groups `9e85fb0f675e`→`a381419e0f31`, `d47a3cfe0d81`→`0654d2d673cf`, `afeee722255a`→`fa93705e149f`.
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
@@ -215,19 +217,19 @@ Closes AUDIT-20260604-01 (claude-01 + codex-03; cross-model). Surface: `.dw-life
 
 ### Task 33 (fix-finding-AUDIT-20260604-03) (non-bug): AUDIT-20260604-03 — README Phase 25 row says "Tasks 4–11 remain" while the same …
 
-Closes AUDIT-20260604-03. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 25 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 4 block).
+**Complete (2026-06-04).** Closes AUDIT-20260604-03. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 25 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 4 block).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260604-03` in subject (use `Closes AUDIT-20260604-03` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: disposition prose — the README Phase 25 cell was not advanced in the same commit as Task 4's substantive work; the cell's prose carried forward from the cont. 5 state ("Task 3 shipped; Tasks 4–11 remain"). Three artifacts in one diff disagreed about Task 4's status (README cell, workplan Task 4 block, journal cont. 5 handoff). The fix advances the cell to "Tasks 3–4 shipped; Tasks 5–11 remain" + names Task 4's substantive scope (file/identifier rename + importer updates + etymology preservation + commit ref `49f8a4d6`) so the adopter-facing status matches the workplan.
+- [x] Step 2: action applied — README Phase 25 row updated in this commit. DEVELOPMENT-NOTES "cont. 5" entries continue to describe their session's handoff verbatim per the journal-preservation rule; the README's per-release state-of-the-art table is authoritative for "what's shipped now," which it now is.
+- [x] Step 3: commit with `Acknowledges AUDIT-20260604-03` in subject — non-bug disposition (doc edit); `Acknowledges` is correct because the README status is a documentation defect, not a test-verifiable code change. Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition would arm a false flip.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (README Phase 25 row updated this commit).
+- [x] Audit-log Status flipped open → `acknowledged-readme-phase-25-row-advanced-to-tasks-3-4-shipped-2026-06-04` in this commit.
 
 ### Task 3: Disposition + baseline commands
 

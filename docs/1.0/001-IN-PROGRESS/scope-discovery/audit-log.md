@@ -4169,7 +4169,7 @@ This is exactly the non-pending→pending transition `check-disposition-survivor
 ### AUDIT-20260604-02 — `ledger.ts` comment claims the doctor rule surfaces tolerated-malformed ranges — it provably does not
 
 Finding-ID: AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model)
-Status:     fixed-PENDING-SHA
+Status:     fixed-b6e1f660
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` docblock (the AUDIT-92 fallback comment)
 
@@ -4182,7 +4182,7 @@ The net effect: the AUDIT-92 fix tolerates malformed `archived-fix-tasks` ranges
 ### AUDIT-20260604-03 — README Phase 25 row says "Tasks 4–11 remain" while the same audited range marks Task 4 complete — status drift
 
 Finding-ID: AUDIT-20260604-03
-Status:     open
+Status:     acknowledged-readme-phase-25-row-advanced-to-tasks-3-4-shipped-2026-06-04
 Severity:   low
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 25 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 4 block)
 
