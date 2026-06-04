@@ -4649,7 +4649,7 @@ The added comment reads: *"… stdin delivery bypasses the OS per-arg limit. **P
 ### AUDIT-20260604-39 — Test comment claims e2e integration coverage that AUDIT-37 explicitly says doesn't exist
 
 Finding-ID: AUDIT-20260604-39 (claude-01 + claude-02 + codex-02; cross-model)
-Status:     acknowledged-slush-pile-2026-06-04
+Status:     fixed-7bfeccb9
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts:340-351` (the AUDIT-37 test's trailing comment block)
 
