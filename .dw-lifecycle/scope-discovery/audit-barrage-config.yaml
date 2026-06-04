@@ -19,12 +19,17 @@
 # https://github.com/audiocontrol-org/deskwork/issues (the LLM-CLI-failure
 # tooling-feedback context).
 
+# 2026-06-04 (#418): migrated args_template from `{{prompt}}` (argv) to
+# `{{prompt-stdin}}` so the audit prompt is delivered via child stdin instead
+# of argv — bypasses the OS ARG_MAX limit that fails large-diff barrages with
+# `spawn E2BIG` (the #386/#397 fix; this config was a pre-#397 override that
+# still used argv). Matches the plugin default template.
 models:
   - name: claude
     binary: claude
-    args_template: "-p {{prompt}}"
+    args_template: "-p {{prompt-stdin}}"
     timeout_seconds: 300
   - name: codex
     binary: codex
-    args_template: "exec {{prompt}}"
+    args_template: "exec {{prompt-stdin}}"
     timeout_seconds: 300
