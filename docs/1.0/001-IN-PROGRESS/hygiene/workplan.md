@@ -189,16 +189,16 @@ Six structural-check verbs (`check-clones`, `check-anti-patterns`, `check-adopte
 
 **Approach:** Argv accepts `--feature <slug>`. When present, only validate `Closes clones.yaml <id>` claims whose surfaces fall in feature-scope. When absent, behavior unchanged.
 
-- [ ] Step 1: write failing test — (a) `--feature hygiene` validates only feature-scope clone claims; (b) no flag = all `Closes clones.yaml <id>` claims validated; (c) clone-id-not-in-feature-scope is silently skipped (not a refusal).
-- [ ] Step 2: confirm tests fail.
-- [ ] Step 3: implement.
-- [ ] Step 4: confirm tests pass.
-- [ ] Step 5: commit with `Refs #417` in subject.
+- [x] Step 1: wrote 3 tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/refactor-preconditions.feature-flag.test.ts` — (b) no flag validates every marked ID (errors for both IN and OUT); (a)+(c) `--feature hygiene` + scope-manifest pointing at `in-scope/x.ts` → only ID_IN's errors surface, ID_OUT silently skipped; (d) unknown slug via main() → exit 2 + FeatureNotFoundError on stderr.
+- [x] Step 2: confirmed 2/3 failed pre-implementation (case b passed). Case (a)+(c) failed: Cli type didn't have `feature` field. Case (d) failed: unknown arg `--feature`.
+- [x] Step 3: implemented — added `feature: string | null` to `Cli`. Added `--feature <slug>` to parseCli. In `runGate`, after computing markedIds, when `cli.feature` is set: resolve scope, build `inScopeIds` set of IDs whose group has ≥1 member in scope (unknown IDs pass through so the standard "no entry exists" error still fires), filter the per-ID checking loop. main() catches FeatureNotFoundError → exit 2.
+- [x] Step 4: 3/3 tests pass; full plugin suite 2723/2723 green (fixed a regression in the existing refactor-preconditions tests by treating `feature === undefined` as no-narrowing alongside `=== null`).
+- [x] Step 5: commit with `Refs #417` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] `dw-lifecycle check-refactor-preconditions --feature hygiene --commit-msg-file <path>` exits 0 without `unknown arg`.
-- [ ] Test cases pass; plugin suite green.
+- [x] `dw-lifecycle check-refactor-preconditions --feature hygiene --commit-msg-file <path>` exits 0 without `unknown arg`.
+- [x] Test cases pass; plugin suite green (2723/2723).
 
 ### Task 7: `check-disposition-survivor` learns `--feature <slug>`
 
