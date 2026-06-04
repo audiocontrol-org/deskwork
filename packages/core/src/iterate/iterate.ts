@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
-import { refineToIndexDoc, resolveStoredArtifactPath } from '../entry/resolve-artifact.ts';
+import { resolveArtifactPathOrThrow } from '../entry/resolve-artifact.ts';
 import { resolveEntryStrictTemplate } from '../lanes/resolve.ts';
 import {
   assertStageInTemplate,
@@ -46,17 +46,14 @@ interface IterateResult {
  *   stored path itself (shared-directory layouts, e.g. deskwork's own
  *   prd.md / workplan.md / README.md sharing a directory). That is a
  *   read-side refinement OF a stored path, not a guess for an absent one.
+ *
+ * Phase 39c-2b(a): the resolve + throw-on-absent + index.md refinement is
+ * the shared `resolveArtifactPathOrThrow` core helper — this thin wrapper
+ * keeps the call-site name local while the logic (and its throw message)
+ * lives in one place shared with the CLI verbs and the studio.
  */
 function resolveIndexPath(projectRoot: string, sidecar: Entry): string {
-  const absArtifact = resolveStoredArtifactPath(sidecar, projectRoot);
-  if (absArtifact === null) {
-    throw new Error(
-      `Cannot iterate entry ${sidecar.uuid} (slug "${sidecar.slug}"): the sidecar has no ` +
-        `artifactPath. Resolution reads the stored path only — there is no slug+stage ` +
-        `fallback. Run \`deskwork doctor --fix\` to backfill artifactPath, then retry.`,
-    );
-  }
-  return refineToIndexDoc(absArtifact);
+  return resolveArtifactPathOrThrow(sidecar, projectRoot);
 }
 
 /**
