@@ -21,17 +21,14 @@ fail() { echo "SMOKE FAIL: $1" >&2; exit 1; }
 
 [ -f "$GOVERN" ] || fail "govern.sh not found at $GOVERN"
 
-before_runs=$(find "$RUNS_DIR" -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
-
 echo "smoke: invoking govern.sh (base=${GOVERN_DIFF_BASE:-HEAD~1})..."
-GOVERN_DIFF_BASE="${GOVERN_DIFF_BASE:-HEAD~1}" bash "$GOVERN" \
+# Capture govern.sh's stdout; its final line is the authoritative run-dir path
+# (AUDIT-20260604-26) — do NOT re-derive it by globbing the runs directory.
+out="$(GOVERN_DIFF_BASE="${GOVERN_DIFF_BASE:-HEAD~1}" bash "$GOVERN")" \
   || fail "govern.sh exited non-zero"
-
-after_runs=$(find "$RUNS_DIR" -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
-[ "$after_runs" -gt "$before_runs" ] || fail "no new audit run-dir created"
-
-latest="$(find "$RUNS_DIR" -maxdepth 1 -type d -name '*-pluggable-lifecycle-providers' | sort | tail -1)"
-[ -n "$latest" ] || fail "could not locate latest run-dir"
+latest="$(printf '%s\n' "$out" | tail -1)"
+[ -n "$latest" ] && [ -d "$latest" ] \
+  || fail "govern.sh did not print a valid run-dir as its final stdout line (got: '$latest')"
 
 # Count model lanes = *.md in the run-dir excluding INDEX.md / PROMPT.md, with >0 bytes.
 lanes=0

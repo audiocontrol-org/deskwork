@@ -10,14 +10,29 @@
 # absent — no silent skip (constitution V / spec FR-005 edge).
 #
 # Env:
-#   GOVERN_FEATURE_SLUG  (default: pluggable-lifecycle-providers)
+#   GOVERN_FEATURE_SLUG  (optional override; otherwise derived from the deskwork
+#                         feature branch `feature/<slug>`)
 #   GOVERN_DIFF_BASE     (default: HEAD~1) — git ref the implemented work is diffed against
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-SLUG="${GOVERN_FEATURE_SLUG:-pluggable-lifecycle-providers}"
+# Derive the deskwork feature slug generically (AUDIT-20260604-24): never hardcode
+# a project default. deskwork runs each feature on its own `feature/<slug>` branch,
+# so the slug is the branch name minus the `feature/` prefix. Explicit env override
+# wins; if neither resolves, fail loudly (no silent wrong-target — constitution V).
+if [ -n "${GOVERN_FEATURE_SLUG:-}" ]; then
+  SLUG="${GOVERN_FEATURE_SLUG}"
+else
+  _branch="$(git branch --show-current 2>/dev/null || true)"
+  case "${_branch}" in
+    feature/*) SLUG="${_branch#feature/}" ;;
+    *)
+      echo "govern.sh: FATAL — cannot derive feature slug from branch '${_branch}' (expected 'feature/<slug>'). Set GOVERN_FEATURE_SLUG." >&2
+      exit 2 ;;
+  esac
+fi
 BASE="${GOVERN_DIFF_BASE:-HEAD~1}"
 FEATURE_DOCS="docs/1.0/001-IN-PROGRESS/${SLUG}"
 AUDIT_LOG="${FEATURE_DOCS}/audit-log.md"
