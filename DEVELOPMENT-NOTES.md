@@ -4545,3 +4545,64 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Triage: #315 (open, novel-anti-pattern detection — Phase 11 ships the polymorphic dispatcher that addresses the underlying defect, but the issue itself wasn't closed by Phase 11); #349 (open, canary feedback parent — Phase 6 dogfood); #350/#351/#352 (open, canary §3a/3b/3c friction items, NOT addressed by Phase 24's no-git-hook-enforcement reframe though #352 is partially mooted); #392 (open, Phase 20 Task 1 deferred).
 - Address TBD markers: (no bare TBD markers introduced this session)
 - Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals. Stale per the Phase 11 worktree-report scan; consider running `/dw-lifecycle:dismantle-worktrees` next session if the graphical-entries work is paused.
+
+## 2026-06-04 (cont. 2): close-shipped dogfood + scope 8 fix-issue tasks + archive 5 phases
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Resume the prior session's hygiene recommendation: run `/dw-lifecycle:close-shipped` against v0.35.0..v0.36.0 to surface post-release verification candidates. Then triage the open-issue backlog into the workplan with TDD-first task blocks (bug-fix shape only — no full feature-extension ceremony). Use the freshly-productized Phase 26 `archive-phases` verb to shrink workplan.md.
+
+**Accomplished:**
+
+- **`/dw-lifecycle:close-shipped` end-to-end dogfood against v0.35.0..v0.36.0.** First production run of the Phase 15 propose/apply split shipped in v0.27.0+. Phase A scan emitted 28 bundles; 28 parallel general-purpose Agent dispatches each evaluated one bundle and wrote a verdict JSON; the propose helper rendered the proposal at `.dw-lifecycle/close-shipped/proposals-2026-06-04T11-59-11-533Z.json`. Verdicts: 9 shipped, 18 not-shipped, 1 uncertain (#293 — CLOSED so skip-already-closed at apply anyway). Apply step: comments posted to all 10 shipped-verdict items + 10 `pending-verification` labels applied. Issues now in the operator's verification queue: #294, #295, #401, #402, #403, #404, #405, #407, #409, #410 (the last is the PR #410 — gh accepted the label uniformly).
+- **Two close-shipped friction items filed.** Surfaced during the dogfood and captured exhaustively per the capture-mode rule.
+  - **#411** — `close-shipped apply` requires the `pending-verification` label to already exist; no pre-flight or auto-create. First-run failure leaves comments posted + labels not added; re-run would duplicate comments. Recovery loop ran 10 `gh issue edit` calls by hand to add labels. Proposed fix: pre-flight `gh label list` and auto-create the label or refuse with an actionable error before any comment posts.
+  - **#412** — SKILL.md prescribes bare `/tmp/close-shipped-bundles.json` / `/tmp/close-shipped-verdicts.json` paths that conflict with `.claude/rules/file-handling.md` § "no un-namespaced /tmp paths." Safety-classifier warning fired on the #406 sub-agent's Write call. Proposed fix: switch to `mktemp` OR move under `.dw-lifecycle/close-shipped/runs/<timestamp>/` (the latter is the better architecture — auditable + worktree-safe).
+- **#413 filed** — Operator-named merge-main bookkeeping friction. No existing GH issue covered it (#347 + #361 are different shapes). The issue body captures 10 known friction surfaces (clones.yaml + audit-log.md + workplan-archive-ledger + workplan task numbering + `fixed-pending-sha` resolution + DEVELOPMENT-NOTES.md + audit-runs/ + anti-patterns.yaml + README phase table + disposition propagation) with concrete merge-commit evidence (`3898f684`, `be395cfe`). Proposed shape: portfolio of cures (per-file merge drivers + post-merge hygiene helper + doctor-rule additions + workflow change toward shorter feature-branch lifespans). The cure is investigation-first; Task 45 in the workplan reflects that.
+- **8 fix-issue task blocks scoped into the workplan** (commit `920e65c8`, +160 lines). All TDD-first shape: Step 0 working-code invariant + Step 1 bug-repro test path cited + Step 2 regression-lock + Step 3 implementation + Step 4 live-verify + commit-with-Closes-trailer.
+  - **Phase 12:** Task 8 (#397 spawn E2BIG); Task 9 (#396 audit-barrage-render `{{var}}` false-positives).
+  - **Phase 6:** Task 40 (#411); Task 41 (#412); Task 42 (#366 commit-log walker back-fill false-positives); Task 43 (#350 validate-return refactor-cue substring matches); Task 44 (#297 clone-detector test flake); Task 45 (#413 merge-main bookkeeping — investigation-first portfolio).
+- **First end-to-end dogfood of `dw-lifecycle archive-phases`** (Phase 26 productized verb shipped in v0.36.0 yesterday). Archived Phase 7/8/15/25/26 from workplan.md to workplan-archive.md (commit `4d8c083f`). All 5 phases were 0-unchecked — no `--allow-vestigial` needed despite Phase 8/15 being explicit Phase-24 retirements. Mechanical effects: workplan.md 2380 → 1690 lines (-29%); workplan-archive.md 3329 → 4019 lines; `archived-phases` ledger extended; `archived-fix-tasks` extended with 7.1-7.2, 8.1-8.5, 15.1-15.6, 25.1-25.11, 26.1-26.6; `next-fix-task-id` 5.124 → 26.7. Active phases in workplan.md narrowed from 10 to 5 (now 6, 11, 12, 20, 24).
+- **README.md updated** — archived-phases note extended; active-phases list narrowed.
+
+**Course corrections:**
+
+- None. Operator's directives were sequential and well-scoped: "just close them" → applied labels; "scope the hot candidates, starting with 397" + "the merge friction needs an issue if not captured" → 8 scope blocks + new #413; "use the archive tooling" → archived 5 phases. Zero redirects.
+
+**Insights:**
+
+- **Phase 26 `archive-phases` self-dogfooded clean.** First end-to-end exercise of the verb that shipped yesterday, applied to the feature that built it. Verb refused nothing, computed ledger ranges correctly, advanced `next-fix-task-id` without colliding with active-phase task numbers. The integer-namespace concern from AUDIT-94 (over-capture into archived-fix-tasks) didn't bite here because none of the active-phase tasks I just added (Phase 6 Tasks 40-45 + Phase 12 Tasks 8-9) live in an archived range.
+- **Phase 15 propose/apply split caught two friction items at the propose→apply boundary.** Both are about the apply step's environmental assumptions (label-must-exist, /tmp-paths-allowed) rather than the verdict-quality of the agent dispatch. The agent dispatches themselves performed well: 28 parallel general-purpose agents, all correctly distinguished `Closes #N` from back-fill cite from cross-link mention. The propose surface delivered the right disposition signal; the apply surface tripped on infrastructure assumptions that the SKILL.md didn't surface.
+- **28 parallel Agent dispatches is operationally cheap when the per-bundle prompt is pre-built on disk.** Building 28 prompts on disk via a small Python helper kept each agent's prompt to <8KB; the orchestrator's dispatch message was ~28×~80-line Agent calls. Wall-time was ~45-60s for the slowest. The "single message with N tool_use blocks" prescription from the SKILL.md is the right shape — batching would have been slower wall-clock and added bookkeeping cost.
+- **Friction-file-at-capture-time discipline kept the dogfood signal honest.** Both #411 and #412 are direct dogfood surfaces — the SKILL.md's prescribed `/tmp` paths AND its label-existence assumption were both wrong in the same run. Filing as separate issues immediately (not batched, not deferred) preserves the per-finding repro context that gets lost in batched filing.
+
+**Quantitative:**
+
+- Commits this session: 2 (`920e65c8` scope + `4d8c083f` archive). Plus 0 implementation commits — this was a scoping/triage session, not an implementation session.
+- Workplan: 5 unchecked → 79 unchecked (+74 from 8 fix-issue task blocks × ~9 boxes each); workplan-size 2380 → 1690 lines after archive (-29%). Net active workplan scope: smaller in pages, larger in TODO surface — exactly the shape the operator wanted (focus + visible-work-only).
+- Tests this session: 2696 → 2696 (no new tests; pure docs/scope work).
+- GH issues filed: 3 (#411 close-shipped label preflight; #412 close-shipped /tmp paths; #413 merge-main bookkeeping friction).
+- GH issues labeled `pending-verification`: 10 (#294, #295, #401, #402, #403, #404, #405, #407, #409, #410).
+- Sub-agent dispatches: 28 parallel general-purpose agents (close-shipped Phase A); 0 implementation sub-agents.
+- Audit findings dispositioned: 0 (no new findings introduced; no slush-pile movement).
+- Workplan phases active: 10 → 5 (post-archive: 6, 11, 12, 20, 24).
+
+### Hygiene observations
+
+- issue #297 [OPEN] referenced this session: scope-discovery: clone-detector tests flake under full-suite parallel load
+- issue #349 [OPEN] referenced this session: scope-discovery dogfood feedback: Phase 6 graphical-entries — what worked, what's underexercised, what cost time
+- issue #350 [OPEN] referenced this session: validate-return: refactor-cue substring match false-positives (canary #349 §3a)
+- issue #366 [OPEN] referenced this session: close-shipped commit-log walker matches any #NNN mention as fix-shipped; false-positive comments on referenced / cross-linked / PR-merge issues
+- issue #396 [OPEN] referenced this session: implement-hook audit-barrage-render false-positives on {{var}}-shaped strings inside the diff var value (blocks /dwi barrage)
+- issue #397 [OPEN] referenced this session: audit-barrage spawn E2BIG: prompt passed via argv overflows ARG_MAX on large diffs (blocks barrage on bootstrap HEAD~10 range)
+- issue #411 [OPEN] referenced this session: close-shipped apply: pending-verification label must already exist; no pre-flight / auto-create
+- issue #412 [OPEN] referenced this session: close-shipped SKILL.md prescribes bare /tmp/<name> paths that conflict with file-handling rule
+- issue #413 [OPEN] referenced this session: Merging main into a feature branch produces friction in audit-log / scope-discovery / disposition bookkeeping
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: **Phase 12 Task 8 (fix-issue-#397) — audit-barrage spawn E2BIG**, per operator's "start with 397" directive this session. Implementation-priority order: #397 → #396 → #411 → #412 → #366 → #350 → #297 → #413. The investigation-first task (#413, merge-main bookkeeping) sits last because it's a portfolio of cures rather than a single bug-fix and benefits from running AFTER the other CLI-surface fixes land.
+- Triage: #297 (scope-discovery: clone-detector tests flake under full-suite parallel load) — now Task 44, scoped; #349 (canary feedback parent — stays parked); #350 (now Task 43, scoped); #366 (now Task 42, scoped); #396 (now Task 9 in Phase 12, scoped); #397 (now Task 8 in Phase 12, scoped); #411/#412/#413 (newly filed + scoped this session); #315 stays parked (operator decision; Phase 11 dispatcher landed); the 10 `pending-verification` issues (#294/#295/#401/#402/#403/#404/#405/#407/#409/#410) wait on operator install-and-verify pass per the agent-discipline rule.
+- Address TBD markers: (no bare TBD markers introduced this session)
+- Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals. Stale per the Phase 11 worktree-report scan; consider running `/dw-lifecycle:dismantle-worktrees` next session if the graphical-entries work is paused.
