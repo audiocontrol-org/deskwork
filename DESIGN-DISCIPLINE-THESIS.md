@@ -1,6 +1,6 @@
 ---
 title: Deskwork design-discipline thesis
-description: Why UI-surface changes go wrong, the hard-won discipline that fixes them (lo-fi wireframes that model the change · a settled design language · device-free visual verification), and the north star of productizing that discipline as a portable deskwork plugin. Read before any UI-surface work and before defining the design-loop plugin.
+description: Why UI-surface changes go wrong, the hard-won discipline that fixes them (lo-fi wireframes that model the change · a settled design language · device-free visual verification), and the north star of productizing that discipline as a portable deskwork plugin. Read before any UI-surface work and before defining the design-control plugin.
 deskwork:
   doc: thesis
   status: load-bearing
@@ -10,7 +10,8 @@ deskwork:
 # Deskwork design-discipline thesis
 
 Read this before any studio UI work, and before defining the plugin that productizes
-this discipline (working name **`design-loop`** — finalized at `/dw-lifecycle:define`).
+this discipline: **`design-control`** (named for the `*control` family —
+audiocontrol, editorialcontrol, stackcontrol; scope finalized at `/dw-lifecycle:define`).
 
 This document exists because a discipline for changing UI surfaces *sanely* was earned
 the hard way in a sibling project (audiocontrol), at real cost — a multi-day,
@@ -136,7 +137,7 @@ it. Per deskwork's own principle (*the discipline does not exist for an adopter 
 installs the plugin and follows the README*), a discipline that lives in one repo's
 `tools/` + docs + a feature branch effectively doesn't exist for anyone else.
 
-The north star is a **`design-loop` plugin** that travels with `claude plugin install` and
+The north star is a **`design-control` plugin** that travels with `claude plugin install` and
 gives any markdown/UI project the full loop:
 
 - **Stage 1 — design language:** a skill to scaffold + maintain a per-surface

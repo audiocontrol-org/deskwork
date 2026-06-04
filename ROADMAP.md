@@ -228,9 +228,10 @@ Failure modes to design against:
 
 This section is **the long-term arc**, not committed work. Phase 16 (audit-coverage hole) is the audit-half of *"fully audited"*; that lands first. The autonomous-but-self-interruptible-on-real-ambiguity half is the next frontier, likely a Phase 17/18 after we have feedback from running the autonomous loop end-to-end on a real burndown.
 
-## Design-loop — UX/UI surface-change discipline as a plugin (north star)
+## Design-control — UX/UI surface-change discipline as a plugin (north star)
 
-*Working name `design-loop`; finalized at `/dw-lifecycle:define`. Full narrative +
+*Plugin `design-control` (named for the `*control` family — audiocontrol, editorialcontrol,
+stackcontrol); scope finalized at `/dw-lifecycle:define`. Full narrative +
 architectural commitments: [`DESIGN-DISCIPLINE-THESIS.md`](./DESIGN-DISCIPLINE-THESIS.md).
 Provenance audit: [`docs/superpowers/specs/audiocontrol-uxui-discipline-session-audit.md`](./docs/superpowers/specs/audiocontrol-uxui-discipline-session-audit.md).*
 
