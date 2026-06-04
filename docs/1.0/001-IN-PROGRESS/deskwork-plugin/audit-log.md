@@ -1105,7 +1105,7 @@ I also checked and found clean: the markdown-only guard fires pre-`readCalendar`
 ### AUDIT-20260604-01 — body-state.ts's `PLACEHOLDER_MARKER` contract is now orphaned — the diff reworded the comment to survive the `scaffoldBlogPost` deletion instead of re-evaluating it; no `src/` path emits the marker and nothing in `src/` calls `bodyState()`
 
 Finding-ID: AUDIT-20260604-01 (claude-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-fe848e1024bdeaad9308749e53b6db9e467ec715
 Severity:   medium
 Surface:    `packages/core/src/body-state.ts:5-7,25,49` (comment rewordings + `PLACEHOLDER_MARKER` + `bodyState()`) vs. the deleted `packages/core/src/scaffold.ts`
 
@@ -1118,7 +1118,7 @@ Rather than acknowledge that, the diff reworded the docblock from *"The scaffold
 ### AUDIT-20260604-02 — `renameSlug` now hard-depends on the entry's sidecar existing; an entry with a calendar row but no sidecar file throws a raw `readSidecarSync` ENOENT, bypassing the actionable `doctor --fix` guidance the function provides for every other drift case
 
 Finding-ID: AUDIT-20260604-02 (claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-03; cross-model)
-Status:     open
+Status:     fixed-ef5c061602f8293820e105061ac831c39fbe3fb8
 Severity:   high
 Surface:    `packages/core/src/rename-slug.ts:170-176` (`readSidecarSync(projectRoot, entry.id)` then the `sidecar.artifactPath === undefined` guard)
 
@@ -1131,7 +1131,7 @@ The function already validates `entry.id` exists (`:143-147`) for exactly this d
 ### AUDIT-20260604-03 — The new sync `writeSidecarSync` duplicates `writeSidecar` (async) with the same mkdir/tmp/write/rename shape, but no `clones.yaml` entry was added — while the analogous read.ts async/sync pair *was* dispositioned (`f2aa9e0ff153`) in this very diff
 
 Finding-ID: AUDIT-20260604-03
-Status:     open
+Status:     acknowledged-non-bug-2026-06-04 — jscpd does NOT detect the write.ts async/sync pair (verified: `check-clones` reports 0 NEW; the pair is below jscpd's match threshold), so there is no clone-id to disposition in clones.yaml. The asymmetry with the read.ts pair (`f2aa9e0ff153`) is benign: read.ts tripped jscpd, write.ts didn't. Added a docstring hedge on `writeSidecarSync` cross-referencing the read.ts disposition so a future `refresh-clones-baseline` that surfaces it has the rationale. Non-bug; no code defect.
 Severity:   low
 Surface:    `packages/core/src/sidecar/write.ts:18-34` (`writeSidecarSync`) vs. `writeSidecar` (`:8-16`); `.dw-lifecycle/scope-discovery/clones.yaml` (added `f2aa9e0ff153` for `sidecar/read.ts:25-34 ↔ :47-56`, no write.ts sibling)
 

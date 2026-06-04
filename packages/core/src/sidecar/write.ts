@@ -20,6 +20,14 @@ export async function writeSidecar(projectRoot: string, entry: Entry): Promise<v
  * Synchronous sibling of `writeSidecar` (Phase 39c-2b(a)). `renameSlug`
  * is a sync helper and rewrites the entry's `artifactPath` after moving
  * the file/dir; this validates + atomically writes the same way.
+ *
+ * Deliberate async/sync-sibling shape (same as `sidecar/read.ts`'s
+ * `readSidecar`/`readSidecarSync`, dispositioned `keep-with-reason` as
+ * clones.yaml `f2aa9e0ff153`): the validate + mkdir/tmp/write/rename
+ * sequence can't share a call across the async/sync boundary. jscpd does
+ * NOT currently flag this write pair (below threshold); this note is the
+ * hedge so a future `refresh-clones-baseline` that does surface it has the
+ * rationale (AUDIT-20260604-03, non-bug).
  */
 export function writeSidecarSync(projectRoot: string, entry: Entry): void {
   const result = EntrySchema.safeParse(entry);

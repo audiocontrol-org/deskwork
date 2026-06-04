@@ -2188,7 +2188,7 @@ Closes AUDIT-20260604-01 (claude-01 + codex-02; cross-model). Surface: `packages
 
 - [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
 - [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 39.16 (fix-finding-AUDIT-20260604-02): AUDIT-20260604-02 — `renameSlug` now hard-depends on the entry's sidecar existin…
@@ -2208,7 +2208,7 @@ Closes AUDIT-20260604-02 (claude-02 + claude-03 + claude-04 + claude-05 + codex-
 - [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
 - [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
 - [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
 
 
 ### Task 39.17 (fix-finding-AUDIT-20260604-03) (non-bug): AUDIT-20260604-03 — The new sync `writeSidecarSync` duplicates `writeSidecar` (a…
@@ -2217,15 +2217,15 @@ Closes AUDIT-20260604-03. Surface: `packages/core/src/sidecar/write.ts:18-34` (`
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with an `Acknowledges AUDIT-20260604-03` trailer in the commit message (use `Closes AUDIT-20260604-03` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: `apply-audit-flips` parses `Closes` trailers ONLY — `Acknowledges` and `Defers` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using `Closes` on a non-fix disposition arms a false `fixed-<sha>` flip when the audit-log entry is later re-opened.
+- [x] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [x] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [x] Step 3: commit with an `Acknowledges AUDIT-20260604-03` trailer in the commit message (use `Closes AUDIT-20260604-03` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: `apply-audit-flips` parses `Closes` trailers ONLY — `Acknowledges` and `Defers` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using `Closes` on a non-fix disposition arms a false `fixed-<sha>` flip when the audit-log entry is later re-opened.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [x] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [x] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
 
 ### Task 39.13 (fix-finding-AUDIT-20260603-46): AUDIT-20260603-46 — Image `--artifact-path` is stamped verbatim with zero normal…
 
