@@ -195,6 +195,74 @@ describe('workplan-archive-ledger-coherence doctor rule', () => {
     expect(extraFinding, 'other-feature finding suppressed by malformed sibling').toBeDefined();
   });
 
+  it('AUDIT-20260604-02 bug-repro: flags malformed archived-fix-tasks ranges (cross-phase, mismatched-dotted, non-numeric)', async () => {
+    // The expandRange parser tolerates these shapes via singleton-pair
+    // fallback (AUDIT-92) so archivePhases doesn't crash; the
+    // companion claim is that workplan-archive-ledger-coherence is the
+    // operator-facing surface notifying about them. Pre-fix this rule
+    // does NOT inspect archived-fix-tasks at all — the claim is false.
+    // Post-fix the rule walks each fix-task range and emits a warning
+    // per non-well-formed shape.
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '<!-- workplan-archive-ledger',
+        'archived-phases: 1',
+        'archived-fix-tasks: 5.10-6.3, 5.1-5, 5.x-5.y',
+        'archive-file: workplan-archive.md',
+        'next-fix-task-id: 6.4',
+        '-->',
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(featureDir, 'workplan-archive.md'),
+      '## Phase 1\n',
+    );
+    const findings = await check({ repoRoot });
+    // Three malformed shapes → at least three findings (one per shape).
+    const fixTaskFindings = findings.filter((f) =>
+      f.message.toLowerCase().includes('archived-fix-tasks'),
+    );
+    expect(fixTaskFindings.length).toBeGreaterThanOrEqual(3);
+    expect(fixTaskFindings.every((f) => f.severity === 'warning')).toBe(true);
+    // Each shape names itself in the message so the operator can locate
+    // the offending range without grepping.
+    const messages = fixTaskFindings.map((f) => f.message).join('\n');
+    expect(messages).toMatch(/cross-phase/i);
+    expect(messages).toMatch(/mismatched-dotted/i);
+    expect(messages).toMatch(/non-numeric/i);
+  });
+
+  it('AUDIT-20260604-02 regression-lock: well-formed archived-fix-tasks emits no malformed-range finding', async () => {
+    // Pin the new check's selectivity: singletons + contiguous ranges
+    // with matching dotted prefix + numeric endpoints are all well-
+    // formed and must NOT trip the malformed-range warning. Without
+    // this regression-lock the fix could over-trigger and surface
+    // spurious findings on every well-formed ledger.
+    writeFileSync(
+      join(featureDir, 'workplan.md'),
+      [
+        '# Workplan',
+        '<!-- workplan-archive-ledger',
+        'archived-phases: 1-2',
+        'archived-fix-tasks: 5.1-5.10, 5.12, 6.1-6.5',
+        'archive-file: workplan-archive.md',
+        'next-fix-task-id: 6.6',
+        '-->',
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(featureDir, 'workplan-archive.md'),
+      '## Phase 1\n\n## Phase 2\n',
+    );
+    const findings = await check({ repoRoot });
+    const fixTaskFindings = findings.filter((f) =>
+      f.message.toLowerCase().includes('archived-fix-tasks'),
+    );
+    expect(fixTaskFindings).toEqual([]);
+  });
+
   it('all findings are severity: warning (non-blocking)', async () => {
     writeFileSync(
       join(featureDir, 'workplan.md'),

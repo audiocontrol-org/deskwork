@@ -195,22 +195,22 @@ Closes AUDIT-20260604-01 (claude-01 + codex-03; cross-model). Surface: `.dw-life
 
 ### Task 32 (fix-finding-AUDIT-20260604-02): AUDIT-20260604-02 — `ledger.ts` comment claims the doctor rule surfaces tolerate…
 
-Closes AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` docblock (the AUDIT-92 fallback comment). Severity: high.
+**Complete (2026-06-04).** Closes AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` docblock (the AUDIT-92 fallback comment). Severity: high.
 
-- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
-- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
-- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
-- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
-- [ ] Step 3: implement the fix
-- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
-- [ ] Step 5: commit with `Closes AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model)` in subject
+- [x] Step 0: working-code invariant — `expandRange` correctly tolerates cross-phase / mismatched-dotted / non-numeric ranges via singleton-pair fallback (AUDIT-92), letting `archivePhases` keep running on operator-edited malformed ledgers; the regression-lock test must pin that tolerance.
+- [x] Step 1: bug-repro test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.test.ts:215-251` (`AUDIT-20260604-02 bug-repro: flags malformed archived-fix-tasks ranges (cross-phase, mismatched-dotted, non-numeric)`).
+- [x] Step 1b: regression-lock test at `workplan-archive-ledger-coherence.test.ts:253-279` (`AUDIT-20260604-02 regression-lock: well-formed archived-fix-tasks emits no malformed-range finding`) — asserts that singletons + contiguous numeric ranges within the same dotted prefix don't trip the new check; the existing AUDIT-92 `ledger.test.ts` block continues to pin `expandRange`'s singleton-pair fallback unchanged.
+- [x] Step 2: confirmed bug-repro fails pre-fix — `expected 0 to be greater than or equal to 3` (the rule didn't inspect archived-fix-tasks at all).
+- [x] Step 3: implemented in two places — (a) `ledger.ts` adds the `classifyFixTaskRange(range) → 'well-formed' | 'cross-phase' | 'mismatched-dotted' | 'non-numeric'` exported helper; (b) `workplan-archive-ledger-coherence.ts` walks `ledger.archivedFixTasks`, calls the classifier per range, emits a `warning` per non-`well-formed` shape with the offending range + shape tag named in the message. The docstring's "Scenarios it catches" / "Non-scenarios" sections updated to reflect the new coverage. The original `expandRange` doctor-rule claim is now true; the comment was updated in the same commit to reference `classifyFixTaskRange` as the truth-keeper of the relationship.
+- [x] Step 4: confirmed 11/11 tests pass in `workplan-archive-ledger-coherence.test.ts` post-fix; full plugin suite 2666/2666 (was 2664 — +2 new tests for AUDIT-04 bug-repro + regression-lock).
+- [x] Step 5: commit with `Closes AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model)` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
-- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
-- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
-- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+- [x] Failing test exists at `plugins/dw-lifecycle/src/__tests__/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.test.ts:215-251` (cited in Step 1).
+- [x] Regression-lock test exists in the same file (Step 1b); test block count for this finding is 2 (bug-repro + regression-lock) per Option D discipline.
+- [x] `npx vitest run src/__tests__/scope-discovery/doctor-rules/workplan-archive-ledger-coherence.test.ts` from `plugins/dw-lifecycle/` exits 0 (11/11 pass post-fix).
+- [x] Audit-log Status flipped to `fixed-<sha>` via the apply-audit-flips step.
 
 
 ### Task 33 (fix-finding-AUDIT-20260604-03) (non-bug): AUDIT-20260604-03 — README Phase 25 row says "Tasks 4–11 remain" while the same …

@@ -12,20 +12,34 @@
  *     Phase 3.
  *   - Archive file contains Phase 7 but ledger doesn't list it.
  *   - Ledger references an archive-file path that doesn't exist.
+ *   - Per AUDIT-20260604-02: `archived-fix-tasks` ranges that
+ *     `expandRange` tolerates via singleton-pair fallback (cross-phase
+ *     `5.10-6.3`, mismatched-dotted `5.1-5`, non-numeric `5.x-5.y`).
+ *     `expandRange` does NOT throw on these — `archive-phases` keeps
+ *     running — but the operator deserves a notification so they can
+ *     fix the ledger before downstream consumers misread it. This rule
+ *     calls `classifyFixTaskRange` per range and warns on each
+ *     non-`well-formed` shape.
  *
  * Non-scenarios (intentionally NOT checked):
  *   - Workplan content vs archive content drift (per-phase fidelity) —
  *     out of scope; the archive is append-only.
- *   - Ledger fix-task ID coherence — a separate rule (future work)
- *     could validate `archived-fix-tasks` against actual archived
- *     content.
+ *   - `archived-fix-tasks` cross-reference with the archive file's
+ *     actual `### Task <N>` headings — a stricter rule (future work)
+ *     could compare declared fix-task IDs against the ones the
+ *     archive file physically contains.
  *
  * Severity: warning (operator action required, not a parse blocker).
  */
 
 import { readFile, readdir, access } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseLedgerFromWorkplan, type IdRange, type Ledger } from '../workplan-archive/ledger.js';
+import {
+  parseLedgerFromWorkplan,
+  classifyFixTaskRange,
+  type IdRange,
+  type Ledger,
+} from '../workplan-archive/ledger.js';
 import { errorMessage } from '../util/typeguards.js';
 import type { DoctorRuleCheck, ScopeDoctorFinding, DoctorRuleOptions } from './types.js';
 
@@ -159,6 +173,22 @@ export const check: DoctorRuleCheck = async (
             rule: RULE,
             severity: 'warning',
             message: `${slug}: ${ledger.archiveFile} contains phases ${extra.join(', ')} that are NOT declared in the workplan's archived-phases ledger range. Update the ledger to include them (or unarchive them via \`unarchive-phases\` if they should be active).`,
+          });
+        }
+        // Per AUDIT-20260604-02: walk each archived-fix-tasks range and
+        // warn on the three malformed shapes that `expandRange` tolerates
+        // via singleton-pair fallback. The fallback is correct (it lets
+        // archivePhases keep running) but the operator deserves a
+        // notification so the ledger can be repaired before downstream
+        // consumers misread it.
+        for (const range of ledger.archivedFixTasks) {
+          const shape = classifyFixTaskRange(range);
+          if (shape === 'well-formed') continue;
+          const repr = range.end === undefined ? range.start : `${range.start}-${range.end}`;
+          findings.push({
+            rule: RULE,
+            severity: 'warning',
+            message: `${slug}: archived-fix-tasks range "${repr}" has malformed shape "${shape}" (per AUDIT-20260604-02). expandRange tolerates this via singleton-pair fallback, but the ledger entry should be repaired so downstream consumers read the intended IDs. Fix the workplan's <!-- workplan-archive-ledger --> annotation.`,
           });
         }
       }

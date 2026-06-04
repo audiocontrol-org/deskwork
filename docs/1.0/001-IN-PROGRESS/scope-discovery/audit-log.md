@@ -4169,7 +4169,7 @@ This is exactly the non-pending→pending transition `check-disposition-survivor
 ### AUDIT-20260604-02 — `ledger.ts` comment claims the doctor rule surfaces tolerated-malformed ranges — it provably does not
 
 Finding-ID: AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-PENDING-SHA
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` docblock (the AUDIT-92 fallback comment)
 

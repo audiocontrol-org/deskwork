@@ -270,7 +270,11 @@ export function incrementId(id: string): string {
  * verbatim (no iteration of the middle), so a malformed input is preserved
  * in the merged output instead of crashing the call chain. The doctor rule
  * `workplan-archive-ledger-coherence` is the operator-facing surface for
- * notifying about the malformed input.
+ * notifying about the malformed input — it calls `classifyFixTaskRange`
+ * (this module) on every `archivedFixTasks` range and emits a warning
+ * naming each non-`well-formed` shape (per AUDIT-20260604-02; the original
+ * claim was false until the doctor rule was extended to walk fix-task
+ * ranges).
  */
 function expandRange(range: IdRange): string[] {
   if (range.end === undefined) return [range.start];
@@ -345,6 +349,51 @@ export function mergeFixTaskIds(
   }
   compacted.push(runStart === runEnd ? { start: runStart } : { start: runStart, end: runEnd });
   return compacted;
+}
+
+/**
+ * Per AUDIT-20260604-02: companion classifier to `expandRange`'s
+ * tolerance. Classifies a fix-task range as `well-formed` or names
+ * which malformed shape it has. The `workplan-archive-ledger-coherence`
+ * doctor rule calls this on every `archivedFixTasks` range and emits
+ * a warning per non-well-formed shape — so an operator sees the
+ * malformed-input notification that `expandRange`'s singleton-pair
+ * fallback would otherwise swallow silently. The three malformed
+ * shapes match `expandRange`'s fallback triggers exactly:
+ *
+ *   - cross-phase: start prefix differs from end prefix
+ *     (`5.10-6.3` → cross-phase).
+ *   - mismatched-dotted: start and end have different dot-component
+ *     counts (`5.1-5` → mismatched-dotted).
+ *   - non-numeric: at least one endpoint's last component is not
+ *     a finite number (`5.x-5.y` → non-numeric).
+ *
+ * Singletons (no `end`) are always well-formed; non-numeric singletons
+ * surface as a separate `non-numeric` classification.
+ */
+export type FixTaskRangeShape =
+  | 'well-formed'
+  | 'cross-phase'
+  | 'mismatched-dotted'
+  | 'non-numeric';
+
+export function classifyFixTaskRange(range: IdRange): FixTaskRangeShape {
+  if (range.end === undefined) {
+    const singleParts = range.start.split('.');
+    const lastRaw = singleParts[singleParts.length - 1];
+    if (lastRaw === undefined || !Number.isFinite(Number(lastRaw))) return 'non-numeric';
+    return 'well-formed';
+  }
+  const startParts = range.start.split('.');
+  const endParts = range.end.split('.');
+  if (startParts.length !== endParts.length) return 'mismatched-dotted';
+  for (let i = 0; i < startParts.length - 1; i += 1) {
+    if (startParts[i] !== endParts[i]) return 'cross-phase';
+  }
+  const startLast = Number(startParts[startParts.length - 1]);
+  const endLast = Number(endParts[endParts.length - 1]);
+  if (!Number.isFinite(startLast) || !Number.isFinite(endLast)) return 'non-numeric';
+  return 'well-formed';
 }
 
 /**
