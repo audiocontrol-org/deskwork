@@ -1,46 +1,48 @@
 /**
- * plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts
+ * plugins/dw-lifecycle/src/scope-discovery/module-symmetry-matrix.ts
  *
  * Matrix computation for the cross-module symmetry checker (Phase 4
  * Family B). Walks `.dw-lifecycle/scope-discovery/adopter-manifests.yaml`
  * (the same registry Family C's `check-adopters` consumes) and, for
- * each manifest entry, computes a per-editor adoption status from the
+ * each manifest entry, computes a per-module adoption status from the
  * entry's `expected_adopters_glob` + canonical `from` path.
  *
  * # Terminology
  *
- * "Editor" in this file means "parallel top-level module that shares
+ * "Module" in this file means "parallel top-level module that shares
  * canonical primitives with its peers." The pilot's audiocontrol
  * convention was `modules/<slug>-editor/` per device family; the
  * concept generalizes to any project with parallel top-level modules
- * (see `util/editors.ts` for the canonical terminology note).
+ * (see `util/modules.ts` for the canonical terminology note —
+ * including why the "editor" connotation persists in some downstream
+ * surfaces).
  *
  * # Output shape
  *
  * An in-memory `SymmetryMatrix` whose `rows[i].cells[j]` holds the
- * adoption status of `editors[j]` for `manifests[i]`. The renderer
- * (`editor-symmetry-report.ts`) emits the matrix as a markdown table.
- * The CLI (`check-editor-symmetry.ts`) wires the pieces together.
+ * adoption status of `modules[j]` for `manifests[i]`. The renderer
+ * (`module-symmetry-report.ts`) emits the matrix as a markdown table.
+ * The CLI (`check-module-symmetry.ts`) wires the pieces together.
  *
  * # Status semantics per cell
  *
- *   - ✓: every glob-matched file in the editor imports the canonical
+ *   - ✓: every glob-matched file in the module imports the canonical
  *        path OR is exempted; no holdouts AND no tracked-holdouts.
- *   - ⚠: at least one glob-matched file in the editor does NOT import
+ *   - ⚠: at least one glob-matched file in the module does NOT import
  *        the canonical path and is not exempted (partial adoption).
  *        REAL holdouts dominate tracked-holdouts: if both exist in
  *        the same cell, status is ⚠, not ⏳.
- *   - ✗: the manifest's glob targets the editor (the glob's static
- *        prefix is `<moduleRoot>/<editor>/...` or a wildcard editor
- *        segment) but no glob-matched files exist in the editor OR
- *        all matched files are holdouts with no adoption. The editor
+ *   - ✗: the manifest's glob targets the module (the glob's static
+ *        prefix is `<moduleRoot>/<module>/...` or a wildcard module
+ *        segment) but no glob-matched files exist in the module OR
+ *        all matched files are holdouts with no adoption. The module
  *        was EXPECTED to participate but isn't.
- *   - ⏳: the editor has tracked-holdouts but NO regular holdouts.
+ *   - ⏳: the module has tracked-holdouts but NO regular holdouts.
  *        Gate-passing (AUDIT-06): operator has explicitly deferred
  *        these files via `tracked_holdouts:` with mandatory tracking
  *        issues; matrix surfaces them distinctly so the deferral is
  *        visible instead of masked behind a false ✓.
- *   - —: the manifest's glob does not target this editor at all
+ *   - —: the manifest's glob does not target this module at all
  *        (n/a). The cell carries no signal; it's there for matrix
  *        alignment.
  *
@@ -48,7 +50,7 @@
  *
  * Re-uses `loadRegistry` + `AdopterManifestEntry` from Family C's
  * `adopter-manifests-registry.ts`, the glob walker from `util/glob.ts`,
- * the editor-set helpers from `util/editors.ts`, and the import-regex
+ * the module-set helpers from `util/modules.ts`, and the import-regex
  * builder from Family C's `check-adopters.ts`. No copy-paste.
  */
 
@@ -60,10 +62,10 @@ import {
 } from './adopter-manifests-registry.js';
 import { buildImportRegex } from './check-adopters.js';
 import {
-  discoverEditors,
-  editorForPath,
-  editorsTargetedByGlob,
-} from './util/editors.js';
+  discoverModules,
+  moduleForPath,
+  modulesTargetedByGlob,
+} from './util/modules.js';
 import { listFilesMatching, toPosix } from './util/glob.js';
 import { errorMessage } from './util/typeguards.js';
 import {
@@ -85,12 +87,12 @@ const SKIP_DIRS: ReadonlySet<string> = new Set([
 
 const DEFAULT_MODULE_ROOT = 'src';
 
-/** Adoption status of one (manifest x editor) cell. */
+/** Adoption status of one (manifest x module) cell. */
 export type CellStatus = 'ok' | 'partial' | 'missing' | 'tracked' | 'na';
 
 export interface MatrixCell {
   readonly status: CellStatus;
-  /** Files in the editor matching the manifest's glob (count). */
+  /** Files in the module matching the manifest's glob (count). */
   readonly expected: number;
   /** Subset of `expected` that import the canonical `from` path. */
   readonly actual: number;
@@ -108,7 +110,7 @@ export interface MatrixCell {
 
 export interface MatrixRow {
   readonly entry: AdopterManifestEntry;
-  /** One cell per editor, in `editors` order. */
+  /** One cell per module, in `modules` order. */
   readonly cells: readonly MatrixCell[];
   /**
    * Loop status inherited verbatim from the
@@ -141,14 +143,14 @@ export interface ComputeOptions {
 }
 
 /**
- * Compute the full editor-symmetry matrix from the on-disk registry +
- * editor set. Empty registry -> matrix with zero rows; the renderer
+ * Compute the full module-symmetry matrix from the on-disk registry +
+ * module set. Empty registry -> matrix with zero rows; the renderer
  * produces a "no manifests" placeholder body in that case.
  */
 export async function computeMatrix(opts: ComputeOptions): Promise<SymmetryMatrix> {
   const rootAbs = resolve(opts.scanRoot);
   const moduleRoot = opts.moduleRoot ?? DEFAULT_MODULE_ROOT;
-  const editors = await discoverEditors(rootAbs, moduleRoot);
+  const modules = await discoverModules(rootAbs, moduleRoot);
   const registry = await loadRegistry(opts.registryPath);
   // filter to actively-enforced entries before
   // building the matrix. Adopter-manifest entries with `status:
@@ -159,17 +161,17 @@ export async function computeMatrix(opts: ComputeOptions): Promise<SymmetryMatri
   // preserved (back-compat with all pre-Phase-11 baselines).
   const activeEntries = filterActiveEntries(registry.entries);
   if (activeEntries.length === 0) {
-    return { modules: editors, rows: [], filesVisited: 0, moduleRoot };
+    return { modules, rows: [], filesVisited: 0, moduleRoot };
   }
   const visited = new Set<string>();
   const rows: MatrixRow[] = [];
   for (const entry of activeEntries) {
-    rows.push(await computeRow(entry, rootAbs, editors, moduleRoot, visited));
+    rows.push(await computeRow(entry, rootAbs, modules, moduleRoot, visited));
   }
-  return { modules: editors, rows, filesVisited: visited.size, moduleRoot };
+  return { modules, rows, filesVisited: visited.size, moduleRoot };
 }
 
-interface PerEditorBuckets {
+interface PerModuleBuckets {
   expected: Set<string>;
   actual: Set<string>;
   exempted: Set<string>;
@@ -180,12 +182,12 @@ interface PerEditorBuckets {
 async function computeRow(
   entry: AdopterManifestEntry,
   rootAbs: string,
-  editors: readonly string[],
+  modules: readonly string[],
   moduleRoot: string,
   visited: Set<string>,
 ): Promise<MatrixRow> {
   // Step 1: find every file matching ANY of the entry's globs. The
-  // scanner walks the tree once; we bucket per-editor below.
+  // scanner walks the tree once; we bucket per-module below.
   const globRegexes = entry.globs.map((g) => g.regex);
   const matchedAbs = await listFilesMatching(
     rootAbs,
@@ -194,11 +196,11 @@ async function computeRow(
     SCANNED_EXTENSIONS,
   );
 
-  // Step 2: build a per-editor bucket map. Keys are editor slugs;
+  // Step 2: build a per-module bucket map. Keys are module slugs;
   // values are sets of repo-relative paths.
-  const buckets = new Map<string, PerEditorBuckets>();
-  for (const editor of editors) {
-    buckets.set(editor, {
+  const buckets = new Map<string, PerModuleBuckets>();
+  for (const module of modules) {
+    buckets.set(module, {
       expected: new Set(),
       actual: new Set(),
       exempted: new Set(),
@@ -214,9 +216,9 @@ async function computeRow(
   for (const abs of matchedAbs) {
     visited.add(abs);
     const rel = toPosix(toRepoRel(abs, rootAbs));
-    const editor = editorForPath(rel, editors, moduleRoot);
-    if (editor === null) continue;
-    const bucket = buckets.get(editor);
+    const module = moduleForPath(rel, modules, moduleRoot);
+    if (module === null) continue;
+    const bucket = buckets.get(module);
     if (bucket === undefined) continue;
     bucket.expected.add(rel);
     if (exceptionSet.has(rel)) {
@@ -235,18 +237,18 @@ async function computeRow(
     }
   }
 
-  // Step 3: which editors does this manifest target? An editor is in
+  // Step 3: which modules does this manifest target? A module is in
   // scope if at least one of its globs' static prefixes covers it.
-  const targetedEditors = new Set<string>();
+  const targetedModules = new Set<string>();
   for (const glob of entry.globs) {
-    for (const ed of editorsTargetedByGlob(glob.pattern, editors, moduleRoot)) {
-      targetedEditors.add(ed);
+    for (const m of modulesTargetedByGlob(glob.pattern, modules, moduleRoot)) {
+      targetedModules.add(m);
     }
   }
 
-  // Step 4: build the cells, in `editors` order.
-  const cells: MatrixCell[] = editors.map((editor) => {
-    const bucket = buckets.get(editor);
+  // Step 4: build the cells, in `modules` order.
+  const cells: MatrixCell[] = modules.map((module) => {
+    const bucket = buckets.get(module);
     if (bucket === undefined) {
       return cellNa();
     }
@@ -255,8 +257,8 @@ async function computeRow(
     const exempted = bucket.exempted.size;
     const trackedHoldouts = bucket.trackedHoldouts.size;
     const holdouts = bucket.holdouts.size;
-    if (!targetedEditors.has(editor)) {
-      // The glob doesn't target this editor's tree.
+    if (!targetedModules.has(module)) {
+      // The glob doesn't target this module's tree.
       return cellNa();
     }
     const status = deriveStatus(expected, actual, exempted, holdouts, trackedHoldouts);
@@ -306,6 +308,6 @@ async function readFileSafe(path: string): Promise<string> {
     if (fileStat.size === 0) return '';
     return await readFile(path, 'utf8');
   } catch (err) {
-    throw new Error(`editor-symmetry: failed to read ${path}: ${errorMessage(err)}`);
+    throw new Error(`module-symmetry: failed to read ${path}: ${errorMessage(err)}`);
   }
 }

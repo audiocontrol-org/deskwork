@@ -45,7 +45,7 @@ import { parseClonesYamlStrict } from '../../scope-discovery/clones-yaml.parse.j
 import { loadOverridePatterns } from '../../scope-discovery/discovery-agents/pattern-handlers/loader.js';
 import { scan as scanAntiPatterns } from '../../scope-discovery/check-anti-patterns.js';
 import { scan as scanAdopters } from '../../scope-discovery/check-adopters.js';
-import { computeMatrix } from '../../scope-discovery/editor-symmetry-matrix.js';
+import { computeMatrix } from '../../scope-discovery/module-symmetry-matrix.js';
 import { detectRegimeHoldouts } from '../../scope-discovery/discovery-agents/regime-holdout-detector.js';
 import {
   filterActiveEntries,
@@ -580,8 +580,8 @@ describe('Phase 11 Task 11 — scanners filter on status at the registry boundar
     try {
       const { adopterManifestsPath } = plantUniformRegistries(root);
 
-      // Plant a module so discoverEditors finds something. The matrix's
-      // row count is independent of editors discovered — what matters is
+      // Plant a module so discoverModules finds something. The matrix's
+      // row count is independent of modules discovered — what matters is
       // which adopter-manifest entries become rows.
       const editorDir = join(root, 'src', 'roland');
       mkdirSync(editorDir, { recursive: true });

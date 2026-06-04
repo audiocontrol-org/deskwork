@@ -10,7 +10,7 @@ import { customize } from './subcommands/customize.js';
 import { checkClones } from './subcommands/check-clones.js';
 import { checkAntiPatterns } from './subcommands/check-anti-patterns.js';
 import { checkAdopters } from './subcommands/check-adopters.js';
-import { checkEditorSymmetry } from './subcommands/check-editor-symmetry.js';
+import { checkEditorSymmetry } from './subcommands/check-module-symmetry.js';
 import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
 import { scopeInventory } from './subcommands/scope-inventory.js';
 import { scopeWiden } from './subcommands/scope-widen.js';

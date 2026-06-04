@@ -1,5 +1,5 @@
 /**
- * plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts
+ * plugins/dw-lifecycle/src/scope-discovery/check-module-symmetry.ts
  *
  * Cross-module symmetry gate (Phase 4 Family B). Reads
  * `.dw-lifecycle/scope-discovery/adopter-manifests.yaml` (Family C's
@@ -13,9 +13,9 @@
  *     piping into a markdown renderer or scanning in a terminal.
  *   - `.dw-lifecycle/scope-discovery/editor-symmetry.md` (only with
  *     `--write`): the committed operator-readable artifact. The
- *     pre-commit hook (Phase 8) runs WITHOUT `--write`; operators
- *     refresh the artifact by re-running with `--write` when the
- *     registry changes.
+ *     on-disk filename retains the `editor-symmetry` suffix —
+ *     that's wire-format and travels on its own deprecation arc
+ *     (separate from the Phase 25 source-rename pass).
  *
  * # Exit codes
  *
@@ -25,8 +25,8 @@
  *
  * # DRY
  *
- * Re-uses `computeMatrix` from `editor-symmetry-matrix.ts` and the
- * renderer from `editor-symmetry-report.ts`; the registry parser +
+ * Re-uses `computeMatrix` from `module-symmetry-matrix.ts` and the
+ * renderer from `module-symmetry-report.ts`; the registry parser +
  * glob walker + import detection are inherited via Family C's
  * extraction. No duplicated YAML loading, no duplicated glob walk,
  * no duplicated import regex.
@@ -35,12 +35,12 @@
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { computeMatrix, type SymmetryMatrix } from './editor-symmetry-matrix.js';
+import { computeMatrix, type SymmetryMatrix } from './module-symmetry-matrix.js';
 import {
   ARTIFACT_PATH,
   renderMatrix,
   tallyStatuses,
-} from './editor-symmetry-report.js';
+} from './module-symmetry-report.js';
 import { errorMessage } from './util/typeguards.js';
 
 const DEFAULT_REGISTRY = '.dw-lifecycle/scope-discovery/adopter-manifests.yaml';

@@ -1628,13 +1628,15 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 ### Task 4 — Source identifier rename
 
-- Step 1: Rename source files: `editor-symmetry-matrix.ts` → `module-symmetry-matrix.ts`, `editor-symmetry-report.ts` → `module-symmetry-report.ts`, `check-editor-symmetry.ts` → `check-module-symmetry.ts`, `util/editors.ts` → `util/modules.ts`.
-- Step 2: Rename function + type identifiers: `discoverEditors` → `discoverModules`, `editorsTargetedByGlob` → `modulesTargetedByGlob`, `editorForPath` → `moduleForPath`, `SymmetryMatrix.editors` → `SymmetryMatrix.modules`, etc.
-- Step 3: Update every import.
-- Step 4: Preserve the etymology paragraph as a historical comment in `util/modules.ts` (operator decides at scope time whether to keep or erase).
-- Step 5: Confirm tests pass; `tsc` clean.
+**Complete (2026-06-03 cont. 6).** Source files renamed via `git mv`; function identifiers renamed across every importer; tsc clean; full plugin suite still at 2664/2664. Test FILE renames + CLI verb-string rename + skill folder rename are out of scope here (Phase 25 Tasks 5/6/9 own them) — operator-confirmed via the dispatch prompt's explicit out-of-scope list.
 
-**Acceptance:** Grep for `editor` outside the etymology comment in `util/modules.ts` yields zero hits in scope-discovery source.
+- [x] Step 1: Rename source files via `git mv`: `editor-symmetry-matrix.ts` → `module-symmetry-matrix.ts`, `editor-symmetry-report.ts` → `module-symmetry-report.ts`, `check-editor-symmetry.ts` (both copies — `src/scope-discovery/` and `src/subcommands/`) → `check-module-symmetry.ts`, `util/editors.ts` → `util/modules.ts`.
+- [x] Step 2: Rename function identifiers: `discoverEditors` → `discoverModules`, `editorsTargetedByGlob` → `modulesTargetedByGlob`, `editorForPath` → `moduleForPath`. (`SymmetryMatrix.editors` → `SymmetryMatrix.modules` already shipped in Task 3; no re-do.)
+- [x] Step 3: Updated every import. Files touched: `cli.ts`, `scope-inventory.ts`, `check-deprecations.ts`, `deprecation-report.ts`, `discovery-agents/regime-holdout-detector.ts`, plus the 3 test files that reference the renamed identifiers (`cross-surface-loop.test.ts`, `editor-symmetry.fixtures.ts`, `editor-symmetry.test.ts`).
+- [x] Step 4: Etymology paragraph preserved verbatim in `util/modules.ts` (the leading docblock — kept as historical comment per operator decision at scope time).
+- [x] Step 5: `npx tsc -p plugins/dw-lifecycle --noEmit` exit 0; `npx vitest run` from `plugins/dw-lifecycle/` reports 205 test files / 2664 tests, all passing.
+
+**Acceptance:** ✅ Source-side rename complete. The remaining `editor` hits in scope-discovery source live on their own deprecation arcs (CLI verb-string + printHelp banner + stderr-prefix → Phase 25 Task 5; LAYOUT.md + skill folder → Phase 25 Task 6; test-file names → Phase 25 Task 9 sweep; wire-format catalog paths `editor-symmetry-matrix.yaml` / `editor-symmetry.md` → governed separately). Audit-log + DEVELOPMENT-NOTES preserved verbatim per the preservation rule.
 
 ### Task 5 — CLI verb rename
 

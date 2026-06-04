@@ -1,15 +1,17 @@
 /**
- * plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-report.ts
+ * plugins/dw-lifecycle/src/scope-discovery/module-symmetry-report.ts
  *
  * Markdown-table renderer for the cross-module symmetry matrix (Phase 4
  * Family B). The CLI calls this twice: once for stdout (operator
  * scanning) and once for the committed artifact at
  * `.dw-lifecycle/scope-discovery/editor-symmetry.md` when `--write` is
- * passed.
+ * passed. The on-disk artifact filename retains the `editor-symmetry`
+ * suffix — that's a wire-format path with its own deprecation arc
+ * (handled separately from the Phase 25 source-rename pass).
  *
- * Output shape (one row per manifest entry, one column per editor):
+ * Output shape (one row per manifest entry, one column per module):
  *
- *   | Convention | <editor-a> | <editor-b> |
+ *   | Convention | <module-a> | <module-b> |
  *   |---|---|---|
  *   | <id> (<from>) | ✓ 4/4 | ⚠ 2/3 (1 holdout) |
  *
@@ -30,7 +32,7 @@ import type {
   MatrixCell,
   MatrixRow,
   SymmetryMatrix,
-} from './editor-symmetry-matrix.js';
+} from './module-symmetry-matrix.js';
 
 /**
  * Default destination path for the committed artifact (relative to
@@ -164,24 +166,24 @@ function renderSuggestions(matrix: SymmetryMatrix): readonly string[] {
   const blocks: string[] = [];
   for (const row of matrix.rows) {
     const missing = row.cells
-      .map((cell, idx) => ({ cell, editor: matrix.modules[idx] }))
+      .map((cell, idx) => ({ cell, module: matrix.modules[idx] }))
       .filter(({ cell }) => cell.status === 'missing' || cell.status === 'partial');
     if (missing.length === 0) continue;
     const lines: string[] = [];
     const primary = row.entry.from[0] ?? '';
     lines.push(`### ${row.entry.id} — \`${primary}\``);
     lines.push('');
-    for (const { cell, editor } of missing) {
+    for (const { cell, module } of missing) {
       const glyph = STATUS_GLYPH[cell.status];
       if (cell.status === 'missing' && cell.expected === 0) {
         lines.push(
-          `- ${glyph} **${editor ?? '<unknown>'}**: glob targets the module ` +
+          `- ${glyph} **${module ?? '<unknown>'}**: glob targets the module ` +
             `but no matching files exist. Either the module hasn't built the ` +
             `relevant surface yet, or the manifest glob is mis-authored.`,
         );
       } else {
         lines.push(
-          `- ${glyph} **${editor ?? '<unknown>'}**: ` +
+          `- ${glyph} **${module ?? '<unknown>'}**: ` +
             `${cell.actual + cell.exempted}/${cell.expected} adopters ` +
             `(${cell.holdouts} holdout${cell.holdouts === 1 ? '' : 's'}). ` +
             `Run \`dw-lifecycle check-adopters\` for the per-file list.`,

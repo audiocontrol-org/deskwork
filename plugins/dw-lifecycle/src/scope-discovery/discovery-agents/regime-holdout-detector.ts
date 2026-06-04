@@ -37,7 +37,7 @@
  * # DRY (per .claude/CLAUDE.md)
  *
  * Re-uses the in-process scan APIs of `check-anti-patterns.ts`,
- * `check-adopters.ts`, and `editor-symmetry-matrix.ts` directly — no
+ * `check-adopters.ts`, and `module-symmetry-matrix.ts` directly — no
  * subprocess round-trip, no shape duplication. The shared agent CLI
  * wrapper (`shared.ts`'s `runIfMain` + `runAgentCli`) handles argv
  * parsing and JSON serialization the same way the other four agents
@@ -62,7 +62,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { scan as scanAntiPatterns } from '../check-anti-patterns.js';
 import { scan as scanAdopters } from '../check-adopters.js';
-import { computeMatrix } from '../editor-symmetry-matrix.js';
+import { computeMatrix } from '../module-symmetry-matrix.js';
 import { scan as scanDeprecations } from '../deprecation-scan.js';
 import type {
   DiscoveryAgentInput,

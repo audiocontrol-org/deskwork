@@ -40,7 +40,7 @@
  *
  * Re-uses the walker (`util/glob.ts`'s `listFilesMatching`) via
  * `deprecation-scan.ts`, mirrors the CLI shape of
- * `check-editor-symmetry.ts` for parity, and shares the `errorMessage`
+ * `check-module-symmetry.ts` for parity, and shares the `errorMessage`
  * type-guard from `util/typeguards.ts`. No copy-paste of subprocess /
  * glob / regex utilities.
  *

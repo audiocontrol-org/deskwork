@@ -1,12 +1,12 @@
 /**
- * plugins/dw-lifecycle/src/scope-discovery/util/editors.ts
+ * plugins/dw-lifecycle/src/scope-discovery/util/modules.ts
  *
  * Single-source-of-truth for "the set of parallel top-level modules
  * participating in cross-module symmetry checks." Consumed by the
- * editor-symmetry matrix builder (Family B) and by Family A's
+ * module-symmetry matrix builder (Family B) and by Family A's
  * regime-holdout-detector (which surfaces symmetry-cell holdouts).
  *
- * # Terminology
+ * # Terminology (historical — preserved verbatim per Phase 25 Task 4)
  *
  * The audiocontrol pilot uses the term "editor" for "a parallel
  * top-level module sharing canonical primitives with its peers" (each
@@ -20,6 +20,13 @@
  * the Phase 3 schema and types already at destination. Read "editor"
  * as "parallel top-level module" anywhere in this file.
  *
+ * Phase 25 followup (2026-06-03): the source-side rename from `editor`
+ * to `module` shipped in Phase 25 Task 4. The etymology paragraph
+ * above is kept verbatim so the reasoning trail remains intact;
+ * downstream surfaces still carrying the `editor` connotation (wire-
+ * format YAML field names, the `editor-symmetry.md` artifact path,
+ * audit-log finding bodies) travel on their own deprecation arcs.
+ *
  * # Module-root parameterization
  *
  * The pilot hard-coded `MODULES_DIR = 'modules'` and filtered
@@ -30,11 +37,7 @@
  *   - the `-editor` suffix filter is dropped by default; every child
  *     directory under `<rootAbs>/<moduleRoot>/` is returned. Projects
  *     that need a name filter can supply it via the optional
- *     `nameFilter` parameter on `discoverEditors`.
- *
- * The exported function names retain the "editor" connotation for
- * cross-layer naming consistency (matrix renderer, regime-holdout
- * derivation, manifest schema) — see "Terminology" above.
+ *     `nameFilter` parameter on `discoverModules`.
  */
 
 import { readdir } from 'node:fs/promises';
@@ -46,7 +49,7 @@ import { errorMessage, isEnoent } from './typeguards.js';
  * Discover the set of parallel top-level modules under
  * `<rootAbs>/<moduleRoot>/`. Returns sorted slugs (the directory
  * names). Throws on infra errors; returns an empty array when the
- * module-root does not exist (callers treat that as "no editors ->
+ * module-root does not exist (callers treat that as "no modules ->
  * matrix is empty").
  *
  * @param rootAbs Absolute path to the project root.
@@ -57,7 +60,7 @@ import { errorMessage, isEnoent } from './typeguards.js';
  *   suffix gate (e.g. the audiocontrol `-editor` convention) pass a
  *   custom filter.
  */
-export async function discoverEditors(
+export async function discoverModules(
   rootAbs: string,
   moduleRoot: string = 'src',
   nameFilter: (name: string) => boolean = () => true,
@@ -71,40 +74,40 @@ export async function discoverEditors(
     entries = await readdir(modulesRoot, { withFileTypes: true });
   } catch (err) {
     if (isEnoent(err)) return [];
-    throw new Error(`editors: cannot read ${modulesRoot}: ${errorMessage(err)}`);
+    throw new Error(`modules: cannot read ${modulesRoot}: ${errorMessage(err)}`);
   }
-  const editors: string[] = [];
+  const modules: string[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     if (entry.name.startsWith('.')) continue;
     if (!nameFilter(entry.name)) continue;
-    editors.push(entry.name);
+    modules.push(entry.name);
   }
-  editors.sort();
-  return editors;
+  modules.sort();
+  return modules;
 }
 
 /**
- * Bucket a repo-relative POSIX path to its owning editor module, if
- * any. A path under `<moduleRoot>/<editor>/...` returns `<editor>`
- * when `<editor>` is in `editors`; otherwise returns null.
+ * Bucket a repo-relative POSIX path to its owning module, if any.
+ * A path under `<moduleRoot>/<module>/...` returns `<module>` when
+ * `<module>` is in `modules`; otherwise returns null.
  *
  * Path-based bucketing rather than glob-based: a glob like
  * `src/{foo,bar}/...` covers two modules. The compiled regex matches
  * paths in either tree, and the matrix wants to surface BOTH columns.
  * Enumerating the matched files and bucketing by
- * `<moduleRoot>/<editor>/` prefix is the simplest correct answer.
+ * `<moduleRoot>/<module>/` prefix is the simplest correct answer.
  */
-export function editorForPath(
+export function moduleForPath(
   repoRelPath: string,
-  editors: readonly string[],
+  modules: readonly string[],
   moduleRoot: string = 'src',
 ): string | null {
   const segments = repoRelPath.split('/');
   if (segments.length < 2 || segments[0] !== moduleRoot) return null;
   const candidate = segments[1];
   if (candidate === undefined) return null;
-  return editors.includes(candidate) ? candidate : null;
+  return modules.includes(candidate) ? candidate : null;
 }
 
 /**
@@ -142,22 +145,22 @@ export function staticPrefixes(globPattern: string): readonly (readonly string[]
 }
 
 /**
- * Compute which editors a glob targets by inspecting the glob's
- * static directory prefix. An editor is targeted if either:
- *   (a) the prefix is `<moduleRoot>/<editor>/...` (matches the editor
+ * Compute which modules a glob targets by inspecting the glob's
+ * static directory prefix. A module is targeted if either:
+ *   (a) the prefix is `<moduleRoot>/<module>/...` (matches the module
  *       directory literally), or
  *   (b) the prefix is `<moduleRoot>` or shorter (the glob spans all
- *       editors via a wildcard in the editor-segment position).
+ *       modules via a wildcard in the module-segment position).
  *
- * Order of the returned slugs matches `editors`. Used by the matrix
- * to decide n/a vs ✗-with-zero cells: an editor not in the targeted
- * set gets a — cell; an editor in the targeted set with zero matching
+ * Order of the returned slugs matches `modules`. Used by the matrix
+ * to decide n/a vs ✗-with-zero cells: a module not in the targeted
+ * set gets a — cell; a module in the targeted set with zero matching
  * files gets a ✗ cell (the glob was supposed to find files in that
- * editor but didn't — possible regime drift).
+ * module but didn't — possible regime drift).
  */
-export function editorsTargetedByGlob(
+export function modulesTargetedByGlob(
   globPattern: string,
-  editors: readonly string[],
+  modules: readonly string[],
   moduleRoot: string = 'src',
 ): readonly string[] {
   const prefixes = staticPrefixes(globPattern);
@@ -165,26 +168,26 @@ export function editorsTargetedByGlob(
   for (const prefix of prefixes) {
     if (prefix.length === 0 || prefix[0] !== moduleRoot) {
       // The glob doesn't start with `<moduleRoot>/...`. Treat as
-      // spanning all editors (e.g., a hypothetical `lib/**`); the
-      // matrix is editor-scoped and the manifest authoring convention
-      // is `<moduleRoot>/<editor>/...`, so this is a misauthored
-      // glob, but we don't reject — we include every editor and let
+      // spanning all modules (e.g., a hypothetical `lib/**`); the
+      // matrix is module-scoped and the manifest authoring convention
+      // is `<moduleRoot>/<module>/...`, so this is a misauthored
+      // glob, but we don't reject — we include every module and let
       // the matched-file count decide ✗ vs ✓.
-      for (const e of editors) targeted.add(e);
+      for (const m of modules) targeted.add(m);
       continue;
     }
     if (prefix.length === 1) {
-      // Prefix is exactly `<moduleRoot>` — glob spans all editors.
-      for (const e of editors) targeted.add(e);
+      // Prefix is exactly `<moduleRoot>` — glob spans all modules.
+      for (const m of modules) targeted.add(m);
       continue;
     }
-    // Prefix is `<moduleRoot>/<X>/...` — X must be in the editor set.
+    // Prefix is `<moduleRoot>/<X>/...` — X must be in the module set.
     const candidate = prefix[1];
-    if (candidate !== undefined && editors.includes(candidate)) {
+    if (candidate !== undefined && modules.includes(candidate)) {
       targeted.add(candidate);
     }
   }
-  return editors.filter((e) => targeted.has(e));
+  return modules.filter((m) => targeted.has(m));
 }
 
 /**
@@ -201,11 +204,11 @@ function expandBraceAlternatives(pattern: string): readonly string[] {
     if (ch === '{') {
       const closeIndex = pattern.indexOf('}', i + 1);
       if (closeIndex === -1) {
-        throw new Error(`editors: unmatched '{' at index ${i} in "${pattern}"`);
+        throw new Error(`modules: unmatched '{' at index ${i} in "${pattern}"`);
       }
       const inner = pattern.substring(i + 1, closeIndex);
       if (inner.includes('{')) {
-        throw new Error(`editors: nested braces not supported in "${pattern}"`);
+        throw new Error(`modules: nested braces not supported in "${pattern}"`);
       }
       const parts = inner.split(',').map((s) => s.trim());
       const next: string[] = [];

@@ -21,8 +21,8 @@ import { readCloneDetectorOutput } from './discovery-agents/clone-detector-reade
 import { huntPrdThemes } from './discovery-agents/prd-themed-pattern-hunter.js';
 import { detectRegimeHoldouts } from './discovery-agents/regime-holdout-detector.js';
 import { checkAdopterManifests } from './discovery-agents/adopter-manifest-checker.js';
-import { computeMatrix } from './editor-symmetry-matrix.js';
-import { renderMatrix } from './editor-symmetry-report.js';
+import { computeMatrix } from './module-symmetry-matrix.js';
+import { renderMatrix } from './module-symmetry-report.js';
 import type {
   DiscoveryAgentFinding,
   DiscoveryAgentInput,
