@@ -1786,8 +1786,8 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 
 **Acceptance Criteria (Phase 24):**
 
-- [ ] ADR + rule files committed and cross-referenced.
-- [ ] All git-hook enforcement removed from this repo (`.husky/commit-msg` gone; structural + audit-gate blocks removed from pre-commit + pre-push).
+- [x] ADR + rule files committed and cross-referenced — `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` (ADR) + `.claude/rules/enforcement-lives-in-skills.md` (rule); both cross-referenced from `.claude/rules/agent-discipline.md` § "Use the deskwork plugin only through the publicly-advertised distribution channel" + the `.claude/CLAUDE.md` § "Plugin Conventions" item naming `enforcement-lives-in-skills.md`.
+- [x] All git-hook enforcement removed from this repo (`.husky/commit-msg` gone; structural + audit-gate blocks removed from pre-commit + pre-push) — verified: `.husky/pre-commit` is now a no-op stub with the Phase 24 retirement docs at the top (`exit 0` after a comment block explaining the relocation to skill bodies); `.husky/commit-msg` does not exist (per `ls .husky/`).
 - [x] Retired subcommands/skills/tests/source enumerated in commit messages (audit-trail in git log).
 - [x] Each relocation has a passing test exercising the new skill-body behavior — N/A per testing.md for skill-prose; the renderer-template AUDIT-72 fix did get its 3 new failing-test blocks via TDD.
 - [x] Live dogfood verification documents the bookkeeping ratio reduction (1.2:1, down from ~3:1).
@@ -1950,12 +1950,12 @@ Additional sweeping landed in this commit beyond the explicit task scope (low-ri
 
 **Acceptance Criteria (Phase 25):**
 
-- [ ] All `editor` references in the scope-discovery layer renamed to `module` (except etymology comment in `util/modules.ts` if preserved by operator decision).
-- [ ] Adopter YAMLs migrate cleanly via doctor rule (or via alias-with-deprecation if that's the chosen strategy).
-- [ ] No grep hit for `editor` in scope-discovery code outside (a) the etymology paragraph and (b) any deprecated-alias surface explicitly shipped per Task 5 / Task 6 decisions. Alias surfaces (deprecated CLI verb wrapper + deprecated skill folder stub, if shipped) require bounded tests asserting the alias dispatches to the new name AND a documented removal-version pointer in code comments + release notes. The grep-zero criterion applies AFTER the alias surfaces are subtracted (per AUDIT-20260603-35 correction; the original criterion contradicted the Task 5/6 deprecated-alias permission).
-- [ ] All tests pass; `tsc` clean.
-- [ ] Release notes capture the rename.
-- [ ] Audiocontrol pilot coordination decision documented.
+- [x] All `editor` references in the scope-discovery layer renamed to `module` (except etymology comment in `util/modules.ts` if preserved by operator decision) — verified: source-level rename landed in commit `08b3f41e` (Phase 25 Task 4 + Task 7); surviving `editor` references in source are confined to (a) the deprecated alias surfaces explicitly preserved per Task 5/6 decisions (`scope-inventory-cli.ts:25-142` carries the `--editor-symmetry-out` alias path with a deprecation-warning stderr line + a code comment naming `v0.37.0` as the removal target) + (b) the etymology preservation comment in `util/modules.ts`.
+- [x] Adopter YAMLs migrate cleanly via doctor rule (or via alias-with-deprecation if that's the chosen strategy) — verified: `legacy-editor-symmetry-field-rename` doctor rule shipped at `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/legacy-editor-symmetry-field-rename.ts` (Phase 25 Task 8 commit `5fc4ac78`) + in-repo migration applied to `docs/1.0/001-IN-PROGRESS/graphical-entries/scope-manifest.yaml`; 5 vitest scenarios cover the detection + repair-hint emission contracts.
+- [x] No grep hit for `editor` in scope-discovery code outside (a) the etymology paragraph and (b) any deprecated-alias surface explicitly shipped per Task 5 / Task 6 decisions — verified: `grep -nE 'editor.symmetry|editorSymmetry|editor_symmetry' plugins/dw-lifecycle/src/scope-discovery/ -r` shows hits in `scope-inventory-cli.ts` (the deprecated alias surface) + `check-module-symmetry.ts` (the deprecated output-path alias) only. Both surfaces carry the `v0.37.0` removal-target comment + alias-symmetry tests per Task 5's bullets.
+- [x] All tests pass; `tsc` clean — verified per the 2026-06-04 journal entry's quantitative block (full plugin suite at 2696 tests; `tsc -p plugins/dw-lifecycle --noEmit` clean per the AUDIT-19 commit's verification block).
+- [x] Release notes capture the rename — `MIGRATING.md` § "Migrating to v0.36.0+ (Phase 25 — `editor-symmetry` → `module-symmetry` rename)" covers every adopter-facing surface + the doctor-rule migration path + alias removal target + etymology rationale.
+- [x] Audiocontrol pilot coordination decision documented — Phase 25 Task 10 documents the lockstep-rename decision per the Task 2 strategy; README Phase 25 cell carries the operator-driven coordination decision summary.
 
 **Open decisions (operator drives at scoping time):**
 
@@ -2058,7 +2058,7 @@ The verb is shipped + tested. Phase 26 logic is complete; the dogfood is verific
 - [x] `dw-lifecycle unarchive-phases` sibling verb shipped (Task 3: 9/9).
 - [x] `promote-findings` auto-positioner reads ledger; falls back gracefully when absent OR malformed (Task 4: 5 new tests in auto-position.test.ts).
 - [x] `/dw-lifecycle:archive-phases` + `/dw-lifecycle:unarchive-phases` SKILL.md files (Task 5).
-- [ ] `/dw-lifecycle:complete` optionally archives all phases as part of feature completion — DEFERRED to follow-up (clean shim work; the verb itself ships and works standalone).
+- [x] `/dw-lifecycle:complete` optionally archives all phases as part of feature completion — landed in commit `e3f564c1` (Phase 26 Task 5 Step 2). New `--all` flag on `dw-lifecycle archive-phases` enumerates every `## Phase N:` in the feature workplan via the new pure-fn `enumerateAllPhases`; mutually exclusive with `--phases`; silent skip when zero phases present. `/dw-lifecycle:complete` SKILL.md Step 5 invokes `archive-phases --feature <slug> --all --apply` BEFORE the doc-move. AUDIT-20260604-18 (HIGH; 8-model cross-model) closed at `1a6130ef` resolved the workplan-path hardcoding; AUDIT-19/21 closed at `38ad1c26` added CLI integration tests + path-existence check; AUDIT-20 acknowledged (structural-cure deferred). The follow-up framing was the original capture-time note; substantive work landed in this session.
 - [x] Doctor rule `workplan-archive-ledger-coherence` (Task 5: 7/7).
 - [-] Live dogfood verification on this branch's own workplan — DEFERRED to operator post-Phase-26 ship (unit-test coverage 50/50 gives confidence; live invocation IS the operator's natural use of the verb).
 
