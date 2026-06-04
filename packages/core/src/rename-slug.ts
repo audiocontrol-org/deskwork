@@ -18,9 +18,48 @@
 import { existsSync, renameSync, writeFileSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DeskworkConfig } from './config.ts';
-import { resolveBlogPostDir, resolveCalendarPath } from './paths.ts';
+import { resolveCalendarPath } from './paths.ts';
 import { readCalendar, writeCalendar } from './calendar.ts';
-import { effectiveContentType } from './types.ts';
+import { readSidecarSync } from './sidecar/read.ts';
+import { writeSidecarSync } from './sidecar/write.ts';
+
+/**
+ * Detect a slug rename's filesystem shape from the entry's stored
+ * (POSIX, relative) `artifactPath` (Phase 39c-2b(a), spec AUDIT-36).
+ *
+ *   - `…/<slug>/index.md`  → move the per-post DIR `<base>/<slug>`
+ *   - `…/<slug>/README.md` → move the per-post DIR `<base>/<slug>`
+ *   - `…/<slug>.<ext>`     → move the FILE
+ *
+ * Returns the relative move source + target (dir or file) plus the new
+ * relative artifactPath. No naive slug-substring replacement — only the
+ * slug segment changes, never a same-named ancestor directory.
+ */
+function planArtifactMove(
+  artifactPath: string,
+  newSlug: string,
+): { fromRel: string; toRel: string; newArtifactRel: string } {
+  const segments = artifactPath.split('/');
+  const filename = segments[segments.length - 1];
+  const isDirLayout = filename === 'index.md' || filename === 'README.md';
+  if (isDirLayout) {
+    // <base>/<slug>/<filename> → move the <slug> dir.
+    const slugDirRel = segments.slice(0, -1).join('/'); // <base>/<slug>
+    const baseRel = segments.slice(0, -2).join('/'); // <base>
+    const toDirRel = baseRel === '' ? newSlug : `${baseRel}/${newSlug}`;
+    return {
+      fromRel: slugDirRel,
+      toRel: toDirRel,
+      newArtifactRel: `${toDirRel}/${filename}`,
+    };
+  }
+  // Flat: <base>/<slug>.<ext> → move the file.
+  const ext = filename.slice(filename.lastIndexOf('.'));
+  const baseRel = segments.slice(0, -1).join('/');
+  const toFileRel =
+    baseRel === '' ? `${newSlug}${ext}` : `${baseRel}/${newSlug}${ext}`;
+  return { fromRel: artifactPath, toRel: toFileRel, newArtifactRel: toFileRel };
+}
 
 export interface RenameSlugOptions {
   projectRoot: string;
@@ -117,37 +156,43 @@ export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
   }
 
   const actions: RenameSlugPlanAction[] = [];
-  const oldDir = resolveBlogPostDir(projectRoot, config, site, oldSlug);
-  const newDir = resolveBlogPostDir(projectRoot, config, site, newSlug);
 
-  // 1. Directory rename. Under the dir-based layout blog posts live as
-  //    `<contentDir>/<slug>/` with assets co-located, so a single mv
-  //    carries the markdown + co-located assets in one atomic
-  //    operation. For blog entries the directory must exist when the
-  //    layout is dir-based — if it's missing the calendar row has
-  //    drifted from disk and the operator needs to reconcile before
-  //    rename can proceed. Flat-file layouts (e.g.
-  //    `blogFilenameTemplate: "{slug}.md"`) don't have a per-post
-  //    directory; the rename is then calendar-only.
-  const isDirLayout = !siteCfg.blogFilenameTemplate || siteCfg.blogFilenameTemplate.includes('/');
-  const dirExists = existsSync(oldDir);
-  if (isDirLayout && !dirExists && effectiveContentType(entry) === 'blog') {
+  // 1. Move the artifact. Phase 39c-2b(a) / spec AUDIT-36: the move is
+  //    derived from the entry's STORED artifactPath (layout-detected) —
+  //    not a slug-template dir. For an index/README layout the per-post
+  //    DIR moves (carrying co-located assets in one mv); for a flat
+  //    layout the FILE moves. The sidecar's artifactPath is rewritten to
+  //    the new location. No naive slug-substring replacement.
+  const sidecar = readSidecarSync(projectRoot, entry.id);
+  if (sidecar.artifactPath === undefined) {
     throw new Error(
-      `calendar entry "${oldSlug}" is a blog post but no directory exists at ${oldDir}. ` +
-        `The calendar row has drifted from disk — reconcile the row's slug to match the actual ` +
-        `directory name, then re-run the rename against the real slug.`,
+      `entry "${oldSlug}" (${entry.id}) has no artifactPath — run ` +
+        `\`deskwork doctor --fix\` to backfill it before renaming.`,
     );
   }
-  if (dirExists) {
-    if (existsSync(newDir)) {
-      throw new Error(`target directory already exists: ${newDir}`);
-    }
-    actions.push({
-      kind: 'dir-rename',
-      summary: 'rename post directory',
-      details: `${oldDir}\n         → ${newDir}`,
+  const move = planArtifactMove(sidecar.artifactPath, newSlug);
+  const fromAbs = join(projectRoot, move.fromRel);
+  const toAbs = join(projectRoot, move.toRel);
+  if (!existsSync(fromAbs)) {
+    throw new Error(
+      `entry "${oldSlug}" artifactPath ${sidecar.artifactPath} does not exist on disk at ` +
+        `${fromAbs}. The calendar/sidecar has drifted from disk — reconcile before renaming.`,
+    );
+  }
+  if (existsSync(toAbs)) {
+    throw new Error(`target already exists: ${toAbs}`);
+  }
+  actions.push({
+    kind: 'dir-rename',
+    summary: 'move post artifact',
+    details: `${fromAbs}\n         → ${toAbs}`,
+  });
+  if (!dryRun) {
+    renameSync(fromAbs, toAbs);
+    writeSidecarSync(projectRoot, {
+      ...sidecar,
+      artifactPath: move.newArtifactRel,
     });
-    if (!dryRun) renameSync(oldDir, newDir);
   }
 
   // 2. Calendar entry slug change
