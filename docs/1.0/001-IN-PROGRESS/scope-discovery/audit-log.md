@@ -4397,7 +4397,7 @@ Fix: export `resolveFeatureDir` from `archive-phases.ts` and have the CLi's `--a
 ### AUDIT-20260604-19 — The "AUDIT-18 bug-repro" test exercises the library resolver, not the buggy CLI `--all` surface — it would pass against the pre-fix logic
 
 Finding-ID: AUDIT-20260604-19
-Status:     open
+Status:     fixed-38ad1c2602f3242ef2dca7082d43880032ca8a2c
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/workplan-archive/archive-phases.test.ts:48-124` vs. `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:113-130`
 
@@ -4408,7 +4408,7 @@ The consequence: the "bug-repro" test does not reproduce the bug. Run against pr
 ### AUDIT-20260604-20 — AUDIT-18's double-derivation of the feature dir was not eliminated — the fix arguably adds a third resolution pass
 
 Finding-ID: AUDIT-20260604-20
-Status:     open
+Status:     fixed-38ad1c2602f3242ef2dca7082d43880032ca8a2c
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:118-135` + `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:418-431`
 
@@ -4419,7 +4419,7 @@ This is low-cost at runtime (a handful of `stat` calls + a small file read), so 
 ### AUDIT-20260604-21 — `resolveFeatureWorkplanPath` returns a path without confirming `workplan.md` exists — the dir-exists-but-no-workplan case bypasses the friendly resolver error
 
 Finding-ID: AUDIT-20260604-21
-Status:     open
+Status:     fixed-38ad1c2602f3242ef2dca7082d43880032ca8a2c
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/archive-phases.ts:422-431` + `plugins/dw-lifecycle/src/subcommands/archive-phases.ts:118-135`
 
