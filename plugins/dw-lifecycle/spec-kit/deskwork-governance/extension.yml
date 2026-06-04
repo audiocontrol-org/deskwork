@@ -21,4 +21,8 @@ provides:
       file: commands/speckit.deskwork-governance.govern.md
       description: "Govern the just-implemented work: cross-model audit-barrage + lift findings"
 
-# hooks.after_implement is added in T009 (wired after the command + govern.sh exist)
+hooks:
+  after_implement:
+    command: speckit.deskwork-governance.govern
+    optional: false
+    description: "Run deskwork governance (cross-model audit-barrage + finding lift) over the implemented work"
