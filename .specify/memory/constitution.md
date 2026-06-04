@@ -1,50 +1,127 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: (uninitialized template) → 1.0.0
+- Ratification: initial adoption 2026-06-04
+- Principles defined (8):
+  I. Test-First (NON-NEGOTIABLE)
+  II. Integration-First, No Speculative Building
+  III. Branch on Capabilities, Never Provider Identity
+  IV. Division of Labor (provider intent / deskwork substrate + governance)
+  V. No Fallbacks, No Mock Data Outside Tests
+  VI. Strict Typing & Composition
+  VII. Commit & Push Early and Often
+  VIII. Faithful Tool Adoption
+- Added sections: Additional Constraints; Development Workflow & Quality Gates; Governance
+- Removed sections: none (template placeholders replaced)
+- Template alignment:
+  ✅ .specify/templates/plan-template.md — reviewed; generic Constitution Check slot is compatible
+  ✅ .specify/templates/spec-template.md — reviewed; no mandatory-section conflict
+  ✅ .specify/templates/tasks-template.md — reviewed; principle-driven task types (test-first) compatible
+- Follow-up TODOs: none
+-->
+
+# deskwork pluggable-lifecycle-providers Constitution
+
+This constitution governs the development of the `pluggable-lifecycle-providers` feature within the
+deskwork monorepo. It derives from deskwork's existing conventions (`.claude/CLAUDE.md`,
+`.claude/rules/`), the feature's `design.md`, and the operator directives set during the
+integration-first dogfood of GitHub Spec Kit. Where this constitution and deskwork's repo-level
+rules overlap, they are intended to agree; deskwork's rules remain authoritative for the wider repo.
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Test-First (NON-NEGOTIABLE)
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+TDD is mandatory: write a failing test, watch it fail for the expected reason, then write the
+minimal code to pass. Red-Green-Refactor is strictly enforced. Exploration spikes are permitted to
+discover shape, but a spike MUST be thrown away and rebuilt test-first — a spike is NEVER kept as
+"for now" production code. Rationale: tests written after implementation pass immediately and prove
+nothing; only a test seen failing first proves it tests the right thing.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Integration-First, No Speculative Building
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+Abstractions MUST be derived from real, concrete instances — never designed from a single imagined
+provider. A port or schema is only trusted once two concrete instances have flowed through it.
+Specs capture everything known or knowably implied; scoping is a SEPARATE, explicit, operator-driven
+pass. The agent MUST NOT insert unrequested scope cuts ("YAGNI", "deferred", "not in v1",
+scope-advisory tables). Rationale: designing the abstraction before a real instance is the standard
+way to build the wrong shape; capture-then-scope keeps the operator in control of scope.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Branch on Capabilities, Never Provider Identity
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+The differentiated back half (audit-barrage, the finding state machine, scope/clone/debt governance)
+MUST contain zero branches on which provider authored a plan. It branches only on a declared
+capability snapshot. Rationale: this is the load-bearing rule that makes a future provider cheap —
+a provider implementing the minimum contract works because deskwork fills the rest from capabilities,
+not from special-casing a provider name.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Division of Labor
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Providers own authoring intent: the source artifact is authoritative for INTENT and is never written
+to by deskwork. deskwork owns physical substrate (docs tree, branch, worktree), execution status, and
+governance, and is authoritative for PROGRESS. Projection is strictly one-way (provider artifact →
+normalized manifest); deskwork NEVER writes governance state back into a provider artifact. Rationale:
+the authority split — intent vs progress — is what dissolves the impedance mismatch; bidirectional
+sync reintroduces it.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. No Fallbacks, No Mock Data Outside Tests
+
+Outside test code, the system MUST NOT implement fallbacks or use mock data. Missing functionality or
+data MUST raise a descriptive error naming what is absent. Rationale: fallbacks and mock data hide
+unimplemented paths and become permanent bug factories; an error surfaces the gap immediately.
+
+### VI. Strict Typing & Composition
+
+Composition over inheritance; interface-first design across boundaries; dependency injection with
+interface types. No `any`, no `as Type`, no `@ts-ignore`. Source files stay within 300–500 lines;
+larger files MUST be refactored for modularity. Use the package's established import conventions.
+Rationale: typing discipline and small modules keep the differentiated back half auditable as it
+grows.
+
+### VII. Commit & Push Early and Often
+
+Work is committed and pushed frequently, one logical change per commit, with descriptive messages.
+Commit messages and PR descriptions carry NO AI/Claude attribution. A wrong commit stays small and
+cheap to revert when commits are atomic. Rationale: small, frequent, pushed commits minimize lost
+work and keep the branch reviewable.
+
+### VIII. Faithful Tool Adoption
+
+When evaluating or living with an adopted tool's workflow (here, Spec Kit's
+constitution → specify → clarify → plan → checklist → tasks → analyze → implement), follow its
+prescribed steps IN ORDER. Do not skip steps or off-road, even when a step seems optional or
+redundant. Rationale: the purpose of adoption is to learn the tool's intended lived experience;
+off-roading produces knowledge of a workflow the tool does not actually prescribe.
+
+## Additional Constraints
+
+- The `lifecycle-manifest` is the port between authoring and governance. Its task spine is a flat,
+  top-level collection; phases (when present) are a thin overlay referencing tasks by id.
+- Enforcement discipline lives in skill bodies and CLI verbs, never in git hooks the adopter does not
+  receive from installing the plugin.
+- Provider/version pinning is treated as one unit; a version change is a recorded event, never a
+  silent drift.
+
+## Development Workflow & Quality Gates
+
+- Pre-implementation: the relevant design/spec is read and the applicable principle is cited before
+  code is written.
+- Findings from audits are scoped into the plan (not deferred via code comments); a fix follows TDD
+  (a test exercising the defect is written before the fix).
+- Pre-commit hooks are never bypassed; issues are fixed rather than skipped.
+- Closure requires verification in a formally-installed release; the agent posts evidence, the
+  operator decides closure.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes ad-hoc practice for this feature's development. Amendments require: a
+written rationale, a version bump per the policy below, and propagation to dependent Spec Kit
+templates in the same change. Compliance is checked at planning (`/speckit-plan` Constitution Check)
+and review; complexity that violates a principle MUST be justified in writing or removed.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+Versioning policy (semantic):
+- MAJOR: backward-incompatible governance/principle removal or redefinition.
+- MINOR: a new principle/section added or materially expanded guidance.
+- PATCH: clarifications, wording, non-semantic refinements.
+
+**Version**: 1.0.0 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-04
