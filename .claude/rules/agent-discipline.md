@@ -152,6 +152,20 @@ No issue closes until its fix is verified in a **formally-installed release** �
 
 **Marketplace-clone script contract (sub-rule):** once a `~/.claude/plugins/marketplaces/deskwork/scripts/<name>.sh` is documented for adopters (e.g. wired into a SessionStart hook), its **path, name, flag set, and exit-code contract become a frozen adopter contract** — never rename/remove; add an alias or no-op instead (e.g. `--dry-run` aliases `--check`). The same applies to documented CLI subcommands.
 
+## Push early and often
+
+After every commit on a feature branch, push to `origin/<branch>`. Don't batch pushes until session-end or PR-ship time.
+
+**Why:** *"push early and often"* — operator directive 2026-06-04. A worktree that gets dismantled before push silently loses the unpushed commits. Pushing protects the work, makes mid-session collaboration possible (operator can pull from another machine), and turns every commit into a recoverable checkpoint. The cost is ~1s per push; the cost of losing a session's commits is hours.
+
+**How to apply:**
+- After each task-completion commit (i.e. inside the `/dw-lifecycle:implement` loop, post-Step 6 chain): `git push origin <branch>`.
+- After end-of-task bookkeeping commits (audit-flips, etc.): push.
+- After every chore/docs commit: push.
+- After session-end's documentation commit: push.
+- The only time NOT to push is when the branch has unresolved local conflicts or pre-commit/pre-push hooks failing — in which case fix the underlying state, don't bypass the hook (per the existing `Never bypass pre-commit/pre-push hooks` rule).
+- Force-push is still operator-authorized only — `push early and often` is about normal fast-forward pushes, not the destructive variety.
+
 ## Closure is a structural step, not aspirational
 
 A feature's lifecycle has two halves — shipping and closing — and only shipping has natural momentum. The hygiene-skill family mechanizes closure so it fires at the same cadence as ship-work. The load-bearing contract (shared with "Issue closure requires verification…" above): **the agent posts evidence; the operator decides.** The agent that shipped a fix is the wrong party to judge whether it matches the operator's lived experience of the bug.

@@ -32,6 +32,7 @@
  *   2 = infra error.
  */
 
+import { realpathSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,6 +48,7 @@ import {
   reportJson,
   reportText,
 } from './adopter-manifests-report.js';
+import { FeatureNotFoundError, resolveFeatureScope } from './resolve-feature-scope.js';
 import { listFilesMatching, toPosix } from './util/glob.js';
 import { errorMessage } from './util/typeguards.js';
 
@@ -77,6 +79,13 @@ export interface CliOptions {
    * can run the scanner ad-hoc without their session being terminated.
    */
   readonly gateMode: boolean;
+  /**
+   * Phase 18: per-feature narrowing slug. When set, the holdout check
+   * runs ONLY against feature-scope files (per resolveFeatureScope's
+   * hybrid scope-manifest-or-git-diff source). Mutually exclusive with
+   * `--root`. Refs #417.
+   */
+  readonly feature: string | null;
 }
 
 // Re-export shared types so the validator can import everything from
@@ -90,9 +99,11 @@ export type { ManifestResult, ScanResult } from './adopter-manifests-report.js';
 export function parseCli(argv: readonly string[]): CliOptions {
   let registryPath = DEFAULT_REGISTRY;
   let scanRoot = DEFAULT_ROOT;
+  let rootExplicit = false;
   let quiet = false;
   let json = false;
   let gateMode = false;
+  let feature: string | null = null;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
@@ -107,6 +118,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
         const next = argv[i + 1];
         if (next === undefined) throw new Error('--root requires a path argument');
         scanRoot = next;
+        rootExplicit = true;
         i += 1;
         break;
       }
@@ -119,6 +131,13 @@ export function parseCli(argv: readonly string[]): CliOptions {
       case '--gate-mode':
         gateMode = true;
         break;
+      case '--feature': {
+        const next = argv[i + 1];
+        if (next === undefined) throw new Error('--feature requires a slug argument');
+        feature = next;
+        i += 1;
+        break;
+      }
       case '--help':
       case '-h':
         printHelp();
@@ -128,7 +147,14 @@ export function parseCli(argv: readonly string[]): CliOptions {
         throw new Error(`unknown argument: ${arg}`);
     }
   }
-  return { registryPath, scanRoot, quiet, json, gateMode };
+  if (feature !== null && rootExplicit) {
+    throw new Error(
+      '--feature and --root are mutually exclusive: --feature narrows the scan to ' +
+        "the feature's scope-manifest (or git-diff fallback); --root scans a fixed " +
+        'directory tree. Pass one or the other, not both.',
+    );
+  }
+  return { registryPath, scanRoot, quiet, json, gateMode, feature };
 }
 
 function printHelp(): void {
@@ -202,7 +228,10 @@ function escapeRegex(s: string): string {
 // Top-level scan
 // ---------------------------------------------------------------------------
 
-export async function scan(opts: CliOptions): Promise<ScanResult> {
+export async function scan(
+  opts: CliOptions,
+  featureScope?: ReadonlySet<string>,
+): Promise<ScanResult> {
   const registry = await loadRegistry(opts.registryPath);
   // filter to actively-enforced entries only.
   // Entries with `status: pending | ignore | tracked-holdout | withdrawn`
@@ -217,7 +246,7 @@ export async function scan(opts: CliOptions): Promise<ScanResult> {
   const visited = new Set<string>();
   const manifests: ManifestResult[] = [];
   for (const entry of activeEntries) {
-    const result = await scanEntry(entry, rootAbs, visited);
+    const result = await scanEntry(entry, rootAbs, visited, featureScope);
     manifests.push(result);
   }
   return {
@@ -231,9 +260,17 @@ async function scanEntry(
   entry: AdopterManifestEntry,
   rootAbs: string,
   visited: Set<string>,
+  featureScope?: ReadonlySet<string>,
 ): Promise<ManifestResult> {
   const regexes = entry.globs.map((g) => g.regex);
-  const matched = await listFilesMatching(rootAbs, regexes, SKIP_DIRS, SCANNED_EXTENSIONS);
+  let matched = await listFilesMatching(rootAbs, regexes, SKIP_DIRS, SCANNED_EXTENSIONS);
+  // Phase 18: when --feature is set, narrow the matched files to
+  // those in feature scope. `featureScope` is a set of absolute paths
+  // (realpath-normalized in main()); each `matched` is already an
+  // absolute path so set membership is straightforward.
+  if (featureScope !== undefined) {
+    matched = matched.filter((abs) => featureScope.has(abs));
+  }
   const importRe = buildImportRegex(entry.from);
   const expectedFiles: string[] = [];
   const actualAdopters: string[] = [];
@@ -313,9 +350,41 @@ export async function main(argv: readonly string[]): Promise<number> {
     process.stderr.write(`adopter-manifests: ${errorMessage(err)}\n`);
     return 2;
   }
+  // Phase 18: --feature narrows the holdout check to feature scope.
+  // Resolve scope upfront and pass the absolute-path set to scan().
+  let featureScope: ReadonlySet<string> | undefined;
+  if (opts.feature !== null) {
+    const repoRoot = process.cwd();
+    let canonRepo = repoRoot;
+    try {
+      canonRepo = realpathSync(repoRoot);
+    } catch {
+      /* keep raw */
+    }
+    try {
+      const scope = await resolveFeatureScope({ slug: opts.feature, repoRoot });
+      featureScope = new Set(
+        scope.files.map((f) => {
+          const abs = resolve(canonRepo, f);
+          try {
+            return realpathSync(abs);
+          } catch {
+            return abs;
+          }
+        }),
+      );
+    } catch (err) {
+      if (err instanceof FeatureNotFoundError) {
+        process.stderr.write(`adopter-manifests: ${err.message}\n`);
+        return 2;
+      }
+      process.stderr.write(`adopter-manifests: ${errorMessage(err)}\n`);
+      return 2;
+    }
+  }
   let result: ScanResult;
   try {
-    result = await scan(opts);
+    result = await scan(opts, featureScope);
   } catch (err) {
     process.stderr.write(`adopter-manifests: ${errorMessage(err)}\n`);
     return 2;
