@@ -144,4 +144,32 @@ describe('renameSlug — 39c-2b(a) artifactPath layout detection (AUDIT-36)', ()
       renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'no-sidecar', newSlug: 'renamed' }),
     ).toThrow(/doctor --fix/);
   });
+
+  it('propagates the corrupt-sidecar diagnosis instead of misreporting it as "no sidecar" (AUDIT-20260604-05)', () => {
+    // Sidecar file EXISTS but is invalid JSON. A bare catch would flatten
+    // this into the "no sidecar on disk" message, sending the operator to
+    // the wrong remedy. The corrupt-content diagnosis must survive.
+    writeCalendar(join(root, '.deskwork', 'calendar.md'), {
+      entries: [
+        {
+          id: UUID,
+          slug: 'corrupt',
+          title: 'Corrupt',
+          description: '',
+          stage: 'Drafting',
+          targetKeywords: [],
+          source: 'manual',
+        },
+      ],
+      distributions: [],
+    });
+    writeFileSync(join(root, '.deskwork', 'entries', `${UUID}.json`), '{ not valid json', 'utf-8');
+
+    expect(() =>
+      renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'corrupt', newSlug: 'renamed' }),
+    ).toThrow(/invalid/i);
+    expect(() =>
+      renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'corrupt', newSlug: 'renamed' }),
+    ).not.toThrow(/no sidecar on disk/);
+  });
 });

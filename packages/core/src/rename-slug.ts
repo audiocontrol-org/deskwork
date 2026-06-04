@@ -22,6 +22,7 @@ import { resolveCalendarPath } from './paths.ts';
 import { readCalendar, writeCalendar } from './calendar.ts';
 import { readSidecarSync } from './sidecar/read.ts';
 import { writeSidecarSync } from './sidecar/write.ts';
+import { sidecarPath } from './sidecar/paths.ts';
 
 /**
  * Detect a slug rename's filesystem shape from the entry's stored
@@ -166,10 +167,18 @@ export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
   // AUDIT-20260604-02: an entry with a calendar row but no sidecar file is
   // a drift case like any other — surface the actionable doctor --fix
   // guidance, not the raw `sidecar not found` ENOENT from readSidecarSync.
+  // AUDIT-20260604-05: distinguish a MISSING sidecar (file absent) from a
+  // CORRUPT one (file present but invalid JSON/schema). A bare catch would
+  // misreport corruption as "no sidecar on disk" and send the operator to
+  // the wrong remedy — re-throw readSidecarSync's accurate diagnosis when
+  // the file actually exists.
   let sidecar;
   try {
     sidecar = readSidecarSync(projectRoot, entry.id);
-  } catch {
+  } catch (err) {
+    if (existsSync(sidecarPath(projectRoot, entry.id))) {
+      throw err;
+    }
     throw new Error(
       `entry "${oldSlug}" (${entry.id}) has a calendar row but no sidecar on ` +
         `disk — run \`deskwork doctor --fix\` to reconcile before renaming.`,

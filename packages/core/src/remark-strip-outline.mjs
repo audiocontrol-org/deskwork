@@ -11,9 +11,8 @@
  *
  * Stripping shape: find the first H2 whose text starts with "Outline",
  * then remove that heading plus every subsequent top-level node until
- * the next H1 or H2 (non-inclusive) or the end of the document. Matches
- * the line-based stripper in `body-state.ts`; kept independent here
- * because mdast traversal beats regex on structured content.
+ * the next H1 or H2 (non-inclusive) or the end of the document. Uses
+ * mdast traversal (beats regex on structured content).
  *
  * No-op when the document has no outline section.
  */
