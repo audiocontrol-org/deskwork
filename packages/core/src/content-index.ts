@@ -331,6 +331,24 @@ function collectLaneScaffoldDirs(projectRoot: string): string[] {
 }
 
 /**
+ * The studio content-browser discovery roots (Phase 39c, c5 — sites→lanes
+ * retirement, Decision #21): the de-duplicated, SORTED union of every
+ * configured lane's `scaffoldDefaults` directories, resolved to absolute
+ * paths. Reuses the doctor's `collectLaneScaffoldDirs` pattern so the
+ * content browser walks the same add-time content roots the sidecar index
+ * already discovers — introducing no new "location-as-key" coupling
+ * (`scaffoldDefaults` stays a convenience/discovery field per Decision #5;
+ * per-entry resolution remains `entry.artifactPath` only).
+ *
+ * Archived lanes are included (matching the doctor's discovery) so content
+ * under a lane that was later archived stays visible in the browser.
+ * Malformed lane files are skipped (other doctor rules surface those).
+ */
+export function collectContentRoots(projectRoot: string): string[] {
+  return collectLaneScaffoldDirs(projectRoot).sort();
+}
+
+/**
  * The discovery roots for the sidecar-driven content index (Phase 39c):
  * the union of (a) every entry's resolved artifact DIRECTORY and (b)
  * every lane's `scaffoldDefaults` directory. (a) finds bound content;
