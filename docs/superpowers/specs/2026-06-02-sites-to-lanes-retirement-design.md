@@ -173,6 +173,49 @@ The per-kind legal-layout matrix was part of the (now-reverted) kind-aware attem
 
 This finding flagged that Decision #12 (global `index` default) wasn't marked superseded by the (kind-aware) #16. With the kind-aware attempt reverted, **#12 is restored as operative** and #16 is struck — so the `DEFAULT_SCAFFOLD_LAYOUT` docblock correctly cites #12 again. No drift remains.
 
+## 39c-2b(c5) terminal-deletion design pass (2026-06-04)
+
+The terminal deletion of `resolveSite` / `siteConfig` / `resolveContentDir` / `config.sites` / `SiteConfig` was blocked by three entangled surfaces the earlier passes mapped but did not resolve: the studio content **browser** (c5 headline), the review-workflow **`site` keying** (c3), and **`rename-slug` redirects** (c4). This section resolves all three so the deletion can land. The doctor's orphan/duplicate detection is **already migrated** (`doctor/runner.ts` builds `ctx.index` via `buildContentIndexFromSidecars`, which unions sidecar `artifactPath` directories with `collectLaneScaffoldDirs`); it is NOT part of this gap.
+
+### c5 — Studio content browser enumeration
+
+The studio content browser (`/dev/content`, `/dev/content/:site`, `/dev/content/:site/:project`) renders a **hierarchical** tree via `buildContentTree` → `defaultFsWalk`, today rooted at `resolveContentDir(projectRoot, config, site)` = `config.sites[site].contentDir`. A flat sidecar index (the doctor's `buildContentIndexFromSidecars`) cannot reproduce a hierarchy that includes empty organizational container directories and untracked subdirectories.
+
+**Decision (operator, 2026-06-04): re-root the existing recursive walk at the union of lane `scaffoldDefaults` directories** (chosen over a sidecar-index projection and a calendar-only projection). `defaultFsWalk` keeps its recursive filesystem walk — so organizational/untracked nodes, orphan files, and ghost nodes (calendar entries with no fs dir) all stay visible in the browser — but its root set becomes `⋃ lane.scaffoldDefaults[*]` across all configured lanes instead of a single per-site `contentDir`.
+
+This reuses the **same scaffoldDefaults-as-discovery-root pattern the doctor already ships** (`collectLaneScaffoldDirs`), so it introduces no new "location-as-key" coupling: `scaffoldDefaults` remains a convenience/discovery field per Decision #5, never per-entry resolution (which stays `entry.artifactPath` only). The only behavior lost vs. today is visibility of content created **outside** any lane scaffold root — an edge case the sidecar index already does not cover, and one an operator resolves by adding the directory to a lane's `scaffoldDefaults` or tracking the entry.
+
+**Mechanics:**
+- New core helper `collectContentRoots(projectRoot)` (or extend `content-tree`'s input) returns the de-duplicated union of every lane's `scaffoldDefaults` values, resolved to absolute paths.
+- `buildContentTree` and `defaultFsWalk` drop their `site` parameter and `config`-derived `contentDir`; they walk each root in `collectContentRoots(...)` and merge the results into one tree. The `byPath`/path-hint base becomes projectRoot-relative (matching `entry.artifactPath`'s base, consistent with `buildContentIndexFromSidecars`).
+- The 3 studio routes drop the `:site` path segment dependency for enumeration. Route shape change: `/dev/content/:site/...` collapses to `/dev/content/:project{.+}` (single project, single tree). The per-site overview and top-level overview merge into one page.
+- Display-only `resolveContentDir` callers (`content.ts:495` path hints, `content-detail.ts:224` organizational-README lookup, the scrapbook-dir fallbacks in `scrapbook/paths.ts`, `content-detail.ts:146`, `review-scrapbook-drawer.ts:67`) re-base on the owning content root from `collectContentRoots(...)` (the root that contains the node's path) rather than `config.sites[site].contentDir`.
+- `ingest`'s scrapbook-skip root (`ingest.ts:130`) walks/excludes a `scrapbook` dir under each content root rather than under a single `contentDir`.
+
+### c3 — Review-workflow keying (`workflow.site`)
+
+Persisted review workflows carry `site: string` (`review/pipeline.ts`), used to (a) validate `site in config.sites`, (b) key/dedup workflows by `(site, slug)`, and (c) bucket the review report by site (`report.ts` `bySite`). Under entry-owns-location there are no sites to validate against and `(site, slug)` is no longer a stable key.
+
+**Decision: workflows key on the entry, not `(site, slug)`.** Resolution:
+- The `site in config.sites` validation in `start-handlers.ts` / `handlers.ts` is **removed** (no sites to check). An unknown/absent entry is surfaced via the existing entry-lookup `404`, not a site-membership check.
+- Workflow identity/dedup keys on the entry's **`id`** (the `entryId` lookup path already exists — `render.ts:75`). The `(site, slug)` match expressions (`pipeline.ts:147`, `start-handlers.ts:92,227`) switch to `entryId` equality; `slug` stays as a human label, not a key.
+- `workflow.site` is **re-homed to `workflow.lane`** (derived from the entry's `lane`) for the report breakdown (`report.ts` `bySite` → `byLane`), matching the per-lane dashboards graphical-entries already shipped. Persisted legacy workflows carrying `site` are read tolerantly (the field is ignored for resolution; the lane is derived from the entry) — consistent with §"Tolerated reads."
+- This is forced by the model (no fork): removing `sites` leaves no site axis, and the entry is the only stable identity. The lane is the natural successor to `site` for *grouping* (not resolution).
+
+### c4 — `rename-slug` redirects (`redirectsPath`)
+
+`rename-slug.ts` appends a 301 redirect block to a site's Netlify-style `_redirects` file, sourced from `SiteConfig.redirectsPath` via the `siteEntry(config, site)` helper. `redirectsPath` is **website-publishing metadata** — it only matters when the collection is published as a website, exactly the class of field Decision #2 moved (`host`).
+
+**Decision: `redirectsPath` re-homes onto the lane**, an optional sibling of `lane.host` (`LaneConfig.redirectsPath?: string`). Resolution:
+- `rename-slug` resolves the renamed entry's **lane**, reads `lane.redirectsPath`, and appends the 301 block there. When the lane has no `redirectsPath`, the redirect-append step is skipped (already the unset behavior).
+- The `siteEntry(config, site)` helper + its `site in config.sites` guard are deleted with `sites`.
+- The migration (39b/39e) carries each legacy `site.redirectsPath` onto the lane created from that site, alongside `host` (Decision #2 / Migration step 1).
+- Mirrors Decision #2 (publish-target metadata belongs on the lane that publishes); spec-derived, no fork.
+
+### Terminal-deletion completion check (updated)
+
+After c5/c3/c4 land, zero references to `resolveSite` / `siteConfig` / `resolveContentDir` / `config.sites` / `SiteConfig` / `siteEntry` / `redirectsPath`-on-SiteConfig remain outside the 39b migration reader (`legacy-config.ts`). The AUDIT-38 roster is extended with: `review/{pipeline,handlers,start-handlers,report,render}.ts` (c3), `rename-slug.ts` `siteEntry`/`redirectsPath` (c4), and `content-tree.ts` / `content-tree-fs-walk.ts` / studio `pages/content*.ts` (c5).
+
 ## Decisions log
 
 | # | Decision | Rationale |
@@ -197,6 +240,9 @@ This finding flagged that Decision #12 (global `index` default) wasn't marked su
 | 18 | `artifactPath` composed with forward-slash join, never `node:path.join` | AUDIT-40: persisted path must be POSIX-separated for cross-OS string-equality. |
 | 19 | Custom `blogFilenameTemplate` migrates to a layout; unmappable shapes halt the migration | AUDIT-37: prevents a silent layout regression for custom-template adopters. |
 | 20 | `shortform-start` (+ shortform approve/iterate) is a create-verb composing from the parent entry's `artifactPath` dir; `rename-slug` derives the new path by layout detection | AUDIT-35/36: both were under-mapped by the two-bucket split. |
+| 21 | Studio content browser re-roots `defaultFsWalk` at the union of lane `scaffoldDefaults` dirs (not a sidecar-index or calendar-only projection) | Operator 2026-06-04. Behavior-preserving (hierarchy + orphan/organizational visibility retained); reuses the doctor's `collectLaneScaffoldDirs` discovery pattern, so no new location-as-key (Decision #5 holds). |
+| 22 | Review workflows key on `entry.id`, not `(site, slug)`; `site` validation drops; `workflow.site` → `workflow.lane` for report breakdowns | Forced by the model: no `sites` axis remains; the entry is the only stable identity; lane is the grouping successor (matches graphical-entries per-lane dashboards). |
+| 23 | `redirectsPath` re-homes from `SiteConfig` onto `LaneConfig` (optional), alongside `host` | Mirrors Decision #2 — publish-target metadata belongs on the lane that publishes; migration carries legacy `site.redirectsPath` onto the lane. |
 
 ## The paused release (§9 cross-ref)
 
