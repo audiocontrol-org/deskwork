@@ -97,22 +97,39 @@ All three CLIs handle auth themselves; the plugin does NOT store or rotate crede
 
 ## Phase 19 — `{{prompt-stdin}}` opt-in (GH #386)
 
-As of Phase 19 (post-v0.32.0), `args_template` accepts an alternative placeholder `{{prompt-stdin}}` that signals the spawn helper to deliver the rendered prompt via `child.stdin` instead of substituting it into argv. The argv-substitution path (`{{prompt}}`) remains the working-code default and is what the plugin-shipped config uses.
+As of Phase 19 (post-v0.32.0), `args_template` accepts an alternative placeholder `{{prompt-stdin}}` that signals the spawn helper to deliver the rendered prompt via `child.stdin` instead of substituting it into argv. The argv-substitution path (`{{prompt}}`) remains supported for back-compat; the placeholders are mutually exclusive per entry.
 
 **When to switch a model to `{{prompt-stdin}}`:** the orchestrator's prompt has grown past the OS `ARG_MAX` ceiling (macOS: ~256KB), making argv-delivery fail at spawn time with `spawn ENAMETOOLONG` / `E2BIG`. The stdin path bypasses `ARG_MAX` since the prompt no longer needs to fit in the argv block.
 
-**Per-CLI compatibility:** all three CLIs (`claude`, `codex`, `gemini`) emit a "reading additional input from stdin" or equivalent message when launched with stdin open. That behavior is consistent with reading the prompt off stdin instead of argv, but **live verification per CLI is still required** before flipping the plugin-default config to the stdin variant. Operators who hit `E2BIG` today can switch their `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` override per model:
+**Per-CLI compatibility:** all three CLIs (`claude`, `codex`, `gemini`) emit a "reading additional input from stdin" or equivalent message when launched with stdin open. That behavior is consistent with reading the prompt off stdin instead of argv.
+
+Constraint: `{{prompt}}` and `{{prompt-stdin}}` are mutually exclusive per entry — the spawn helper picks the delivery path off the placeholder. A template carrying both is rejected at config-load time.
+
+## Phase 12 Task 8 — `{{prompt-stdin}}` becomes the default (GH #397, v0.37.0)
+
+The Phase 19 opt-in is now the plugin-shipped default. The default model battery in `plugins/dw-lifecycle/templates/audit-barrage-config.yaml` ships with `{{prompt-stdin}}` for all three CLIs:
 
 ```yaml
 models:
   - name: claude
     binary: claude
-    # was: "-p {{prompt}}"
     args_template: "-p {{prompt-stdin}}"
+    timeout_seconds: 300
+  - name: codex
+    binary: codex
+    args_template: "exec {{prompt-stdin}}"
+    timeout_seconds: 300
+  - name: gemini
+    binary: gemini
+    args_template: "{{prompt-stdin}}"
     timeout_seconds: 300
 ```
 
-Constraint: `{{prompt}}` and `{{prompt-stdin}}` are mutually exclusive per entry — the spawn helper picks the delivery path off the placeholder. A template carrying both is rejected at config-load time.
+**Why the default flipped:** the audit prompt embeds the full feature diff; on a fresh scope-discovery opt-in `implement-hook` defaults the range to `HEAD~10..HEAD`. On most feature branches that diff exceeds the per-arg OS limit, and the prior argv default failed with `spawn E2BIG`. The hook then forward-progressed silently (`barrage-outage` text), so the loop continued but no model actually audited the work. Issue #397 names the failure mode in full.
+
+**Structured E2BIG classifier:** when an adopter still hits `spawn E2BIG` (e.g. they kept their pre-v0.37.0 override pointing at `{{prompt}}`), `spawn-cli.ts` now emits a structured classifier message naming the byte count, the migration path (`{{prompt-stdin}}`), the issue (#397), and `MIGRATING.md`. The previous behavior — `spawnError: 'spawn E2BIG'` with no migration cue — was technically correct but adopter-hostile; the new message lets an operator fix the override without reading source.
+
+**Back-compat:** the `{{prompt}}` argv path is unchanged for small payloads. Existing override configs that explicitly customized to `{{prompt}}` continue to work below the OS limit; they fail loud with the structured classifier above the limit. See `MIGRATING.md` § "Migrating to v0.37.0+" for the recommended migration.
 
 ## Open items for downstream tasks
 

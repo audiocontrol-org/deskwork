@@ -4590,10 +4590,82 @@ There's a defensible counter — AUDIT-31 is *newly filed* in this commit by the
 ### AUDIT-20260604-34 — AUDIT-BARRAGE-claude-05 — AUDIT-29's "9-skill picker gap" is reconciled by authoring "10" command entries; the off-by-one isn't explained and the skill/command totals still don't close
 
 Finding-ID: AUDIT-20260604-34
-Status:     acknowledged-slush-pile-2026-06-04
+Status:     fixed-4d8c083f
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/__tests__/shortcuts.test.ts:101-111` (the 10 hygiene-family entries added to `META_COMMANDS`) vs. AUDIT-29's cited counts (50 skill folders − 41 command entries = 9-skill gap)
 
 AUDIT-29 (marked `fixed-972d8dba` in this same diff) established the gap arithmetically: **50 skill folders, 41 command entries → 9 skills undiscoverable.** The remediation, per the new test comment (line 101-104), is that commit `972d8dba` "Authored … to close AUDIT-20260604-29's picker-discoverability gap," and this diff adds **10** hygiene-family verbs to the `META_COMMANDS` allowlist. Nine missing, ten added — the numbers don't reconcile, and nothing in the diff explains the off-by-one (was a 10th skill also missing? was one of the 10 already present?). If `commands/` went 41 → 51 against 50 skill folders, there is now either a surplus command entry or the original 50/41 count was itself off.
 
 This matters because AUDIT-29 was flipped to `fixed-<sha>` partly on the strength of these counts; a `fixed-` flip should rest on arithmetic that closes. Per the project's own `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions (AUDIT-04)," derived counts must reconcile or the line should be omitted. Fix: state the post-fix totals explicitly (e.g., "commands/ now 41 → 51; skills 50 → 51 after adding `unarchive-phases`'s command shim" — whatever the real ledger is) so a reader can verify all skills are now picker-resolvable rather than trusting a 9-vs-10 hand-wave.
+
+## 2026-06-04 — audit-barrage lift (20260604T160450496Z-scope-discovery)
+
+### AUDIT-20260604-35 — `Closes #NNN` trailers prescribed for all 8 new fix-tasks auto-close issues on merge, contradicting the project's issue-closure rule
+
+Finding-ID: AUDIT-20260604-35
+Status:     acknowledged-prose-updated-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 40 ("commit with `Closes #411` trailer"), Task 41 (`Closes #412`), Task 42 (`Closes #366`), Task 43 (`Closes #350`), Task 44 (`Closes #297`), Task 45 (`Closes #413`), Task 8 (`Closes #397`), Task 9 (`Closes #396`)
+
+Every one of the 8 new fix-task blocks instructs the implementer to "commit with `Closes #N` trailer" (Step 4 of each). A `Closes #N` git trailer on a commit auto-closes the GitHub issue when the branch lands on the default branch. The journal in this same diff records that PR #410 was delivered as a **96-commit merge commit** (`9cd694ef`, not a squash), so branch-commit trailers reach `main` verbatim and will trigger GitHub's auto-close.
+
+This directly conflicts with the project's `Issue closure requires verification in a formally-installed release` rule (`agent-discipline.md`): *"the agent posts evidence, never closes … The closing transition is the operator's call."* It also contradicts each task's own acceptance criterion — e.g. Task 8 lists `[ ] Closure transition (gh issue close 397) is the operator's call` while Step 4 prescribes a `Closes #397` trailer. You cannot both leave closure to the operator and embed a trailer that auto-closes on merge. Task 8 has already marked Step 4 `[x]`, and the visible fix commit (`fix(audit-barrage): catch E2BIG…`) is the #397 fix.
+
+Fix: replace every prescribed `Closes #N` with `Refs #N` / `Part of #N` (no auto-close verb) across all 8 task blocks, so the operator retains the post-release closing transition. If any branch commit already carries a `Closes #397/#396/#411…` trailer, note that the merge will auto-close those issues and the operator must reopen-then-verify per the rule.
+
+### AUDIT-20260604-36 — AUDIT-34 left `acknowledged-slush-pile` while its substance (the 9-vs-10 off-by-one) is resolved in this same diff — the recurring mislabel AUDIT-31/33 already named
+
+Finding-ID: AUDIT-20260604-36
+Status:     acknowledged-flipped-audit-34-to-fixed-4d8c083f-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4589-4599` (AUDIT-34 block, `Status: acknowledged-slush-pile-2026-06-04`) vs. `workplan-archive.md` Phase 7 acceptance criterion (the reconciled-totals prose)
+
+AUDIT-34's ask was explicit: "state the post-fix totals explicitly … so a reader can verify all skills are now picker-resolvable rather than trusting a 9-vs-10 hand-wave." This diff **does exactly that** — the archived Phase 7 acceptance criterion now reads "50 skill folders … all 50 have a corresponding entry … `commands/` now ships **51 entries (50 skills + 1 retired-alias check-editor-symmetry)**", which closes the arithmetic (41 + 10 = 51; the gap was 10, not AUDIT-29's "9"). Yet AUDIT-34 is appended in this very diff with `Status: acknowledged-slush-pile-2026-06-04`.
+
+This is the identical mislabel class the operator flagged in AUDIT-31 (`fixed-c254c1ed` now) and AUDIT-33 (`fixed-e6d1fe99`): a finding whose substance is addressed by the commit but recorded as parked-without-fix. Per the `apply-audit-flips` convention those findings cite, an addressed finding reads `fixed-<sha>`. A future reader running the slush-pile reconciliation (`DEVELOPMENT-NOTES` § "Quantitative reporting conventions") will count AUDIT-34 as an unfixed LOW defect it is not. Fix: flip AUDIT-34 to `fixed-<thiscommit-sha>` since the totals are now stated, or — if the project genuinely wants it re-audited next lift — say so in the block rather than leaving the default slush mislabel that the last two findings were filed to eliminate.
+
+### AUDIT-20260604-37 — Template default flips gemini to bare `{{prompt-stdin}}` with no test covering the placeholder-only arg shape
+
+Finding-ID: AUDIT-20260604-37 (claude-03 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     fixed-9fb4db0b5431931d29f6657ab1f105b1c2040fa5
+Severity:   high
+Surface:    `plugins/dw-lifecycle/templates/audit-barrage-config.yaml:48` (`args_template: "{{prompt-stdin}}"` for gemini) + `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.e2big.test.ts`
+
+The template default now ships gemini with `args_template: "{{prompt-stdin}}"` — the placeholder is the *entire* template, no flag. When the spawn helper strips the stdin placeholder, gemini's argv must resolve to `[]`, not `['']` (a single empty-string argument), or gemini is launched with a stray empty arg. The new e2big test (`spawn-cli.e2big.test.ts:67,82`) only exercises templates where the placeholder is preceded by other tokens (`-p {{prompt-stdin}}`, `-e <eval> {{prompt-stdin}}`); the bare-placeholder shape the template default now ships for gemini has no coverage.
+
+This is the one shape most likely to break the new default in practice, and it's the only one with no regression-lock. The `buildArgs` stripping logic isn't in this diff, so I can't confirm whether it filters empty tokens — which is exactly why a test pinning `buildArgs("{{prompt-stdin}}") → []` (or the spawnCli equivalent) belongs in this commit alongside the default flip. Add one assertion for the placeholder-only template before relying on the flipped default.
+
+### AUDIT-20260604-38 — Duplicated "Phase 19's Phase 19" in the project-override config comment
+
+Finding-ID: AUDIT-20260604-38
+Status:     acknowledged-typo-fixed-2026-06-04
+Severity:   low
+Surface:    `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml:22-27` (added comment block)
+
+The added comment reads: *"… stdin delivery bypasses the OS per-arg limit. **Phase 19's Phase 19 verb path** supports `{{prompt-stdin}}` since v0.32.1 …"*. "Phase 19's Phase 19" is a copy-paste duplication. Minor, but this comment is the durable explanation for why the project's own active config (claude + codex only) diverges from the 3-model template default, so it's worth getting clean. Fix: "Phase 19's verb path supports `{{prompt-stdin}}` since v0.32.1."
+
+## 2026-06-04 — audit-barrage lift (20260604T161650717Z-scope-discovery)
+
+### AUDIT-20260604-39 — Test comment claims e2e integration coverage that AUDIT-37 explicitly says doesn't exist
+
+Finding-ID: AUDIT-20260604-39 (claude-01 + claude-02 + codex-02; cross-model)
+Status:     fixed-7bfeccb9
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts:340-351` (the AUDIT-37 test's trailing comment block)
+
+The new test contains two real, passing `buildArgs` assertions (lines 333-339), then a ~10-line comment that narrates an e2e spawn test it never writes, and closes with: *"Verified via integration: the spawn-cli e2big counterfactual (`{{prompt-stdin}}` 5MB → exit 0) already exercises this path through the gemini-shaped argsTemplate `{{prompt-stdin}}`."* This directly contradicts AUDIT-37 itself, whose surface says the e2big test *"only exercises templates where the placeholder is preceded by other tokens (`-p {{prompt-stdin}}`, `-e <eval> {{prompt-stdin}}`); the bare-placeholder shape … has no coverage."* The comment asserts the exact integration coverage the finding was filed to say is absent.
+
+This matters because the comment is now the durable record a future reader trusts: it says the bare-`{{prompt-stdin}}` gemini default is e2e-verified end-to-end, when in fact only the `buildArgs` unit contract is pinned. The `buildArgs` assertions are sufficient to close AUDIT-37's actual ask (`buildArgs("{{prompt-stdin}}") → []`), so the fix is real — but the over-claiming comment reintroduces the false-confidence shape the project's UI-verification rule names ("a passing probe of the wrong assertions is worse than no probe"). Fix: delete the false "Verified via integration" sentence and the narration of the unwritten e2e test; either write the actual spawn assertion or state plainly that coverage is unit-level via `buildArgs` only.
+
+### AUDIT-20260604-40 — Docs commit subject "disposition AUDIT-35/36/38" omits AUDIT-37, which the same range also dispositions
+
+Finding-ID: AUDIT-20260604-40 (claude-03 + codex-01; cross-model)
+Status:     acknowledged-misclassification-trailer-is-the-signal-2026-06-04
+Severity:   medium
+Surface:    commit subject `docs(scope-discovery): disposition AUDIT-35/36/38 from the post-Task-8 barrage` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 48 + `audit-log.md` AUDIT-37 block
+
+**Disposition (2026-06-04, hand-acknowledged):** the finding misreads the project's audit-finding-to-commit signal convention. AUDIT-37's disposition landed in commit `9fb4db0b` (subject "test(audit-barrage): pin bare {{prompt-stdin}} template strips to empty argv"). That subject describes the SUBSTANCE of the disposition (a new regression-lock test); the `Closes AUDIT-20260604-37` git trailer in the message body IS the subject-level signal `apply-audit-flips` parses to flip the audit-log Status. A reader scanning `git log --oneline` finds 9fb4db0b's subject AND running `git log --format='%H %s%n%b' | grep 'Closes AUDIT-37'` finds the trailer. The convention is trailer-as-signal, not subject-as-enumeration. The docs commit `2ffead37` correctly subject-enumerated the three findings (35/36/38) it dispositioned via doc-only `Acknowledges` trailers — the fourth (AUDIT-37) was a separate code-fix commit handled by its own trailer. No fix; the commit subjects are correct.
+
+The audited range dispositions four findings — AUDIT-35, 36, 37, and 38 — adding Task 46/47/48/49 to the workplan and four blocks to the audit-log. AUDIT-37's audit-log block carries `Status: fixed-9fb4db0b…` and Task 48 (`Closes AUDIT-20260604-37`) is a full fix-task. Yet the docs commit subject enumerates only "AUDIT-35/36/38," dropping 37. Whether 37's disposition landed in the docs commit or the test commit (`9fb4db0b`, subject "pin bare {{prompt-stdin}} template strips to empty argv"), no commit subject in the range names "disposition AUDIT-37" — so a reader scanning `git log --oneline` for where 37 was handled finds no subject-level signal.
+
+This is the same subject/content-drift class the prior audit-log already flagged repeatedly (AUDIT-31/33/36: "the commit subject says X while the durable record does Y"). It's cosmetic here — the content reconciles — but the project's own `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions" treats subject-vs-content honesty as load-bearing. Fix: when a single docs commit dispositions four findings, the subject should list all four (or say "AUDIT-35–38"), so the enumerated set matches the blocks the commit actually writes.

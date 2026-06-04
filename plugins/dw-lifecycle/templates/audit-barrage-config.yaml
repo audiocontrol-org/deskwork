@@ -14,25 +14,37 @@
 #                       `--models` flag.
 #   binary            — path or PATH-resolvable name of the CLI to spawn.
 #   args_template     — whitespace-delimited argv template; MUST contain
-#                       the literal `{{prompt}}` placeholder, which the
-#                       spawn helper substitutes with the rendered audit
-#                       prompt as a single argv element.
+#                       EITHER the literal `{{prompt}}` placeholder
+#                       (argv substitution) OR the `{{prompt-stdin}}`
+#                       placeholder (stdin delivery — bypasses the OS
+#                       ARG_MAX limit, default since v0.37.0). The
+#                       spawn helper picks the delivery path off the
+#                       placeholder; the two are mutually exclusive
+#                       per entry.
 #   timeout_seconds   — wall-clock budget; on expiry the subprocess is
 #                       sent SIGTERM, then SIGKILL after a 5s grace.
 #
 # Default invocation patterns mirror the live-probed contracts captured
 # in docs/1.0/001-IN-PROGRESS/scope-discovery/audit-barrage-cli-notes.md.
+#
+# Why {{prompt-stdin}} is the default (per #397): the audit prompt
+# embeds the full feature diff; on a fresh scope-discovery opt-in the
+# bootstrap range defaults to HEAD~10, which on most branches exceeds
+# the per-arg OS limit (~256KB on macOS, ~128KB MAX_ARG_STRLEN on
+# Linux). The argv path fails with spawn E2BIG; the stdin path is
+# unbounded. Adopters who previously customized to "-p {{prompt}}" /
+# "exec {{prompt}}" / "{{prompt}}" must migrate — see MIGRATING.md.
 
 models:
   - name: claude
     binary: claude
-    args_template: "-p {{prompt}}"
+    args_template: "-p {{prompt-stdin}}"
     timeout_seconds: 300
   - name: codex
     binary: codex
-    args_template: "exec {{prompt}}"
+    args_template: "exec {{prompt-stdin}}"
     timeout_seconds: 300
   - name: gemini
     binary: gemini
-    args_template: "{{prompt}}"
+    args_template: "{{prompt-stdin}}"
     timeout_seconds: 300
