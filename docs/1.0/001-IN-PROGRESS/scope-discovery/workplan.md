@@ -175,6 +175,60 @@ Closes AUDIT-20260603-91. Surface: `plugins/dw-lifecycle/src/scope-discovery/doc
 - [x] `check-refactor-preconditions [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag landed (default informational; flag flips to hook-friendly exit 1 on precondition failures).
 
 
+
+### Task 31 (fix-finding-AUDIT-20260604-01) (non-bug): AUDIT-20260604-01 — Rename invalidated three operator-curated `keep-with-reason`…
+
+Closes AUDIT-20260604-01 (claude-01 + codex-03; cross-model). Surface: `.dw-lifecycle/scope-discovery/clones.yaml` — groups `9e85fb0f675e`→`a381419e0f31`, `d47a3cfe0d81`→`0654d2d673cf`, `afeee722255a`→`fa93705e149f`.
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [x] Step 1: disposition prose — the three lost `keep-with-reason` dispositions were re-applied verbatim from the pre-rename twins via three `batch-dispose --disposition keep-with-reason --reason ...` invocations against the new ids; the structural fix to `refresh-clones-baseline`'s carry-forward (key on member content-fingerprint instead of clone-id so a pure file rename preserves the disposition) is filed at [#409](https://github.com/audiocontrol-org/deskwork/issues/409) with a regression-test acceptance criterion.
+- [x] Step 2: action applied — `batch-dispose` invocations re-applied each disposition; clones.yaml is verified clean by the gate (`check-clones --gate-mode` exit 0); #409 filed with reproducible context (the AUDIT-20260604-01 audit-log entry, the pre/post rename id pairs, the workaround commit references).
+- [x] Step 3: commit with `Acknowledges AUDIT-20260604-01 (claude-01 + codex-03; cross-model)` in subject — non-bug disposition (registry curation + follow-up issue); `Acknowledges` is correct because the immediate close is a config-side mitigation, with the structural carry-forward fix tracked separately under #409. Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition would arm a false flip if the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (3 batch-dispose invocations applied; #409 filed at https://github.com/audiocontrol-org/deskwork/issues/409).
+- [x] Audit-log Status flipped open → `acknowledged-3-keep-with-reasons-restored-409-tracks-structural-fix-2026-06-04` in this commit.
+
+
+### Task 32 (fix-finding-AUDIT-20260604-02): AUDIT-20260604-02 — `ledger.ts` comment claims the doctor rule surfaces tolerate…
+
+Closes AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model). Surface: `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` docblock (the AUDIT-92 fallback comment). Severity: high.
+
+- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
+- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
+- [ ] Step 5: commit with `Closes AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 33 (fix-finding-AUDIT-20260604-03) (non-bug): AUDIT-20260604-03 — README Phase 25 row says "Tasks 4–11 remain" while the same …
+
+Closes AUDIT-20260604-03. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 25 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 4 block).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with `Acknowledges AUDIT-20260604-03` in subject (use `Closes AUDIT-20260604-03` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
 ### Task 3: Disposition + baseline commands
 
 - [x] `dispose-clone <id> --as <refactor|keep-with-reason|ignore-with-justification> [args]` — refuses without Step 0a/0b flags on refactor disposition. Single-id convenience wrapper around `batch-dispose`. `keep-with-reason` + `ignore-with-justification` pass through verbatim; `--as refactor` requires all Step 0a/0b precondition flags (`--canonical-side`, `--canonical-reason`, [`--new-shape-summary` if canonical-side=new], `--tests`, `--tests-proof-sha`, `--tests-proof-demonstration`) AND still refuses to write (refactor's 5 fields don't fit `--reason` shape; the wrapper redirects to manual editing + `dw-lifecycle check-refactor-preconditions`). The flag-presence requirement is a forcing function — the operator who tries `--as refactor` sees the full precondition surface in the error message. 19 vitest scenarios.

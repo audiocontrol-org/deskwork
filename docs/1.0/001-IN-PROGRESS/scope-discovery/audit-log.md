@@ -4150,3 +4150,42 @@ The risk is silent: if any adopter phase ever numbers fix-tasks in a separate na
 ---
 
 I verified the AUDIT-91 doctor-rule `try/catch` + `continue` is correct and its two new tests genuinely exercise the per-feature isolation (malformed feature doesn't suppress the sibling's finding). I checked `incrementId`/`findMaxId`/`mergeFixTaskIds` arithmetic against the three new `archive-phases` scenarios and the "never-shrink" floor logic — the happy paths and the regression-lock (content-free passthrough) are sound. The strongest signal is **claude-01**: this diff adds a hard-crash path for malformed ledger ranges in the same commit family that hardened a different surface against exactly that, and the throw is untested.
+
+## 2026-06-04 — audit-barrage lift (20260604T004947330Z-scope-discovery)
+
+### AUDIT-20260604-01 — Rename invalidated three operator-curated `keep-with-reason` clone dispositions — silently reset to `pending`/`null`
+
+Finding-ID: AUDIT-20260604-01 (claude-01 + codex-03; cross-model)
+Status:     acknowledged-3-keep-with-reasons-restored-409-tracks-structural-fix-2026-06-04
+Severity:   high
+Surface:    `.dw-lifecycle/scope-discovery/clones.yaml` — groups `9e85fb0f675e`→`a381419e0f31`, `d47a3cfe0d81`→`0654d2d673cf`, `afeee722255a`→`fa93705e149f`
+
+The Task 4 file rename (`editor-symmetry-*.ts`/`check-editor-symmetry.ts` → `module-*`) changed the member paths of three clone groups. Because the clone id is content/shape-derived, each got a NEW id, and `refresh-clones-baseline`'s carry-forward — which keys on the *old* id — failed to match. The result, visible directly in this diff: three groups that were `disposition: keep-with-reason` with substantive operator rationale ("intentional shared scaffolding across sibling scope-discovery scanners…") were silently rewritten to `disposition: pending` / `reason: null`. The clone *shape* is unchanged — only the filename moved — yet the curation is gone.
+
+This is exactly the non-pending→pending transition `check-disposition-survivor` exists to catch, but it slipped through because the rename minted new ids the survivor diff can't pair with the old ones. The consequence is concrete churn: the next `check-clones` / Step-6a structural-chain run will surface these three as NEW undispositioned groups, forcing the operator to re-litigate curation they already settled — the precise failure mode the cont. 5 journal entry complains about ("pre-existing NEW clones … the structural chain refused"). A correct fix is for the carry-forward to match on member *shape* (line-span + normalized content) rather than exact id, so a pure file rename preserves the disposition; failing that, the rename pass must re-apply the three `keep-with-reason` reasons in the same commit. As shipped, three curated reasons are lost and no test or gate flagged it.
+
+---
+
+### AUDIT-20260604-02 — `ledger.ts` comment claims the doctor rule surfaces tolerated-malformed ranges — it provably does not
+
+Finding-ID: AUDIT-20260604-02 (claude-02 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `expandRange` docblock (the AUDIT-92 fallback comment)
+
+The new `expandRange` docblock justifies swallowing malformed ranges with: *"The doctor rule `workplan-archive-ledger-coherence` is the operator-facing surface for notifying about the malformed input."* I read that rule (`doctor-rules/workplan-archive-ledger-coherence.ts`). The claim is false on two counts. (1) The rule's own header explicitly lists fix-task coherence as a **non-scenario**: lines 16–21, *"Ledger fix-task ID coherence — a separate rule (future work) could validate `archived-fix-tasks`…"* It never inspects `archivedFixTasks` at all — only `archivedPhases` (line 144). (2) The only malformed-input path the rule reports is when `parseLedgerFromWorkplan` *throws* (lines 122–131). But the whole premise of AUDIT-92 is that the parser *accepts* a cross-phase range like `5.10-6.3` as a well-formed `IdRange` — so it does not throw, and the doctor rule reaches it via the happy path and ignores it.
+
+The net effect: the AUDIT-92 fix tolerates malformed `archived-fix-tasks` ranges silently, and the comment points the operator at a surface that will never notify them. This is the IOU-comment / unsupported-claim pattern the project rules name as a bug-factory — a comment asserting a safety net that isn't wired up. Fix: either delete the false sentence, or actually extend `workplan-archive-ledger-coherence` to validate `archivedFixTasks` for cross-phase / mismatched-dotted / non-numeric shapes and cite *that* code in the comment.
+
+---
+
+### AUDIT-20260604-03 — README Phase 25 row says "Tasks 4–11 remain" while the same audited range marks Task 4 complete — status drift
+
+Finding-ID: AUDIT-20260604-03
+Status:     open
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 25 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 4 block)
+
+The README's plugin-status table is updated in this diff to read *"Task 3 shipped (2026-06-03 cont. 5); Tasks 4–11 remain. … Tasks 4–11 are file/identifier renames + CLI verb + skill folder + doctor rule + sweeps."* But the same audited commit range includes `refactor(scope-discovery): Phase 25 Task 4 — source identifier rename`, and the workplan Task 4 block is marked **Complete (2026-06-03 cont. 6)** with every step `[x]` and tsc/test green. So at the tip of this range the README tells an operator Task 4 is outstanding while the workplan and code say it shipped.
+
+Compounding the timeline confusion: the DEVELOPMENT-NOTES entry added here is "cont. 5" and lists Task 4 as the *next-session handoff* ("Resume: Phase 25 Task 4"), yet the workplan records Task 4 done in "cont. 6." Three artifacts in one diff disagree about whether Task 4 is done. Per the project's documentation rule (status tables drift when not bumped with the work), the README row should advance to reflect Task 4's completion in the same commit that lands the rename. Fix: update the Phase 25 README cell to "Tasks 3–4 shipped; Tasks 5–11 remain" so the adopter-facing status matches the workplan.
