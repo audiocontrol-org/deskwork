@@ -4319,3 +4319,60 @@ Surface:    `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/legacy-editor
 The new doctor rule's message asserts *"The strict scope-manifest schema validator now rejects the legacy name; existing files must migrate."* I verified this is true — and that it's the problem. `scope-manifest.yaml.schema.json:74-75` sets `regime_holdouts` to `"additionalProperties": false` with `"required": [..., "module_symmetry", ...]`. So an adopter manifest still carrying `editor_symmetry:` (and lacking `module_symmetry:`) fails validation on **two** counts simultaneously: the legacy key is an additional property, and the required `module_symmetry` key is absent. Any verb that *validates* the manifest (`scope-inventory`, `scope-export`, the synthesis path) throws a raw ajv error before the operator ever sees this rule's friendly guidance.
 
 The workplan (Task 8 "Scope adjustment") frames the detection-only doctor rule as the migration path that replaces the original `--fix` rewrite: *"the absent-ledger fallback... IS the migration."* But a detection-only rule the operator must remember to run is not reachable in the normal upgrade flow — the strict validator fires first on the next ordinary scope-inventory invocation. The net adopter experience on upgrade-with-legacy-manifest is: opaque schema crash, no `--fix`, manual edit required. The rule's message text is itself correct and sufficient (rename the key, value unchanged, satisfies both constraints in one edit) — the gap is purely reachability/ordering. A reasonable fix: either (a) make the manifest *loader* catch the specific missing-`module_symmetry`/extra-`editor_symmetry` validation shape and re-throw with the doctor rule's migration sentence, or (b) wire `--fix` for this one rule so `dw-lifecycle doctor --fix` does the rename. Shipping a detection-only rule while strict validation hard-fails ahead of it leaves no graceful upgrade.
+
+## 2026-06-04 — audit-barrage lift (20260604T032527668Z-scope-discovery)
+
+### AUDIT-20260604-13 — README Phase 25 cell says Tasks 9–11 "partial / pending" while the workplan in the SAME commit marks all three "Complete"
+
+Finding-ID: AUDIT-20260604-13 (claude-01 + claude-03 + codex-01 + codex-03; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md:43` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:1826,1838,1851`
+
+The two status surfaces this single commit edits directly contradict each other. The README's rewritten Phase 25 cell reads **"Tasks 3–8 shipped; Tasks 9–11 partial / pending"** and spells it out: *"Task 9 (PRD + workplan + feature-doc sweep) and Task 11 (release notes) remain; Task 10 (audiocontrol pilot coordination) is operator-driven."* But the workplan diff in the same commit marks **Task 9 → "Complete (2026-06-04)"**, **Task 10 → "Complete (2026-06-04)"** with all steps `[x]` and acceptance `✅`, and **Task 11 → "Complete (2026-06-04)"** with all steps `[x]`.
+
+This is exactly the "status table not bumped with the code" pattern AUDIT-20260604-02/03/05 penalized — except here it's worse than stale, it's self-contradicting inside one diff. A future reader (or the operator deciding whether Phase 25 can ship) cannot tell from these two adopter-facing surfaces whether Tasks 9 and 11 are done or open. The commit subject ("Phase 25 Tasks 9 + 10 + 11") asserts they were done; the workplan agrees; the README says they "remain." Fix: advance the README cell to match the workplan ("Tasks 3–11 shipped"), or — if the README's "partial / pending" framing is the honest one — back the `[x]`/`✅` markers out of the workplan. The two must agree in the commit that touches both.
+
+### AUDIT-20260604-14 — MIGRATING.md sells a graceful `doctor`-driven migration while the same commit files AUDIT-12 documenting that ordinary verbs ajv-crash *before* the rule is reachable
+
+Finding-ID: AUDIT-20260604-14
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `MIGRATING.md:24-37` vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4313-4321` (AUDIT-20260604-12, added in this same commit)
+
+The new MIGRATING.md § "Migration: existing `scope-manifest.yaml` files" presents a calm, leisurely upgrade flow: *"Phase 25 ships a new doctor rule … that detects the legacy field on `dw-lifecycle doctor` runs … `dw-lifecycle doctor` → edit YAML → re-run `dw-lifecycle doctor` to confirm zero findings."* The hook-wiring section reinforces this: *"Update at your leisure … the alias's stderr warning will prompt the rename on every invocation."* But **this same commit adds AUDIT-20260604-12** (cross-model, 7 models: claude-01..05 + codex-01..02) which establishes that the strict schema (`additionalProperties:false` + `required:[module_symmetry]`) makes any verb that *validates* the manifest — `scope-inventory`, `scope-export`, the synthesis path — throw a raw ajv error **before the operator ever reaches the friendly doctor guidance.** I confirmed the rule is detection-only with no `--fix` (`legacy-editor-symmetry-field-rename.ts:24-34`).
+
+So the adopter who follows MIGRATING.md verbatim — upgrade, plan to run doctor "at their leisure" — hits an opaque schema crash on their next ordinary `scope-inventory` run, not the documented graceful path. The author *knew* this when writing the doc (they filed AUDIT-12 in the same commit) yet MIGRATING.md neither warns that legacy manifests hard-fail on first non-doctor invocation nor tells the adopter to run the rename *immediately* rather than at leisure. This is the documentation-vs-known-defect drift the project's documentation rule exists to prevent. Fix: either add a "migrate before your next scope-inventory run — the validator rejects legacy keys hard" warning to MIGRATING.md § Migration, or hold the "migrate at your leisure" framing until AUDIT-12's reachability gap (loader catches the shape and re-throws the migration sentence, or `--fix` wiring) is closed.
+
+### AUDIT-20260604-15 — MIGRATING.md (adopter-facing) hardcodes an internal source path + line range that will rot on the next refactor
+
+Finding-ID: AUDIT-20260604-15
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `MIGRATING.md:11`
+
+The new "What stays unchanged" bullet writes: *"PRESERVED verbatim (wire-format; travels on its own deprecation arc per the comment in `plugins/dw-lifecycle/src/scope-discovery/check-module-symmetry.ts:14-18`)."* I verified the reference is *currently* accurate — the comment is at lines 14-18 of that file. But this is precisely the rot vector `.claude/rules/documentation.md` § "No rot-prone specifics in adopter-facing docs" names: an internal source-file path with a pinned line range, embedded in a release-notes doc adopters read. The next time anyone edits the top-of-file docblock in `check-module-symmetry.ts` (entirely plausible — it still carries Phase 25 rename commentary), the `:14-18` anchor silently goes stale, and an adopter who clicks through lands on the wrong lines or a moved comment.
+
+Adopters don't need an internal implementation pointer at all to understand "the `editor-symmetry.md` filename is preserved." Fix: drop the file-path-and-line-range reference and state the wire-format rationale inline (one sentence), or point at a stable anchor (the MIGRATING.md § "What stays unchanged" list itself) rather than a line range in a churning source file.
+
+### AUDIT-20260604-16 — The in-repo "`scope-manifest.yaml` migration" the README/workplan credit to Task 8 actually migrated `scope-inventory-graphical-entries.yaml`, which the new doctor rule does not walk — so the doctor rule's detection path was never exercised against a real in-repo target
+
+Finding-ID: AUDIT-20260604-16
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/scope-inventory-graphical-entries.yaml:432,439` + `README.md:43` ("in-repo `scope-manifest.yaml` migration (graphical-entries)") + `workplan.md:1834`
+
+The README Phase 25 cell describes Task 8 as *"new `legacy-editor-symmetry-field-rename` doctor rule + in-repo `scope-manifest.yaml` migration (graphical-entries)"*, and workplan Task 9 Step 2 records the migrated file as `scope-inventory-graphical-entries.yaml` (the two `editor_symmetry:` → `module_symmetry:` edits at lines 432 and 439 of the diff). But the doctor rule itself (`legacy-editor-symmetry-field-rename.ts:9-11`) walks **only files literally named `scope-manifest.yaml`** (`docs/<v>/<status>/<slug>/scope-manifest.yaml` and `.dw-lifecycle/scope-discovery/scope-manifest.yaml`). `scope-inventory-graphical-entries.yaml` is a paper-test inventory fixture, not named `scope-manifest.yaml`, so the rule would never have flagged it.
+
+Two consequences worth surfacing: (1) calling this a "`scope-manifest.yaml` migration" is inaccurate — the file migrated is not a `scope-manifest.yaml` and is not a target of the rule that supposedly drives the migration; the naming overstates coupling between the rule and the edit. (2) The in-repo migration therefore did *not* exercise the doctor rule against any real detection target — the rule shipped with unit tests but its claimed in-repo dogfood landed on a file outside its glob. If the intent was to prove the doctor-rule → manual-edit → re-run-doctor loop on this repo's own manifests, that proof didn't happen. Fix: either correct the README/workplan wording to "migrated a paper-test inventory fixture (not a `scope-manifest.yaml`; outside the doctor rule's walk set)", or run the rename against an actual `scope-manifest.yaml` the rule walks so the detection path is genuinely dogfooded.
+
+### AUDIT-20260604-17 — MIGRATING says the YAML field rename is additive even though the same section says the legacy YAML field is rejected
+
+Finding-ID: AUDIT-20260604-17
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `MIGRATING.md:10,42`
+
+`MIGRATING.md:10` correctly says the strict schema rejects `regime_holdouts.editor_symmetry` and there is “no alias on the YAML side.” But `MIGRATING.md:42` then says “All `module-symmetry`-canonical surfaces named above are additive (CLI + slash-command + flag + field name); the legacy names continue to function via deprecation aliases.” Including “field name” in that sentence is false for the schema surface.
+
+This is adopter-facing release guidance, so the contradiction can cause a failed upgrade expectation: CLI and flag aliases survive, but YAML does not. The fix is to split the statement: CLI/slash-command/flag are additive aliases for one release cycle; the YAML field is a breaking rename requiring manual migration.
