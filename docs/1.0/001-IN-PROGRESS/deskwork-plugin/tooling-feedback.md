@@ -90,3 +90,15 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 **Status:** Addressed — commit `37683c8` (set `gitignore: true` in the scope-discovery `.jscpd.json` + the adopter template seed; regression `clone-detector.gitignore.test.ts`). **Residual (verified, jscpd 4.2.3):** the option reads only `cwd/.gitignore`, not `.git/info/exclude` / global excludes — documented in the test header + workplan; not a recurrence risk for `.gitignore`-listed paths.
 
 **Suggested fix:** n/a (closed). Kept per the append-only contract.
+
+## TF-006 · AB · high · `implement-hook` audit-barrage dies with `spawn E2BIG` on a large task diff
+
+**Status:** open (2026-06-04, Phase 39 sub-task 39c-2b(a) end-of-task chain).
+
+**Repro:** after a multi-commit task (the 39c-2b(a) cross-surface resolution flip — 9 commits, large cumulative diff), `dw-lifecycle implement-hook --feature deskwork-plugin` printed `audit-barrage: orchestration failed: spawn E2BIG` then `audit-barrage all-models-failed (outage); marker written, hook complete.` (exit 0). The cross-model barrage passes the rendered prompt + diff to each CLI via argv; a large diff overflows the OS `ARG_MAX`, so every model fails to spawn. Per the failure-path policy this is treated as an OUTAGE (forward-progress), which means a large-diff task silently receives NO cross-model audit — exactly the work most likely to need it.
+
+**Workaround used:** none — the hook forward-progressed; the diff went un-audited by the barrage (suites + the in-band structural chain still ran). Surfaced to the operator in the task report.
+
+**Suggested fix:**
+- *Light:* pass the prompt/diff to each CLI via stdin (or a temp prompt-file path), not argv, so large diffs don't hit `ARG_MAX`.
+- *Medium:* when the barrage detects a diff above a size threshold, chunk it (per-file or per-commit) or fall back to a file-list + on-demand reads, and distinguish `E2BIG` (a real coverage gap to flag loudly) from a genuine model outage in the per-task report rather than collapsing both into "outage, forward-progress".
