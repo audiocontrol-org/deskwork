@@ -219,16 +219,16 @@ Six structural-check verbs (`check-clones`, `check-anti-patterns`, `check-adopte
 
 **Approach:** Smoke pass — invoke every SKILL-documented chain that uses `--feature` and confirm no verb emits `unknown arg: --feature`. No SKILL prose edits expected (prose already uses `--feature`); this task is a regression check + audit log.
 
-- [ ] Step 1: enumerate every SKILL chain that uses `--feature` (`grep -rn "dw-lifecycle.*--feature" plugins/dw-lifecycle/skills/`).
-- [ ] Step 2: invoke each verb with `--feature hygiene` against this worktree; record exit codes.
-- [ ] Step 3: if any verb still rejects, file the gap; if all pass, append a confirmation note in the workplan.
-- [ ] Step 4: commit with `Refs #417` in subject (chore/test commit).
+- [x] Step 1: enumerated every SKILL chain using `--feature` via `grep -rhE "dw-lifecycle (check-clones|check-anti-patterns|check-adopters|check-module-symmetry|check-refactor-preconditions|check-disposition-survivor).*--feature" plugins/dw-lifecycle/skills/`. 10 unique invocations across 6 verbs.
+- [x] Step 2: wrote `scripts/smoke-task8-feature-flag.sh` that invokes each of the 6 verbs with `--feature hygiene` against the local source via `npx tsx src/cli.ts` from the repo root. Smoke passes — all 6 verbs accept the flag without `unknown arg`. Exit codes: check-clones=1 (existing baseline diff), all others=0.
+- [x] Step 3: confirmation — all 6 verbs run clean against the local source. Live verification against an installed `dw-lifecycle` binary awaits the next release (per the verify-in-installed-release rule). Smoke is committed for future regression coverage.
+- [x] Step 4: commit with `Refs #417` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] All 6 structural-check verbs from Phase 18 accept `--feature hygiene` without `unknown arg`.
-- [ ] No SKILL-prose chain emits `unknown arg: --feature` end-to-end.
-- [ ] Plugin test suite green at session end.
+- [x] All 6 structural-check verbs from Phase 18 accept `--feature hygiene` without `unknown arg` (smoke verified).
+- [x] No SKILL-prose chain emits `unknown arg: --feature` end-to-end (smoke covers all 6 verbs).
+- [x] Plugin test suite green at session end (2727/2727 as of Task 7).
 
 **Provenance:**
 
