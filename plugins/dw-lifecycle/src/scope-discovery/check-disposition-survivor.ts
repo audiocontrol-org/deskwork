@@ -58,6 +58,7 @@ import {
   type Disposition,
   parseClonesYamlStrict,
 } from './clones-yaml.js';
+import { FeatureNotFoundError, resolveFeatureScope } from './resolve-feature-scope.js';
 import { errorMessage, isEnoent } from './util/typeguards.js';
 
 const DEFAULT_BASELINE = '.dw-lifecycle/scope-discovery/clones.yaml';
@@ -84,6 +85,14 @@ export interface Cli {
   readonly baseline: string;
   readonly headRef: string;
   readonly repoRoot: string;
+  /**
+   * Phase 18: per-feature narrowing slug. When set, only clone-group
+   * entries whose group has ≥1 member in feature-scope (per
+   * resolveFeatureScope's hybrid scope-manifest-or-git-diff source)
+   * are checked for the silent non-pending → pending reversion.
+   * Refs #417.
+   */
+  readonly feature: string | null;
 }
 
 function parseCli(argv: readonly string[]): Cli {
@@ -91,6 +100,7 @@ function parseCli(argv: readonly string[]): Cli {
   let baseline = DEFAULT_BASELINE;
   let headRef = DEFAULT_HEAD_REF;
   let repoRoot = process.cwd();
+  let feature: string | null = null;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--allow-disposition-loss') allowDispositionLoss = true;
@@ -106,6 +116,10 @@ function parseCli(argv: readonly string[]): Cli {
       const next = argv[++i];
       if (next === undefined) throw new Error('--repo requires a path');
       repoRoot = next;
+    } else if (a === '--feature') {
+      const next = argv[++i];
+      if (next === undefined) throw new Error('--feature requires a slug');
+      feature = next;
     } else if (a === '--help' || a === '-h') {
       printHelp();
       process.exit(0);
@@ -114,7 +128,7 @@ function parseCli(argv: readonly string[]): Cli {
       throw new Error(`unknown arg: ${a}`);
     }
   }
-  return { allowDispositionLoss, baseline, headRef, repoRoot };
+  return { allowDispositionLoss, baseline, headRef, repoRoot, feature };
 }
 
 function printHelp(): void {
@@ -191,16 +205,26 @@ export interface Transition {
  * pending, matched by id). Pure function over two parsed `ClonesYaml`
  * documents; the I/O happens in `main()`. Exported for direct unit
  * testing without the git-side fixtures.
+ *
+ * Phase 18: when `featureScopeFiles` is provided, only HEAD entries
+ * whose group has ≥1 member in scope are considered. Refs #417.
  */
 export function findDestructiveTransitions(
   headDoc: ClonesYaml,
   workingDoc: ClonesYaml,
+  featureScopeFiles?: ReadonlySet<string>,
 ): readonly Transition[] {
   const workingById = new Map<string, CloneGroup>();
   for (const g of workingDoc.clones) workingById.set(g.id, g);
   const out: Transition[] = [];
   for (const headEntry of headDoc.clones) {
     if (!isProtected(headEntry.disposition)) continue;
+    if (featureScopeFiles !== undefined) {
+      const inScope = headEntry.members.some((m) =>
+        featureScopeFiles.has(stripMemberRange(m)),
+      );
+      if (!inScope) continue;
+    }
     const workingEntry = workingById.get(headEntry.id);
     if (workingEntry === undefined) continue; // dropped entirely; not this gate's job
     if (workingEntry.disposition !== 'pending') continue; // disposition preserved (or changed but still non-pending)
@@ -213,6 +237,14 @@ export function findDestructiveTransitions(
     });
   }
   return out;
+}
+
+/** Strip jscpd's `:start:end` suffix from a clone member entry. */
+function stripMemberRange(member: string): string {
+  const lastColon = member.lastIndexOf(':');
+  if (lastColon < 0) return member;
+  const prev = member.lastIndexOf(':', lastColon - 1);
+  return prev < 0 ? member : member.slice(0, prev);
 }
 
 function reportTransitions(
@@ -323,7 +355,26 @@ export async function runCheck(cli: Cli): Promise<number> {
     return 2;
   }
 
-  const transitions = findDestructiveTransitions(headDoc, workingDoc);
+  // Phase 18: when --feature is set, narrow the survivor check to
+  // clone groups whose ≥1 member is in feature-scope. Refs #417.
+  let featureScopeFiles: ReadonlySet<string> | undefined;
+  if (cli.feature !== null && cli.feature !== undefined) {
+    try {
+      const scope = await resolveFeatureScope({
+        slug: cli.feature,
+        repoRoot: cli.repoRoot,
+      });
+      featureScopeFiles = new Set(scope.files);
+    } catch (err) {
+      if (err instanceof FeatureNotFoundError) {
+        process.stderr.write(`check-disposition-survivor: ${err.message}\n`);
+        return 2;
+      }
+      throw err;
+    }
+  }
+
+  const transitions = findDestructiveTransitions(headDoc, workingDoc, featureScopeFiles);
   if (transitions.length === 0) return 0;
 
   if (cli.allowDispositionLoss) {
