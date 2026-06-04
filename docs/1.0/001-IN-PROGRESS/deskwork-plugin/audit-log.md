@@ -1043,3 +1043,59 @@ Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md` Task 39.9 (`(
 Task 39.9 is titled `(non-bug)` and its boilerplate asserts *"This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test."* That classification is contradicted by the task's own body and by the diff: AUDIT-42 (severity **high**) landed a genuine CLI surface — the `--artifact-path` flag with parsing, mutually-exclusive validation against `--layout`, fail-loud-when-absent-for-image, and four new tests in `add-lane-stage-integration.test.ts`. The task even says *"a real code change verifiable by test."* So the "(non-bug)/non-source" framing is wrong.
 
 The consequence isn't cosmetic: by being shaped as a 3-step non-bug disposition, the HIGH fix skipped the Option-D task structure (Step 0 working-code invariant + Step 1 bug-repro + Step 1b regression-lock + Step 2 pre-fix-fail confirmation) that the project's own audit-discipline applies to HIGH+ source findings — the same structure correctly applied to 39.6 and newly applied to 39.11 (AUDIT-44). The tests that landed are happy-path/rejection assertions, not a confirmed-failing-then-green pair anchored at the finding's surface. The fix: re-shape Task 39.9 as a real fix-finding task (it produced source), or, if the workplan's auto-promotion mis-classified it, note that the promoter mapped a HIGH source finding to the non-bug template — a promote-findings shaping bug worth its own correction so the next HIGH source finding doesn't silently skip the regression-lock discipline.
+
+## 2026-06-03 — audit-barrage lift (20260603T144020922Z-deskwork-plugin)
+
+### AUDIT-20260603-49 — Workplan adds Tasks 39.13–39.15 as open fix-tasks for findings the SAME commit's audit-log resolves as MOOT — zombie tasks that will strand an implementer
+
+Finding-ID: AUDIT-20260603-49
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md` (added Tasks 39.13/39.14/39.15) vs. `docs/1.0/001-IN-PROGRESS/deskwork-plugin/audit-log.md` (added AUDIT-46/47/48, all `Status: resolved-2026-06-03 — MOOT`)
+
+The same commit ships two contradictory dispositions for AUDIT-46/47/48. The audit-log diff adds all three with `resolved-2026-06-03 — MOOT` ("the image `--artifact-path` branch is removed, so there is no verbatim image path to normalize"; "`add` now refuses non-markdown kinds … the divergence cannot occur"; "the AUDIT-42 `--artifact-path` source change was reverted … there is no longer a HIGH source change to re-shape"). But the workplan diff *simultaneously* adds Task 39.13 (`Closes AUDIT-20260603-46`), Task 39.14 (`Closes AUDIT-20260603-47`), and Task 39.15 (`Acknowledges AUDIT-20260603-48`) as **unchecked** fix-tasks with full TDD step lists ("Step 1: write failing test exercising the bug … anchor at the file:line cited in the finding's Surface").
+
+Those tasks are unimplementable as written. Task 39.13 instructs an implementer to anchor a failing test at `add.ts` "image branch: `artifactPath = artifactPathFlag;` ~`:218-221`" and `--kind image requires --artifact-path` validation `~:148-156` — code paths this very commit deleted (the `add.ts` diff removes both). Task 39.14 points at "`add.ts` stamping `<slug>/index.html` for `--kind html-mockup`" — also removed. An agent running `/dw-lifecycle:implement` will pick Task 39.13, fail to locate the cited surface, and burn a session on a finding already closed two files over. The fix: strike/remove Tasks 39.13–39.15 (or mark them resolved-by-removal mirroring the audit-log), since promote-findings scoped them from the pre-revert tip and the revert mooted them in the same commit. As-is, the workplan and audit-log disagree about whether three findings are open.
+
+---
+
+### AUDIT-20260603-50 — AUDIT-45's audit-log resolution narrative is now false after the revert — it claims the docblock cites Decision #16, but the spec restored #12 and the code cites #12
+
+Finding-ID: AUDIT-20260603-50
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/audit-log.md` AUDIT-20260603-45 Status line (NOT updated in this diff) vs. `docs/superpowers/specs/2026-06-02-sites-to-lanes-retirement-design.md` § "AUDIT-45 — MOOT" + Decisions log #12 (now "OPERATIVE") + `packages/core/src/lanes/scaffold-path.ts` `DEFAULT_SCAFFOLD_LAYOUT` docblock (now cites #12)
+
+AUDIT-45's audit-log Status reads `resolved-2026-06-03 — Decision #12 marked superseded-by-#16 in the spec; scaffold-path.ts docblock cites #16.` That resolution describes the pre-revert world. This commit reverses it: the spec's Decisions log now reads `12 | Default layout = index … OPERATIVE (the #16 supersession was reverted)` and `16 | ~~Default layout is per-kind~~ REVERTED (see #12, restored)`, and the `scaffold-path.ts` docblock the audit-log points at now says *"Per design Decision #12 this is a single GLOBAL default. (The superseding per-kind Decision #16 was retired…)"*. So the audit-log's own description of how AUDIT-45 was resolved — "marked superseded-by-#16", "docblock cites #16" — is now the exact opposite of the live state.
+
+This is the spec-is-canonical rot-vector the project's `state-machine.md`/`design-standards.md` rules exist to catch: a future reader auditing AUDIT-45's resolution against the code finds the audit-log asserting `#16` while the code cites `#12`, and can't tell which document is authoritative. Unlike AUDIT-46/47/48 (which got fresh MOOT addenda in this diff), AUDIT-45's entry was left untouched. The fix: append a revert addendum to AUDIT-45's Status line in the audit-log — same form as the AUDIT-42/44 addenda this commit already wrote — noting that #16 was reverted, #12 is operative again, and the docblock now correctly cites #12.
+
+---
+
+### AUDIT-20260603-51 — `composeAddArtifactPath` validates `kind !== 'markdown'` and throws, but `add.ts` already rejected non-markdown with a different message — two divergent rejection sites for one condition; the `kind` param is now validated-then-ignored
+
+Finding-ID: AUDIT-20260603-51
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/cli/src/commands/add.ts` (the `if (artifactKind !== 'markdown') { fail(...) }` guard, ~`:134-142`) + `packages/core/src/lanes/scaffold-path.ts` (`if (kind !== 'markdown') { throw … }`, ~`:104-110`)
+
+The markdown-only gate is now enforced in two places with two different messages. `add.ts` fails first (`--kind "${artifactKind}" is not supported: deskwork add only supports markdown entries right now …`, exit 2 via `fail()` which returns `never`), so `composeAddArtifactPath`'s internal throw (`deskwork add currently supports only markdown entries; artifact kind "${kind}" is not yet supported …`) is unreachable from the CLI — it fires only under direct unit-test calls. The `kind: ArtifactKind` parameter of `composeAddArtifactPath` is therefore validated-then-ignored: every reachable call passes `'markdown'`, the function rejects anything else, and the value is never used to vary behavior (the extension is hardcoded `.md` in `layoutToContentRelativePath`).
+
+This is a maintenance hazard rather than a runtime bug: the duplicated guard means a future change that relaxes the `add.ts` gate (e.g. to add html-mockup support) would silently surface the *core's* different error message, and the two messages would need to be kept in sync. It also leaves a vestigial parameter that reads as "this function is kind-generic" when it is markdown-only. A cleaner shape: drop the `kind` parameter from `composeAddArtifactPath` (it composes markdown paths; the kind-gate is an `add`-verb policy decision, not a path-composition concern) and keep a single rejection site in `add.ts`. The diff already removed the per-kind machinery; this is the last vestige of it in the signature. (If the param is deliberately retained as a future-multi-kind seam, a one-line comment saying so would prevent the next reader from "simplifying" it away — but per the project's no-IOU rule, a seam with no consumer is itself a deferral.)
+
+---
+
+### AUDIT-20260603-52 — AUDIT-40 docblock claims "all stamped artifactPaths are forward-slash," but the `directory` component from `scaffoldDefaults['markdown']` is `posix.join`-ed verbatim with no separator normalization
+
+Finding-ID: AUDIT-20260603-52
+Status:     acknowledged-slush-pile-2026-06-03
+Severity:   low
+Surface:    `packages/core/src/lanes/scaffold-path.ts` (`return posix.join(directory, relativePath)`, ~`:130`) + the docblock's POSIX-join paragraph
+
+The revert correctly keeps the AUDIT-40 fix: `relativePath` is built with hardcoded `/` separators and the join uses `node:path/posix`. But `posix.join` does **not** convert backslashes in its inputs to forward slashes — it only joins with `/`. The `directory` argument comes straight from operator config (`lane.scaffoldDefaults['markdown']`, set via `deskwork lane … --scaffold-default markdown=<dir>`) with no normalization in this module. So a Windows operator who configures `--scaffold-default markdown=content\blog` gets `posix.join('content\\blog', 'my-post/index.md')` → `content\blog/my-post/index.md` — backslashes stamped into the sidecar, violating the very "persisted path must be POSIX-separated for cross-OS string-equality" invariant the docblock asserts as guaranteed.
+
+This is the same failure class AUDIT-40 names, surviving on the `directory` axis (AUDIT-40 closed it on the `relativePath` axis; AUDIT-46 was filed for the image axis and is now moot). It predates this diff, but the diff is the one whose docblock now makes the absolute claim *"`artifactPath` is persisted and string-compared against the forward-slash paths the rest of the system stores"* — a claim the code only partially backs. Worth either (a) normalizing the `directory` component (`directory.split('\\').join('/')` before the join, or rejecting backslashes pre-write), or (b) confirming the lane `--scaffold-default` setter already validates POSIX form and citing that as the guarantee. I could not confirm the setter's validation from this diff, so the invariant is unverified at this surface.
+
+---
+
+I also checked and found clean: the markdown-only guard fires pre-`readCalendar`/`writeCalendar`, and both new integration tests (`rejects --kind html-mockup`/`--kind image`) assert exit 2 *and* `calendarRaw not contains` the rejected slug, so the no-disk-mutation contract is genuinely covered; the `default-when-`--kind`-omitted` path resolves to `markdown` (confirmed indirectly — the "no markdown scaffoldDefault" test omits `--kind` and asserts stderr contains both `nomd` and `markdown`, which only the scaffold-default-missing message carries, not the markdown-guard message); the export removals in `index.ts` (`composeRelativePath`/`defaultLayoutForKind`/`legalLayoutsForKind`/`isLayoutLegalForKind`) are matched by removals in `scaffold-path.ts` and the test file's import list, so no dangling re-export; and the `SCAFFOLD_LAYOUTS`/`DEFAULT_SCAFFOLD_LAYOUT` unit tests correctly pin the three legal markdown layouts after the matrix removal. My findings concentrate on the workplan↔audit-log disposition contradiction (the highest-value signal — it will actively misdirect an implementer), the stale AUDIT-45 resolution narrative, the duplicated/vestigial kind-gate, and the unverified directory-normalization edge of the AUDIT-40 invariant.
