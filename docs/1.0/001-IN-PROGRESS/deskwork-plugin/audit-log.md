@@ -1342,7 +1342,7 @@ Today this is moot because the `catch` makes resolution non-throwing, so orderin
 ### AUDIT-20260604-19 — `renameSlug` still silently drops a valid 301 redirect when the lane's pipelineTemplate is unresolvable — AUDIT-17's primary concern is unaddressed despite the "FIXED" label
 
 Finding-ID: AUDIT-20260604-19 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01; cross-model)
-Status:     open
+Status:     fixed-e70674a5a63a2ad4369821df17465389b0f53e93
 Severity:   high
 Surface:    `packages/core/src/rename-slug.ts:208-217` (the `try { redirectsPath = loadLaneConfig(...).redirectsPath } catch (err) { void err }` block) + `packages/core/src/lanes/loader.ts:190-198`
 
@@ -1353,7 +1353,7 @@ The disposition addendum's own prose admits the narrower fix AUDIT-17 recommende
 ### AUDIT-20260604-20 — Behavior-changing fix lands with no accompanying test in the diff, and AUDIT-18 is closed "obsolete" without the throw-independent ordering test it recommended
 
 Finding-ID: AUDIT-20260604-20
-Status:     open
+Status:     fixed-e70674a5a63a2ad4369821df17465389b0f53e93
 Severity:   low
 Surface:    diff scope (no `packages/core/test/rename-slug.test.ts` hunk) + audit-log addendum "AUDIT-18 — OBSOLETE-by-design"
 

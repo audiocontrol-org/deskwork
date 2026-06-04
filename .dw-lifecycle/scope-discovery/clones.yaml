@@ -1,4 +1,4 @@
-generated_at: 2026-06-04T14:43:20.089Z
+generated_at: 2026-06-04T21:40:03.912Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -400,32 +400,32 @@ clones:
       - packages/core/src/pipelines/operations/update.ts:324:333
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: in-file similarity between applySetLocked and applySetOffPipeline — both validate each comma-separated stage against linearStages with mirror invariants. Collapsing into a shared helper would obscure the asymmetry (set-locked enforces subset, set-off-pipeline enforces disjoint) that matters at the error-message level."
-  - id: 68e3966349bd
-    lines: 11
+  - id: dba29300cb11
+    lines: 6
     members:
-      - packages/core/src/review/start-handlers.ts:150:160
-      - packages/core/src/review/start-handlers.ts:54:65
-    disposition: pending
-    reason: null
+      - packages/core/src/review/start-handlers.ts:155:160
+      - packages/core/src/review/start-handlers.ts:60:66
+    disposition: keep-with-reason
+    reason: Intentionally-parallel sibling start handlers (longform + shortform). The shared 6-line site+slug input guard is minimal sibling duplication; extracting it requires a type-narrowing workaround and shifts jscpd onto the handlers remaining structural parallelism (entry-lookup + workflow-setup) with no net reduction. c3 surfaced it by aligning the two comment/guard blocks.
   - id: 1884e3dfff81
     lines: 7
     members:
       - packages/core/src/review/start-handlers.ts:167:173
-      - packages/core/src/review/start-handlers.ts:65:71
+      - packages/core/src/review/start-handlers.ts:66:72
     disposition: pending
     reason: null
   - id: 0b03898d0cc8
     lines: 8
     members:
       - packages/core/src/review/start-handlers.ts:223:230
-      - packages/core/src/review/start-handlers.ts:88:95
+      - packages/core/src/review/start-handlers.ts:89:96
     disposition: pending
     reason: null
   - id: 0e85f4a2e968
     lines: 10
     members:
       - packages/core/src/review/start-handlers.ts:232:241
-      - packages/core/src/review/start-handlers.ts:95:104
+      - packages/core/src/review/start-handlers.ts:96:105
     disposition: pending
     reason: null
   - id: e3dffdccdd78
