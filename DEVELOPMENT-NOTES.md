@@ -4590,3 +4590,65 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - **Resume: Phase 39 sub-task 39c-2b(a)** — migrate the existing-entry verbs (publish / iterate / shortform-start / rename-slug) to resolve via `entry.artifactPath` only, per spec § "CLI-verb resolution migration". Then **(c)** delete `resolveSite`/`siteConfig`/`config.sites`/`SiteConfig`, then **39e** (MIGRATING.md + doc `sites` refs).
 - **No release** until the full Phase 39 lands; `config.sites` is a tolerated schema field until 39c-2b(c).
 - **Optional cleanup:** dismantle/archive the two stale worktrees above.
+
+## 2026-06-04: Phase 39 — 39c-2b(a) CLI-verb resolution flip complete; dead-code removal; (c) decomposed + entanglement finding
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Resume Phase 39 at 39c-2b(a) (flip every CLI verb + the studio review surface off the slug-template family onto `entry.artifactPath`), then remove the dead code that flip orphaned, then start 39c-2b(c) terminal deletion.
+
+**Accomplished:**
+
+- **39c-2b(a) DONE — CLI-verb resolution flip (7 units, `7dd0067f`..`3447aaa5` + `265ff31b`/`3fbda90e`).** All wired act-on-existing + create verbs resolve via `entry.artifactPath`; missing-path throws `doctor --fix` (no slug+stage search).
+  - Unit 1: core `resolveArtifactPathOrThrow` (shared act-on-existing resolver); studio `resolveIndexPath` delegates.
+  - Unit 2: `publish` legacy repo-content branch → `doctor --fix` throw.
+  - Unit 3: core `iterate` `resolveIndexPath` collapsed onto the shared helper (clone removed); longform iterate was already entry-centric.
+  - Unit 4: core `composeShortformDraftPath` (compose from parent's `artifactPath` dir, AUDIT-35).
+  - Unit 5a: `review/workflow-paths.ts` longform+shortform flip via new `readSidecarSync`; studio review-start `start-handlers`/`handlers` wrapped; the slug-template "materialize fallback" retired. Resolution prefers the looked-up entry's id over a caller-supplied `entryId` (provenance vs resolution key).
+  - Unit 5b: cli `iterate`+`approve` shortform compose; extracted shared `composeShortformFileForWorkflow` helper.
+  - Unit 6: `rename-slug` derives the new path by layout-detecting the stored `artifactPath` (AUDIT-36) + `writeSidecarSync`.
+  - Fixtures migrated to the sidecar+artifactPath shape across core (review-handlers / -shortform / -entryid) + studio (api / shortform-routing).
+- **Dead-code removal (`4f11e975`, `1b0b990c`, `1f17e008`).** `scaffoldBlogPost`/`scaffold.ts` (tests-only callers; live `add` stamps `artifactPath` via `composeAddArtifactPath`); the now-orphaned `resolveEntryFilePath` + `resolveShortformFilePath`; `resolveChannelsPath` (zero consumers). Reworded the stale comments/headers that named the deleted symbols; dropped the `./scaffold` package export.
+- **39c-2b(c) decomposed (c0–c5) + started.** c0 (dead code) + c1 (`resolveChannelsPath`) landed.
+
+**Didn't Work:**
+
+- **The audit-barrage couldn't run (`spawn E2BIG`).** `implement-hook` passes the rendered prompt + diff to each CLI via argv; this session's large cumulative diff overflowed `ARG_MAX`, so every model failed to spawn. Per policy it forward-progressed as an "outage" — meaning this diff got structural-chain + suite coverage but NO cross-model audit. Logged as **TF-006** (high).
+- **First dead-code audit overstated the kill.** A `grep -v paths.ts:` filter accidentally masked `scrapbook/paths.ts`, so I claimed the whole slug-template family was dead and over-removed `findEntryFile`/`resolveBlogPostDir`/`resolveBlogFilePath`. `tsc` caught it immediately (`TS2305`); restored `paths.ts`, re-audited correctly, removed only the two genuinely-dead resolvers.
+- **(c)'s "mechanical parts" mostly aren't mechanical.** Starting c3 revealed the `sites` axis is threaded deeper than echo: `approve`/`shortform-start`/`iterate` thread `site` into workflow lookups (filter by `w.site`); `ingest`'s `--site` drives `resolveContentDir`; scrapbook's `scrapbookDirAtPath` + slug read-helpers tie it to `resolveContentDir`/`resolveBlogPostDir`. Only c1 was cleanly separable; c2/c3/c4 converge on the deferred c5 design.
+
+**Course Corrections:**
+
+- [PROCESS] Operator: when a flip orphans code, remove the dead code (scaffold.ts) — did so, then found more (the 2 resolvers).
+- [FABRICATION] Self-caught + corrected: the "whole slug-template family is dead" claim was wrong (buggy audit grep masked scrapbook); reported the correction explicitly rather than letting it stand.
+- [COMPLEXITY] (c) is feature-sized with a genuine spec gap (content-index/content-tree filesystem model under lanes — no `contentDir` left to scan; sidecar-enumeration loses orphan detection). Surfaced the design fork instead of barreling in (the 39c-2 guardrail-STOP failure mode).
+- [PROCESS] Operator cadence: chose "continue now, verify against suites" for the cross-surface flip and "mechanical parts now" for (c); both honored, with the entanglement finding reported back.
+
+**Quantitative:**
+
+- Commits this session: **14** (`7dd0067f`..`781854ea`): 7 for (a) + 3 dead-code removals + c1 + 3 docs/workplan/tooling-feedback.
+- Suites at session end: **core 1014 · cli 454 · studio 1269** — all green. Core moved 1041 → 1052 (+11 new test blocks from (a)) → 1014 (−38 from removing dead-code tests: scaffold ×2 files, resolve-entry-file-path, the resolveShortformFilePath/resolveChannelsPath blocks).
+- Open audit findings at session end: **0** (no slush-pile entries; the barrage was an E2BIG outage, not a clean run — see TF-006).
+- Issues: none filed; #370 (no slug-rename verb) referenced via the rename-slug work; TF-006 logged in `tooling-feedback.md`.
+
+**Insights:**
+
+- The 39d studio `resolveIndexPath` pattern (resolve-stored-path + throw-`doctor --fix` + `index.md` refine) was the right seed to promote to a shared core helper — it made every verb's flip a 3-line delegation instead of a re-derivation, and collapsed three copies of the throw message into one.
+- "Dead after a flip" needs a consumer audit that does NOT filter by a substring that also matches sibling files (`scrapbook/paths.ts` vs `paths.ts`). `tsc` is the real backstop; trust it over the grep.
+- The sites→lanes retirement's hard core is the **content-browser filesystem model** (content-index/content-tree), not the per-entry resolution — that's where `config.sites` can't be deleted until a design decision lands. The (a) entry-resolution flip was the tractable 80%; (c)'s headline is gated on that design.
+
+### Hygiene observations
+
+- issue #370 [OPEN] referenced this session: Gap: no slug-rename equivalent for /editorial-rename-slug (touched by Unit 6's rename-slug migration; still no studio route wires it).
+- (issue #14 / #20 references in the hygiene scan are spurious — matched version/number strings in commit bodies, not real issue work this session.)
+- No bare TBD markers introduced in the workplan this session.
+- Tree clean; all 3 workspaces green.
+- Stale worktree flagged (unchanged): `~/work/deskwork-work/graphical-entries` (`feature/graphical-entries`, 4/9 signals) — dismantle/archive candidate.
+
+### Next session recommendation (hygiene)
+
+- **Resume: 39c-2b(c5) design pass** — decide the content-index/content-tree filesystem model under lanes (what `buildContentIndex` + the studio content browser enumerate when both `config.sites.contentDir` and `lane.contentDir` are gone; how orphan detection survives) + the `workflow.site` semantics under a single project + host/redirects-under-lanes. Update the spec, THEN implement c2/c3/c4/c5 + the terminal `config.sites`/`SiteConfig`/`resolveSite`/`siteConfig`/`resolveContentDir` deletion together. This is the gate on the "retire sites" headline.
+- **Owed before any release:** live studio UI verification of the review-start shortform path (per `.claude/rules/ui-verification.md`); the cross-model audit-barrage on the (a)+dead-code diffs never ran (TF-006 E2BIG).
+- **Tooling:** TF-006 (barrage `spawn E2BIG` on large diffs) — light fix is to pass prompt/diff via stdin not argv.
+- **Optional:** dismantle/archive the stale `graphical-entries` worktree.
