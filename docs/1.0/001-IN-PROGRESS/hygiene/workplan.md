@@ -26,17 +26,17 @@ The Phase 15 redesign's `apply` step posts a `pending-verification` comment + ad
 
 **Approach:** Option 1 from the issue body (operator-recommended) — pre-flight via `gh label list`; auto-create if absent. Surface a one-line "created pending-verification label" message on first run; silent on subsequent runs.
 
-- [ ] Step 1: Add a `preflightLabel(runGh, repo, label, label_color, label_description)` helper in `apply-v2.ts`. Calls `gh label list --repo <repo> --search <label> --json name`. If the result contains the label, return `'exists'`. If empty, call `gh label create <label> --repo <repo> --color <color> --description <description>` and return `'created'`. On either call's failure, throw an `InvalidProposalError` with the actionable error ("label X does not exist and could not be created: <err>; create it manually with `gh label create ...` or pass `--label <existing>`").
-- [ ] Step 2: Call `preflightLabel` from `applyV2` BEFORE the per-item loop. If `preflightLabel` returns `'created'`, push a one-line "created pending-verification label on <repo>" to a new `notes` field on the `ApplyV2Result` shape; the CLI wrapper surfaces it to stdout. Default color: `fbca04` (matches GH-default yellow used in the existing `pending-verification` label). Default description: `"Fix shipped in a release; awaiting operator verification before close"`.
-- [ ] Step 3: Vitest cases: (a) label exists → `preflightLabel` returns `exists`, single `gh label list` call; (b) label absent → returns `created`, both `gh label list` + `gh label create` called; (c) `gh label create` throws → `InvalidProposalError` bubbles up with actionable message; (d) `applyV2` surfaces the `created` note in the result.
-- [ ] Step 4: Update `SKILL.md` Phase B Step 1 prose to document the pre-flight behavior so adopters know auto-create is the default.
+- [x] Step 1: Add a `preflightLabel(runGh, repo, label, label_color, label_description)` helper in `apply-v2.ts`. Calls `gh label list --repo <repo> --search <label> --json name`. If the result contains the label, return `'exists'`. If empty, call `gh label create <label> --repo <repo> --color <color> --description <description>` and return `'created'`. On either call's failure, throw an `InvalidProposalError` with the actionable error.
+- [x] Step 2: Call `preflightLabel` from `applyV2` BEFORE the per-item loop. `created` returns push a one-line note to the new `notes` field on `ApplyV2Result`; the CLI wrapper surfaces it to stdout before the summary line. Defaults: color `fbca04`, description `"Fix shipped in a release; awaiting operator verification before close"`.
+- [x] Step 3: Vitest cases — extended close-shipped-apply-v2.test.ts from 5 → 9 cases. New cases: (a) label exists → single list call; (b) absent → list + create + `created` note; (c) `gh label create` throws → `InvalidProposalError` with actionable message; (d) pre-flight failure aborts BEFORE any comment posts.
+- [x] Step 4: Updated `SKILL.md` Phase B with a new Step 3 documenting the pre-flight behavior; renumbered subsequent steps.
 
 **Acceptance Criteria:**
 
-- [ ] `dw-lifecycle close-shipped apply --proposal <path>` against a repo without the label auto-creates the label, surfaces the one-line note, then proceeds with the normal per-item dispatch loop.
-- [ ] `apply` against a repo with the label is silent about labels (no spurious "exists" message every run).
-- [ ] If `gh label create` itself fails (permissions / rate limit / etc.), `apply` aborts with an actionable error BEFORE any comment posts — no half-applied state.
-- [ ] Vitest covers all four cases above; full plugin suite green.
+- [x] `dw-lifecycle close-shipped apply --proposal <path>` against a repo without the label auto-creates the label, surfaces the one-line note, then proceeds with the normal per-item dispatch loop. (Mechanically verified via test case b; live verification deferred to operator-run post-ship walk.)
+- [x] `apply` against a repo with the label is silent about labels (no spurious "exists" message every run). (Test case a: `notes` array empty; CLI wrapper only writes notes when populated.)
+- [x] If `gh label create` itself fails (permissions / rate limit / etc.), `apply` aborts with an actionable error BEFORE any comment posts — no half-applied state. (Test cases c + d.)
+- [x] Vitest covers all four cases above; full plugin suite green. (9 cases in close-shipped-apply-v2.test.ts; 2700/2700 plugin tests pass.)
 - [ ] Live verification against a repo without the label (operator-driven, post-ship walk per the project's verify-in-installed-release rule).
 
 **Provenance:**

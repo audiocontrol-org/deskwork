@@ -84,9 +84,11 @@ The skill operates in three phases (`scan` → agent dispatch → `propose`) fol
 
 2. Pre-validation: every item must have a non-empty `decision`. If any is empty, the helper exits 2 and the operator re-edits the proposal.
 
-3. Per-item dispatch: each `accept-verdict`-shipped or `override-shipped` item posts a `pending-verification` comment + adds the label via `gh`. Failures recorded per-item; partial-success surfaces with per-row reasons.
+3. **Label pre-flight (Phase 16 / [#411](https://github.com/audiocontrol-org/deskwork/issues/411)).** Before the per-item loop, `apply` checks whether the target label exists in the repo (`gh label list --search <label> --json name`). If the label is missing, it auto-creates the label with the canonical color + description and surfaces a one-line `created '<label>' label on <repo> (color <hex>)` note. If the auto-create itself fails (permissions / rate limit / etc.), `apply` aborts with an actionable `InvalidProposalError` BEFORE any comment posts — that's the half-applied-state guard. The pre-flight runs exactly once per `apply` invocation.
 
-4. Report `applied: N, skipped: M, failed: P` to the operator.
+4. Per-item dispatch: each `accept-verdict`-shipped or `override-shipped` item posts a `pending-verification` comment + adds the label via `gh`. Failures recorded per-item; partial-success surfaces with per-row reasons.
+
+5. Report `applied: N, skipped: M, failed: P` to the operator. Any pre-flight `created` note prints on stdout before the summary line.
 
 ## Legacy fallback
 

@@ -1,6 +1,8 @@
 // Apply runtime for Phase 15 close-shipped redesign. Consumes an
 // operator-curated Proposal; pre-validates every item has a valid
-// decision; dispatches gh comment + label per effectively-shipped row.
+// decision; pre-flights the pending-verification label (auto-creates
+// if absent) per Phase 16 / #411; dispatches gh comment + label per
+// effectively-shipped row.
 
 import type { Proposal, ProposalDecision, ProposalItem, RunGh } from './types.js';
 
@@ -16,6 +18,9 @@ const VALID_DECISIONS: ReadonlySet<ProposalDecision> = new Set<ProposalDecision>
 ]);
 
 const LABEL = 'pending-verification';
+const DEFAULT_LABEL_COLOR = 'fbca04';
+const DEFAULT_LABEL_DESCRIPTION =
+  'Fix shipped in a release; awaiting operator verification before close';
 
 export interface PerItemOutcome {
   readonly issue: number;
@@ -26,11 +31,14 @@ export interface ApplyV2Result {
   readonly applied: readonly PerItemOutcome[];
   readonly skipped: readonly PerItemOutcome[];
   readonly failed: readonly PerItemOutcome[];
+  readonly notes: readonly string[];
 }
 
 export interface ApplyV2Args {
   readonly proposal: Proposal;
   readonly runGh: RunGh;
+  readonly labelColor?: string;
+  readonly labelDescription?: string;
 }
 
 function effectiveVerdict(item: ProposalItem): 'shipped' | 'skip' {
@@ -82,8 +90,99 @@ function buildCommentBody(item: ProposalItem, proposal: Proposal): string {
   ].join('\n');
 }
 
+/**
+ * Pre-flight the label in the target repo. Returns `'exists'` when
+ * `gh label list --search <label> --json name` includes the exact label
+ * name; otherwise calls `gh label create` and returns `'created'`. Throws
+ * `InvalidProposalError` on any failure with an actionable message so
+ * the caller aborts BEFORE the per-item loop posts any comments — that's
+ * the failure mode Phase 16 / #411 prevents.
+ */
+export function preflightLabel(args: {
+  readonly runGh: RunGh;
+  readonly repo: string;
+  readonly label: string;
+  readonly color: string;
+  readonly description: string;
+}): 'exists' | 'created' {
+  let raw: string;
+  try {
+    raw = args.runGh([
+      'label',
+      'list',
+      '--repo',
+      args.repo,
+      '--search',
+      args.label,
+      '--json',
+      'name',
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new InvalidProposalError(
+      `label '${args.label}' check failed on ${args.repo}: ${msg}; ` +
+        `run \`gh label list --repo ${args.repo} --search ${args.label}\` manually.`,
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = raw.trim() === '' ? [] : JSON.parse(raw);
+  } catch {
+    parsed = [];
+  }
+  if (
+    Array.isArray(parsed) &&
+    parsed.some(
+      (entry): boolean =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        (entry as { name?: unknown }).name === args.label,
+    )
+  ) {
+    return 'exists';
+  }
+  try {
+    args.runGh([
+      'label',
+      'create',
+      args.label,
+      '--repo',
+      args.repo,
+      '--color',
+      args.color,
+      '--description',
+      args.description,
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new InvalidProposalError(
+      `label '${args.label}' does not exist on ${args.repo} and auto-create failed: ${msg}; ` +
+        `create it manually with \`gh label create ${args.label} --repo ${args.repo} ` +
+        `--color ${args.color} --description "${args.description}"\` and re-run apply.`,
+    );
+  }
+  return 'created';
+}
+
 export function applyV2(args: ApplyV2Args): ApplyV2Result {
   validateProposal(args.proposal);
+
+  const color = args.labelColor ?? DEFAULT_LABEL_COLOR;
+  const description = args.labelDescription ?? DEFAULT_LABEL_DESCRIPTION;
+
+  const notes: string[] = [];
+  const result = preflightLabel({
+    runGh: args.runGh,
+    repo: args.proposal.repo,
+    label: LABEL,
+    color,
+    description,
+  });
+  if (result === 'created') {
+    notes.push(
+      `created '${LABEL}' label on ${args.proposal.repo} (color ${color})`,
+    );
+  }
 
   const applied: PerItemOutcome[] = [];
   const skipped: PerItemOutcome[] = [];
@@ -114,5 +213,5 @@ export function applyV2(args: ApplyV2Args): ApplyV2Result {
     }
   }
 
-  return { applied, skipped, failed };
+  return { applied, skipped, failed, notes };
 }
