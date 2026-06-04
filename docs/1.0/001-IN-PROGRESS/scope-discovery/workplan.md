@@ -1888,3 +1888,73 @@ New Step 9.5 between closing-discipline (Step 9) and commit (Step 10) — invoke
 - [ ] Live dogfood on this repo: at the next session-end after a phase completes, the phase is archived in the same `docs: session-end` commit; live workplan shrinks; archive grows.
 - [ ] If Task 4 doctor rule shipped (operator pick): rule appears in `/dw-lifecycle:doctor`; `--fix` archives the detected phases; rule documented in doctor SKILL.md.
 - [ ] Closure transition is the operator's call post-install verification (operator-owned closure per AUDIT-35).
+
+## Phase 28: Session-start branch-staleness detector — pre-merge early warning ([#422](https://github.com/audiocontrol-org/deskwork/issues/422))
+
+The 2026-06-04 cont. 5 session opened on a `feature/scope-discovery` branch that was **24 commits behind `origin/main`**. The hygiene helper's mechanical first-unchecked-task pick aimed the agent at Task 40 (`#411`); the agent shipped 290 lines of substantive fix + 2 audit-barrage cascade-burndown commits before discovering main had ALREADY shipped both `#411` and `#412` via PR `#414`. All three commits were reset out. Net cost: ~30 minutes of agent attention, 5 audit findings filed-then-reverted, operator distraction for the merge-vs-reset decision.
+
+This phase ships a cheap pre-merge early-warning surface at session-start so the operator notices stale-branch state before picking up tasks. Distinct cure-shape from [#413](https://github.com/audiocontrol-org/deskwork/issues/413) (the post-merge bookkeeping portfolio of per-file merge drivers): #413 makes each merge cheaper; this phase prompts the merge to happen sooner. Operator framing during session-start scoping (2026-06-04): *"shouldn't it go in session-start so it's not a tax on every iteration of the implement loop?"* Session-start fires once per session; the implement-loop iterates many times per session, so the cost lives at session-start.
+
+**Motivation:**
+
+- One stale-branch incident per ~10-day branch lifespan is the current rate; the cost compounds as branches age.
+- Detection is cheap (one `git fetch` + one `git log` count); the fix is one nudge line in the bootstrap report.
+- Symmetric with the existing session-start hygiene-recommendation surface — both are advisory diagnostic signals that the operator integrates into the session goal.
+
+### Task 1: Pure-fn library — detect-branch-staleness
+
+Pure-function library at `plugins/dw-lifecycle/src/lifecycle-integration/branch-staleness.ts`. Given a branch name, upstream remote/branch, fetch fn (DI for tests), and threshold, returns `BranchStalenessSnapshot { branch, remote, behind, threshold, nudgeRequired }`. Threading the fetch as a function lets tests run offline.
+
+- [x] Step 0: working-code invariant — no existing helper of this name; pure-additive.
+- [x] Step 1: bug-repro / contract test — fixture pattern (no real git; mock the `gitLogCount` + `gitFetch` injection points): `behind: 24, threshold: 5` → `nudgeRequired: true`; `behind: 0, threshold: 5` → `nudgeRequired: false`; `behind: 5, threshold: 5` → `nudgeRequired: false` (boundary inclusive); `behind: 6, threshold: 5` → `nudgeRequired: true`. Real-git fixture covers two cases (6 behind synthetic main → nudge; tip of main → no nudge).
+- [x] Step 2: regression-lock — `--no-fetch` path doesn't invoke the fetch fn (tested via `vi.fn()` not called).
+- [x] Step 3: implementation — pure-fn with DI for `gitFetch` + `gitLogCount`; returns the snapshot type; never throws on `behind === 0`. Boundary contract: `behind <= threshold` → no nudge; `behind > threshold` → nudge.
+- [x] Step 4: 9/9 vitest scenarios pass (`plugins/dw-lifecycle/src/__tests__/lifecycle-integration/branch-staleness.test.ts`); `tsc --noEmit` clean.
+
+### Task 2: CLI subcommand — `dw-lifecycle branch-staleness-check`
+
+CLI verb at `plugins/dw-lifecycle/src/subcommands/branch-staleness-check.ts`. Flags: `--threshold N`, `--no-fetch`, `--json`, `--remote <ref>` (defaults `origin/main`). Reads `config.session.start.branchStalenessThreshold` from `.dw-lifecycle/config.json` when `--threshold` absent. Exit 0 always (advisory).
+
+- [x] Step 0: working-code invariant — no existing verb of this name; pure-additive. CLI dispatcher in `cli.ts` registers the new verb.
+- [x] Step 1: bug-repro / contract test — 12 argv-parser scenarios in `plugins/dw-lifecycle/src/__tests__/subcommands/branch-staleness-check.test.ts` cover `--threshold` validation (negative / fractional / non-numeric all rejected with actionable errors), `--remote` format check, `--no-fetch` / `--json` flag flips, and unknown-flag rejection. Live-verify against this repo's current state: `Branch staleness: 0 commits behind origin/main (threshold 5).` Verb exit 0; JSON output emits documented structured shape.
+- [x] Step 2: regression-lock — `behind === 0` path live-verified emits the line without a nudge; exit 0. Detached-HEAD / not-a-git-repo path emits `skipped (detached HEAD or not a git repo).` and exits 0 (never refuses).
+- [x] Step 3: implementation — verb wires the pure-fn library; reads `--remote`, `--threshold` (CLI > config > default 5), `--no-fetch`, `--json`; nudge text cross-references `#422` + `#413`.
+- [x] Step 4: 12/12 verb tests pass; `tsc --noEmit` clean.
+
+### Task 3: Config schema extension
+
+Extend the Zod config schema to accept `session.start.branchStalenessThreshold: number` (optional; default applied by the verb, not the schema, so absence means "use the verb default").
+
+- [x] Step 0: working-code invariant — existing config files continue to parse; absence of the new key is valid.
+- [x] Step 1: bug-repro test — `.dw-lifecycle/config.json` with `session.start.branchStalenessThreshold: 10` parses; verb run with `--threshold` absent honors the config value (covered by config-loader fallback path inside `branch-staleness-check.ts`).
+- [x] Step 2: regression-lock — non-integer (fractional) and negative thresholds fail the Zod parse with an actionable error mentioning `branchStalenessThreshold` in the message.
+- [x] Step 3: implementation — extended Zod schema at `plugins/dw-lifecycle/src/config.types.ts` with `branchStalenessThreshold: z.number().int().nonnegative().optional()`. The verb-default-not-schema-default shape preserves the "absence = use verb default" contract. Template surface (commented-out default) deferred — adopter docs update happens in the Phase 28 release notes; the schema change itself is non-breaking for existing config files.
+- [x] Step 4: 10/10 config tests pass; `tsc --noEmit` clean.
+
+### Task 4: Wire into `/dw-lifecycle:session-start` SKILL.md
+
+Insert Step 8 between current Step 7 (structural snapshot) and the former Step 8 (`gh issue list`, now Step 9). Bootstrap report renders the staleness signal alongside the structural snapshot — both advisory.
+
+- [x] Step 0: working-code invariant — existing steps fire in order; the staleness step is additive, not a replacement. The former Step 8 (`gh issue list`) renumbers to Step 9; former Step 9 (report context) renumbers to Step 10.
+- [x] Step 1: skill-body integration check — live-walk against this repo: the verb fires and prints `Branch staleness: 0 commits behind origin/main (threshold 5).` (since this branch merged main in cont. 5; expected at the moment of writing).
+- [x] Step 2: regression-lock — when the installed binary lacks `branch-staleness-check` (older release), the skill body's "When the installed binary doesn't recognize ..., silently skip Step 8" clause kicks in. The skill body matches the structural-snapshot pattern's opt-in framing.
+- [x] Step 3: implementation — edited `plugins/dw-lifecycle/skills/session-start/SKILL.md` Step 8 prose; documents verb invocation, the `branchStalenessThreshold` config key, the threshold + remote-ref override flags, and the advisory framing. Cross-references `#422` and `#413` inline. Added an error-handling row for the skip-on-older-binary path.
+- [x] Step 4: live-verify on this repo's actual `/dw-lifecycle:session-start` invocation — verified at the cont. 6 session-start that produced this phase. Verb is present in the operator's running plugin (post-build from the source tree); operator-installed-plugin verification happens at the next release after merge.
+
+### Open design questions (operator pick at implementation)
+
+1. **Default upstream remote / branch.** `origin/main` is correct for this repo + most adopters; some use `upstream/main` or `origin/master`. **Capture-time recommendation:** default `origin/main`; accept `--remote <ref>` CLI flag override; read `config.branches.upstream: string` if present (schema addition, optional). Sufficient for v1.
+2. **Threshold default.** `5` per the cont. 5 incident (24 was far past comfort; ~5 felt like the threshold at which the operator would routinely want to merge). Operator confirms at implementation; can tune later via config without breaking anyone.
+3. **Hard gate or advisory.** Advisory — symmetric with the structural-snapshot pattern at Step 7. The session-start skill's framing is "report context; do NOT start work until they confirm the session goal," so the operator is already a hard gate; the nudge informs them.
+4. **Cross-reference to other long-running branches?** A multi-branch staleness sweep (look across all worktrees) is a richer surface — out of scope for v1. Filed as the "future work" hook in this phase's body. Could be a sibling verb `dw-lifecycle worktree-staleness-report` aligned with the existing `worktree-report`.
+5. **Should the implement skill re-check?** No — operator framing was explicit. The implement skill SKILL.md can reference this signal as a precondition reminder but does NOT re-fetch.
+6. **`--no-fetch` UX.** Useful for offline + tests; should it also be the default in CI environments where network fetches are slow / disallowed? **Capture-time recommendation:** default-on `--fetch`; ops can pass `--no-fetch` if needed. CI never invokes this verb (the skill body is what invokes it; CI doesn't run session-start). No CI hook.
+
+### Acceptance Criteria
+
+- [x] `branch-staleness.ts` pure-fn library returns the documented `BranchStalenessSnapshot` shape across all 4 boundary fixtures.
+- [x] `dw-lifecycle branch-staleness-check` verb prints the human-readable line + nudge when `behind > threshold`; emits structured `--json` output; exit 0 always.
+- [x] Config schema accepts `session.start.branchStalenessThreshold: number` optionally; absence honored as "use verb default."
+- [x] `/dw-lifecycle:session-start` Step 8 invokes the verb; bootstrap report includes the staleness line alongside the structural snapshot.
+- [ ] Live dogfood on this repo: at the next session-start, the staleness signal appears in the bootstrap report. Operator confirms the surface fires before any task pickup. *(Pending — verified at cont. 6 from the source tree; operator-installed verification happens at the next release.)*
+- [ ] Closure transition is the operator's call post-install verification (operator-owned closure per AUDIT-35).
