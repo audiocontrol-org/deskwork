@@ -22,9 +22,9 @@
 # Phase 12 Task 8 (#397, 2026-06-04): migrated to {{prompt-stdin}} for
 # both active models. The argv path failed with spawn E2BIG on bootstrap
 # HEAD~N ranges; stdin delivery bypasses the OS per-arg limit. Phase 19's
-# Phase 19 verb path supports {{prompt-stdin}} since v0.32.1 (the cached
-# v0.36.0 binary respects this override even though its own plugin default
-# still ships {{prompt}} until v0.37.0).
+# verb path supports {{prompt-stdin}} since v0.32.1 (the cached v0.36.0
+# binary respects this override even though its own plugin default still
+# ships {{prompt}} until v0.37.0).
 
 models:
   - name: claude

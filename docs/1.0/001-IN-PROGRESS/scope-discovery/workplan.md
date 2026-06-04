@@ -946,36 +946,36 @@ Closes AUDIT-20260603-71. Surface: `plugins/dw-lifecycle/skills/doctor/SKILL.md:
 
 ### Task 46 (fix-finding-AUDIT-20260604-35) (non-bug): AUDIT-20260604-35 — `Closes #NNN` trailers prescribed for all 8 new fix-tasks au…
 
-Closes AUDIT-20260604-35. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 40 ("commit with `Closes #411` trailer"), Task 41 (`Closes #412`), Task 42 (`Closes #366`), Task 43 (`Closes #350`), Task 44 (`Closes #297`), Task 45 (`Closes #413`), Task 8 (`Closes #397`), Task 9 (`Closes #396`).
+Acknowledges AUDIT-20260604-35. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` — Task 40 (`Closes #411`), Task 41 (`Closes #412`), Task 42 (`Closes #366`), Task 43 (`Closes #350`), Task 44 (`Closes #297`), Task 45 (`Closes #413`), Task 8 (`Closes #397`), Task 9 (`Closes #396`).
 
-**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+**Shape**: non-bug (workplan-prose edit). Action taken below; no test pins the change because the affected surface is the workplan's Step 4 trailer prescription, not source code.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with an `Acknowledges AUDIT-20260604-35` trailer in the commit message (use `Closes AUDIT-20260604-35` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: `apply-audit-flips` parses `Closes` trailers ONLY — `Acknowledges` and `Defers` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using `Closes` on a non-fix disposition arms a false `fixed-<sha>` flip when the audit-log entry is later re-opened.
+- [x] Step 1: disposition prose — every Step 4 trailer prescription across the 7 unimplemented fix-issue tasks (Tasks 9, 40–45) updated from `Closes #N` to `Refs #N`, with an inline parenthetical naming this finding as the source of the rule (so future readers reading the task in isolation see the policy). Task 8's Step 4 line preserves the historical fact that commit `e7f5b4df` shipped with `Closes #397` (the auto-close on merge is a real consequence; the parenthetical names the operator-reopen-and-verify path).
+- [x] Step 2: action applied — 8 Step-4 lines edited in workplan.md.
+- [x] Step 3: commit with `Acknowledges AUDIT-20260604-35` trailer.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Disposition prose exists (≥40 chars substantive).
+- [x] The 7 unimplemented task-block Step 4 lines now prescribe `Refs #N`; Task 8's already-shipped Step 4 line documents the auto-close caveat.
+- [x] Audit-log Status flipped to `acknowledged-prose-updated-2026-06-04` (hand-set; `Acknowledges` trailer does not auto-flip).
 
 
 ### Task 47 (fix-finding-AUDIT-20260604-36) (non-bug): AUDIT-20260604-36 — AUDIT-34 left `acknowledged-slush-pile` while its substance …
 
-Closes AUDIT-20260604-36. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md:4589-4599` (AUDIT-34 block, `Status: acknowledged-slush-pile-2026-06-04`) vs. `workplan-archive.md` Phase 7 acceptance criterion (the reconciled-totals prose).
+Acknowledges AUDIT-20260604-36. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md` (AUDIT-34 block) vs. `workplan-archive.md` Phase 7 acceptance criterion (the reconciled-totals prose, written in commit `4d8c083f`).
 
-**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+**Shape**: non-bug (audit-log status flip). The corrective action is hand-setting AUDIT-34's audit-log Status to the actual reconciliation commit; no test pins doc-state.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with an `Acknowledges AUDIT-20260604-36` trailer in the commit message (use `Closes AUDIT-20260604-36` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: `apply-audit-flips` parses `Closes` trailers ONLY — `Acknowledges` and `Defers` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using `Closes` on a non-fix disposition arms a false `fixed-<sha>` flip when the audit-log entry is later re-opened.
+- [x] Step 1: disposition prose — the reconciliation prose AUDIT-34 named was written in commit `4d8c083f` (the archive-phases dogfood), where the archived Phase 7 acceptance criterion gained the explicit "`commands/` now ships 51 entries (50 skills + 1 retired-alias `check-editor-symmetry`)" line. AUDIT-34's `acknowledged-slush-pile-2026-06-04` Status mislabeled the disposition — the substance had been addressed in `4d8c083f`. Flipped to `fixed-4d8c083f`.
+- [x] Step 2: action applied — AUDIT-34's Status line in `audit-log.md` edited from `acknowledged-slush-pile-2026-06-04` to `fixed-4d8c083f`.
+- [x] Step 3: commit with `Acknowledges AUDIT-20260604-36` trailer.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Disposition prose exists (≥40 chars substantive).
+- [x] AUDIT-34's Status line in `audit-log.md` flipped to `fixed-4d8c083f`.
+- [x] AUDIT-36's audit-log Status hand-set to `acknowledged-flipped-audit-34-to-fixed-4d8c083f-2026-06-04` (the `Acknowledges` trailer does not auto-flip).
 
 
 ### Task 48 (fix-finding-AUDIT-20260604-37): AUDIT-20260604-37 — Template default flips gemini to bare `{{prompt-stdin}}` wit…
@@ -997,19 +997,19 @@ Closes AUDIT-20260604-37 (claude-03 + claude-05 + codex-01 + codex-02; cross-mod
 
 ### Task 49 (fix-finding-AUDIT-20260604-38) (non-bug): AUDIT-20260604-38 — Duplicated "Phase 19's Phase 19" in the project-override con…
 
-Closes AUDIT-20260604-38. Surface: `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml:22-27` (added comment block).
+Acknowledges AUDIT-20260604-38. Surface: `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` (project-override comment block).
 
-**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+**Shape**: non-bug (typo fix in a config file comment).
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with an `Acknowledges AUDIT-20260604-38` trailer in the commit message (use `Closes AUDIT-20260604-38` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: `apply-audit-flips` parses `Closes` trailers ONLY — `Acknowledges` and `Defers` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using `Closes` on a non-fix disposition arms a false `fixed-<sha>` flip when the audit-log entry is later re-opened.
+- [x] Step 1: disposition prose — the comment introduced in commit `740377e9` carried a copy-paste duplication: "Phase 19's Phase 19 verb path supports {{prompt-stdin}}". Fixed to "Phase 19's verb path supports {{prompt-stdin}}". The comment is the durable explanation for why the project's active config (claude + codex only) diverges from the 3-model template default, so it's worth getting clean.
+- [x] Step 2: action applied — typo corrected in `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` comment block.
+- [x] Step 3: commit with `Acknowledges AUDIT-20260604-38` trailer.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Disposition prose exists (≥40 chars substantive).
+- [x] Typo fix landed in `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml`.
+- [x] AUDIT-38's audit-log Status hand-set to `acknowledged-typo-fixed-2026-06-04` (the `Acknowledges` trailer does not auto-flip).
 
 ### Task 40 (fix-issue-#411): close-shipped `apply` — `pending-verification` label must already exist; no pre-flight / auto-create ([#411](https://github.com/audiocontrol-org/deskwork/issues/411))
 
@@ -1021,7 +1021,7 @@ Context: surfaced 2026-06-04 dogfood — first `close-shipped apply` against `au
 - [ ] Step 1: bug-repro integration test that stubs `gh label list` returning empty + asserts `close-shipped apply` does NOT post any comment before failing or auto-creating; existing happy-path test still passes.
 - [ ] Step 2: regression-lock — `gh label list` returning the label → behavior unchanged from today (comment + add-label per issue).
 - [ ] Step 3: implementation — pre-flight `gh label list --repo <repo> --search <label>` BEFORE the per-issue loop; if absent, EITHER auto-create with default color `fbca04` + description "Fix shipped in a release; awaiting operator verification before close" OR refuse with an actionable error (operator preference — propose: auto-create as the zero-config default, refusal-with-message under `--no-create-label`). Update SKILL.md to document the new behavior.
-- [ ] Step 4: live-verify against a fresh repo / a repo with the label deleted; full plugin suite green; commit with `Closes #411` trailer.
+- [ ] Step 4: live-verify against a fresh repo / a repo with the label deleted; full plugin suite green; commit with `Refs #411` trailer (NOT `Closes #411` — per the project's "operator closes after install + verify" rule, branch trailers must not auto-close GH issues on merge; AUDIT-20260604-35 names the policy).
 
 **Acceptance Criteria:**
 
@@ -1040,7 +1040,7 @@ Context: SKILL.md Step 2/Step 6 reference `/tmp/close-shipped-bundles.json` and 
 - [ ] Step 1: bug-repro test — assert that the scan output path is `mktemp`-style OR a project-local `.dw-lifecycle/close-shipped/runs/<timestamp>/bundles.json`; assert the proposal helper accepts an explicit `--bundles <path>` regardless of location.
 - [ ] Step 2: regression-lock — proposals continue to land at `.dw-lifecycle/close-shipped/proposals-<timestamp>.json` (existing convention).
 - [ ] Step 3: implementation — either (a) switch SKILL.md + helpers to `mktemp` (cheap fix; ephemeral cleanup), OR (b) move bundles + verdicts + per-bundle prompts under `.dw-lifecycle/close-shipped/runs/<timestamp>/` (auditable; worktree-safe; consistent with proposals/). Recommend (b) per the issue body. Update SKILL.md Steps 2/5/6 to use the new path scheme.
-- [ ] Step 4: full plugin suite green; commit with `Closes #412` trailer.
+- [ ] Step 4: full plugin suite green; commit with `Refs #412` trailer (NOT `Closes #412` — operator-owned closure per AUDIT-35).
 
 **Acceptance Criteria:**
 
@@ -1062,7 +1062,7 @@ Context: Phase 13 dropped bare `#NNN` mentions + `(#NNN)` end-of-subject parens 
 - [ ] Step 1: bug-repro test that constructs a commit corpus with both genuine `feat(area): fix (#42)` AND `docs(area): back-fill (#42)` shapes; assert the propose surface marks the docs/back-fill commit as `not-shipped` automatically (without an Agent dispatch) — a cheaper pattern-based pre-filter that downgrades known-noise commits.
 - [ ] Step 2: regression-lock — existing happy-path commits (real `Closes #N` / `Fixes #N` / `Resolves #N`) still surface as shipped candidates; end-of-subject-parens opt-in still works.
 - [ ] Step 3: implementation — add a per-subject classifier that downgrades back-fill / docs-only subject shapes to `auto-skip` BEFORE the Agent dispatch, reducing the dispatch cost and the operator's review burden. Document the classifier rules in SKILL.md.
-- [ ] Step 4: live-verify by re-running close-shipped against v0.35.0..v0.36.0 on this repo; confirm fewer Agent dispatches AND same correct apply set. Commit with `Closes #366` trailer.
+- [ ] Step 4: live-verify by re-running close-shipped against v0.35.0..v0.36.0 on this repo; confirm fewer Agent dispatches AND same correct apply set. Commit with `Refs #366` trailer (NOT `Closes #366` — operator-owned closure per AUDIT-35).
 
 **Acceptance Criteria:**
 
@@ -1081,7 +1081,7 @@ Context: surfaced in canary #349 §3a; ticked-then-untickered during the 2026-06
 - [ ] Step 1: bug-repro test capturing the canary §3a substring shapes — e.g. an agent's normal-prose mention of "refactor" inside a non-refactor message should NOT trip the gate. Assert the gate does NOT classify the message as a refactor-cue match.
 - [ ] Step 2: regression-lock — genuine refactor-cue messages still trip; existing happy-path coverage stays green.
 - [ ] Step 3: implementation — switch from substring match to a context-aware classifier (word-boundary regex + structural cues like quote-context exclusion). Document the classifier shape in `orchestrator-loop/README.md`.
-- [ ] Step 4: full plugin suite green; live-verify the gate against the canary §3a fixture; commit with `Closes #350` trailer.
+- [ ] Step 4: full plugin suite green; live-verify the gate against the canary §3a fixture; commit with `Refs #350` trailer (NOT `Closes #350` — operator-owned closure per AUDIT-35).
 
 **Acceptance Criteria:**
 
@@ -1099,7 +1099,7 @@ Context: tests pass in isolation (`npx vitest run clone-detector`) but flake whe
 - [ ] Step 1: bug-repro test — re-create the full-suite load conditions deterministically (e.g. wrap a known-flaky test in a `for (let i = 0; i < 100; i++)` style stress-loop running in parallel with sibling tests); assert pass rate ≥ 99/100.
 - [ ] Step 2: regression-lock — isolated-suite runs still pass (existing coverage).
 - [ ] Step 3: implementation — audit for shared-state offenders: `mktemp`-everything (no bare `/tmp` per `.claude/rules/file-handling.md`); confirm jscpd is invoked with unique config paths per-test; confirm no shared mutable module-level state. Document the isolation contract in the test directory README.
-- [ ] Step 4: live-verify: run the full plugin suite 10 times in a row, assert zero failures; commit with `Closes #297` trailer.
+- [ ] Step 4: live-verify: run the full plugin suite 10 times in a row, assert zero failures; commit with `Refs #297` trailer (NOT `Closes #297` — operator-owned closure per AUDIT-35).
 
 **Acceptance Criteria:**
 
@@ -1122,7 +1122,7 @@ Context: each main → feature-branch resync surfaces conflicts in `.dw-lifecycl
    - **3b:** `audit-log.md` merge driver — chronological merge by date heading + AUDIT-ID collision detector. Tests cover same-date-different-ID, same-ID-different-content (loud error).
    - **3c:** post-merge hygiene helper — `dw-lifecycle merge-from-main --apply` walks a known repair set (archive-ledger reconciliation; duplicate-task-number detection; stale `fixed-pending-sha` resolution). Tests cover each repair.
 - [ ] Step 4: doctor-rule additions for whatever the cure portfolio doesn't structurally prevent — e.g. post-merge duplicate AUDIT-IDs across the merged log. Each rule names the merge-from-main case in its description.
-- [ ] Step 5: live-verify on the next main → `feature/scope-discovery` resync; commit with `Closes #413` trailer.
+- [ ] Step 5: live-verify on the next main → `feature/scope-discovery` resync; commit with `Refs #413` trailer (NOT `Closes #413` — operator-owned closure per AUDIT-35).
 
 **Acceptance Criteria:**
 
@@ -1497,7 +1497,7 @@ Context: Phase 19 (v0.32.1) added `{{prompt-stdin}}` as an opt-in placeholder fo
 - [x] Step 1: bug-repro test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.e2big.test.ts` — 5 MiB prompt (well over macOS's ~256 KB and Linux's ~128 KB MAX_ARG_STRLEN). Asserts `{{prompt-stdin}}` succeeds AND `{{prompt}}` fails with a structured classifier naming `E2BIG`, the byte count, `{{prompt-stdin}}`, and the issue / MIGRATING.md references.
 - [x] Step 2: regression-lock — already covered by existing `spawn-cli.test.ts` (`buildArgs` argv-substitution suite + happy-path `spawnCliAgainstModel` tests with small `{{prompt}}` payloads). Full suite remained green (113/113 audit-barrage tests pre + post; 2696 → 2698 plugin total).
 - [x] Step 3: implementation — `spawn-cli.ts` wraps `spawn()` in try/catch (Node emits E2BIG synchronously, before the async `'error'` handler can fire); `classifyE2BIGSpawnError()` exported helper produces the structured message; defense-in-depth E2BIG classification in the async error handler too. `templates/audit-barrage-config.yaml` defaults all three CLIs to `{{prompt-stdin}}` with a comment block explaining the flip. `audit-barrage-cli-notes.md` adds a "Phase 12 Task 8" section + reframes the Phase 19 section as opt-in → default. `MIGRATING.md` prepends "Migrating to v0.37.0+" with the recommended path + back-compat note.
-- [x] Step 4: full plugin suite green (2698/2698); commit with `Closes #397` trailer. Live-verify against a real `HEAD~10` range with the operator's CLIs is the operator's call per the project's `Issue closure requires verification in a formally-installed release` rule.
+- [x] Step 4: full plugin suite green (2698/2698); commit `e7f5b4df` shipped with `Closes #397` trailer (authored under the prior workplan-template convention; AUDIT-20260604-35 later named the convention as conflicting with the operator-owned closure rule). **Auto-close caveat:** when this branch merges to main, GH will auto-close #397 from the `Closes` trailer; per the project rule the operator must reopen + verify against the formally-installed release before final closure. Live-verify against a real `HEAD~10` range with the operator's CLIs is the operator's call.
 
 **Acceptance Criteria:**
 
@@ -1517,7 +1517,7 @@ Context: the renderer's unsubstituted-var check fires on `{{x}}` patterns inside
 - [ ] Step 1: bug-repro test at `prompt-renderer.test.ts` — render a template whose `{{diff}}` value contains a literal `{{prompt}}` substring (e.g. the audit-barrage feature's own diff); assert rendering succeeds and the rendered output preserves the inner `{{prompt}}` literal.
 - [ ] Step 2: regression-lock — existing tests for true unsubstituted-vars on the template side stay green; pre-substitution detection of malformed template (e.g. `{{unknown_var}}`) still fires loud.
 - [ ] Step 3: implementation — refactor the check to run ONLY against the post-substitution surface that came from the template, not against substituted values. Use `<!-- {{var_name}} -->` HTML-comment markers in the template + post-substitution scan that excludes value-origin spans.
-- [ ] Step 4: full plugin suite green; live-verify by running `/dwi`-equivalent barrage against a diff containing `{{var}}` literals; commit with `Closes #396` trailer.
+- [ ] Step 4: full plugin suite green; live-verify by running `/dwi`-equivalent barrage against a diff containing `{{var}}` literals; commit with `Refs #396` trailer (NOT `Closes #396` — operator-owned closure per AUDIT-35).
 
 **Acceptance Criteria:**
 
