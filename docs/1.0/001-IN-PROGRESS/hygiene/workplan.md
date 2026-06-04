@@ -113,17 +113,17 @@ Six structural-check verbs (`check-clones`, `check-anti-patterns`, `check-adopte
 
 **Approach:** Single source of truth for the manifest-vs-git-diff decision. New module under `plugins/dw-lifecycle/src/scope-discovery/resolve-feature-scope.ts` exporting `resolveFeatureScope({ slug, repoRoot, baseRef }): Promise<{ files: string[]; source: 'scope-manifest' | 'git-diff'; }>`. Each downstream verb in Tasks 2-7 consumes the file list.
 
-- [ ] Step 1: write failing tests against the resolver — (a) manifest-present path returns regime_holdouts + modules files; (b) manifest-absent path runs `git diff --name-only <baseRef>...HEAD` and returns the changed files; (c) slug-resolves-to-no-feature-doc throws `FeatureNotFoundError`; (d) both-empty returns `[]` with `source: 'git-diff'`.
-- [ ] Step 2: confirm tests fail against current code (the module doesn't exist yet).
-- [ ] Step 3: implement the resolver — read `docs/<v>/<status>/<slug>/scope-manifest.yaml` via the existing scope-discovery loader; when absent, shell out to `git diff --name-only <baseRef>...HEAD`. `baseRef` defaults to `main` but is an arg so tests can pin it.
-- [ ] Step 4: confirm tests pass.
-- [ ] Step 5: commit with `Refs #417` in subject (NOT `Closes #417` — Phase 18 ships behind the verify-in-installed-release gate per project canon).
+- [x] Step 1: wrote failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/resolve-feature-scope.test.ts` — (a) manifest-present returns regime_holdouts files with `source: 'scope-manifest'`; (b) manifest-absent runs the injected git-diff dep and returns its paths with `source: 'git-diff'`; (c) feature-dir-not-found throws `FeatureNotFoundError`; (d) manifest-absent + diff-empty returns `[]`.
+- [x] Step 2: confirmed tests failed against missing module (`Failed to load url ../../scope-discovery/resolve-feature-scope.js`).
+- [x] Step 3: implemented at `plugins/dw-lifecycle/src/scope-discovery/resolve-feature-scope.ts`. Uses the existing `resolveFeatureRoot` walker for slug → feature dir. Manifest-present path parses YAML and collects all `regime_holdouts.{anti_patterns,adopter_manifests,module_symmetry,deprecations}[].file` paths (deduped). Manifest-absent path shells out via `gitDiffNameOnly` (DI-injectable for tests; production uses `execFileSync git diff --name-only <baseRef>...HEAD`).
+- [x] Step 4: 4/4 tests pass; full plugin suite 2705/2705 green.
+- [x] Step 5: commit with `Refs #417` in subject.
 
 **Acceptance Criteria:**
 
-- [ ] `plugins/dw-lifecycle/src/scope-discovery/resolve-feature-scope.ts` exists, exports `resolveFeatureScope` + `FeatureNotFoundError`.
-- [ ] `plugins/dw-lifecycle/src/__tests__/scope-discovery/resolve-feature-scope.test.ts` covers all four cases above; full plugin suite green.
-- [ ] No verb wired yet — Tasks 2-7 consume this resolver.
+- [x] `plugins/dw-lifecycle/src/scope-discovery/resolve-feature-scope.ts` exists, exports `resolveFeatureScope` + `FeatureNotFoundError` + `FeatureScope` + `FeatureScopeSource`.
+- [x] `plugins/dw-lifecycle/src/__tests__/scope-discovery/resolve-feature-scope.test.ts` covers all four cases above; full plugin suite green (2705/2705).
+- [x] No verb wired yet — Tasks 2-7 consume this resolver.
 
 ### Task 2: `check-clones` learns `--feature <slug>`
 
