@@ -254,19 +254,19 @@ Closes AUDIT-20260604-01 (claude-01 + codex-03; cross-model). Surface: `.dw-life
 
 ### Task 34 (fix-finding-AUDIT-20260604-05) (non-bug): AUDIT-20260604-05 — README Phase 26 row test count (2664) is now stale vs. workp…
 
-Closes AUDIT-20260604-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 26 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 32 Step 4).
+**Complete (2026-06-04).** Closes AUDIT-20260604-05. Surface: `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 26 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 32 Step 4).
 
 **Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
 
-- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
-- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
-- [ ] Step 3: commit with `Acknowledges AUDIT-20260604-05` in subject (use `Closes AUDIT-20260604-05` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition arms a false flip when the audit-log entry is later re-opened.
+- [x] Step 1: disposition prose — the audit's recommended cure had two options: (a) bump the absolute count + name the AUDIT-20260604-02 fix in the cell, or (b) drop the absolute count entirely in favor of "see workplan" per the no-rot-prone-specifics rule. Choosing (b) since this same-shape drift will recur every audit-finding cycle if the cell carries per-fix metrics — the rule is documented (`docs/1.0/001-IN-PROGRESS/scope-discovery/.claude/rules/documentation.md` § no-rot-prone-specifics) and the workplan + journal are the authoritative per-fix records.
+- [x] Step 2: action applied — README Phase 26 row updated this commit. Cell now mentions AUDIT-04 + AUDIT-02 by ID without absolute test counts; the back-reference to AUDIT-05 is explicit so future readers see why the cell was restructured.
+- [x] Step 3: commit with `Acknowledges AUDIT-20260604-05` in subject — non-bug disposition (doc edit); `Acknowledges` is correct because the README status is a documentation defect, not a test-verifiable code change. Per AUDIT-20260602-01: `apply-audit-flips` parses `Closes` trailers as `fixed-<sha>` proposals — using `Closes` on a non-fix disposition would arm a false flip.
 
 **Acceptance Criteria:**
 
-- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
-- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
-- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+- [x] Step 1 disposition prose exists and is ≥40 characters of substantive content.
+- [x] The named action has landed in this branch (README Phase 26 row updated this commit).
+- [x] Audit-log Status flipped open → `acknowledged-readme-phase-26-row-drops-absolute-count-2026-06-04` in this commit.
 
 ### Task 3: Disposition + baseline commands
 

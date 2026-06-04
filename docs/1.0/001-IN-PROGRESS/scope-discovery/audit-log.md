@@ -4195,7 +4195,7 @@ Compounding the timeline confusion: the DEVELOPMENT-NOTES entry added here is "c
 ### AUDIT-20260604-04 — Re-implements `expandRange`'s fallback-trigger logic in a parallel function with no shared source and no correspondence test — same comment-asserts-an-unenforced-relationship shape the fix was meant to retire
 
 Finding-ID: AUDIT-20260604-04 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)
-Status:     fixed-PENDING-SHA
+Status:     fixed-aa208ee8
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/workplan-archive/ledger.ts` — `classifyFixTaskRange` (new, lines ~354-396) vs. `expandRange` (lines ~280+)
 
@@ -4208,7 +4208,7 @@ The drift is concrete and silent. If a future change alters `expandRange`'s fall
 ### AUDIT-20260604-05 — README Phase 26 row test count (2664) is now stale vs. workplan Task 32 (2666) and omits the AUDIT-20260604-02 fix — reproducing the exact status-drift shape this diff corrects for Phase 25
 
 Finding-ID: AUDIT-20260604-05
-Status:     open
+Status:     acknowledged-readme-phase-26-row-drops-absolute-count-2026-06-04
 Severity:   low
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 26 row) vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` (Task 32 Step 4)
 
