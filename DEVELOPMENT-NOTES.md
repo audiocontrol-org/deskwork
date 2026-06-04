@@ -4713,3 +4713,57 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - **Owed before release:** live studio UI verification of the review-start shortform path (`.claude/rules/ui-verification.md`).
 - **Triage filed issues:** #418 (installer "Example override" still ships `{{prompt}}` — plugin-side), #419 (dead-code hygiene sweep), #420 (promote-findings auto-numbering).
 - **Optional:** dismantle/archive the stale `graphical-entries` + `hygiene` worktrees.
+
+## 2026-06-04 (cont. 2): Phase 39c-2b implementation — design pass + c4 (redirects→lane) + c3 (review rekey); barrage caught 2 real HIGHs in my own fixes
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Resolve the deferred 39c-2b(c5) design pass, then implement the sites→lanes terminal-deletion sequence (operator chose the full implementation, expand/contract order: c4 → c3 → c5-impl → c2 → terminal deletion).
+
+**Accomplished:**
+
+- **Design pass (c5/c3/c4) — Decisions #21/#22/#23 in the spec.** Oriented the content-enumeration subsystem via a code-explorer dispatch. Key correction: the doctor's orphan/duplicate detection is ALREADY migrated (`buildContentIndexFromSidecars` + `collectLaneScaffoldDirs`) — never part of the gap; the real surfaces were the studio content *browser* (c5), review keying (c3), redirects (c4). Operator chose c5 Option B (re-root `defaultFsWalk` at the lane `scaffoldDefaults` union); c3/c4 spec-derived. `ba430400` + `274f8c38` (fixed 2 self-caused barrage findings on the design commit).
+- **c4 — redirects re-homed onto the lane.** `LaneConfig.redirectsPath` added; migration carries legacy `site.redirectsPath`; `rename-slug` resolves redirects from the entry's lane. `8c84e82c` + 4 hardening rounds.
+- **c3 — review-workflow keying decoupled from `config.sites`.** Removed both `site in config.sites` 400 checks; `report.ts` `bySite`→`byLane` via new `resolveWorkflowLane` (entryId-preferred, `(unknown)` orphan bucket); `matchesKey` discriminator preserved + regression-tested. `17c9bb6b`.
+- **The audit-barrage caught two real HIGHs in my own c4 fixes** — exactly the third-audit-surface value: (1) AUDIT-08, a partial-apply crash (lane resolved AFTER the artifact move, throwing on an unresolvable lane); (2) AUDIT-19 (cross-model), a silent SEO regression — a valid `redirectsPath` was lost whenever an orthogonal `pipelineTemplate` failed to resolve, because `loadLaneConfig` cross-validates the pipeline. Fixed at the root: new `loadLaneConfigSchemaOnly` (read+schema, no pipeline cross-validation) + a visible `redirect-skipped` action. `9e2e2bc3`/`361085fc`/`a1bde974`/`e70674a5`.
+- **Clone disposition:** the c3 edit aligned the two parallel start-handlers past the 6-line jscpd threshold (`dba29300cb11`); extraction proved to be whack-a-mole (tsc narrowing friction + shifted to a new 9-line clone), so disposed `keep-with-reason` (intentionally-parallel sibling entry points). `b68fb06e`.
+
+**Didn't Work:**
+
+- **My c4 fix was wrong twice before it was right.** The first fix (AUDIT-08) resolved the lane post-mutation → partial-apply. The second (existsSync guard) only covered the missing-file case, not purged-pipeline. The third (best-effort `catch {}`) was overbroad (cross-model flagged the bare swallow vs. the no-silent-fallback rule). Only the fourth — schema-only read (pipeline orthogonality) — addressed the architectural root. The fix author is the wrong party to spot their own fix's flaws; the cross-model barrage was.
+- **Clone extraction shifted rather than removed the clone.** Extracting the shared start-handler guard moved jscpd onto the remaining structural parallelism — reverted + disposed instead.
+
+**Course Corrections:**
+
+- [PROCESS] Operator chose the c5 content-browser model (Option B) via the design-decision gate; c3/c4 were model-forced/spec-derived and captured for review.
+- [PROCESS] Held convergence discipline on the c4 barrage loop — fixed HIGHs + self-caused defects, did NOT chase slushed MED/LOW (the dampener's job; the "no whack-a-mole" rule).
+- [FABRICATION] Self-caught + cross-model-caught: AUDIT-19 showed I'd marked AUDIT-17 "FIXED" while only handling a different case — overstated. Re-fixed at the root and corrected the false `void err` "attributability" comment.
+
+**Quantitative:**
+
+- Commits this session: **9** (`ba430400`..`b68fb06e`).
+- Suites at end: **core 1029 · cli 454 · studio 1269** — all green. Core 1014→1029 net +15 (c4 redirect/migration cases, the schema-only-loader + redirect-skipped tests, c3 review-report + handler tests, the renumbered/converted rename-slug cases).
+- Open audit findings: **0**. Slush-pile this session: ~6 acknowledged entries (AUDIT-20260604-07/13/14/15/16/17 + the c4-final run) — all MED/LOW; each either fixed-anyway-and-annotated (13/15/16/17) or a non-bug/refactor/UX-nuance the dampener parked (07/14 + c4-final's loadLaneConfig-composition / redirect-skipped-noise / resolveCalendarPath-site items). No unfixed HIGH or correctness defect parked.
+- Issues: #420 (promote-findings auto-numbering) RECURRED — hand-renumbered the 39.25 collision to 39.27 again.
+
+**Insights:**
+
+- The audit-barrage earns its cost on NEW work: it caught two real HIGHs the implementer (me) could not see in their own fixes. The convergence risk is real too — three of the four c4 rounds were "the fix is subtly still wrong," and only the architectural root-cause framing (pipeline orthogonality → schema-only read) ended it.
+- A "best-effort `catch {}`" is a code smell even when semantically correct; the cross-model audit + the project's no-silent-fallback rule both push toward narrowing + visible signal (`redirect-skipped` action) over swallowing.
+- Doctor already owning orphan detection (sidecar enumeration) made the c5 design far smaller than the workplan note implied — orient before designing.
+
+### Hygiene observations
+
+- Commits this session: `ba430400`..`b68fb06e` (9). One `keep-with-reason` disposition (`dba29300cb11`).
+- Issue referenced/recurred this session: **#420** (OPEN) — promote-findings auto-numbering collision (hand-renumbered again). (The session-end-hygiene scan also surfaced #2/#22/#23 as "referenced" — these are noise from `#NNN` strings inside committed audit-log addenda, not issues actually worked.)
+- No bare TBD markers introduced in the workplan this session.
+- Tree clean; all 3 workspaces green; structural + open-findings gates clean (0 open).
+- Stale worktrees flagged: `~/work/deskwork-work/graphical-entries` (4/9), `~/work/deskwork-work/hygiene` (3/9) — dismantle/archive candidates.
+
+### Next session recommendation (hygiene)
+
+- **Resume: Phase 39c-2b remaining implementation** — c5-impl (`collectContentRoots` + re-root `defaultFsWalk` at the lane `scaffoldDefaults` union + collapse the `/dev/content/:site` studio routes + re-base the display callers) → c2 (scrapbook re-base on `collectContentRoots`) → the terminal deletion of `config.sites`/`SiteConfig`/`resolveSite`/`siteConfig`/`resolveContentDir` (~137 refs across core+cli+studio; the riskiest unit — warrants fresh context) → 39e (MIGRATING.md + doc `sites` refs). (NOT the workplan's stale line-76 "Install deskwork plugin in audiocontrol.org" — that's a superseded pre-pivot Phase 4 item.)
+- **Owed before release:** live studio UI verification of the review-start shortform path (`.claude/rules/ui-verification.md`).
+- **Triage:** #420 (auto-numbering collision recurred — the auto-numberer is still buggy; consider fixing it before the next promote-findings run).
+- **Optional:** dismantle/archive the stale `graphical-entries` + `hygiene` worktrees.

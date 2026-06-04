@@ -1358,3 +1358,54 @@ Severity:   low
 Surface:    diff scope (no `packages/core/test/rename-slug.test.ts` hunk) + audit-log addendum "AUDIT-18 — OBSOLETE-by-design"
 
 The diff changes runtime behavior — adds the `existsSync` guard and alters the catch — but contains no test change, contradicting the workplan's own Option D / TDD task shape (Step 1 failing test anchored at the surface, Step 1b regression-lock). The addendum asserts "ghost / purged-pipeline / corrupt-JSON tests all assert the rename COMPLETES and skips," but those tests are not in this diff, so a reviewer cannot verify the new `existsSync`-skip path is distinguished from the catch path, nor that the valid-redirect/broken-pipeline case (Finding-01) is covered (it is not — it would have caught the bug). Separately, AUDIT-18 recommended a *throw-independent* ordering lock — "old path present XOR new path present is never violated" — that survives the throw→skip change; the disposition closes AUDIT-18 as obsolete without adding it. So a future re-narrowing of the catch (e.g. to swallow only `ENOENT`) reintroduces partial-apply with no guard, which is the regression AUDIT-08 was filed to prevent.
+
+## 2026-06-04 — audit-barrage lift (20260604T214207738Z-deskwork-plugin)
+
+### AUDIT-20260604-21 — `loadLaneConfig` was not refactored to compose on the new `loadLaneConfigSchemaOnly`; the two now duplicate the entire read-prefix
+
+Finding-ID: AUDIT-20260604-21
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `packages/core/src/lanes/loader.ts:168-201` (`loadLaneConfig`) vs. `:223-231` (`loadLaneConfigSchemaOnly`)
+
+`loadLaneConfigSchemaOnly` (223-231) is a strict prefix of `loadLaneConfig` (168-201): both run the identical empty-id guard (`id.trim().length === 0` → throw), the identical `assertSafeLaneId(projectRoot, id)`, and the identical `readAndValidate(laneConfigPath(projectRoot, id), id)`. The only thing `loadLaneConfig` adds is the pipeline cross-validation block (190-198). The new function was added *alongside* the old one rather than the old one being rebuilt to compose on it. The clean, intent-revealing shape is:
+
+```ts
+export function loadLaneConfig(id, projectRoot) {
+  const lane = loadLaneConfigSchemaOnly(id, projectRoot);
+  // cross-validate pipeline template …
+  return lane;
+}
+```
+
+This matters concretely here, not just stylistically: this is exactly the kind of in-file near-duplicate the repo's own `check-clones` baseline tracks (see `.dw-lifecycle/scope-discovery/clones.yaml`), so the diff arguably introduces a new clone group in the same session whose theme is audit discipline. It also creates a divergence hazard — the empty-id error message is now copy-pasted with the function name hardcoded into the string (`loadLaneConfig requires…` vs `loadLaneConfigSchemaOnly requires…`), and any future change to the safe-id / read / schema contract (e.g. a new validation step) must be made in two places or silently drift between the two readers. The fix is composition, which also shrinks the new function to two lines.
+
+---
+
+### AUDIT-20260604-22 — `redirect-skipped` is emitted whenever the lane is unreadable, even for entries that never configured a `redirectsPath` — conflating "lane gone" with "you lost a 301"
+
+Finding-ID: AUDIT-20260604-22
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `packages/core/src/rename-slug.ts:204-217` (catch → push `redirect-skipped`) + `:284` (append gate) + the locking test at `packages/core/test/rename-slug.test.ts` ("emits redirect-skipped when the lane config is missing")
+
+The new visibility behavior is asymmetric in a way that will cry wolf. When the lane reads cleanly but simply has no `redirectsPath` set, the code correctly does nothing (the `if (redirectsPath !== undefined)` gate at `:284` is false, no action). But when the lane file is **absent/corrupt** (`loadLaneConfigSchemaOnly` throws), the catch at `:209-214` pushes a `redirect-skipped` action *unconditionally* — without knowing whether the lane, had it been readable, would have carried a `redirectsPath` at all. Per the project's own foundational principle (a collection without a renderer/host is fully valid; `redirectsPath` is optional website-publishing metadata), the overwhelming common case is **no redirect configured**. So renaming any entry whose lane has been archived/purged now reports `skipped 301 redirect — lane "<x>" could not be read` even though there was never a 301 to lose.
+
+The summary string compounds it: "skipped 301 redirect" asserts a redirect existed and was dropped, which an operator will read as a broken-link regression — the exact alarm AUDIT-17/19 were filed about — when in fact nothing was lost. This is the inverse of the silent-drop bug (over-reporting rather than under-reporting), and it's aligned with the project's visible-over-silent value, so it isn't data loss; but it makes the action stream misleading on routine archived-lane renames. Worse, the rewritten test at `rename-slug.test.ts` ("…missing (archived/purged)") now *asserts* `redirect-skipped` is present, cementing the cry-wolf behavior as the contract. A truer shape would distinguish "lane unreadable → couldn't determine redirect config" from "redirect was configured and is being skipped," e.g. soften the summary to "could not consult lane for an optional 301 redirect" (no claim a redirect existed), or only surface the skip when there's independent evidence the lane published a website (e.g. a `host`/legacy redirect file already on disk).
+
+---
+
+### AUDIT-20260604-23 — `resolveWorkflowLane`'s slug fallback resolves the calendar through the retired site axis (`resolveCalendarPath(…, w.site)`), silently degrading legacy workflows to `(unknown)`
+
+Finding-ID: AUDIT-20260604-23
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `packages/core/src/review/report.ts:130-141` (`resolveWorkflowLane` → `lookupEntry(projectRoot, config, w.site, { slug: w.slug })`) + `packages/core/src/review/workflow-paths.ts:38-59`
+
+The whole point of Phase 39c c3 is that `w.site` is now an *opaque, unvalidated* label — but the `entryId`-absent fallback path in `resolveWorkflowLane` still routes through `lookupEntry(projectRoot, config, w.site, …)`, which calls `resolveCalendarPath(projectRoot, config, site)` (`workflow-paths.ts:45`). That resolver is site-keyed against `config.sites`. For a legacy workflow that lacks an `entryId` and carries a `site` label not present in `config.sites`, `resolveCalendarPath` will resolve the wrong calendar (or its `existsSync` check fails / it throws), the surrounding `try/catch` returns `undefined`, and the workflow buckets under `(unknown)` — even when a calendar row with that slug exists under the default/another lane. So the lane breakdown silently mis-attributes exactly the legacy workflows the fallback was written to handle.
+
+This is low severity because (a) new workflows carry `entryId` and skip the fallback entirely, and (b) the report degrading one orphan to `(unknown)` is non-fatal by design. But it's worth surfacing: the new code couples a "sites are retired / opaque" report path back onto the site-keyed calendar resolver, which is the coupling this whole phase is trying to remove. When the terminal `config.sites`/`resolveCalendarPath(site)` deletion lands (c5-impl), this fallback will need to re-resolve via `collectContentRoots`/the lane-agnostic calendar, or it becomes dead-by-degradation (everything legacy → `(unknown)`). A breadcrumb comment or a follow-up note tying this fallback to the c5 calendar de-siting would keep it from being missed.
+
+---
+
+I walked the redirect-resolution change, the schema-only loader, the `bySite`→`byLane` report rework, and the `site`-validation removals in the handlers. The core AUDIT-19 fix is real this time — `loadLaneConfigSchemaOnly` genuinely decouples the redirect from pipeline cross-validation, and the test at `rename-slug.test.ts` ("appends the 301 even when the lane pipeline template is unresolvable") would have caught the prior regression. The handler `site`-validation removals are sound (still require `b.site` presence, defer unknown-entry to the existing 404, tests cover both 404-not-400 and the opaque-label-resolves cases). The `byLane` rename has **no external consumers** (`buildReport`/`renderReport`/`ReviewReport.bySite` are referenced only inside `report.ts` and its test — studio's `byLane` symbols are unrelated dashboard code), so it is not a breaking cross-package change. My three findings are: one DRY/clone regression (medium), one misleading-action-noise issue (medium), and one site-coupling breadcrumb (low).
