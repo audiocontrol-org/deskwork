@@ -1138,6 +1138,25 @@ Context: each main → feature-branch resync surfaces conflicts in `.dw-lifecycl
 - [ ] Next live main → feature-branch merge produces materially less manual reconciliation than the most-recent pre-fix merge (operator-judged; the inventory report provides the falsifiable baseline).
 - [ ] Closure transition is operator's call after install + verify on the next real merge.
 
+### Task 50 (fix-issue-#415): structural-chain SKILL.md prescribes `--feature <slug>` that the v0.36.0 verbs reject ([#415](https://github.com/audiocontrol-org/deskwork/issues/415))
+
+Refs #415. Surface: `plugins/dw-lifecycle/src/subcommands/{check-clones,check-anti-patterns,check-adopters,check-module-symmetry}.ts` + `plugins/dw-lifecycle/skills/{session-start,implement}/SKILL.md`. Severity: medium (every Claude Code session that follows the SKILL.md verbatim hits this on first invocation; current behavior silently degrades the structural snapshot).
+
+Context: surfaced 2026-06-04 during a `/dw-lifecycle:session-start` + `/dw-lifecycle:implement` dogfood on `feature/scope-discovery`. The four structural-chain verbs reject `--feature` (no flag declared); the SKILL.md prescriptions all pass it. The agent worked around by dropping the flag from each invocation. See the issue body for the per-verb reproduction.
+
+- [ ] Step 0: working-code invariant — existing CLI invocations without `--feature` keep working (registry resolution from defaults / `--registry` flag). The fix must not change registry-discovery semantics for any verb.
+- [ ] Step 1: bug-repro test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/structural-chain/feature-flag-acceptance.test.ts` — for each of the 4 verbs, spawn the CLI with `--feature scope-discovery` and assert the process does NOT exit with `unknown arg: --feature` / `unknown argument: --feature`. Pre-fix the test fails for all four; post-fix passes for all four.
+- [ ] Step 2: regression-lock — for each of the 4 verbs, spawn without `--feature` and assert behavior is unchanged from today (same exit code + same stdout / stderr report shape against a fixture project).
+- [ ] Step 3: implementation — recommend **Option 1 (accept-but-ignore)** per the issue body: add `--feature <slug>` to each verb's argv parser as a passthrough (consumed silently). The SKILL.md prescription becomes valid without changing any check's semantics. Decline Option 2 (per-feature registries) without operator scoping; decline Option 3 (drop from SKILL.md) because the verb-side fix is the smaller surface that fixes both ends. Operator may override at implementation time.
+- [ ] Step 4: full plugin suite green; live-verify by re-running `/dw-lifecycle:session-start` and confirming Step 7's structural snapshot lines all exit 0 with the `--feature scope-discovery` prescription verbatim. Commit with `Refs #415` trailer (NOT `Closes #415` — operator-owned closure per AUDIT-35).
+
+**Acceptance Criteria:**
+
+- [ ] Bug-repro test exists; was failing on main pre-fix (proved by spawning each verb with `--feature` against the current binary).
+- [ ] Regression-lock test asserts no-`--feature` behavior is unchanged.
+- [ ] `/dw-lifecycle:session-start` Step 7 + `/dw-lifecycle:implement` Step 6a invocations run clean (no `unknown arg` stderr) against a fresh install.
+- [ ] Closure transition is operator's call after install + verify on a fresh `/dw-lifecycle:session-start` run.
+
 ## Phase 11: Pattern discovery loop with self-correcting controller
 
 **Parent issue:** [#316](https://github.com/audiocontrol-org/deskwork/issues/316).
