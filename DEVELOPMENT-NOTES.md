@@ -4670,3 +4670,64 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Triage: #415 (Task 50 scoped this session; pending implementation). All `pending-verification`-labeled issues from prior session's close-shipped dogfood (#294/#295/#401/#402/#403/#404/#405/#407/#409/#410) remain operator-pending-verify. #397 also pending operator-reopen-and-verify (see hygiene observations above).
 - Address TBD markers: (no bare TBD markers introduced this session).
 - Dismantle stale worktrees: `/Users/orion/work/deskwork-work/graphical-entries` (`feature/graphical-entries`) — 4 of 9 signals. Consider `/dw-lifecycle:dismantle-worktrees` next session if graphical-entries work is paused.
+
+## 2026-06-04 (cont. 4): Session-start bootstrap + scope #418 (Phase 12 Task 10) + new Phase 27 (session-end archive hook)
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Resume the prior session's recommendation queue starting with Phase 12 Task 9 (#396 `audit-barrage-render` `{{var}}` false-positives). Operator redirected after session-start bootstrap — scope two new items into the workplan instead: a fix for GH #418 (audit-barrage E2BIG fix is inert for existing configs) and a new Phase 27 wiring `archive-phases` into `/dw-lifecycle:session-end` to keep the live workplan focused.
+
+**Accomplished:**
+
+- **Session-start bootstrap via `/dwss`.** Confirmed active feature (scope-discovery, branch `feature/scope-discovery`, worktree clean). Read prior session journal (cont. 3) + hygiene helper output. Structural snapshot: `clones=256 total / 0 NEW vs baseline · anti-patterns=0 (4 entries scanned across 0 files) · holdouts=0 · symmetry-deltas=registry empty`.
+- **Flag-drift bug (#415 / Phase 6 Task 50) re-confirmed live during bootstrap.** All four structural-chain verbs (`check-clones`, `check-anti-patterns`, `check-adopters`, `check-module-symmetry`) reject `--feature <slug>` with `unknown arg`. Re-ran each verb without the flag to get the advisory snapshot above. This was already scoped as Phase 6 Task 50 last session; no new finding, just confirms the issue still bites at the prescribed firing point.
+- **Scoped GH #418 → Phase 12 Task 10.** Issue claim: `audit-barrage` E2BIG fix (#397, v0.37.0) is inert for existing configs because the committed dogfood YAML + installer "Example override" comment still teach `{{prompt}}`. State-accounting check against this branch revealed the issue is half-fixed:
+   - Surface (a) — this repo's `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml`: **ALREADY migrated** in prior session's commit `740377e9` (PR #416, v0.37.0). The issue body was filed pre-merge while verifying on `feature/deskwork-plugin` (per its Provenance line).
+   - Surface (b) — `install-scope-discovery.ts:117-131` "Example override" comment block: **STILL `{{prompt}}`** on `main` + this branch. Direct fix scoped.
+   - Surface (c) — already-installed adopters' configs: **STILL `{{prompt}}`** universally. Auto-migration path scoped as Step 4 with operator-pick between (i) doctor rule, (ii) fire-time warning, (iii) both.
+   - Task block uses TDD-first shape + `Refs #418` trailer (operator-owned closure per AUDIT-35; no auto-close on merge).
+- **Scoped new Phase 27 — wire `archive-phases` into `/dw-lifecycle:session-end`.** 3 core tasks: (1) phase-completion detection helper, (2) `archive-phases --auto-detect` CLI flag, (3) SKILL.md Step 9.5 wiring (between Step 9 closing-discipline + Step 10 commit). Plus 1 optional Task 4 doctor-rule companion (`phase-ready-to-archive`) captured in design questions. Open design questions (operator pick at implementation): firing mode (auto-apply vs operator-confirm vs doctor-only), doctor-rule ship/skip, config-flag default, ordering. Motivation: live workplan currently 1820 lines despite only 5 active phases — completed phases linger between manual archive sweeps. Symmetric with Phase 26 Task 5 Step 2's `/complete` wiring.
+- **Closing discipline (Step 9) green.** `check-disposition-survivor` exit 0 (no clones.yaml regressions). `check-open-findings --feature scope-discovery` reports zero open findings. Bare-TBD scan via hygiene helper: no markers introduced this session.
+
+**Didn't Work:**
+
+- **Hygiene helper missed #418 in the "issues referenced this session" enumeration.** The helper derives from `git log <boundarySha>..HEAD` commit subjects + bodies; this session's scoping work is uncommitted at the time of hygiene capture, so the helper's session range is empty. Not a bug — the journal entry captures the narrative authoritatively; the helper is a mechanical companion.
+- **`session-start-recommendation` mechanical Resume pick is Task 40 Step 0 (Phase 6 #411).** The operator-set queue (last session: #396 → #411 → #412 → #366 → #350 → #297 → #413 → #415) overrides text order. The helper's mechanical pick will continue to surface the first unchecked task per file scan until #396 is implemented; not a defect, just the documented helper behavior.
+
+**Course Corrections:**
+
+- **[PROCESS] `check-disposition-survivor` verb's flag surface differs from session-end SKILL.md.** SKILL.md Step 9 prescribes `check-disposition-survivor --feature <slug>`; verb's actual flags are `--allow-disposition-loss / --baseline / --head-ref / --repo` — no `--feature`. Same drift class as #415 (structural-chain verbs). I invoked without the flag and it worked (silent + exit 0). Could fold into the existing Phase 6 Task 50 (#415) scope — Task 50 currently lists 4 structural-chain verbs; adding `check-disposition-survivor` makes it 5. Or file separately. Capturing here for the next session to decide.
+- **[PROCESS] No mechanical priority-queue persistence.** The operator-set queue from prior session (`#396 → #411 → ...`) only survives in the journal entry text + my context. Phase 27 + #418 are unplaced; if the operator wants them in the queue, they'll need to state it explicitly (or a tooling change tracks queue position explicitly — too speculative to scope without operator framing).
+
+**Quantitative:**
+
+- Commits this session: 1 (session-end commit bundling the two scope deltas + this journal entry, per skill Step 10 prescription).
+- Workplan delta: +133 lines net (Task 10 +36; Phase 27 +97); workplan now 1880 lines (was 1747 at session start).
+- README delta: +1 row (Phase 27), 1 row updated (Phase 12 to mention Task 10), active-phases note now `6, 11, 12, 20, 24, 27`.
+- Structural snapshot at session-end: identical to session-start (no source code changed; scoping was doc-only).
+- Issues scoped: 1 (#418 → Phase 12 Task 10).
+- New phases scoped: 1 (Phase 27, no GH issue yet — the operator can file one if the implementation phase needs an external tracker).
+- Audit findings dispositioned: 0 (no new audit-log activity this session).
+- Sub-agent dispatches: 0.
+
+**Insights:**
+
+- **The "verify reviewer-cited external constraints" memory paid off on #418.** Issue body asserted surface (a) was still broken on this repo; a 30-second `git show main:<path>` confirmed it was already migrated in commit `740377e9`. Without that check, I'd have written a 3-surface task block including a "migrate the committed YAML" step that's already shipped — would have led to a wasted implementation cycle + a confusing "fix" commit that did nothing. Verification at scope-time is cheaper than verification at implementation-time.
+- **Capture-vs-scope discipline made Phase 27 honest.** The natural temptation was to pre-decide: "auto-detect-and-apply, config-flag default true, ship the doctor rule too." Instead the 4 design questions are captured for operator pick at implementation. The cost is ~30 lines of design-question prose in the workplan; the benefit is operator-owned scope decisions actually made by the operator, not by me masquerading as the operator with capture-time-recommendation cover.
+- **Flag-drift is a recurring class, not a one-off bug.** #415 named structural-chain verbs; `check-disposition-survivor` shows the same drift class survives outside that scope. A general "SKILL.md prescribes flag X / CLI rejects flag X" mechanical test would close the class. Phase 6 Task 50's current scope is limited to the 4 structural-chain verbs; expanding to all SKILL-prescribed flags is a design call for the operator.
+
+### Hygiene observations
+
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/hygiene` `feature/hygiene` — 3 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: **Phase 12 Task 9 (fix-issue-#396) — `audit-barrage-render` false-positives on `{{var}}`-shaped strings inside the diff**, per the operator-set priority queue established in prior session:
+   `#396 (Phase 12 Task 9) → #411 (Task 40) → #412 (Task 41) → #366 (Task 42) → #350 (Task 43) → #297 (Task 44) → #413 (Task 45) → #415 (Task 50)`.
+   New this session and **unplaced in the queue**: `#418 (Phase 12 Task 10)` + `Phase 27` (no GH issue yet). Operator decides placement.
+   The hygiene-helper's mechanical Resume pick was Task 40 Step 0 (first unchecked text-order); the operator queue overrides.
+- Triage: pending-verification carryover from prior sessions remains: #294, #295, #401, #402, #403, #404, #405, #407, #409, #410, #411, #412, #413. #397 also pending operator-reopen-and-verify against installed v0.37.0.
+- Address TBD markers: (no bare TBD markers introduced this session)
+- Dismantle stale worktrees: `/Users/orion/work/deskwork-work/graphical-entries` (4/9 signals), `/Users/orion/work/deskwork-work/hygiene` (3/9 signals) — consider `/dw-lifecycle:dismantle-worktrees` if either is paused.
+- Flag-drift follow-up: `check-disposition-survivor` verb rejects the SKILL-prescribed `--feature <slug>` flag — same class as #415. Fold into Task 50 scope OR file separately.

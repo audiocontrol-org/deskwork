@@ -1551,6 +1551,42 @@ Context: the renderer's unsubstituted-var check fires on `{{x}}` patterns inside
 - [ ] Live verification: barrage runs cleanly against a diff containing inline `{{var}}` template literals (e.g. the audit-barrage feature itself).
 - [ ] Closure transition is the operator's call post-install verification.
 
+### Task 10 (fix-issue-#418): audit-barrage E2BIG fix (#397) is inert for existing configs — installer "Example override" still teaches `{{prompt}}`; existing adopter configs silently stay on argv form ([#418](https://github.com/audiocontrol-org/deskwork/issues/418))
+
+Refs #418. Surfaces: `plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:117-131` (installer-seeded "Example override" comment block — STILL `{{prompt}}` on both `main` and this branch). Plus the broader migration question: every adopter who installed pre-#397 keeps `{{prompt}}` in their `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` until they hand-edit, so #397's cure is inert for them. Severity: **medium** (cross-model audit silently degrades to outage on large diffs for existing adopters + on any first-customization the installer's example bait-and-switches the adopter back onto the broken default).
+
+**State accounting (scoping-time, 2026-06-04):**
+
+- Surface (a) — this repo's own committed `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml`: **ALREADY MIGRATED** in commit `740377e9` (prior session, PR #416, shipped in v0.37.0). Visible on both `main` and `feature/scope-discovery`. The issue body was written pre-merge while verifying on `feature/deskwork-plugin` (per its Provenance line); on that branch the migration is not yet visible. No action on this branch.
+- Surface (b) — installer "Example override" comment block at `install-scope-discovery.ts:117-131`: **STILL `{{prompt}}`** on both `main` and this branch. Any adopter who uncomments to customize a model adopts the argv form and reintroduces the exact failure #397 fixed. Direct fix below.
+- Surface (c) — existing adopters' on-disk configs: **STILL `{{prompt}}`** on every project that installed pre-#397 and hasn't hand-edited. No mechanical migration path exists today. Operator-decision sub-item below.
+
+Context: `#397` (v0.37.0) flipped the **shipped template** (`plugins/dw-lifecycle/templates/audit-barrage-config.yaml`) to `{{prompt-stdin}}` and added `classifyE2BIGSpawnError` to name the cure on failure. The migration didn't reach the installer's example block (it bait-and-switches the adopter onto the broken form on first customization) or already-installed adopters (the classifier only fires AFTER a lost barrage run, which silently loses cross-model coverage on that diff).
+
+- [ ] Step 0: working-code invariant — fresh-template installs (v0.37.0+ default) continue to ship `{{prompt-stdin}}` for all three CLIs; the `{{prompt}}` form continues to work for prompts under `ARG_MAX` (back-compat preserved per #397); `classifyE2BIGSpawnError` continues to emit its structured cure message on failure.
+- [ ] Step 1: bug-repro test for surface (b) — assert (regex-pin) that the `install-scope-discovery.ts` "Example override" comment block uses `{{prompt-stdin}}` for all three CLI examples (claude / codex / gemini); should be RED on main pre-fix.
+- [ ] Step 2: regression-lock — installer still writes a valid YAML config; existing fresh-install path tests stay green; `classifyE2BIGSpawnError` tests stay green; the surface-(a) regex-pin already present in `audit-barrage-config.yaml` tests (if any; verify) stays green.
+- [ ] Step 3: implementation for surface (b) — edit `install-scope-discovery.ts:117-131` "Example override" comment block: flip the three example `args_template` lines:
+  - `args_template: "-p {{prompt}}"` → `args_template: "-p {{prompt-stdin}}"` (claude)
+  - `args_template: "exec {{prompt}}"` → `args_template: "exec {{prompt-stdin}}"` (codex)
+  - `args_template: "{{prompt}}"` → `args_template: "{{prompt-stdin}}"` (gemini)
+- [ ] Step 4: scope surface (c) — auto-migration for existing adopters. The issue body's "Suggested fix" names two paths; **operator pick required before implementation**:
+  - **(i) Doctor rule** — new `audit-barrage-config-uses-argv-prompt` doctor rule flagging configs still on `{{prompt}}` with a `--fix` that migrates to `{{prompt-stdin}}` (with the override flag preserved in a backup or noted). Fires on `/dw-lifecycle:doctor`; doesn't slow the audit-barrage hot path; explicit operator-driven repair surface.
+  - **(ii) Fire-time warning** — `audit-barrage` emits a structured warning when a config uses `{{prompt}}` AND the rendered prompt exceeds a byte threshold (e.g. `ARG_MAX / 2`), naming the `{{prompt-stdin}}` migration BEFORE the inevitable failure. Adds belt-and-suspenders to `classifyE2BIGSpawnError`'s post-failure message.
+  - **(iii) Both.** (i) is the explicit-repair surface; (ii) catches adopters who don't run doctor regularly.
+  - Capture-time recommendation: (iii) is the most defensive — doctor catches the issue on schedule, fire-time warning catches it during silent degradation. Operator decides at implementation time; do NOT pre-decide here. If operator picks (i) or (iii), implement as part of this task; if (ii) alone, ship the warning then leave a follow-up issue for the doctor-rule path.
+- [ ] Step 5: full plugin suite green; live-verify by running `dw-lifecycle audit-barrage` against this repo's `HEAD~10..HEAD` range post-migration (the same range #397 named); confirm the barrage doesn't `spawn E2BIG` AND (if Step 4 implemented (ii)) confirm the fire-time warning emits when fed a config still on `{{prompt}}` over the byte threshold; commit with `Refs #418` trailer (NOT `Closes #418` — operator-owned closure per AUDIT-35).
+
+**Acceptance Criteria:**
+
+- [ ] Bug-repro test for surface (b) exists; was failing on main pre-fix.
+- [ ] `install-scope-discovery.ts` "Example override" comment block uses `{{prompt-stdin}}` for all three CLI examples (claude / codex / gemini).
+- [ ] Surface (c) auto-migration path scoped + implemented per operator pick during Step 4 (OR filed as a follow-up GH issue with the captured design space if operator decides to defer).
+- [ ] If (i) doctor rule implemented: rule detects `{{prompt}}` configs + `--fix` migrates them; rule documented in `/dw-lifecycle:doctor` SKILL.md.
+- [ ] If (ii) fire-time warning implemented: warning fires when config uses `{{prompt}}` AND rendered prompt size > threshold; warning message names `{{prompt-stdin}}` migration + issue #418.
+- [ ] Live verification: `dw-lifecycle audit-barrage` against `HEAD~10..HEAD` on this repo runs without `spawn E2BIG` AND surfaces the new warning path if exercised against a `{{prompt}}` config.
+- [ ] Closure transition is the operator's call post-install verification (operator-owned closure per AUDIT-35).
+
 ## Phase 20: AUDIT-68 follow-up + audit-barrage review-surface consolidation
 
 Two issues filed externally (2026-06-02) that close out latent work from this session's burndown loop. Both touch scope-discovery's review surface; both are tagged here so future sessions don't lose track of the commitment.
@@ -1781,3 +1817,64 @@ GH [#387](https://github.com/audiocontrol-org/deskwork/issues/387) — the "thre
 - **Reconsidering whether `/dw-lifecycle:doctor` should grow more enforcement.** Orthogonal; survives.
 - **Renaming `editor-symmetry` terminology.** Captured separately as Phase 25 below; Phase 25 must NOT block Phase 24.
 - **Audiocontrol pilot migration.** Pilot doesn't have the audit-finding hooks; nothing to migrate. The structural chain in the pilot is the operator's call to leave or upgrade.
+
+## Phase 27: Wire `archive-phases` into `/dw-lifecycle:session-end` — auto-archive completed phases at session boundaries
+
+Phase 26 productized `archive-phases` and Task 5 Step 2 wired it into `/dw-lifecycle:complete` for feature-completion archive. But `/complete` only fires when the feature ships; on a long-running multi-phase feature (scope-discovery, 27 phases over ~2 months), completed phases accumulate in the live workplan between releases. Wiring `archive-phases` into `/session-end` archives completed phases at the natural session boundary — same cadence as the journal entry, same commit — keeping the live workplan focused on in-progress work.
+
+**Motivation:**
+
+- The live workplan currently sits at ~1820 lines despite only 5 active phases (6/11/12/20/24); the remaining 22 phases shipped + were manually archived. Without a routine hook, completed phases linger between manual archive sweeps.
+- Symmetric with `/complete`'s auto-apply pattern (Phase 26 Task 5 Step 2 set the precedent: archive at lifecycle boundaries).
+- Infrastructure already exists — `archive-phases` has `--all` + `--phases <range>` + dry-run + refuse-on-partial. The work is skill-body wiring + a detection helper, not new core logic.
+
+### Task 1: Phase-completion detection helper
+
+Pure-function library at `plugins/dw-lifecycle/src/scope-discovery/archive-phases/detect-completed-phases.ts`. Given workplan + README paths + feature slug, returns `{ readyToArchive: PhaseId[], inProgress: PhaseId[], rationale: Record<PhaseId, string> }`. Needed because `archive-phases --all` refuses on any partial-complete phase (correct gate at `/complete`, wrong gate at `/session-end` where most phases are still in progress); the detector mechanically computes the safe `--phases` range.
+
+- [ ] Step 0: working-code invariant — existing `archive-phases --all` refuse-on-partial gate continues to fire when operator passes `--phases <range>` manually.
+- [ ] Step 1: bug-repro / contract test — fixture with mixed phase states (e.g. 3 complete-and-all-checked + 2 in-progress + 1 README-says-Complete-but-has-unchecked-task) → detector returns 3 complete as `readyToArchive`; README-mismatch phase as `inProgress` with rationale naming the unchecked line.
+- [ ] Step 2: regression-lock — all-complete workplan → all phases returned; all-in-progress → empty `readyToArchive`.
+- [ ] Step 3: implementation — AND-gate structural signal (all `- [ ]` → `- [x]` under the phase heading) with operator-curated signal (README Status row reads "Complete" / "Shipped" / "Substantive complete"); explicit per-phase rationale strings for surface in session-end report.
+- [ ] Step 4: full plugin suite green; live-verify against this repo's current workplan (expect: 0 phases ready — Phases 6/11/12/20/24 all in progress).
+
+### Task 2: CLI flag — `archive-phases --auto-detect`
+
+Extend the existing `archive-phases` verb with `--auto-detect` flag that invokes the Task 1 detector and threads its `readyToArchive` set as the `--phases` range. Mutually exclusive with `--all` + `--phases`. Same exit codes as today.
+
+- [ ] Step 0: working-code invariant — existing `--all` + `--phases <range>` paths unchanged.
+- [ ] Step 1: bug-repro test — `--auto-detect --apply` against a mixed-state workplan archives only the detected-complete phases.
+- [ ] Step 2: regression-lock — `--auto-detect` without `--apply` is dry-run; `--all` still refuses on partial-complete.
+- [ ] Step 3: implementation — `--auto-detect` invokes detector + threads phase set; `--help` documents the flag.
+- [ ] Step 4: full plugin suite green; live-verify: `dw-lifecycle archive-phases --feature scope-discovery --auto-detect` (expect dry-run: 0 phases).
+
+### Task 3: Wire into `/dw-lifecycle:session-end` SKILL.md
+
+New Step 9.5 between closing-discipline (Step 9) and commit (Step 10) — invokes `archive-phases --auto-detect --apply` and surfaces archived count + IDs in the session-end report. Gated by `config.session.end.archiveCompletedPhases` (default true; opt-out per project).
+
+- [ ] Step 0: working-code invariant — existing 11 steps fire in order; new step is additive, not replacement.
+- [ ] Step 1: skill-body integration test — fixture where 1 phase just got completed this session → (a) Step 9 closing-discipline fires against pre-archive workplan, (b) Step 9.5 archives the phase, (c) Step 10 commit includes the archive move + journal entry reports it.
+- [ ] Step 2: regression-lock — fixture with no completed phases → session-end proceeds without disrupting the flow.
+- [ ] Step 3: implementation — edit `plugins/dw-lifecycle/skills/session-end/SKILL.md` Step 9.5 prose + config flag handling + error-handling section.
+- [ ] Step 4: full plugin suite green; live-verify on this repo's actual session-end.
+
+### Open design questions (operator pick required at implementation)
+
+1. **Firing mode at session-end.**
+   - **(a) Auto-detect + auto-apply** (Task 2 shape) — always-fire; in-progress phases left alone; no operator prompt.
+   - **(b) Detect + operator-confirm** — surface candidates in the report, prompt before applying. Safer if there are edge cases warranting human-in-the-loop.
+   - **(c) Doctor-rule-only** — new doctor rule `phase-ready-to-archive` flagging candidates on `/dw-lifecycle:doctor`; session-end surfaces the count but doesn't auto-archive.
+   - **Capture-time recommendation: (a)** — symmetric with `/complete`'s auto-apply; archive-phases already has refuse-on-partial guard; no new operator-attention surface. Operator decides at implementation time.
+2. **Doctor-rule companion (Task 4, optional).** Ship `phase-ready-to-archive` doctor rule ALSO (regardless of firing-mode pick), so operators can check the state mid-session without running session-end? Cheap (~30 LOC); orthogonal visibility surface. **Capture-time recommendation: ship.** If operator picks (c) above, this becomes the primary surface and Task 3's skill wiring becomes a thin "report the doctor-rule count" step.
+3. **Config flag default.** `config.session.end.archiveCompletedPhases: true` (always-on, opt-out) or `false` (opt-in)? **Capture-time recommendation: true** — symmetric with the rest of `/session-end`'s always-on hygiene steps.
+4. **Order vs Step 9 (closing-discipline).** New step fires AFTER Step 9 so the closing-discipline checks (`check-disposition-survivor` + bare-TBD scan + `check-open-findings`) fire against the still-live workplan — no false negatives from completed-phase TBDs migrating to archive prematurely. **Capture-time decision: confirmed in Task 3 scope above; not a re-litigable question, but flagged here so the operator sees the ordering choice explicitly.**
+
+**Acceptance Criteria:**
+
+- [ ] Phase-completion detector returns correct `readyToArchive` set across mixed-state fixtures.
+- [ ] `archive-phases --auto-detect --apply` archives only detected-complete phases; in-progress untouched.
+- [ ] `/dw-lifecycle:session-end` Step 9.5 fires the auto-detect + apply path; archived count + IDs in the report; config flag respected.
+- [ ] Step 9 closing-discipline checks fire BEFORE Step 9.5 (verified by integration test).
+- [ ] Live dogfood on this repo: at the next session-end after a phase completes, the phase is archived in the same `docs: session-end` commit; live workplan shrinks; archive grows.
+- [ ] If Task 4 doctor rule shipped (operator pick): rule appears in `/dw-lifecycle:doctor`; `--fix` archives the detected phases; rule documented in doctor SKILL.md.
+- [ ] Closure transition is the operator's call post-install verification (operator-owned closure per AUDIT-35).
