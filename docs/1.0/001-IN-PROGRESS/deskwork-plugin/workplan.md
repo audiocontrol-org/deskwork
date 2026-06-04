@@ -2174,6 +2174,60 @@ Closes AUDIT-20260603-41. Surface: `packages/cli/src/commands/add.ts:155-167` (c
 
 
 
+
+### Task 39.17 (fix-finding-AUDIT-20260604-04) (non-bug): AUDIT-20260604-04 — Duplicate Task ID — two `### Task 39.15` headings now coexis…
+
+Closes AUDIT-20260604-04 (claude-01 + claude-04 + codex-02; cross-model). Surface: `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md:2177` (`Task 39.15 (fix-finding-AUDIT-20260604-01)`) collides with `:2267` (`Task 39.15 (fix-finding-AUDIT-20260603-48)`).
+
+**Shape**: non-bug. This finding's surface is non-source (docs, registry, markers, commit-history, or process feedback). The disposition below is the substantive action taken — not a code change verified by a failing test.
+
+- [ ] Step 1: write the disposition prose (≥40 chars, substantive). Describe what concrete action closes this finding — a specific edit, an explicit acknowledgement with reason, or a documented decision. No placeholders like "to be filled in" or "TBD".
+- [ ] Step 2: apply the action named in Step 1 (the file edit / acknowledgement / decision).
+- [ ] Step 3: commit with an `Acknowledges AUDIT-20260604-04 (claude-01 + claude-04 + codex-02; cross-model)` trailer in the commit message (use `Closes AUDIT-20260604-04 (claude-01 + claude-04 + codex-02; cross-model)` ONLY when the disposition included a real code change verifiable by test; for doc-only acknowledgements use `Acknowledges`; for deferrals use `Defers`). Per AUDIT-20260602-01 + AUDIT-20260603-50/51: `apply-audit-flips` parses `Closes` trailers ONLY — `Acknowledges` and `Defers` are audit-trail trailers that do NOT trigger an auto-flip; the audit-log status for a non-fix disposition is hand-set by the operator and the trailer documents the disposition for future readers. Using `Closes` on a non-fix disposition arms a false `fixed-<sha>` flip when the audit-log entry is later re-opened.
+
+**Acceptance Criteria:**
+
+- [ ] Step 1 disposition prose exists and is ≥40 characters of substantive content (no placeholder strings).
+- [ ] The named action has landed in this branch (the substantive edit or acknowledgement is present).
+- [ ] Audit-log Status flipped to `fixed-<sha>` (or `acknowledged-<reason>` for accepted-trade-off dispositions) via the close-shipped-audit-findings step.
+
+
+### Task 39.18 (fix-finding-AUDIT-20260604-05): AUDIT-20260604-05 — `renameSlug`'s bare `catch` reclassifies a corrupt/invalid s…
+
+Closes AUDIT-20260604-05 (claude-02 + codex-01; cross-model). Surface: `packages/core/src/rename-slug.ts:170-176` (the `try { sidecar = readSidecarSync(...) } catch { throw new Error("…has a calendar row but no sidecar on disk…") }`). Severity: high.
+
+- [ ] Step 0: working-code invariant — what does the current code do correctly that this fix touches? 1-2 sentences. Per Option D discipline, HIGH+ findings get a regression-lock test pinning this invariant in addition to the bug-repro test.
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 1b: write a regression-lock test pinning the Step 0 invariant — the test that would FAIL if the fix breaks the working-code behavior the invariant describes
+- [ ] Step 2: confirm test(s) fail against current code (verify the bug repros + the regression-lock test passes pre-fix)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm all tests pass (bug-repro flips green; regression-lock stays green)
+- [ ] Step 5: commit with `Closes AUDIT-20260604-05 (claude-02 + codex-01; cross-model)` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] Regression-lock test exists in the same file (Step 1b); test block count for this finding is ≥2 per Option D discipline
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
+
+### Task 39.19 (fix-finding-AUDIT-20260604-06): AUDIT-20260604-06 — The fix that deletes `body-state.ts` leaves a stale cross-re…
+
+Closes AUDIT-20260604-06. Surface: `packages/core/src/remark-strip-outline.mjs:15` (`Matches the line-based stripper in \`body-state.ts\`; kept independent here`) vs. the `body-state.ts` deletion in this diff. Severity: medium.
+
+- [ ] Step 1: write failing test exercising the bug (anchor at the file:line cited in the finding's Surface)
+- [ ] Step 2: confirm test fails against current code (verify the bug repros)
+- [ ] Step 3: implement the fix
+- [ ] Step 4: confirm test passes
+- [ ] Step 5: commit with `Closes AUDIT-20260604-06` in subject
+
+**Acceptance Criteria:**
+
+- [ ] Failing test exists at `(to be filled in by Step 1 implementer)` (cited in Step 1)
+- [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
+- [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
+
 ### Task 39.15 (fix-finding-AUDIT-20260604-01): AUDIT-20260604-01 — body-state.ts's `PLACEHOLDER_MARKER` contract is now orphane…
 
 Closes AUDIT-20260604-01 (claude-01 + codex-02; cross-model). Surface: `packages/core/src/body-state.ts:5-7,25,49` (comment rewordings + `PLACEHOLDER_MARKER` + `bodyState()`) vs. the deleted `packages/core/src/scaffold.ts`. Severity: medium.

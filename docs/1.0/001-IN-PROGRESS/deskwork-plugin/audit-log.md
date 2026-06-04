@@ -1136,3 +1136,44 @@ Severity:   low
 Surface:    `packages/core/src/sidecar/write.ts:18-34` (`writeSidecarSync`) vs. `writeSidecar` (`:8-16`); `.dw-lifecycle/scope-discovery/clones.yaml` (added `f2aa9e0ff153` for `sidecar/read.ts:25-34 ↔ :47-56`, no write.ts sibling)
 
 This diff adds `writeSidecarSync` as an explicit sync mirror of `writeSidecar` — same `EntrySchema.safeParse` validation, same `sidecarPath`, same `mkdir`/`${path}.<pid>.tmp`/`write`/`rename` atomic-write sequence, differing only in sync-vs-async fs calls. That is the identical "async-sync sibling" shape the diff *did* register and disposition for `read.ts` (clone `f2aa9e0ff153`, `keep-with-reason`: *"residual readFile-vs-readFileSync + ENOENT mapping cannot share a call across the async/sync boundary"*). The write-side pair got no `clones.yaml` entry. Either jscpd's threshold didn't trip on the ~12-line write block (in which case the asymmetry is benign but worth a one-line note so a future `refresh-clones-baseline` doesn't surface it as a surprise NEW clone), or the detector missed it and the project's clone-discipline has a gap for the exact same shape it just dispositioned two files over. Given the project explicitly tracks this async/sync-sibling pattern, the write.ts pair should carry the same `keep-with-reason` disposition for consistency, so the two siblings are documented identically rather than one tracked and one invisible.
+
+## 2026-06-04 — audit-barrage lift (20260604T172614738Z-deskwork-plugin)
+
+### AUDIT-20260604-04 — Duplicate Task ID — two `### Task 39.15` headings now coexist in the workplan
+
+Finding-ID: AUDIT-20260604-04 (claude-01 + claude-04 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    `docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md:2177` (`Task 39.15 (fix-finding-AUDIT-20260604-01)`) collides with `:2267` (`Task 39.15 (fix-finding-AUDIT-20260603-48)`)
+
+This diff inserts three new tasks (39.15/39.16/39.17 for AUDIT-20260604-01/02/03) immediately *before* the pre-existing Task 39.13. But the workplan already contained a `Task 39.15 (fix-finding-AUDIT-20260603-48)` further down (verified live at `workplan.md:2267`). The result is two headings both numbered **39.15** — one for AUDIT-20260604-01, one for AUDIT-20260603-48 — and a non-monotonic ordering (`39.15, 39.16, 39.17, 39.13, 39.14, 39.15-again, …`). The auto-positioner the project relies on (the `workplan-archive-ledger` comment, named in the `archive-phases` skill) picked `39.15` without detecting it was already taken.
+
+This is the exact "workplan↔audit-log disposition contradiction" class that prior audit entries (AUDIT-20260603-50 and the codex sibling note) called the **highest-value signal** because it actively misdirects an implementer: `/dw-lifecycle:implement` and `promote-findings` reference tasks by their numeric ID, and "go do Task 39.15" is now ambiguous between an orphaned-marker fix and a duplicate-clone acknowledgement. The fix is to renumber the newly-inserted tasks to the next free IDs after the highest existing one (39.18/39.19/39.20, or whatever the ledger's true high-water mark is) and update the three `Closes`/`Acknowledges` task headers + the commit-trailer references to match.
+
+---
+
+### AUDIT-20260604-05 — `renameSlug`'s bare `catch` reclassifies a corrupt/invalid sidecar as "no sidecar on disk" — a misleading message that sends the operator to the wrong remedy
+
+Finding-ID: AUDIT-20260604-05 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    `packages/core/src/rename-slug.ts:170-176` (the `try { sidecar = readSidecarSync(...) } catch { throw new Error("…has a calendar row but no sidecar on disk…") }`)
+
+`readSidecarSync` throws for **three** distinct reasons, verified at `packages/core/src/sidecar/read.ts:43-56` + `parseSidecar:7-19`: (a) `ENOENT` → `"sidecar not found: <path>"`, (b) malformed JSON → `"sidecar JSON invalid at <path>"`, (c) schema-invalid → `"sidecar schema invalid at <path>: …"` (plus any other fs error re-thrown raw at `:53`). The new fix catches **all** of them with a bare `catch {` and replaces every case with `"…has a calendar row but no sidecar on disk — run \`deskwork doctor --fix\`"`. So an entry whose sidecar file *exists but is corrupt* (truncated write, hand-edit that broke the schema, partial atomic-rename) is now reported as *missing*. The operator is told the file is absent when it is present-but-broken — and `doctor --fix` reconciling a "missing" sidecar may take a different repair path than fixing a corrupt one, so the guidance can be actively wrong.
+
+The original finding AUDIT-20260604-02 explicitly flagged this: *"a raw `readSidecarSync` ENOENT (**or a schema-parse error**)"*. The fix addressed the ENOENT half and swallowed the parse-error half into the same misleading branch. The correct shape mirrors `read.ts`'s own discrimination: catch, inspect, and only map the *not-found* case (match on `error.message.startsWith('sidecar not found')`, or better, check `existsSync(sidecarPath(...))` before the read) to the `doctor --fix` guidance — and **re-throw** JSON/schema-invalid errors unchanged so the operator sees "sidecar JSON invalid at …", which points at the real problem. The new test at `rename-slug.test.ts:124-147` only seeds a calendar-row-with-no-file, so the corrupt-sidecar misclassification is invisible to the suite.
+
+---
+
+### AUDIT-20260604-06 — The fix that deletes `body-state.ts` leaves a stale cross-reference to it in `remark-strip-outline.mjs` — the same doc-drift failure mode the finding named, re-created by the fix
+
+Finding-ID: AUDIT-20260604-06
+Status:     open
+Severity:   medium
+Surface:    `packages/core/src/remark-strip-outline.mjs:15` (`Matches the line-based stripper in \`body-state.ts\`; kept independent here`) vs. the `body-state.ts` deletion in this diff
+
+AUDIT-20260604-01's whole point was that comments must not describe code that no longer exists. The disposition correctly deletes `body-state.ts` AND correctly updates `outline-split.ts:40-44` (the comment there was rewritten from *"mirrors the line-wise logic in `scripts/lib/editorial/body-state.ts`"* to a self-contained note). But it **missed a second comment** that points at the same now-deleted file: `remark-strip-outline.mjs:15` still reads *"Matches the line-based stripper in `body-state.ts`; kept independent here because mdast traversal beats regex on structured content."* I verified live — `body-state.ts` is gone, yet this kept-source file still tells a future reader to go compare against it. That is precisely the "comment describing a thing that no longer exists in the codebase" drift the finding flagged, re-introduced by the cleanup itself.
+
+The fix is one edit: reword `remark-strip-outline.mjs:15` to drop the `body-state.ts` reference the same way `outline-split.ts` was (e.g. *"Independent mdast-based stripper; mdast traversal beats regex on structured content."*). The asymmetry — one of the two sibling outline-stripper comments updated, the other not — also signals the deletion's blast radius wasn't fully grepped before commit. (The `cli/test/review-lifecycle-integration.test.ts:114` hit is narrative-only and harmless; this `.mjs` one is the live drift. I confirmed there are zero `import … body-state` statements anywhere, so the build is not broken — this is purely the doc-drift residue.)
+
+---
