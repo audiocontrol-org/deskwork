@@ -120,4 +120,28 @@ describe('renameSlug — 39c-2b(a) artifactPath layout detection (AUDIT-36)', ()
     expect(readSidecarSync(root, UUID).artifactPath).toBe('content/blog/notes/index.md');
     expect(existsSync(join(root, 'content/blog/notes/index.md'))).toBe(true);
   });
+
+  it('throws doctor --fix guidance (not a raw ENOENT) when the entry has a calendar row but no sidecar (AUDIT-20260604-02)', () => {
+    // Calendar row only — no sidecar file written. renameSlug must surface
+    // the same actionable doctor --fix guidance it gives for every other
+    // drift case, not a raw `sidecar not found` ENOENT from readSidecarSync.
+    writeCalendar(join(root, '.deskwork', 'calendar.md'), {
+      entries: [
+        {
+          id: UUID,
+          slug: 'no-sidecar',
+          title: 'No Sidecar',
+          description: '',
+          stage: 'Drafting',
+          targetKeywords: [],
+          source: 'manual',
+        },
+      ],
+      distributions: [],
+    });
+
+    expect(() =>
+      renameSlug({ projectRoot: root, config: config(), site: 'main', oldSlug: 'no-sidecar', newSlug: 'renamed' }),
+    ).toThrow(/doctor --fix/);
+  });
 });

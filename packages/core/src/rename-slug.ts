@@ -163,7 +163,18 @@ export function renameSlug(options: RenameSlugOptions): RenameSlugResult {
   //    DIR moves (carrying co-located assets in one mv); for a flat
   //    layout the FILE moves. The sidecar's artifactPath is rewritten to
   //    the new location. No naive slug-substring replacement.
-  const sidecar = readSidecarSync(projectRoot, entry.id);
+  // AUDIT-20260604-02: an entry with a calendar row but no sidecar file is
+  // a drift case like any other — surface the actionable doctor --fix
+  // guidance, not the raw `sidecar not found` ENOENT from readSidecarSync.
+  let sidecar;
+  try {
+    sidecar = readSidecarSync(projectRoot, entry.id);
+  } catch {
+    throw new Error(
+      `entry "${oldSlug}" (${entry.id}) has a calendar row but no sidecar on ` +
+        `disk — run \`deskwork doctor --fix\` to reconcile before renaming.`,
+    );
+  }
   if (sidecar.artifactPath === undefined) {
     throw new Error(
       `entry "${oldSlug}" (${entry.id}) has no artifactPath — run ` +
