@@ -62,6 +62,28 @@ Astro/Next/Hugo/etc. — doesn't matter) — but **NOT agent-independent** (a re
 required). No "any-adopter / framework-independent" overclaim. v1 ships **one** conformant referee
 adapter (Claude / `/frontend-design`).
 
+## Definitions
+
+These terms are load-bearing — the lint, the `status` gate, the baseline matrix, and the referee
+all key on them.
+
+- **Surface.** A named, addressable UI region identified by a stable `surface id` — typically a page
+  or route-rendered view, or a significant named region within one (e.g. the studio content-browser,
+  the scrapbook drawer). **Granularity is the operator's declaration at authoring time, not
+  auto-derived.** A surface is verified across the orthogonal axes `route/state + viewport +
+  capture-step`, so one `surface id` spans many baseline-matrix cells. ("~32 surfaces" in the
+  problem statement counts surface ids — the coarse unit; the manifest key adds the finer axes.) The
+  dogfood "≥ 2 diverse surfaces" bar means two distinct `surface id`s of materially different shape.
+- **GROSS regression.** A regression perceptible **without pixel measurement** — visible at thumbnail
+  scale or on an unaided side-by-side glance. Operationally: a difference that **changes layout
+  topology** (an element occluded; a control overlapped so its center point hit-tests to another
+  element; primary content pushed below the fold at the declared viewport; reading-order / hierarchy
+  inverted) **or removes / duplicates a signature component.** Explicitly **NOT gross**: sub-component
+  pixel drift — a token color off by a shade, a few-px spacing change, a font-weight tweak. Gross
+  regressions are the two-image referee's scope; non-gross drift routes to the stable-region
+  pixel-diff arm. The Phase 5 falsification set must span **both clearly-gross and clearly-subtle**
+  planted cases so the boundary is exercised.
+
 ## The discipline — engine threaded through 3 concerns
 
 | # | Concern | Owns | Reference artifact | engine role |
@@ -159,19 +181,31 @@ The **`author-wireframe` conformance falsification set** includes planted **"emo
 **"𝐌𝐚𝐭𝐡-bold heading"** cases. Grandfather allowlist entries require an **issue link + expiry**.
 
 **Retroactive path.** Artifacts derived from an existing surface (existing surface → `derived`
-wireframe/spec) are **marked `derived`**, **require operator editing to assert *intended* UX before
-acceptance**, and **do NOT satisfy a "wireframe drove the implementation" claim.** (Provenance —
-`drove-implementation` vs `derived-retroactively` — must be carried so `status` cannot launder a
-non-driving artifact into "complete.")
+wireframe/spec) are **marked `derived`** and **do NOT satisfy a "wireframe drove the implementation"
+claim.** Acceptance of a `derived` artifact requires a **recorded operator edit** — a non-empty diff
+between the auto-derived draft and the accepted version — **not merely a state transition**;
+`status` **refuses to accept an unedited derived artifact** (the edit is how the operator asserts
+*intended* UX, and it is **mechanically checkable**, not an honor-system precondition). Provenance —
+`drove-implementation` vs `derived-retroactively` — is carried so `status` cannot launder a
+non-driving artifact into "complete."
 
 ### Design-language spec convention + static link-liveness
 
 A **markdown spec schema**: palette / type / spacing tokens + signature-component vocabulary +
-do/don't, **each rule linked to a live CSS file/class + ≥1 current example**. A **static
-link-liveness check**: the selector/class must be **defined in source** — **scaffold performs NO
-app boot** (preserves "authoring artifacts only / no capture dependency", *round-6 M1*). A skill
-`translate-design-language` uses `/frontend-design` to author/maintain the spec from approved
-wireframe intent.
+do/don't, **each rule linked to a live CSS file/class + ≥1 current example**. The spec is a
+**markdown artifact the operator authors and edits by hand — it does NOT require the engine.**
+`translate-design-language` (via `/frontend-design`) is an **optional accelerator** that drafts the
+spec from approved wireframe intent; its engine conformance is tested **only when `/frontend-design`
+is present.** **Scaffold completion requires the spec artifact + passing static link-liveness —
+neither needs the engine.** (This is precisely what "the scaffold works with no engine present"
+means: **both** scaffold reference artifacts — wireframe *and* spec — are hand-authorable; the engine
+only accelerates. "No referee" ≠ "no engine," but the scaffold genuinely needs neither.)
+
+A **static link-liveness check**: each referenced selector/class must be **defined in source** —
+**scaffold performs NO app boot** (preserves "authoring artifacts only / no capture dependency",
+*round-6 M1*). "Defined in source" is scoped to **author-written CSS selectors/classes** (the
+deskwork studio, where portability is validated); utility-framework (Tailwind), CSS-in-JS, and hashed
+CSS-Modules class resolution are **not validated in v1** — see Out of Scope.
 
 Named-deferred (see Out of Scope): **runtime dead-CSS detection** and **spec-truthfulness**
 (link-liveness ≠ truthfulness — a resolving selector doesn't prove the live CSS still matches the
@@ -190,15 +224,22 @@ Per surface: the **next required action** + a **refusal of "complete"** while re
 are missing. It keys on **manifest structure / artifact presence**, **never on referee verdict
 *content*** (so it is **not a gate-by-proxy**).
 
-- **Scaffold-mode** gates on: missing wireframe, unaccepted decision, stale-or-dead-link spec,
-  malformed manifest.
+- **Scaffold-mode** gates on: missing wireframe, unaccepted decision, **dead-link spec**, **stale
+  surface**, and malformed manifest. *Dead-link and stale-surface are **two distinct mechanisms**,
+  named separately so one can ship while the other is descoped:*
+  - **dead-link spec** — a referenced selector is **not defined in source** (the static
+    link-liveness check); **always ships.**
+  - **stale surface** — the surface's **mapped source/routes have drifted** (the graph-derived map);
+    **feasibility-gated**, see below.
 - **Referee-preview-mode** adds: incomplete baseline matrix, oversized / invariant-covering dynamic
   region, missing referee evidence.
 
-**"Stale surface"** needs a `surface-id → source-files/routes` map — a real scaffold deliverable,
-**derived from the import/route graph** (not hand-authored, which rots). **If the graph derivation
-isn't feasible, staleness is descoped — an explicit operator decision, not pushed onto the adopter
-and not an implementer's silent mid-build cut.**
+**Stale-surface detection** needs a `surface-id → source-files/routes` map — a real scaffold
+deliverable, **derived from the import/route graph** (not hand-authored, which rots). It is
+**feasibility-gated**: if the graph derivation is feasible it ships **with its own acceptance**
+(`status` flags a surface whose mapped source drifted); if it is **not** feasible, it is an
+**explicit operator-approved descope recorded in the workplan** — never an implementer's silent
+mid-build cut. The **dead-link half always ships regardless.**
 
 ### Referee-request manifest schema (scaffold = schema validation only)
 
@@ -221,7 +262,13 @@ schema Phase 5 must immediately break.
   as optional evidence until it passes an adversarial falsification set. It does **NOT** claim to
   satisfy `ui-verification.md`'s numeric-measurement mandate.
 - **Two-image judgment = GROSS comparison only** (panel below the fold; hierarchy inverted) — never
-  the numeric spine.
+  the numeric spine. See Definitions for the operational GROSS boundary.
+- **Design-language violations split by grossness.** The two-image referee owns **gross**
+  design-language violations (a missing / wrong signature component; a palette swapped to an
+  obviously different family). **Subtle** token-level drift (color off by a shade, wrong type scale,
+  few-px spacing) is **not** the referee's job — it routes to the **stable-region pixel-diff arm**.
+  Neither the referee nor v1 claims to catch subtle design-language drift **outside** declared stable
+  regions (that is `spec-truthfulness`, named-deferred).
 - **Structured change-scope contract** in the manifest: allowed changes, protected invariants,
   out-of-scope regions, expected per-viewport impact, baseline-replacement requested. The referee
   classifies each difference **`intended` / `unintended` / `ambiguous` / `outside-scope`**;
@@ -294,23 +341,37 @@ mask, or covers an intentionally-changed area *(round-5 codex-1 / claude-M1)*.
 
 **`v1-referee-preview` (acceptance is adversarial — the referee earns trust empirically):**
 
-- [ ] The referee **escalates** (not merely "emits findings") on planted **GROSS regressions** (an
-      occluded element; a panel forced below the fold) across **multiple** instances.
-- [ ] A **negative/specificity arm**: across planted **unchanged** and **legitimately-changed-but-
-      intended** pairs, the referee does **not** over-escalate (a stated false-positive ceiling) —
-      so a referee that cries "regression" on everything **fails**.
+- [ ] The referee **escalates** (not merely "emits findings") on **every** planted **GROSS
+      regression** (see Definitions) across **≥ 2 instances per gross class on ≥ 2 distinct
+      surfaces** — a **single miss fails the gate** (gross = must-catch-all; the gate exists because
+      LLM judges have missed gross defects).
+- [ ] **Negative / specificity arm:** across **≥ 5** planted **unchanged** + **legitimately-changed-
+      but-intended** pairs, the referee over-escalates on **≤ 1** (a **≤ 20% false-positive
+      ceiling**) — a referee that cries "regression" on everything **fails**. *(Thresholds are the v1
+      gate's starting values, operator-tunable; the point is that concrete numbers exist so the gate
+      is mechanically checkable.)*
 - [ ] Existing-tool **stable-region pixel-diff catches a planted numeric drift** in a declared-stable
       DOM locator.
-- [ ] **Stale screenshot / wrong viewport / oversized dynamic region / design-language violation** are
-      caught or escalated.
+- [ ] **Stale screenshot / wrong viewport / oversized dynamic region** are caught or escalated; a
+      planted **gross design-language violation** (missing / wrong signature component; palette
+      swapped to an obviously different family) is caught or escalated. *(Subtle token drift is out
+      of the referee's scope — see The referee.)*
 
 Until the referee-preview set passes, **its output is optional evidence and no "catches these cases"
 claim ships.**
 
-**Dogfood:** the **sites→lanes studio content-browser + scrapbook redesign** runs the full loop
-end-to-end (wireframe → pick → `translate-design-language` → implement → referee evidence at **both**
-viewports → archive) across **≥ 2 diverse surfaces**; the plugin **loads via the marketplace**.
-Portability is validated **only on the deskwork studio**.
+**Dogfood (two arms; the scaffold arm is the `v1-scaffold` ship gate):**
+
+- [ ] **Scaffold arm (must pass to ship `v1-scaffold`):** the **sites→lanes studio content-browser +
+      scrapbook redesign** runs the loop **wireframe → pick → `translate-design-language` →
+      implement → archive — NO referee** — across **≥ 2 diverse surfaces**; the plugin **loads via
+      the marketplace**.
+- [ ] **Referee arm (required only to ship `v1-referee-preview`; conditional on the Phase 5 gate):**
+      the referee produces spirit + letter + gross-regression evidence at **both** viewports.
+
+**If the referee never earns trust (Phase 5 gate unmet), v1 ships scaffold-only** — the referee
+remains optional evidence and no "catches these cases" claim ships. Portability is validated **only
+on the deskwork studio**.
 
 ## Out of Scope (v1 — captured, named-deferred; not hidden)
 
@@ -326,6 +387,10 @@ Portability is validated **only on the deskwork studio**.
   engine is required (v1 ships one conformant Claude adapter).
 - **Runtime dead-CSS detection** and **spec-truthfulness** (link-liveness ≠ truthfulness) — named-
   deferred.
+- **Link-liveness on non-author-written CSS** — utility frameworks (Tailwind: classes are *composed*,
+  not defined), CSS-in-JS (selectors generated at build/runtime), hashed CSS-Modules names — have no
+  clear "defined in source" meaning; v1's static check is scoped to author-written CSS selectors
+  (validated on the deskwork studio). Resolving link-liveness for those stacks is deferred.
 - **Semantic stability verification of `stableRegions`** (detecting a mis-declared region whose
   content legitimately varies) — v1's stable-region checks are **structural** (resolve / overlap /
   covers-changed); semantic stability is the operator's declared assertion unless/until a sampling
