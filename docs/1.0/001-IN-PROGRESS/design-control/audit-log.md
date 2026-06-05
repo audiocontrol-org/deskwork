@@ -130,7 +130,9 @@ This matters because AUDIT-20260605-01’s remediation explicitly depends on com
 ### AUDIT-20260605-08 — Removing `satisfies z.ZodType<EngineAdapterRequest>` deleted the request schema's field-drift guard; the claimed replacement doesn't cover that drift
 
 Finding-ID: AUDIT-20260605-08 (claude-01 + claude-03 + claude-04 + codex-01; cross-model)
-Status:     acknowledged-slush-pile-2026-06-05
+Status:     fixed-6d99c0ea699a5e59aca025438c6c301842b6e642
+
+Disposition override: slushed by the dampener, but a real cross-model MEDIUM drift-safety regression introduced by the AUDIT-05 fix. Fixed in 6d99c0ea — restored compile-time field-set drift detection as a key-set `Expect<Equal<...>>` assertion in types.binding.test.ts (verified teeth: a phantom field fails `tsc --noEmit` TS2344); the unreachable parseAndValidate branch now throws instead of fabricating a violation (claude-04); the zod `alwaysSet` reliance is documented + version-pinned (claude-03). Over-claiming doc-comments corrected.
 Severity:   medium
 Surface:    plugins/design-control/src/engine-adapter/conformance.ts:37-67 (request schema), and the response schema doc-comment still claiming a `satisfies` clause
 
@@ -143,7 +145,9 @@ A reasonable fix: restore a compile-time guard the `ZodEffects` form can carry. 
 ### AUDIT-20260605-09 — AUDIT-07's `tsc --noEmit` gate is unverifiable from the diff — the tsconfig that decides whether the binding tests are even type-checked is the missing surface
 
 Finding-ID: AUDIT-20260605-09
-Status:     acknowledged-slush-pile-2026-06-05
+Status:     fixed-6d99c0ea699a5e59aca025438c6c301842b6e642
+
+Disposition override: slushed by the dampener. Resolved in 6d99c0ea: empirically verified the AUDIT-07 `tsc --noEmit` gate has teeth (removing a still-needed `@ts-expect-error` fails tsc with TS2322); the package tsconfig (commit c8c19f5d) includes `src/__tests__/**` under `exactOptionalPropertyTypes`, and the new key-set drift assertion further exercises the gate. The auditor flagged this because the tsconfig was outside the round-2 diff it reviewed — the gate was real; the doc-claims are now accurate.
 Severity:   medium
 Surface:    plugins/design-control/package.json:8-10 (new `tsc --noEmit` gate); missing plugins/design-control/tsconfig.json in the diff
 
