@@ -162,7 +162,9 @@ The tsconfig is the surface that should be in this diff and isn't. The fix shoul
 ### AUDIT-20260605-10 — Request-schema field-set guard only compares key *names*, leaving field *types* unguarded — the AUDIT-08 asymmetry is only half-closed
 
 Finding-ID: AUDIT-20260605-10
-Status:     acknowledged-slush-pile-2026-06-05
+Status:     fixed-19af9658afef2509a21c411dfec3edda8e2a3c4e
+
+Disposition override: slushed by the dampener; a real MEDIUM (single-model) — my AUDIT-08 fix restored only field-SET drift detection, not field-TYPE. Fixed in 19af9658: the request guard is now `Expect<Equal<Omit<z.input<S>,'payload'>, Omit<EngineAdapterRequest,'payload'>>>` (full structural equality ex-payload). Verified teeth: drifting manifestId's schema type fails `tsc --noEmit` (TS2344). Over-stated doc-comment corrected.
 Severity:   medium
 Surface:    plugins/design-control/src/__tests__/engine-adapter/types.binding.test.ts:112-114; plugins/design-control/src/engine-adapter/conformance.ts:48-53,87-96
 
@@ -177,7 +179,9 @@ The AUDIT-08 doc-comment is *technically* honest (it says "field-set drift"), bu
 ### AUDIT-20260605-11 — `parseAndValidate` can now throw, but its JSDoc still presents an always-returns contract
 
 Finding-ID: AUDIT-20260605-11
-Status:     acknowledged-slush-pile-2026-06-05
+Status:     fixed-19af9658afef2509a21c411dfec3edda8e2a3c4e
+
+Disposition: fixed in 19af9658 — added an `@throws` note to parseAndValidate's JSDoc documenting the (unreachable) invariant-violation throw introduced by the AUDIT-08/claude-04 fail-loud branch.
 Severity:   low
 Surface:    plugins/design-control/src/engine-adapter/conformance.ts:213-256
 
@@ -190,7 +194,9 @@ The gap is documentation drift: `parseAndValidate`'s JSDoc (conformance.ts:213-2
 ### AUDIT-20260605-12 — Context: the new field-set guard is inert when tests run outside the exact `npm test` invocation
 
 Finding-ID: AUDIT-20260605-12
-Status:     acknowledged-slush-pile-2026-06-05
+Status:     informational
+
+Disposition: informational, no code change. The auditor explicitly flagged this as the already-dispositioned AUDIT-07/09 shape ("not re-litigating") — the compile-time field-set/type guards are tsc-only by design (their teeth live in the `tsc --noEmit` prefix of the package `test` script, confirmed effective under AUDIT-09). Recorded so the run-context fragility (bare `vitest run` / watch / IDE runners skip the type gate) is on the record.
 Severity:   informational
 Surface:    plugins/design-control/src/__tests__/engine-adapter/types.binding.test.ts:106-119
 
