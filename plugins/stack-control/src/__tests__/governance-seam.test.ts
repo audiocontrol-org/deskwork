@@ -26,7 +26,13 @@ const STRIPPED_PATH = '/usr/bin:/bin';
 function runGovern(script: string) {
   return spawnSync('bash', [script], {
     encoding: 'utf8',
-    env: { ...process.env, PATH: STRIPPED_PATH },
+    // Pin GOVERN_FEATURE_SLUG (AUDIT-20260605-02): govern.sh derives the slug
+    // from the `feature/<slug>` branch BEFORE the dw-lifecycle PATH check. On a
+    // detached HEAD or non-feature branch (e.g. CI checkout at a SHA/tag) that
+    // derivation FATALs first, so without this override the seam assertion would
+    // be a false RED about slug derivation, not the dependency it claims to
+    // guard. The override is the path the command body documents.
+    env: { ...process.env, PATH: STRIPPED_PATH, GOVERN_FEATURE_SLUG: 'seam-test' },
   });
 }
 

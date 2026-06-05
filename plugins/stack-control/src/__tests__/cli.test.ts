@@ -1,15 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-
-const here = dirname(fileURLToPath(import.meta.url));
-const CLI = resolve(here, '..', 'cli.ts');
-const TSX = resolve(here, '..', '..', '..', '..', 'node_modules', '.bin', 'tsx');
-
-function runCli(args: string[]) {
-  return spawnSync(TSX, [CLI, ...args], { encoding: 'utf8' });
-}
+import { runCli } from './_run-helpers.js';
 
 describe('stackctl dispatcher (T008)', () => {
   it('exits 2 with a usage line listing known verbs on an unknown verb', () => {

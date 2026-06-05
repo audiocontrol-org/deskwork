@@ -1,17 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const here = dirname(fileURLToPath(import.meta.url));
-const CLI = resolve(here, '..', 'cli.ts');
-const TSX = resolve(here, '..', '..', '..', '..', 'node_modules', '.bin', 'tsx');
-
-function runCli(args: string[]) {
-  return spawnSync(TSX, [CLI, ...args], { encoding: 'utf8' });
-}
+import { join } from 'node:path';
+import { runCli } from './_run-helpers.js';
 
 // Pin the "runnable" set (A1): a Spec Kit spec is runnable for native
 // /speckit-implement iff tasks.md is present. spec.md + plan.md are

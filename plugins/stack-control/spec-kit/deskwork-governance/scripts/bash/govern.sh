@@ -55,6 +55,17 @@ command -v jq >/dev/null 2>&1 || {
 
 # --- gather the implemented-work context (the plan under audit) ---
 DIFF="$(git diff "${BASE}" 2>/dev/null || true)"
+# Include untracked-but-not-ignored files so newly-added work is audited too
+# (AUDIT-20260605-01): `git diff <base>` omits untracked files, so a barrage
+# run before those files are committed cannot review the very surfaces most
+# worth auditing (new modules, new tests). Render each as an all-added diff
+# via --no-index WITHOUT mutating the index. The real after_implement flow
+# commits first (git hook precedes governance), but a manual govern run on a
+# dirty tree must not silently drop new files.
+while IFS= read -r _untracked; do
+  [ -n "${_untracked}" ] || continue
+  DIFF="${DIFF}"$'\n'"$(git diff --no-index --no-color -- /dev/null "${_untracked}" 2>/dev/null || true)"
+done < <(git ls-files --others --exclude-standard 2>/dev/null || true)
 COMMIT_SUBJECTS="$(git log "${BASE}..HEAD" --oneline 2>/dev/null || true)"
 AUDIT_EXCERPT="$(tail -n 40 "${AUDIT_LOG}" 2>/dev/null || true)"
 WORKPLAN_SUMMARY="Governance pass over the just-implemented work for feature '${SLUG}', diffed against ${BASE}. The differentiated back half audits a plan it did not author or execute."
