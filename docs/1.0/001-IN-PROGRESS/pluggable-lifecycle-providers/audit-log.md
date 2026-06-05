@@ -252,3 +252,58 @@ Surface:    plugins/dw-lifecycle/spec-kit/deskwork-governance/scripts/bash/gover
 `git branch --show-current` was introduced in git 2.22 (2019). On an older git the subcommand errors; `2>/dev/null || true` swallows it and leaves `_branch` empty, so even on a legitimately-checked-out `feature/<slug>` branch the script hits the `*)` arm and dies with "cannot derive feature slug from branch '' (expected 'feature/<slug>')." The diagnostic blames the branch name when the real cause is the git version — a misleading error that would cost an adopter on an old toolchain real debugging time.
 
 Severity is low because modern environments overwhelmingly satisfy 2.22+, and the script does fail loudly rather than guessing. But since the surrounding comment emphasizes loud, correct failure, the message should be accurate: either add a `command -v git` / version probe, or fall back to `git symbolic-ref --short HEAD` (available far earlier) before declaring the branch underivable, so the FATAL text only fires for an actually-undefined branch (detached HEAD), not for a tooling gap.
+
+## 2026-06-05 — audit-barrage lift (20260605T182226949Z-pluggable-lifecycle-providers)
+
+### AUDIT-20260605-01 — Audit diff omits `execute-check.ts` and two governance test files that the included code depends on
+
+Finding-ID: AUDIT-20260605-01 (claude-01 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     fixed-ad694abb (govern.sh now folds untracked-but-not-ignored files into the audited diff via `git diff --no-index`, no index mutation; untracked-capture mechanism verified. The audited code was already correct — 16 tests green — so this closes the harness coverage gap, not a code defect. The real after_implement flow commits before governing, so the gap only bit the manual smoke.)
+Severity:   blocking
+Surface:    `plugins/stack-control/src/cli.ts:12,18` (import + registration of a file absent from the diff); missing surfaces `plugins/stack-control/src/subcommands/execute-check.ts`, `src/__tests__/execute-check.test.ts`, `src/__tests__/governance-seam.test.ts`, `src/__tests__/governance-neutrality.test.ts`
+
+The `cli.ts` shown in the diff does `import { runExecuteCheck } from './subcommands/execute-check.js'` and registers `'execute-check': runExecuteCheck` in `SUBCOMMANDS`, but `execute-check.ts` is **not in the diff handed to this audit** — it was untracked at session start (`?? …/execute-check.ts`) and the diff generator (`git diff HEAD~1`, which excludes untracked files) dropped it along with `execute-check.test.ts`, `governance-seam.test.ts`, and `governance-neutrality.test.ts`. An auditor reading only the supplied diff sees a dangling import to a module that does not exist and would reasonably conclude the dispatcher cannot load (it would `throw` at module resolution, breaking even `stackctl version`). I verified against the working tree: the file does exist on disk, all 16 tests pass, and the suite is green — so the *code* is fine. The finding is about the **governance harness this feature is building**: its diff-gathering step silently excludes new/untracked files, so the cross-model barrage cannot review the `execute-check` verb logic, the cross-plugin seam test, or the neutrality test at all — exactly the surfaces most worth auditing this commit. There was also a real staging hazard: at session start `cli.ts` was modified (`M`) while `execute-check.ts` was untracked (`??`); committing `cli.ts` without `git add`-ing `execute-check.ts` would have produced a checkout that fails to run. That window is now closed (both are staged `A`/`M`), but the harness gap that would let it ship un-audited remains. A reasonable fix: have `govern.sh` gather the diff with `git diff HEAD --` plus untracked-but-relevant files (`git status --porcelain` / `git add -N` before diffing), so staged-and-untracked work is in the audited surface.
+
+---
+
+### AUDIT-20260605-02 — `govern.sh` slug-derivation precedes the dw-lifecycle PATH check, coupling the seam test to the current git branch
+
+Finding-ID: AUDIT-20260605-02
+Status:     fixed-ad694abb (governance-seam.test.ts now pins GOVERN_FEATURE_SLUG in the spawn env, so slug derivation short-circuits the branch and the seam assertion reaches the dw-lifecycle PATH check on any branch / detached HEAD; verified the pinned-slug path FATALs on dw-lifecycle absent.)
+Severity:   medium
+Surface:    `plugins/stack-control/src/__tests__/governance-seam.test.ts:38-43` against `…/govern.sh:24-33` (slug derivation) → `:47-48` (dw-lifecycle check)
+
+The seam test asserts `r.status` is non-zero **and** that output matches `/dw-lifecycle\b.*not on PATH/i`. But in `govern.sh` the feature-slug derivation (lines 24-33, the `case "${_branch}" in feature/*)` block) runs *before* the `command -v dw-lifecycle` check (line 47). The test passes today only because the worktree's branch is `feature/pluggable-lifecycle-providers`, so derivation succeeds and execution reaches the PATH check. Run the same test from a detached HEAD (the normal state of a CI `actions/checkout` at a tag/SHA) or any non-`feature/<slug>` branch, and `git branch --show-current` returns empty → the `*)` FATAL arm fires `exit 2` at slug derivation, *before* the dw-lifecycle check is ever reached. The status assertion (`not 0`) still passes, but the content assertion (`/dw-lifecycle.*not on PATH/`) fails — the test would report a false RED that has nothing to do with the seam it claims to guard. The test passes `{ ...process.env, PATH: STRIPPED_PATH }` but does not pin `GOVERN_FEATURE_SLUG`. Fix: set `GOVERN_FEATURE_SLUG` in the test's env (the override the SKILL.md docs now advertise) so the seam assertion is decoupled from the ambient branch and tests the dependency-absent path it names.
+
+---
+
+### AUDIT-20260605-03 — Tests hardcode the repo-root-hoisted `tsx` path while `bin/stackctl` robustly walks up — fragile + cryptic on a nested install
+
+Finding-ID: AUDIT-20260605-03
+Status:     fixed-ad694abb (extracted src/__tests__/_run-helpers.ts whose resolveTsx() walks up from the plugin root exactly like bin/stackctl's find_tsx; cli/version/execute-check tests now use it, so tests and shim agree on tsx location whether hoisted or nested plugin-local.)
+Severity:   low
+Surface:    `plugins/stack-control/src/__tests__/cli.test.ts:8`, `src/__tests__/version.test.ts:9` (`resolve(here,'..','..','..','..','node_modules','.bin','tsx')`)
+
+Both test files resolve `tsx` to a fixed four-levels-up path (`<repo-root>/node_modules/.bin/tsx`), assuming npm hoists `tsx` to the monorepo root. `bin/stackctl` deliberately does *not* make that assumption — its `find_tsx()` walks up from `PLUGIN_ROOT` precisely because `tsx` may resolve from an ancestor *or* from the plugin's own `node_modules`. The package-lock churn in this very diff shows `plugins/stack-control/node_modules/` getting populated (vitest, vite, esbuild platform binaries landed plugin-local, not hoisted), which demonstrates npm *does* nest deps for this workspace when versions diverge. If `tsx` ever nests the same way, the hardcoded test path points at a non-existent binary; `spawnSync` then returns `{ status: null, error: ENOENT }` and every assertion fails with an opaque "expected null to be 2" rather than a clear "tsx not found." Reuse the same walk-up resolution the shim already implements (or resolve `tsx` via `require.resolve`/`import.meta.resolve`) so the tests and the shim agree on dependency location.
+
+---
+
+### AUDIT-20260605-04 — No plugin-level `README.md` for `stack-control`, though the marketplace entry and project conventions point adopters at one
+
+Finding-ID: AUDIT-20260605-04
+Status:     acknowledged-2026-06-05 (already scoped: the plugin README is task T032 in the Polish phase of tasks.md — beyond the US1 MVP the operator scoped this session. Tracked, not silent drift.)
+Severity:   low
+Surface:    `plugins/stack-control/` (no `README.md`); `.claude-plugin/marketplace.json:44-54` (new entry)
+
+The diff registers `stack-control` in the marketplace and creates `plugin.json`, `package.json`, `bin/`, `src/`, but adds no `plugins/stack-control/README.md`. The project's own conventions make the plugin README the canonical adopter surface — `.claude/CLAUDE.md`: *"follow each plugin's own README … that's the canonical adopter-facing install path"* — and the "Add a New Plugin" playbook lists README as step 3. The README that *was* moved into this plugin tree (`spec-kit/deskwork-governance/README.md`) documents the governance extension, not the plugin. This is a scaffold gap, not a bug, and may be planned for a later phase — but the marketplace entry is now live pointing at a plugin with no top-level README, so flagging it so the omission is a tracked decision rather than a silent drift.
+
+---
+
+### AUDIT-20260605-05 — `plugin.json` and `marketplace.json` descriptions have diverged
+
+Finding-ID: AUDIT-20260605-05
+Status:     acknowledged-2026-06-05 (informational, not a defect: plugin.json carries the fuller description and marketplace.json the shorter adopter-facing summary — distinct audiences, maintained separately by intent. Per `.claude/rules/documentation.md` the marketplace entry stays terse; no auto-derivation warranted.)
+Severity:   informational
+Surface:    `plugins/stack-control/.claude-plugin/plugin.json:4` vs `.claude-plugin/marketplace.json:53`
+
+The two manifests describe the same plugin with non-identical strings — `plugin.json` ends *"Successor to dw-lifecycle (absorb-then-retire)."* while the marketplace entry ends *"Successor to dw-lifecycle."* (and the lead clauses differ in wording too). `bump-version.ts` keeps the *versions* in lockstep but does nothing for description text, so these will keep drifting independently. Not a defect — just a note that two copies of the same prose will diverge over time; if one is meant to be canonical, derive the other or accept that they're maintained separately.
