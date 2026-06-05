@@ -156,3 +156,48 @@ AUDIT-07's remediation note claims: *"package `test` now runs `tsc --noEmit && v
 Two concrete failure modes that the diff cannot rule out: (1) if `include` is scoped to runtime sources (e.g. `["src/engine-adapter"]` or excludes `__tests__`), then `tsc --noEmit` never type-checks `types.binding.test.ts`, the `@ts-expect-error` directives (types.binding.test.ts:67-83) remain inert exactly as before, AUDIT-07 is **not** actually fixed, *and the gate passes green* — a false "verified." (2) if there is no package-local tsconfig at all, `tsc --noEmit` runs with default options that don't resolve the `@/` alias, so the gate fails unconditionally; the fact that the commit landed suggests a tsconfig exists, but its scope is unconfirmed. Additionally, the AUDIT-05 narrative leans hard on `exactOptionalPropertyTypes` being enabled (*"clearly compiling under"*) — that too lives only in the unshown tsconfig.
 
 The tsconfig is the surface that should be in this diff and isn't. The fix should include (or the reviewer should confirm) that the tsconfig `include`s `src/__tests__/**`, sets `strict` + `exactOptionalPropertyTypes` + `noUnusedLocals`, and that `tsc --noEmit` reports an error if a `@ts-expect-error` is removed from a still-erroring line. Without that, "binding drift fails the normal test gate" is an untested claim about an untested gate.
+
+## 2026-06-05 — audit-barrage lift (20260605T185344732Z-design-control)
+
+### AUDIT-20260605-10 — Request-schema field-set guard only compares key *names*, leaving field *types* unguarded — the AUDIT-08 asymmetry is only half-closed
+
+Finding-ID: AUDIT-20260605-10
+Status:     acknowledged-slush-pile-2026-06-05
+Severity:   medium
+Surface:    plugins/design-control/src/__tests__/engine-adapter/types.binding.test.ts:112-114; plugins/design-control/src/engine-adapter/conformance.ts:48-53,87-96
+
+The deleted `satisfies z.ZodType<EngineAdapterRequest>` enforced full structural assignability — key presence **and each field's type** **and** optionality. Its replacement, `Expect<Equal<keyof z.input<typeof EngineAdapterRequestSchema>, keyof EngineAdapterRequest>>`, compares only the **union of key names**. That is strictly weaker: a field whose *type* drifts between the schema and the interface compiles clean and passes the assertion, because the key set is unchanged.
+
+Concretely: change `manifestId: z.string().min(1)` (conformance.ts:63) to `z.number()` while the interface keeps `manifestId: string` (types.ts:98). The old `satisfies` clause would have errored. The new `keyof` guard does not — `"method"|"manifestId"|...` is identical on both sides. `validateConformance` won't catch it either: its `response.manifestId !== request.manifestId` echo check (conformance.ts:131) passes when both parse as the same drifted type. So request-schema field-*type* drift now ships silently. Meanwhile the **response** schema still has `satisfies` (conformance.ts:96) and *does* catch type drift. The request/response asymmetry AUDIT-08 set out to close is only restored for the field-*set*, not the field-*type* — and the request envelope (the one carrying the load-bearing `payload`) is again the less-protected sibling, which is precisely the framing AUDIT-08 used to justify the fix.
+
+The AUDIT-08 doc-comment is *technically* honest (it says "field-set drift"), but the finding's narrative ("restored compile-time field-set drift detection… asymmetric drift protection") reads as a full restoration when it isn't. A reasonable closure: assert full type alignment for everything except the one optionality-mismatched field, e.g. `Expect<Equal<Omit<z.input<typeof S>, 'payload'>, Omit<EngineAdapterRequest, 'payload'>>>` (which keeps field-type checking on `method`/`manifestId`/`imageHashes`/`rubricItemIds`) paired with the existing payload-presence `@ts-expect-error` test (types.binding.test.ts:99-104). That restores type-drift teeth without tripping over the `payload?`-vs-`payload` optionality difference that forced the `keyof` retreat. As written, the conformance.ts:48-53 claim that this assertion is the request schema's "equivalent drift guard" to the response's `satisfies` overstates the equivalence.
+
+---
+
+### AUDIT-20260605-11 — `parseAndValidate` can now throw, but its JSDoc still presents an always-returns contract
+
+Finding-ID: AUDIT-20260605-11
+Status:     acknowledged-slush-pile-2026-06-05
+Severity:   low
+Surface:    plugins/design-control/src/engine-adapter/conformance.ts:213-256
+
+The unreachable branch (conformance.ts:241-253) was changed from returning a `ConformanceResult` to `throw new Error(...)`. The fail-loud posture is correct and consistent with project guidelines, and the branch is genuinely unreachable (the `.superRefine` at conformance.ts:68-76 rejects an absent `payload` before `safeParse` can return success, so `narrowParsedRequest` at line 201 can never see a payload-less success). So there is no practical runtime impact.
+
+The gap is documentation drift: `parseAndValidate`'s JSDoc (conformance.ts:213-222) describes only return behavior ("returns the structural violations…", "return its result") and never mentions that the function may now throw on invariant violation. This sits directly beside `validateConformance`, whose JSDoc explicitly promises "Does NOT throw" (conformance.ts:106-107) — so a caller reasonably infers the same of `parseAndValidate` and may wrap it in `if (!result.conformant)` without a try/catch. Because the throw is unreachable this is low severity, but the contract a caller reads is now incomplete. A one-line `@throws` note (e.g. "@throws if the parsed request violates the payload-presence invariant the schema is expected to enforce") would keep the documented contract aligned with the code. This is the same doc-vs-code alignment the project's other rules guard against; flagging so the JSDoc isn't left describing the pre-throw behavior.
+
+---
+
+### AUDIT-20260605-12 — Context: the new field-set guard is inert when tests run outside the exact `npm test` invocation
+
+Finding-ID: AUDIT-20260605-12
+Status:     acknowledged-slush-pile-2026-06-05
+Severity:   informational
+Surface:    plugins/design-control/src/__tests__/engine-adapter/types.binding.test.ts:106-119
+
+This is the already-dispositioned AUDIT-07/AUDIT-09 shape, surfaced only because this diff adds a **new** instance of it — I am not re-litigating the disposition. The `it('pins each schema field-set…')` block's runtime body asserts `expect([requestKeysAligned, responseKeysAligned]).toEqual([true, true])`, where both locals are literally `= true` (types.binding.test.ts:112-118). The real teeth are entirely at compile time via `tsc --noEmit`; the runtime `it()` is tautological by construction (the comment at line 111 is honest about this — "keeps the locals used"). The consequence worth recording: any test run that does **not** go through the `tsc --noEmit && vitest run` package script — a bare `vitest run`, `vitest --watch`, or an IDE/editor test runner during development — executes this block as JavaScript, passes green, and verifies nothing. A developer iterating in watch mode who introduces field-set drift gets a passing test locally; the drift only surfaces at the `npm test` / CI boundary.
+
+This is the documented design (the teeth deliberately live in `tsc`, not vitest), and AUDIT-09 confirmed the gate has teeth via the package `test` script. I flag it only so the operator knows the *new* AUDIT-08 guard inherits the same run-context fragility as the AUDIT-05/07 binding assertions — three of the four meaningful assertions in this file (`@ts-expect-error` × 3 plus the new `Expect<Equal<...>>`) are now compile-time-only and share a single point of enforcement (the `tsc --noEmit` prefix in one package script). If that prefix is ever dropped or reordered, all of them silently go green at once.
+
+---
+
+**What I checked that came back clean:** the `keyof` guard's teeth for field add/remove (confirmed `EngineAdapterRequest` is a flat single interface, not a union, so `keyof` doesn't collapse to common keys — the failure mode that would have silently weakened the guard); the `Equal<A,B>` definition (standard, correct for unions of string-literal keys); the unreachability of the new throw (superRefine rejects absent payload pre-parse); zod `z.input`/`alwaysSet` reasoning in the doc-comment (internally consistent with how `z.unknown()` materializes keys); and the response schema's double-guard (`satisfies` + `keyof` pin) which is harmless belt-and-suspenders, not a conflict.

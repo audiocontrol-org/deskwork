@@ -219,6 +219,16 @@ function structuralViolations(label: string, error: z.ZodError): string[] {
  *
  * This makes the safe path the easy path: a caller wiring engine output that
  * arrives as `unknown` cannot accidentally skip structural validation.
+ *
+ * Unlike {@link validateConformance} (which never throws), this function throws if
+ * the parsed request violates the payload-presence invariant the request schema's
+ * `.superRefine` is expected to enforce — an unreachable-by-construction state that
+ * indicates a broken schema invariant rather than a normal validation failure. A
+ * caller handling untrusted input should treat a throw here as a programming/version
+ * error, not as a `conformant: false` result.
+ *
+ * @throws {Error} if a successfully-parsed request is missing the `payload` key
+ *   (invariant violation — the schema is expected to have rejected it first).
  */
 export function parseAndValidate(
   rawRequest: unknown,

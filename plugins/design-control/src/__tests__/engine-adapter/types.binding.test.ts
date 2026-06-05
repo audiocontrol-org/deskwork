@@ -103,18 +103,32 @@ describe('EngineAdapter method/envelope binding (compile-time)', () => {
     expect(adapter).toBeDefined();
   });
 
-  it('pins each schema field-set to its type — field drift fails tsc (AUDIT-08)', () => {
-    // These consts are typed `Expect<Equal<schema-keys, type-keys>>`. When the key
-    // sets align, `Equal` is `true` and `= true` typechecks. Add/remove a field on
-    // one side only and `Equal` becomes `false`, `Expect<false>` violates its
-    // `extends true` constraint, and `tsc --noEmit` (run before vitest by the
-    // package `test` script) fails. The runtime `expect` keeps the locals used.
-    const requestKeysAligned: Expect<
-      Equal<keyof z.input<typeof EngineAdapterRequestSchema>, keyof EngineAdapterRequest>
+  it('pins each schema to its type — field-set AND field-type drift fail tsc (AUDIT-08, AUDIT-10)', () => {
+    // Each const is typed `Expect<Equal<schema-shape, type-shape>>`. When the shapes
+    // align, `Equal` is `true` and `= true` typechecks. Drift either side and `Equal`
+    // becomes `false`, `Expect<false>` violates its `extends true` constraint, and
+    // `tsc --noEmit` (run before vitest by the package `test` script) fails. The
+    // runtime `expect` keeps the locals used.
+    //
+    // The REQUEST guard compares full structural shape (field names AND field types
+    // AND optionality) for every field EXCEPT `payload` — `z.unknown()` infers an
+    // optional output key while the type keeps `payload` required (the `ZodEffects`
+    // mismatch that forced the original `satisfies` clause out), so `payload` is
+    // excluded here and covered separately by the payload-omitted `@ts-expect-error`
+    // case above plus the runtime payload-presence cases in conformance.test.ts. This
+    // restores the field-TYPE drift teeth the bare key-set assertion lacked (AUDIT-10):
+    // e.g. changing `manifestId: z.string()` to `z.number()` now fails tsc.
+    const requestShapeAligned: Expect<
+      Equal<
+        Omit<z.input<typeof EngineAdapterRequestSchema>, 'payload'>,
+        Omit<EngineAdapterRequest, 'payload'>
+      >
     > = true;
-    const responseKeysAligned: Expect<
-      Equal<keyof z.input<typeof EngineAdapterResponseSchema>, keyof EngineAdapterResponse>
+    // The RESPONSE schema has no required-`unknown` field, so it keeps its own
+    // `satisfies` clause (full structural) AND is pinned here for symmetry.
+    const responseShapeAligned: Expect<
+      Equal<z.input<typeof EngineAdapterResponseSchema>, EngineAdapterResponse>
     > = true;
-    expect([requestKeysAligned, responseKeysAligned]).toEqual([true, true]);
+    expect([requestShapeAligned, responseShapeAligned]).toEqual([true, true]);
   });
 });
