@@ -3,37 +3,356 @@ slug: design-control
 title: design-control — portable UX/UI surface-change discipline
 targetVersion: "1.0"
 date: 2026-06-05
-parentIssue: 
+parentIssue: 424
 deskwork:
   id: 60692084-08dc-4395-b861-7c66ec523743
 ---
 
 # PRD: design-control — portable UX/UI surface-change discipline
 
+> **Design-of-record.** This PRD is the self-standing design for the feature. It absorbs the
+> converged design [`docs/superpowers/specs/2026-06-04-design-control-design.md`](../../../superpowers/specs/2026-06-04-design-control-design.md)
+> (v12 — converged via 11 adversarial audit-barrage rounds, claude + codex in parallel, run until
+> **two consecutive rounds returned zero HIGH findings**, rounds 10 + 11, the operator's stop
+> criterion) and its companion [`DESIGN-DISCIPLINE-THESIS.md`](../../../../DESIGN-DISCIPLINE-THESIS.md).
+> The spec remains the convergence record (per-round provenance lives in
+> `.dw-lifecycle/scope-discovery/audit-runs/*design-control*`); this PRD is what the review gate
+> and the implementer read. Round-N citations below (e.g. *round-5 H2*) point at the barrage round
+> that drove each decision, preserved so the rationale survives.
+
 ## Problem Statement
 
-Changing a UI surface "blind" degenerates into a screenshot-by-screenshot correction loop (audiocontrol S-550: ~32 surfaces entered scope, zero found proactively by the agent). Root cause: mockups did double duty (UX + visual design), so stale detail shipped as if intended and visual identity had no durable home. A hard-won discipline fixes it: model the change as a deliberately lo-fi wireframe (UX intent, can't be mistaken for implementation), keep visual identity in a settled design language, and verify by *looking* at the realized thing against specific criteria. That discipline is trapped in one sibling repo; **design-control productizes it as a portable deskwork plugin.**
+Changing a UI surface "blind" degenerates into a screenshot-by-screenshot correction loop
+(audiocontrol S-550: ~32 surfaces entered scope, **zero found proactively by the agent**). Root
+cause: mockups did **double duty** (UX *and* visual design at once), so stale detail shipped as if
+intended (a drifted color, a leftover control), and visual identity had **no durable home** — it
+lived inside disposable mockups instead of a settled reference. The missing leg the operator named:
+*"a stage separate from mockups that formally defines the design language … backfill the visual
+design part that we are cleaving"* out of the wireframe.
 
-## Solution
+A hard-won discipline fixes it: **model the change as a deliberately lo-fi wireframe** (UX intent,
+structurally un-styled so it can't be mistaken for implementation guidance), **keep visual identity
+in a settled design language** (its own durable reference, not inside a wireframe), and **verify by
+*looking*** at the realized thing against specific criteria. That discipline is currently trapped in
+one sibling repo. **design-control productizes it as a portable deskwork plugin.**
 
-A deskwork marketplace plugin that productizes the discipline as **workflow tooling orchestrating an existing engine — `/frontend-design` — with NO roll-your-own visual-verification engine** (the load-bearing commitment; a custom pixel/determinism engine was killed across two adversarial audit-barrage rounds). `/frontend-design` is the single proven engine threaded through three concerns, anchored by two durable reference artifacts: a **lo-fi wireframe** (UX *spirit*) and a **design-language spec** (visual *letter*). The loop: author a lo-fi wireframe (works out the UX) → operator picks → `/frontend-design` translates intent into the project's local design language → implement against it → `/frontend-design` **referees** a screenshot against the spirit of the wireframe and the letter of the spec (advisory evidence, never a gate). v1 ships in two modes: **`v1-scaffold`** (wireframe kit + allowlist lint + design-language spec + archive + `status`; zero referee dependency) and a gated **`v1-referee-preview`** (the advisory referee, which must earn trust via an adversarial falsification set). Canonical converged design: [`docs/superpowers/specs/2026-06-04-design-control-design.md`](../../../superpowers/specs/2026-06-04-design-control-design.md) (11 audit-barrage rounds → two consecutive zero-HIGH). Companion thesis: [`DESIGN-DISCIPLINE-THESIS.md`](../../../../DESIGN-DISCIPLINE-THESIS.md).
+## What it is
+
+A **deskwork marketplace plugin** that productizes the discipline as **workflow tooling that
+orchestrates an existing engine — with NO roll-your-own visual-verification engine.** It ships CLI
+verbs, a lint, a `status` command, manifests, and skills — that is tooling; **it builds no custom
+pixel / visual / determinism engine.** A roll-your-own visual-regression engine was the original
+v1 design and was **killed across the first two adversarial barrage rounds**; everything since is
+orchestration of `/frontend-design` (the single proven engine).
+
+`/frontend-design` is threaded through **three concerns**, anchored by **two durable reference
+artifacts** (lo-fi wireframe = UX *spirit*; design-language spec = visual *letter*) plus a
+**promoted baseline**. The loop:
+
+> author a lo-fi wireframe (works out the UX) → operator picks → `/frontend-design` translates
+> intent into the project's local design language → implement against it → `/frontend-design`
+> **referees** a screenshot against the *spirit* of the wireframe and the *letter* of the spec
+> (advisory evidence, **never** a gate).
+
+### Identity & portability (claim matched to evidence)
+
+A deskwork marketplace plugin **with a pluggable referee-engine requirement.**
+**Render-framework-independent** (the referee looks at a screenshot, so the rendering stack —
+Astro/Next/Hugo/etc. — doesn't matter) — but **NOT agent-independent** (a referee engine *is*
+required). No "any-adopter / framework-independent" overclaim. v1 ships **one** conformant referee
+adapter (Claude / `/frontend-design`).
+
+## The discipline — engine threaded through 3 concerns
+
+| # | Concern | Owns | Reference artifact | engine role |
+|---|---|---|---|---|
+| 1 | **UX (spirit)** | organization & flow | lo-fi wireframe (deliberately un-polished; captured UX invariants) | collaborates on the UX |
+| 2 | **Design language (letter)** | what it looks like | design-language spec (markdown; each rule linked to a live CSS file/class + ≥1 current example; **link-liveness checked**) | translates wireframe intent → local design language |
+| 3 | **Review (referee)** | gross spirit/letter regressions + declared stable-region pixel drift | candidate + **promoted baseline** + structured change-scope | emits **advisory evidence** (never a gate) |
+
+Spirit and letter are **two separate questions that never cross** — the wireframe is deliberately
+ugly, so it can never be read as a visual-design source; the design language is the only home for
+visual identity.
+
+### Engine-adapter seam (conformance-tested; Claude-only in v1)
+
+A declared interface — **`author-wireframe`, `translate-design-language`, `referee-screenshot`** —
+with **`/frontend-design` as the default Claude adapter**. A **declared cross-plugin dependency**
+plus a **preflight presence check that fails loud**, scoped to adapter **execution** paths and
+**NOT** to manual authoring (so the scaffold's operator-driven, lint-enforced authoring works with
+no engine present; the adapter methods are **optional accelerators, not scaffold preconditions**).
+
+Conformance is specified — JSON request/response schemas; the adapter echoes manifest ids, image
+hashes, model identity, and rubric-item ids; confidence and failure modes are defined. Two
+conformance clauses are load-bearing:
+
+- **(a)** `author-wireframe` **must emit sketch-kit-only, lint-passing lo-fi markup.** A claiming
+  engine is **constrained by the lint, never trusted**; the default Claude adapter fails conformance
+  **loudly** if it leaks polish *(round-6 H1)*.
+- **(b)** `referee-screenshot` is a **Claude-vision shim wrapping the engine** (distinct from
+  `/frontend-design`'s code-gen role); its **adversarial falsification set is its acceptance gate.**
+
+**v1 ships ONE conformant adapter (Claude).** Multi-family is **not** assumed from the existing
+audit-barrage harness — that harness fires CLIs at a *text* diff; a *vision* `referee-screenshot`
+adapter (image ingestion at fidelity + conformant output) for codex/gemini is unproven and is
+**phase 2, gated on demonstrating per-family vision-adapter conformance.**
+
+## v1 split — two releasable modes; the boundary is sharp
+
+- **`v1-scaffold`** — ship-ready **alone**; depends on **NO referee, NO capture/baseline**:
+  wireframe kit + leakage lint; design-language spec schema + link-liveness; ACCEPTED/REJECTED
+  archive (decision states/links); referee-request manifest **schema** validation (structure only,
+  no execution); `design-control status` over **authoring artifacts only**.
+- **`v1-referee-preview`** — **gated, optional evidence**: the referee + **all** capture / baseline /
+  matrix machinery. A surface acquires a baseline-matrix requirement **only when the operator opts
+  it into visual review** (i.e. referee-preview is present). Capture, baselines, stable-regions, and
+  the matrix are **referee-preview deliverables — never scaffold-completion requirements**
+  *(round-5 H3: the scaffold must not gate "complete" on artifacts only the referee consumes).*
+
+**Build order is inverted:** ship the scaffold first (zero referee risk), build the referee as a
+constrained evidence-spike **last**, gated on its falsification set.
+
+## Component design (v1-scaffold)
+
+### Wireframe authoring (greenfield + retroactive) + the `check-mockup-lofi` lint
+
+The kit: `sketch-kit.css` + the `.sk-*` vocabulary + a self-labeling **WIREFRAME banner** + a fixed
+`.sk-img` placeholder element + a bundled local OFL hand-drawn webfont (**aesthetic only, not a
+determinism claim**). An authoring skill `/design-control:wireframe <change>`. Authoring is
+**operator-driven + lint-enforced**; the engine `author-wireframe` method is an **optional
+accelerator routed through the same lint** — engine output is constrained, never trusted.
+
+**The lint is an element/attribute ALLOWLIST, not a forbid-list** *(round-7)*: a denylist is
+whack-a-mole — each round closes one channel while passive-polish channels stay open; an allowlist
+closes the whole class and makes the lo-fi guarantee — **"lint green ⇒ genuinely lo-fi"** —
+actually trustworthy. It **permits only**: the single sketch-kit `<link rel=stylesheet>`, the
+`.sk-*` structural tags, the `.sk-img` placeholder, a closed set of plain structural tags + text,
+and the WIREFRAME banner. It **rejects everything else**, notably every polish channel:
+
+- external resources of any kind — `<img src>` (remote/relative, incl. external `.svg`),
+  `<picture>` / `srcset`, `<iframe>` / `<object>` / `<embed>`;
+- `<script>` / `<style>` / inline `style=`; `data:` URIs;
+- presentational attributes — `background`, `bgcolor`, `<font>`, layout `width` / `height` /
+  `align`.
+
+*(Round-6's `data:` / inline-SVG rules survive as defense-in-depth under the allowlist.)*
+
+Two **value/content-level** rules close the channels an element/attribute allowlist structurally
+cannot reach *(round-8)*:
+
+- **(i) Stylesheet identity pin.** The single permitted `<link>` is **pinned by identity** —
+  canonical resolved path + content hash/SRI — **not** merely "at most one stylesheet." Arbitrary
+  `class` *values* are permitted-but-**inert** *only because* that pinned stylesheet is the sole CSS
+  source; **state this invariant explicitly.**
+- **(ii) Codepoint ALLOWLIST for text content** — symmetric with the element/attribute allowlist (a
+  denylist of ranges is the same whack-a-mole round 7 abolished: Mathematical-Alphanumeric letters
+  𝐃𝐚𝐬𝐡𝐛𝐨𝐚𝐫𝐝/script/fraktur/double-struck, enclosed ①②③, and fullwidth Ｄａｓｈ carry Unicode
+  category *Letter* — not emoji/symbol — so a range-denylist passes them and "designed typography"
+  leaks with zero CSS, *round-9*). It **permits only**: Basic-Latin letters/digits, a closed
+  enumerated punctuation set, an **enumerated whitespace set** (space + newline + tab only — **not**
+  the Unicode whitespace *category*, which would leak em/en/hair/ideographic spacers as an alignment
+  channel, *round-10*), and an enumerated set of accented-Latin extras. It **rejects everything
+  else** in one rule: math-alphanumeric, enclosed, fullwidth, fraktur/double-struck,
+  pictographic/emoji, box-drawing, tag chars, variation selectors, zero-width formatting.
+
+The **`author-wireframe` conformance falsification set** includes planted **"emoji-as-icon"** and
+**"𝐌𝐚𝐭𝐡-bold heading"** cases. Grandfather allowlist entries require an **issue link + expiry**.
+
+**Retroactive path.** Artifacts derived from an existing surface (existing surface → `derived`
+wireframe/spec) are **marked `derived`**, **require operator editing to assert *intended* UX before
+acceptance**, and **do NOT satisfy a "wireframe drove the implementation" claim.** (Provenance —
+`drove-implementation` vs `derived-retroactively` — must be carried so `status` cannot launder a
+non-driving artifact into "complete.")
+
+### Design-language spec convention + static link-liveness
+
+A **markdown spec schema**: palette / type / spacing tokens + signature-component vocabulary +
+do/don't, **each rule linked to a live CSS file/class + ≥1 current example**. A **static
+link-liveness check**: the selector/class must be **defined in source** — **scaffold performs NO
+app boot** (preserves "authoring artifacts only / no capture dependency", *round-6 M1*). A skill
+`translate-design-language` uses `/frontend-design` to author/maintain the spec from approved
+wireframe intent.
+
+Named-deferred (see Out of Scope): **runtime dead-CSS detection** and **spec-truthfulness**
+(link-liveness ≠ truthfulness — a resolving selector doesn't prove the live CSS still matches the
+rule's described intent).
+
+### ACCEPTED/REJECTED exploration archive primitive
+
+A standalone archive (the plugin owns its own; it does not depend on deskwork's `docs/studio-design/`).
+Each entry: briefs + the lo-fi wireframe visual + decision states/links — **proposal, accepted
+wireframe, impl commit, rejected rationale, `supersedes`.** Archive writes are **generated by the
+skill flow, not "remember to archive."**
+
+### `design-control status` — adoptability backstop (keys on manifest structure, not verdict)
+
+Per surface: the **next required action** + a **refusal of "complete"** while required **artifacts**
+are missing. It keys on **manifest structure / artifact presence**, **never on referee verdict
+*content*** (so it is **not a gate-by-proxy**).
+
+- **Scaffold-mode** gates on: missing wireframe, unaccepted decision, stale-or-dead-link spec,
+  malformed manifest.
+- **Referee-preview-mode** adds: incomplete baseline matrix, oversized / invariant-covering dynamic
+  region, missing referee evidence.
+
+**"Stale surface"** needs a `surface-id → source-files/routes` map — a real scaffold deliverable,
+**derived from the import/route graph** (not hand-authored, which rots). **If the graph derivation
+isn't feasible, staleness is descoped — an explicit operator decision, not pushed onto the adopter
+and not an implementer's silent mid-build cut.**
+
+### Referee-request manifest schema (scaffold = schema validation only)
+
+The manifest schema: surface id; route/state; **viewport(s)** (desktop ≥ 1280 + phone ≤ 390);
+wireframe path + hash; spec path + version + hash; baseline + candidate paths; impl commit;
+change-intent brief. **Scaffold validates the schema only — no execution, no capture.** The schema
+**also carries the fields later referee controls need** (stable-region locators, dynamic regions,
+capture-config identity, viewport identity, auth/principal metadata) so Phase 4 doesn't ship a
+schema Phase 5 must immediately break.
+
+## Component design (v1-referee-preview — GATED; advisory only)
+
+### The referee (advisory; narrowed; no custom engine)
+
+- **Strictly advisory.** Emits structured findings; **never auto-passes/fails** (project rule:
+  *agent posts evidence, operator decides*).
+- **Scope narrowed to GROSS spirit/letter/layout regressions — and even that is not assumed
+  reliable.** `ui-verification.md` records an LLM-judge missing a *gross* defect (an occluded chip,
+  reported "matches spec"). So the referee is advisory **and must earn trust empirically**: it ships
+  as optional evidence until it passes an adversarial falsification set. It does **NOT** claim to
+  satisfy `ui-verification.md`'s numeric-measurement mandate.
+- **Two-image judgment = GROSS comparison only** (panel below the fold; hierarchy inverted) — never
+  the numeric spine.
+- **Structured change-scope contract** in the manifest: allowed changes, protected invariants,
+  out-of-scope regions, expected per-viewport impact, baseline-replacement requested. The referee
+  classifies each difference **`intended` / `unintended` / `ambiguous` / `outside-scope`**;
+  **ambiguous → operator.**
+- **v1 reliability = Claude stability sampling, labeled as such** (repeat runs detect flake; this is
+  **NOT diversity/quorum** and may not back a "high-confidence" verdict). Genuine cross-family quorum
+  is phase 2 (gated on the vision-adapter conformance of clause H1).
+
+### Numeric drift — an EXISTING pixel-diff tool on DOM-locator stable regions
+
+Numeric drift uses an **existing** pixel-diff tool (Playwright `toHaveScreenshot` / Argos / Percy) —
+**never a rolled engine** — on operator-declared **STABLE regions expressed as DOM LOCATORS, not
+coordinate boxes.** `stableRegions` is a machine-executable contract keyed by
+`surface id + route/state + viewport + capture-step`; each region compiles to an existing-tool
+primitive (locator-clip / region config). **Locators re-anchor across reflow; coordinate boxes
+don't.** **Fail loud** when a region is missing, unresolvable at a viewport, overlaps a dynamic
+mask, or covers an intentionally-changed area *(round-5 codex-1 / claude-M1)*.
+
+### Baseline & capture (PNG is the artifact of record)
+
+- **Baseline promotion is an operator state transition.** A screenshot becomes `ACCEPTED` only when
+  its manifest is complete, route/state/viewport/capture-config hashes match the surface contract,
+  the required viewport matrix is present, dynamic regions are declared, **and the operator
+  explicitly promotes it.** Lineage + a `supersedes` reason on replace.
+- **The accepted baseline PNG is the artifact of record.** On capture-config change, **invalidate
+  the baseline and require operator re-promotion under the new recipe** — do **NOT** synthesize a
+  re-capture from the historical git commit (old commits frequently won't build/boot under the
+  current toolchain; that swaps a bounded recipe delta for an unbounded app-reproducibility delta)
+  *(round-5 H2)*.
+- **Capture-config hash covers the DETERMINISTIC recipe** (route, viewport, wait condition, masks)
+  **plus a non-secret auth/profile identity** — role, tenant/profile fixture id, feature-flag-set id,
+  seeded-data version, setup-script version — and **excludes only secret token material** (rotating
+  `storageState` tokens) so the hash doesn't churn every run. This prevents an `admin/flags-A`
+  baseline from false-matching an `editor/flags-B` candidate while the hash appears valid
+  *(round-6 codex-1 / claude-M3)*. Role is encoded in the `state` axis. **Fail loud** if
+  `storageState` is supplied without a named reproducible fixture/profile, or when two candidates
+  share `surface+route+state+viewport+capture-step` but resolve different auth principals. Recorded
+  for baseline + candidate; masks applied to both. *(Classification is default-deny: an explicit
+  allowlist of hashable identity fields, everything else excluded.)*
+- **Capture-config contract** (adopter glue, existing executor): the adopter supplies route/URL,
+  setup-or-fixture, auth/storageState, viewport matrix, wait condition, and **specific, bounded,
+  named, justified** dynamic regions + stable-region locators. design-control orchestrates Playwright
+  as the executor; **capturing the right surface is adopter glue, stated plainly.**
+- **Baselines are a matrix** keyed by `surface id + route/state + viewport + capture-step`;
+  referee-preview `status` refuses completion when candidate screenshots don't cover the required
+  matrix (unless the change-scope explicitly retires/replaces a cell with operator approval).
 
 ## Acceptance Criteria
 
-- [ ] **v1-scaffold ships independently:** the `check-mockup-lofi` lint is an allowlist on *both* the element/attribute and codepoint axes, and its adversarial validator rejects every polish-leakage case (inline-style/`<style>`/`<script>`/`data:`/external-resource/presentational-attr, emoji-as-icon, math-alphanumeric text); a hand-authored lo-fi wireframe passes.
-- [ ] Design-language spec link-liveness is **static against source** (no app boot); a dead selector is flagged.
-- [ ] ACCEPTED/REJECTED archive round-trips; `design-control status` refuses "complete" on missing authoring artifacts and never reads referee verdicts.
-- [ ] Referee-request manifest schema validation rejects a malformed manifest; the engine-adapter preflight fails loud when `/frontend-design` is absent, while manual authoring still works.
-- [ ] **v1-referee-preview earns trust:** the referee escalates on planted GROSS regressions (occluded element; panel below the fold) across multiple instances; existing-tool pixel-diff on DOM-locator stable regions catches a planted numeric drift; stale-screenshot / wrong-viewport / oversized-dynamic-region / design-language-violation are caught or escalated. Until this passes, referee output is optional evidence.
-- [ ] **Dogfood:** the sites→lanes studio content-browser + scrapbook redesign runs the full loop end-to-end across ≥2 surfaces; the plugin loads via the marketplace.
+**`v1-scaffold` (acceptance is independent — runnable with zero referee):**
 
-## Out of Scope (v1 — captured, deferred)
+- [ ] `check-mockup-lofi` is an **allowlist on *both* axes** (element/attribute **and** codepoint),
+      with the **stylesheet identity pin** invariant asserted. Its **adversarial validator rejects
+      every polish-leakage case**: inline-style / `<style>` / `<script>` / `data:` / external-resource
+      / presentational-attr leakage, **emoji-as-icon**, and **𝐌𝐚𝐭𝐡-bold-heading** text leakage. A
+      hand-authored lo-fi wireframe **passes** — verified against a **small positive corpus of
+      diverse legitimate wireframes**, not a single fixture. The engine-authored wireframe is
+      constrained by the **same** lint.
+- [ ] Design-language spec **link-liveness is static against source** (no app boot); a **dead
+      selector is flagged.** The `translate-design-language` skill produces a spec linked to live
+      source.
+- [ ] ACCEPTED/REJECTED archive **round-trips** (a decision + its links). `design-control status`
+      **refuses "complete"** on a missing wireframe and **never reads referee verdict content**.
+      Status distinguishes a **driving** wireframe from a retroactive **`derived`** one via
+      provenance.
+- [ ] Referee-request manifest **schema validation rejects a malformed manifest**; the schema
+      carries the fields Phase 5 needs. The **engine-adapter preflight fails loud when
+      `/frontend-design` is absent**, while **manual authoring still works** — and the preflight
+      precedes the first engine-consuming skill.
 
-- **Any roll-your-own visual / pixel / determinism engine** (the commitment, not a deferral). Pixel regression, if ever needed, uses an *existing* tool (Playwright `toHaveScreenshot` / Percy / Argos / Chromatic).
-- **Cross-family referee quorum / design-barrage engine battery** — phase 2, gated on demonstrating per-family *vision*-adapter conformance (the text-diff audit-barrage harness does not generalize to image ingestion).
-- Living styleguide gallery; WebKit/iOS coverage (real iOS = manual/real-device); waypoint auto-fire; per-exploration-type lint profiles; a11y/keyboard review; runtime dead-CSS / spec-truthfulness checks; deskwork `docs/studio-design/` migration onto the archive primitive.
-- **Cross-agent portability:** render-framework-independent, NOT agent-independent — a referee engine is required (v1 ships one conformant Claude adapter).
+**`v1-referee-preview` (acceptance is adversarial — the referee earns trust empirically):**
+
+- [ ] The referee **escalates** (not merely "emits findings") on planted **GROSS regressions** (an
+      occluded element; a panel forced below the fold) across **multiple** instances.
+- [ ] A **negative/specificity arm**: across planted **unchanged** and **legitimately-changed-but-
+      intended** pairs, the referee does **not** over-escalate (a stated false-positive ceiling) —
+      so a referee that cries "regression" on everything **fails**.
+- [ ] Existing-tool **stable-region pixel-diff catches a planted numeric drift** in a declared-stable
+      DOM locator.
+- [ ] **Stale screenshot / wrong viewport / oversized dynamic region / design-language violation** are
+      caught or escalated.
+
+Until the referee-preview set passes, **its output is optional evidence and no "catches these cases"
+claim ships.**
+
+**Dogfood:** the **sites→lanes studio content-browser + scrapbook redesign** runs the full loop
+end-to-end (wireframe → pick → `translate-design-language` → implement → referee evidence at **both**
+viewports → archive) across **≥ 2 diverse surfaces**; the plugin **loads via the marketplace**.
+Portability is validated **only on the deskwork studio**.
+
+## Out of Scope (v1 — captured, named-deferred; not hidden)
+
+- **Any roll-your-own visual / pixel / determinism engine** — this is **the commitment, not a
+  deferral.** Pixel regression, if ever needed, uses an **existing** tool (Playwright
+  `toHaveScreenshot` / Percy / Argos / Chromatic). *(Boundary to draw in implementation: static
+  text/DOM allowlisting and capture-recipe hashing are **configuration validation**, not a
+  determinism **engine**; the prohibited thing is runtime visual/pixel comparison logic.)*
+- **Cross-family referee quorum / design-barrage engine battery** — phase 2, **gated on demonstrating
+  per-family *vision*-adapter conformance** (the text-diff audit-barrage harness does **not**
+  generalize to image ingestion).
+- **Cross-agent portability** — render-framework-independent, **NOT** agent-independent; a referee
+  engine is required (v1 ships one conformant Claude adapter).
+- **Runtime dead-CSS detection** and **spec-truthfulness** (link-liveness ≠ truthfulness) — named-
+  deferred.
+- **Semantic stability verification of `stableRegions`** (detecting a mis-declared region whose
+  content legitimately varies) — v1's stable-region checks are **structural** (resolve / overlap /
+  covers-changed); semantic stability is the operator's declared assertion unless/until a sampling
+  check is added. *(Surfaced as an open risk to resolve during Phase 5.)*
+- Living styleguide gallery (design-language rendered from real components, shot device-free);
+  WebKit/iOS coverage (real iOS = manual/real-device; Linux-WebKit ≠ iOS Safari); waypoint auto-fire;
+  per-exploration-type lint profiles; a11y/keyboard review; broader pixel regression beyond declared
+  stable regions; deskwork `docs/studio-design/` migration onto the design-control archive.
 
 ## Technical Approach
 
-A discipline/orchestration plugin (standalone; own archive primitive; enforcement in skills/CLI verbs, never git hooks). **Build order inverted:** ship the scaffold first (no referee risk); build the referee as a constrained evidence-spike last, gated on its falsification set. Render-framework-independent (the referee looks at a screenshot) — NOT agent-independent (a referee engine is required; declared cross-plugin dependency + fail-loud preflight).
+A **discipline/orchestration plugin** — standalone (its own archive primitive); enforcement in
+**skills / CLI verbs, never git hooks** (per `.claude/rules/enforcement-lives-in-skills.md`).
+**Build order inverted:** ship the scaffold first (no referee risk); build the referee as a
+constrained evidence-spike last, gated on its falsification set. **TDD-shaped:** each task writes
+failing tests first, then minimal implementation. Render-framework-independent (the referee looks at
+a screenshot) — NOT agent-independent (a referee engine is required; declared cross-plugin dependency
++ fail-loud preflight). **`/frontend-design` is the engine, not a tool we build** — any UI/CSS
+authored here (the sketch-kit) is a **static lo-fi convention**; visual verification is
+`/frontend-design`. Implementation runs in a **separate session** against the `design-control`
+worktree via `/dw-lifecycle:implement`.
+
+## Phase 2-of-product (captured; out of v1)
+
+Living styleguide gallery (design-language rendered from real components, shot device-free);
+**design-barrage** (cross-family referee quorum + configurable engine battery, gated on per-family
+vision-adapter conformance — the text-diff audit-barrage harness does NOT generalize to image
+ingestion); WebKit/iOS; waypoint auto-fire; per-exploration-type lint profiles; a11y/keyboard review;
+broader existing-tool pixel regression; deskwork `docs/studio-design/` migration onto the
+design-control archive.
