@@ -90,13 +90,13 @@ New **fat plugin, in-tree TS via `tsx`** under `plugins/stack-control/`, mirrori
 
 ### Tests for User Story 2 (RED-first) ⚠️
 
-- [ ] T024 [P] [US2] RED: `spec-check` unit tests in `plugins/stack-control/src/__tests__/spec-check.test.ts` — reports presence of `spec.md`/`plan.md`/`tasks.md` as a machine-readable line (e.g. `spec=yes plan=yes tasks=no`), exit 0, read-only; missing `--spec` → exit 2; spec dir absent → exit ≠0 descriptive. Tmp fixture trees. Watch it fail.
+- [X] T024 [P] [US2] RED: `spec-check` unit tests in `plugins/stack-control/src/__tests__/spec-check.test.ts` — reports presence of `spec.md`/`plan.md`/`tasks.md` as a machine-readable line (e.g. `spec=yes plan=yes tasks=no`), exit 0, read-only; missing `--spec` → exit 2; spec dir absent → exit ≠0 descriptive. Tmp fixture trees. Watch it fail.
 
 ### Implementation for User Story 2
 
-- [ ] T025 [US2] GREEN: implement `plugins/stack-control/src/subcommands/spec-check.ts` (satisfies T024; register verb in `src/cli.ts`)
-- [ ] T026 [P] [US2] Author `plugins/stack-control/skills/define/SKILL.md` + `plugins/stack-control/commands/define.md` per contracts/front-door-skills.md § define: drive native `/speckit-specify` (+ downstream chain) via in-session agent to create a NEW spec; call `stackctl spec-check` to confirm state; spec-authoring ONLY (no worktree/docs infra — `define` ≠ `setup`)
-- [ ] T027 [P] [US2] Author `plugins/stack-control/skills/extend/SKILL.md` + `plugins/stack-control/commands/extend.md` per contracts/front-door-skills.md § extend: `stackctl spec-check` → edit/iterate/review loop over the EXISTING spec (`/speckit-clarify`, re-`/speckit-plan`, re-`/speckit-tasks`, edits) reusing the current spec dir → bring to runnable (so execute-check passes), in-session
+- [X] T025 [US2] GREEN: implement `plugins/stack-control/src/subcommands/spec-check.ts` (satisfies T024; register verb in `src/cli.ts`)
+- [X] T026 [P] [US2] Author `plugins/stack-control/skills/define/SKILL.md` + `plugins/stack-control/commands/define.md` per contracts/front-door-skills.md § define: drive native `/speckit-specify` (+ downstream chain) via in-session agent to create a NEW spec; call `stackctl spec-check` to confirm state; spec-authoring ONLY (no worktree/docs infra — `define` ≠ `setup`)
+- [X] T027 [P] [US2] Author `plugins/stack-control/skills/extend/SKILL.md` + `plugins/stack-control/commands/extend.md` per contracts/front-door-skills.md § extend: `stackctl spec-check` → edit/iterate/review loop over the EXISTING spec (`/speckit-clarify`, re-`/speckit-plan`, re-`/speckit-tasks`, edits) reusing the current spec dir → bring to runnable (so execute-check passes), in-session
 
 **Checkpoint**: US1 + US2 both work. The front door is a usable control plane (author + run), not a bare execution trigger.
 

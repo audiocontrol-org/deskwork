@@ -10,12 +10,14 @@
 
 import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
+import { runSpecCheck } from './subcommands/spec-check.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
 const SUBCOMMANDS: Record<string, Subcommand> = {
   version: runVersion,
   'execute-check': runExecuteCheck,
+  'spec-check': runSpecCheck,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
