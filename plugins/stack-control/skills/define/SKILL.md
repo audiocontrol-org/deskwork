@@ -24,15 +24,15 @@ Author a **new** Spec Kit spec through the stack-control front door (Feature 1, 
 
 2. **Drive native `/speckit-specify`** via the in-session agent to create the new spec. Honor Spec Kit's prescribed order (Principle VIII — Faithful Tool Adoption): `specify → clarify → plan → checklist → tasks → analyze`. Do not skip or off-road; let each `/speckit-*` step run in order as the spec matures.
 
-3. **Confirm artifact state as it advances.** After each authoring step that adds an artifact, run:
+3. **Resolve and state the spec dir.** `/speckit-specify` numbers the new spec dir (`specs/NNN-<slug>/`). Resolve it before you reference it anywhere below. Note: this program runs on one long-lived branch (`feature/pluggable-lifecycle-providers`) with numbered spec dirs, so Spec Kit's `check-prerequisites.sh` rejects the branch name (TF-09) — the active spec dir is resolved via the `<!-- SPECKIT START -->…<!-- SPECKIT END -->` marker in `CLAUDE.md`, not via the branch. State which spec dir you created before proceeding (matching `extend`'s resolve-then-report ordering).
+
+4. **Confirm artifact state as it advances.** After each authoring step that adds an artifact, run `stackctl spec-check` against the dir you resolved in step 3:
 
    ```bash
    plugins/stack-control/bin/stackctl spec-check --spec <spec-dir>
    ```
 
    It prints a machine-readable presence line (`spec=yes plan=yes tasks=no`). Use it to confirm the chain actually produced what you expect before moving to the next step — read it, do not assume.
-
-4. **Resolve the spec dir.** Spec Kit numbers the new spec dir (`specs/NNN-<slug>/`). Note: this program runs on one long-lived branch (`feature/pluggable-lifecycle-providers`) with numbered spec dirs, so Spec Kit's `check-prerequisites.sh` rejects the branch name (TF-09) — the active spec dir is resolved via the `<!-- SPECKIT START -->…<!-- SPECKIT END -->` marker in `CLAUDE.md`, not via the branch. State which spec dir you created.
 
 5. **Advance toward runnable.** Bring the spec through the chain to the point where `tasks.md` exists — at which `/stack-control:execute`'s `execute-check` will pass. Confirm with a final `stackctl spec-check`.
 

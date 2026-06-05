@@ -47,7 +47,7 @@ The deterministic primitive the skills call (`bin/stackctl <verb>`, in-tree Type
 | Verb | Purpose |
 |---|---|
 | `stackctl execute-check --spec <dir>` | Gate: is the spec **runnable** for native `/speckit-implement`? Exit 0 (`runnable`) iff `tasks.md` is present; otherwise exit ≠0 naming the missing artifact. Read-only. |
-| `stackctl spec-check --spec <dir>` | Report a spec's authoring state as a machine-readable line (`spec=yes plan=yes tasks=no`), exit 0. Read-only; never gates. |
+| `stackctl spec-check --spec <dir>` | Report a spec's authoring state as a machine-readable line (`spec=yes plan=yes tasks=no`), exit 0 when it can report; exit ≠0 (fail-loud) on a missing/unknown flag, an absent dir, or a non-directory. Read-only; never gates on artifact *content* (a partial spec is a valid report). |
 | `stackctl version` | Print the plugin version (lockstep with the rest of the monorepo). |
 
 ## Governance extension

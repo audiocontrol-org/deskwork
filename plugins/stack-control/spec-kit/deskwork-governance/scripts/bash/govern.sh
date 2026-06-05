@@ -69,6 +69,12 @@ DIFF="$(git diff "${BASE}" 2>/dev/null || true)"
 # audit-runs output dir). We additionally (a) skip binary files — never ship
 # binary blobs — and (b) cap the total folded bytes, logging any drop to stderr
 # (no silent truncation, per the project "no silent caps" rule).
+#
+# The budget accounts each file's raw size (`wc -c`); the actual folded payload
+# is the larger `git diff --no-index` output (per-line `+` prefixes + headers),
+# so the off-box total runs modestly above UNTRACKED_FOLD_BUDGET. The cap is a
+# soft bound on transmitted working-tree content, not a hard byte ceiling on the
+# wire (AUDIT-20260605-12 acknowledgment).
 UNTRACKED_FOLD_BUDGET=$((256 * 1024))
 _folded_bytes=0
 while IFS= read -r _untracked; do
@@ -81,8 +87,14 @@ while IFS= read -r _untracked; do
   fi
   _sz="$(wc -c < "${_untracked}" 2>/dev/null || echo 0)"
   if [ "$((_folded_bytes + _sz))" -gt "${UNTRACKED_FOLD_BUDGET}" ]; then
-    echo "govern.sh: untracked-fold budget (${UNTRACKED_FOLD_BUDGET} bytes) reached at ${_untracked}; skipping it and any further untracked files (not silently — audit them by committing first)." >&2
-    break
+    # Skip ONLY this oversized file and keep packing smaller ones (AUDIT-20260605-12):
+    # `git ls-files` emits sorted paths, so a single large file early in the sort
+    # must not suppress folding of the feature's smaller new source/test files that
+    # sort later — exactly the surfaces the fold exists to audit. `continue` (not
+    # `break`) skips the over-budget file without incrementing _folded_bytes, so
+    # later files that still fit are folded. The skip is logged (no silent cap).
+    echo "govern.sh: untracked file ${_untracked} (${_sz} bytes) would exceed the fold budget (${UNTRACKED_FOLD_BUDGET} bytes); skipping it but continuing with smaller files (not silently — audit it by committing first)." >&2
+    continue
   fi
   DIFF="${DIFF}"$'\n'"$(git diff --no-index --no-color -- /dev/null "${_untracked}" 2>/dev/null || true)"
   _folded_bytes="$((_folded_bytes + _sz))"
