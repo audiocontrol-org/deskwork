@@ -56,4 +56,25 @@ describe('stackctl execute-check (T015)', () => {
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/--spec/);
   });
+
+  it('exits non-zero with a directory-specific error when --spec points at a file (AUDIT-08)', () => {
+    const dir = makeSpec({ tasks: true });
+    const fileAsSpec = join(dir, 'tasks.md'); // an existing FILE, not a dir
+    const r = runCli(['execute-check', '--spec', fileAsSpec]);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/not a directory/i);
+  });
+
+  it('exits 2 on an unknown flag — no flag silently ignored (AUDIT-09)', () => {
+    const dir = makeSpec({ tasks: true });
+    const r = runCli(['execute-check', '--spec', dir, '--bogus']);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/unexpected argument/i);
+  });
+
+  it('exits 2 on a stray positional (AUDIT-09)', () => {
+    const dir = makeSpec({ tasks: true });
+    const r = runCli(['execute-check', '--spec', dir, 'extra']);
+    expect(r.status).toBe(2);
+  });
 });

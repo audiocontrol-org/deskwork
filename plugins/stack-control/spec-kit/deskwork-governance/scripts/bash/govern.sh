@@ -62,9 +62,30 @@ DIFF="$(git diff "${BASE}" 2>/dev/null || true)"
 # via --no-index WITHOUT mutating the index. The real after_implement flow
 # commits first (git hook precedes governance), but a manual govern run on a
 # dirty tree must not silently drop new files.
+#
+# BOUNDED (AUDIT-20260605-06): the folded content is shipped to external model
+# CLIs, so the enumeration must not transmit arbitrary working-tree content
+# off-box. `--exclude-standard` already drops gitignored paths (incl. the
+# audit-runs output dir). We additionally (a) skip binary files — never ship
+# binary blobs — and (b) cap the total folded bytes, logging any drop to stderr
+# (no silent truncation, per the project "no silent caps" rule).
+UNTRACKED_FOLD_BUDGET=$((256 * 1024))
+_folded_bytes=0
 while IFS= read -r _untracked; do
   [ -n "${_untracked}" ] || continue
+  # grep -I treats a binary file as non-matching; `.` matches any text line.
+  # So a non-zero exit here means "binary or empty" — skip it.
+  if ! grep -Iq . "${_untracked}" 2>/dev/null; then
+    echo "govern.sh: skipping untracked binary/empty file ${_untracked} (not folded into the audit diff)." >&2
+    continue
+  fi
+  _sz="$(wc -c < "${_untracked}" 2>/dev/null || echo 0)"
+  if [ "$((_folded_bytes + _sz))" -gt "${UNTRACKED_FOLD_BUDGET}" ]; then
+    echo "govern.sh: untracked-fold budget (${UNTRACKED_FOLD_BUDGET} bytes) reached at ${_untracked}; skipping it and any further untracked files (not silently — audit them by committing first)." >&2
+    break
+  fi
   DIFF="${DIFF}"$'\n'"$(git diff --no-index --no-color -- /dev/null "${_untracked}" 2>/dev/null || true)"
+  _folded_bytes="$((_folded_bytes + _sz))"
 done < <(git ls-files --others --exclude-standard 2>/dev/null || true)
 COMMIT_SUBJECTS="$(git log "${BASE}..HEAD" --oneline 2>/dev/null || true)"
 AUDIT_EXCERPT="$(tail -n 40 "${AUDIT_LOG}" 2>/dev/null || true)"
