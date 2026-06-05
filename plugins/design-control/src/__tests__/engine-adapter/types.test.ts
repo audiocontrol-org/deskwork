@@ -4,7 +4,9 @@ import {
   isConfidence,
   assertConfidence,
   FAILURE_MODES,
+  ENGINE_METHODS,
 } from '@/engine-adapter';
+import { EngineAdapterRequestSchema } from '@/engine-adapter';
 
 describe('DEFAULT_CLAUDE_ADAPTER_ID', () => {
   it('is the frontend-design cross-plugin dependency', () => {
@@ -39,5 +41,36 @@ describe('confidence validator', () => {
 describe('FAILURE_MODES', () => {
   it('includes engine-absent as a defined failure mode', () => {
     expect(FAILURE_MODES).toContain('engine-absent');
+  });
+});
+
+describe('ENGINE_METHODS — single-sourced method vocabulary', () => {
+  it('has exactly the three method members', () => {
+    expect([...ENGINE_METHODS]).toEqual([
+      'author-wireframe',
+      'translate-design-language',
+      'referee-screenshot',
+    ]);
+    expect(ENGINE_METHODS).toHaveLength(3);
+  });
+
+  it('the request zod enum accepts each declared method', () => {
+    for (const method of ENGINE_METHODS) {
+      const parsed = EngineAdapterRequestSchema.safeParse({
+        method,
+        manifestId: 'm',
+        payload: {},
+      });
+      expect(parsed.success).toBe(true);
+    }
+  });
+
+  it('the request zod enum rejects a non-member method', () => {
+    const parsed = EngineAdapterRequestSchema.safeParse({
+      method: 'not-an-engine-method',
+      manifestId: 'm',
+      payload: {},
+    });
+    expect(parsed.success).toBe(false);
   });
 });

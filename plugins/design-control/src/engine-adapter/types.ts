@@ -4,9 +4,9 @@
  * The engine-adapter is the contract between the design-control plugin's
  * execution paths (wireframe authoring, design-language translation, screenshot
  * refereeing) and a concrete design engine. The default engine is the Claude
- * `/frontend-design` plugin (see {@link DEFAULT_CLAUDE_ADAPTER_ID}); the concrete
- * adapter that wires `/frontend-design` is a separate, later implementation. This
- * module declares ONLY the interface + supporting value types.
+ * `/frontend-design` plugin (see {@link DEFAULT_CLAUDE_ADAPTER_ID}). This module
+ * declares ONLY the interface + supporting value types; concrete adapters that
+ * wire a specific engine are supplied by callers via dependency injection.
  *
  * Interface-first / composition-over-inheritance: callers depend on the
  * {@link EngineAdapter} interface and receive a concrete implementation via
@@ -22,11 +22,18 @@
  *                                concrete styling/markup decisions.
  * - `referee-screenshot`      — engine referees a rendered screenshot against a
  *                                rubric (rubric-item ids are load-bearing here).
+ *
+ * Single-sourced as a `const [...] as const` array (mirroring {@link FAILURE_MODES})
+ * so the {@link EngineMethod} type, the zod method enum, and any method-iteration
+ * loop all derive from one declaration — collapsing the drift surface to one site.
  */
-export type EngineMethod =
-  | 'author-wireframe'
-  | 'translate-design-language'
-  | 'referee-screenshot';
+export const ENGINE_METHODS = [
+  'author-wireframe',
+  'translate-design-language',
+  'referee-screenshot',
+] as const;
+
+export type EngineMethod = (typeof ENGINE_METHODS)[number];
 
 /**
  * Closed set of defined failure modes an engine response may carry. A response
@@ -78,34 +85,40 @@ export function assertConfidence(value: number): Confidence {
 }
 
 /**
- * Request envelope handed to an engine method. The request carries the identity
- * fields the response must echo back (manifestId, imageHashes, rubricItemIds)
- * plus a method-specific `payload`.
+ * Request envelope handed to an engine method, parameterised by the specific
+ * {@link EngineMethod} `M` it targets. The `method` field is narrowed to `M`, so
+ * a request typed for one method cannot be passed where another method's request
+ * is expected. The request carries the identity fields the response must echo
+ * back (manifestId, imageHashes, rubricItemIds) plus a method-specific `payload`.
  */
-export interface EngineAdapterRequest {
-  /** Which engine method this request targets. */
-  method: EngineMethod;
+export interface EngineAdapterRequestFor<M extends EngineMethod> {
+  /** Which engine method this request targets. Narrowed to `M`. */
+  method: M;
   /** The manifest the engine is acting on. Echoed back by the response. */
   manifestId: string;
   /** Image hashes the engine is asked to act on. Echoed back by the response. */
-  imageHashes?: string[];
+  imageHashes?: string[] | undefined;
   /**
    * Rubric-item ids. Required (and load-bearing) for `referee-screenshot`;
    * optional for the other methods.
    */
-  rubricItemIds?: string[];
-  /** Method-specific input payload. */
-  payload: unknown;
+  rubricItemIds?: string[] | undefined;
+  /**
+   * Method-specific input payload. Typed `unknown` (which already admits the
+   * absent value), so callers narrow it per method before use.
+   */
+  payload?: unknown;
 }
 
 /**
- * Response envelope returned by an engine method. The response ECHOES the
- * request's identity fields and carries the engine's model identity, a
- * confidence value, and EITHER a success `result` OR a `failureMode`.
+ * Response envelope returned by an engine method, parameterised by the specific
+ * {@link EngineMethod} `M` it answers. The `method` field is narrowed to `M`. The
+ * response ECHOES the request's identity fields and carries the engine's model
+ * identity, a confidence value, and EITHER a success `result` OR a `failureMode`.
  */
-export interface EngineAdapterResponse {
-  /** Echo of the request method. */
-  method: EngineMethod;
+export interface EngineAdapterResponseFor<M extends EngineMethod> {
+  /** Echo of the request method. Narrowed to `M`. */
+  method: M;
   /** Echo of the request manifestId. */
   manifestId: string;
   /**
@@ -118,7 +131,7 @@ export interface EngineAdapterResponse {
    * Echo of the rubric-item ids. Required and non-empty for
    * `referee-screenshot` responses; may be omitted for other methods.
    */
-  rubricItemIds?: string[];
+  rubricItemIds?: string[] | undefined;
   /** Identity of the model/engine that produced this response. Non-empty. */
   modelIdentity: string;
   /** Confidence in [0, 1]. */
@@ -126,23 +139,44 @@ export interface EngineAdapterResponse {
   /** Success payload. Present on success; absent on failure. */
   result?: unknown;
   /** Defined failure mode. Present on failure; absent on success. */
-  failureMode?: FailureMode;
+  failureMode?: FailureMode | undefined;
 }
 
 /**
+ * The wide request union across every {@link EngineMethod}. Used by
+ * schema/conformance code that operates on any method's envelope.
+ */
+export type EngineAdapterRequest = EngineAdapterRequestFor<EngineMethod>;
+
+/**
+ * The wide response union across every {@link EngineMethod}. Used by
+ * schema/conformance code that operates on any method's envelope.
+ */
+export type EngineAdapterResponse = EngineAdapterResponseFor<EngineMethod>;
+
+/**
  * The engine-adapter contract. A concrete adapter (e.g. one wiring Claude's
- * `/frontend-design`) implements these three async methods. Callers depend on
+ * `/frontend-design`) implements these three async methods. Each method's
+ * request/response envelope is bound to its own {@link EngineMethod} at compile
+ * time, so passing a wrong-method envelope is a type error. Callers depend on
  * this interface and receive an implementation via dependency injection.
  */
 export interface EngineAdapter {
-  authorWireframe(request: EngineAdapterRequest): Promise<EngineAdapterResponse>;
-  translateDesignLanguage(request: EngineAdapterRequest): Promise<EngineAdapterResponse>;
-  refereeScreenshot(request: EngineAdapterRequest): Promise<EngineAdapterResponse>;
+  authorWireframe(
+    request: EngineAdapterRequestFor<'author-wireframe'>,
+  ): Promise<EngineAdapterResponseFor<'author-wireframe'>>;
+  translateDesignLanguage(
+    request: EngineAdapterRequestFor<'translate-design-language'>,
+  ): Promise<EngineAdapterResponseFor<'translate-design-language'>>;
+  refereeScreenshot(
+    request: EngineAdapterRequestFor<'referee-screenshot'>,
+  ): Promise<EngineAdapterResponseFor<'referee-screenshot'>>;
 }
 
 /**
  * The default engine adapter id. design-control's default engine is the Claude
  * `/frontend-design` plugin; this constant documents that cross-plugin
- * dependency. The concrete adapter implementation is a separate, later task.
+ * dependency. Concrete adapter implementations are supplied by callers via
+ * dependency injection.
  */
 export const DEFAULT_CLAUDE_ADAPTER_ID = 'frontend-design' as const;

@@ -22,9 +22,9 @@ import {
 } from '@/engine-adapter/types';
 
 /**
- * Probe that reports whether a given engine adapter is available. Injected by
- * the caller; the real `/frontend-design`-detection probe is wired at the skill
- * layer in a later task. Here it is a parameter so the library is testable.
+ * Probe that reports whether a given engine adapter is available. The concrete
+ * `/frontend-design`-detection probe is injected by the caller; this library
+ * declares the probe as a parameter so it depends only on the interface.
  */
 export interface EngineProbe {
   isAvailable(adapterId: string): boolean;
@@ -50,9 +50,13 @@ export function preflightEngine(probe: EngineProbe, options: PreflightOptions): 
   if (probe.isAvailable(adapterId)) {
     return;
   }
+  const isDefaultAdapter = adapterId === DEFAULT_CLAUDE_ADAPTER_ID;
+  const remedy = isDefaultAdapter
+    ? `Remedy: install/enable the "${DEFAULT_CLAUDE_ADAPTER_ID}" plugin, `
+    : `Remedy: install/enable the "${adapterId}" engine adapter, `;
   throw new Error(
     `Engine adapter "${adapterId}" is required by the "${options.method}" execution path but is not available. ` +
-      `Remedy: install/enable the "${DEFAULT_CLAUDE_ADAPTER_ID}" plugin, ` +
+      remedy +
       `or use the manual authoring path (which needs no engine).`,
   );
 }

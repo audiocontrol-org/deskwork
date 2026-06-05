@@ -3,9 +3,14 @@ import {
   EngineAdapterRequestSchema,
   EngineAdapterResponseSchema,
   validateConformance,
+  parseAndValidate,
+  ENGINE_METHODS,
+  isConfidence,
   type EngineAdapterRequest,
   type EngineAdapterResponse,
+  type EngineProbe,
 } from '@/engine-adapter';
+import { ConfidenceSchema } from '@/engine-adapter/conformance';
 
 function baseRequest(): EngineAdapterRequest {
   return {
@@ -196,6 +201,118 @@ describe('validateConformance — load-bearing echo check', () => {
       failureMode: 'engine-absent',
     };
     const result = validateConformance(request, response);
+    expect(result.conformant).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
+});
+
+describe('ConfidenceSchema agrees with isConfidence by construction (1d single-source)', () => {
+  const boundaryValues = [0, 1, -0.0001, 1.0001, Number.NaN, 0.5];
+
+  for (const value of boundaryValues) {
+    it(`schema-refine and isConfidence agree for ${String(value)}`, () => {
+      const predicate = isConfidence(value);
+      const schemaAccepts = ConfidenceSchema.safeParse(value).success;
+      expect(schemaAccepts).toBe(predicate);
+    });
+  }
+});
+
+describe('non-execution conformance surface requires no engine probe (AUDIT-02)', () => {
+  // This test proves TODAY's engine-free property of the seam: the non-execution
+  // surface — ENGINE_METHODS, the confidence validators, the request/response zod
+  // schemas, validateConformance, and parseAndValidate — is fully exercisable with
+  // NO engine and NO probe constructed. preflightEngine is the only entry point
+  // that consults a probe. It does not claim a manual-authoring helper exists.
+  it('exercises the schema + validateConformance + parseAndValidate end-to-end with no probe constructed', () => {
+    // method vocabulary is available without any engine
+    expect([...ENGINE_METHODS]).toContain('referee-screenshot');
+
+    // confidence validators run with no engine
+    expect(isConfidence(0.5)).toBe(true);
+
+    const request: EngineAdapterRequest = baseRequest();
+    const response: EngineAdapterResponse = baseSuccessResponse();
+
+    // structural parse runs with no engine
+    expect(EngineAdapterRequestSchema.safeParse(request).success).toBe(true);
+    expect(EngineAdapterResponseSchema.safeParse(response).success).toBe(true);
+
+    // semantic echo check runs with no engine
+    expect(validateConformance(request, response).conformant).toBe(true);
+
+    // combined parse-then-echo runs with no engine
+    expect(parseAndValidate(request, response).conformant).toBe(true);
+  });
+
+  it('an always-absent probe has zero effect on any non-execution operation', () => {
+    const absentProbe: EngineProbe = { isAvailable: () => false };
+
+    const request = baseRequest();
+    const response = baseSuccessResponse();
+
+    // Each non-execution operation produces the same result regardless of probe
+    // availability — they never consult the probe.
+    expect(EngineAdapterRequestSchema.safeParse(request).success).toBe(true);
+    expect(EngineAdapterResponseSchema.safeParse(response).success).toBe(true);
+    expect(validateConformance(request, response).conformant).toBe(true);
+    expect(parseAndValidate(request, response).conformant).toBe(true);
+    expect(isConfidence(0.5)).toBe(true);
+
+    // The absent probe was never needed by any of the above; assert it is
+    // available as an object but irrelevant to non-execution operations.
+    expect(absentProbe.isAvailable('any')).toBe(false);
+  });
+});
+
+describe('parseAndValidate — parse-then-echo wrapper (AUDIT-03)', () => {
+  it('returns conformant:false with structural violations for a malformed raw response (confidence 5)', () => {
+    const rawResponse = { ...baseSuccessResponse(), confidence: 5 };
+    const result = parseAndValidate(baseRequest(), rawResponse);
+    expect(result.conformant).toBe(false);
+    expect(result.violations.length).toBeGreaterThan(0);
+    // structural source (confidence range), surfaced from the zod error path
+    expect(result.violations.some((v) => v.toLowerCase().includes('confidence'))).toBe(true);
+  });
+
+  it('returns conformant:false with structural violations for a response missing manifestId', () => {
+    const rawResponse = {
+      method: 'referee-screenshot',
+      imageHashes: ['sha256:aaa', 'sha256:bbb'],
+      rubricItemIds: ['rubric-1', 'rubric-2'],
+      modelIdentity: 'claude',
+      confidence: 0.9,
+      result: { verdict: 'pass' },
+    };
+    const result = parseAndValidate(baseRequest(), rawResponse);
+    expect(result.conformant).toBe(false);
+    expect(result.violations.some((v) => v.toLowerCase().includes('manifestid'))).toBe(true);
+  });
+
+  it('does not run the echo check when structural parse fails (echo is not the failure source)', () => {
+    // Request is structurally malformed (missing manifestId). The echo check, if
+    // run, would compare manifestIds — but structural parse must short-circuit so
+    // the violations are structural, not echo-mismatch text.
+    const rawRequest = { method: 'author-wireframe', payload: {} };
+    const rawResponse = baseSuccessResponse();
+    const result = parseAndValidate(rawRequest, rawResponse);
+    expect(result.conformant).toBe(false);
+    expect(result.violations.some((v) => v.toLowerCase().includes('manifestid'))).toBe(true);
+    // The echo mismatch message uses the word "mismatch"; structural failure must not.
+    expect(result.violations.some((v) => v.toLowerCase().includes('mismatch'))).toBe(false);
+  });
+
+  it('returns the echo violations for a well-formed-but-non-echoing pair', () => {
+    const rawResponse = { ...baseSuccessResponse(), manifestId: 'manifest-999' };
+    const result = parseAndValidate(baseRequest(), rawResponse);
+    expect(result.conformant).toBe(false);
+    expect(result.violations.some((v) => v.toLowerCase().includes('manifest'))).toBe(true);
+    // proves the echo layer ran (the structural shape is valid)
+    expect(result.violations.some((v) => v.toLowerCase().includes('mismatch'))).toBe(true);
+  });
+
+  it('returns conformant:true for a fully-conformant pair', () => {
+    const result = parseAndValidate(baseRequest(), baseSuccessResponse());
     expect(result.conformant).toBe(true);
     expect(result.violations).toEqual([]);
   });

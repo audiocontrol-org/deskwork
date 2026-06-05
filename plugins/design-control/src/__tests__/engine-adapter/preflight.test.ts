@@ -2,22 +2,16 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   preflightEngine,
   DEFAULT_CLAUDE_ADAPTER_ID,
+  ENGINE_METHODS,
   type EngineProbe,
-  type EngineMethod,
 } from '@/engine-adapter';
-
-const ALL_METHODS: EngineMethod[] = [
-  'author-wireframe',
-  'translate-design-language',
-  'referee-screenshot',
-];
 
 function probeReturning(available: boolean): EngineProbe {
   return { isAvailable: () => available };
 }
 
 describe('preflightEngine — fail-loud presence check (execution paths)', () => {
-  for (const method of ALL_METHODS) {
+  for (const method of ENGINE_METHODS) {
     it(`throws when the engine is absent on execution method "${method}"`, () => {
       const probe = probeReturning(false);
       expect(() => preflightEngine(probe, { method })).toThrow();
@@ -61,22 +55,35 @@ describe('preflightEngine — fail-loud presence check (execution paths)', () =>
     expect(isAvailable).toHaveBeenCalledWith(DEFAULT_CLAUDE_ADAPTER_ID);
   });
 
-  // Manual-authoring invariant: manual authoring never calls preflightEngine, so it
-  // never requires the engine. We assert the invariant at the preflight boundary:
-  // a manual-authoring code path that does NOT invoke the probe never throws and
-  // never touches the probe — modeled here by simply not calling preflightEngine.
-  it('manual authoring path does not invoke the probe and requires no engine', () => {
-    const isAvailable = vi.fn<(adapterId: string) => boolean>(() => false);
-    // An absent-engine probe exists, but the manual path never consults it.
-    const absentEngineProbe: EngineProbe = { isAvailable };
-    expect(absentEngineProbe.isAvailable).toBe(isAvailable);
+  it('the remedy names the ACTUAL missing custom adapter and does not misdirect to frontend-design', () => {
+    const probe = probeReturning(false);
+    let caught: unknown;
+    try {
+      preflightEngine(probe, { adapterId: 'custom-engine', method: 'referee-screenshot' });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    const message = caught instanceof Error ? caught.message : '';
+    // remedy interpolates the actual absent adapter id
+    expect(message).toContain('custom-engine');
+    // does NOT tell the operator to install the wrong (default) plugin
+    expect(message).not.toContain(DEFAULT_CLAUDE_ADAPTER_ID);
+    // the manual-authoring fallback clause stays
+    expect(message.toLowerCase()).toContain('manual');
+  });
 
-    // Simulate the manual-authoring path: operator-driven authoring runs without
-    // ever calling preflightEngine. With an absent engine, authoring still works
-    // because the probe is never consulted on this path.
-    const manualAuthoringResult = (() => 'manual-wireframe-authored')();
-
-    expect(manualAuthoringResult).toBe('manual-wireframe-authored');
-    expect(isAvailable).not.toHaveBeenCalled();
+  it('the default-adapter case still names frontend-design in the remedy', () => {
+    const probe = probeReturning(false);
+    let caught: unknown;
+    try {
+      preflightEngine(probe, { method: 'author-wireframe' });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    const message = caught instanceof Error ? caught.message : '';
+    expect(message).toContain(DEFAULT_CLAUDE_ADAPTER_ID);
+    expect(message.toLowerCase()).toContain('manual');
   });
 });

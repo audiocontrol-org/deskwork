@@ -13,35 +13,44 @@
 
 import { z } from 'zod';
 import {
+  ENGINE_METHODS,
   FAILURE_MODES,
+  isConfidence,
   type EngineAdapterRequest,
   type EngineAdapterResponse,
 } from '@/engine-adapter/types';
 
-const EngineMethodSchema = z.enum([
-  'author-wireframe',
-  'translate-design-language',
-  'referee-screenshot',
-]);
+const EngineMethodSchema = z.enum(ENGINE_METHODS);
 
 const FailureModeSchema = z.enum(FAILURE_MODES);
 
-const ConfidenceSchema = z
-  .number()
-  .refine((n) => Number.isFinite(n) && n >= 0 && n <= 1, {
-    message: 'confidence must be a finite number in the inclusive range [0, 1]',
-  });
+/**
+ * Confidence schema, single-sourced against {@link isConfidence} so the
+ * structural [0, 1] check has exactly one definition shared by the zod schema and
+ * the semantic conformance check.
+ */
+export const ConfidenceSchema = z.number().refine(isConfidence, {
+  message: 'confidence must be a finite number in the inclusive range [0, 1]',
+});
 
-/** Structural schema for an engine-adapter request. */
+/**
+ * Structural schema for an engine-adapter request. The `satisfies` clause keeps
+ * the schema's parsed output aligned with {@link EngineAdapterRequest} at compile
+ * time, so adding/removing an envelope field surfaces here as a type error.
+ */
 export const EngineAdapterRequestSchema = z.object({
   method: EngineMethodSchema,
   manifestId: z.string().min(1),
   imageHashes: z.array(z.string()).optional(),
   rubricItemIds: z.array(z.string()).optional(),
   payload: z.unknown(),
-});
+}) satisfies z.ZodType<EngineAdapterRequest>;
 
-/** Structural schema for an engine-adapter response. */
+/**
+ * Structural schema for an engine-adapter response. The `satisfies` clause keeps
+ * the schema's parsed output aligned with {@link EngineAdapterResponse} for the
+ * same compile-time-drift reason as the request schema above.
+ */
 export const EngineAdapterResponseSchema = z.object({
   method: EngineMethodSchema,
   manifestId: z.string().min(1),
@@ -51,7 +60,7 @@ export const EngineAdapterResponseSchema = z.object({
   confidence: ConfidenceSchema,
   result: z.unknown().optional(),
   failureMode: FailureModeSchema.optional(),
-});
+}) satisfies z.ZodType<EngineAdapterResponse>;
 
 /** Structured result of an echo-conformance check. */
 export interface ConformanceResult {
@@ -105,7 +114,7 @@ export function validateConformance(
     violations.push('modelIdentity must be a non-empty string.');
   }
 
-  if (!Number.isFinite(response.confidence) || response.confidence < 0 || response.confidence > 1) {
+  if (!isConfidence(response.confidence)) {
     violations.push(
       `confidence out of range: ${String(response.confidence)} is not in the inclusive range [0, 1].`,
     );
@@ -138,4 +147,43 @@ export function validateConformance(
   }
 
   return { conformant: violations.length === 0, violations };
+}
+
+/** Render a zod error into a flat list of operator-readable structural messages. */
+function structuralViolations(label: string, error: z.ZodError): string[] {
+  return error.issues.map((issue) => {
+    const path = issue.path.length > 0 ? issue.path.join('.') : '(root)';
+    return `${label} structural violation at "${path}": ${issue.message}.`;
+  });
+}
+
+/**
+ * Safe entry point for UNTRUSTED engine output. Runs the structural zod schemas
+ * FIRST against `unknown` inputs; if either fails to parse, returns the structural
+ * violations WITHOUT running the semantic echo check (a malformed shape cannot be
+ * meaningfully echo-checked). Only when both parse does it run
+ * {@link validateConformance} on the parsed envelopes and return its result.
+ *
+ * This makes the safe path the easy path: a caller wiring engine output that
+ * arrives as `unknown` cannot accidentally skip structural validation.
+ */
+export function parseAndValidate(
+  rawRequest: unknown,
+  rawResponse: unknown,
+): ConformanceResult {
+  const parsedRequest = EngineAdapterRequestSchema.safeParse(rawRequest);
+  const parsedResponse = EngineAdapterResponseSchema.safeParse(rawResponse);
+
+  if (!parsedRequest.success || !parsedResponse.success) {
+    const violations: string[] = [];
+    if (!parsedRequest.success) {
+      violations.push(...structuralViolations('request', parsedRequest.error));
+    }
+    if (!parsedResponse.success) {
+      violations.push(...structuralViolations('response', parsedResponse.error));
+    }
+    return { conformant: false, violations };
+  }
+
+  return validateConformance(parsedRequest.data, parsedResponse.data);
 }
