@@ -1,32 +1,43 @@
 <!--
 Sync Impact Report
-- Version change: (uninitialized template) → 1.0.0
-- Ratification: initial adoption 2026-06-04
-- Principles defined (8):
+- Version change: 1.0.0 → 1.1.0 (MINOR — new principle IX + reframe to the stack-control program)
+- Ratification: initial adoption 2026-06-04; amended 2026-06-04
+- Amendment 1.1.0 (2026-06-04): reframed preamble + title around the stack-control program
+  (successor to dw-lifecycle); added Principle IX (Execution-Backend Pluggability); qualified the
+  Additional Constraints (manifest port DEFERRED to substrate; plan source is Spec Kit tasks.md;
+  isolation invariant). Rationale: capture this session's architectural decisions so every spec
+  inherits them.
+- Principles defined (9):
   I. Test-First (NON-NEGOTIABLE)
   II. Integration-First, No Speculative Building
   III. Branch on Capabilities, Never Provider Identity
-  IV. Division of Labor (provider intent / deskwork substrate + governance)
+  IV. Division of Labor (provider intent / stack-control substrate + governance)
   V. No Fallbacks, No Mock Data Outside Tests
   VI. Strict Typing & Composition
   VII. Commit & Push Early and Often
   VIII. Faithful Tool Adoption
+  IX. Execution-Backend Pluggability (capability, not vendor)
 - Added sections: Additional Constraints; Development Workflow & Quality Gates; Governance
-- Removed sections: none (template placeholders replaced)
+- Removed sections: none
 - Template alignment:
-  ✅ .specify/templates/plan-template.md — reviewed; generic Constitution Check slot is compatible
-  ✅ .specify/templates/spec-template.md — reviewed; no mandatory-section conflict
-  ✅ .specify/templates/tasks-template.md — reviewed; principle-driven task types (test-first) compatible
+  ✅ .specify/templates/plan-template.md — generic Constitution Check slot still compatible (no change)
+  ✅ .specify/templates/spec-template.md — no mandatory-section conflict (no change)
+  ✅ .specify/templates/tasks-template.md — principle-driven task types compatible (no change)
 - Follow-up TODOs: none
 -->
 
-# deskwork pluggable-lifecycle-providers Constitution
+# stack-control Constitution (pluggable-lifecycle-providers program)
 
-This constitution governs the development of the `pluggable-lifecycle-providers` feature within the
-deskwork monorepo. It derives from deskwork's existing conventions (`.claude/CLAUDE.md`,
-`.claude/rules/`), the feature's `design.md`, and the operator directives set during the
-integration-first dogfood of GitHub Spec Kit. Where this constitution and deskwork's repo-level
-rules overlap, they are intended to agree; deskwork's rules remain authoritative for the wider repo.
+This constitution governs the development of the `pluggable-lifecycle-providers` program — realized as
+the **`stack-control`** plugin (CLI `stackctl`), built as the **successor to `dw-lifecycle`** (a new
+in-monorepo plugin with its own version line; absorb-then-retire; `dw-lifecycle` stays undisturbed
+until parity). It derives from deskwork's existing conventions (`.claude/CLAUDE.md`, `.claude/rules/`,
+including `.claude/rules/stack-control-succession.md`), the program roadmap
+(`docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md`), and the operator
+directives set during the integration-first dogfood of GitHub Spec Kit. Where this constitution and
+deskwork's repo-level rules overlap, they are intended to agree; deskwork's rules remain authoritative
+for the wider repo. (The earlier `design.md` is superseded-as-spine — it now describes the deferred
+substrate feature, not the current path.)
 
 ## Core Principles
 
@@ -93,10 +104,27 @@ prescribed steps IN ORDER. Do not skip steps or off-road, even when a step seems
 redundant. Rationale: the purpose of adoption is to learn the tool's intended lived experience;
 off-roading produces knowledge of a workflow the tool does not actually prescribe.
 
+### IX. Execution-Backend Pluggability (capability, not vendor)
+
+The execution engine MUST talk to execution backends only through a capability port and MUST NOT
+branch on a vendor/tool identity in backend selection or dispatch. It MUST support at least two
+backend kinds — in-session sub-agent dispatch and batch CLI shell-out — and MUST run a plan to
+completion when only one kind is available; it MUST NOT hard-depend on any vendor's batch/headless
+CLI mode (which a vendor may sunset). When no available backend declares a needed capability, it
+fails loudly (Principle V), never silently skipping. Rationale: this is Principle III applied to the
+*execution* axis — capability-based selection is what makes the engine outlive any single vendor's
+CLI surface. (Note the two distinct axes: the *provider/plan-source* port is DEFERRED — features are
+built concretely against Spec Kit's `tasks.md` first; the *execution-backend* port is in scope now.)
+
 ## Additional Constraints
 
-- The `lifecycle-manifest` is the port between authoring and governance. Its task spine is a flat,
-  top-level collection; phases (when present) are a thin overlay referencing tasks by id.
+- **Plan source (current):** features are built **concretely against Spec Kit's `tasks.md`** (its
+  `[P]` markers + Dependencies section). The normalized `lifecycle-manifest` as a provider port is
+  **DEFERRED to the substrate feature** — derived once concrete integration proves the shape, not
+  designed up front. (When that port is built, its task spine is a flat top-level collection; phases,
+  when present, are a thin overlay referencing tasks by id.)
+- **Isolation invariant:** `stack-control` is developed and published WITHOUT destabilizing
+  `dw-lifecycle`, which is in active use doing real work.
 - Enforcement discipline lives in skill bodies and CLI verbs, never in git hooks the adopter does not
   receive from installing the plugin.
 - Provider/version pinning is treated as one unit; a version change is a recorded event, never a
@@ -124,4 +152,4 @@ Versioning policy (semantic):
 - MINOR: a new principle/section added or materially expanded guidance.
 - PATCH: clarifications, wording, non-semantic refinements.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-04
+**Version**: 1.1.0 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-04
