@@ -2,7 +2,7 @@
 
 > **Status:** program-level capture (operator decisions, 2026-06-04 session). This document holds the *program* vision for `stack-control`; individual features have their own Spec Kit specs under `specs/`. No dates — milestones, not deadlines.
 
-> **⚠ Revision pass in progress (2026-06-04).** After the exploratory slice-001 implementation and this session's architectural decisions, the operator called for revising the overall plan. Agreed approach: **(b) resequence the feature order first** (is execution really next, or do the dw-lifecycle migrations / the control-plane frontend come first?), **then (a) realign the stale manifest-first docs** (`workplan.md`, `design.md`, `prd.md`, `README.md`, and a Spec Kit `constitution.md` amendment) to the corrected sequence. The **002 execution spec is PAUSED** until the sequence is settled (the resequence determines whether 002 is even the next feature to finish). The **Feature sequence** table below is therefore **PROVISIONAL** pending this pass.
+> **Revision pass — resequenced 2026-06-04 (self-hosting order).** After the exploratory slice-001 implementation and this session's architectural decisions, the operator resequenced the program around a **self-hosting** strategy: after the plugin infrastructure exists, build the **minimum control plane first** — `stackctl` + a *thin* frontend with two touch points: **spec curation** and **execution via the native Spec Kit mechanism** (`/speckit-implement`, with governance firing). Then **use that front door to spec and build the rest of the plugin** (the parallel multi-backend engine, the migrations, the fuller frontend). The foundational docs were realigned to the stack-control architecture in the same pass. **Consequence:** the execution "two modes" split across features — native execution rides in the Feature 1 front door; the parallel multi-backend engine (the current `specs/002-parallel-execution-engine/`) becomes a later feature built *through* the frontend (this dissolves the earlier "add native mode to the 002 body" gap).
 
 ## What stack-control is
 
@@ -31,15 +31,19 @@ It is the realization of the `pluggable-lifecycle-providers` north star (see the
 
 Each feature is independently shippable. Order is the current intent; the operator owns resequencing.
 
+Resequenced 2026-06-04 around the self-hosting strategy. Features 2–6 ("the rest") are built *through* the Feature 1 front door; their internal order is downstream and can be refined when we reach them.
+
 | # | Feature | Scope | Status |
 |---|---|---|---|
-| Founding | **Governance as a Spec Kit `after_implement` extension** | The `deskwork-governance` extension that fires deskwork's cross-model audit-barrage automatically after `/speckit-implement`, cross-model, zero provider branching. | Built last session (`specs/001-speckit-backhalf-slice/`, source currently in the `dw-lifecycle` tree). Rehomes into `stack-control`. |
-| 1 | **Execution** | Two selectable modes over the same plan source: (a) **native Spec Kit execution with extensions** — drive `/speckit-implement` with the extension hooks (governance) firing; (b) **parallel multi-backend engine** — worktree-isolated, cross-backend fan-out (the differentiator). Both governed. Drivable by both `stackctl` and the future control-plane frontend. | Speccing now (`specs/002-parallel-execution-engine/`). |
-| 2 | **Migrate scope-discovery** into `stack-control` | Move the scope-discovery primitives + skills out of `dw-lifecycle`. | Future. |
-| 3 | **Migrate audit-barrage** into `stack-control` | Governance moves in-house; the execution → governance seam (one-way) survives the move. | Future. |
-| 4 | **Migrate session-start / session-end** | Session lifecycle skills move over. | Future. |
-| 5 | **Control-plane frontend** | The UI surface: spec-creation, spec → implementation negotiation, and scope-discovery + audit-barrage surfaces. Pairs with the `stackctl` CLI over shared interface artifacts (run records, handoffs). | Future. |
-| 6 | **Parity → retire `dw-lifecycle`** | When `stack-control` does real work as well as `dw-lifecycle`, retire `dw-lifecycle`. | Future. |
+| Founding | **Governance as a Spec Kit `after_implement` extension** | The `deskwork-governance` extension that fires cross-model audit-barrage automatically after `/speckit-implement`, zero provider branching. | Built last session (`specs/001-speckit-backhalf-slice/`, source in the `dw-lifecycle` tree). **Rehomes in Feature 0.** |
+| 0 | **stack-control plugin infrastructure** | Stand up `packages/stack-control/` + `plugins/stack-control/` (shell, `plugin.json`, bin shim, own version line, marketplace registration); **rehome the founding governance extension** into it. The gate everything else passes through. | Next. |
+| 1 | **`stackctl` + minimal control-plane front door** | The CLI + a *thin* frontend with two touch points: **spec curation** and **execution via the native Spec Kit mechanism** (`/speckit-implement`, governance firing). The self-hosting front door — used to build everything after. | After 0. |
+| 2 | **Parallel multi-backend execution engine** | The differentiator: worktree-isolated, cross-backend fan-out across distinct coding agents, capability-selected (survives batch/headless CLI sunset). The current `specs/002-parallel-execution-engine/`. Built *through* the frontend. | After 1 (spec drafted, paused). |
+| 3 | **Migrate scope-discovery** into `stack-control` | Move the scope-discovery primitives + skills out of `dw-lifecycle`. | After 1. |
+| 4 | **Migrate audit-barrage** into `stack-control` | Governance moves in-house; the execution → governance seam (one-way) survives the move. | After 1. |
+| 5 | **Migrate session-start / session-end** | Session lifecycle skills move over. | After 1. |
+| 6 | **Fuller control-plane frontend** | Beyond the thin front door: spec → implementation negotiation, scope-discovery + audit-barrage surfaces, the parallel engine's run surfaces. | After the capabilities exist. |
+| 7 | **Parity → retire `dw-lifecycle`** | When `stack-control` does real work as well as `dw-lifecycle`, retire it. | Future. |
 
 ## Two distinct pluggability axes (do not conflate)
 

@@ -16,18 +16,12 @@ Build **`stack-control`** (CLI `stackctl`) — a new plugin, the **successor to 
 
 **Pivoted 2026-06-04 → integration-first, and reframed as the `stack-control` plugin.** Rather than building the manifest/port abstraction up front, we adopted Spec Kit as a real management layer and let the bridge's shape emerge from concrete integration. The work is being built as `stack-control`, a new in-monorepo plugin that succeeds `dw-lifecycle` via absorb-then-retire (isolation so `dw-lifecycle` keeps doing real work undisturbed).
 
-**Overall plan is under an active resequence-then-realign revision pass (2026-06-04).** The foundational docs have been realigned to the stack-control architecture (this pass); the *feature order* may still shift. The canonical program + sequence lives in [`stack-control-roadmap.md`](./stack-control-roadmap.md) (the table there is the single source of truth and is marked PROVISIONAL).
+**Resequenced 2026-06-04 around a self-hosting strategy.** The foundational docs were realigned to the stack-control architecture and the feature order was set: build the minimum control plane first, then use it to build the rest. The **canonical sequence (with scope + status) lives in [`stack-control-roadmap.md`](./stack-control-roadmap.md) § Feature sequence** — this README does not duplicate it (drift-avoidance). In short:
 
-### Feature sequence (provisional — canonical copy in the roadmap)
-
-| Feature | Description | Status |
-|---|---|---|
-| Founding | Governance as a Spec Kit `after_implement` extension (govern a foreign plan) | ✅ Built — fires automatically, cross-model, caught real self-bugs. `specs/001-speckit-backhalf-slice/`. Rehomes into stack-control. |
-| Execution | Two modes: native Spec-Kit-with-extensions **+** parallel multi-backend engine | 🚧 Speccing — `specs/002-parallel-execution-engine/` (spec body paused mid-revision) |
-| Migrations | Move scope-discovery → audit-barrage → session-start/end out of `dw-lifecycle` | Future |
-| Control-plane frontend | Spec creation, spec→impl negotiation, scope-discovery + audit-barrage surfaces | Future |
-| Retire `dw-lifecycle` | At parity | Future |
-| Substrate | Manifest / provider port / `reconcile()` / tracker (the deferred provider abstraction) | Deferred — sequence after the slices prove the shape |
+1. **Feature 0** — stack-control plugin infrastructure + rehome the founding governance extension.
+2. **Feature 1** — `stackctl` + a thin control-plane front door (spec curation + native Spec Kit execution). The self-hosting front door.
+3. **The rest, built *through* the front door** — parallel multi-backend execution engine (`specs/002-parallel-execution-engine/`), the dw-lifecycle migrations (scope-discovery, audit-barrage, session), the fuller frontend.
+4. **Retire `dw-lifecycle`** at parity. (Substrate / provider abstraction deferred until a 2nd provider arrives.)
 
 ## Key Links
 
