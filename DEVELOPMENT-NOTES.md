@@ -4782,3 +4782,44 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - The fat-plugin decision pays off in the task shapes: T018's governance rehome is a single `git mv` and T013 is a 2-line MANIFESTS addition — both are moves/extends, not re-packaging, exactly as the fat-vs-thin rationale predicted.
 
 **Next step:** Feature 1 is analyze-clean (0 CRITICAL/HIGH). Next Spec Kit step is `/speckit-implement` — which runs in a **separate implementation session** in this worktree (orchestrator ≠ implementer per `.claude/rules/agent-discipline.md`). Start that session with `/session-start` (NOT `/dwss`); MVP target is US1 (Phases 1+2+3 → execute a spec via native Spec Kit with governance firing).
+
+## 2026-06-05 (cont. 3): Feature 1 `/speckit-implement` — US1 MVP shipped + governance loop (2 passes, 9 findings)
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** The implementation session (orchestrator ≠ implementer; this is the implementer). `/session-start` → operator confirmed **full MVP (US1, Phases 1+2+3)** → run `/speckit-implement` on Feature 1: stand up the `stack-control` plugin + `stackctl` + the execute-path with governance firing automatically.
+
+**Accomplished:**
+- **23/23 MVP tasks (T001–T023), all TDD RED-first** (Principle I; tests watched fail for the right reason before GREEN). 19 tests green, strict typecheck clean.
+  - Phase 1 (Setup): `plugins/stack-control/` tree, plugin.json (lockstep 0.37.0), package.json (`tsx` + dev `vitest` only — M1/Principle II), tsconfig/vitest, `bin/stackctl` shim (dep-probe narrowed to tsx), cli.ts.
+  - Phase 2 (Foundational): dispatcher (exit 2 unknown / `--help` 0 / no silent flag drop) + `version` verb; registered in `marketplace.json` + the `bump-version.ts` lockstep sweep; workspace resolves via hoisted tsx.
+  - Phase 3 (US1 MVP): `execute-check` (fail-loud runnability gate), **governance rehome via `git mv`** (dw-lifecycle → stack-control, history preserved, re-installed via `specify`, `after_implement` wiring preserved, neutrality held), `execute` SKILL.md + command, cross-plugin-seam guard (govern.sh fails loud naming dw-lifecycle under stripped PATH).
+- **`after_implement` governance hook fired twice** — Phase 1-2 pass (T022 smoke, green: run-dir, 2 lanes, 5 findings lifted), then a full-feature pass covering Phase 3 (4 more findings). **9 cross-model findings, all dispositioned: 7 fixed (TDD-verified), 2 acknowledged.** `check-open-findings` → **zero open**.
+- Validated quickstart Scenarios A (validate + `stackctl version` 0.37.0), C (execute-check fail-loud non-runnable / pass runnable), D (governance smoke).
+- **Isolation invariant held** (VR-2): only the governance tree left dw-lifecycle; **no dw-lifecycle runtime touched**. 6 commits, all pushed.
+
+**Didn't Work / course corrections:**
+- [PROCESS] The first governance pass (default base `HEAD~1`, run after the Phase 1-2 commit) **never covered Phase 3** — the US1 core (execute-check, rehome, execute skill, seam guard) went un-audited until a manual full-feature pass with `GOVERN_DIFF_BASE=<prior-session-tip>`. Captured as **TF-12 Repro A** (suggested fix: `after_implement` should diff the feature base, not HEAD~1).
+- [PROCESS] The dw-lifecycle `check-open-findings` gate's cure (`promote-findings → workplan.md`) doesn't map to Spec Kit `tasks.md`. Dispositioned findings **directly in `audit-log.md`** (Status `open` → `fixed-<sha>` / `acknowledged-<date>`) instead. Captured as **TF-12 Repro B**.
+- The governance loop caught a defect in the agent's **own** AUDIT-01 fix — **AUDIT-06**: the untracked-fold was repo-wide/unbounded, shipping arbitrary working-tree content **off-box to external model CLIs**. Bounded it (binary-skip + 256KB cap + logged drops). The cross-model audit earning its keep on the agent's own work, mid-session.
+- No substantive *approach* corrections from the operator — "full mvp" was confirmed and the implement loop ran to completion.
+
+**Quantitative** (re-derived from `git log f93097fe..HEAD`):
+- Messages: ~3 (start-confirm, "full mvp", session-end)
+- Commits: 6 (`48295090`, `1de44b18`, `ad694abb`, `506137bb`, `5833f356`, `813fef2f`) + this session-end commit
+- Files changed: 31 (+1635 / −49), pre-journal
+- Tests: 0 → **19** (cli 3, version 1, execute-check 8, governance-neutrality 5, governance-seam 2)
+- Governance findings: **9** (AUDIT-20260605-01..09) — 7 fixed, 2 acknowledged
+- Corrections: 0 substantive (2 [PROCESS] notes above are tooling-friction captures, not approach corrections)
+- MVP tasks: **23/23** (T001–T023); T024–T035 (US2/US3/Polish) intentionally unstarted — beyond the confirmed MVP scope.
+
+**Open findings at session end:** **0 open.** No acknowledged-slush-pile carrying unfixed defects — the 2 acknowledged are a genuine non-defect (AUDIT-05 description prose, informational) and an already-planned item (AUDIT-04 plugin README, scoped to T032/Polish), not parked bugs.
+
+**Insights:**
+- The cross-model governance loop is most valuable **on the agent's own fixes**: AUDIT-06 caught a real scope/security regression the agent introduced while fixing AUDIT-01 (unbounded untracked content shipped off-box). Two passes, each tightening the prior.
+- Multi-commit implement sessions need a **feature-base diff, not `HEAD~1`** — the default base under-covers; govern the whole feature against the pre-feature tip (TF-12).
+- The **self-hosting bootstrap is real and exercised**: execute-check + the execute skill + the rehomed governance now gate-and-run a spec via native Spec Kit — the surface used to build US2/US3/Polish and Feature 2.
+- **Fat-plugin + `git mv` paid off exactly as predicted**: the governance rehome was a clean history-preserving move; dw-lifecycle isolation held with zero runtime changes.
+
+**Next step:** Continue Feature 1 → **US2** (T024–T027: `spec-check` verb + `define`/`extend` authoring skills), then **US3** (T028–T031: isolation/registration verification), then **Polish** (T032–T035: plugin README, stale-ref cleanup, self-hosting proof, full quickstart A–F). Bootstrap with `/session-start` (NOT `/dwss`); the implement session can continue in this worktree. When governing future commits, pass an explicit `GOVERN_DIFF_BASE` at the feature base (TF-12).
