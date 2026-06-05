@@ -307,3 +307,49 @@ Severity:   informational
 Surface:    `plugins/stack-control/.claude-plugin/plugin.json:4` vs `.claude-plugin/marketplace.json:53`
 
 The two manifests describe the same plugin with non-identical strings — `plugin.json` ends *"Successor to dw-lifecycle (absorb-then-retire)."* while the marketplace entry ends *"Successor to dw-lifecycle."* (and the lead clauses differ in wording too). `bump-version.ts` keeps the *versions* in lockstep but does nothing for description text, so these will keep drifting independently. Not a defect — just a note that two copies of the same prose will diverge over time; if one is meant to be canonical, derive the other or accept that they're maintained separately.
+
+## 2026-06-05 — audit-barrage lift (20260605T183438233Z-pluggable-lifecycle-providers)
+
+### AUDIT-20260605-06 — Repo-wide untracked-file folding in `govern.sh` is unbounded and ships arbitrary untracked content to external model CLIs
+
+Finding-ID: AUDIT-20260605-06
+Status:     fixed-5833f356 (untracked-fold now bounded: --exclude-standard already drops gitignored paths incl. audit-runs; additionally skips binary/empty files and caps total folded bytes at 256KB, logging any drop to stderr — no silent truncation, no off-box binary content. Binary-skip verified. Residual: untracked text files in the dirty tree are still folded by design; the real after_implement flow commits first.)
+Severity:   medium
+Surface:    `plugins/stack-control/spec-kit/deskwork-governance/scripts/bash/govern.sh:56-66` (the untracked-folding loop added by AUDIT-20260605-01's fix)
+
+The fix for AUDIT-20260605-01 folds untracked files into the audited diff via `git ls-files --others --exclude-standard`. That command is **repo-wide and unscoped** — it enumerates every untracked-not-ignored file anywhere in the working tree, not just the feature's surfaces. The tracked half of the context is commit-scoped (`git diff "${BASE}"`), but the untracked half is not bounded by `BASE`, by the feature slug, or by any path filter. Whatever a developer happens to have lying around untracked (scratch notes, an unrelated half-built module in another plugin, a prior governance run's output if `.dw-lifecycle/scope-discovery/audit-runs/` is not gitignored) is concatenated into `DIFF`.
+
+This matters more than diff-noise because `DIFF` is the payload `audit-barrage` ships to multiple **external** LLM CLIs in parallel. So the consequence of the fix is that arbitrary untracked working-tree content gets transmitted off-box to third-party model providers on every govern run — content the operator never staged and may not realize is in scope. It also risks ballooning the diff (untracked binaries render as `git diff --no-index` "Binary files differ" or, worse, full content) and slows the loop (one `git diff --no-index` subprocess per untracked file). A tighter fix scopes the untracked enumeration to the feature/spec paths under audit (e.g. `git ls-files --others --exclude-standard -- "${pathspec}"`), or at minimum excludes the audit-runs output dir and skips binary files, so the audited surface matches the feature rather than the entire dirty tree.
+
+### AUDIT-20260605-07 — `execute` skill step 1 has no fail-loud path when neither an argument nor the `CLAUDE.md` SPECKIT marker resolves a spec dir
+
+Finding-ID: AUDIT-20260605-07
+Status:     fixed-5833f356 (execute SKILL.md step 1 now has a STOP-don't-guess branch: if neither an argument nor the CLAUDE.md marker resolves a spec dir, the skill stops and reports rather than guessing — mirrors step 2's fail-loud STOP.)
+Severity:   low
+Surface:    `plugins/stack-control/skills/execute/SKILL.md:30` (Step 1, "Resolve the target spec dir")
+
+Step 1 says: use the arg if given, else resolve from the `<!-- SPECKIT START -->…<!-- SPECKIT END -->` marker in `CLAUDE.md`, then "State which spec dir you resolved before proceeding." It specifies no behavior for the case where **neither** resolves — no argument passed and the marker is absent, empty, or points at a stale/nonexistent `specs/<feature>/plan.md`. Every other branch of this skill is explicitly fail-loud (Step 2 STOP + verbatim stderr, Step 4 "if the hook does not fire, that is a failure to surface — not something to work around," the Postcondition "never a faked or partial run"), so the silent gap at the very first step is inconsistent with the discipline the rest of the skill enforces.
+
+The risk is that an agent with no resolvable spec dir proceeds to Step 2 with an empty or guessed path, which then either trips `execute-check`'s "not found" error (acceptable but with a confusing surface) or — if it guesses an unrelated extant dir containing a `tasks.md` — fabricates a runnable verdict against the wrong spec. A one-line addition closes it: "If neither an argument nor the marker resolves a spec dir, STOP and report that no spec dir could be resolved — do not guess." This mirrors the spec-not-runnable STOP already in Step 2.
+
+---
+
+Everything else I checked came back clean for specific reasons: `cli.ts` dispatch handles unknown/empty/`--help` verbs with correct exit codes and is `noUncheckedIndexedAccess`-safe (`process.argv[2]` and `SUBCOMMANDS[verb]` are both undefined-guarded); `execute-check.ts`'s `parseSpecFlag` correctly rejects a missing or `--`-prefixed value and `process.exit` narrows the type so there's no `any`/`as`; `version.ts` resolves `plugin.json` two levels up correctly and fails loud on a missing/empty version field; the `bin/stackctl` resolution order, workspace-dev detection, version-keyed sentinel, and `--omit=dev --workspaces=false` install are internally consistent with the shim's stated contract; the neutrality test's provider regex genuinely matches a planted control and `govern.sh`/the command body carry zero provider-identity strings; and `bump-version.ts` + `marketplace.json` correctly add the new plugin to the lockstep sweep.
+
+### AUDIT-20260605-08 — `stackctl execute-check` accepts files as spec directories
+
+Finding-ID: AUDIT-20260605-08
+Status:     fixed-5833f356 (execute-check now statSync().isDirectory()-checks the spec path and fails with a directory-specific error before the tasks.md check; regression test added — --spec at a file exits non-zero with "not a directory".)
+Severity:   low
+Surface:    `plugins/stack-control/src/subcommands/execute-check.ts:29-41`
+
+`execute-check` validates `existsSync(specDir)` but never verifies that the path is actually a directory. If `--spec` points at an existing file, the code proceeds to check `<file>/tasks.md` and reports `tasks.md missing; spec not runnable`, which misdiagnoses the operator error. The skill contract says `--spec <dir>` and the absent-spec case already has a distinct fatal path; this should use `statSync(specDir).isDirectory()` or equivalent and fail with a directory-specific error before checking `tasks.md`.
+
+### AUDIT-20260605-09 — `execute-check` silently ignores unknown flags
+
+Finding-ID: AUDIT-20260605-09
+Status:     fixed-5833f356 (execute-check now parses args strictly — accepts only --spec <value>, rejects unknown flags and stray positionals with exit 2; regression tests added for both. Honors the dispatcher's "no flag silently ignored" contract.)
+Severity:   low
+Surface:    `plugins/stack-control/src/subcommands/execute-check.ts:15-20`, `plugins/stack-control/src/cli.ts:8`
+
+The dispatcher comment says “no flag silently ignored”, with each subcommand validating its own flags. `execute-check` only searches for the first `--spec` and accepts everything else, so `stackctl execute-check --spec specs/foo --bogus` can still exit `0`. That weakens the front-door gate because typos in future or documented flags are treated as success. A reasonable fix is to parse `args` strictly: accept only `--spec <value>`, reject unknown flags or extra positionals with exit `2`, and cover that in `execute-check.test.ts`.
