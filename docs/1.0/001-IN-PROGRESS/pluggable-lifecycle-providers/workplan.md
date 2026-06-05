@@ -6,6 +6,8 @@ date: 2026-06-04
 
 # Pluggable Lifecycle Providers Implementation Plan
 
+> **⚠ RETIRED (2026-06-04).** This manifest-first Phases 1–8 plan is **superseded** and is no longer the tracking surface. Two things retired it: (1) the **integration-first pivot** — the manifest/port/reconcile work it sequences is now the deferred *substrate* feature, not the spine; (2) the move to **Spec-Kit-managed tracking** — work is now tracked per-feature via each `specs/<feature>/tasks.md`, not this workplan. Kept for history (not deleted — content-management preserves history). Current program + sequence: [`stack-control-roadmap.md`](./stack-control-roadmap.md). Current framing: [`prd.md`](./prd.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make `dw-lifecycle`'s authoring layer pluggable via a provider port (native | spec-kit | kiro | future), backed by a normalized `lifecycle-manifest.yaml` that the differentiated back half (audit barrage, finding state machine, scope/clone/debt governance) reads regardless of which provider authored the plan.

@@ -1,9 +1,12 @@
 # Pluggable Lifecycle Providers — Design
 
-**Status:** Spec (design proposal)
+> **⚠ SUPERSEDED AS THE SPINE (2026-06-04 integration-first pivot).** This is the **manifest-first** technical design (a normalized `lifecycle-manifest.yaml` as the port, `normalize()`/`reconcile()`, the provider port, the tracker capability). The 2026-06-04 Spec-Kit dogfood pivoted the program to **integration-first**: build `stack-control` concretely against a real provider (Spec Kit) and let the abstraction emerge, rather than designing the manifest up front. Consequently the material below now describes the **future "substrate" feature** (the provider abstraction, sequenced *after* concrete integration proves the shape) — **not the current path**. Retained as the design-of-record for that future feature; do not implement from it as the current spine.
+>
+> Current program: [`stack-control-roadmap.md`](./stack-control-roadmap.md). Current framing: [`prd.md`](./prd.md). Live per-feature technical design: the Spec Kit `plan.md` in each `specs/<feature>/`. Settled decisions: `.claude/rules/stack-control-succession.md`.
+
+**Status:** Superseded-as-spine; design-of-record for the future substrate feature
 **Date:** 2026-06-04
 **Source:** Design conversation, "deskwork as front-end shim over Spec Kit / Kiro / native"
-**Target release:** dw-lifecycle v0.40.0 (provisional)
 
 ---
 

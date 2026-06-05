@@ -5,6 +5,8 @@
 > `setup`/`issues`; cuts recorded there are operator decisions, not pre-emptive
 > narrowing here.
 
+> **Historical (point-in-time, 2026-06-04).** This is the original definition interview. The program has since pivoted integration-first and is being realized as the `stack-control` plugin. For the current vision + framing, see [`stack-control-roadmap.md`](./stack-control-roadmap.md) and [`prd.md`](./prd.md).
+
 ## Problem
 
 The front half of `dw-lifecycle` (define → setup → issues) is now commodity. Spec-driven tools — GitHub Spec Kit, AWS Kiro, and others arriving on a ~6-month cadence — author feature decompositions at least as well as the native `superpowers:writing-plans` flow, several with more formal acceptance-criteria notation (Kiro's EARS). The operator wants to keep `deskwork` as the single control plane while treating authoring as a swappable layer, so the differentiated back half (audit barrage, finding state machine, scope/clone/debt governance) sits on top of whatever authored the plan.

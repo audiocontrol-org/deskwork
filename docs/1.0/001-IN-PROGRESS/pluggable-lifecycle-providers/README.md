@@ -6,41 +6,35 @@ branch: feature/pluggable-lifecycle-providers
 parentIssue: 
 ---
 
-# Feature: pluggable-lifecycle-providers
+# Feature: pluggable-lifecycle-providers → **stack-control**
 
-Make `dw-lifecycle`'s authoring layer pluggable via a provider port (`native` | `spec-kit` | `kiro` | future), backed by a normalized `lifecycle-manifest.yaml` that the differentiated back half (audit barrage, finding state machine, scope/clone/debt governance) reads regardless of which provider authored the plan. Ports-and-adapters with the manifest as the port; the back half branches on `capabilities()`, never on provider identity.
+Build **`stack-control`** (CLI `stackctl`) — a new plugin, the **successor to `dw-lifecycle`** — as the provider-agnostic **control plane** that takes ANY authoring provider's dependency-annotated plan and both **governs it** (cross-model audit-barrage, finding state machine, scope/clone/debt) and **executes it** (two modes: native Spec-Kit-with-extensions, and a parallel multi-backend worktree-isolated engine), branching only on capabilities, never on provider identity. Built **integration-first** (concretely against Spec Kit; the provider abstraction is deferred to a later substrate feature).
 
-> **North Star (ideal end-state):** deskwork as the provider-agnostic control plane that takes ANY provider's dependency-annotated plan and both **governs it** (cross-model audit/findings/scope) and **executes it better than the provider's single-agent grinder** — a parallel, multi-CLI, worktree-isolated engine that fans tranches of independent tasks across multiple LLM CLIs. See `prd.md` § North Star. The phases below are the incremental path; this is the destination.
+> **North Star (ideal end-state):** `stack-control` as the control plane that governs AND executes any provider's plan better than the provider's own single-agent grinder — a parallel, multi-**backend**, worktree-isolated engine (in-session sub-agents + batch CLIs, selected by capability so it survives any vendor sunsetting batch/headless CLI mode). See [`prd.md`](./prd.md) § North Star and [`stack-control-roadmap.md`](./stack-control-roadmap.md).
 
 ## Status
 
-**Approach pivoted 2026-06-04 → integration-first.** Rather than building the manifest/port abstraction up front (the manifest-first phase plan below), we adopted Spec Kit as a real management layer and let the interface emerge from concrete integration — to avoid building the wrong shape. We dogfooded Spec Kit's *own* native flow (`constitution → specify → clarify → plan → tasks → analyze → implement`) to build the first slice. The phase table below is the original manifest-first plan and is **superseded pending an explicit workplan restructure** around the slices + north star.
+**Pivoted 2026-06-04 → integration-first, and reframed as the `stack-control` plugin.** Rather than building the manifest/port abstraction up front, we adopted Spec Kit as a real management layer and let the bridge's shape emerge from concrete integration. The work is being built as `stack-control`, a new in-monorepo plugin that succeeds `dw-lifecycle` via absorb-then-retire (isolation so `dw-lifecycle` keeps doing real work undisturbed).
 
-### Slices (integration-first path toward the north star)
+**Overall plan is under an active resequence-then-realign revision pass (2026-06-04).** The foundational docs have been realigned to the stack-control architecture (this pass); the *feature order* may still shift. The canonical program + sequence lives in [`stack-control-roadmap.md`](./stack-control-roadmap.md) (the table there is the single source of truth and is marked PROVISIONAL).
 
-| Slice | Description | Status |
+### Feature sequence (provisional — canonical copy in the roadmap)
+
+| Feature | Description | Status |
 |---|---|---|
-| — | Stabilize PRD via deskwork review | ✅ Done (PRD `Final` 2026-06-04) |
-| 001 | deskwork governance as a Spec Kit `after_implement` extension (govern a foreign plan) | ✅ Done — fires automatically, cross-model, caught real self-bugs. `specs/001-speckit-backhalf-slice/` |
-| next | Parallel multi-CLI, worktree-isolated **execution** engine (north-star headline; nobody else does cross-CLI) | Captured, not started |
-| substrate | Manifest / provider port / `reconcile()` / tracker (full pluggability, beneath govern+execute) | Deferred — sequence after slices prove shape |
-
-### Original manifest-first phases (superseded — see pivot note above)
-
-| Phase | Description | Status |
-|---|---|---|
-| 1 | Stabilize PRD via deskwork review | ✅ Done |
-| 2 | Extract the lifecycle manifest (schema + validator; back half reads it; `native` emits) | Superseded → "substrate" |
-| 3 | Provider port + `native` adapter | Superseded → "substrate" |
-| 4 | `reconcile()` core + re-sync command | Superseded → "substrate" |
-| 5 | `spec-kit` adapter | Partially realized by slice 001 (Spec Kit live) |
-| 6 | `kiro` importer | Not started |
-| 7 | Tracker capability + `gh`-skill gating | Not started |
-| 8 | Customization polish (project-local adapter override seam) | Not started |
+| Founding | Governance as a Spec Kit `after_implement` extension (govern a foreign plan) | ✅ Built — fires automatically, cross-model, caught real self-bugs. `specs/001-speckit-backhalf-slice/`. Rehomes into stack-control. |
+| Execution | Two modes: native Spec-Kit-with-extensions **+** parallel multi-backend engine | 🚧 Speccing — `specs/002-parallel-execution-engine/` (spec body paused mid-revision) |
+| Migrations | Move scope-discovery → audit-barrage → session-start/end out of `dw-lifecycle` | Future |
+| Control-plane frontend | Spec creation, spec→impl negotiation, scope-discovery + audit-barrage surfaces | Future |
+| Retire `dw-lifecycle` | At parity | Future |
+| Substrate | Manifest / provider port / `reconcile()` / tracker (the deferred provider abstraction) | Deferred — sequence after the slices prove the shape |
 
 ## Key Links
 
+- Program roadmap (canonical): [`stack-control-roadmap.md`](./stack-control-roadmap.md)
+- Settled decisions (don't relitigate): `.claude/rules/stack-control-succession.md`
+- PRD (problem / solution / scope): [`prd.md`](./prd.md)
+- Founding feature spec: `specs/001-speckit-backhalf-slice/`
+- Execution feature spec: `specs/002-parallel-execution-engine/spec.md`
+- Superseded (history): [`design.md`](./design.md) (manifest-first, now the future substrate's design), [`workplan.md`](./workplan.md) (retired), [`feature-definition.md`](./feature-definition.md) (original interview)
 - Branch: `feature/pluggable-lifecycle-providers`
-- PRD: `prd.md`
-- Workplan: `workplan.md`
-- Parent Issue: 
