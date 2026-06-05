@@ -33,7 +33,7 @@ verbatim in substance** — when they drift, the PRD wins.
 
 ## Phase 1 — Engine-adapter seam + lo-fi wireframe kit + allowlist lint (v1-scaffold)
 
-- [ ] **Engine-adapter interface declaration + fail-loud preflight — FIRST, before any engine-
+- [x] **Engine-adapter interface declaration + fail-loud preflight — FIRST, before any engine-
       consuming skill.** Declare the interface (`author-wireframe`, `translate-design-language`,
       `referee-screenshot`) with conformance JSON request/response schemas (adapter echoes manifest
       ids, image hashes, model identity, rubric-item ids; defined confidence + failure modes), and a
