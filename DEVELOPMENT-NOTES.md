@@ -4714,3 +4714,40 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Triage: (no issues referenced this session need disposition)
 - Address TBD markers: (none introduced this session)
 - Dismantle stale worktrees: `graphical-entries` (4/9), `hygiene` (3/9), `scope-discovery` (4/9) — candidates for `/dw-lifecycle:dismantle-worktrees` if desired.
+
+## 2026-06-05 (cont.): Feature 1 `/speckit-plan` + clarifications (shared version, define/extend/execute) + branch-local session skills
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** Session-start → kick off the Spec Kit chain on Feature 1 (the stack-control front door, `specs/003-stack-control-front-door`). It became a `/speckit-plan` + design-decision session: generate the plan artifacts, resolve two clarifications, settle fat-vs-thin and the front-door verb naming, and repoint the project-level session skills so the next fresh session bootstraps to Spec Kit instead of dw-lifecycle ceremony. Planning/spec/skill-config only — no implementation code.
+
+**Accomplished:**
+- **`/speckit-plan` for Feature 1** — generated `plan.md` (Technical Context, Constitution Check I–IX PASS with IX deferred-to-Feature-2 rationale, fat-plugin structure), `research.md` (R1–R7), `data-model.md`, `contracts/{stackctl-cli,front-door-skills,governance-extension}.md`, `quickstart.md` (6 scenarios → SC-001..006). Repointed the `CLAUDE.md` SPECKIT marker to the 003 plan.
+- **Clarification 1 — shared lockstep version:** all plugins share the repo's single version (no own version line for stack-control) — independent versions are harder to manage and the Claude marketplace update is monolithic. Propagated across spec (FR-001/US3/entities), plan, research R4, data-model, quickstart; **constitution amended 1.1.0 → 1.1.1 (PATCH)**; succession rule §1 updated.
+- **Clarification 2 — minimal `stackctl` surface:** two check verbs (`spec-check`, `execute-check`) + `version`; spec authoring delegated to native Spec Kit (research R3).
+- **Design decision — fat plugin, no npm:** stack-control mirrors dw-lifecycle (in-tree TS via `tsx`), NOT published to npm. Decisive driver: features 3/4/5 `git mv` dw-lifecycle's in-tree code in, so fat keeps migrations as moves rather than re-packaging. Captured research R1.
+- **Design decision — front-door verbs `define` / `extend` / `execute`:** retired the vague `curate`. `define`/`extend` are dw-lifecycle's lifecycle vocabulary over a Spec Kit substrate (authoring-only; infra stays separate, mirroring `define` ≠ `setup`); `execute` kept as the backend-agnostic verb that survives Feature 2. Captured research R7; propagated everywhere; `curate-check` → `spec-check`.
+- **Branch-local session skills repointed:** rewrote `.claude/skills/` + `.agents/skills/` `session-start`/`session-end` to orient a blank-context agent to the Spec Kit tooling + this feature's docs (kept the DEVELOPMENT-NOTES development log; dropped THESIS/state-machine/design-standards/workplan + dw-lifecycle closing ceremony). The dw-lifecycle PLUGIN skills were left untouched (isolation invariant).
+
+**Didn't Work / course corrections:**
+- [PROCESS] At session-start I started running the dw-lifecycle structural-chain verbs (`check-clones` etc.); they rejected `--feature` and the operator clarified **Spec Kit** (not the dw-lifecycle workplan/tooling) is the build+spec surface for this feature. Redirected.
+- [PROCESS] My plan recommended an **own version line** for stack-control (R4); operator overrode → shared lockstep version. Corrected across all artifacts + constitution + succession rule.
+- [PROCESS] I asked "want me to commit?" instead of just committing per the standing discipline; operator: *"commit and push early and often… not committing is less safe."* Internalized — committed + pushed each subsequent decision immediately.
+- [UX] I proposed `curate` for the authoring touch point; operator flagged it as **vague** and steered to `define`/`extend` (precise, carries new-vs-existing infra semantics, makes the succession legible).
+
+**Quantitative:**
+- Messages: ~11
+- Commits: 3 this session (`51d03ffd`, `a5a0e6b8`, `8a960142`) + this session-end commit. Re-derived from `git log 6e1cb149..HEAD`.
+- Corrections: 4 (3 [PROCESS], 1 [UX])
+- Files changed: 15 (+647/−115), pre-journal
+- No code — planning / spec / skill-config only.
+
+**Open findings at session end:** 0. No audit-barrage run (planning/spec session, no implementation code to audit); `check-open-findings` N/A.
+
+**Insights:**
+- The succession is now legible in the verbs themselves: stack-control speaks dw-lifecycle's `define`/`extend`/`execute` over a Spec Kit substrate. When dw-lifecycle retires, the verbs carry over unchanged.
+- Fat-vs-thin is decided by the migration path, not aesthetics: the keepers move OUT of a fat dw-lifecycle, so a fat stack-control makes each migration a `git mv`; a thin one would force re-packaging on every migration. npm publish has no good reason for a marketplace-distributed dev-tool plugin.
+- The self-hosting bootstrap now has a clean branch-local entry: `/session-start` orients a fresh agent to Spec Kit; `/dwss` (dw-lifecycle) is intentionally left as-is per isolation. Reconcile the branch-local session skills at merge.
+
+**Next step:** `/speckit-tasks` for Feature 1 (`specs/003-stack-control-front-door`) — generate the dependency-ordered, TDD-first `tasks.md` (MVP = US1: execute a spec via native Spec Kit, governance firing). Bootstrap the next session with `/session-start` (NOT `/dwss`).
