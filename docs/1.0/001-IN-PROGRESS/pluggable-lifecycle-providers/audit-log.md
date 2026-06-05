@@ -353,3 +353,38 @@ Severity:   low
 Surface:    `plugins/stack-control/src/subcommands/execute-check.ts:15-20`, `plugins/stack-control/src/cli.ts:8`
 
 The dispatcher comment says “no flag silently ignored”, with each subcommand validating its own flags. `execute-check` only searches for the first `--spec` and accepts everything else, so `stackctl execute-check --spec specs/foo --bogus` can still exit `0`. That weakens the front-door gate because typos in future or documented flags are treated as success. A reasonable fix is to parse `args` strictly: accept only `--spec <value>`, reject unknown flags or extra positionals with exit `2`, and cover that in `execute-check.test.ts`.
+
+## 2026-06-05 — audit-barrage lift (20260605T234757995Z-pluggable-lifecycle-providers)
+
+### AUDIT-20260605-10 — README spec-check row says "exit 0" but the verb fails loud (exit 1), contradicting the same diff's extend skill
+
+Finding-ID: AUDIT-20260605-10
+Status:     fixed-659bef47 (README spec-check row now qualifies exit semantics like the execute-check row: "exit 0 when it can report; exit !=0 (fail-loud) on a missing/unknown flag, an absent dir, or a non-directory" — matches the extend skill's dependency on the fail-loud path. Doc fix; no test per #392.)
+Severity:   low
+Surface:    `plugins/stack-control/README.md:52` (the `spec-check` verb row) vs. `plugins/stack-control/src/subcommands/spec-check.ts:48-55` and `plugins/stack-control/skills/extend/SKILL.md:24`
+
+The README's `stackctl` verb table describes `spec-check` as: *"Report a spec's authoring state as a machine-readable line (`spec=yes plan=yes tasks=no`), **exit 0**. Read-only; never gates."* The unqualified "exit 0" is wrong: `spec-check.ts` exits `1` on an absent dir (`spec dir … not found`) and on a file-masquerading-as-dir (`… is not a directory`), and exits `2` on a missing/unknown flag. The `execute-check` row directly above it correctly writes *"otherwise exit ≠0 naming the missing artifact,"* so the asymmetry reads as if `spec-check` never fails — which is the opposite of its design comment (`spec-check.ts:11-12`: *"Fail-loud only on the inputs that make a report impossible"*).
+
+This is an internal contradiction *within this diff*: `extend/SKILL.md:24` instructs the agent *"If the spec dir does not exist, `spec-check` fails loud with a descriptive error. STOP and surface it verbatim,"* which depends on the exact exit-1 behavior the README denies. An agent or adopter reading the README table could reasonably assume `spec-check` always exits 0 and skip handling the fail-loud path. Fix: qualify the row like the `execute-check` row — *"exit 0 when it can report; exit ≠0 (fail-loud) on a missing flag / absent dir / non-directory."*
+
+### AUDIT-20260605-11 — define SKILL.md tells the agent to run `spec-check --spec <spec-dir>` (step 3) before step 4 resolves the spec dir
+
+Finding-ID: AUDIT-20260605-11
+Status:     fixed-659bef47 (define SKILL.md reordered: the spec dir is resolved-and-stated immediately after /speckit-specify creates it (now step 3, via the CLAUDE.md marker / TF-09), then referenced by the spec-check confirmation (now step 4) — matching extend's resolve-then-report ordering. Doc fix; no test per #392.)
+Severity:   low
+Surface:    `plugins/stack-control/skills/define/SKILL.md:28-40` (Steps 3 and 4)
+
+The numbered procedure is ordered so the placeholder is used before it is defined. Step 3 ("Confirm artifact state as it advances") instructs the agent to run `stackctl spec-check --spec <spec-dir>` "after each authoring step," but `<spec-dir>` is not resolved until Step 4 ("Resolve the spec dir … State which spec dir you created"), which explains that on this program's long-lived branch the dir is resolved via the `<!-- SPECKIT START -->…<!-- SPECKIT END -->` marker in `CLAUDE.md` rather than the branch name (TF-09). The `extend` skill gets this right — its Step 1 resolves *and reports* the dir before any `spec-check` call.
+
+An agent following `define` sequentially reaches the first `spec-check` invocation without having been told how to determine `<spec-dir>` on a branch Spec Kit's `check-prerequisites.sh` rejects, and may guess or stall. The fix is to reorder: make "resolve the spec dir (via the marker)" the step that immediately follows `/speckit-specify` creating it, and have the `spec-check` confirmation step reference the already-resolved dir — matching `extend/SKILL.md`'s ordering.
+
+### AUDIT-20260605-12 — govern.sh untracked-fold uses `break` on budget-exceed, dropping later small feature files because an unrelated large file sorts first
+
+Finding-ID: AUDIT-20260605-12 (claude-03 + codex-01; cross-model)
+Status:     fixed-659bef47 (govern.sh untracked-fold now uses `continue` not `break`: an over-budget file is skipped without incrementing the budget so smaller later-sorting files are still folded; the per-file skip is logged (no silent cap). Secondary point acknowledged in-comment: the byte budget is a soft bound (the folded diff output exceeds raw file size), not a hard on-the-wire ceiling. RED-first regression smoke scripts/smoke-govern-untracked-fold.sh drives the real govern.sh (watched fail against `break`, green against `continue`); installed copy re-synced.)
+Severity:   medium
+Surface:    `.specify/extensions/deskwork-governance/scripts/bash/govern.sh:80-84` (and the mirrored install copy under `plugins/stack-control/spec-kit/deskwork-governance/`)
+
+This is not a re-litigation of the AUDIT-06 cap (the 256KB budget + binary-skip + stderr logging are the accepted residual) — it flags one mechanism choice inside that cap. When `_folded_bytes + _sz` exceeds `UNTRACKED_FOLD_BUDGET`, the loop `break`s, abandoning *all remaining* untracked files. Because `git ls-files --others --exclude-standard` emits paths in sorted order, a single large untracked file early in the sort (e.g. a scratch log under `a-scratch.txt`) suppresses folding of the feature's actual new source/test files that sort later (`plugins/stack-control/...`, `specs/...`) — exactly the surfaces the fold exists to audit on a dirty manual run.
+
+A `continue` (skip only the oversized file, keep packing smaller ones — `_folded_bytes` isn't incremented for the skipped file, so later small files still fit) would preserve coverage of the relevant files while still honoring the cap and logging the per-file skip. The drop is logged (no silent cap), and the real `after_implement` flow commits first so this only bites manual govern-on-dirty-tree runs, hence informational — but `continue` is the strictly-better shape for the stated goal of "audit the newly-added work." Separately, the budget accounts the raw file byte count (`wc -c`) while folding the larger `git diff --no-index` output (per-line `+` prefixes + headers), so the actual off-box payload runs modestly above the stated 256KB — worth a one-line acknowledgment if the cap is meant as a hard transmission ceiling.
