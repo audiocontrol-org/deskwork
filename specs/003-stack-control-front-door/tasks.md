@@ -110,13 +110,13 @@ New **fat plugin, in-tree TS via `tsx`** under `plugins/stack-control/`, mirrori
 
 ### Tests / verifications for User Story 3 ⚠️
 
-- [ ] T028 [P] [US3] Isolation grep (VR-2 / R5): `grep -rn "deskwork-governance\|spec-kit/" plugins/dw-lifecycle/{src,bin,commands,skills}` → **0 matches** (no inbound coupling from dw-lifecycle to the moved extension). Encode as a guard test or quickstart Scenario E step.
+- [X] T028 [P] [US3] Isolation grep (VR-2 / R5): `grep -rn "deskwork-governance\|spec-kit/" plugins/dw-lifecycle/{src,bin,commands,skills}` → **0 matches** (no inbound coupling from dw-lifecycle to the moved extension). Encode as a guard test or quickstart Scenario E step. **DONE:** encoded as a durable vitest guard `src/__tests__/dw-lifecycle-isolation.test.ts` (greps the 4 runtime dirs, asserts 0 matches + old path gone) — 0 matches confirmed.
 
 ### Verification for User Story 3
 
-- [ ] T029 [US3] `claude plugin validate plugins/stack-control` passes; `plugins/stack-control/bin/stackctl version` prints the lockstep version (matches marketplace.json) — SC-001 / quickstart Scenario A
-- [ ] T030 [US3] `specify extension list` shows `deskwork-governance` enabled from the new home; old `plugins/dw-lifecycle/spec-kit/deskwork-governance/` no longer exists — SC-001 / quickstart Scenario B
-- [ ] T031 [US3] `npm --workspace @deskwork/plugin-dw-lifecycle test` passes unchanged (dw-lifecycle suite green before/after the move) — SC-003 / quickstart Scenario E
+- [X] T029 [US3] `claude plugin validate plugins/stack-control` passes; `plugins/stack-control/bin/stackctl version` prints the lockstep version (matches marketplace.json) — SC-001 / quickstart Scenario A. **DONE:** validate "passed with warnings" (only a benign no-`author` warning — symmetric with dw-lifecycle, which also omits `author`); `stackctl version` → `0.37.0` == marketplace.json.
+- [X] T030 [US3] `specify extension list` shows `deskwork-governance` enabled from the new home; old `plugins/dw-lifecycle/spec-kit/deskwork-governance/` no longer exists — SC-001 / quickstart Scenario B. **DONE:** `specify extension list` shows `deskwork Governance (v0.1.0) … Status: Enabled`; old dw-lifecycle path absent.
+- [X] T031 [US3] `npm --workspace @deskwork/plugin-dw-lifecycle test` passes unchanged (dw-lifecycle suite green before/after the move) — SC-003 / quickstart Scenario E. **DONE:** 2704 tests / 211 files green.
 
 **Checkpoint**: All three stories independently functional; isolation invariant held.
 
