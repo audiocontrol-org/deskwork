@@ -310,11 +310,14 @@ for UX vs visual-letter vs referee), not a premature commitment. **Out of scope 
 
 ### Status
 
-North star, not yet committed work. Kickoff is feature-request [#424](https://github.com/audiocontrol-org/deskwork/issues/424), which seeds
-`/dw-lifecycle:define` → `:setup` → PRD iteration. Composition-first per the project's
-principle: design-control orchestrates the proven `/frontend-design` engine and reuses the
-archive + enforcement-in-skills patterns rather than introducing parallel infrastructure (and
-rolls **no** visual-verification engine of its own — see the thesis).
+North star, not yet committed work. Kickoff is feature-request [#424](https://github.com/audiocontrol-org/deskwork/issues/424). The design has been
+**converged** through 11 adversarial audit-barrage rounds (two consecutive zero-HIGH) into
+[`docs/superpowers/specs/2026-06-04-design-control-design.md`](./docs/superpowers/specs/2026-06-04-design-control-design.md)
+— `v1-scaffold` (wireframe kit + allowlist lint + design-language spec + archive + status; zero
+referee dependency) ships first; `v1-referee-preview` (advisory `/frontend-design` referee, gated
+on an adversarial falsification set) follows. Next: `/dw-lifecycle:setup` → PRD iteration.
+Composition-first: orchestrates the proven `/frontend-design` engine and reuses the archive +
+enforcement-in-skills patterns; rolls **no** visual-verification engine of its own.
 
 ## Cross-cutting principles
 

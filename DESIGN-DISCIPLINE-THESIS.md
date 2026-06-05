@@ -179,11 +179,20 @@ redesign and repeat Act I.
   `audiocontrol-redesign-infra-inventory.md`.
 - Source repo (in-flight): `audiocontrol-org/audiocontrol`, `feature/editor-ux-refinement`
   — `design-mockup-pipeline.md`, `docs/wireframe-kit/`, `tools/check-mockup-lofi.sh`.
-- Adversarial design audits that killed the roll-your-own visual-regression engine (two rounds,
-  cross-model): `.dw-lifecycle/scope-discovery/audit-runs/*design-control*`. Round 1 found the
-  exact-hash foundation unsound; round 2 found the determinism subsystem is a research project,
-  not a feature — leading to the "never roll your own; orchestrate `/frontend-design`" commitment.
-- Feature definition (kickoff): issue #424; `/tmp/feature-definition-design-control.md`.
+- **Converged design:** `docs/superpowers/specs/2026-06-04-design-control-design.md` — reached
+  via **11 adversarial audit-barrage rounds** (claude + codex in parallel) run until **two
+  consecutive zero-HIGH rounds** (the operator's stop criterion). The barrage killed a
+  roll-your-own visual-regression engine (rounds 1–2: exact-hash unsound → determinism is a
+  research project, not a feature → the "never roll your own; orchestrate `/frontend-design`"
+  commitment), then hardened the result: the **v1-scaffold / v1-referee-preview split** (scaffold
+  ships with zero referee dependency), the **referee as advisory evidence that must earn trust via
+  an adversarial falsification set** (numeric drift delegated to an existing pixel-diff tool on
+  DOM-locator stable regions; the `ui-verification.md` occluded-chip miss cited against itself),
+  a **capture-config identity hash** (non-secret auth/profile in, secret tokens out), and the
+  **lint reshaped to allowlists on both the element/attribute and codepoint axes** (denylists are
+  whack-a-mole; allowlists close the polish-leakage class). Per-round records:
+  `.dw-lifecycle/scope-discovery/audit-runs/*design-control*`.
+- Feature definition + kickoff: issue #424; `/tmp/feature-definition-design-control.md`.
 - Related deskwork docs: `THESIS.md`, `DESIGN-STANDARDS.md`,
   `.claude/rules/ui-verification.md`, `.claude/rules/design-standards.md`,
   `.claude/rules/enforcement-lives-in-skills.md`.
