@@ -280,12 +280,41 @@ surfaces. That redesign is the **first dogfood** of the loop. deskwork already c
 design-decision archive; the gaps to build are the **wireframe kit + lint**, the
 **design-language spec convention**, and the **`/frontend-design` referee orchestration**.
 
+### Design-barrage — diverse UX/UI engines (research thread)
+
+`/frontend-design` is the proven default, but it should not be the *only* engine — single-tool
+lock-in is its own risk, and the audit-barrage already taught us that **genetic diversity in
+model families surfaces failure modes a single one misses.** This thread investigates other
+design tools/models that yield good UX/UI results, to use **instead of or in parallel to**
+`/frontend-design` — a **"design-barrage": the audit-barrage pattern applied to UX/UI
+concerns** rather than code defects.
+
+It maps onto design-control's two `/frontend-design`-driven roles:
+
+- **Generation diversity** — fire several engines at the same wireframe-intent + design-language
+  and compare the candidate designs (the panel/judge shape, but for visual design). The operator
+  picks; runners-up can graft good ideas.
+- **Referee diversity** — have multiple model families look at the *same* screenshot and judge
+  it against the spirit (wireframe) + letter (design-language spec). Cross-model agreement on a
+  visual problem is the high-confidence signal — exactly the audit-barrage's HIGH-confidence
+  rule, transposed to pixels.
+
+Architecturally it composes with what already exists: design-control orchestrates engines, so a
+**configurable design-engine battery** (mirroring `audit-barrage-config.yaml`) lets adopters
+add/swap tools without code changes. Candidates to *investigate* (not yet endorsed — evaluate
+before quoting): the audit-barrage CLI families already on hand (`claude`, `codex`, `gemini`)
+in a referee/generation role, other design-generation skills/MCPs, and dedicated UI-generation
+tools. The investigation's deliverable is an evidence-based shortlist (what each is good/bad at
+for UX vs visual-letter vs referee), not a premature commitment. **Out of scope for v1**
+(v1 uses `/frontend-design` only); this is a phase-2 research thread.
+
 ### Status
 
 North star, not yet committed work. Kickoff is feature-request [#424](https://github.com/audiocontrol-org/deskwork/issues/424), which seeds
 `/dw-lifecycle:define` → `:setup` → PRD iteration. Composition-first per the project's
-principle: the capture engine, the archive, and the enforcement-in-skills pattern all
-compose existing deskwork primitives rather than introduce parallel infrastructure.
+principle: design-control orchestrates the proven `/frontend-design` engine and reuses the
+archive + enforcement-in-skills patterns rather than introducing parallel infrastructure (and
+rolls **no** visual-verification engine of its own — see the thesis).
 
 ## Cross-cutting principles
 
