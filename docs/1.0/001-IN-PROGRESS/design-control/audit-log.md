@@ -32,7 +32,7 @@ Canonical grep queue:
 ### AUDIT-20260605-01 — EngineMethod union is hardcoded in three places with no compile-time link — silent drift on adding a method
 
 Finding-ID: AUDIT-20260605-01 (claude-01 + claude-03 + claude-04 + codex-01 + codex-03; cross-model)
-Status:     open
+Status:     fixed-55e23a571aacbb3ebc78edf7bb58f5e1d3fd16e3
 Severity:   medium
 Surface:    plugins/design-control/src/engine-adapter/types.ts:24-27, conformance.ts:21-25, src/__tests__/engine-adapter/preflight.test.ts:9-13
 
@@ -50,7 +50,7 @@ This is asymmetric with the sibling `FAILURE_MODES` (types.ts:42-49), which IS s
 ### AUDIT-20260605-02 — Manual-authoring test is tautological — asserts a string literal against itself, covers no implementation
 
 Finding-ID: AUDIT-20260605-02 (claude-02 + codex-02; cross-model)
-Status:     open
+Status:     fixed-55e23a571aacbb3ebc78edf7bb58f5e1d3fd16e3
 Severity:   medium
 Surface:    plugins/design-control/src/__tests__/engine-adapter/preflight.test.ts:63-81
 
@@ -63,7 +63,7 @@ This matters because the manual-authoring-needs-no-engine invariant is the centr
 ### AUDIT-20260605-03 — validateConformance trusts its typed inputs — no structural parse, and no combined parse-then-echo helper is exported
 
 Finding-ID: AUDIT-20260605-03
-Status:     open
+Status:     fixed-55e23a571aacbb3ebc78edf7bb58f5e1d3fd16e3
 Severity:   low
 Surface:    plugins/design-control/src/engine-adapter/conformance.ts:78-141, index.ts:24-29
 
