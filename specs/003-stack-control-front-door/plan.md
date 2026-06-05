@@ -6,7 +6,7 @@
 
 ## Summary
 
-Stand up **`stack-control`** as its own in-monorepo Claude Code plugin (CLI `stackctl`, sharing the repo's single lockstep version — see Technical Context / research R4), **rehome** the founding governance Spec Kit extension into it (still firing on `after_implement`, still provider-neutral), and ship a **thin front door**: two in-session Claude Code skills — **curate** (full edit/iterate/review of a Spec Kit spec) and **execute** (drive native `/speckit-implement`, governance firing afterward) — layered over a small `stackctl` CLI. The whole thing must not change `dw-lifecycle`'s behavior (isolation invariant) and must be sufficient to curate-and-run the *next* feature's spec through it (the self-hosting proof). The structure mirrors `dw-lifecycle`'s real shape: a fat plugin shipping TypeScript in-tree via `tsx`, NOT a thin shell over a `packages/` workspace.
+Stand up **`stack-control`** as its own in-monorepo Claude Code plugin (CLI `stackctl`, sharing the repo's single lockstep version — see Technical Context / research R4), **rehome** the founding governance Spec Kit extension into it (still firing on `after_implement`, still provider-neutral), and ship a **thin front door**: three in-session Claude Code skills — **define** (author a new Spec Kit spec) / **extend** (refine the existing spec in place) for spec-authoring, and **execute** (drive native `/speckit-implement`, governance firing afterward) — layered over a small `stackctl` CLI. The whole thing must not change `dw-lifecycle`'s behavior (isolation invariant) and must be sufficient to author-and-run the *next* feature's spec through it (the self-hosting proof). The structure mirrors `dw-lifecycle`'s real shape: a fat plugin shipping TypeScript in-tree via `tsx`, NOT a thin shell over a `packages/` workspace.
 
 ## Technical Context
 
@@ -30,7 +30,7 @@ Stand up **`stack-control`** as its own in-monorepo Claude Code plugin (CLI `sta
 - **Fail-loud** — no fallbacks, no mock data, no faked runs outside tests; missing mechanism/spec/governance raises a descriptive error naming what is absent (FR-008, Principle V).
 - TypeScript discipline: no `any`, no `as Type`, no `@ts-ignore`; files 300–500 lines; composition over inheritance. Mirror `dw-lifecycle`'s established module/import conventions (relative ESM `./x.js` imports) for parity.
 
-**Scale/Scope**: One plugin standup + one governance-extension rehome (physical move, not fork) + two front-door skills (curate, execute) + a thin `stackctl` verb surface. **MVP = User Story 1** (execute a spec via native Spec Kit, governance firing).
+**Scale/Scope**: One plugin standup + one governance-extension rehome (physical move, not fork) + three front-door skills (`define`, `extend`, `execute`) + a thin `stackctl` verb surface. **MVP = User Story 1** (execute a spec via native Spec Kit, governance firing).
 
 ## Constitution Check
 
@@ -41,7 +41,7 @@ Stand up **`stack-control`** as its own in-monorepo Claude Code plugin (CLI `sta
 | I | Test-First (NON-NEGOTIABLE) | **PASS (committed)** | Every code task is RED-first: the governance-rehome smoke (`scripts/smoke-governance-after-implement.sh`, repointed) and `stackctl` verb tests are written failing, watched fail for the right reason, then made green. Spikes (if any) are thrown away and rebuilt test-first. |
 | II | Integration-First, No Speculative Building | **PASS** | Built concretely against Spec Kit; the provider/plan-source port stays DEFERRED (the spec's Assumptions say so). No agent-inserted scope cuts — the spec captured everything; this plan only sequences it. |
 | III | Branch on Capabilities, Never Provider Identity | **PASS** | The rehomed `govern.sh` keeps its zero-provider-branching invariant (FR-004, SC-004); the neutrality grep gate moves with it. The front door triggers execution by capability ("spec is runnable"), never by who authored the spec. |
-| IV | Division of Labor | **PASS** | Governance is one-way (provider artifact → findings in `audit-log.md`); it never writes governance state back into a Spec Kit spec. Curation edits the spec the operator owns — authoring, not governance write-back. |
+| IV | Division of Labor | **PASS** | Governance is one-way (provider artifact → findings in `audit-log.md`); it never writes governance state back into a Spec Kit spec. Authoring (`define`/`extend`) edits the spec the operator owns — not governance write-back. |
 | V | No Fallbacks, No Mock Data Outside Tests | **PASS** | FR-008: native-exec-unavailable / spec-not-runnable / governance-absent all fail loud with a descriptive error. `govern.sh` already fails loud when `dw-lifecycle` is off PATH. |
 | VI | Strict Typing & Composition | **PASS (committed)** | TS strict, no `any`/`as`/`@ts-ignore`, files 300–500 lines, composition + DI. Mirrors `dw-lifecycle`'s module shape. |
 | VII | Commit & Push Early and Often | **PASS (committed)** | One logical change per commit, pushed frequently, no AI attribution. |
@@ -83,13 +83,15 @@ plugins/stack-control/
 │   └── stackctl                 # bash shim → tsx src/cli.ts (mirrors bin/dw-lifecycle)
 ├── src/
 │   ├── cli.ts                   # stackctl dispatcher
-│   ├── subcommands/             # deterministic verbs (curate-check, execute-check, …)
+│   ├── subcommands/             # deterministic verbs (spec-check, execute-check, …)
 │   └── __tests__/               # vitest unit/integration
 ├── commands/
-│   ├── curate.md                # /stack-control:curate  (US2)
+│   ├── define.md                # /stack-control:define  (US2 — new spec)
+│   ├── extend.md                # /stack-control:extend  (US2 — existing spec)
 │   └── execute.md               # /stack-control:execute (US1)
 ├── skills/
-│   ├── curate/SKILL.md
+│   ├── define/SKILL.md
+│   ├── extend/SKILL.md
 │   └── execute/SKILL.md
 ├── spec-kit/
 │   └── deskwork-governance/     # REHOMED from plugins/dw-lifecycle/spec-kit/ (git mv)

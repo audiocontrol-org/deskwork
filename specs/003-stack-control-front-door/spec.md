@@ -32,18 +32,18 @@ An operator points the stack-control front door at a Spec Kit spec and runs it. 
 
 ---
 
-### User Story 2 - Curate a spec through the front door (Priority: P2)
+### User Story 2 - Author a spec through the front door — `define` / `extend` (Priority: P2)
 
-An operator uses the front door's **spec-curation touch point** to create, **edit, iterate, and review** a Spec Kit spec — the full authoring loop — so the same surface that runs a spec is also where the spec is fully prepared.
+An operator uses the front door's **spec-authoring touch point** to create, **edit, iterate, and review** a Spec Kit spec — the full authoring loop — so the same surface that runs a spec is also where the spec is fully prepared. The touch point is realized as **two in-session skills mirroring the dw-lifecycle lifecycle vocabulary**: **`define`** (author a NEW spec for a new feature) and **`extend`** (refine the EXISTING spec in place).
 
-**Why this priority**: Curation + execution are the two touch points that make the front door a usable control plane rather than a bare execution trigger. Execution (US1) is the bootstrap; the full curation loop makes the front door self-contained for authoring. P2 relative to execution, but both ship in this feature.
+**Why this priority**: Authoring + execution are the two touch points that make the front door a usable control plane rather than a bare execution trigger. Execution (US1) is the bootstrap; the full authoring loop makes the front door self-contained. P2 relative to execution, but both ship in this feature.
 
-**Independent Test**: Through the front door, initiate a new Spec Kit spec and bring it to a state where US1 can execute it — without dropping out of the stack-control surface to do so.
+**Independent Test**: Through the front door, `define` a new Spec Kit spec (or `extend` an existing one) and bring it to a state where US1 can execute it — without dropping out of the stack-control surface to do so.
 
 **Acceptance Scenarios**:
 
-1. **Given** the front door, **When** the operator initiates spec curation, **Then** a Spec Kit spec is created/advanced to a runnable state through the stack-control surface.
-2. **Given** a curated spec, **When** the operator hands it to execution (US1), **Then** it runs without manual re-assembly.
+1. **Given** the front door, **When** the operator runs `define` (new) or `extend` (existing), **Then** a Spec Kit spec is created / advanced to a runnable state through the stack-control surface.
+2. **Given** an authored spec, **When** the operator hands it to execution (US1), **Then** it runs without manual re-assembly.
 
 ---
 
@@ -83,11 +83,11 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 - **FR-003**: The founding governance extension (the Spec Kit `after_implement` extension that fires cross-model audit-barrage) MUST be rehomed into `stack-control` and remain registered and functional.
 - **FR-004**: The rehomed governance extension MUST continue to fire automatically on `after_implement` with no manual invocation, and MUST preserve its zero-provider-identity-branching invariant.
 
-**Front door — curation + execution touch points**
+**Front door — authoring + execution touch points**
 
-- **FR-005**: stack-control MUST expose a **spec-curation** touch point — a Claude Code skill (see FR-007) — providing a **full edit / iterate / review loop** over a Spec Kit spec. The operator can create a spec, edit it, iterate it, and review it by invoking the skill in-session, without leaving their Claude Code session. *(Operator decision 2026-06-04.)*
+- **FR-005**: stack-control MUST expose the **spec-authoring** touch point as **two in-session Claude Code skills** (see FR-007) mirroring dw-lifecycle's lifecycle vocabulary: **`define`** (author a NEW Spec Kit spec — drive native `/speckit-specify` for a new feature) and **`extend`** (refine the EXISTING spec in place — `/speckit-clarify`, re-plan, re-tasks). Together they provide the **full create / edit / iterate / review loop** over a Spec Kit spec, invoked in-session without leaving the operator's Claude Code session. These are **spec-authoring verbs only**; infra creation (worktree / docs) is a separate concern, NOT folded into them — mirrors dw-lifecycle's `define` ≠ `setup` split. *(Operator decisions 2026-06-04 full-loop authoring; 2026-06-05 `define`/`extend` naming, retiring the vaguer "curate".)*
 - **FR-006**: The **execution** touch point is a **Claude Code skill the operator invokes in-session** that runs a spec via the **native Spec Kit mechanism** (`/speckit-implement`), governance firing afterward. Because the skill runs inside the operator's Claude Code session, it drives native execution via the **in-session agent** (sub-agent dispatch available) and MUST NOT depend on a headless/batch CLI to invoke the agent — this is the mechanism that satisfies the durability constraint and avoids a context-switch out of the session. *(Operator decision 2026-06-04: front-door touch points are in-session skills.)*
-- **FR-007**: The operator-facing front door is a set of **Claude Code skills** (invoked in-session as `/stack-control:…` slash commands) — NOT a standalone TUI or web app — layered over a **`stackctl` CLI** that performs the deterministic work (mirrors `dw-lifecycle`'s skills-over-CLI-verbs architecture). The skill is the touch point; `stackctl` is the primitive it calls; the in-session agent does the agent-work. *(Operator decision 2026-06-04 — supersedes the earlier TUI answer.)*
+- **FR-007**: The operator-facing front door is a set of **Claude Code skills** — the three front-door verbs **`define`**, **`extend`**, **`execute`** (invoked in-session as `/stack-control:…` slash commands) — NOT a standalone TUI or web app — layered over a **`stackctl` CLI** that performs the deterministic work (mirrors `dw-lifecycle`'s skills-over-CLI-verbs architecture). The skill is the touch point; `stackctl` is the primitive it calls; the in-session agent does the agent-work. *(Operator decision 2026-06-04 — supersedes the earlier TUI answer.)*
 - **FR-008**: When native execution genuinely cannot run (mechanism unavailable, spec not runnable, governance capability absent), the front door MUST fail loudly with a descriptive error naming what is missing — no silent no-op, no faked run, no mock (Principle V).
 
 **Self-hosting**
@@ -99,7 +99,7 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 - **stack-control plugin**: the new plugin shell + package, on the repo's shared lockstep version, hosting the front door and the rehomed governance extension.
 - **`stackctl`**: the CLI entry point to the front door.
 - **Front door**: the operator-facing touch points — **Claude Code skills** (`/stack-control:…`) invoked in-session — layered over the `stackctl` CLI primitive.
-- **Spec-curation touch point**: the surface that brings a Spec Kit spec to a runnable state.
+- **Spec-authoring touch point (`define` / `extend`)**: the surfaces that bring a Spec Kit spec to a runnable state — `define` creates a new spec, `extend` refines the existing one (spec-authoring only; infra creation is separate).
 - **Execution touch point**: the surface that runs a spec via native Spec Kit execution.
 - **Governance extension (rehomed)**: the founding feature's `after_implement` audit-barrage extension, now living in stack-control.
 - **Spec Kit spec**: the unit being curated and run (concretely, a `specs/<feature>/` produced by the native Spec Kit flow).
@@ -112,7 +112,7 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 - **SC-002**: An operator can run a Spec Kit spec via the front door and observe native execution complete **and** governance fire automatically afterward — in a single front-door action, **0** manual barrage invocations.
 - **SC-003**: Exercising `dw-lifecycle`'s existing surfaces after stack-control is installed shows **0** behavior changes (isolation invariant).
 - **SC-004**: The rehomed governance selection path contains **0** branches on provider identity (neutrality survives the rehome).
-- **SC-005**: The next feature's spec (Feature 2 or a migration) is **curated and run through the front door** — the self-hosting proof — rather than via ad-hoc invocation.
+- **SC-005**: The next feature's spec (Feature 2 or a migration) is **authored (`define`/`extend`) and run (`execute`) through the front door** — the self-hosting proof — rather than via ad-hoc invocation.
 - **SC-006**: On any path where native execution cannot run, the front door produces a descriptive error naming the missing piece — **0** silent no-ops or faked runs.
 
 ## Assumptions

@@ -79,12 +79,13 @@ npm --workspace @deskwork/plugin-dw-lifecycle test
 ## Scenario F — Self-hosting proof (SC-005, FR-009)
 
 ```text
-# Through the front door (in-session), curate + run the NEXT feature's spec:
-#   /stack-control:curate   → advance Feature 2's spec (specs/002-parallel-execution-engine) to runnable
+# Through the front door (in-session), author + run the NEXT feature's spec:
+#   /stack-control:extend   → advance Feature 2's existing spec (specs/002-parallel-execution-engine) to runnable
+#                             (or /stack-control:define for a brand-new spec)
 #   /stack-control:execute  → run it via native Spec Kit, governance firing
 ```
 
-**Expected**: the next feature's spec is **curated and run through the front door**, not via ad-hoc invocation — demonstrating the front door is usable to drive subsequent stack-control development (the reason this feature is first).
+**Expected**: the next feature's spec is **authored (`define`/`extend`) and run (`execute`) through the front door**, not via ad-hoc invocation — demonstrating the front door is usable to drive subsequent stack-control development (the reason this feature is first).
 
 ---
 
@@ -96,5 +97,5 @@ npm --workspace @deskwork/plugin-dw-lifecycle test
 | SC-002 (run + governance auto-fires, 0 manual barrage) | D |
 | SC-003 (dw-lifecycle 0 behavior change) | E |
 | SC-004 (0 provider-identity branches) | D |
-| SC-005 (next feature curated+run through the door) | F |
+| SC-005 (next feature authored+run through the door) | F |
 | SC-006 (descriptive error, 0 silent no-ops) | C, D |

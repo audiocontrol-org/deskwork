@@ -10,8 +10,10 @@ All decisions below are derived from the **actual** repository (read during plan
 
 **Rationale**: The repo has two live patterns. `deskwork` / `deskwork-studio` are *thin shells* whose `bin/` first-run-installs a published `@deskwork/<pkg>` from npm; their logic lives in `packages/{core,cli,studio}`. `dw-lifecycle` is a *fat plugin*: its logic ships in-tree at `plugins/dw-lifecycle/src/*.ts`, the `bin/dw-lifecycle` shim runs it through `tsx` (npm-installing only the runtime deps `tsx + yaml + zod + ajv + ajv-formats + jscpd`), and its `package.json` is the private workspace package `@deskwork/plugin-dw-lifecycle`. stack-control is the *successor to dw-lifecycle* and shares its skills-over-CLI lifecycle shape, so mirroring dw-lifecycle (not deskwork-studio) gives parity during the absorb-then-retire migration and avoids publishing a separate npm package before the surface stabilizes.
 
+**No npm publish (operator-confirmed 2026-06-05)**: stack-control is NOT published to npm. The only good reasons to publish are (a) offering a reusable *library* third parties `npm i`, or (b) needing a compiled/minified artifact for size / cold-start (e.g. a built web server — `deskwork-studio`'s case). stack-control is neither — it's a dev-tool plugin distributed through the Claude marketplace (git-subdir clone) and run via `tsx`, exactly like `dw-lifecycle`. Publishing would only add release machinery and "packaging is UX" failure modes (404s, version skew, OIDC) for zero benefit. Operator: *"Is there ever a good reason to publish anything to npm?"* — for this plugin, no. This reinforces the fat decision.
+
 **Alternatives considered**:
-- *Thin shell over a new `packages/stack-control`*: rejected — forces an npm publish + lockstep version coupling before the front door has proven its shape (violates Principle II).
+- *Thin shell over a new `packages/stack-control`*: rejected — forces an npm publish + lockstep version coupling before the front door has proven its shape (violates Principle II), and multiplies migration friction: features 3/4/5 move dw-lifecycle's in-tree code in, which would mean re-packaging on every migration if stack-control were thin.
 - *Subdirectory inside `plugins/dw-lifecycle`*: rejected — violates the isolation invariant and the succession rule (stack-control is its own plugin, even though it shares the repo's lockstep version per R4).
 
 ---
@@ -32,14 +34,14 @@ All decisions below are derived from the **actual** repository (read during plan
 
 **Decision**: `stackctl` carries only the **deterministic** work the skills delegate to; the agent-work stays in the in-session skills (mirrors dw-lifecycle's skills-over-CLI split). Minimum verb surface for Feature 1:
 - `stackctl execute-check --spec <dir>` — validate a Spec Kit spec is in a **runnable** state (spec.md + plan.md + tasks.md present / whatever native `/speckit-implement` requires); exit non-zero with a descriptive error naming what's missing (FR-008). The `execute` skill calls this *before* driving `/speckit-implement`.
-- `stackctl curate-check --spec <dir>` — report a spec's curation state (which Spec Kit artifacts exist), so the `curate` skill can advance it. (Curation itself = the operator + in-session agent editing the spec; `stackctl` reports state, does not author prose.)
+- `stackctl spec-check --spec <dir>` — report a spec's authoring state (which Spec Kit artifacts exist), so the `define` / `extend` skills can advance it. (Authoring itself = the operator + in-session agent editing the spec via native Spec Kit; `stackctl` reports state, does not author prose.)
 - `stackctl version` / dispatcher scaffolding — mirrors `dw-lifecycle`'s `cli.ts`.
 
 The exact verb names + flags are pinned in [`contracts/stackctl-cli.md`](./contracts/stackctl-cli.md) and are the unit-under-test (RED-first).
 
 **Rationale**: Keeps the front door thin (spec's "minimal scaffolding"). The deterministic checks are exactly the fail-loud gates Principle V demands; putting them in `stackctl` makes them testable in vitest without the agent in the loop.
 
-**Resolved (operator deferred to agent, 2026-06-05 — "I don't know how to answer")**: take the **smallest surface**. Feature 1 adds NO `stackctl` verb beyond the two checks + `version`. Spec *creation/editing* is delegated to native Spec Kit (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`) driven by the in-session `curate` skill's agent; `stackctl` only *reads/checks* state. Rationale: this is the minimum that satisfies US1 (execute-check gates native execution) + US2 (curate-check reports state, agent drives native authoring). Widening is cheap and additive if a concrete need appears later — choosing minimal now avoids speculative surface (Principle II).
+**Resolved (operator deferred to agent, 2026-06-05 — "I don't know how to answer")**: take the **smallest surface**. Feature 1 adds NO `stackctl` verb beyond the two checks + `version`. Spec *creation/editing* is delegated to native Spec Kit (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`) driven by the in-session `define` / `extend` skills' agent; `stackctl` only *reads/checks* state. Rationale: this is the minimum that satisfies US1 (execute-check gates native execution) + US2 (spec-check reports state, agent drives native authoring). Widening is cheap and additive if a concrete need appears later — choosing minimal now avoids speculative surface (Principle II).
 
 ---
 
@@ -76,6 +78,22 @@ The exact verb names + flags are pinned in [`contracts/stackctl-cli.md`](./contr
 
 **Alternatives considered**:
 - *Headless `stackctl execute` that shells out to a batch CLI to run the agent*: rejected — reintroduces the exact batch/headless-CLI fragility the constitution (Principle IX) and the operator flagged; also a vendor may sunset batch mode.
+
+---
+
+## R7 — Front-door verb naming (operator, 2026-06-05)
+
+**Decision**: the three front-door verbs are **`define`** / **`extend`** / **`execute`**. The vaguer **`curate`** is retired. `execute` is kept. The spec-authoring touch point (FR-005) is realized as two verbs borrowed verbatim from dw-lifecycle's lifecycle vocabulary:
+- **`define`** — author a NEW Spec Kit spec for a new feature (drive native `/speckit-specify`).
+- **`extend`** — refine the EXISTING spec in place (`/speckit-clarify`, re-plan, re-tasks; reuse the current spec dir).
+
+Both are **spec-authoring verbs only** — infra creation (worktree / docs) is a separate concern, NOT folded in, exactly mirroring dw-lifecycle where `define` ≠ `setup`.
+
+**Rationale (operator)**: "`curate` is a little vague." `define`/`extend` carry precise, already-internalized meaning (new-feature vs in-place, with the new-worktree-vs-reuse-infra connotation) and make the succession legible — **stack-control speaks dw-lifecycle's lifecycle verbs over a Spec Kit substrate**. When dw-lifecycle retires, the verbs carry over unchanged. `execute` is kept because it is the stable, backend-agnostic verb that survives Feature 2: Feature 1 wires it native-only; Feature 2 selects native-vs-parallel backends *beneath* the same verb (Principle IX), so no rename is forced later.
+
+**Knock-on**: the `stackctl` read verb `curate-check` → **`spec-check`** (serves both `define` and `extend`); `execute-check` unchanged.
+
+**Alternatives considered**: keep `curate` (rejected — vague); `author`/`run` (viable but `define`/`extend` reuse existing muscle memory and the new-vs-existing infra split, which a single `author` loses).
 
 ---
 

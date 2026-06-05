@@ -19,9 +19,9 @@ Validate that a Spec Kit spec directory is in a **runnable** state for native `/
 
 What "runnable" means is pinned by what native `/speckit-implement` consumes (at minimum `tasks.md`; the test fixture encodes the exact set). The check reads only; it does not author or repair.
 
-### `stackctl curate-check --spec <dir>`
+### `stackctl spec-check --spec <dir>`
 
-Report a spec's curation state so the `curate` skill knows what to advance.
+Report a spec's authoring state so the `define` / `extend` skills know what to advance.
 
 - **Input**: `--spec <dir>` (required, same error shape as above).
 - **Output**: exit `0`; stdout reports presence of `spec.md`, `plan.md`, `tasks.md` (machine-readable line, e.g. `spec=yes plan=yes tasks=no`). Read-only.

@@ -1,6 +1,6 @@
 # Contract: Front-door skills
 
-Two Claude Code skills, invoked in-session as `/stack-control:…`. Skills-over-CLI: the skill body is the agent-facing touch point; `stackctl` is the deterministic primitive it calls; the in-session agent does the agent-work (FR-007). Mirrors `dw-lifecycle`'s skill+command pairing (`commands/<x>.md` slash command + `skills/<x>/SKILL.md` body).
+Three Claude Code skills, invoked in-session as `/stack-control:…`: **`define`** / **`extend`** (spec authoring) and **`execute`** (run). Skills-over-CLI: the skill body is the agent-facing touch point; `stackctl` is the deterministic primitive it calls; the in-session agent does the agent-work (FR-007). Mirrors `dw-lifecycle`'s skill+command pairing (`commands/<x>.md` slash command + `skills/<x>/SKILL.md` body) — and its `define`/`extend` lifecycle vocabulary, now over a Spec Kit substrate.
 
 > Per `.claude/rules/enforcement-lives-in-skills.md`: discipline lives in skill bodies + CLI verbs, never in git hooks. These skills travel with the plugin install.
 
@@ -22,23 +22,34 @@ Two Claude Code skills, invoked in-session as `/stack-control:…`. Skills-over-
 
 ---
 
-## `/stack-control:curate` — Curation touch point (US2)
+## `/stack-control:define` — Spec authoring, NEW spec (US2)
 
-**Frontmatter** (`skills/curate/SKILL.md`): `name: curate`, description naming "create / edit / iterate / review a Spec Kit spec in-session."
+**Frontmatter** (`skills/define/SKILL.md`): `name: define`, description naming "author a NEW Spec Kit spec for a new feature, in-session."
 
 **Body contract**:
-1. Call `stackctl curate-check --spec <dir>` to report current artifact state.
-2. Provide the **full edit / iterate / review loop** over the spec, in-session, via the agent (FR-005): create a spec (delegating creation to native `/speckit-specify` where appropriate — see research R3 open item), edit it, iterate it, review it — without the operator leaving their Claude Code session.
-3. Bring the spec to a **runnable** state (such that `/stack-control:execute`'s `execute-check` passes) without manual re-assembly (US2 scenario 2).
+1. Drive native `/speckit-specify` (and the downstream authoring chain as needed) via the in-session agent to **create a new** Spec Kit spec.
+2. Call `stackctl spec-check --spec <dir>` to confirm artifact state as it advances.
+3. **Spec-authoring only** — does NOT create worktree / docs infra (that's a separate concern, mirroring dw-lifecycle's `define` ≠ `setup`).
 
-**Postcondition**: the spec is advanced toward runnable; handing it to `/stack-control:execute` runs without manual re-assembly.
+**Postcondition**: a new spec exists and is advanced toward runnable.
 
-**Acceptance mapping**: US2 scenarios 1–2.
+## `/stack-control:extend` — Spec authoring, EXISTING spec (US2)
+
+**Frontmatter** (`skills/extend/SKILL.md`): `name: extend`, description naming "refine the EXISTING Spec Kit spec in place, in-session."
+
+**Body contract**:
+1. Call `stackctl spec-check --spec <dir>` to report current artifact state.
+2. Provide the **edit / iterate / review loop** over the existing spec, in-session, via the agent (FR-005): `/speckit-clarify`, re-`/speckit-plan`, re-`/speckit-tasks`, edits — reusing the current spec dir; no manual re-assembly.
+3. Bring the spec to a **runnable** state (such that `/stack-control:execute`'s `execute-check` passes) without dropping out of the session (US2 scenario 2).
+
+**Postcondition**: the existing spec is advanced toward runnable; handing it to `/stack-control:execute` runs without manual re-assembly.
+
+**Acceptance mapping (define + extend)**: US2 scenarios 1–2. Together they deliver FR-005's full create / edit / iterate / review loop.
 
 ---
 
 ## Cross-skill invariants
 
-- **In-session only**: both skills run inside the operator's Claude Code session; neither depends on a headless agent invocation (FR-006/007).
-- **Self-hosting (FR-009 / SC-005)**: the two skills together MUST be sufficient to curate **and** run the *next* feature's spec (e.g. Feature 2) through the front door — the self-hosting proof, validated in quickstart.
+- **In-session only**: all three skills run inside the operator's Claude Code session; none depends on a headless agent invocation (FR-006/007).
+- **Self-hosting (FR-009 / SC-005)**: the three skills together MUST be sufficient to author (`define` / `extend`) **and** run (`execute`) the *next* feature's spec (e.g. Feature 2) through the front door — the self-hosting proof, validated in quickstart.
 - **Fail-loud**: every skill's "cannot proceed" branch surfaces the underlying `stackctl` / native error verbatim; no skill papers over a missing mechanism (Principle V).

@@ -18,7 +18,7 @@ The new plugin package. Physical manifestation of FR-001.
 | CLI entry | `bin/stackctl` (bash shim → `tsx src/cli.ts`) | executable; resolves `tsx` per dw-lifecycle's resolution order |
 | marketplace entry | `.claude-plugin/marketplace.json#plugins[]` with `path: plugins/stack-control` | present; `claude plugin validate` passes |
 
-**Relationships**: hosts → Front-door skills (curate, execute); hosts → Governance extension (rehomed).
+**Relationships**: hosts → Front-door skills (`define`, `extend`, `execute`); hosts → Governance extension (rehomed).
 
 ---
 
@@ -29,7 +29,7 @@ The deterministic command surface the skills delegate to. Carries no agent-work.
 | Verb | Input | Output / exit | Rule |
 |---|---|---|---|
 | `execute-check` | `--spec <dir>` | exit 0 if runnable; exit ≠0 + descriptive stderr naming the missing artifact otherwise | fail-loud (FR-008 / Principle V); never "assume runnable" |
-| `curate-check` | `--spec <dir>` | reports which Spec Kit artifacts exist (spec/plan/tasks) | read-only; no prose authoring |
+| `spec-check` | `--spec <dir>` | reports which Spec Kit artifacts exist (spec/plan/tasks) | read-only; no prose authoring; serves `define` + `extend` |
 | `version` | — | prints stack-control version | matches `plugin.json#version` |
 
 Contract: [`contracts/stackctl-cli.md`](./contracts/stackctl-cli.md).
@@ -42,8 +42,11 @@ Two Claude Code skills, invoked in-session. The operator-facing surface (FR-005,
 
 | Touch point | Skill / command | Behavior | Maps to |
 |---|---|---|---|
-| Spec curation | `/stack-control:curate` (`skills/curate/SKILL.md`, `commands/curate.md`) | full edit / iterate / review loop over a Spec Kit spec, in-session | US2, FR-005 |
+| Spec authoring — new | `/stack-control:define` (`skills/define/SKILL.md`, `commands/define.md`) | author a NEW Spec Kit spec (drive native `/speckit-specify`), in-session | US2, FR-005 |
+| Spec authoring — existing | `/stack-control:extend` (`skills/extend/SKILL.md`, `commands/extend.md`) | refine the EXISTING spec in place (`/speckit-clarify`, re-plan, re-tasks), in-session | US2, FR-005 |
 | Execution | `/stack-control:execute` (`skills/execute/SKILL.md`, `commands/execute.md`) | `execute-check` → drive native `/speckit-implement` via in-session agent → governance fires on `after_implement` | US1, FR-006/007 |
+
+`define` / `extend` are **spec-authoring verbs only** — infra creation (worktree / docs) is a separate concern, not folded in (mirrors dw-lifecycle's `define` ≠ `setup`).
 
 Contract: [`contracts/front-door-skills.md`](./contracts/front-door-skills.md).
 
@@ -65,24 +68,24 @@ Contract: [`contracts/governance-extension.md`](./contracts/governance-extension
 
 ---
 
-### 5. Spec Kit spec (the unit curated and run)
+### 5. Spec Kit spec (the unit authored and run)
 
 Not owned by stack-control — owned by the operator / native Spec Kit. stack-control reads its state, never corrupts it.
 
 | State | Meaning | Detected by |
 |---|---|---|
-| curating | spec.md exists, plan/tasks may be incomplete | `curate-check` |
+| authoring | spec.md exists, plan/tasks may be incomplete | `spec-check` |
 | runnable | the artifacts native `/speckit-implement` requires are present | `execute-check` exit 0 |
 | not-runnable | required artifact missing | `execute-check` exit ≠0 (names the gap) |
 
-**Division of labor (Principle IV)**: stack-control reads spec state for execution/curation gating; governance writes findings only into `audit-log.md`; neither writes governance state back into the spec.
+**Division of labor (Principle IV)**: stack-control reads spec state for execution/authoring gating; governance writes findings only into `audit-log.md`; neither writes governance state back into the spec.
 
 ---
 
 ## State transitions (front-door flow)
 
 ```text
-[spec curating] --/stack-control:curate (edit/iterate/review)--> [spec runnable]
+[spec authoring] --/stack-control:define (new) | :extend (existing)--> [spec runnable]
 [spec runnable] --/stack-control:execute--> execute-check(ok)
                                           --> native /speckit-implement (in-session agent)
                                           --> after_implement hook
