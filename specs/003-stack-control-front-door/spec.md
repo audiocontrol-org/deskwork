@@ -49,7 +49,7 @@ An operator uses the front door's **spec-curation touch point** to create, **edi
 
 ### User Story 3 - stack-control ships as its own plugin without destabilizing dw-lifecycle (Priority: P2)
 
-stack-control installs as its **own plugin** (the `stackctl` CLI is available; its own version line, separate from `dw-lifecycle`), the founding governance extension is **rehomed** into it and still fires, and `dw-lifecycle` continues to work exactly as before — undisturbed.
+stack-control installs as its **own plugin** (the `stackctl` CLI is available; it shares the repository's single lockstep version with every other plugin — operator decision 2026-06-05), the founding governance extension is **rehomed** into it and still fires, and `dw-lifecycle` continues to work exactly as before — undisturbed.
 
 **Why this priority**: The isolation invariant is load-bearing: `dw-lifecycle` is in active use doing real work, so standing up stack-control must not regress it. This is the foundational scaffolding (folded into this feature), validated as its own observable outcome.
 
@@ -75,7 +75,7 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 
 **Plugin standup (scaffolding, folded in)**
 
-- **FR-001**: The system MUST stand up `stack-control` as its own plugin with its own version line separate from `dw-lifecycle` (a new workspace package + plugin shell, manifest, a `stackctl` CLI entry point), following the repository's existing plugin conventions.
+- **FR-001**: The system MUST stand up `stack-control` as its own plugin (a new workspace package + plugin shell, manifest, a `stackctl` CLI entry point), following the repository's existing plugin conventions. Its version MUST be the repository's **single shared lockstep version** — the same version every other plugin and `marketplace.json` carry, bumped together by `scripts/bump-version.ts`; stack-control does NOT get an independent version line. *(Operator decision 2026-06-05: all plugins share one version — independent versions are harder to manage and the Claude marketplace update is monolithic.)*
 - **FR-002**: Standing up `stack-control` MUST NOT change `dw-lifecycle`'s behavior (isolation invariant). `dw-lifecycle` continues to operate unchanged.
 
 **Rehome the founding governance feature**
@@ -96,7 +96,7 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 
 ### Key Entities *(include if feature involves data)*
 
-- **stack-control plugin**: the new plugin shell + package, own version line, hosting the front door and the rehomed governance extension.
+- **stack-control plugin**: the new plugin shell + package, on the repo's shared lockstep version, hosting the front door and the rehomed governance extension.
 - **`stackctl`**: the CLI entry point to the front door.
 - **Front door**: the operator-facing touch points — **Claude Code skills** (`/stack-control:…`) invoked in-session — layered over the `stackctl` CLI primitive.
 - **Spec-curation touch point**: the surface that brings a Spec Kit spec to a runnable state.

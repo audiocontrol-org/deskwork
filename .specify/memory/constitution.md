@@ -1,7 +1,9 @@
 <!--
 Sync Impact Report
+- Version change: 1.1.0 → 1.1.1 (PATCH — version-line constraint reversed: stack-control shares the
+  repo's single lockstep version, no longer "its own version line"; operator decision 2026-06-05)
 - Version change: 1.0.0 → 1.1.0 (MINOR — new principle IX + reframe to the stack-control program)
-- Ratification: initial adoption 2026-06-04; amended 2026-06-04
+- Ratification: initial adoption 2026-06-04; amended 2026-06-04, 2026-06-05
 - Amendment 1.1.0 (2026-06-04): reframed preamble + title around the stack-control program
   (successor to dw-lifecycle); added Principle IX (Execution-Backend Pluggability); qualified the
   Additional Constraints (manifest port DEFERRED to substrate; plan source is Spec Kit tasks.md;
@@ -30,8 +32,8 @@ Sync Impact Report
 
 This constitution governs the development of the `pluggable-lifecycle-providers` program — realized as
 the **`stack-control`** plugin (CLI `stackctl`), built as the **successor to `dw-lifecycle`** (a new
-in-monorepo plugin with its own version line; absorb-then-retire; `dw-lifecycle` stays undisturbed
-until parity). It derives from deskwork's existing conventions (`.claude/CLAUDE.md`, `.claude/rules/`,
+in-monorepo plugin sharing the repository's single lockstep version with every other plugin;
+absorb-then-retire; `dw-lifecycle` stays undisturbed until parity). It derives from deskwork's existing conventions (`.claude/CLAUDE.md`, `.claude/rules/`,
 including `.claude/rules/stack-control-succession.md`), the program roadmap
 (`docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md`), and the operator
 directives set during the integration-first dogfood of GitHub Spec Kit. Where this constitution and
@@ -152,4 +154,4 @@ Versioning policy (semantic):
 - MINOR: a new principle/section added or materially expanded guidance.
 - PATCH: clarifications, wording, non-semantic refinements.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-04
+**Version**: 1.1.1 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-05
