@@ -31,7 +31,7 @@ for the converged design (11 audit-barrage rounds → two consecutive zero-HIGH)
 
 | Phase | Description | Mode | Status |
 |---|---|---|---|
-| 1 | Engine-adapter seam + preflight + lo-fi wireframe kit + dual-axis allowlist lint | v1-scaffold | Not started |
+| 1 | Engine-adapter seam + preflight + lo-fi wireframe kit + dual-axis allowlist lint | v1-scaffold | In progress — engine-adapter seam + fail-loud preflight landed (task 1/8); sketch-kit + lint next |
 | 2 | Design-language spec convention (hand-authorable) + static link-liveness | v1-scaffold | Not started |
 | 3 | ACCEPTED/REJECTED archive primitive + `design-control status` | v1-scaffold | Not started |
 | 4 | Referee-request manifest schema validation (carries Phase-5 fields) | v1-scaffold | Not started |

@@ -4814,3 +4814,51 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Address TBD markers: (no bare TBD markers introduced this session)
 - Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals; /Users/orion/work/deskwork-work/hygiene (`feature/hygiene`) — 3 of 9 signals; /Users/orion/work/deskwork-work/scope-discovery (`feature/scope-discovery`) — 4 of 9 signals
 
+
+## 2026-06-05 (cont.): Phase 1 Task 1 — engine-adapter seam + 4-round audit-barrage convergence
+
+### Feature: design-control
+### Worktree: design-control
+
+**Goal:** Begin Phase 1 implementation via `/dw-lifecycle:implement` — the engine-adapter interface declaration + conformance schemas + fail-loud preflight (the first, foundational task that must precede any engine-consuming skill).
+
+**Accomplished:**
+- **Engine-adapter seam shipped** (`c8c19f5d`) in a NEW self-contained workspace package `plugins/design-control/` (mirrors `plugins/dw-lifecycle/`; `@/`-enabled via the `packages/core` tsconfig style). The Claude-plugin manifest / bin shim / README / marketplace registration are deliberately left to Phase 6 — only the npm workspace shell needed to host + test the seam was created. Three modules: `types.ts` (the `EngineAdapter` interface, `author-wireframe`/`translate-design-language`/`referee-screenshot`, single-sourced `ENGINE_METHODS`, compile-time method/envelope binding, `DEFAULT_CLAUDE_ADAPTER_ID`), `conformance.ts` (zod request/response schemas + `validateConformance` echo-validator + safe `parseAndValidate(unknown,unknown)` parse-then-echo), `preflight.ts` (DI `EngineProbe`, fail-loud on absent engine on execution paths only; manual authoring needs no engine).
+- **Four cross-model audit-barrage rounds to convergence.** Each end-of-task barrage (claude + codex) caught real defects — including regressions my own fixes introduced — fixed every one with TDD rather than accept the dampener's slush. Round 1: 4 findings (2 cross-model MED — tautological test, loose method vocab). Round 2: 3 (a real payload-contract regression req→opt; inert `@ts-expect-error` tests). Round 3: 5→2 MED (lost field-drift guard when dropping `satisfies`; verified the tsc-gate teeth). Round 4: **codex CLEAN + 1 non-overlapping claude MED** — the documented convergence signature — closed the field-TYPE-drift gap. 10 findings → `fixed-<sha>`, 2 `informational`.
+- **Initialized feature audit infrastructure** the first barrage needed: `audit-log.md` (canonical header) and `tooling-feedback.md`.
+- README Phase-1 row moved to in-progress; workplan task 1 checked off.
+
+**Didn't Work:**
+- The structural-chain verbs and `branch-staleness-check` use a different flag interface in the installed v0.37.0 binary than this worktree's SKILL.md (`--root`/`--registry`, not `--feature`; no `branch-staleness-check`). Advisory at session-start (skipped); at end-of-task I invoked the structural chain with `--root plugins/design-control/src` — clean (0 new clones / anti-patterns / holdouts).
+- `implement-hook`'s first run aborted: it fired the barrage cleanly but `audit-barrage-lift` failed because the feature's `audit-log.md` didn't exist (no `setup`/`define` seeds it). Logged as **TF-001**; worked around by hand-creating the log + lifting the already-fired run.
+- `audit-barrage-lift` merged five distinct findings under one ID (AUDIT-01) but documented only one in the body — a fixer reading the merged entry would miss four real defects. Logged as **TF-002**; worked around by reading the raw `claude.md`/`codex.md` and fixing all underlying findings.
+- Discovered all my `exit=${PIPESTATUS[0]}` probes were silently blank because this shell is zsh (`$pipestatus`, 1-indexed). Conclusions held (verified via the actual text output), but I switched to explicit `$?` capture mid-session.
+
+**Course Corrections:**
+- (No operator course-corrections this session — the operator drove `/dwss` → `/dwi` and I ran the implement loop; corrections came from the audit-barrage, not the operator.)
+
+**Quantitative:**
+- Messages: ~4 substantive operator turns (`/dwss`, `/dwi`, round-4 resume, `/dwse`)
+- Commits: 9 (`c8c19f5d`..`7a50e1be`): 5 substantive (1 seam + 4 fix passes) + 4 audit-log flip commits
+- Operator corrections: 0
+- Tests: 0 → 58 (new `@deskwork/plugin-design-control` package; all green, `tsc --noEmit` gates the test script)
+- Audit findings: open at session end **0** (0 acknowledged-slush-pile carrying unfixed defects — all 10 lifted findings `fixed-<sha>`, 2 `informational`). The dampener slushed 5 findings across rounds 2–4 (its documented MED trade-off); I **overrode** each to `fixed` because they were real seam defects, with the override rationale recorded in the audit-log per the project's "slush 0-open must not hide real defects" rule.
+
+**Insights:**
+- The audit-barrage on fresh implementation converges the same way it did on the PRD last session: each round's fix spawns a finer next-round finding (tautological-test → payload-regression → drift-guard-loss → field-type-drift), with cross-model agreement fading as the curve flattens. Round 4's "codex CLEAN + one non-overlapping claude MEDIUM" is exactly the convergence signature the prior session named — that's the stop point, and barraging further on doc-level nits is the infinite-regress trap.
+- The dampener is a bookkeeping-load tool, not a defect-acceptance gate. It slushed three real MEDIUM regressions I'd just introduced (payload contract, drift-guard loss, field-type gap). Treating "fired-and-slushed, findings=0" as convergence would have shipped them — the summary line undercounts; the run-dir is the truth.
+- `satisfies z.ZodType<T>` fights `z.unknown()` (which infers an optional output key) when the type wants a required field. The clean resolution is to keep the type required, enforce key-presence at runtime via `.superRefine`, and move the compile-time drift guard to a `tsc`-gated `Expect<Equal<...>>` type-test — which also forced making the package `test` script run `tsc --noEmit` first, so the `@ts-expect-error` binding assertions actually gate (they were inert under bare `vitest run`).
+
+### Hygiene observations
+
+- issue #424 [OPEN] referenced this session: Feature: design-control plugin — portable UX/UI surface-change discipline (lo-fi wireframes + design-language + device-free visual baselines)
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/hygiene` `feature/hygiene` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/scope-discovery` `feature/scope-discovery` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: `sketch-kit.css` + `.sk-*` vocabulary + self-labeling WIREFRAME banner + a fixed `.sk-img` placeholder (Phase 1, task 2)
+- Triage: #424 (Feature: design-control plugin — portable UX/UI surface-change discipline)
+- Address TBD markers: (no bare TBD markers introduced this session)
+- Dismantle stale worktrees: graphical-entries (4/9), hygiene (3/9), scope-discovery (4/9)
