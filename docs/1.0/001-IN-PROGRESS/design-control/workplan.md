@@ -150,14 +150,19 @@ preserved); a **referee-preview manifest** that omits a required referee field i
       an obviously different family); **subtle** token drift routes to the pixel-diff arm. Advisory
       evidence, never an auto-gate.
 - [ ] Numeric drift via an **existing** pixel-diff tool (Playwright `toHaveScreenshot` / Argos /
-      Percy) on operator-declared **DOM-locator** `stableRegions` (keyed surface+route+viewport+
-      step; fail-loud on missing/unresolvable/overlap/covers-changed).
+      Percy) on operator-declared **DOM-locator** `stableRegions` (keyed **`surface id + route/state +
+      viewport + capture-step`** — `state` included, matching the PRD key exactly: a locator valid in
+      one state can be invalid/semantically different in another; fail-loud on
+      missing/unresolvable/overlap/covers-changed).
 - [ ] Capture-config contract + identity hash (deterministic recipe + non-secret auth/profile
       identity in; secret tokens out; default-deny field classification; fail-loud on unnamed
       storageState / principal mismatch).
 - [ ] Baseline promotion as an operator state transition; PNG is the artifact of record;
       invalidate-and-re-promote on recipe change (never git re-synth); per-viewport baseline
-      matrix; governed dynamic regions (specific/bounded/named/justified; status warns/blocks).
+      matrix; governed dynamic regions (specific/bounded/named/justified). **"Oversized" is the
+      concrete rule** (PRD § Baseline & capture): a region covering > **25%** of the captured surface
+      (v1 default, operator-tunable) **or** overlapping any `stableRegion` / protected invariant trips
+      `status` (warn-then-block).
 - [ ] Claude **stability sampling** labeled as such (NOT diversity/quorum).
 - [ ] **"Escalation" definition** wired into the gate: an escalation = a referee finding classified
       **`unintended` or `ambiguous`** and localized to a region (distinct from a mention or an
@@ -165,14 +170,18 @@ preserved); a **referee-preview manifest** that omits a required referee field i
       referee emits such a localized finding. (Keeps the referee strictly advisory while making the
       trust gate scorable — PRD § The referee.)
 - [ ] **Falsification set** — planted cases covering **all seven v1 gross classes** (PRD §
-      Definitions) at ≥2 instances per class on ≥2 distinct surfaces, **plus clearly-subtle** cases
-      (must NOT be escalated as gross), plus **≥5 unchanged/intended-change pairs** for the
+      Definitions) at ≥2 instances per class on ≥2 distinct surfaces; the **viewport-relative classes
+      (≥ class 3 below-fold, plus the occlusion/overlap classes 1–2) are planted at BOTH declared
+      viewports** (desktop ≥1280 + phone ≤390) — a below-fold or phone-only overlap appears at one
+      viewport and not the other (per `ui-verification.md` § Dual-viewport); **plus clearly-subtle**
+      cases (must NOT be escalated as gross), plus **≥5 unchanged/intended-change pairs** for the
       specificity arm.
 
 **Acceptance (the referee earns trust empirically; thresholds are v1 starting values, operator-
 tunable):** the referee **escalates** (emits an `unintended`/`ambiguous` localized finding) on
 **EVERY** planted gross regression across **all seven v1 gross classes**, ≥2 instances per class on
-≥2 distinct surfaces — a **single miss fails**; **negative/specificity arm** — across a set of **≥5**
+≥2 distinct surfaces, with the **viewport-relative classes planted at both declared viewports** — a
+**single miss fails**; **negative/specificity arm** — across a set of **≥5**
 unchanged + intended-change pairs the referee over-escalates on **≤20% of the set** (ratio governs at
 any size; v1 set of 5 ⇒ ≤1), so an escalate-everything referee **fails**; stable-region pixel-diff
 catches a planted numeric drift in a declared-stable locator; stale-screenshot / wrong-viewport /

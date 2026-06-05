@@ -76,18 +76,22 @@ all key on them.
   dogfood "≥ 2 diverse surfaces" bar means two distinct `surface id`s of materially different shape.
 - **GROSS regression.** A regression perceptible **without pixel measurement** — visible at thumbnail
   scale or on an unaided side-by-side glance. Operationally: a difference that **changes layout
-  topology** (an element occluded; a control overlapped so its center point hit-tests to another
-  element; primary content pushed below the fold at the declared viewport; reading-order / hierarchy
+  topology** (an element occluded; a control visibly occluded or overlapped at the declared viewport;
+  primary content pushed below the fold at the declared viewport; reading-order / hierarchy
   inverted) **or removes / duplicates a signature component.** Explicitly **NOT gross**: sub-component
   pixel drift — a token color off by a shade, a few-px spacing change, a font-weight tweak. Gross
   regressions are the two-image referee's scope; non-gross drift routes to the stable-region
   pixel-diff arm. The Phase 5 falsification set must span **both clearly-gross and clearly-subtle**
   planted cases so the boundary is exercised. The **closed v1 gross-class list** — each must be
   planted in the Phase 5 falsification set, and "every gross class" in the acceptance means exactly
-  these seven: (1) element occluded; (2) control overlapped (center point hit-tests to another
-  element); (3) primary content below the fold at the declared viewport; (4) reading-order /
-  hierarchy inverted; (5) signature component removed; (6) signature component duplicated; (7)
-  signature component wrong / replaced (incl. palette swapped to an obviously different family).
+  these seven: (1) element occluded; (2) a control **visibly occluded or overlapped at the declared
+  viewport** (its interactive glyph no longer cleanly visible) — stated in **screenshot-perceivable**
+  terms because the referee grades a screenshot, not a DOM; a DOM `elementsFromPoint` hit-test is
+  reserved for a separate DOM-side check if one is ever added, never as the grossness criterion the
+  vision referee is scored on; (3) primary content below the fold at the declared viewport;
+  (4) reading-order / hierarchy inverted; (5) signature component removed; (6) signature component
+  duplicated; (7) signature component wrong / replaced (incl. palette swapped to an obviously
+  different family).
 - **capture-step.** A named point in a surface's capture sequence at which a screenshot is taken —
   e.g. `default` (initial render), a post-interaction state (`menu-open`), or a scroll position
   (`scrolled-to-footer`). The operator **enumerates the required capture-steps per surface**; the
@@ -195,10 +199,14 @@ The **`author-wireframe` conformance falsification set** includes planted **"emo
 wireframe/spec) are **marked `derived`** and **do NOT satisfy a "wireframe drove the implementation"
 claim.** Acceptance of a `derived` artifact requires a **recorded operator edit** — a non-empty diff
 between the auto-derived draft and the accepted version — **not merely a state transition**;
-`status` **refuses to accept an unedited derived artifact** (the edit is how the operator asserts
-*intended* UX, and it is **mechanically checkable**, not an honor-system precondition). The
-auto-derived draft is **snapshotted at derivation time** (stored alongside provenance) so the diff
-has a baseline to compare against; `status` diffs the accepted artifact against that stored snapshot.
+`status` **refuses to accept an unedited derived artifact.** The auto-derived draft is
+**snapshotted at derivation time** (stored alongside provenance); `status` diffs the accepted
+artifact against that stored snapshot and requires a **non-empty, non-whitespace content diff.**
+What this **mechanically guarantees** is narrow and stated honestly: *a recorded substantive edit
+exists* — enough to defeat a bare state transition. It does **NOT** by itself guarantee the edit
+*captures intended UX* (a token-level edit satisfies it); semantic intent remains the operator's
+responsibility, **surfaced** (the diff is shown) rather than asserted by the gate. This is a
+discipline backstop, not a proof of meaningfulness.
 Provenance — `drove-implementation` vs `derived-retroactively` — is carried so `status` cannot
 launder a non-driving artifact into "complete."
 
@@ -339,6 +347,12 @@ mask, or covers an intentionally-changed area *(round-5 codex-1 / claude-M1)*.
   setup-or-fixture, auth/storageState, viewport matrix, wait condition, and **specific, bounded,
   named, justified** dynamic regions + stable-region locators. design-control orchestrates Playwright
   as the executor; **capturing the right surface is adopter glue, stated plainly.**
+- **"Oversized dynamic region" defined (so `status` can warn/block mechanically):** a dynamic region
+  is **oversized** if it (a) covers **more than a per-viewport coverage threshold** of the captured
+  surface area (v1 default **25%**, operator-tunable), **or** (b) **overlaps any declared
+  `stableRegion` or change-scope `protected invariant`.** Either condition trips `status`
+  (warn-then-block); a region that masks an invariant-bearing panel is the failure this catches. This
+  is what makes the Phase 5 "oversized dynamic region is caught or escalated" acceptance falsifiable.
 - **Baselines are a matrix** keyed by `surface id + route/state + viewport + capture-step`;
   referee-preview `status` refuses completion when candidate screenshots don't cover the required
   matrix (unless the change-scope explicitly retires/replaces a cell with operator approval).
@@ -393,9 +407,14 @@ claim ships.**
 **Dogfood (two arms; the scaffold arm is the `v1-scaffold` ship gate):**
 
 - [ ] **Scaffold arm (must pass to ship `v1-scaffold`):** the **sites→lanes studio content-browser +
-      scrapbook redesign** runs the loop **wireframe → pick → `translate-design-language` →
-      implement → archive — NO referee** — across **≥ 2 diverse surfaces**; the plugin **loads via
-      the marketplace**.
+      scrapbook redesign** runs the loop **wireframe → pick → spec → implement → archive — NO
+      referee** — across **≥ 2 diverse surfaces**; the plugin **loads via the marketplace**. The
+      "spec" step is **hand-authored OR via the `translate-design-language` accelerator**, and **≥ 1
+      of the ≥ 2 surfaces MUST run engine-absent** — a hand-authored spec with the **preflight
+      confirming `/frontend-design` absent** — as the integrated end-to-end witness that the scaffold
+      needs no engine. *(Do not bake `translate-design-language` into the canonical loop — that would
+      make the scaffold ship gate engine-dependent, contradicting "the scaffold genuinely needs
+      neither.")*
 - [ ] **Referee arm (required only to ship `v1-referee-preview`; conditional on the Phase 5 gate):**
       the referee produces spirit + letter + gross-regression evidence at **both** viewports.
 
