@@ -4663,3 +4663,54 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Address TBD markers: line 51: markers: out-of-scope — 7. Out of Scope (verbatim from feature-definition.md § Scope > Out).
 - Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals; /Users/orion/work/deskwork-work/hygiene (`feature/hygiene`) — 3 of 9 signals; /Users/orion/work/deskwork-work/scope-discovery (`feature/scope-discovery`) — 4 of 9 signals
 
+
+## 2026-06-05: stack-control program — reframe, realign, resequence; Feature 1 spec (front door)
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** Session-start → kick off the next Spec Kit slice (parallel execution engine). It evolved into a major architecture + planning session: reframe the whole feature as a new `stack-control` plugin (successor to dw-lifecycle), realign every foundational doc, resequence around a self-hosting strategy, and spec Feature 1 (the front door). No implementation code — planning + specs only.
+
+**Accomplished:**
+- Session-start bootstrap; operator clarified Spec Kit (not the dw-lifecycle workplan) is the spec+build surface.
+- Began speccing the parallel execution engine (`specs/002`); captured the batch-CLI-fragility constraint (must support in-session sub-agents + batch CLIs, selected by capability so it survives any vendor sunsetting headless/batch CLI mode).
+- **Architecture decisions (captured durably):** build as a NEW plugin `stack-control` (CLI `stackctl`), the successor to dw-lifecycle via absorb-then-retire (isolation so dw-lifecycle keeps doing real work); built concretely against Spec Kit (provider abstraction deferred — two pluggability axes kept separate); two execution modes (native + parallel); a control plane spanning spec curation → execution; founding feature = slice 001 (the governance extension), execution is the *next* feature.
+- **Consolidated the program** into `stack-control-roadmap.md` (canonical), `.claude/rules/stack-control-succession.md` (settled-decisions rule), and a reframed `ROADMAP.md`.
+- **Realigned all foundational docs** to the stack-control architecture (operator: "stale docs become nucleation sites for confusion"): `prd.md` reframed in place (edit-in-place, Spec-Kit-managed now), `design.md` superseded-as-spine header (now the future substrate's design), `workplan.md` retired header, `feature-definition.md` historical pointer, `README.md` rewritten, Spec Kit `constitution.md` amended 1.0.0 → 1.1.0 (new Principle IX — execution-backend pluggability; manifest-deferred constraint; isolation invariant).
+- **Resequenced** around a self-hosting strategy: build the minimum control plane (native Spec Kit execution) FIRST, then use it to build the rest. Merged plugin-infrastructure into Feature 1 (operator option b — first feature is a capability, not plumbing).
+- **Re-scoped `specs/002`** to the parallel engine only (native execution relocated to Feature 1; dissolved the earlier "add native mode to the 002 body" gap).
+- **Specced Feature 1** (`specs/003-stack-control-front-door`): plugin standup (minimal scaffolding folded in) + rehome the founding governance extension + a thin control plane with two touch points (spec curation + native Spec Kit execution). All 3 clarifications resolved: full edit/iterate/review curation; **in-session Claude Code skills** over a `stackctl` CLI (supersedes an earlier TUI pick); execution skill drives native `/speckit-implement` in-session (no headless dependency, no context-switch). Spec is clarification-clean.
+
+**Didn't Work / course-corrections:**
+- [PROCESS] Initially framed 002 (execution engine) as stack-control's founding feature; operator corrected — slice 001 is founding, execution is next.
+- [PROCESS] Recommended execution-first sequencing; operator chose self-hosting (native-execution-first), then folded the plugin infra into the first feature.
+- [PROCESS] Recorded the frontend as a TUI per an operator pick, then the operator refined it to in-session Claude Code skills — which superseded the TUI and also dissolved the execution-mechanism dilemma (in-session skill → in-session agent → no headless fragility).
+- [PROCESS] Operator paused mid-flow to verify every decision was captured on disk before resequencing — capture-before-act.
+
+**Quantitative:**
+- Messages: ~20
+- Commits: 9 (`7486da2a..f32357ed`), all docs/spec; + this session-end commit. Re-derived from `git log`.
+- Corrections: 4 ([PROCESS])
+- Files changed: 14 (+608/−106)
+- Specs created: `specs/002-parallel-execution-engine` (re-scoped to parallel-only, paused as Feature 2), `specs/003-stack-control-front-door` (Feature 1, clarification-clean)
+
+**Open findings at session end:** `check-open-findings` reports **0** for this feature. No audit-barrage run this session — it was a planning/spec session with no implementation code to audit.
+
+**Insights:**
+- The "front-door touch points are in-session Claude Code skills" decision was the keystone: it dissolved the execution-mechanism dilemma at a stroke. Because the skill runs in-session, it drives native `/speckit-implement` via the in-session agent — resolving BOTH the agent-invoked-not-headless constraint AND the operator's batch/headless-CLI durability concern, with no context-switch. Mirrors dw-lifecycle's skills-over-CLI architecture.
+- Self-hosting sequencing: build the front door (native execution) first; use it to build the parallel engine and everything after. The first feature is defined by a capability ("curate a spec and run it"), not by plumbing.
+- Push-early-and-often paid off: 9 small doc/spec commits, each pushed, kept the heavy reshaping reversible and the capture durable — exactly the safeguard against losing a long planning session's work.
+
+### Hygiene observations
+
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/hygiene` `feature/hygiene` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/scope-discovery` `feature/scope-discovery` — 4 of 9 staleness signals
+- No bare TBD markers introduced this session; no issues needing disposition.
+
+### Next session recommendation (hygiene)
+
+- Resume: **Feature 1 (`specs/003-stack-control-front-door`) is clarification-clean** — run `/speckit-clarify` (the dedicated deeper-sweep pass) then `/speckit-plan` → `/speckit-tasks` → `/speckit-implement`. Implement is where the front door actually gets built; once built, it is the surface used to build everything after. (NOTE: the helper's default "read the seeded PRD" resume line is a stale artifact of the retired manifest-first workplan — ignore it.)
+- Triage: (no issues referenced this session need disposition)
+- Address TBD markers: (none introduced this session)
+- Dismantle stale worktrees: `graphical-entries` (4/9), `hygiene` (3/9), `scope-discovery` (4/9) — candidates for `/dw-lifecycle:dismantle-worktrees` if desired.
