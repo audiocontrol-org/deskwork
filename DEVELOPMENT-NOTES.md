@@ -4606,3 +4606,60 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Triage: #297 (scope-discovery: clone-detector tests flake under full-suite parallel load) — now Task 44, scoped; #349 (canary feedback parent — stays parked); #350 (now Task 43, scoped); #366 (now Task 42, scoped); #396 (now Task 9 in Phase 12, scoped); #397 (now Task 8 in Phase 12, scoped); #411/#412/#413 (newly filed + scoped this session); #315 stays parked (operator decision; Phase 11 dispatcher landed); the 10 `pending-verification` issues (#294/#295/#401/#402/#403/#404/#405/#407/#409/#410) wait on operator install-and-verify pass per the agent-discipline rule.
 - Address TBD markers: (no bare TBD markers introduced this session)
 - Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals. Stale per the Phase 11 worktree-report scan; consider running `/dw-lifecycle:dismantle-worktrees` next session if the graphical-entries work is paused.
+
+## 2026-06-04: Integration-first pivot — dogfooding Spec Kit to build the governance slice
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** Approve the PRD and start building. Evolved over the session into: adopt Spec Kit as a real management layer and let the bridge's shape emerge from concrete integration, rather than building the manifest/port abstraction up front.
+
+**Accomplished:**
+- Approved the PRD (Drafting → Final); recorded OQ-1..4 dispositions (adopted design leanings); retired the stale `applied`-workflow gate language.
+- Ran a **pre-implementation audit-barrage over all feature docs** (claude + codex) → 23 deduped findings (8 cross-model) lifted into `audit-log.md`. Walked 4 genuine design decisions with the operator (task spine, tracker home, minimal-provider contract, AC granularity) + a 5th (workplan-render).
+- **Pivoted to integration-first** (operator-directed): installed Spec Kit 0.9.4 and dogfooded its *own* native flow end to end (`constitution → specify → clarify → plan → tasks → analyze → implement`) to build slice 001.
+- **Slice 001 shipped + proven:** `deskwork-governance` Spec Kit extension (source in `plugins/dw-lifecycle/spec-kit/deskwork-governance/`) that fires deskwork's cross-model audit-barrage on `after_implement`. Demonstrated firing **automatically** (run `20260604T233543076Z`), cross-model (2/2 claude+codex), feature auto-derived from the branch, zero provider branching (gate PASS).
+- The governance pass **audited its own code and caught real bugs** — incl. a cross-model HIGH (hardcoded slug) and two regressions in my own fixes (empty-slug, dropped freshness assertion). Fixed the 5 real ones; acknowledged 5 with reasons; stopped the recursive barrage loop after inspection-verifying (convergence + cost discipline).
+- Captured the **north star** (deskwork as provider-agnostic *govern + parallel-multi-CLI-execute* control plane) in PRD, README, and top-level `ROADMAP.md`.
+- Logged 11 lived-experience friction findings (TF-01..11) — the de-facto requirements doc for the bridge.
+
+**Didn't Work:**
+- Authored the extension source AT the install target (`.specify/extensions/<id>/`); `specify extension add --dev --force` deleted it (source==target wipe). Relocated source to the plugin tree (TF-10). Files were uncommitted → unrecoverable; reinforced commit-before-force-install.
+- First command name (`speckit.deskwork.govern`) failed validation — Spec Kit requires `speckit.<extension-id>.<cmd>` namespace (TF-10).
+- Spec Kit's `check-prerequisites.sh --require-tasks` hard-fails on deskwork's `feature/<slug>` branch name (TF-09); proceeded via `.specify/feature.json`.
+
+**Course Corrections:**
+- [PROCESS] Proposed running `/dw-lifecycle:extend`, then proposed skipping `/speckit-clarify` and had skipped `/speckit-constitution`. Operator: *"we shouldn't skip steps… if we offroad we won't understand what it's supposed to be like."* → walked the full native sequence in order.
+- [PROCESS] Baked "deskwork's implement walks the tasks" into the spec without examining it. Operator: *"why would we want to feed implement?"* → pivoted to Model 3 (deskwork governs via an `after_implement` hook; Spec Kit executes).
+- [COMPLEXITY] Designed the manifest/port abstraction-first. Operator wanted integration-first — *"start with one of the management solutions, then adapt the interface to it."*
+- [COMMUNICATION] Over-used jargon in a status report. Operator: *"less technical language please."*
+
+**Quantitative:**
+- Messages: ~30
+- Commits: 22 (since baseline `fd3d11c3`)
+- Corrections: 4
+- Files changed: 97 (+9457/−54; most are Spec Kit scaffolding/skill files from `specify init`)
+- Audit-barrage runs: 3 (1 doc-audit, 1 slice-green, 1 auto-fire)
+
+**Open findings at session end:** `check-open-findings` reports **0** for this feature (the 10 slice self-findings AUDIT-24..33 are all dispositioned: 5 fixed, 5 acknowledged-with-reason). HONESTY CAVEAT (per AUDIT-03 convention): the verb does NOT count the 23 **documentation**-audit findings AUDIT-01..23 — they use a different inline format. Those are substantively *superseded by the integration-first pivot* (the manifest-schema findings -01..-08 applied to the abandoned manifest-first plan) or *deferred to the future "substrate" slice*; none are silently-parked real defects in shipped slice-001 code.
+
+**Insights:**
+- The recursive self-hosting governance loop is real and valuable: Spec Kit builds, deskwork audits the build, and it caught genuine bugs in the very code implementing the audit — including mistakes made *while fixing earlier findings*. The discipline is knowing when to stop the loop (inspection-verify, don't re-barrage forever).
+- The friction log (TF-01..11) is the actual deliverable of "live with the tool" — every seam (branch ownership, namespace rules, source-vs-install, prereq branch-name gating) is a concrete bridge requirement that abstract reasoning would have missed.
+- Integration-first surfaced the headline differentiator: prior art (MAQA, Fleet) parallelizes via one model's subagents; **nobody does cross-CLI execution**. That's deskwork's open lane.
+- The workplan's manifest-first phase plan is now superseded; a deliberate restructure around slices + north star is pending (flagged in README, not done this session — operator's call).
+
+### Hygiene observations
+
+- workplan /Users/orion/work/deskwork-work/pluggable-lifecycle-providers/docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/workplan.md:51 — markers: out-of-scope — 7. Out of Scope (verbatim from feature-definition.md § Scope > Out).
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/hygiene` `feature/hygiene` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/scope-discovery` `feature/scope-discovery` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: **Step 1: Read the seeded PRD** to see what setup produced.
+- Triage: (no issues referenced this session need disposition)
+- Address TBD markers: line 51: markers: out-of-scope — 7. Out of Scope (verbatim from feature-definition.md § Scope > Out).
+- Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals; /Users/orion/work/deskwork-work/hygiene (`feature/hygiene`) — 3 of 9 signals; /Users/orion/work/deskwork-work/scope-discovery (`feature/scope-discovery`) — 4 of 9 signals
+
