@@ -18,10 +18,9 @@ Build **`stack-control`** (CLI `stackctl`) — a new plugin, the **successor to 
 
 **Resequenced 2026-06-04 around a self-hosting strategy.** The foundational docs were realigned to the stack-control architecture and the feature order was set: build the minimum control plane first, then use it to build the rest. The **canonical sequence (with scope + status) lives in [`stack-control-roadmap.md`](./stack-control-roadmap.md) § Feature sequence** — this README does not duplicate it (drift-avoidance). In short:
 
-1. **Feature 0** — stack-control plugin infrastructure + rehome the founding governance extension.
-2. **Feature 1** — `stackctl` + a thin control-plane front door (spec curation + native Spec Kit execution). The self-hosting front door.
-3. **The rest, built *through* the front door** — parallel multi-backend execution engine (`specs/002-parallel-execution-engine/`), the dw-lifecycle migrations (scope-discovery, audit-barrage, session), the fuller frontend.
-4. **Retire `dw-lifecycle`** at parity. (Substrate / provider abstraction deferred until a 2nd provider arrives.)
+1. **Feature 1 (next)** — stack-control front door: stand up the plugin (minimal scaffolding folded in) + `stackctl` + a thin control plane that can **curate a spec** and **run it via native Spec Kit execution** (`/speckit-implement`, governance firing). The founding governance extension rehomes here. The self-hosting bootstrap — used to build everything after.
+2. **The rest, built *through* the front door** — parallel multi-backend execution engine (`specs/002-parallel-execution-engine/`), the dw-lifecycle migrations (scope-discovery, audit-barrage, session), the fuller frontend.
+3. **Retire `dw-lifecycle`** at parity. (Substrate / provider abstraction deferred until a 2nd provider arrives.)
 
 ## Key Links
 
