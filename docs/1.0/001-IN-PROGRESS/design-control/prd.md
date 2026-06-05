@@ -82,7 +82,18 @@ all key on them.
   pixel drift — a token color off by a shade, a few-px spacing change, a font-weight tweak. Gross
   regressions are the two-image referee's scope; non-gross drift routes to the stable-region
   pixel-diff arm. The Phase 5 falsification set must span **both clearly-gross and clearly-subtle**
-  planted cases so the boundary is exercised.
+  planted cases so the boundary is exercised. The **closed v1 gross-class list** — each must be
+  planted in the Phase 5 falsification set, and "every gross class" in the acceptance means exactly
+  these seven: (1) element occluded; (2) control overlapped (center point hit-tests to another
+  element); (3) primary content below the fold at the declared viewport; (4) reading-order /
+  hierarchy inverted; (5) signature component removed; (6) signature component duplicated; (7)
+  signature component wrong / replaced (incl. palette swapped to an obviously different family).
+- **capture-step.** A named point in a surface's capture sequence at which a screenshot is taken —
+  e.g. `default` (initial render), a post-interaction state (`menu-open`), or a scroll position
+  (`scrolled-to-footer`). The operator **enumerates the required capture-steps per surface**; the
+  baseline matrix requires one cell per `surface × route/state × viewport × capture-step`. A surface
+  with no interactions has a single `default` capture-step — so the "required matrix" is always
+  enumerable, which is what makes the matrix-coverage check mechanical.
 
 ## The discipline — engine threaded through 3 concerns
 
@@ -185,9 +196,11 @@ wireframe/spec) are **marked `derived`** and **do NOT satisfy a "wireframe drove
 claim.** Acceptance of a `derived` artifact requires a **recorded operator edit** — a non-empty diff
 between the auto-derived draft and the accepted version — **not merely a state transition**;
 `status` **refuses to accept an unedited derived artifact** (the edit is how the operator asserts
-*intended* UX, and it is **mechanically checkable**, not an honor-system precondition). Provenance —
-`drove-implementation` vs `derived-retroactively` — is carried so `status` cannot launder a
-non-driving artifact into "complete."
+*intended* UX, and it is **mechanically checkable**, not an honor-system precondition). The
+auto-derived draft is **snapshotted at derivation time** (stored alongside provenance) so the diff
+has a baseline to compare against; `status` diffs the accepted artifact against that stored snapshot.
+Provenance — `drove-implementation` vs `derived-retroactively` — is carried so `status` cannot
+launder a non-driving artifact into "complete."
 
 ### Design-language spec convention + static link-liveness
 
@@ -243,12 +256,19 @@ mid-build cut. The **dead-link half always ships regardless.**
 
 ### Referee-request manifest schema (scaffold = schema validation only)
 
-The manifest schema: surface id; route/state; **viewport(s)** (desktop ≥ 1280 + phone ≤ 390);
-wireframe path + hash; spec path + version + hash; baseline + candidate paths; impl commit;
-change-intent brief. **Scaffold validates the schema only — no execution, no capture.** The schema
-**also carries the fields later referee controls need** (stable-region locators, dynamic regions,
-capture-config identity, viewport identity, auth/principal metadata) so Phase 4 doesn't ship a
-schema Phase 5 must immediately break.
+The manifest schema's **scaffold-required** fields: surface id; route/state; **viewport(s)**
+(desktop ≥ 1280 + phone ≤ 390); wireframe path + hash; spec path + version + hash; impl commit;
+change-intent brief. **Scaffold validates the schema only — no execution, no capture.**
+
+The schema **also defines the fields later referee controls need** (baseline + candidate paths,
+stable-region locators, dynamic regions, capture-config identity, viewport identity, auth/principal
+metadata) — but these are **mode-aware: defined-and-validated-when-present (structure-only) and
+OPTIONAL in scaffold mode.** A scaffold manifest that **omits** them is **valid**; only a
+**referee-preview manifest** (visual-review opt-in) **requires** them. The schema rejects a manifest
+that **supplies** a referee field in malformed shape — **never** one that merely omits referee fields
+in scaffold mode. This lets Phase 4 ship a schema Phase 5 won't have to break **without** making
+referee data a scaffold-completion requirement (preserving the `v1-scaffold` "NO capture/baseline"
+boundary).
 
 ## Component design (v1-referee-preview — GATED; advisory only)
 
@@ -273,6 +293,13 @@ schema Phase 5 must immediately break.
   out-of-scope regions, expected per-viewport impact, baseline-replacement requested. The referee
   classifies each difference **`intended` / `unintended` / `ambiguous` / `outside-scope`**;
   **ambiguous → operator.**
+- **"Escalation" defined (so the Phase 5 gate is scorable).** An *escalation* is a referee finding
+  classified **`unintended` or `ambiguous`** and localized to a region, **surfaced to the operator**
+  — distinct from a descriptive mention or an `intended` / `outside-scope` classification. The Phase
+  5 "escalates / a single miss fails" gate is scored against this concrete output: a planted gross
+  regression is **"caught" iff** the referee emits an `unintended`-or-`ambiguous` finding localized
+  to it. This keeps the referee strictly advisory (it never auto-fails a build) while making the
+  *trust gate's* pass/fail mechanically evaluable.
 - **v1 reliability = Claude stability sampling, labeled as such** (repeat runs detect flake; this is
   **NOT diversity/quorum** and may not back a "high-confidence" verdict). Genuine cross-family quorum
   is phase 2 (gated on the vision-adapter conformance of clause H1).
@@ -328,16 +355,18 @@ mask, or covers an intentionally-changed area *(round-5 codex-1 / claude-M1)*.
       diverse legitimate wireframes**, not a single fixture. The engine-authored wireframe is
       constrained by the **same** lint.
 - [ ] Design-language spec **link-liveness is static against source** (no app boot); a **dead
-      selector is flagged.** The `translate-design-language` skill produces a spec linked to live
-      source.
+      selector is flagged.** The spec is **hand-authorable** — scaffold completion does not require
+      the engine; the `translate-design-language` accelerator (when `/frontend-design` is present)
+      produces a spec linked to live source and passes adapter conformance.
 - [ ] ACCEPTED/REJECTED archive **round-trips** (a decision + its links). `design-control status`
       **refuses "complete"** on a missing wireframe and **never reads referee verdict content**.
       Status distinguishes a **driving** wireframe from a retroactive **`derived`** one via
       provenance.
-- [ ] Referee-request manifest **schema validation rejects a malformed manifest**; the schema
-      carries the fields Phase 5 needs. The **engine-adapter preflight fails loud when
-      `/frontend-design` is absent**, while **manual authoring still works** — and the preflight
-      precedes the first engine-consuming skill.
+- [ ] Referee-request manifest **schema validation rejects a malformed manifest**; referee-control
+      fields are validated **when supplied** but are **optional in scaffold mode** (a scaffold
+      manifest omitting them is **valid**; only a referee-preview manifest requires them). The
+      **engine-adapter preflight fails loud when `/frontend-design` is absent**, while **manual
+      authoring still works** — and the preflight precedes the first engine-consuming skill.
 
 **`v1-referee-preview` (acceptance is adversarial — the referee earns trust empirically):**
 
@@ -345,11 +374,12 @@ mask, or covers an intentionally-changed area *(round-5 codex-1 / claude-M1)*.
       regression** (see Definitions) across **≥ 2 instances per gross class on ≥ 2 distinct
       surfaces** — a **single miss fails the gate** (gross = must-catch-all; the gate exists because
       LLM judges have missed gross defects).
-- [ ] **Negative / specificity arm:** across **≥ 5** planted **unchanged** + **legitimately-changed-
-      but-intended** pairs, the referee over-escalates on **≤ 1** (a **≤ 20% false-positive
-      ceiling**) — a referee that cries "regression" on everything **fails**. *(Thresholds are the v1
-      gate's starting values, operator-tunable; the point is that concrete numbers exist so the gate
-      is mechanically checkable.)*
+- [ ] **Negative / specificity arm:** across a planted set of **≥ 5** **unchanged** +
+      **legitimately-changed-but-intended** pairs, the referee over-escalates on **≤ 20% of the set**
+      (the **ratio governs** at any set size; the v1 set is sized at 5, so ≤ 1) — a referee that
+      cries "regression" on everything **fails**. *(Thresholds are the v1 gate's starting values,
+      operator-tunable; the point is that concrete numbers exist so the gate is mechanically
+      checkable.)*
 - [ ] Existing-tool **stable-region pixel-diff catches a planted numeric drift** in a declared-stable
       DOM locator.
 - [ ] **Stale screenshot / wrong viewport / oversized dynamic region** are caught or escalated; a
@@ -393,8 +423,9 @@ on the deskwork studio**.
   (validated on the deskwork studio). Resolving link-liveness for those stacks is deferred.
 - **Semantic stability verification of `stableRegions`** (detecting a mis-declared region whose
   content legitimately varies) — v1's stable-region checks are **structural** (resolve / overlap /
-  covers-changed); semantic stability is the operator's declared assertion unless/until a sampling
-  check is added. *(Surfaced as an open risk to resolve during Phase 5.)*
+  covers-changed); semantic stability is the operator's declared assertion. **v1 ships structural-
+  only; a semantic-stability sampling check is named-deferred — NOT a Phase 5 obligation** (no
+  dangling "resolve later" commitment).
 - Living styleguide gallery (design-language rendered from real components, shot device-free);
   WebKit/iOS coverage (real iOS = manual/real-device; Linux-WebKit ≠ iOS Safari); waypoint auto-fire;
   per-exploration-type lint profiles; a11y/keyboard review; broader pixel regression beyond declared

@@ -19,9 +19,17 @@ verbatim in substance** — when they drift, the PRD wins.
 > **separate session** against the `design-control` worktree (`/dw-lifecycle:implement`).
 
 > **Definitions** (see PRD § Definitions): a **surface** is an operator-declared named UI region
-> (`surface id`), verified across `route/state + viewport + capture-step`. A **GROSS regression** is
-> one perceptible without pixel measurement (layout-topology change or removed/duplicated signature
-> component); sub-component pixel drift is NOT gross and routes to the stable-region pixel-diff arm.
+> (`surface id`), verified across `route/state + viewport + capture-step` (a `capture-step` is a
+> named point in a surface's capture sequence — `default` / a post-interaction state / a scroll
+> position). A **GROSS regression** is one perceptible without pixel measurement (one of the closed
+> v1 seven-class list in PRD § Definitions); sub-component pixel drift is NOT gross and routes to the
+> stable-region pixel-diff arm.
+
+> **Phase sequencing & the inversion.** Phase numbers are reference labels, **not a strict build
+> sequence.** The `v1-scaffold` ship gate — plugin packaging + the scaffold dogfood arm (Phase 6
+> scaffold arm) — depends **only on Phases 1–4 and NOT on Phase 5 (the referee).** It is intended to
+> ship **before** Phase 5 begins; that is what "ship the scaffold first" means. Phase 5 (referee) and
+> the Phase 6 referee arm are the gated, last-built track.
 
 ## Phase 1 — Engine-adapter seam + lo-fi wireframe kit + allowlist lint (v1-scaffold)
 
@@ -56,10 +64,11 @@ verbatim in substance** — when they drift, the PRD wins.
       allowlist failure).
 - [ ] `/design-control:wireframe <change>` authoring skill (operator-driven + lint-enforced; the
       engine `author-wireframe` method is an optional accelerator routed through the same lint).
-- [ ] Retroactive path: existing surface → `derived` wireframe/spec; **acceptance of a `derived`
-      artifact requires a recorded operator edit** (non-empty diff between the auto-derived draft and
-      the accepted version), not just a state transition; does NOT satisfy a "wireframe drove
-      implementation" claim.
+- [ ] Retroactive path: existing surface → `derived` wireframe/spec; **snapshot the auto-derived
+      draft at derivation time** (stored alongside provenance) so the edit-diff has a baseline;
+      **acceptance of a `derived` artifact requires a recorded operator edit** (non-empty diff
+      between the stored auto-derived snapshot and the accepted version), not just a state
+      transition; does NOT satisfy a "wireframe drove implementation" claim.
 
 **Acceptance:** the engine-adapter **preflight fails loud when `/frontend-design` is absent while
 manual authoring still works**, and the preflight **precedes the first engine-consuming skill**; the
@@ -114,19 +123,22 @@ testable.
 
 ## Phase 4 — Referee-request manifest schema validation (v1-scaffold)
 
-- [ ] Referee-request manifest **schema** (surface id, route/state, viewport(s) desktop≥1280 +
-      phone≤390, wireframe path+hash, spec path+version+hash, baseline+candidate paths, impl
-      commit, change-intent brief) + **schema validation only** (no execution, no capture). *(The
+- [ ] Referee-request manifest **schema**. **Scaffold-required** fields: surface id, route/state,
+      viewport(s) desktop≥1280 + phone≤390, wireframe path+hash, spec path+version+hash, impl
+      commit, change-intent brief. **Schema validation only** (no execution, no capture). *(The
       engine-adapter interface itself is declared in Phase 1; Phase 4 is the request **manifest**
       schema.)*
-- [ ] **Schema carries the fields later referee controls need** — `stableRegions` DOM-locators,
-      governed dynamic regions, capture-config identity, per-viewport identity, auth/principal
-      metadata — so Phase 4 does NOT ship a schema Phase 5 must immediately break (validated
-      structurally; never executed in scaffold mode).
+- [ ] **Schema also DEFINES the later referee-control fields** — baseline+candidate paths,
+      `stableRegions` DOM-locators, governed dynamic regions, capture-config identity, per-viewport
+      identity, auth/principal metadata — **mode-aware: validated-when-present (structure-only) but
+      OPTIONAL in scaffold mode.** A scaffold manifest that **omits** them is **valid**; only a
+      **referee-preview manifest** (visual-review opt-in) **requires** them. This is how Phase 4 ships
+      a schema Phase 5 won't break **without** making referee data a scaffold-completion requirement.
 
-**Acceptance:** a malformed manifest is rejected by schema; the schema **already contains** the
-Phase-5 fields (stableRegions, dynamic regions, capture-config identity, viewport identity,
-auth/principal) under structure-only validation; a manifest missing those fields is rejected.
+**Acceptance:** a malformed manifest is rejected by schema; a manifest that **supplies** a
+referee-control field in malformed shape is rejected; a **scaffold-mode manifest that omits** the
+referee-control fields is **accepted as valid** (the `v1-scaffold` "NO capture/baseline" boundary is
+preserved); a **referee-preview manifest** that omits a required referee field is rejected.
 
 ## Phase 5 — `v1-referee-preview` evidence-spike (GATED; advisory only)
 
@@ -147,37 +159,54 @@ auth/principal) under structure-only validation; a manifest missing those fields
       invalidate-and-re-promote on recipe change (never git re-synth); per-viewport baseline
       matrix; governed dynamic regions (specific/bounded/named/justified; status warns/blocks).
 - [ ] Claude **stability sampling** labeled as such (NOT diversity/quorum).
-- [ ] **Falsification set** — planted cases spanning **both clearly-gross and clearly-subtle**
-      regressions; ≥2 instances per gross class on ≥2 distinct surfaces; ≥5 unchanged/intended-change
-      pairs for the specificity arm.
+- [ ] **"Escalation" definition** wired into the gate: an escalation = a referee finding classified
+      **`unintended` or `ambiguous`** and localized to a region (distinct from a mention or an
+      `intended`/`outside-scope` classification). A planted gross regression is "caught" iff the
+      referee emits such a localized finding. (Keeps the referee strictly advisory while making the
+      trust gate scorable — PRD § The referee.)
+- [ ] **Falsification set** — planted cases covering **all seven v1 gross classes** (PRD §
+      Definitions) at ≥2 instances per class on ≥2 distinct surfaces, **plus clearly-subtle** cases
+      (must NOT be escalated as gross), plus **≥5 unchanged/intended-change pairs** for the
+      specificity arm.
 
 **Acceptance (the referee earns trust empirically; thresholds are v1 starting values, operator-
-tunable):** the referee **escalates on EVERY planted GROSS regression** (occluded element; panel
-below the fold) across **≥2 instances per gross class on ≥2 distinct surfaces** — a **single miss
-fails**; **negative/specificity arm** — across **≥5** unchanged + intended-change pairs the referee
-over-escalates on **≤1** (**≤20% false-positive ceiling**), so an escalate-everything referee
-**fails**; stable-region pixel-diff catches a planted numeric drift in a declared-stable locator;
-stale-screenshot / wrong-viewport / oversized-dynamic-region are caught or escalated, and a **gross**
-design-language violation is caught or escalated. Until this set passes, referee output is optional
-evidence and no "catches these" claim ships.
+tunable):** the referee **escalates** (emits an `unintended`/`ambiguous` localized finding) on
+**EVERY** planted gross regression across **all seven v1 gross classes**, ≥2 instances per class on
+≥2 distinct surfaces — a **single miss fails**; **negative/specificity arm** — across a set of **≥5**
+unchanged + intended-change pairs the referee over-escalates on **≤20% of the set** (ratio governs at
+any size; v1 set of 5 ⇒ ≤1), so an escalate-everything referee **fails**; stable-region pixel-diff
+catches a planted numeric drift in a declared-stable locator; stale-screenshot / wrong-viewport /
+oversized-dynamic-region are caught or escalated, and a **gross** design-language violation is caught
+or escalated. Until this set passes, referee output is optional evidence and no "catches these" claim
+ships.
 
 ## Phase 6 — Dogfood + packaging
 
-- [ ] **Scaffold arm (the `v1-scaffold` ship gate):** run the sites→lanes studio content-browser +
-      scrapbook redesign through **wireframe → pick → `translate-design-language` → implement →
+> **Realizes the inversion:** the scaffold ship gate (plugin shell + scaffold arm) depends only on
+> Phases 1–4 and is intended to ship **before** Phase 5; the referee arm is the gated, last track.
+
+- [ ] **Plugin shell (scaffold ship gate; depends only on Phases 1–4, NOT Phase 5):**
+      `plugins/design-control/` — `.claude-plugin/plugin.json`, bin shim, README,
+      marketplace.json registration; standalone (own archive primitive).
+- [ ] **Scaffold arm (the `v1-scaffold` ship gate; no Phase-5 dependency):** run the sites→lanes
+      studio content-browser + scrapbook redesign through **wireframe → pick → spec → implement →
       archive — NO referee** — across **≥2 diverse surfaces**; the plugin loads via the marketplace.
+      **At least one of the ≥2 surfaces runs engine-absent** — a **hand-authored** design-language
+      spec with the preflight confirming `/frontend-design` absent — so the "scaffold needs no engine"
+      claim has an **integrated end-to-end witness**, not only the Phase-2 unit test. (The other
+      surface may use the `translate-design-language` accelerator.)
 - [ ] **Referee arm (only to ship `v1-referee-preview`; conditional on the Phase 5 gate):** referee
       evidence (spirit + letter + gross-regression) at **both** viewports for the same surfaces.
-- [ ] Plugin shell (`plugins/design-control/`): `.claude-plugin/plugin.json`, bin shim, README,
-      marketplace.json registration; standalone (own archive primitive).
 - [ ] Portability claim validated **only on the deskwork studio**; cross-framework + cross-agent
       via the adapter seam is phase 2.
 
 **Acceptance:** **(scaffold arm, required for v1-scaffold ship)** the redesign was driven by a
-wireframe, translated via `/frontend-design`, archived — no referee — across ≥2 surfaces, and the
-plugin loads via the marketplace; **(referee arm, only for v1-referee-preview)** the referee produced
-spirit+letter+gross-regression evidence at both viewports, conditional on Phase 5 passing. **If the
-referee never earns trust, v1 ships scaffold-only** (referee remains optional evidence).
+wireframe and archived — no referee — across ≥2 surfaces, with **≥1 surface run engine-absent**
+(hand-authored spec, preflight confirming `/frontend-design` absent) and the other optionally via the
+`translate-design-language` accelerator, and the plugin loads via the marketplace; **(referee arm,
+only for v1-referee-preview)** the referee produced spirit+letter+gross-regression evidence at both
+viewports, conditional on Phase 5 passing. **If the referee never earns trust, v1 ships
+scaffold-only** (referee remains optional evidence).
 
 ## Phase 2-of-product (captured; out of v1)
 
