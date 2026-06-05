@@ -14,7 +14,7 @@ set -uo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-GOVERN="plugins/dw-lifecycle/spec-kit/deskwork-governance/scripts/bash/govern.sh"
+GOVERN="plugins/stack-control/spec-kit/deskwork-governance/scripts/bash/govern.sh"
 RUNS_DIR=".dw-lifecycle/scope-discovery/audit-runs"
 
 fail() { echo "SMOKE FAIL: $1" >&2; exit 1; }

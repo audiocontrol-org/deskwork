@@ -9,11 +9,13 @@
 //   - no flag silently ignored (each subcommand validates its own flags)
 
 import { runVersion } from './subcommands/version.js';
+import { runExecuteCheck } from './subcommands/execute-check.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
 const SUBCOMMANDS: Record<string, Subcommand> = {
   version: runVersion,
+  'execute-check': runExecuteCheck,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
