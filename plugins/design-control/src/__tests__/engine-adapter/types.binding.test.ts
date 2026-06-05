@@ -77,4 +77,11 @@ describe('EngineAdapter method/envelope binding (compile-time)', () => {
     await adapter.refereeScreenshot({ method: 'author-wireframe', manifestId: 'm', payload: {} });
     expect(adapter).toBeDefined();
   });
+
+  it('rejects (at the type level) a request envelope that omits the required payload key (AUDIT-05)', async () => {
+    const adapter = makeStubAdapter();
+    // @ts-expect-error — payload is a REQUIRED key on the request envelope; omitting it is a type error.
+    await adapter.authorWireframe({ method: 'author-wireframe', manifestId: 'm' });
+    expect(adapter).toBeDefined();
+  });
 });

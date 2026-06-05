@@ -34,17 +34,37 @@ export const ConfidenceSchema = z.number().refine(isConfidence, {
 });
 
 /**
- * Structural schema for an engine-adapter request. The `satisfies` clause keeps
- * the schema's parsed output aligned with {@link EngineAdapterRequest} at compile
- * time, so adding/removing an envelope field surfaces here as a type error.
+ * Structural schema for an engine-adapter request.
+ *
+ * `payload` is a REQUIRED key on the {@link EngineAdapterRequest} type, but
+ * `z.unknown()` infers an OPTIONAL output key in zod — so a plain `z.object`
+ * would accept a request with no `payload` key at all, silently weakening the
+ * envelope's load-bearing structural contract. The `.superRefine` enforces
+ * key-presence: a request with no `payload` key is rejected; a request whose
+ * `payload` key is present (any value, including an explicit `undefined`) passes,
+ * because the method-specific shape of the payload is validated downstream, not
+ * here. The schema's `_output` therefore still types `payload?` (a `ZodEffects`
+ * limitation), so a `satisfies z.ZodType<EngineAdapterRequest>` clause cannot be
+ * kept against the required field; the request/response conformance tests are the
+ * drift guard in its place.
  */
-export const EngineAdapterRequestSchema = z.object({
-  method: EngineMethodSchema,
-  manifestId: z.string().min(1),
-  imageHashes: z.array(z.string()).optional(),
-  rubricItemIds: z.array(z.string()).optional(),
-  payload: z.unknown(),
-}) satisfies z.ZodType<EngineAdapterRequest>;
+export const EngineAdapterRequestSchema = z
+  .object({
+    method: EngineMethodSchema,
+    manifestId: z.string().min(1),
+    imageHashes: z.array(z.string()).optional(),
+    rubricItemIds: z.array(z.string()).optional(),
+    payload: z.unknown(),
+  })
+  .superRefine((val, ctx) => {
+    if (!('payload' in val)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['payload'],
+        message: 'payload key is required (its value may be undefined).',
+      });
+    }
+  });
 
 /**
  * Structural schema for an engine-adapter response. The `satisfies` clause keeps
@@ -149,6 +169,26 @@ export function validateConformance(
   return { conformant: violations.length === 0, violations };
 }
 
+/**
+ * The output type of {@link EngineAdapterRequestSchema}. Because the schema is a
+ * `ZodEffects` over `z.unknown()`, its inferred output types `payload` as an
+ * optional key even though the `.superRefine` rejects an absent `payload` at
+ * runtime. {@link narrowParsedRequest} bridges that gap into the required-field
+ * {@link EngineAdapterRequest} without a cast.
+ */
+type ParsedRequest = z.infer<typeof EngineAdapterRequestSchema>;
+
+/**
+ * Narrows a parsed request to {@link EngineAdapterRequest}. The schema's
+ * `.superRefine` already guarantees the `payload` key is present on any value
+ * that parsed successfully; this guard makes that guarantee type-visible (the
+ * `'payload' in req` check narrows the optional key to a required one) so the
+ * value flows into {@link validateConformance} without a cast.
+ */
+function narrowParsedRequest(req: ParsedRequest): req is EngineAdapterRequest {
+  return 'payload' in req;
+}
+
 /** Render a zod error into a flat list of operator-readable structural messages. */
 function structuralViolations(label: string, error: z.ZodError): string[] {
   return error.issues.map((issue) => {
@@ -183,6 +223,16 @@ export function parseAndValidate(
       violations.push(...structuralViolations('response', parsedResponse.error));
     }
     return { conformant: false, violations };
+  }
+
+  if (!narrowParsedRequest(parsedRequest.data)) {
+    // Unreachable: the schema's .superRefine rejects an absent payload key, so a
+    // value that parsed successfully always has the key. The guard exists to make
+    // that runtime guarantee type-visible without a cast.
+    return {
+      conformant: false,
+      violations: ['request structural violation at "payload": payload key is required.'],
+    };
   }
 
   return validateConformance(parsedRequest.data, parsedResponse.data);

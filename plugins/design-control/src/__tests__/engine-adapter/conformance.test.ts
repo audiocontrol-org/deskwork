@@ -8,7 +8,6 @@ import {
   isConfidence,
   type EngineAdapterRequest,
   type EngineAdapterResponse,
-  type EngineProbe,
 } from '@/engine-adapter';
 import { ConfidenceSchema } from '@/engine-adapter/conformance';
 
@@ -47,6 +46,18 @@ describe('zod schemas reject malformed shapes', () => {
 
   it('accepts a well-formed request', () => {
     expect(EngineAdapterRequestSchema.safeParse(baseRequest()).success).toBe(true);
+  });
+
+  it('rejects a request missing the payload key entirely (AUDIT-05 key-presence contract)', () => {
+    const noPayload = { method: 'author-wireframe', manifestId: 'm' };
+    expect('payload' in noPayload).toBe(false);
+    expect(EngineAdapterRequestSchema.safeParse(noPayload).success).toBe(false);
+  });
+
+  it('accepts a request whose payload key is present with an explicit undefined value (AUDIT-05)', () => {
+    const explicitUndefined = { method: 'author-wireframe', manifestId: 'm', payload: undefined };
+    expect('payload' in explicitUndefined).toBe(true);
+    expect(EngineAdapterRequestSchema.safeParse(explicitUndefined).success).toBe(true);
   });
 
   it('rejects a response with out-of-range confidence (> 1)', () => {
@@ -243,25 +254,6 @@ describe('non-execution conformance surface requires no engine probe (AUDIT-02)'
 
     // combined parse-then-echo runs with no engine
     expect(parseAndValidate(request, response).conformant).toBe(true);
-  });
-
-  it('an always-absent probe has zero effect on any non-execution operation', () => {
-    const absentProbe: EngineProbe = { isAvailable: () => false };
-
-    const request = baseRequest();
-    const response = baseSuccessResponse();
-
-    // Each non-execution operation produces the same result regardless of probe
-    // availability — they never consult the probe.
-    expect(EngineAdapterRequestSchema.safeParse(request).success).toBe(true);
-    expect(EngineAdapterResponseSchema.safeParse(response).success).toBe(true);
-    expect(validateConformance(request, response).conformant).toBe(true);
-    expect(parseAndValidate(request, response).conformant).toBe(true);
-    expect(isConfidence(0.5)).toBe(true);
-
-    // The absent probe was never needed by any of the above; assert it is
-    // available as an object but irrelevant to non-execution operations.
-    expect(absentProbe.isAvailable('any')).toBe(false);
   });
 });
 

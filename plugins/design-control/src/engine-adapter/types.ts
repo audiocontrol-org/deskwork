@@ -104,10 +104,13 @@ export interface EngineAdapterRequestFor<M extends EngineMethod> {
    */
   rubricItemIds?: string[] | undefined;
   /**
-   * Method-specific input payload. Typed `unknown` (which already admits the
-   * absent value), so callers narrow it per method before use.
+   * Method-specific input payload. Required (the key MUST be present, though its
+   * value is `unknown`): an execution request always carries a method-specific
+   * payload, and callers narrow it per method before use. Under
+   * `exactOptionalPropertyTypes`, `payload: unknown` enforces key-presence while
+   * still admitting an explicit `undefined` value.
    */
-  payload?: unknown;
+  payload: unknown;
 }
 
 /**
