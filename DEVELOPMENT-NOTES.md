@@ -4767,3 +4767,50 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - **Owed before release:** live studio UI verification of the review-start shortform path (`.claude/rules/ui-verification.md`).
 - **Triage:** #420 (auto-numbering collision recurred — the auto-numberer is still buggy; consider fixing it before the next promote-findings run).
 - **Optional:** dismantle/archive the stale `graphical-entries` + `hygiene` worktrees.
+
+## 2026-06-05: Branch rebase onto deskwork-plugin + fully-realized PRD + 6-round audit-barrage convergence
+
+### Feature: design-control
+### Worktree: design-control
+
+**Goal:** Bootstrap the design-control session; run an audit-barrage against the scaffold PRD/workplan. Scope expanded mid-session to (a) fix a wrong branch base, (b) fully realize the PRD from the converged spec, (c) harden it via iterated audit-barrage.
+
+**Accomplished:**
+- **Fixed a wrong branch base (operator-flagged).** `feature/design-control` had been cut from recent `main` (v0.38.0) + a 193-line scaffold — missing the entire #424 kickoff lineage (thesis, converged design, `/frontend-design` reframe) AND the sites→lanes content-browser/scrapbook work that IS the Phase 6 dogfood target. Reset onto `feature/deskwork-plugin` (v0.36.0-based), replayed the scaffold as `cf7fd637`, dropped the redundant doc-import, force-pushed with `--force-with-lease`. Pre-rebase tip preserved at `backup/design-control-prerebase-20260605` (`adb27275`). Branch is now v0.36.0-based, 42 commits behind main (a future-merge concern, recorded).
+- **Realized the PRD** from a thin 39-line digest → a 423-line self-standing design-of-record absorbing all 12 sections of the converged spec (engine-adapter seam, 3-concern table, v1 split, dual-axis allowlist lint, status gate modes, referee, baseline/capture), with round-N barrage provenance preserved inline. Realized the README stub (full 6-phase status table + resolving links). Backfilled `parentIssue: 424`.
+- **6-round audit-barrage convergence** (claude + codex per round) against the realized PRD: findings 16→11→11→6→2→2; cross-model-HIGH 5→5→2→0→0→0. Hit **two consecutive zero-HIGH/zero-blocking rounds (5 + 6)** — the converged-spec stop criterion. Each round's findings folded into PRD + workplan: § Definitions (surface/GROSS seven-class list/capture-step), mode-aware manifest schema, engine-absent integrated witness, operationally-defined referee gate + pinned thresholds, honest claim/mechanism scoping. Six run-dirs preserved as the convergence record.
+
+**Didn't Work:**
+- The structural-chain verbs (`check-clones`, `check-anti-patterns`, …) and `branch-staleness-check` rejected `--feature` / weren't recognized by the installed binary (older than the SKILL.md in this worktree) at session-start — advisory-only, surfaced and skipped. `check-disposition-survivor --feature` likewise rejected the flag at session-end (ran bare; clean).
+- First audit-barrage ran against the isolated scaffold PRD; once the full context was in-tree the operator scrapped its results (run-dir removed) — re-run against the realized PRD instead.
+
+**Course Corrections:**
+- [PROCESS] Branch should have been cut from `feature/deskwork-plugin`, not `main` — the feature depends on that branch's docs + dogfood substrate. Systemic: feature setup picked the wrong base.
+- [DOCUMENTATION] PRD shipped as a thin digest pointing at a spec that wasn't even on the branch (dead links); had to bring the canonical docs in-tree AND fully realize the PRD so it stands alone.
+- [PROCESS] Scrap the first audit — it judged a digest, not the design.
+
+**Quantitative:**
+- Messages: ~10
+- Commits: 8 content (`cf7fd637`→`a7c2c6f9`) + this session-end = 9
+- Corrections: 3 ([PROCESS]×2, [DOCUMENTATION]×1)
+- Files changed: prd.md, README.md, workplan.md, DESIGN-DISCIPLINE-THESIS.md, converged-design spec (imported)
+
+**Insights:**
+- Iterated audit-barrage on a *planning doc* converges the same way it does on a diff: each round's fixes spawn a finer next-round finding until the curve flattens and cross-model agreement disappears. The signature of convergence is "one model CLEAN + one non-overlapping medium," not zero findings.
+- Realizing a PRD *strengthens* its acceptance criteria, which then drift from an un-synced workplan — most of round 2's findings were self-inflicted PRD↔workplan drift. Sync the workplan in the same pass.
+- A canonical-doc link is only as good as the branch it resolves on; cross-branch feature setup silently produces dead links.
+
+### Hygiene observations
+
+- issue #424 [OPEN] referenced this session: Feature: design-control plugin — portable UX/UI surface-change discipline (lo-fi wireframes + design-language + device-free visual baselines)
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/hygiene` `feature/hygiene` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/scope-discovery` `feature/scope-discovery` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: **Engine-adapter interface declaration + fail-loud preflight — FIRST, before any engine-
+- Triage: #424 (Feature: design-control plugin — portable UX/UI surface-change discipline (lo-fi wireframes + design-language + device-free visual baselines))
+- Address TBD markers: (no bare TBD markers introduced this session)
+- Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals; /Users/orion/work/deskwork-work/hygiene (`feature/hygiene`) — 3 of 9 signals; /Users/orion/work/deskwork-work/scope-discovery (`feature/scope-discovery`) — 4 of 9 signals
+
