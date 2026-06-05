@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch-kit · Direction B — Blueprint Grid</title>
+<style>
+/* =========================================================================
+   DIRECTION B — "BLUEPRINT GRID"  (engineering schematic lineage)
+   Mockup preview only. Shipped sketch-kit.css is a single external sheet.
+   Real kit bundles an OFL technical/mono webfont (e.g. Space Mono);
+   preview falls back to a system monospace stack.
+   ========================================================================= */
+:root{
+  --sk-ground:#0e2a3b;          /* deep blueprint blue */
+  --sk-ground-2:#123448;
+  --sk-line:#5fb6d6;            /* cyan ink */
+  --sk-line-soft:#3a7d97;
+  --sk-ink:#dff2fb;
+  --sk-ink-soft:#8fc4dc;
+  --sk-accent:#ffd24a;          /* drafting-pencil yellow accent */
+  --sk-grid:#ffffff14;
+  --sk-font:"Space Mono","IBM Plex Mono","Courier New",monospace;
+}
+*{box-sizing:border-box;}
+body.sk{
+  margin:0;font-family:var(--sk-font);color:var(--sk-ink);
+  background:var(--sk-ground);
+  background-image:
+    linear-gradient(var(--sk-grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--sk-grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  line-height:1.5;font-size:15px;-webkit-font-smoothing:antialiased;
+}
+
+/* --- self-labeling WIREFRAME banner: title-block stamp ---------------- */
+.sk-banner{
+  position:sticky;top:0;z-index:5;
+  display:flex;gap:.8rem;align-items:center;
+  background:var(--sk-ground-2);color:var(--sk-ink-soft);
+  border-bottom:1px solid var(--sk-line);
+  padding:.4rem 1.1rem;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;
+}
+.sk-banner strong{
+  color:var(--sk-ground);background:var(--sk-accent);
+  padding:.1rem .6rem;letter-spacing:.22em;border:1px solid var(--sk-ground);
+}
+.sk-banner .sk-rev{margin-left:auto;color:var(--sk-line-soft);}
+
+/* --- shared idiom: thin sharp cyan rules, corner ticks ---------------- */
+.sk-card,.sk-img,.sk-btn,.sk-box,.sk-search,.sk-logo,.sk-nav,.sk-avatar{
+  border:1px solid var(--sk-line);background:#0d2536cc;border-radius:0;
+}
+.sk-shell{max-width:1100px;margin:0 auto;padding:1.4rem 1.2rem 3rem;}
+
+/* corner-tick decoration on cards (drafting frame feel) */
+.sk-card{position:relative;}
+.sk-card::before,.sk-card::after{content:"";position:absolute;width:10px;height:10px;border:1px solid var(--sk-accent);}
+.sk-card::before{top:-1px;left:-1px;border-right:0;border-bottom:0;}
+.sk-card::after{bottom:-1px;right:-1px;border-left:0;border-top:0;}
+
+/* --- header ----------------------------------------------------------- */
+.sk-header{display:flex;align-items:center;gap:.9rem;margin-bottom:1.1rem;}
+.sk-logo{width:50px;height:50px;display:grid;place-items:center;font-size:.7rem;color:var(--sk-ink-soft);flex:0 0 auto;}
+.sk-h1{font-size:1.4rem;margin:0;flex:1;letter-spacing:.06em;text-transform:uppercase;}
+.sk-search{flex:0 0 220px;padding:.5rem .7rem;color:var(--sk-ink-soft);border-style:dashed;font-size:.85rem;}
+.sk-avatar{width:42px;height:42px;display:grid;place-items:center;font-size:.7rem;color:var(--sk-ink-soft);flex:0 0 auto;}
+
+/* --- nav -------------------------------------------------------------- */
+.sk-nav{display:flex;flex-wrap:wrap;gap:0;padding:0;margin-bottom:1.3rem;}
+.sk-nav-item{padding:.45rem 1rem;border-right:1px solid var(--sk-line-soft);color:var(--sk-ink-soft);font-size:.85rem;letter-spacing:.05em;}
+.sk-nav-item:last-child{border-right:0;}
+.sk-nav-item.is-here{background:var(--sk-line);color:var(--sk-ground);}
+
+/* --- layout ----------------------------------------------------------- */
+.sk-row{display:flex;gap:1rem;flex-wrap:wrap;}
+.sk-stats{margin-bottom:1.2rem;}
+.sk-stat{flex:1 1 160px;padding:.9rem 1rem;}
+.sk-stat .sk-num{font-size:2.1rem;line-height:1;color:var(--sk-accent);}
+.sk-stat .sk-label{color:var(--sk-ink-soft);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;}
+
+.sk-main{display:grid;grid-template-columns:1.4fr 1fr;gap:1rem;}
+@media(max-width:720px){.sk-main{grid-template-columns:1fr;}}
+.sk-card{padding:1rem 1.1rem;}
+.sk-title{font-size:.95rem;margin:.1rem 0 .8rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--sk-line);border-bottom:1px solid var(--sk-line-soft);padding-bottom:.35rem;}
+
+.sk-line{height:.7rem;background:repeating-linear-gradient(90deg,var(--sk-line-soft) 0 6px,transparent 6px 10px);
+  opacity:.6;margin:.5rem 0;}
+.sk-line.s{width:55%;}.sk-line.m{width:78%;}.sk-line.l{width:95%;}
+
+.sk-listrow{display:flex;align-items:center;gap:.7rem;padding:.45rem 0;border-bottom:1px dotted var(--sk-line-soft);}
+.sk-dot{width:26px;height:26px;border:1px solid var(--sk-line);flex:0 0 auto;}
+.sk-listrow .sk-line{margin:0;flex:1;}
+
+/* --- crossed-box image placeholder ------------------------------------ */
+.sk-img{position:relative;width:100%;aspect-ratio:4/3;display:grid;place-items:center;
+  color:var(--sk-ink-soft);font-size:.8rem;overflow:hidden;letter-spacing:.12em;text-transform:uppercase;}
+.sk-img::before,.sk-img::after{content:"";position:absolute;inset:0;border-top:1px solid var(--sk-line-soft);}
+.sk-img::before{transform:rotate(11deg) scaleX(1.7);}
+.sk-img::after{transform:rotate(-11deg) scaleX(1.7);}
+.sk-img span{position:relative;background:var(--sk-ground);padding:.15rem .55rem;}
+
+/* --- buttons ---------------------------------------------------------- */
+.sk-actions{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1.2rem;}
+.sk-btn{padding:.5rem 1.1rem;font-family:inherit;font-size:.82rem;color:var(--sk-ink);letter-spacing:.1em;text-transform:uppercase;cursor:default;}
+.sk-btn.is-primary{background:var(--sk-accent);color:var(--sk-ground);border-color:var(--sk-accent);}
+
+.sk-foot{margin-top:2rem;text-align:center;color:var(--sk-line-soft);font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;}
+</style>
+</head>
+<body class="sk">
+
+<div class="sk-banner">
+  <strong>Wireframe</strong> schematic — structure &amp; flow only, not a visual design
+  <span class="sk-rev">rev · lo-fi</span>
+</div>
+
+<div class="sk-shell">
+
+  <header class="sk-header">
+    <div class="sk-logo">LOGO</div>
+    <h1 class="sk-h1">Content Dashboard</h1>
+    <div class="sk-search">search…</div>
+    <div class="sk-avatar">you</div>
+  </header>
+
+  <nav class="sk-nav">
+    <div class="sk-nav-item is-here">Dashboard</div>
+    <div class="sk-nav-item">Calendar</div>
+    <div class="sk-nav-item">Review</div>
+    <div class="sk-nav-item">Archive</div>
+    <div class="sk-nav-item">Settings</div>
+  </nav>
+
+  <div class="sk-row sk-stats">
+    <div class="sk-card sk-stat"><div class="sk-num">12</div><div class="sk-label">In review</div></div>
+    <div class="sk-card sk-stat"><div class="sk-num">04</div><div class="sk-label">Drafting</div></div>
+    <div class="sk-card sk-stat"><div class="sk-num">38</div><div class="sk-label">Published</div></div>
+  </div>
+
+  <div class="sk-main">
+    <section class="sk-card">
+      <h2 class="sk-title">Recent entries</h2>
+      <div class="sk-listrow"><div class="sk-dot"></div><div class="sk-line l"></div></div>
+      <div class="sk-listrow"><div class="sk-dot"></div><div class="sk-line m"></div></div>
+      <div class="sk-listrow"><div class="sk-dot"></div><div class="sk-line l"></div></div>
+      <div class="sk-listrow"><div class="sk-dot"></div><div class="sk-line s"></div></div>
+      <div class="sk-actions">
+        <div class="sk-btn is-primary">+ New entry</div>
+        <div class="sk-btn">Approve</div>
+        <div class="sk-btn">Cancel</div>
+      </div>
+    </section>
+
+    <section class="sk-card">
+      <h2 class="sk-title">Preview</h2>
+      <div class="sk-img"><span>image</span></div>
+      <div class="sk-line m"></div>
+      <div class="sk-line s"></div>
+    </section>
+  </div>
+
+  <div class="sk-foot">wireframe · sketch-kit direction B · blueprint grid</div>
+</div>
+
+</body>
+</html>

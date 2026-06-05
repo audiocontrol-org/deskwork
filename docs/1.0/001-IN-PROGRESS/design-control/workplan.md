@@ -41,12 +41,25 @@ verbatim in substance** — when they drift, the PRD wins.
       manual authoring. `/frontend-design` is the default Claude adapter; the dependency is declared
       cross-plugin. *(Pulled into Phase 1 so the preflight precedes the first engine-consuming skill —
       `author-wireframe` is consumed below.)*
-- [ ] `sketch-kit.css` + `.sk-*` vocabulary + self-labeling WIREFRAME banner + a fixed `.sk-img`
+- [x] `sketch-kit.css` + `.sk-*` vocabulary + self-labeling WIREFRAME banner + a fixed `.sk-img`
       placeholder; bundled local OFL hand-drawn webfont (aesthetic only, not a determinism claim).
+      **Multi-theme** (operator decision 2026-06-05, see
+      `mockups/sketch-kit/DECISION.md`): ships THREE adopter-selectable lo-fi visual languages
+      (`sk-theme-marker` / `sk-theme-blueprint` / `sk-theme-grayscale`) inside the SINGLE
+      identity-pinnable `sketch-kit.css` — the converged spec's one-`<link>` invariant is
+      preserved (theme = a `.sk-theme-*` root class within the closed `.sk-*` set). Bundles
+      Patrick Hand (marker) + Space Mono (blueprint) OFL woff2; grayscale uses a plain system
+      stack. SSOT module `@/wireframe-kit/sketch-kit` exports the asset paths, closed vocabulary,
+      and theme/font manifests. 21 tests (self-contained: no http/https/data:/`@import`, all
+      `url()`s + fonts resolve on disk, one `<link>`, example uses only vocabulary tokens).
 - [ ] `check-mockup-lofi` lint as an **element/attribute allowlist** (permit only the pinned
-      sketch-kit `<link>`, `.sk-*` tags, `.sk-img`, a closed set of plain structural tags; reject
+      sketch-kit `<link>`, `.sk-*` tags **including `.sk-theme-{marker,blueprint,grayscale}`**,
+      `.sk-img`, a closed set of plain structural tags; reject
       all external resources — `<img src>`/`<picture>`/`srcset`/`<iframe>`/`<object>`/`<embed>` —
-      `<script>`/`<style>`/inline `style=`, `data:` URIs, presentational attributes).
+      `<script>`/`<style>`/inline `style=`, `data:` URIs, presentational attributes). The closed
+      `.sk-*` set is sourced from `SK_VOCABULARY` in `@/wireframe-kit/sketch-kit` (single source
+      of truth; multi-theme adds only the three `.sk-theme-*` classes, one pinned stylesheet
+      unchanged).
 - [ ] Stylesheet **identity pin**: the single permitted `<link>` matched by canonical resolved
       path + content hash/SRI; assert the "arbitrary class values are inert because the pinned
       stylesheet is the sole CSS source" invariant.
