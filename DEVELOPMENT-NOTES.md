@@ -4751,3 +4751,34 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - The self-hosting bootstrap now has a clean branch-local entry: `/session-start` orients a fresh agent to Spec Kit; `/dwss` (dw-lifecycle) is intentionally left as-is per isolation. Reconcile the branch-local session skills at merge.
 
 **Next step:** `/speckit-tasks` for Feature 1 (`specs/003-stack-control-front-door`) — generate the dependency-ordered, TDD-first `tasks.md` (MVP = US1: execute a spec via native Spec Kit, governance firing). Bootstrap the next session with `/session-start` (NOT `/dwss`).
+
+## 2026-06-05 (cont. 2): Feature 1 `/speckit-tasks` + `/speckit-analyze` — 35 tasks, MVP=US1, analyze-remediated
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** Resume the Spec Kit chain on Feature 1 (the stack-control front door, `specs/003-stack-control-front-door`) from where last session left it (plan + checklist done, no tasks). Generate `tasks.md` (`/speckit-tasks`), then run the cross-artifact consistency pass (`/speckit-analyze`) and remediate. Planning/spec artifacts only — no implementation code (per the orchestrator/implementation session split, `/speckit-implement` is a separate session).
+
+**Accomplished:**
+- **`/speckit-tasks`** — generated `specs/003-stack-control-front-door/tasks.md`: 34 tasks across 6 phases, organized by user story, TDD-first (Constitution Principle I is NON-NEGOTIABLE, so tests are REQUIRED — every `stackctl` verb + the governance neutrality check is RED-first). Grounded all file paths against the real `plugins/dw-lifecycle/` layout (fat plugin, in-tree TS via `tsx`, bin shim, `src/cli.ts` + `subcommands/`, `spec-kit/deskwork-governance/`), `marketplace.json`, and `scripts/bump-version.ts` MANIFESTS — not guessed. MVP = US1 (execute a spec via native Spec Kit, governance firing). Honored the optional `after_tasks` git-commit hook.
+- **`/speckit-analyze`** — read-only cross-artifact pass (spec ↔ plan ↔ tasks ↔ constitution v1.1.1). 100% requirement coverage (9 FR + 6 SC all mapped). 0 CRITICAL/HIGH; 2 MEDIUM, 3 LOW. Verified Principle IX correctly N/A (no backend-selection tasks — deferred to Feature 2) and Principle I honored throughout.
+- **Remediation** (operator: "remediate") — rewrote `tasks.md` 34→35 tasks: **C1** added T023 [US1] (cross-plugin-seam fail-loud test — `govern.sh` errors when `dw-lifecycle`/`jq` absent, no silent skip); **A1** pinned the "runnable" set in T015 (runnable ⇔ `tasks.md` present, exact exit codes/stderr per case); **M1** narrowed T003 deps to `tsx`+`vitest` only (dropped speculative `zod`/`yaml` per Principle II); **T1** fixed T016's neutrality RED to fail for a content reason, not file-not-found. Downstream IDs shifted +1; Dependencies/Parallel/Strategy sections reconciled.
+
+**Didn't Work / course corrections:**
+- [PROCESS] `/speckit-analyze`'s `check-prerequisites.sh --require-tasks` hard-failed on the `feature/pluggable-lifecycle-providers` branch name (expects `NNN-feature-name`). This is **TF-09, already captured** in `tooling-feedback.md` — it recurred exactly as recorded (TF-09 even names `/speckit-analyze`). Proceeded with the read-only analysis without the script (all artifacts already loaded); no new TF entry needed.
+- [PROCESS] Operator asked "did you commit and push?" after the tasks commit — I *had* already committed + pushed (`0bab3159`) before reporting, and confirmed with `git status`/ahead-behind. Reinforced the standing "commit and push early and often" discipline: each artifact landed + pushed immediately, no "want me to commit?" prompts.
+- [PROCESS] Operator's first reply "done" was ambiguous right after my proceed-question; I asked go/end rather than guessing on a substantial generative step. They said "do it." Correct call to disambiguate before launching `/speckit-tasks`.
+
+**Quantitative:** (re-derived from `git log 5bfc6951..HEAD`)
+- Messages: ~6
+- Commits: 2 (`0bab3159` tasks, `40349514` analyze-remediation) + this session-end commit
+- Corrections: 0 substantive (3 [PROCESS] notes above are tooling-friction / discipline-reinforcement, not approach corrections)
+- Files changed: 1 (`tasks.md`, created then revised) + this journal
+- No code — Spec Kit artifacts only.
+
+**Insights:**
+- Tests aren't optional on this program: the tasks template says "tests OPTIONAL," but Constitution Principle I overrides — the analyze pass confirmed every code task is RED-first, and the two MEDIUM findings (C1, A1) were both about *making the RED stronger / more deterministic*, not about whether to test.
+- `/speckit-analyze` earned its keep: C1 (the cross-plugin-seam fail-loud guard) was a real coverage gap the tasks pass missed — a preserved-behavior invariant from the governance contract with no task. Cheap to catch now, expensive as a silent skip in production.
+- The fat-plugin decision pays off in the task shapes: T018's governance rehome is a single `git mv` and T013 is a 2-line MANIFESTS addition — both are moves/extends, not re-packaging, exactly as the fat-vs-thin rationale predicted.
+
+**Next step:** Feature 1 is analyze-clean (0 CRITICAL/HIGH). Next Spec Kit step is `/speckit-implement` — which runs in a **separate implementation session** in this worktree (orchestrator ≠ implementer per `.claude/rules/agent-discipline.md`). Start that session with `/session-start` (NOT `/dwss`); MVP target is US1 (Phases 1+2+3 → execute a spec via native Spec Kit with governance firing).
