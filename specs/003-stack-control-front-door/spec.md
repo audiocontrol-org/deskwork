@@ -64,7 +64,7 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 
 ### Edge Cases
 
-- **Native Spec Kit execution cannot be invoked headlessly.** Slice 001 established that `/speckit-implement` is an agent-invoked Claude skill, not a script-callable binary. The execution touch point therefore cannot simply shell out to it; how it fires is an open mechanism question (see FR-006 / clarification). Whatever the mechanism, on a path where native execution genuinely cannot run, the front door MUST fail loudly with a descriptive error — never silently no-op or fake a run (Principle V).
+- **Native Spec Kit execution cannot be invoked headlessly.** Slice 001 established that `/speckit-implement` is an agent-invoked Claude skill, not a script-callable binary. This is **resolved** by making the execution touch point an **in-session Claude Code skill** (FR-006): it runs inside the operator's session where `/speckit-implement` and the governance extension already live, so it drives native execution via the in-session agent — no headless shell-out needed. On a path where native execution still genuinely cannot run, the front door MUST fail loudly with a descriptive error — never silently no-op or fake a run (Principle V).
 - **Governance dependency at rehome.** Governance fires deskwork's audit-barrage, which today lives in `dw-lifecycle`. The rehomed extension must continue to reach it (cross-plugin) until audit-barrage itself migrates (a later feature). A missing audit-barrage capability fails loud, not silent.
 - **`dw-lifecycle` regression.** Any change required to stand up stack-control that would alter `dw-lifecycle` behavior is out of bounds — the isolation invariant takes precedence; surface the conflict rather than regress `dw-lifecycle`.
 - **Spec not in a runnable state** when execution is triggered: surfaced as an actionable error, not a partial run.
@@ -85,9 +85,9 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 
 **Front door — curation + execution touch points**
 
-- **FR-005**: stack-control MUST expose a **spec-curation** touch point providing a **full edit / iterate / review loop** over a Spec Kit spec through the stack-control surface — not just initiate-and-view. The operator can create a spec, edit it, iterate it, and review it without leaving the front door. *(Operator decision 2026-06-04.)*
-- **FR-006**: stack-control MUST expose an **execution** touch point that runs a spec via the **native Spec Kit mechanism** (`/speckit-implement`), with governance firing afterward. [NEEDS CLARIFICATION: native-execution mechanism — since `/speckit-implement` is an agent-invoked skill (not headlessly callable), does the touch point (a) launch/surface the agent command for an agent session to run, (b) orchestrate an agent session programmatically, or (c) drive only the deterministic parts and hand the agent step to the operator? Scope- and architecture-determining.]
-- **FR-007**: The front door's frontend is a **terminal UI (TUI)** — an in-terminal interactive surface, no browser — exposing the two touch points, alongside the `stackctl` CLI. *(Operator decision 2026-06-04. Note: this is a deliberate departure from deskwork studio's web-surface lineage; the fuller frontend feature inherits the TUI direction unless revisited.)*
+- **FR-005**: stack-control MUST expose a **spec-curation** touch point — a Claude Code skill (see FR-007) — providing a **full edit / iterate / review loop** over a Spec Kit spec. The operator can create a spec, edit it, iterate it, and review it by invoking the skill in-session, without leaving their Claude Code session. *(Operator decision 2026-06-04.)*
+- **FR-006**: The **execution** touch point is a **Claude Code skill the operator invokes in-session** that runs a spec via the **native Spec Kit mechanism** (`/speckit-implement`), governance firing afterward. Because the skill runs inside the operator's Claude Code session, it drives native execution via the **in-session agent** (sub-agent dispatch available) and MUST NOT depend on a headless/batch CLI to invoke the agent — this is the mechanism that satisfies the durability constraint and avoids a context-switch out of the session. *(Operator decision 2026-06-04: front-door touch points are in-session skills.)*
+- **FR-007**: The operator-facing front door is a set of **Claude Code skills** (invoked in-session as `/stack-control:…` slash commands) — NOT a standalone TUI or web app — layered over a **`stackctl` CLI** that performs the deterministic work (mirrors `dw-lifecycle`'s skills-over-CLI-verbs architecture). The skill is the touch point; `stackctl` is the primitive it calls; the in-session agent does the agent-work. *(Operator decision 2026-06-04 — supersedes the earlier TUI answer.)*
 - **FR-008**: When native execution genuinely cannot run (mechanism unavailable, spec not runnable, governance capability absent), the front door MUST fail loudly with a descriptive error naming what is missing — no silent no-op, no faked run, no mock (Principle V).
 
 **Self-hosting**
@@ -98,7 +98,7 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 
 - **stack-control plugin**: the new plugin shell + package, own version line, hosting the front door and the rehomed governance extension.
 - **`stackctl`**: the CLI entry point to the front door.
-- **Front door**: the thin control plane surface (`stackctl` CLI + a terminal UI) exposing the two touch points.
+- **Front door**: the operator-facing touch points — **Claude Code skills** (`/stack-control:…`) invoked in-session — layered over the `stackctl` CLI primitive.
 - **Spec-curation touch point**: the surface that brings a Spec Kit spec to a runnable state.
 - **Execution touch point**: the surface that runs a spec via native Spec Kit execution.
 - **Governance extension (rehomed)**: the founding feature's `after_implement` audit-barrage extension, now living in stack-control.

@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,7 +31,9 @@
 
 ## Notes
 
-- **FR-005 — RESOLVED 2026-06-04 (operator):** curation is the **full edit/iterate/review loop** (not initiate-only).
-- **FR-007 — RESOLVED 2026-06-04 (operator):** frontend is a **terminal UI (TUI)** (deliberate departure from deskwork studio's web lineage).
-- **1 [NEEDS CLARIFICATION] marker remains** — FR-006: native-execution mechanism (given `/speckit-implement` is agent-invoked, not headless): launch/surface the command, orchestrate an agent session, or drive deterministic parts + hand off the agent step. Under discussion with the operator.
-- Resolve inline or via `/speckit-clarify` before `/speckit-plan`.
+All three clarifications RESOLVED by the operator (2026-06-04) — **0 markers remain**; spec is clarification-clean:
+
+- **FR-005:** curation is the **full edit/iterate/review loop** (not initiate-only), exposed as a Claude Code skill.
+- **FR-006:** the execution touch point is an **in-session Claude Code skill** that drives native `/speckit-implement` via the in-session agent — no headless/batch dependency, no context-switch. This resolved the "agent-invoked, not headless" tension and the durability concern at once.
+- **FR-007:** the front door is a set of **Claude Code skills** (`/stack-control:…`) over a **`stackctl` CLI** (mirrors `dw-lifecycle`'s skills-over-CLI-verbs architecture) — **supersedes the earlier TUI answer** (a standalone TUI contradicts in-session skills).
+- Ready for `/speckit-clarify` (optional deeper sweep) → `/speckit-plan`.
