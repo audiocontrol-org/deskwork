@@ -10,8 +10,8 @@
  * Files updated (relative to repo root):
  *   - package.json
  *   - packages/{core,cli,studio}/package.json
- *   - plugins/{deskwork,deskwork-studio,dw-lifecycle}/package.json
- *   - plugins/{deskwork,deskwork-studio,dw-lifecycle}/.claude-plugin/plugin.json
+ *   - plugins/{deskwork,deskwork-studio,dw-lifecycle,stack-control}/package.json
+ *   - plugins/{deskwork,deskwork-studio,dw-lifecycle,stack-control}/.claude-plugin/plugin.json
  *   - .claude-plugin/marketplace.json (top-level metadata.version + each
  *     plugin entry's version)
  *
@@ -56,9 +56,11 @@ const MANIFESTS: readonly VersionedManifest[] = [
   { path: 'plugins/deskwork/package.json', label: 'deskwork plugin shell', kind: 'lockstep-package-json' },
   { path: 'plugins/deskwork-studio/package.json', label: 'deskwork-studio plugin shell', kind: 'lockstep-package-json' },
   { path: 'plugins/dw-lifecycle/package.json', label: 'dw-lifecycle plugin shell', kind: 'package-json' },
+  { path: 'plugins/stack-control/package.json', label: 'stack-control plugin shell', kind: 'package-json' },
   { path: 'plugins/deskwork/.claude-plugin/plugin.json', label: 'deskwork plugin.json', kind: 'plugin-json' },
   { path: 'plugins/deskwork-studio/.claude-plugin/plugin.json', label: 'deskwork-studio plugin.json', kind: 'plugin-json' },
   { path: 'plugins/dw-lifecycle/.claude-plugin/plugin.json', label: 'dw-lifecycle plugin.json', kind: 'plugin-json' },
+  { path: 'plugins/stack-control/.claude-plugin/plugin.json', label: 'stack-control plugin.json', kind: 'plugin-json' },
   { path: '.claude-plugin/marketplace.json', label: 'marketplace manifest', kind: 'marketplace-json' },
 ];
 

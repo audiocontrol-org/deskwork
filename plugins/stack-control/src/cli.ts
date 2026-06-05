@@ -1,0 +1,53 @@
+// stackctl dispatcher (T010).
+//
+// `bin/stackctl <verb> [flags]` → tsx src/cli.ts → dispatch on <verb>.
+// Mirrors dw-lifecycle's cli.ts shape (relative ESM imports, in-tree, tsx-run).
+// Per contracts/stackctl-cli.md § Dispatcher:
+//   - unknown verb → exit 2 with a usage line listing known verbs
+//   - no verb     → usage to stderr, exit 2
+//   - --help/-h/help → usage to stdout, exit 0
+//   - no flag silently ignored (each subcommand validates its own flags)
+
+import { runVersion } from './subcommands/version.js';
+
+type Subcommand = (args: string[]) => Promise<void>;
+
+const SUBCOMMANDS: Record<string, Subcommand> = {
+  version: runVersion,
+};
+
+function printUsage(stream: NodeJS.WriteStream): void {
+  stream.write('Usage: stackctl <verb> [flags...]\n');
+  stream.write(`Verbs: ${Object.keys(SUBCOMMANDS).join(', ')}\n`);
+}
+
+async function main(): Promise<void> {
+  const verb = process.argv[2];
+  const args = process.argv.slice(3);
+
+  if (verb === '--help' || verb === '-h' || verb === 'help') {
+    printUsage(process.stdout);
+    process.exit(0);
+  }
+  if (verb === undefined || verb === '') {
+    printUsage(process.stderr);
+    process.exit(2);
+  }
+
+  const handler = SUBCOMMANDS[verb];
+  if (handler === undefined) {
+    process.stderr.write(`stackctl: unknown verb '${verb}'\n`);
+    printUsage(process.stderr);
+    process.exit(2);
+  }
+
+  await handler(args);
+}
+
+main().catch((err: unknown) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`${msg}\n`);
+  process.exit(1);
+});
+
+export { SUBCOMMANDS };
