@@ -9,9 +9,11 @@ First slice of the `pluggable-lifecycle-providers` north star (govern + execute 
 This directory is the **source**, shipped in the deskwork plugin tree. It is installed INTO a project's `.specify/extensions/deskwork-governance/` (generated install output) via:
 
 ```bash
-specify extension add plugins/dw-lifecycle/spec-kit/deskwork-governance --dev --force
+specify extension add plugins/stack-control/spec-kit/deskwork-governance --dev --force
 specify extension list                       # deskwork-governance enabled
 ```
+
+> Rehomed from `plugins/dw-lifecycle/spec-kit/deskwork-governance` into `plugins/stack-control/` (Feature 1, US1 T018) — `stack-control` is the successor to `dw-lifecycle`. The install command above points at the current source.
 
 Never author at the install target (`.specify/extensions/<id>/`) — `--dev --force` wipes the target before copying and would delete the source.
 
