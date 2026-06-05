@@ -1,6 +1,6 @@
 ---
 title: Deskwork design-discipline thesis
-description: Why UI-surface changes go wrong, the hard-won discipline that fixes them (lo-fi wireframes that model the change · a settled design language · device-free visual verification), and the north star of productizing that discipline as a portable deskwork plugin. Read before any UI-surface work and before defining the design-control plugin.
+description: Why UI-surface changes go wrong, the hard-won discipline that fixes them (lo-fi wireframes for UX intent · a settled design language · /frontend-design as the referee that judges a screenshot against the spirit of the wireframe and the letter of the design language), and the north star of productizing that discipline as a portable deskwork plugin. Core commitment — never roll your own visual verification; orchestrate /frontend-design. Read before any UI-surface work and before defining the design-control plugin.
 deskwork:
   doc: thesis
   status: load-bearing
@@ -88,42 +88,52 @@ resemblance that shouldn't exist."*
 Visual truth is **always anchored in real components, never in a static artifact that can
 rot.** Markdown captures intent; generated artifacts capture pixels.
 
-| Stage | Owns | Artifact | Anti-staleness mechanism |
+`/frontend-design` (the Claude skill) is the single proven engine threaded through all three
+concerns; the discipline is the two durable reference artifacts it works against — the
+wireframe (UX *spirit*) and the design-language spec (visual *letter*).
+
+| Concern | Owns | Reference artifact | `/frontend-design`'s role |
 |---|---|---|---|
-| **1. Design language** | *what it looks like* | markdown spec + **living gallery rendered from real components** | gallery is generated from real components → cannot drift from as-built |
-| **2. UX sketch** | *how it's organized & flows* | **lo-fi hand-drawn wireframe** | deliberately un-styled → cannot be mistaken for visual direction |
-| **3. Implementation + review** | *the realized thing* | real components, shot **device-free** | the screenshot is of the actual product |
+| **1. UX (spirit)** | *how it's organized & flows* | **lo-fi wireframe** — deliberately un-styled, can't be mistaken for implementation guidance | collaborates on working out the UX |
+| **2. Design language (letter)** | *what it looks like* | **design-language spec** (markdown; later a living gallery from real components) | translates wireframe intent into the project's local design language, reduced to practice |
+| **3. Review (referee)** | *did the realized thing honor both?* | a **screenshot** of the real surface (existing tool, e.g. Playwright) | referees: does it adhere to the *spirit* of the wireframe AND the *letter* of the design-language spec? |
 
-**Inverted teeth.** Instead of a gate that checks a mockup *matches* the product (the
-rejected heavy machinery), a gate checks a mockup is *deliberately unlike* it: exploration
-HTML may link **only** the shared sketch kit — no design-system CSS, no `@import`, no
-remote resources — so it is *structurally incapable of impersonating the product*.
-Cheap to enforce (ban the import paths, not substring-grep tokens), and it removes the
-failure mode rather than policing it.
+**Inverted teeth.** The lo-fi wireframe is kept *deliberately unlike* the product so it can't
+be read as "build exactly this": a structural lint requires the WIREFRAME banner, allows only
+the shared sketch kit, and forbids the cheap leakage vectors (inline `style=`, `<style>`,
+`<script>`, `data:` URIs). It's a leakage-blocker, not proof of "perceptually unlike" — the
+banner + human/`/frontend-design` judgment is the real gate.
 
-**Device-free capture** is the load-bearing tool: launch a real surface with no
-hardware/live data, feed it captured/fixture data, shoot a deterministic PNG (explicit
-ready hook + `document.fonts.ready`, no sleeps, pinned viewport + device-scale-factor).
-One engine serves in-loop review, the living gallery, and regression baselines
-(exact-hash compare; re-bless on intentional change).
+**Verification is judgment, not a pixel engine.** Two adversarial audit rounds established that
+a roll-your-own visual-regression engine (exact-hash / perceptual-diff / pinned-container
+determinism) is a research project, not a feature. The discipline instead *looks* at a
+screenshot with specific criteria via `/frontend-design`. If pixel-level regression is ever
+genuinely needed, reach for an **existing** tool (Playwright `toHaveScreenshot`, Percy, Argos,
+Chromatic) — **never hand-rolled.**
 
 ## The thesis (the architectural commitments)
 
 1. **Model the change; don't dictate the implementation.** A design exploration's job is
    to settle *structure, flow, and hierarchy* — not pixels. Make the artifact physically
    incapable of being read as "build it exactly like this."
-2. **Anchor visual truth in real components.** Never in a static page that rots. The
-   living gallery and device-free screenshots are the canonical pixels; markdown holds
-   intent and rationale.
-3. **Inverted teeth over drift policing.** Prefer the design shape that *removes* a
-   failure mode to the gate that *catches* it. A gate that forbids resemblance beats a
-   gate that polices it.
-4. **Inventory before iterating.** A same-class surface audit at the start of UI work
+2. **Never roll your own visual verification — `/frontend-design` is the engine.** It is
+   the single proven tool for UX, for translating intent into the local design language,
+   and for the review referee. Orchestrate it; don't reinvent it. Pixel regression, if ever
+   needed, uses an *existing* tool — never hand-rolled. (This is the hardest-won commitment;
+   two audit rounds and the operator's experience both point here.)
+3. **Two reference artifacts: spirit and letter.** The wireframe carries the UX *spirit*;
+   the design-language spec carries the visual *letter*. The referee judges the realized
+   screenshot against *both*. Visual identity lives in the design language (and later a
+   living gallery from real components), never inside a wireframe.
+4. **Inverted teeth over drift policing.** Keep the exploration *deliberately unlike* the
+   product (a leakage lint), rather than building machinery to police a resemblance that
+   shouldn't exist.
+5. **Inventory before iterating.** A same-class surface audit at the start of UI work
    beats N screenshot-driven point fixes. Widen every complaint into "find every instance
    of this class."
-5. **Look, don't deduce; prove, don't assert.** Self-screenshot the exact surface, measure
-   before/after, show the delta. A passing test suite is a prerequisite, not a substitute,
-   for a visual claim.
+6. **Look, don't deduce; prove, don't assert.** Verification means *looking* at the exact
+   surface (a real screenshot) against specific criteria — not deducing from code. A passing
+   test suite is a prerequisite, not a substitute, for a visual claim.
 
 These specialize deskwork's existing thesis (`THESIS.md`: the agent is the primary tool;
 skills do the work) to the UI domain, and they generalize deskwork's existing
@@ -137,25 +147,23 @@ it. Per deskwork's own principle (*the discipline does not exist for an adopter 
 installs the plugin and follows the README*), a discipline that lives in one repo's
 `tools/` + docs + a feature branch effectively doesn't exist for anyone else.
 
-The north star is a **`design-control` plugin** that travels with `claude plugin install` and
-gives any markdown/UI project the full loop:
+The north star is a **`design-control` plugin** — a *discipline/orchestration* plugin, not a
+tooling plugin — that travels with `claude plugin install` and gives any UI project the loop
+by **orchestrating `/frontend-design`** (rolling no visual engine of its own):
 
-- **Stage 1 — design language:** a skill to scaffold + maintain a per-surface
-  design-language spec, and to generate a **living styleguide gallery** from the project's
-  real components.
-- **Stage 2 — lo-fi wireframe kit + inverted-teeth gate:** a portable `sketch-kit.css` +
-  `.sk-*` vocabulary, a skill to author a wireframe for a proposed change, and a
-  `check-mockup-lofi`-style gate (CLI verb + skill-body enforcement, never a git hook —
-  per `.claude/rules/enforcement-lives-in-skills.md`) that keeps explorations structurally
-  lo-fi.
-- **Stage 3 — device-free capture + visual baselines:** a portable capture engine
-  (fixture-rendered surfaces → deterministic PNGs) plus the `visual-compare` /
-  `visual-update-baseline` pair (exact-hash regression + re-bless), framework-agnostic
-  enough for deskwork's server-rendered Hono studio *and* an adopter's Astro/Next/React
-  site.
-- **Governance:** the ACCEPTED/REJECTED exploration archive (deskwork already has the
-  shape in `DESIGN-STANDARDS.md` + `docs/studio-design/`) extended so the *visual* in each
-  entry is a lo-fi wireframe, never a hi-fi mockup.
+- **Lo-fi wireframe kit + inverted-teeth lint:** a portable `sketch-kit.css` + `.sk-*`
+  vocabulary, a skill to author a wireframe (with `/frontend-design` working out the UX), and
+  a `check-mockup-lofi` leakage lint (CLI verb + skill-body enforcement, never a git hook —
+  per `.claude/rules/enforcement-lives-in-skills.md`).
+- **Design-language spec convention:** a markdown schema + a skill that uses `/frontend-design`
+  to translate approved wireframe intent into the project's local design language. (The
+  *living gallery* rendered from real components is phase 2.)
+- **Review-referee skill:** capture a screenshot with an *existing* tool (Playwright; deskwork
+  already uses it) at the required viewports, then invoke `/frontend-design` as referee —
+  spirit of the wireframe + letter of the design-language spec.
+- **Governance:** design-control ships its own ACCEPTED/REJECTED exploration archive (briefs +
+  lo-fi wireframe visual). deskwork's existing `DESIGN-STANDARDS.md` + `docs/studio-design/`
+  adopting it is a named, separate migration.
 
 The immediate forcing function is real: the sites→lanes clean break requires redesigning
 the studio's content-browser and scrapbook surfaces. That redesign is the **first
@@ -170,8 +178,12 @@ redesign and repeat Act I.
   `docs/superpowers/specs/audiocontrol-editor-ui-tooling-inventory.md` and
   `audiocontrol-redesign-infra-inventory.md`.
 - Source repo (in-flight): `audiocontrol-org/audiocontrol`, `feature/editor-ux-refinement`
-  — `design-mockup-pipeline.md`, `docs/wireframe-kit/`, `tools/check-mockup-lofi.sh`,
-  `scripts/visual-compare.mjs`, `scripts/visual-update-baseline.mjs`.
+  — `design-mockup-pipeline.md`, `docs/wireframe-kit/`, `tools/check-mockup-lofi.sh`.
+- Adversarial design audits that killed the roll-your-own visual-regression engine (two rounds,
+  cross-model): `.dw-lifecycle/scope-discovery/audit-runs/*design-control*`. Round 1 found the
+  exact-hash foundation unsound; round 2 found the determinism subsystem is a research project,
+  not a feature — leading to the "never roll your own; orchestrate `/frontend-design`" commitment.
+- Feature definition (kickoff): issue #424; `/tmp/feature-definition-design-control.md`.
 - Related deskwork docs: `THESIS.md`, `DESIGN-STANDARDS.md`,
   `.claude/rules/ui-verification.md`, `.claude/rules/design-standards.md`,
   `.claude/rules/enforcement-lives-in-skills.md`.

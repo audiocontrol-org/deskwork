@@ -243,41 +243,42 @@ one repo's `tools/`, docs, and a half-shipped feature branch. Per deskwork's own
 README*), it has to ship as installable skills + CLI verbs + tooling, not stay maintainer
 lore.
 
-**The discipline in one line:** model UI changes with **lo-fi wireframes** (so they can't
-be mistaken for implementation guidance), keep visual identity in a **settled design
-language** (not inside mockups), and verify the realized thing with **device-free
-deterministic screenshots** (visual truth anchored in real components, never a static
-artifact that rots).
+**The discipline in one line:** model UI changes with **lo-fi wireframes** (UX *spirit*),
+keep visual identity in a **settled design language** (the *letter*), and verify the realized
+thing by having **`/frontend-design` referee a screenshot against both** — never with
+roll-your-own pixel tooling.
+
+`design-control` is a **discipline/orchestration plugin, not a tooling plugin.** `/frontend-design`
+is the single proven engine, threaded through all three concerns; design-control owns only the
+thin glue and rolls **no** visual-verification engine. (Two adversarial audit-barrage rounds
+killed an earlier roll-your-own visual-regression design — the determinism subsystem was a
+research project, not a feature. See the thesis Provenance.)
 
 ### North-star shape
 
-Three stages, each an installable surface:
+1. **Lo-fi wireframe kit + inverted-teeth lint** — portable `sketch-kit.css` + `.sk-*`
+   vocabulary, an authoring skill (with `/frontend-design` working out the UX), and a
+   `check-mockup-lofi` *leakage* lint (CLI verb + skill-body enforcement, **never a git hook**).
+2. **Design-language spec convention** — a markdown schema + a skill that uses `/frontend-design`
+   to translate approved wireframe intent into the project's local design language. (Living
+   gallery from real components → phase 2.)
+3. **Review-referee skill** — screenshot the real surface with an *existing* tool (Playwright;
+   deskwork already uses it) at desktop + phone viewports, then `/frontend-design` referees:
+   spirit of the wireframe + letter of the design-language spec. No baseline, no diff engine.
+   If pixel regression is ever needed → an *existing* tool (Playwright `toHaveScreenshot`,
+   Percy, Argos, Chromatic), never hand-rolled.
 
-1. **Design language** — a skill to scaffold + maintain a per-surface design-language
-   spec, and to generate a **living styleguide gallery** from the project's real
-   components (so the gallery can't drift from as-built).
-2. **Lo-fi wireframe kit + inverted-teeth gate** — a portable `sketch-kit.css` + `.sk-*`
-   vocabulary, an authoring skill, and a `check-mockup-lofi`-style gate (CLI verb +
-   skill-body enforcement, **never a git hook** per `.claude/rules/enforcement-lives-in-skills.md`)
-   that keeps explorations *structurally* incapable of impersonating the product.
-3. **Device-free capture + visual baselines** — a fixture-rendered capture engine
-   (surface → deterministic PNG) plus a `visual-compare` / `visual-update-baseline` pair
-   (exact-hash regression + re-bless), framework-agnostic enough for the server-rendered
-   Hono studio *and* an adopter's Astro/Next/React site.
-
-Governance reuses deskwork's existing ACCEPTED/REJECTED exploration archive
-(`DESIGN-STANDARDS.md` + `docs/studio-design/`), extended so each entry's *visual* is a
-lo-fi wireframe, never a hi-fi mockup.
+Governance: design-control ships its own ACCEPTED/REJECTED exploration archive (lo-fi wireframe
+visual); deskwork's `DESIGN-STANDARDS.md` + `docs/studio-design/` adopting it is a named,
+separate migration.
 
 ### Why now, and the first dogfood
 
-The sites→lanes clean break forces a redesign of the studio's content-browser and
-scrapbook surfaces. That redesign is the **first dogfood** of the loop — building the loop
-first is what keeps the redesign from repeating the audiocontrol screenshot-loop pain.
-deskwork already carries two legs of the discipline (`.claude/rules/ui-verification.md`
-for "look-don't-deduce / prove-don't-assert"; the design-decision archive); the gaps to
-build are the **lo-fi wireframe kit + inverted-teeth gate** and the **fixture-rendered
-device-free capture + baseline harness**.
+The sites→lanes clean break forces a redesign of the studio's content-browser and scrapbook
+surfaces. That redesign is the **first dogfood** of the loop. deskwork already carries the
+"look-don't-deduce / prove-don't-assert" leg (`.claude/rules/ui-verification.md`) and the
+design-decision archive; the gaps to build are the **wireframe kit + lint**, the
+**design-language spec convention**, and the **`/frontend-design` referee orchestration**.
 
 ### Status
 
