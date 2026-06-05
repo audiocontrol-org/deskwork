@@ -31,8 +31,7 @@
 
 ## Notes
 
-- **3 [NEEDS CLARIFICATION] markers remain** (intentional, within the max-3 limit), all on scope-determining forks, surfaced to the operator:
-  1. FR-005 — spec-curation scope (initiate-only vs. full edit/iterate/review loop).
-  2. FR-006 — native-execution mechanism (given `/speckit-implement` is agent-invoked, not headless): launch/surface the command, orchestrate an agent session, or drive deterministic parts + hand off the agent step.
-  3. FR-007 — frontend shape (local web surface vs. TUI vs. minimal CLI-plus-thin-page).
+- **FR-005 — RESOLVED 2026-06-04 (operator):** curation is the **full edit/iterate/review loop** (not initiate-only).
+- **FR-007 — RESOLVED 2026-06-04 (operator):** frontend is a **terminal UI (TUI)** (deliberate departure from deskwork studio's web lineage).
+- **1 [NEEDS CLARIFICATION] marker remains** — FR-006: native-execution mechanism (given `/speckit-implement` is agent-invoked, not headless): launch/surface the command, orchestrate an agent session, or drive deterministic parts + hand off the agent step. Under discussion with the operator.
 - Resolve inline or via `/speckit-clarify` before `/speckit-plan`.

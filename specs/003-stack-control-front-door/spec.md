@@ -34,9 +34,9 @@ An operator points the stack-control front door at a Spec Kit spec and runs it. 
 
 ### User Story 2 - Curate a spec through the front door (Priority: P2)
 
-An operator uses the front door's **spec-curation touch point** to bring a Spec Kit spec into being and shape it — initiating a new spec and getting it into a runnable state — so that the same surface that runs a spec is also where the spec is prepared.
+An operator uses the front door's **spec-curation touch point** to create, **edit, iterate, and review** a Spec Kit spec — the full authoring loop — so the same surface that runs a spec is also where the spec is fully prepared.
 
-**Why this priority**: Curation + execution are the two touch points that make the front door a usable control plane rather than a bare execution trigger. Execution (US1) is the bootstrap; curation makes the loop self-contained. It is P2 because the very first build through the front door can lean on existing Spec Kit spec-authoring while curation matures.
+**Why this priority**: Curation + execution are the two touch points that make the front door a usable control plane rather than a bare execution trigger. Execution (US1) is the bootstrap; the full curation loop makes the front door self-contained for authoring. P2 relative to execution, but both ship in this feature.
 
 **Independent Test**: Through the front door, initiate a new Spec Kit spec and bring it to a state where US1 can execute it — without dropping out of the stack-control surface to do so.
 
@@ -85,9 +85,9 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 
 **Front door — curation + execution touch points**
 
-- **FR-005**: stack-control MUST expose a **spec-curation** touch point that brings a Spec Kit spec into a runnable state through the stack-control surface. [NEEDS CLARIFICATION: curation scope — initiate-only (create a new spec + view) vs. a full edit/iterate/review loop? Determines how much of the authoring surface this feature builds vs. defers.]
+- **FR-005**: stack-control MUST expose a **spec-curation** touch point providing a **full edit / iterate / review loop** over a Spec Kit spec through the stack-control surface — not just initiate-and-view. The operator can create a spec, edit it, iterate it, and review it without leaving the front door. *(Operator decision 2026-06-04.)*
 - **FR-006**: stack-control MUST expose an **execution** touch point that runs a spec via the **native Spec Kit mechanism** (`/speckit-implement`), with governance firing afterward. [NEEDS CLARIFICATION: native-execution mechanism — since `/speckit-implement` is an agent-invoked skill (not headlessly callable), does the touch point (a) launch/surface the agent command for an agent session to run, (b) orchestrate an agent session programmatically, or (c) drive only the deterministic parts and hand the agent step to the operator? Scope- and architecture-determining.]
-- **FR-007**: The front door MUST be reachable through both the `stackctl` CLI and a minimal frontend. [NEEDS CLARIFICATION: frontend shape — a local web surface (as `dw-lifecycle`/deskwork studio uses), a terminal UI, or a minimal surface (e.g. the CLI plus a thin status/launch page)? Determines the frontend build surface for this feature.]
+- **FR-007**: The front door's frontend is a **terminal UI (TUI)** — an in-terminal interactive surface, no browser — exposing the two touch points, alongside the `stackctl` CLI. *(Operator decision 2026-06-04. Note: this is a deliberate departure from deskwork studio's web-surface lineage; the fuller frontend feature inherits the TUI direction unless revisited.)*
 - **FR-008**: When native execution genuinely cannot run (mechanism unavailable, spec not runnable, governance capability absent), the front door MUST fail loudly with a descriptive error naming what is missing — no silent no-op, no faked run, no mock (Principle V).
 
 **Self-hosting**
@@ -98,7 +98,7 @@ stack-control installs as its **own plugin** (the `stackctl` CLI is available; i
 
 - **stack-control plugin**: the new plugin shell + package, own version line, hosting the front door and the rehomed governance extension.
 - **`stackctl`**: the CLI entry point to the front door.
-- **Front door**: the thin control plane surface (CLI + minimal frontend) exposing the two touch points.
+- **Front door**: the thin control plane surface (`stackctl` CLI + a terminal UI) exposing the two touch points.
 - **Spec-curation touch point**: the surface that brings a Spec Kit spec to a runnable state.
 - **Execution touch point**: the surface that runs a spec via native Spec Kit execution.
 - **Governance extension (rehomed)**: the founding feature's `after_implement` audit-barrage extension, now living in stack-control.
