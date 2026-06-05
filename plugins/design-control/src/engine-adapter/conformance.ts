@@ -45,8 +45,17 @@ export const ConfidenceSchema = z.number().refine(isConfidence, {
  * because the method-specific shape of the payload is validated downstream, not
  * here. The schema's `_output` therefore still types `payload?` (a `ZodEffects`
  * limitation), so a `satisfies z.ZodType<EngineAdapterRequest>` clause cannot be
- * kept against the required field; the request/response conformance tests are the
- * drift guard in its place.
+ * kept against the required field. Field-set drift (a field added to
+ * {@link EngineAdapterRequest} but not to this schema, or vice-versa) is caught at
+ * compile time by the `Expect<Equal<keyof z.input<...>, keyof EngineAdapterRequest>>`
+ * assertion in `types.binding.test.ts`, which `tsc --noEmit` (run as part of the
+ * package `test` script) enforces — NOT by the runtime conformance tests, which only
+ * check semantic echo.
+ *
+ * Key-presence detection here relies on zod v3's object parser materializing an
+ * output key only when the input key was present (`alwaysSet`); this holds for the
+ * pinned `zod ^3.24`. The runtime payload-presence cases in `conformance.test.ts`
+ * fail loud if a zod upgrade changes that materialization behavior.
  */
 export const EngineAdapterRequestSchema = z
   .object({
@@ -67,9 +76,13 @@ export const EngineAdapterRequestSchema = z
   });
 
 /**
- * Structural schema for an engine-adapter response. The `satisfies` clause keeps
- * the schema's parsed output aligned with {@link EngineAdapterResponse} for the
- * same compile-time-drift reason as the request schema above.
+ * Structural schema for an engine-adapter response. The response has no
+ * required-`unknown` field (`result` is legitimately optional — absent on
+ * failure), so a plain `z.object` aligns with {@link EngineAdapterResponse} and the
+ * `satisfies` clause below catches field-set drift directly at compile time. (The
+ * request schema cannot use `satisfies` for the `ZodEffects`/required-`payload`
+ * reason above; its equivalent drift guard is the key-set assertion in
+ * `types.binding.test.ts`.)
  */
 export const EngineAdapterResponseSchema = z.object({
   method: EngineMethodSchema,
@@ -226,13 +239,17 @@ export function parseAndValidate(
   }
 
   if (!narrowParsedRequest(parsedRequest.data)) {
-    // Unreachable: the schema's .superRefine rejects an absent payload key, so a
-    // value that parsed successfully always has the key. The guard exists to make
-    // that runtime guarantee type-visible without a cast.
-    return {
-      conformant: false,
-      violations: ['request structural violation at "payload": payload key is required.'],
-    };
+    // Unreachable by construction: the schema's `.superRefine` rejects an absent
+    // payload key, so any value that passed `safeParse` above already has the key.
+    // The guard exists only to make that runtime guarantee type-visible (narrowing
+    // `payload?` to required) without a cast. If it ever fires it is a broken
+    // invariant, not a normal validation failure — fail loud rather than
+    // manufacturing a fabricated ConformanceResult for a state the code asserts
+    // cannot happen.
+    throw new Error(
+      'design-control invariant violated: EngineAdapterRequestSchema parsed a request whose payload key is absent. ' +
+        'The schema .superRefine is expected to reject that case before this point.',
+    );
   }
 
   return validateConformance(parsedRequest.data, parsedResponse.data);
