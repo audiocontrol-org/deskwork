@@ -369,9 +369,12 @@ mask, or covers an intentionally-changed area *(round-5 codex-1 / claude-M1)*.
       diverse legitimate wireframes**, not a single fixture. The engine-authored wireframe is
       constrained by the **same** lint.
 - [ ] Design-language spec **link-liveness is static against source** (no app boot); a **dead
-      selector is flagged.** The spec is **hand-authorable** — scaffold completion does not require
-      the engine; the `translate-design-language` accelerator (when `/frontend-design` is present)
-      produces a spec linked to live source and passes adapter conformance.
+      selector is flagged.** The schema validates that **each rule carries ≥ 1 example reference**
+      (structural-presence check — a rule with zero examples is rejected; verifying the example still
+      *matches* live UI is `spec-truthfulness`, named-deferred). The spec is **hand-authorable** —
+      scaffold completion does not require the engine; the `translate-design-language` accelerator
+      (when `/frontend-design` is present) produces a spec linked to live source and passes adapter
+      conformance.
 - [ ] ACCEPTED/REJECTED archive **round-trips** (a decision + its links). `design-control status`
       **refuses "complete"** on a missing wireframe and **never reads referee verdict content**.
       Status distinguishes a **driving** wireframe from a retroactive **`derived`** one via

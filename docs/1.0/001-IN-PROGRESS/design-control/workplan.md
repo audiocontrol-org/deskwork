@@ -86,14 +86,18 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
       **no app boot**). Scoped to author-written CSS selectors/classes; utility-framework / CSS-in-JS
       / hashed CSS-Modules resolution is **not validated in v1** (named-deferred). Runtime dead-CSS +
       spec-truthfulness are named-deferred.
+- [ ] **Example-presence validation:** the schema rejects a rule with **zero example references**
+      (each rule carries ≥1 example). Structural-presence only — verifying the example still matches
+      live UI is `spec-truthfulness` (named-deferred).
 - [ ] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
       drafts/maintains the spec from approved wireframe intent; its engine conformance is exercised
       **only when `/frontend-design` is present.**
 
-**Acceptance (two paths):** **(scaffold, required)** an operator can hand-author a spec and static
-link-liveness flags a **dead selector** with **no app boot** — engine absent; **(accelerator, when
-present)** the `translate-design-language` skill produces a spec linked to live source and passes
-adapter conformance. Scaffold completion never depends on engine presence.
+**Acceptance (two paths):** **(scaffold, required)** an operator can hand-author a spec; static
+link-liveness flags a **dead selector** with **no app boot** — engine absent; **and the schema
+rejects a rule with zero example references** (≥1 example per rule, structural-presence only);
+**(accelerator, when present)** the `translate-design-language` skill produces a spec linked to live
+source and passes adapter conformance. Scaffold completion never depends on engine presence.
 
 ## Phase 3 — Archive primitive + `design-control status` (v1-scaffold)
 
