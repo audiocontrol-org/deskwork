@@ -1,47 +1,33 @@
 ---
 name: session-end
-description: "Wrap up a session by updating feature docs, writing a journal entry, and committing documentation changes."
+description: "Wrap up a session on the stack-control feature branch: write the development-log journal entry, capture any Spec Kit tooling friction, and commit + push documentation changes."
 user_invocable: true
 ---
 
-# Session End
+# Session End — stack-control feature branch (Spec Kit)
 
-Perform all end-of-session documentation updates:
+> **Branch-local (temporary).** The old dw-lifecycle closing ceremony (README status table, `workplan.md` check-offs, hygiene recommendation, structural chain) is intentionally **removed** on this branch — `stack-control` is tracked via Spec Kit artifacts, not the dw-lifecycle workplan. The **development log is kept** (it's the useful part). Reconcile at merge.
 
-1. **Update feature README.md** status table:
-   - Read: `docs/1.0/001-IN-PROGRESS/<feature-slug>/README.md`
-   - Update phase statuses based on what was accomplished this session
+Perform the closing steps:
 
-2. **Update workplan.md**:
-   - Check off completed acceptance criteria
-   - Add any new tasks discovered during the session
-   - Note any phase changes
-
-3. **Write DEVELOPMENT-NOTES.md entry** using the template:
+1. **Write the `DEVELOPMENT-NOTES.md` entry** (the development log — keep this):
    ```
    ## YYYY-MM-DD: [Session Title]
-   ### Feature: [feature-slug]
-   ### Worktree: [slug]
-   ### Goal / Accomplished / Didn't Work / Course Corrections / Quantitative / Insights
+   ### Feature: pluggable-lifecycle-providers
+   ### Worktree: pluggable-lifecycle-providers
+   **Goal / Accomplished / Didn't Work / Course Corrections / Quantitative / Insights**
    ```
-   - Tag each course correction: [COMPLEXITY] [UX] [FABRICATION] [DOCUMENTATION] [PROCESS]
-   - Include approximate quantitative data (messages, commits, corrections)
-   - Be honest about mistakes
+   - Tag each course correction: `[PROCESS] [UX] [COMPLEXITY] [FABRICATION] [DOCUMENTATION]`.
+   - Re-derive quantitative counts from source (`git log` for commits) — no false precision.
+   - Be honest about mistakes and unresolved decisions; record the prior session's "next step" so the next session resumes cleanly.
 
-4. **Append USAGE-JOURNAL.md entry** if the session exercised the deskwork plugin or studio in earnest:
-   - Read `USAGE-JOURNAL.md` for format and tone (see the file's header for guidance)
-   - Append a new dated section: `## YYYY-MM-DD: [Session usage-arc title]`
-   - Capture install/acquisition friction, lifecycle skill behavior, studio interactions, anything that surprised the operator (positively or negatively)
-   - Tag concrete items with **friction** / **fix** / **insight** when they cut clearly
-   - Quote the operator directly where the wording sharpens a finding
-   - This is user-research material, not a development log — it captures the *adopter experience* of using deskwork to do real work, distinct from DEVELOPMENT-NOTES.md's "what we built" focus
-   - If the session was infrastructure-only and didn't exercise the plugin, note that briefly and skip — but reflect on whether something *should* have been exercised
+2. **Capture Spec Kit tooling friction (optional, if any surfaced)** — the Spec-Kit-dogfood analog of a usage journal:
+   - Append to `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/tooling-feedback.md` (one friction per entry: Repro / Workaround / Suggested-fix).
+   - Only if the session actually hit Spec Kit / governance / `stackctl` friction. Skip cleanly if not.
 
-5. **Update/close GitHub issues**:
-   - Comment on issues that had progress
-   - Close issues that are complete
+3. **Update / close GitHub issues** that progressed this session (comment with evidence; the operator owns the closing transition).
 
-6. **Commit all documentation changes**:
-   - Stage: README.md, workplan.md, DEVELOPMENT-NOTES.md, USAGE-JOURNAL.md (when updated)
-   - Commit message: `docs: session end — [brief summary]`
-   - Push to feature branch
+4. **Commit + push all documentation changes:**
+   - Stage the journal + any spec/doc edits made this session.
+   - Commit message: `docs(stack-control): session end — [brief summary]` (no AI attribution).
+   - **Push** — pushing is the final mile; not pushing is less safe, not more.
