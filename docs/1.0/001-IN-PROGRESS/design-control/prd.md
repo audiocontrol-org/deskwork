@@ -386,8 +386,11 @@ mask, or covers an intentionally-changed area *(round-5 codex-1 / claude-M1)*.
 
 - [ ] The referee **escalates** (not merely "emits findings") on **every** planted **GROSS
       regression** (see Definitions) across **≥ 2 instances per gross class on ≥ 2 distinct
-      surfaces** — a **single miss fails the gate** (gross = must-catch-all; the gate exists because
-      LLM judges have missed gross defects).
+      surfaces**, with the **viewport-relative classes (below-fold + occlusion/overlap) planted at
+      BOTH declared viewports** (desktop ≥ 1280 + phone ≤ 390 — per `ui-verification.md` §
+      Dual-viewport; a below-fold or phone-only overlap appears at one viewport and not the other) —
+      a **single miss fails the gate** (gross = must-catch-all; the gate exists because LLM judges
+      have missed gross defects).
 - [ ] **Negative / specificity arm:** across a planted set of **≥ 5** **unchanged** +
       **legitimately-changed-but-intended** pairs, the referee over-escalates on **≤ 20% of the set**
       (the **ratio governs** at any set size; the v1 set is sized at 5, so ≤ 1) — a referee that
