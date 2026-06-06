@@ -28,8 +28,8 @@ models:
   - name: claude
     binary: claude
     args_template: "-p {{prompt-stdin}}"
-    timeout_seconds: 300
+    timeout_seconds: 600
   - name: codex
     binary: codex
     args_template: "exec {{prompt-stdin}}"
-    timeout_seconds: 300
+    timeout_seconds: 600

@@ -31,6 +31,8 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 |---|---|---|---|
 | TF-001 | Filed | [#426](https://github.com/audiocontrol-org/deskwork/issues/426) | — |
 | TF-002 | Filed | [#427](https://github.com/audiocontrol-org/deskwork/issues/427) | — |
+| TF-003 | Open | — | — |
+| TF-004 | Open | — | — |
 
 ## How to add an entry
 
@@ -59,3 +61,19 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 **Suggested fix:** *Light* — when the lift merges N raw findings into one entry, the entry body must concatenate (or bullet-list) every merged sub-finding's actionable detail, not just the first/highest-signal one. *Medium* — only merge raw findings when they share a root cause AND surface; findings at different surfaces (preflight.ts vs types.ts vs comment-wording across three files) should stay as separate entries so each is independently closeable. Cross-model agreement should raise confidence/severity on a SHARED finding, not be the trigger to fold unrelated findings together.
 
 **Recurrence (2026-06-06, run `20260606T060403205Z-design-control`, task-3 lint):** the lift again merged FIVE distinct findings under one ID — `AUDIT-20260606-01`'s `Finding-ID` line reads `(claude-01 + claude-02 + claude-03 + codex-01 + codex-02; cross-model)` but the body describes only the data-uri over-rejection (claude-01). The other four are genuinely distinct defects at the same surface but different mechanisms: precedence/mislabel (claude-02), scheme-regex boundary (claude-03), **mixed-rel `<link>` bypass (codex-01, real MED)**, and **control-char scheme obfuscation (codex-02, real MED)**. Same workaround: read the raw run-dir `claude.md`/`codex.md`, fixed all real defects, and SPLIT the merged entry into `AUDIT-20260606-01` (data-uri + precedence), `-02` (mixed-rel), `-03` (control-char scheme) so each is independently closeable. Two barrages in a row exhibiting this confirms it is systematic, not a one-off — the *Medium* fix (don't fold distinct-mechanism findings even when cross-model) is the one that matters.
+
+## TF-003 · MISC · medium · audit-barrage per-model timeout (300s) too short for heavy adversarial / multi-file prompts
+
+**Repro:** Firing `dw-lifecycle audit-barrage` with the design-control lint adversarial prompt (header + 5 concatenated `src/lint/*.ts` files; the agents must read + adversarially reason, not just diff-review). Run `20260606T233137617Z`: `codex` finished in 128s, but `claude` was SIGTERM-killed at exactly 300s (exit 143, 0 bytes stdout) — a DEGRADED single-model run. The diff-review barrages earlier this session finished claude in ~170s, so 300s suffices for diff-review but not for an adversarial generate-and-verify task over multiple source files.
+
+**Workaround used:** raised `timeout_seconds: 300 → 600` for both models in `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` and re-fired.
+
+**Suggested fix:** *Light* — a `--timeout-seconds` flag on `audit-barrage` to override per-run without editing the config (heavy adversarial prompts vs. quick diff-reviews want different caps). *Medium* — a higher default for non-diff prompts, or per-model timeout in the prompt-vars. At minimum, document that the config `timeout_seconds` governs and that adversarial/multi-file prompts need a larger value.
+
+## TF-004 · MISC · medium · barrage agents run AGENTIC and write into the worktree (left a file in src/)
+
+**Repro:** The first (timed-out) `claude` barrage agent, invoked as `claude -p {{prompt-stdin}}`, was building an empirical verification harness and wrote `plugins/design-control/src/_adv_verify.mts` into the repo source tree before the 300s SIGTERM killed it. The barrage agents are full agentic CLIs with write access to cwd; a review/adversarial barrage that the operator expects to be read-only can silently mutate the working tree (here: a stray `.mts` under `src/`; it happened to be excluded from `tsc` by the `*.ts` glob, but a `.ts` write would have entered the build).
+
+**Workaround used:** removed the debris; rewrote the design-control adversarial prompt to (a) instruct agents to keep scratch scripts under a `/tmp` `mktemp` path and never write the repo tree, and (b) be a pure directive (see TF-005 note below).
+
+**Suggested fix:** *Light* — `audit-barrage` prompts should carry a standing "read-only; scratch files in /tmp only" preamble for review-class barrages. *Medium* — run barrage agents with a read-only / sandboxed cwd (e.g. a scratch copy or a tmp working dir), or snapshot+restore the worktree around the fan-out, so a review barrage cannot mutate the tree under audit. (Related prompt-authoring lesson, TF-005-as-note: a prompt framed as a human "how to run this" doc made `claude -p` "orient and hand back" instead of executing; the FED prompt must be an unambiguous directive to the model — fixed in `audit/lint-adversarial-prompt.md`.)
