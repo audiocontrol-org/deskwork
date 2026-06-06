@@ -10,6 +10,8 @@
 
 It is the realization of the `pluggable-lifecycle-providers` north star (see the feature `prd.md` § North Star): the provider-agnostic control plane that **governs** and **executes** any authoring provider's dependency-annotated plan, branching on capabilities, never on provider identity.
 
+It governs not only *produced code* but the **design and ideation process itself**. Two consequences of that, both first-class to the protocol: (1) **low-friction insight capture** — design and scoping are NOT serial; the control plane must let an operator capture an out-of-sequence idea in one move, mid-thread, without losing the current thread, and triage it in a separate deliberate pass (operator: *"design should be as low friction as possible… treating design and scoping as a serial process is goofy"*); (2) **governing the spec, not just the implementation** — e.g. firing the cross-model audit-barrage over a spec at definition time, the same way governance fires over produced code at `after_implement`. The `design-inbox.md` in this feature's docs is the v0 dogfood of (1); both are explicit program features below.
+
 ## Why it is a separate plugin (and the successor to dw-lifecycle)
 
 `stack-control` is the intended **successor to `dw-lifecycle`**. The plan is absorb-then-retire:
@@ -43,6 +45,8 @@ Resequenced 2026-06-04 around the self-hosting strategy. Features 2–6 ("the re
 | 5 | **Migrate session-start / session-end** | Session lifecycle skills move over. | After 1. |
 | 6 | **Fuller control-plane frontend** | Beyond the thin front door: spec → implementation negotiation, scope-discovery + audit-barrage surfaces, the parallel engine's run surfaces. | After the capabilities exist. |
 | 7 | **Parity → retire `dw-lifecycle`** | When `stack-control` does real work as well as `dw-lifecycle`, retire it. | Future. |
+| 8 | **Low-friction insight capture** (governs the *design process*) | Make out-of-sequence idea capture a first-class control-plane capability: capture an insight in one move mid-thread without losing the current thread; **capture ≠ scope** (triage is a separate deliberate pass); support holding multiple design threads at once. Concretely: a `stackctl` capture verb + an inbox surface (frontend + CLI), with graduation paths into a spec / roadmap feature / GitHub issue, and integration with deskwork's Ideas stage for entries that become documents. | Captured 2026-06-06 (`design-inbox.md` is the v0 dogfood). Cross-cutting — sequence is the operator's call. |
+| 9 | **Govern the spec, not just the implementation** | Fire the cross-model audit-barrage over a *spec* at definition time — a Spec Kit governance hook (`after_specify` / `after_clarify` / `after_plan`) mirroring the `after_implement` `deskwork-governance` extension, and/or folded into the front-door `define`/`extend` skills. | Captured 2026-06-06 (surfaced by manually barraging `specs/002`'s spec). Cross-cutting. |
 
 ## Two distinct pluggability axes (do not conflate)
 

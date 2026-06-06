@@ -18,7 +18,7 @@ Entry format (keep it minimal — appending must stay a one-move act):
 - **Context:** Ran audit-barrage manually over `specs/002/spec.md` — 51 findings incl. 3 real contradictions. Spec authoring should not depend on a human remembering to run the barrage.
 - **Idea:** A Spec Kit governance hook (`after_specify` / `after_clarify` / `after_plan`) that fires the cross-model barrage over the *spec*, mirroring the existing `after_implement` `deskwork-governance` extension. And/or fold a barrage pass into the front-door `define` / `extend` skills. Extends stack-control's "govern produced code" to "govern the spec itself" — squarely on the north star.
 - **Provisional home:** stack-control front-door / governance enhancement (NOT Feature 2). Own small feature, or an extension of the governance slice.
-- **Status:** captured — needs scoping. (We'd dogfood it immediately on this very spec.)
+- **Status:** **promoted** → `stack-control-roadmap.md` Feature 9 ("Govern the spec, not just the implementation"), 2026-06-06.
 
 ### SEDA (staged queues) as the execution-engine architecture
 
@@ -34,4 +34,4 @@ Entry format (keep it minimal — appending must stay a one-move act):
 - **Context:** Multiple design ideas surfaced mid-thread this session; the serial "finish, then file" habit loses fresh insight. This file is the v0 convention.
 - **Idea:** Candidate next steps — (a) codify the inbox convention as a `.claude/rules/` rule so it's durable; (b) make it a native stack-control capability (a `stackctl` capture verb / a control-plane "idea inbox" surface) so the control plane itself supports parallel design threads; (c) wire graduation into deskwork's Ideas stage for entries that become real documents.
 - **Provisional home:** stack-control program (process + future capability). This inbox is the first instance.
-- **Status:** captured — convention proposed; codification pending operator nod.
+- **Status:** **promoted** → `stack-control-roadmap.md` Feature 8 ("Low-friction insight capture") + the vision in § What stack-control is, 2026-06-06. Still open: codify the inbox *convention* as a `.claude/rules/` rule (pending operator nod).
