@@ -45,6 +45,7 @@ description: "Task list for design/spec-governance implementation"
 
 - [ ] T004 [P] [US1] RED Bash smoke `scripts/smoke-govern-spec.sh` asserting `govern-spec.sh` over fixture `high-finding/` renders → fires → lifts: a run-dir appears under `.dw-lifecycle/scope-discovery/audit-runs/` and the feature `audit-log.md` gains a dated lift section. Must FAIL (script absent).
 - [ ] T005 [P] [US1] RED Vitest in `plugins/stack-control/tests/spec-governance/hook-wiring.test.ts` asserting the `after_clarify` hook in `extension.yml` resolves to the `speckit.spec-governance.govern-spec` command. Must FAIL.
+- [ ] T025 [P] [US1] RED assertion (coverage remediation — FR-009 / analyze C2) in `scripts/smoke-govern-spec.sh` (or a sibling smoke): `govern-spec.sh` over fixture `clean/` (0 findings) STILL produces a recorded run-dir + a dated `audit-log.md` section — a clean re-run is recorded, never pre-emptively skipped (empty revisions beat missed changes). Must FAIL until T007. NOTE: unlike dw-lifecycle `implement-hook`'s no-new-diff guard, `govern-spec.sh` (mirroring `govern.sh`) always runs — assert that.
 
 ### Implementation for User Story 1
 
@@ -66,6 +67,7 @@ description: "Task list for design/spec-governance implementation"
 ### Tests for User Story 2 (RED first) ⚠️
 
 - [ ] T010 [P] [US2] RED Vitest `plugins/stack-control/tests/spec-governance/cross-model-lift.test.ts`: given a fixture run-dir with the same root cause from two model files, the composed lift produces a merged finding with `crossModelAgreement` + a disposition slot in `audit-log.md`. Must FAIL until the compose path is exercised.
+- [ ] T026 [P] [US2] RED Vitest `plugins/stack-control/tests/spec-governance/disposition-persistence.test.ts` (coverage remediation — SC-004 / analyze C1): a disposition set in barrage run N (e.g. a finding marked `acknowledged-<ref>`) is PRESERVED across a subsequent revision's run N+1 — the later run distinguishes still-open from already-dispositioned findings (no disposition loss across revisions). Exercises the reused finding state machine end-to-end. Must FAIL until T011.
 
 ### Implementation for User Story 2
 
@@ -140,7 +142,7 @@ description: "Task list for design/spec-governance implementation"
 ### Parallel opportunities
 
 - T002 (fixtures) ∥ T001.
-- All RED test tasks across stories are `[P]` (distinct files): T004, T005, T010, T012, T013, T015, T016.
+- All RED test tasks across stories are `[P]` (distinct files): T004, T005, T025, T010, T026, T012, T013, T015, T016.
 - The gate verb (T015–T018) ∥ US2/US3 work (distinct files).
 - Polish T020, T021 are `[P]`.
 
