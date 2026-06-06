@@ -24,9 +24,26 @@ beneath every decision in this plugin. The load-bearing points:
   spots.
 - **Scope-discovery.** Drift / coverage / clone tracking is the catalog; discovered
   leakage classes are registered there, not scattered across ad-hoc tests.
-- **Never roll your own verification** — orchestrate `/frontend-design`. The wireframe's
-  inverted-teeth lint is a crib; "inventory before iterating" and "look, don't deduce" are
-  rituals that replace unreliable agent attention.
+- **Never roll your own verification** — orchestrate existing engines. `/frontend-design` is
+  the engine for the *authoring* concerns; the **referee is a cross-model audit-barrage** (the
+  Level-2 productization of the audit-barrage discipline) that judges a screenshot / live web
+  interface against wireframe-spirit + design-language-letter — `/frontend-design` in the
+  Claude agent, each other family's equivalent in its agent, cross-model agreement as the
+  signal, findings via the audit protocol. The wireframe's inverted-teeth lint is a crib;
+  "inventory before iterating" and "look, don't deduce" are rituals that replace unreliable
+  agent attention.
+
+## Level 1 vs Level 2 — do not conflate
+
+Two distinct applications of the same disciplines:
+- **Level 1 (how we DEVELOP this plugin):** dw-lifecycle's scope-discovery + audit-barrage run
+  over our TypeScript (clone/coverage scans; cross-model code review; adversarial validation of
+  the lint). Dogfooding.
+- **Level 2 (what this plugin SHIPS):** design-control *productizes* the design-domain forms of
+  the same disciplines for adopters building design-heavy products — **surface scope-discovery**
+  (inventory every UI surface of a class before iterating) and the **cross-model design
+  audit-barrage referee**. "We barraged our lint code" (L1) is NOT "design-control provides
+  adversarial design review" (L2).
 
 design-control is the UX/UI-surface specialization of the sibling **stack-control** plugin's
 stance. Source essay: <https://stackcontrol.org/blog/the-lifecycle-and-why-agents-need-one/>.

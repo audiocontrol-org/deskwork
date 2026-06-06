@@ -152,15 +152,18 @@ resemblance that shouldn't exist."*
 Visual truth is **always anchored in real components, never in a static artifact that can
 rot.** Markdown captures intent; generated artifacts capture pixels.
 
-`/frontend-design` (the Claude skill) is the single proven engine threaded through all three
-concerns; the discipline is the two durable reference artifacts it works against — the
-wireframe (UX *spirit*) and the design-language spec (visual *letter*).
+`/frontend-design` (the Claude skill) is the proven engine for the **authoring** concerns
+(1–2); the **referee** (concern 3) is a **cross-model audit-barrage** in which `/frontend-design`
+is the engine *inside the Claude judge* alongside the other model families' equivalents (see
+"The referee is a cross-model audit-barrage" below). The discipline is the two durable
+reference artifacts the engine works against — the wireframe (UX *spirit*) and the
+design-language spec (visual *letter*).
 
-| Concern | Owns | Reference artifact | `/frontend-design`'s role |
+| Concern | Owns | Reference artifact | engine's role |
 |---|---|---|---|
-| **1. UX (spirit)** | *how it's organized & flows* | **lo-fi wireframe** — deliberately un-styled, can't be mistaken for implementation guidance | collaborates on working out the UX |
-| **2. Design language (letter)** | *what it looks like* | **design-language spec** (markdown; later a living gallery from real components) | translates wireframe intent into the project's local design language, reduced to practice |
-| **3. Review (referee)** | *did the realized thing honor both?* | a **screenshot** of the real surface (existing tool, e.g. Playwright) | referees: does it adhere to the *spirit* of the wireframe AND the *letter* of the design-language spec? |
+| **1. UX (spirit)** | *how it's organized & flows* | **lo-fi wireframe** — deliberately un-styled, can't be mistaken for implementation guidance | `/frontend-design` collaborates on working out the UX |
+| **2. Design language (letter)** | *what it looks like* | **design-language spec** (markdown; later a living gallery from real components) | `/frontend-design` translates wireframe intent into the project's local design language, reduced to practice |
+| **3. Review (referee)** | *did the realized thing honor both?* | a **screenshot / live web interface** of the real surface (existing tool, e.g. Playwright) | a **cross-model audit-barrage** judges adherence to the *spirit* of the wireframe AND the *letter* of the design-language spec — `/frontend-design` in the Claude agent, the equivalent design-review tool in each other family's agent; cross-model agreement = the signal; findings flow through the audit protocol |
 
 **Inverted teeth.** The lo-fi wireframe is kept *deliberately unlike* the product so it can't
 be read as "build exactly this": a structural lint requires the WIREFRAME banner, allows only
@@ -170,25 +173,50 @@ banner + human/`/frontend-design` judgment is the real gate.
 
 **Verification is judgment, not a pixel engine.** Two adversarial audit rounds established that
 a roll-your-own visual-regression engine (exact-hash / perceptual-diff / pinned-container
-determinism) is a research project, not a feature. The discipline instead *looks* at a
-screenshot with specific criteria via `/frontend-design`. If pixel-level regression is ever
-genuinely needed, reach for an **existing** tool (Playwright `toHaveScreenshot`, Percy, Argos,
-Chromatic) — **never hand-rolled.**
+determinism) is a research project, not a feature. The discipline instead *looks* at the real
+surface with specific criteria. If pixel-level regression is ever genuinely needed, reach for
+an **existing** tool (Playwright `toHaveScreenshot`, Percy, Argos, Chromatic) — **never
+hand-rolled.**
+
+**The referee is a cross-model audit-barrage (the Level-2 productization of the
+audit-barrage discipline).** A single model judging a screenshot is an unreliable narrator —
+the exact failure mode stochastic correctness exists to defeat. So the referee is not one
+`/frontend-design` call; it is an **audit-barrage**: multiple independent model agents
+(claude, codex, gemini, …) each *look at* the realized surface — a screenshot **or the live
+web interface** (the barrage agents are agentic and multimodal; the prompt instructs them what
+to review) — and judge it against the wireframe *spirit* + design-language *letter*. The
+prompt **explicitly names the per-family design engine**: `/frontend-design` in the Claude
+agent, the equivalent design-review tool in each other family's agent. **Cross-model agreement
+is the genuine-defect signal**; findings flow through the **audit protocol** (audit-log →
+disposition). This is design-control *productizing* the same audit-barrage + audit-protocol it
+is *developed* with — the design-domain instance, distinct from the dev-time code barrage. It
+does **not** reintroduce roll-your-own verification: it uses existing model CLIs as judges +
+the existing audit protocol, rolling no pixel engine. Verification stays *judgment* — now
+multi-judge. (This retires the earlier design's "the barrage is text-only, so a cross-model
+vision referee is unproven/phase-2" reasoning: the barrage prompt can direct agents to review
+images and web interfaces.)
 
 ## The thesis (the architectural commitments)
 
 1. **Model the change; don't dictate the implementation.** A design exploration's job is
    to settle *structure, flow, and hierarchy* — not pixels. Make the artifact physically
    incapable of being read as "build it exactly like this."
-2. **Never roll your own visual verification — `/frontend-design` is the engine.** It is
-   the single proven tool for UX, for translating intent into the local design language,
-   and for the review referee. Orchestrate it; don't reinvent it. Pixel regression, if ever
+2. **Never roll your own visual verification — orchestrate existing engines.** For the
+   **authoring** concerns (UX, translating intent into the local design language),
+   `/frontend-design` is the proven engine — orchestrate it, don't reinvent it. For the
+   **referee**, orchestrate a **cross-model audit-barrage** (the existing audit-barrage +
+   audit-protocol, prompted for design review), with `/frontend-design` as the engine inside
+   the Claude judge and each other family's equivalent in its agent. Pixel regression, if ever
    needed, uses an *existing* tool — never hand-rolled. (This is the hardest-won commitment;
-   two audit rounds and the operator's experience both point here.)
+   two audit rounds and the operator's experience point here. The referee being *multi-judge*
+   rather than a single call is stochastic correctness — it strengthens, not violates, this
+   commitment.)
 3. **Two reference artifacts: spirit and letter.** The wireframe carries the UX *spirit*;
-   the design-language spec carries the visual *letter*. The referee judges the realized
-   screenshot against *both*. Visual identity lives in the design language (and later a
-   living gallery from real components), never inside a wireframe.
+   the design-language spec carries the visual *letter*. The referee — a cross-model
+   audit-barrage — judges the realized surface (screenshot / live web interface) against
+   *both*, with cross-model agreement as the signal and findings routed through the audit
+   protocol. Visual identity lives in the design language (and later a living gallery from real
+   components), never inside a wireframe.
 4. **Inverted teeth over drift policing.** Keep the exploration *deliberately unlike* the
    product (a leakage lint), rather than building machinery to police a resemblance that
    shouldn't exist.
@@ -222,9 +250,13 @@ by **orchestrating `/frontend-design`** (rolling no visual engine of its own):
 - **Design-language spec convention:** a markdown schema + a skill that uses `/frontend-design`
   to translate approved wireframe intent into the project's local design language. (The
   *living gallery* rendered from real components is phase 2.)
-- **Review-referee skill:** capture a screenshot with an *existing* tool (Playwright; deskwork
-  already uses it) at the required viewports, then invoke `/frontend-design` as referee —
-  spirit of the wireframe + letter of the design-language spec.
+- **Review-referee skill — a cross-model audit-barrage:** capture the surface with an
+  *existing* tool (Playwright; deskwork already uses it) at the required viewports, then fire a
+  **cross-model audit-barrage** over the screenshot / live web interface — each family's agent
+  judging spirit-of-the-wireframe + letter-of-the-design-language with its own design engine
+  (`/frontend-design` in the Claude agent, the equivalent in others), cross-model agreement as
+  the signal, findings via the audit protocol. This reuses the same audit-barrage +
+  audit-protocol the plugin is developed with, parameterized for design review.
 - **Governance:** design-control ships its own ACCEPTED/REJECTED exploration archive (briefs +
   lo-fi wireframe visual). deskwork's existing `DESIGN-STANDARDS.md` + `docs/studio-design/`
   adopting it is a named, separate migration.
