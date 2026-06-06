@@ -414,7 +414,7 @@ Per the project's own `.claude/rules/agent-discipline.md` § "Just for now is bu
 ### AUDIT-20260606-15 — SRI fix flags legitimately-stronger (sha384/sha512) pins as a mismatch and tells the operator a true pin is "defeating the pin"
 
 Finding-ID: AUDIT-20260606-15 (claude-01)
-Status:     open
+Status:     fixed-a7c1ef0e5c13778e2d706707a5ea9fd2e723db39
 Severity:   medium
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (SRI check)
 
@@ -427,7 +427,7 @@ The problem is the false-*positive* direction. Because the pin is sha256-only (`
 ### AUDIT-20260606-16 — No test covers sha512 or the stronger-algorithm-only case; coverage asserts only the sha384 + sha256 shape
 
 Finding-ID: AUDIT-20260606-16 (claude-02)
-Status:     open
+Status:     fixed-a7c1ef0e5c13778e2d706707a5ea9fd2e723db39
 Severity:   low
 Surface:    plugins/design-control/src/__tests__/lint/stylesheet-pin.test.ts
 
@@ -440,7 +440,7 @@ I checked the security-critical direction (no false-negative / no path that gree
 ### AUDIT-20260606-17 — URL_ATTRS comment still contains conditional future-work wording
 
 Finding-ID: AUDIT-20260606-17 (codex-01)
-Status:     open
+Status:     fixed-a7c1ef0e5c13778e2d706707a5ea9fd2e723db39
 Severity:   low
 Surface:    plugins/design-control/src/lint/allowlist.ts (URL_ATTRS comment); docs/1.0/001-IN-PROGRESS/design-control/audit-log.md (AUDIT-07 disposition)
 
