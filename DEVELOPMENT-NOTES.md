@@ -4860,3 +4860,41 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - A new tooling seam surfaced (TF-13): `specify extension add` produces a **committed** install copy that drifts from source and is **never executed** (the hook shells to source). Dead-but-committed + drifting is a reviewer trap; the bridge should gitignore the install output or drift-check it.
 
 **Next step:** Feature 1 (stack-control front door) is **complete (35/35), governed, pushed** — the self-hosting bootstrap is live. Next program steps are the operator's call: `/feature-ship` / `/feature-complete` for the PR + doc migration, OR proceed to **Feature 2** (parallel multi-backend execution engine, `specs/002-parallel-execution-engine/`) built *through* the front door, OR the dw-lifecycle migrations (scope-discovery / audit-barrage / session — Features 3–5). Bootstrap the next session with `/session-start` (NOT `/dwss`). When governing future multi-commit work, pass an explicit `GOVERN_DIFF_BASE` at the feature base (TF-12 Repro A).
+
+## 2026-06-06: Feature 2 — /speckit-clarify, reconcile design, cross-model SPEC barrage, thesis grounding
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** Operator: "keep implementing." Advance Feature 2 (parallel multi-backend execution engine, `specs/002-parallel-execution-engine/`) through the Spec Kit chain toward runnable.
+
+**Accomplished:**
+- **Activated Feature 2** as the speckit feature (`.specify/feature.json` + `CLAUDE.md` SPECKIT marker → 002) and ran **`/speckit-clarify`** over the spec — resolved backend roster, single-task-failure disposition, task→backend assignment, the reconcile/merge policy, and captured the load-bearing **unattended directive** ("a system that can run all night with no operator input", FR-021).
+- **Deep reconcile design** across several operator turns: from quarantine-first → **resolve-conflict-as-a-dispatched-task + audit-barrage sanity gate** → refined to **ONE whole-solution audit, only if conflicts occurred** (operator: "you don't have to run the audit barrage on every single conflict site").
+- **Ran a cross-model audit-barrage against the SPEC itself** (claude + codex, 2/2 models, **51 findings**) — caught 3 real contradictions I'd introduced plus deep design gaps. Triaged all.
+- **Design-inbox** established for low-friction out-of-sequence idea capture, then **codified as a self-sunsetting `.claude/rules/design-inbox.md`** (retires when Feature 8 ships native capture; tracked both ends).
+- **Governing the design process made first-class** in the roadmap: Feature 8 (low-friction insight capture) + Feature 9 (govern the spec, not just the implementation).
+- **Thesis recorded + foundations grounded.** "Invest heavily in up-front design and tooling; industrialize execution" is now the roadmap headline + a new canonical `stack-control-thesis.md` (distilling the motivating blog post's hard-won principles), pointed at by the auto-loaded succession rule, the session-start bootstrap, the Spec Kit constitution (bumped 1.1.1 → **1.2.0**, new Thesis & Motivating Context section), the PRD, the roadmap, and the plugin README.
+- **Full spec-hardening pass applied + pushed.** Closed the open decisions (roster split C1, capability vocabulary deferred B, SEDA named) and applied the barrage triage. New requirements FR-001a + FR-023..FR-032 (plan validation; complete=merged; task-success liveness; backend-loss reroute; run-branch lifecycle; worktree/disk; push durability; promotion gate; terminal states; SEDA + behavioral NFRs). New SC-013..SC-015. spec.md 187 → 248 lines; FR-001..FR-032, SC-001..SC-015; **0 NEEDS CLARIFICATION; checklist 16/16**.
+
+**Didn't Work / course corrections:**
+- [PROCESS] I defaulted to **serializing design + scoping** ("finish this, then file that"). Operator corrected: capture out-of-sequence ideas low-friction, hold multiple threads, *"treating design and scoping as a serial process is goofy."* → produced the design-inbox + Feature 8 + the self-sunsetting rule.
+- [PROCESS] My **quarantine-first reconcile policy leaked overnight work** back to the operator, quietly contradicting "run all night." Operator's reframe — *"why can't the orchestrating agent resolve conflicts… and treat it as part of the task(s) and an audit barrage to ensure the resolution is sane?"* — was strictly better. → resolve-as-task + whole-solution audit.
+- [PROCESS] Barrage finding #4 (engine→governance coupling "false because audit-barrage is a separate plugin") was an **artifact of the audit models lacking program context** — audit-barrage migrates in-house (roadmap Feature 4). Operator caught it: *"why do you think the audit barrage is in a separate plugin?"* → downgraded the finding; reframed FR-022 as honest in-house composition + fail-loud.
+- [PROCESS] The barrage caught **3 real contradictions I introduced in my own clarify edits** (FR-019↔Assumptions halt/continue, SC-010 conflict-quarantine, stale Key Entities) — the cross-model layer earning its keep on the agent's own work.
+
+**Quantitative** (re-derived from `git log afc3e64e..HEAD`):
+- Messages: ~16
+- Commits: 9
+- Files changed: 13 (+277 / −36)
+- Spec: `specs/002` spec.md 187 → 248 lines; FR-001..FR-032 (+FR-001a), SC-001..SC-015; 0 NEEDS CLARIFICATION; checklist 16/16
+- Barrage runs: 1 (claude + codex, 51 findings) — run dir `.dw-lifecycle/scope-discovery/audit-runs/20260606T145748044Z-pluggable-lifecycle-providers/`
+- Corrections: 3 substantive [PROCESS] reframes
+
+**Insights:**
+- **Audit-barrage on the SPEC (not just code) is high-leverage** — it found contradictions a single pass missed and motivated Feature 9. Stochastic correctness pointed at the DEFINE phase, which the thesis says is the higher-leverage place.
+- **An explicit organizing thesis resolves design calls deterministically.** Once "invest heavily up front, industrialize execution" + "outcomes independent of operator mood" were written down, the productivity floor (SC-013) and hard promotion gate (FR-030) stopped being judgment calls.
+- **Capture ≠ scope.** A one-move inbox let three out-of-sequence ideas (SEDA, spec-governance, the capture capability itself) be captured without derailing the active thread.
+- **"complete = merged"** (FR-023) is the spine of dependency-respecting parallelism; it closes the dependents-on-quarantined-work hole structurally rather than by policy.
+
+**Next step:** Feature 2 spec is **clarified + barrage-hardened + decision-complete**. Spec Kit chain is at **plan (interrupted — `plan.md` is the empty template; the spec changed substantially since, so the plan should regenerate)**. NEXT: resume **`/speckit-plan`** against the hardened spec (research → data-model → contracts → quickstart); `/speckit-plan` resolves the deferred items (capability vocabulary content, concurrency formula, the two concrete batch CLIs, SEDA stage design, run-record schema). **One thesis-derived default to confirm or veto: C4 push-as-produced (FR-028).** Codify-inbox-as-rule is DONE (self-sunsetting at Feature 8). Bootstrap next session with `/session-start` (NOT `/dwss`).
