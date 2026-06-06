@@ -1958,3 +1958,85 @@ Insert Step 8 between current Step 7 (structural snapshot) and the former Step 8
 - [x] `/dw-lifecycle:session-start` Step 8 invokes the verb; bootstrap report includes the staleness line alongside the structural snapshot.
 - [ ] Live dogfood on this repo: at the next session-start, the staleness signal appears in the bootstrap report. Operator confirms the surface fires before any task pickup. *(Pending — verified at cont. 6 from the source tree; operator-installed verification happens at the next release.)*
 - [ ] Closure transition is the operator's call post-install verification (operator-owned closure per AUDIT-35).
+
+## Phase 29: Adopter-friction burn-down (design-control TF + cont. 5/6 follow-ups)
+
+Four adopter-filed bugs surfaced via real dogfood since v0.38.0. Two ([#426](https://github.com/audiocontrol-org/deskwork/issues/426), [#427](https://github.com/audiocontrol-org/deskwork/issues/427)) came from `feature/design-control` (parent [#424](https://github.com/audiocontrol-org/deskwork/issues/424))'s first barrage rounds — TF-001 + TF-002 in that feature's tooling-feedback log. Two ([#420](https://github.com/audiocontrol-org/deskwork/issues/420), [#425](https://github.com/audiocontrol-org/deskwork/issues/425)) surfaced during the cont. 5/6 sessions on this branch.
+
+Per `.claude/rules/agent-discipline.md` § "Audit findings: scope-don't-defer + TDD enforcement," each bug is scoped here as a TDD-first workplan task with `Refs #N` trailer (NOT `Closes` — operator-owned closure rule per AUDIT-35). Closure happens when the operator verifies against a formally-installed release.
+
+### Task 1 (Refs [#427](https://github.com/audiocontrol-org/deskwork/issues/427)): `audit-barrage-lift` merge collapses distinct findings under one ID
+
+`extract-barrage-findings.ts` clusters raw findings via union-find with edges drawn when EITHER `headingsAgree` (6+ char substring overlap) OR `surfacesAgree` (any shared path token). The OR + transitivity over-merges: five distinct mechanisms touching `allowlist.ts` chain into one cluster, and `mergeCluster` drops every body except the representative's. Adopter impact: real MEDIUM defects buried in the attribution suffix; the dampener slushes the merged entry; "0 open findings" misreads.
+
+- [x] Step 0: working-code invariant — true same-cause cross-model agreement (e.g. claude + codex independently flagging one `EngineMethod`-style defect at the same line) MUST still merge into one entry; only over-merging across distinct mechanisms/surfaces is the bug.
+- [x] Step 1: bug-repro test against the three design-control run-dir cases named in #427 (the AUDIT-20260605-01 / -20260606-01 / -20260606-04 fixtures) — assert each emits N entries, not one merged entry. Fixture lives under `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.merge.test.ts`. Real run-dir samples copied into the test fixture dir; tests run offline.
+- [x] Step 2: regression-lock — existing `extract-barrage-findings` test cases that intentionally exercise same-cause cross-model merge (and the `crossModelAgreement: true` invariant) stay green. Two prior tests that pinned the OR-edge over-merge intent (`merges 2-model agreement via surface path-token match`, `handles multi-path Surface across cross-model agreement`) were renamed + augmented to assert the new contract (surface-only no longer suffices; same-cause cross-model still merges).
+- [x] Step 3: implementation — tightened the clustering edge condition: `clusterFindings` now requires BOTH `headingsAgree` AND `surfacesAgree`. `mergeCluster` concatenates every cluster member's body labelled by source model (single-member clusters keep body verbatim). Header comment updated in both `extract-barrage-findings.ts` and `audit-barrage-lift.ts`.
+- [x] Step 4: full plugin suite green (2761/2761 → 2776/2776 after Task 3); live-verify via fixture-based bug-repros derived from real run-dir shapes. Committed at `39c785c1` with `Refs #427` trailer.
+
+**Acceptance Criteria:**
+
+- [x] Bug-repro tests from all three design-control fixtures (AUDIT-20260605-01 / -20260606-01 / -20260606-04) emit N distinct entries per fixture, not 1.
+- [x] Existing cross-model agreement tests still pass — `crossModelAgreement: true` continues to fire on genuine same-cause merges.
+- [x] `audit-barrage-lift.ts` header comment names the new clustering contract verbatim.
+- [ ] Operator-verified closure post-release per AUDIT-35.
+
+### Task 2 (Refs [#426](https://github.com/audiocontrol-org/deskwork/issues/426)): `implement-hook` aborts when `audit-log.md` doesn't exist yet
+
+First barrage of every new feature hits this. The barrage fires cleanly, run-dir is written, then `audit-barrage-lift` fails with `audit-log not found` and `implement-hook.ts:492` writes `implement-hook: audit-barrage-lift failed; aborting.` and exits. Re-runs skip on the no-new-diff guard, so the first task's audit coverage is silently lost.
+
+- [x] Step 0: working-code invariant — existing-`audit-log.md` case unchanged; lift continues to append to the log normally.
+- [x] Step 1: bug-repro test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/audit-barrage-lift.first-barrage.test.ts` (path differs from scope: nested under `scope-discovery/promote-findings/` to sit next to other lift tests) — feature-dir with no `audit-log.md`; assert `runAuditBarrageLift` auto-inits the file from template and proceeds (exit 0; entries land). Sibling test confirms idempotency (existing audit-log preserved).
+- [x] Step 2: regression-lock — existing `audit-barrage-lift-cli.test.ts` happy-path (15 scenarios) stays green.
+- [x] Step 3: implementation — light fix per #426: `audit-barrage-lift` auto-initializes `audit-log.md` from the new bundled template at `plugins/dw-lifecycle/templates/scope-discovery/audit-log.md` when missing. Symmetric `tooling-feedback.md` auto-init added. `substituteSlug` helper handles both bare and HTML-escaped placeholder forms. Documented in `audit-barrage-lift.ts` header comment.
+- [x] Step 4: full plugin suite green (2763/2763 → 2776/2776 with Task 3). Committed at `44e5f23d` with `Refs #426` trailer.
+
+**Acceptance Criteria:**
+
+- [x] Bug-repro test fails on the no-`audit-log.md` case pre-fix.
+- [x] After fix: missing-`audit-log.md` triggers auto-init from template; lift completes with entries appended.
+- [x] `implement-hook` no longer prints `aborting` on the first-barrage path.
+- [x] `tooling-feedback.md` symmetric auto-init covered by sibling test.
+- [ ] Operator-verified closure post-release per AUDIT-35.
+
+### Task 3 (Refs [#420](https://github.com/audiocontrol-org/deskwork/issues/420)): `promote-findings --auto` task-ID collision
+
+Auto-positioner derives the next task number from a local/recent slice (or the stale `workplan-archive-ledger`) rather than scanning ALL existing `### Task <phase>.<n>` headings (including archived + prior-session impl tasks). Two collisions in one cont. 5 session: 39.15 collided with an earlier promote, then 39.17 collided with that batch's own AUDIT-03. The functional gates still work (keyed on AUDIT-ID), but workplan integrity degrades.
+
+- [x] Step 0: working-code invariant — fresh-phase numbering (no existing tasks under the phase) still starts at `.1`; ledger's `next-fix-task-id` remains the floor.
+- [x] Step 1: bug-repro test at `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/auto-position.collision.test.ts` (13 scenarios). **Honest finding:** the comprehensive shapes I synthesized (plain dotted, fix-finding paren wrap, nested cross-model paren, batch-2-after-batch-1) ALL parse correctly under the current `TASK_HEADING_RE` — meaning the per-phase scanner is not broken for shapes I can synthesize from outside the deskwork-plugin worktree. The fix is therefore defensive (per #420's suggested fix verbatim), and the tests confirm the defensive layer's correctness rather than reproducing the original symptom.
+- [x] Step 2: regression-lock — existing Phase 26 auto-position tests (29 scenarios — cross-phase merge, archive-ledger fallback) stay green.
+- [x] Step 3: implementation — defense-in-depth per #420's suggested fix: (a) `collectAllTaskIds(workplanText)` globally scans every `### Task X.Y` heading in the workplan AND expands every range in the archive ledger's `archived-fix-tasks`. (b) `nextTaskNumberFactory` now accepts an optional `takenIds` set; the factory forward-walks past any candidate ID already in the set instead of blindly using `max+1+idx`. (c) `promote-findings --auto` wires the global set into the factory + post-write re-reads the workplan and calls `findDuplicateTaskHeadings` to fail loud if any `### Task` heading is duplicated.
+- [x] Step 4: full plugin suite green (2776/2776). Committed at `a10ab2d8` with `Refs #420` trailer.
+
+**Acceptance Criteria:**
+
+- [x] Bug-repro tests confirm the per-phase scanner emits collision-free IDs for every realistic heading shape; the defensive layer protects against shapes I can't synthesize.
+- [x] Regression-lock covers Phase 26's existing auto-position contracts.
+- [x] `auto-position.ts` header comment names the new "global scan + ledger union" contract.
+- [ ] Operator-verified closure post-release per AUDIT-35.
+
+### Task 4 (Refs [#425](https://github.com/audiocontrol-org/deskwork/issues/425)): `close-shipped` SKILL.md leftover `/tmp/release-notes.md`
+
+Sibling of #412 (which fixed the bundles/verdicts paths in PR #414 but didn't touch the release-notes generation code path). `plugins/dw-lifecycle/skills/close-shipped/SKILL.md:261-262` uses bare `/tmp/release-notes.md`, violating `.claude/rules/file-handling.md`. Two concurrent `/release` invocations in different worktrees would clobber.
+
+- [x] Step 0: working-code invariant — the documented workflow shape (`close-shipped --release-notes-body > <path>` → `gh release edit --notes-file <path>`) doesn't change; only the path scheme.
+- [x] Step 1: SKILL.md regression test — `plugins/dw-lifecycle/src/__tests__/skills/close-shipped-skill-paths.test.ts` reads `close-shipped/SKILL.md`, walks every fenced code block, and asserts no bare `/tmp/<name>` paths appear inside. Prose mentions explaining WHY `/tmp` is unsafe are correctly skipped.
+- [x] Step 2: regression-lock — no pre-existing `close-shipped.test.ts` covered the release-notes-body codepath; the new regression test substitutes.
+- [x] Step 3: implementation — replaced SKILL.md `/tmp/release-notes.md` code example with the in-tree per-run pattern matching the Phase A precedent. Process-substitution alternative preserved. Added prose paragraph explaining the file-handling rule citation.
+- [x] Step 4: full plugin suite green (2777/2777). Committed at `faa821ed` with `Refs #425` trailer.
+
+**Acceptance Criteria:**
+
+- [x] No `/tmp/release-notes.md` paths remain in `close-shipped/SKILL.md` code blocks.
+- [x] New regression test enforces "no bare /tmp/<name> in SKILL.md."
+- [x] SKILL.md prose names the runs-dir path scheme.
+- [ ] Operator-verified closure post-release per AUDIT-35.
+
+### Phase acceptance
+
+- [x] All 4 tasks shipped with `Refs #N` trailers (NOT `Closes` — operator-owned closure per AUDIT-35). SHAs: `39c785c1` (#427), `44e5f23d` (#426), `a10ab2d8` (#420), `faa821ed` (#425).
+- [x] Plugin test suite green after each task commit (no regressions). 2755 → 2761 → 2763 → 2776 → 2777.
+- [ ] Phase folded into the next release's release notes alongside any other shipped phases.
+- [ ] Operator-verified closure of #420/#425/#426/#427 happens post-release per the closure rule.

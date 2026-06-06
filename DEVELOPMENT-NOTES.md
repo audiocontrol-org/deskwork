@@ -4857,3 +4857,71 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - Address TBD markers: (no bare TBD markers introduced this session)
 - Dismantle stale worktrees: 3 candidates — `graphical-entries` (4/9 signals), `hygiene` (3/9), `pluggable-lifecycle-providers` (3/9). Consider `/dw-lifecycle:dismantle-worktrees` if any are paused.
 - Workflow improvement: at the top of `/dw-lifecycle:implement`, run `git fetch origin main && git log feature/scope-discovery..origin/main --oneline | wc -l` to detect "branch is N commits behind main" before picking up any task; merge BEFORE implementing when N > ~5. The implement skill SKILL.md doesn't currently codify this; worth a rule update or skill amendment after operator scoping.
+
+## 2026-06-04 (cont. 6): Phase 28 ship + v0.38.0 release + post-release verification sweep + 12 issue closures
+
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Resume from cont. 5's hygiene recommendation — pick a high-value queue item against the now-fresh main. Operator pivot at session-start picked "address stale-branch friction at root" but redirected the placement from implement-loop to session-start (one-time cost, not per-iteration tax).
+
+**Accomplished:**
+
+- **Phase 28 scoped + shipped end-to-end.** New phase added to workplan + README with 4 tasks (pure-fn lib, CLI verb, config schema, SKILL.md wiring). All 4 task checklists + 4-of-6 acceptance criteria ticked (the 2 untickable are post-install operator verification per the project's closure rule). GH issue [#422](https://github.com/audiocontrol-org/deskwork/issues/422) filed with capture-mode body (cross-refs #413 / cont. 5 incident). Single commit `4d003915` (725 insertions, 4 deletions across 11 files: pure-fn lib + CLI verb + config schema + SKILL.md Step 8 + 3 new test files).
+- **PR #423 opened + merged.** Verification before completion: `cd plugins/dw-lifecycle && npm test` = 2755/2755 pass (was 2730 pre-Phase 28; +25 net). `tsc --noEmit` exit 0. Live-verify against this repo printed `Branch staleness: 0 commits behind origin/main (threshold 5).` exit 0. PR landed via standard merge-commit (`13599c27`); branch + worktree preserved per finishing-a-development-branch Option 2.
+- **CI gate handled with discovered context.** PR #423's CI was UNSTABLE due to pre-existing `@deskwork/studio` screenshot-test failures already red on main across 3 prior merges today (#414, #416, #421). Surfaced state + got explicit go-ahead before pushing the merge button. Phase 28's own contract: 2755/2755 in CI on the plugin workspace; 0 net failures introduced.
+- **v0.38.0 released.** All 4 release pauses cleared cleanly. Preconditions green; 11-file pure-version-bump diff with no surprises; tag message names both Phase 18 + Phase 28 (Phase 18 source-side closure of #415/#417 rode along from the cont. 5 merge); atomic --follow-tags push exit 0; `assert-published` confirmed all 3 npm packages live; `scripts/smoke-marketplace.sh` exit 0 with every route + asset returning 200. Release URL: https://github.com/audiocontrol-org/deskwork/releases/tag/v0.38.0
+- **Operator delegated the operator-side install + verification call.** Operator's framing: *"This counts as the operator-side install. I want you to verify the fixes actually work instead of making me do it."* — explicit override of the agent-discipline rule's reserved "operator decides closure" clause. I ran the verification sweep against the installed v0.38.0 binary at `~/.claude/plugins/cache/deskwork/dw-lifecycle/0.38.0/`.
+- **12 issues closed with verified evidence:** #294, #295, #397, #401, #402, #403, #404 (Phase 24 retirements all return `Unknown subcommand`); #405 (canonical + alias both work; alias prints stderr deprecation warning); #407 (`archive-phases --all` dry-run produces per-phase verdict shape); #410 (combined Phase 24+25+26 PR contract preserved end-to-end); #411 (close-shipped scanned 22 commits in v0.37.0..v0.38.0, applied `pending-verification` label to #417, 0 failures — pre-flight gate works); #412 (3 named `/tmp/` paths replaced with `.dw-lifecycle/close-shipped/runs/<timestamp>/`).
+- **#409 verification surfaced a NOT-shipped fix; corrected the misleading label.** `mergeDispositions()` at `plugins/dw-lifecycle/src/scope-discovery/clones-yaml.ts:439` still keys on `g.id` (the content-derived hash the issue named as the broken key). No content-fingerprint or rename-matching logic in source or tests. Removed the misleading `pending-verification` label (the issue is awaiting implementation, not verification) + posted explanatory comment.
+- **#418 verification surfaced a partial ship.** Surface 1 (this repo's committed `audit-barrage-config.yaml`) was migrated to `{{prompt-stdin}}`. Surface 2 (installer "Example override" block at `install-scope-discovery.ts:122-130`) still teaches `{{prompt}}`. Auto-migration not shipped. Posted partial-verification comment; kept open pending Phase 12 Task 10.
+- **New issue filed: [#425](https://github.com/audiocontrol-org/deskwork/issues/425).** Sibling of #412 — `/tmp/release-notes.md` at SKILL.md:261-262 in the `--release-notes-body` code path is a leftover the original #412 scope didn't name. Cross-references #412.
+
+**Didn't Work:**
+
+- **Hygiene helper's "Resume" pick was misleading at session-end** — points at Task 40 Step 0 (the close-shipped #411 surface) which already shipped + got closed this session. Same pathology as cont. 5: the mechanical first-unchecked-task scan doesn't know about the closure work that happened. Operator-overridden in the recommendation block below.
+- **`@deskwork/studio` CI failures are still red on main** across at least 5 merges today (PR #414, #416, #421, #410-pre, #423). Not my territory but the pattern is worth flagging — every PR that merges today inherits the broken CI signal.
+- **The cont. 5 stale-branch incident's discipline lesson didn't fire during the implementation pickup** (cont. 5 journal flagged: pre-implementation state-check against main is non-negotiable). I correctly used it for #418's surface check during verification, but the Phase 28 implementation itself was on a fresh-merged branch so the question never arose. The discipline gap is more "when stale-branch matters" than "always check"; Phase 28 (the new branch-staleness verb) is the mechanization of the lesson.
+
+**Course corrections:**
+
+- **[PROCESS] Operator can delegate the operator-side install + verification call.** The agent-discipline rule "Issue closure requires verification in a formally-installed release" reserves the closure transition for the operator. The operator's "This counts as the operator-side install" was an explicit override for this session. Pattern: when the operator delegates a normally-reserved decision, surface the override + execute. Do not extrapolate the override to future sessions; each delegation is per-session unless the rule itself changes.
+- **[PROCESS] Auto-applied `pending-verification` label is not proof of fix.** The `close-shipped` walker labels any issue referenced in the release range, regardless of whether the underlying fix substantively landed. #409 had the label but the fix didn't ship; verification revealed the gap. Lesson: when verifying a `pending-verification` issue, exercise the actual code path, not just the label.
+
+**Quantitative:**
+
+- Commits this session: **1 substantive** (`4d003915` Phase 28) + **1 merge** (`13599c27` PR #423 → main) + **1 release** (`3e8903ec` chore: release v0.38.0) = **3 total**.
+- PRs: **1** opened + merged (#423).
+- Releases: **1** (v0.38.0 — Phase 18 + Phase 28).
+- Tests: 2730 → 2755 (+25 new from Phase 28); plugin suite green in CI.
+- Issues: **12** closed with verified evidence (#294, #295, #397, #401-405, #407, #410, #411, #412), **1** filed (#425), **2** commented + relabeled (#409, #418), **1** new issue from Phase 28 scoping (#422 → closed via close-shipped + verification).
+- Verification: 14 issues exercised against the installed v0.38.0 binary; 12 closure-ready, 1 NOT-verified-fix-missing (#409), 1 partial-verified (#418).
+- Audit findings: 0 (no audit-barrage cycles this session; Phase 28's implementation was single-commit + tested in isolation).
+
+**Insights:**
+
+- **Phase 28's verb is the mechanization of cont. 5's lesson.** The cont. 5 journal named the stale-branch failure mode + manually proposed the cure ("check at session-start"). Phase 28 ships that cure as code that fires automatically. The session-start helper's misleading "Resume" pick is a different but related pathology — the helper's mechanical task-pick doesn't know about closures or main-side state. Both gaps point at the same architectural fact: the session-start surface needs richer context than the current journal-extracted prior recommendation provides.
+- **The verification sweep was high-leverage.** 14 issues exercised against the installed binary in roughly one session-hour produced: 12 closures (durable cleanup of the open queue), 1 not-shipped detection (#409 — corrected misleading state), 1 partial-detection (#418 — accurate state recorded), 1 new bug found (#425). The marginal cost of running each verification was small relative to the cleanup value. Worth considering: a `/dw-lifecycle:verify-pending` skill that batches this against any `pending-verification`-labeled issues post-release.
+- **Branch-staleness math worked at the verification surface too.** When I ran `branch-staleness-check` from inside the feature worktree (not main), it correctly reported "2 commits behind origin/main" — the chore-release commit + merge commit had landed on main but this worktree hadn't pulled them. The number was honest; the threshold (5) correctly didn't trip. Pure-fn boundary contract held in the real environment.
+- **CI red-on-main is a normalization risk.** Five PR merges today landed against a known-red CI; the project's working norm absorbed it without comment. The right move per `enforcement-lives-in-skills.md` § "a `--no-verify` push by the maintainer is evidence the hook chain is broken" is to fix the underlying flake, not normalize the bypass. The `@deskwork/studio` screenshot-test cluster is a candidate for a focused triage session.
+
+### Hygiene observations
+
+- v0.38.0 released — substantive shipping of Phase 18 (#415/#417 source-closure) + Phase 28 (#422)
+- issues closed this session: #294, #295, #397, #401, #402, #403, #404, #405, #407, #410, #411, #412 (12 total — all verified against installed binary)
+- issue #409 [OPEN] — refresh-clones-baseline carry-forward fix did NOT ship; `pending-verification` label removed (misleading)
+- issue #418 [OPEN] — audit-barrage E2BIG fix partially shipped (Surface 1 cured, Surface 2 + auto-migration outstanding); kept open pending Phase 12 Task 10
+- issue #422 [CLOSED] — Phase 28 branch-staleness verb verified live; closed via close-shipped workflow
+- issue #425 [OPEN, NEW] — sibling of #412: /tmp/release-notes.md leftover in close-shipped SKILL.md release-notes-body code path
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/hygiene` `feature/hygiene` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/pluggable-lifecycle-providers` `feature/pluggable-lifecycle-providers` — 3 of 9 staleness signals (per cont. 5 helper output; cont. 6 helper missed it but the staleness wasn't cleared)
+
+### Next session recommendation (hygiene)
+
+- **Resume:** queue head per the operator's call. Remaining substantive in-flight: Phase 12 Task 10 (#418, auto-migration path — operator pick required on doctor-rule vs. fire-time warning vs. both), Phase 20 Tasks 1-2 (not started), Phase 24 Task 10 post-release verification, Phase 27 (session-end archive hook — not started). The session-end-hygiene helper's mechanical "Resume" pick at Task 40 Step 0 is stale (Task 40 / #411 closed this session); ignore the helper output and let the operator state the queue head.
+- **Triage:** #409's lost fix needs scoping (carry-forward content-fingerprint algorithm sketched in the issue body; ready for a workplan task). #425 (new) is a small SKILL.md edit + commit — could fold into Phase 12 Task 10 or its own micro-phase. The `@deskwork/studio` red-CI cluster (screenshot-capture + screenshot-paste-drop) is a different concern area but normalization risk per the agent-discipline rule.
+- **Address TBD markers:** none introduced this session.
+- **Dismantle stale worktrees:** 3 candidates — `graphical-entries` (4/9), `hygiene` (3/9), `pluggable-lifecycle-providers` (3/9, carried from cont. 5). Consider `/dw-lifecycle:dismantle-worktrees` if any are paused.
+- **Workflow improvement:** the post-release verification sweep against the installed binary was high-leverage (12 closures + 2 corrections + 1 new bug found in roughly one session-hour). Consider productizing as `/dw-lifecycle:verify-pending` — batches the install-and-exercise pattern against any `pending-verification`-labeled issues post-release. Would systematize what cont. 6 did ad-hoc.
+- **Branch-staleness check fired correctly during cont. 6.** From the feature worktree post-release: "2 commits behind origin/main (threshold 5)" — below the nudge line, math honest. The Phase 28 cure is working end-to-end.
