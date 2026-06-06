@@ -21,6 +21,13 @@ export {
 } from '@/lint/stylesheet-pin';
 
 export {
+  type DisallowedCodepoint,
+  isAllowedCodepoint,
+  findDisallowedCodepoints,
+  formatCodepoint,
+} from '@/lint/codepoint';
+
+export {
   GLOBAL_ATTRS,
   TAG_ATTRS,
   PRESENTATIONAL_ATTRS,

@@ -80,10 +80,20 @@ verbatim in substance** — when they drift, the PRD wins.
       OPT-IN axis (the pure axis-1 lint stays filesystem-free); shared rule taxonomy extracted to
       `@/lint/types` to avoid a cycle. The inert-class invariant is asserted by a test: arbitrary
       class values pass ONLY alongside a verified pin. 12 tests (real-fs temp fixtures, no mocks).
-- [ ] **Codepoint allowlist** for text content (permit only Basic-Latin letters/digits +
+- [x] **Codepoint allowlist** for text content (permit only Basic-Latin letters/digits +
       enumerated punctuation + enumerated whitespace [space/newline/tab] + enumerated accented
       Latin; reject math-alphanumeric/enclosed/fullwidth/fraktur/emoji/box-drawing/tag-chars/
-      variation-selectors/zero-width).
+      variation-selectors/zero-width). **Implemented** `@/lint/codepoint`
+      (`isAllowedCodepoint`/`findDisallowedCodepoints`), wired into the `lintWireframe` walk over
+      text nodes (iterated by Unicode codepoint, deduped per codepoint) → `disallowed-codepoint`
+      rule. Allowlist: ASCII letters/digits, ASCII + enumerated typographic punctuation
+      (·–—''""…), whitespace = space/newline/tab ONLY (round-10: rejects nbsp/em/ideographic
+      space + CR), accented Latin = Latin-1 Supplement letters (minus ×÷) + Latin Extended-A.
+      Rejects math-alphanumeric/enclosed/fullwidth/fraktur/double-struck/emoji/box-drawing/tag-
+      chars/variation-selectors/zero-width (all carry category Letter or Symbol, so a range-
+      denylist would leak them — round-9). Applies to TEXT nodes only; class values stay inert
+      (axis-1). 16 tests incl. the planted Math-bold heading + emoji-as-icon rejections and the
+      example wireframe passing.
 - [ ] Adversarial validator: the lint MUST reject inline-style / `<style>` / `<script>` / `data:`
       / external-resource / presentational-attr leakage AND emoji-as-icon AND `𝐌𝐚𝐭𝐡`-bold-heading
       text leakage. Grandfather allowlist entries require an issue link + expiry.

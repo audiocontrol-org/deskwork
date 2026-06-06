@@ -32,6 +32,7 @@ export type { LintRule, LintFinding, LintResult } from '@/lint/types';
 
 import type { LintFinding, LintResult } from '@/lint/types';
 import { checkStylesheetIdentity, type StylesheetPin } from '@/lint/stylesheet-pin';
+import { findDisallowedCodepoints, formatCodepoint } from '@/lint/codepoint';
 
 type AnyNode = DefaultTreeAdapterMap['node'];
 type Element = DefaultTreeAdapterMap['element'];
@@ -133,6 +134,15 @@ function checkElement(el: Element, findings: LintFinding[]): void {
   }
 }
 
+function checkText(node: DefaultTreeAdapterMap['textNode'], findings: LintFinding[]): void {
+  for (const { codepoint, char } of findDisallowedCodepoints(ta.getTextNodeContent(node))) {
+    findings.push({
+      rule: 'disallowed-codepoint',
+      message: `disallowed codepoint ${formatCodepoint(codepoint)} (${JSON.stringify(char)}) in text content — outside the lo-fi codepoint allowlist`,
+    });
+  }
+}
+
 function walk(node: AnyNode, findings: LintFinding[]): void {
   if (ta.isElementNode(node)) {
     checkElement(node, findings);
@@ -140,6 +150,8 @@ function walk(node: AnyNode, findings: LintFinding[]): void {
     if ('content' in node && node.content) {
       for (const child of node.content.childNodes) walk(child, findings);
     }
+  } else if (ta.isTextNode(node)) {
+    checkText(node, findings);
   }
   if ('childNodes' in node) {
     for (const child of node.childNodes) walk(child, findings);
