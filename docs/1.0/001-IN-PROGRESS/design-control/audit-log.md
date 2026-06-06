@@ -455,7 +455,7 @@ The issue link is a real improvement over the previous untracked comment, so thi
 ### AUDIT-20260606-18 — SRI algorithm-prefix comparison is case-sensitive — a browser-valid uppercase-prefixed integrity (e.g. `SHA384-<correct-digest>`) is flagged as a mismatch
 
 Finding-ID: AUDIT-20260606-18 (claude-01 + codex-01; cross-model)
-Status:     open
+Status:     fixed-2fe77b14043eef692c0bb2b788cbc2cd5f76695e
 Severity:   low
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (SRI check)
 
@@ -468,7 +468,7 @@ This is the same false-positive *class* that AUDIT-20260606-15 set out to close 
 ### AUDIT-20260606-19 — SRI `?options` suffix (spec-valid) on a correct digest is flagged as a mismatch
 
 Finding-ID: AUDIT-20260606-19 (claude-02)
-Status:     open
+Status:     fixed-2fe77b14043eef692c0bb2b788cbc2cd5f76695e
 Severity:   low
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (SRI check)
 
