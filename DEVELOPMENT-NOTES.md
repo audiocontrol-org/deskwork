@@ -4767,3 +4767,59 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - **Owed before release:** live studio UI verification of the review-start shortform path (`.claude/rules/ui-verification.md`).
 - **Triage:** #420 (auto-numbering collision recurred — the auto-numberer is still buggy; consider fixing it before the next promote-findings run).
 - **Optional:** dismantle/archive the stale `graphical-entries` + `hygiene` worktrees.
+
+## 2026-06-04 → 06: design-control productized via audit-barrage convergence; sites→lanes c5 started + parked
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Resume Phase 39c-2b (sites→lanes), starting c5-impl (content-browser re-root). Mid-session this pivoted — operator-directed — into productizing the audiocontrol UX/UI discipline as a new **`design-control`** plugin, taken all the way through `/dw-lifecycle:define` → `:setup`.
+
+**Accomplished:**
+
+- **sites→lanes c5 (started, then parked):** committed `collectContentRoots` (`b246a73f`); implemented the core re-root (`defaultFsWalk` + `buildContentTree` → single-project, projectRoot-relative; core suite green 1029→1042). **Parked uncommitted** on discovering the studio content-browser collapse entangles with c2 (scrapbook) + the terminal `site`-axis deletion (scrapbook-viewer route + file-serving). Operator directed a **clean break, no fallback**, and that a studio **redesign** is in scope — which became the motivation for design-control. The WIP is the eventual *first dogfood*, not abandoned.
+- **Audited the audiocontrol UX/UI discipline from Claude session transcripts** (s550-support = the pain; editor-ux-refinement = the reframe). Wrote 3 provenance specs under `docs/superpowers/specs/` (session audit + two infra inventories).
+- **Authored `DESIGN-DISCIPLINE-THESIS.md`** (top-level, load-bearing) + ROADMAP `Design-control` north-star + `Design-barrage` research thread; filed **issue #424** (kickoff).
+- **Reframed the design** (operator direction): *never roll your own visual verification — `/frontend-design` is the single engine*, threaded through 3 concerns (UX spirit / design-language letter / review referee). Renamed `design-loop` → `design-control` (align with the `*control` family).
+- **Ran 11 adversarial audit-barrage rounds** (claude + codex in parallel) on the *design* until **two consecutive zero-HIGH rounds** (rounds 10 + 11 — operator's stop criterion). The barrage **killed a roll-your-own visual-regression engine** (rounds 1–2) and hardened the result. Converged design committed (`a00154da`): `docs/superpowers/specs/2026-06-04-design-control-design.md`.
+- **Set up the `design-control` feature** (`/dw-lifecycle:setup`): branch `feature/design-control`, worktree `~/work/deskwork-work/design-control`, PRD (`deskwork.id 60692084`) + TDD workplan + README. Operator expanded the PRD into a full design-of-record (closed 7-item GROSS-regression class list, Definitions).
+
+**Didn't Work:**
+
+- **Twice over-built the verification half** as a roll-your-own visual-regression engine (exact-SHA256 → perceptual-diff + pinned container + arch + masks). The barrage proved it a research project, not a feature; the operator's "never roll your own; `/frontend-design` is core" was the decisive cut.
+- **sites→lanes c5 couldn't land cleanly** — the studio `site`-axis is pervasive (content browser + scrapbook viewer + file serving), so c5-impl is not separable from c2 + terminal deletion. Parked rather than shipped half-done or papered with a fallback.
+
+**Course Corrections:**
+
+- [PROCESS] Operator: *don't add a fallback — clean break.* Reverted the instinct to revert-and-defer; kept the WIP, pursued the proper path.
+- [COMPLEXITY] Operator: *never roll your own visual verification; `/frontend-design` must be core.* The single largest reframe; dissolved every barrage HIGH about determinism.
+- [PROCESS] Operator denied a mid-flow `AskUserQuestion` → use judgment and proceed, don't stop to ask.
+- [PROCESS] Operator: adopt the audiocontrol UX/UI redesign tooling/processes (lo-fi wireframes, three-stage pipeline, inverted-teeth gate) — drove the discipline study.
+- [PROCESS] `design-loop` → `design-control` rename (operator: align with the `*control` website family).
+
+**Quantitative:**
+
+- Commits this session: **6** (`b246a73f`..`a00154da`, deskwork-plugin worktree) + **1** scaffold commit (design-control worktree).
+- Audit-barrage: **11 rounds** (claude + codex); convergence at rounds 10 + 11 (two consecutive zero-HIGH). Run dirs tracked under `.dw-lifecycle/scope-discovery/audit-runs/*design-control*`.
+- New issue: **#424** (open). PRD `deskwork.id`: `60692084`.
+- sites→lanes WIP (parked, uncommitted): core suite **1042** green.
+
+**Insights:**
+
+- The audit-barrage's genetic-diversity value holds on a **design**, not just code: it killed a roll-your-own engine the implementer (me) kept reaching for, and twice surfaced the same **denylist→allowlist** meta-insight (element/attribute axis round 7, codepoint axis round 9) that the single-pass review missed.
+- Productizing hard-won discipline needs the discipline's **own provenance audit** (the session transcripts that produced it) to capture the *why*, not just the *what* — the s550 "reactive to screenshots" pain is what makes the lo-fi/referee split legible.
+- A genuine plan-boundary discovery (the c5/c2/terminal entanglement) is worth surfacing, not plowing through — it reshaped the whole effort productively.
+### Hygiene observations
+
+- Issue **#424** [OPEN] worked this session — design-control kickoff/convergence/setup.
+- (#5, #21 surfaced by the scanner are NOISE — `#NNN` strings inside committed audit-run docs + the audit-log, not issues actually worked. Same false-positive class noted in prior journals for #2/#22/#23.)
+- No bare TBD markers introduced in the workplan this session.
+- Uncommitted non-doc WIP intentionally parked: the sites→lanes core re-root (`content-tree*`) — the design-control first-dogfood. NOT included in the doc-only session-end commit.
+- Stale worktrees flagged: `graphical-entries` (4/9), `scope-discovery` (4/9), `hygiene` (3/9) — dismantle/archive candidates.
+
+### Next session recommendation (hygiene)
+
+- **Resume: design-control PRD iterate cycle.** Run `deskwork ingest` + `review-start` on `docs/1.0/001-IN-PROGRESS/design-control/prd.md` (in the `design-control` worktree) → studio review URL → operator margin notes → `/deskwork:iterate` until `applied`. Then `/dw-lifecycle:issues`. Implementation runs in a SEPARATE session against `~/work/deskwork-work/design-control`. (NOT the scanner's "Install deskwork plugin in audiocontrol.org" — that's the superseded stale workplan line-76 Phase-4 item.)
+- **Also resume (deskwork-plugin):** sites→lanes Phase 39c-2b — the parked core re-root, now framed as the first design-control dogfood (wireframe the studio content-browser/scrapbook redesign via `/frontend-design`, then implement the clean break against it).
+- **Triage:** #424 (design-control) — advance through the PRD-applied gate before implementing.
+- **Optional:** dismantle/archive stale `graphical-entries` / `scope-discovery` / `hygiene` worktrees.
