@@ -27,10 +27,10 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 
 ## Status summary
 
-| TF | Status | Closing commit |
-|---|---|---|
-| TF-001 | Open | — |
-| TF-002 | Open | — |
+| TF | Status | Issue | Closing commit |
+|---|---|---|---|
+| TF-001 | Filed | [#426](https://github.com/audiocontrol-org/deskwork/issues/426) | — |
+| TF-002 | Filed | [#427](https://github.com/audiocontrol-org/deskwork/issues/427) | — |
 
 ## How to add an entry
 
