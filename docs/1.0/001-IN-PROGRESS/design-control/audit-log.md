@@ -297,3 +297,20 @@ Surface:    plugins/design-control/src/__tests__/lint/check-mockup-lofi.test.ts;
 Disposition override: slush-merged under -04; a real (LOW) breadcrumb-drift defect. Fixed in this commit.
 
 The round-1 fix's code/test comments labeled mixed-rel as `AUDIT-20260606-01/codex-01` and control-char as `AUDIT-20260606-01/...` even though those findings were split into `-02` and `-03` in the audit-log. An operator following the breadcrumb would land on the data-uri entry. Fix: updated the comments to cite `-02` (mixed-rel) and `-03` (control-char) to match the audit-log.
+
+## 2026-06-06 — audit-barrage lift (20260606T062311240Z-design-control)
+
+### AUDIT-20260606-07 — Invariant test + audit-log claim guard only the resource-attr direction, leaving AUDIT-04's own `a ping` example unprotected
+
+Finding-ID: AUDIT-20260606-07 (claude-01; codex CLEAN — convergence signature)
+Status:     acknowledged-slush-pile-2026-06-06
+Severity:   low
+Surface:    plugins/design-control/src/__tests__/lint/check-mockup-lofi.test.ts (coverage test); plugins/design-control/src/lint/allowlist.ts (URL_ATTRS doc)
+
+Disposition (honestly scoped, not a hidden defer): the round-3 barrage is the convergence stop point — codex CLEAN + this single non-overlapping claude LOW, dampener engaged (0 HIGH + 0 MED). The HONESTY half is fixed in this commit: the `URL_ATTRS` doc comment now states the coupling caveat explicitly (a non-resource URL attr added to the allowlist must also be added to `URL_ATTRS` or its values ship unscanned), so no overstated "auto-scanned" guarantee survives. The STRUCTURAL half (derive `URL_ATTRS` from URL-tagged allowlist entries so `allowlist → scanning` is machine-checkable) is parked with a CONCRETE TRIGGER rather than a vague "later": it is latent today (the allowlist's only URL attr is `href`, which IS covered — zero currently-unscanned attrs), and becomes actionable the moment the allowlist first adds a non-resource URL attr (`a ping`, `form action`, `q cite`, `area href`). Recorded here so that trigger isn't silently lost.
+
+The new test asserts `RESOURCE_URL_ATTRS ⊆ URL_ATTRS` ("every resource attr is scheme-scanned"). That direction is solid: adding `img: Set(['src'])` to `RESOURCE_URL_ATTRS` while forgetting `URL_ATTRS` fails the test. But the value-shape gate fires on `URL_ATTRS.has(attr)`, and an attribute only reaches that gate after passing `isAllowedAttr` (allowlist membership). So the failure mode that actually leaves a value *unscanned* is **allowlisted-URL-attr ∉ URL_ATTRS** — and nothing enforces that direction. The test guards `RESOURCE_URL_ATTRS → URL_ATTRS`, not `allowlist → URL_ATTRS`.
+
+This matters because AUDIT-04's own stated motivation names `a ping` as a non-href URL attr to worry about — and `ping` is a navigation-beacon attribute, *not* resource-loading, so a future dev would add it to `TAG_ATTRS['a']` (allowlist) without touching `RESOURCE_URL_ATTRS`. Its value would then pass completely unscanned for `data:`/`javascript:`/control-char schemes, and **no test would fail**. Same for `form action`, `blockquote/q cite`, `area href`. The fix's audit-log claim ("adding a resource attr without scheme coverage now fails a test instead of shipping a latent gap") is true but narrower than AUDIT-04's framing implies — the general "URL attr" coupling it set out to close is only closed for the resource-loading subset.
+
+The clean structural fix is to make URL-bearing-ness a property of the allowlist itself (e.g. tag the URL attrs at the point they're added to `TAG_ATTRS`/`GLOBAL_ATTRS`, and derive `URL_ATTRS` from that tagging) so the `allowlist → scanning` invariant is machine-checkable rather than relying on a dev remembering two SSOTs. Short of that, at minimum the audit-log entry and the `URL_ATTRS` doc comment should scope their guarantee honestly ("resource-loading URL attrs are test-guarded; non-resource URL attrs added to the allowlist must be manually added to `URL_ATTRS`") so the next session doesn't read "auto-scanned" and trust a guarantee that doesn't extend to `a ping`.

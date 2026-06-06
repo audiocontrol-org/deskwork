@@ -66,8 +66,16 @@ export const PRESENTATIONAL_ATTRS: ReadonlySet<string> = new Set([
  * javascript:, control-char obfuscation). This is the SSOT the lint gates its
  * value-shape checks on — NOT a hardcoded `'href'` literal — so adding a future
  * URL-bearing attr here automatically extends scheme coverage to it
- * (AUDIT-20260606-04). Invariant (test-enforced): every attr named in
- * {@link RESOURCE_URL_ATTRS} must appear here, so every resource attr is scanned.
+ * (AUDIT-20260606-04).
+ *
+ * Coupling caveat (AUDIT-20260606-07): the test-enforced invariant only covers
+ * the RESOURCE direction — every attr in {@link RESOURCE_URL_ATTRS} must appear
+ * here. A non-resource URL attr added to the allowlist ({@link TAG_ATTRS} /
+ * {@link GLOBAL_ATTRS}) — e.g. `a ping`, `form action`, `q cite` — must ALSO be
+ * added here by hand, or its values ship UNSCANNED with no failing test. Today
+ * the allowlist's only URL attr is `href` (covered), so this is a latent
+ * coupling, not a current gap; the robust fix (derive URL_ATTRS from URL-tagged
+ * allowlist entries) is warranted the moment the allowlist grows such an attr.
  */
 export const URL_ATTRS: ReadonlySet<string> = new Set(['href']);
 
