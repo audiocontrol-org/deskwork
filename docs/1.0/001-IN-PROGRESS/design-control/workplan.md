@@ -13,10 +13,14 @@ dependency); build the referee as a gated evidence-spike last. TDD-shaped: each 
 tests first, then minimal impl. **Per-phase acceptance must match the PRD's acceptance criteria
 verbatim in substance** — when they drift, the PRD wins.
 
-> **Design-shaped feature — `/frontend-design` is the engine, not a tool we build.** Per the
-> thesis: never roll your own visual verification. Any UI/CSS authored here (the sketch-kit) is a
-> static lo-fi convention; visual verification is `/frontend-design`. Implementation runs in a
-> **separate session** against the `design-control` worktree (`/dw-lifecycle:implement`).
+> **Design-shaped feature — orchestrate existing engines, don't build them.** Per the thesis:
+> never roll your own visual verification. `/frontend-design` is the engine for the *authoring*
+> concerns; the **referee is a cross-model audit-barrage** (reuses dw-lifecycle audit-barrage +
+> audit-protocol, parameterized for design review — `/frontend-design` in the Claude agent, each
+> other family's equivalent in its agent; cross-model agreement = signal). See the PRD **DESIGN
+> AMENDMENT (2026-06-06)**. Any UI/CSS authored here (the sketch-kit) is a static lo-fi
+> convention. Implementation runs in a **separate session** against the `design-control` worktree
+> (`/dw-lifecycle:implement`).
 
 > **Definitions** (see PRD § Definitions): a **surface** is an operator-declared named UI region
 > (`surface id`), verified across `route/state + viewport + capture-step` (a `capture-step` is a
@@ -186,7 +190,21 @@ preserved); a **referee-preview manifest** that omits a required referee field i
 
 ## Phase 5 — `v1-referee-preview` evidence-spike (GATED; advisory only)
 
-- [ ] `referee-screenshot` Claude-vision shim adapter (one conformant adapter in v1).
+> **Per the PRD DESIGN AMENDMENT (2026-06-06): the referee is a cross-model audit-barrage**, not a
+> single Claude-vision shim. It REUSES the dw-lifecycle audit-barrage + audit-protocol (declared
+> cross-plugin dependency), parameterized with a design-review prompt that directs each family's
+> agent to review the screenshot / live web interface against wireframe-spirit +
+> design-language-letter using its own design engine (`/frontend-design` in the Claude agent, the
+> equivalent in others). Cross-model agreement = the signal; findings flow through the audit-log →
+> disposition protocol. The tasks below are reframed accordingly.
+
+- [ ] `referee-screenshot` fulfilled by the **cross-model audit-barrage**: a design-review prompt
+      template (explicitly names the per-family engine — `/frontend-design` for Claude, codex's
+      equivalent, etc.) + the reuse wiring onto dw-lifecycle `audit-barrage` + audit-protocol. v1
+      fires every family that can both review the image/web-interface AND run a design engine
+      (Claude + codex certain; gemini if its CLI qualifies). No bespoke vision engine is built;
+      per-family vision conformance is gated on the falsification set (a non-qualifying family is
+      simply absent from the roster).
 - [ ] Two-image **GROSS**-regression judgment (candidate + promoted baseline; GROSS per PRD §
       Definitions); spirit and letter as **two separate questions**; structured change-scope
       classification (intended/unintended/ambiguous/outside-scope; ambiguous → operator). The referee
@@ -207,7 +225,11 @@ preserved); a **referee-preview manifest** that omits a required referee field i
       concrete rule** (PRD § Baseline & capture): a region covering > **25%** of the captured surface
       (v1 default, operator-tunable) **or** overlapping any `stableRegion` / protected invariant trips
       `status` (warn-then-block).
-- [ ] Claude **stability sampling** labeled as such (NOT diversity/quorum).
+- [ ] **Cross-model agreement is the diversity/quorum signal** (the barrage provides genuine
+      model diversity — superseding the prior single-Claude "stability sampling, NOT
+      diversity/quorum" note). Within a single family, repeated sampling remains *stability*,
+      labeled as such; across families, agreement is the HIGH-confidence escalation signal per the
+      audit-barrage's existing cross-model rule.
 - [ ] **"Escalation" definition** wired into the gate: an escalation = a referee finding classified
       **`unintended` or `ambiguous`** and localized to a region (distinct from a mention or an
       `intended`/`outside-scope` classification). A planted gross regression is "caught" iff the

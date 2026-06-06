@@ -43,24 +43,57 @@ orchestrates an existing engine — with NO roll-your-own visual-verification en
 verbs, a lint, a `status` command, manifests, and skills — that is tooling; **it builds no custom
 pixel / visual / determinism engine.** A roll-your-own visual-regression engine was the original
 v1 design and was **killed across the first two adversarial barrage rounds**; everything since is
-orchestration of `/frontend-design` (the single proven engine).
+orchestration of existing engines — `/frontend-design` for the authoring concerns, a
+**cross-model audit-barrage** for the referee (see the DESIGN AMENDMENT below).
 
 `/frontend-design` is threaded through **three concerns**, anchored by **two durable reference
 artifacts** (lo-fi wireframe = UX *spirit*; design-language spec = visual *letter*) plus a
 **promoted baseline**. The loop:
 
 > author a lo-fi wireframe (works out the UX) → operator picks → `/frontend-design` translates
-> intent into the project's local design language → implement against it → `/frontend-design`
-> **referees** a screenshot against the *spirit* of the wireframe and the *letter* of the spec
-> (advisory evidence, **never** a gate).
+> intent into the project's local design language → implement against it → a **cross-model
+> audit-barrage referees** the surface (screenshot / live web interface) against the *spirit* of
+> the wireframe and the *letter* of the spec — `/frontend-design` in the Claude judge, each other
+> family's equivalent in its agent; cross-model agreement = signal (advisory evidence, **never** a gate).
 
 ### Identity & portability (claim matched to evidence)
 
 A deskwork marketplace plugin **with a pluggable referee-engine requirement.**
 **Render-framework-independent** (the referee looks at a screenshot, so the rendering stack —
 Astro/Next/Hugo/etc. — doesn't matter) — but **NOT agent-independent** (a referee engine *is*
-required). No "any-adopter / framework-independent" overclaim. v1 ships **one** conformant referee
-adapter (Claude / `/frontend-design`).
+required). No "any-adopter / framework-independent" overclaim. *(The "v1 ships **one** conformant
+referee adapter (Claude)" plan is superseded — see the DESIGN AMENDMENT directly below.)*
+
+## DESIGN AMENDMENT (2026-06-06) — the referee is a cross-model audit-barrage
+
+This supersedes the "single Claude `/frontend-design` referee adapter; the audit-barrage is
+text-only; cross-model vision is phase-2-unproven" framing that still appears in the
+engine-adapter-seam and identity passages (kept for convergence provenance). Operator decision:
+
+- **The referee is the dw-lifecycle audit-barrage + audit protocol, parameterized for design
+  review** — design-control *productizing* the same discipline it is developed with (Level 2),
+  not a bespoke verifier. Multiple model agents *look at* the realized surface (a screenshot
+  **or the live web interface** — the agents are agentic + multimodal; the prompt instructs them
+  what to review) and judge it against wireframe-*spirit* + design-language-*letter*.
+  **Cross-model agreement is the genuine-defect signal**; findings flow through the audit-log →
+  disposition protocol. (The prior "barrage fires CLIs at a *text* diff" premise was wrong.)
+- **The barrage prompt explicitly names the per-family design engine:** `/frontend-design` in
+  the Claude agent, the equivalent design-review tool in each other family's agent (e.g. codex).
+  "`/frontend-design` is the engine" holds *inside the Claude judge*; the barrage adds the other
+  families for the stochastic-correctness diversity that makes the verdict trustworthy.
+- **Reuse, not re-implement:** the referee invokes the existing dw-lifecycle audit-barrage +
+  audit-protocol (declared cross-plugin dependency, like `/frontend-design`), parameterized with
+  a design-review prompt. Embodying a parallel copy would itself be "rolling your own."
+- **Architected as a barrage from v1:** v1 fires whatever model families can both review the
+  image/web-interface AND run a design engine (Claude + codex certain; gemini if its CLI
+  qualifies). Cross-model agreement + the Phase-5 adversarial falsification set are the trust
+  gate. This replaces "single Claude shim now, cross-model later."
+
+Still consistent with the hardest-won commitment: this rolls **no pixel engine** — it uses
+existing model CLIs as *judges* + the existing audit protocol; verification stays *judgment*,
+now multi-judge. Rationale: a single-model referee is the unreliable-narrator failure mode
+stochastic correctness exists to defeat. See `DESIGN-DISCIPLINE-THESIS.md` § "The referee is a
+cross-model audit-barrage."
 
 ## Definitions
 
@@ -126,13 +159,19 @@ conformance clauses are load-bearing:
 - **(a)** `author-wireframe` **must emit sketch-kit-only, lint-passing lo-fi markup.** A claiming
   engine is **constrained by the lint, never trusted**; the default Claude adapter fails conformance
   **loudly** if it leaks polish *(round-6 H1)*.
-- **(b)** `referee-screenshot` is a **Claude-vision shim wrapping the engine** (distinct from
-  `/frontend-design`'s code-gen role); its **adversarial falsification set is its acceptance gate.**
+- **(b)** `referee-screenshot` is fulfilled by the **cross-model audit-barrage** (see the DESIGN
+  AMENDMENT above): each family's agent reviews the screenshot / live web interface with its own
+  design engine (`/frontend-design` in the Claude agent; the equivalent in others). Its
+  **adversarial falsification set + cross-model agreement are its acceptance gate.**
 
-**v1 ships ONE conformant adapter (Claude).** Multi-family is **not** assumed from the existing
-audit-barrage harness — that harness fires CLIs at a *text* diff; a *vision* `referee-screenshot`
-adapter (image ingestion at fidelity + conformant output) for codex/gemini is unproven and is
-**phase 2, gated on demonstrating per-family vision-adapter conformance.**
+**The referee is architected as a barrage from v1** (superseding the prior "one Claude adapter;
+cross-model vision is phase-2-unproven" plan — that plan wrongly assumed the barrage is
+text-only). v1 fires whatever model families can both review the image/web-interface AND run a
+design engine. The referee **reuses** the existing dw-lifecycle audit-barrage + audit-protocol
+(declared cross-plugin dependency), parameterized with a design-review prompt — it builds no
+vision engine of its own. Per-family vision conformance (image ingestion at fidelity +
+structured output) is a Phase-5 deliverable, gated on the falsification set; a family that
+doesn't yet qualify simply isn't in the barrage's roster.
 
 ## v1 split — two releasable modes; the boundary is sharp
 
