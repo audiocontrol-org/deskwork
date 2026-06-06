@@ -107,6 +107,18 @@ function templatesDir(): string {
   return resolve(here, '..', '..', '..', 'templates', 'scope-discovery');
 }
 
+export interface EnsureAuditArtifactsResult {
+  readonly auditLogInitialized: boolean;
+  readonly toolingFeedbackInitialized: boolean;
+  /**
+   * Templates the helper would have initialized but couldn't because the
+   * bundled file is missing. Populated only in apply mode (writes were
+   * actually attempted). The caller should surface this as an actionable
+   * packaging defect.
+   */
+  readonly missingTemplates: readonly string[];
+}
+
 /**
  * Auto-initialize `audit-log.md` (and the symmetric `tooling-feedback.md`)
  * when missing from the feature directory. The bundled templates use
@@ -117,30 +129,59 @@ function templatesDir(): string {
  * found" abort in `runAuditBarrageLift` because no setup-time path
  * seeded the file. Auto-init at lift time closes that gap without
  * touching the setup flow.
+ *
+ * Post-audit-barrage findings (AUDIT-BARRAGE-claude-01 + codex-01):
+ *
+ *   - `write` defaults to `false` — callers in dry-run mode get a
+ *     "would have created X" diagnostic without disk mutation. Apply
+ *     mode passes `write: true` to actually init.
+ *   - Each template read is wrapped in try/catch so a missing bundled
+ *     file (packaging defect) surfaces as a tracked `missingTemplates`
+ *     entry instead of an unhandled ENOENT crash. The pre-#426 code
+ *     returned a clean exit 2; this preserves that operator-facing
+ *     diagnostic shape.
  */
 export async function ensureAuditArtifactsExist(
   featureRoot: string,
   slug: string,
-): Promise<{ readonly auditLogInitialized: boolean; readonly toolingFeedbackInitialized: boolean }> {
+  write: boolean = false,
+): Promise<EnsureAuditArtifactsResult> {
   const tdir = templatesDir();
   let auditLogInitialized = false;
   let toolingFeedbackInitialized = false;
+  const missingTemplates: string[] = [];
 
-  const auditLogPath = join(featureRoot, 'audit-log.md');
-  if (!existsSync(auditLogPath)) {
-    const tmpl = await readFile(join(tdir, 'audit-log.md'), 'utf8');
-    await writeFile(auditLogPath, substituteSlug(tmpl, slug), 'utf8');
-    auditLogInitialized = true;
-  }
+  const tryInit = async (
+    templateName: string,
+    targetPath: string,
+  ): Promise<boolean> => {
+    if (existsSync(targetPath)) return false;
+    let tmpl: string;
+    try {
+      tmpl = await readFile(join(tdir, templateName), 'utf8');
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        missingTemplates.push(templateName);
+        return false;
+      }
+      throw err;
+    }
+    if (!write) return true; // dry-run: report intent without mutating.
+    await writeFile(targetPath, substituteSlug(tmpl, slug), 'utf8');
+    return true;
+  };
 
-  const tfPath = join(featureRoot, 'tooling-feedback.md');
-  if (!existsSync(tfPath)) {
-    const tmpl = await readFile(join(tdir, 'tooling-feedback.md'), 'utf8');
-    await writeFile(tfPath, substituteSlug(tmpl, slug), 'utf8');
-    toolingFeedbackInitialized = true;
-  }
+  auditLogInitialized = await tryInit(
+    'audit-log.md',
+    join(featureRoot, 'audit-log.md'),
+  );
+  toolingFeedbackInitialized = await tryInit(
+    'tooling-feedback.md',
+    join(featureRoot, 'tooling-feedback.md'),
+  );
 
-  return { auditLogInitialized, toolingFeedbackInitialized };
+  return { auditLogInitialized, toolingFeedbackInitialized, missingTemplates };
 }
 
 /**
@@ -339,15 +380,40 @@ export async function runAuditBarrageLift(
   // Per #426: auto-init audit-log.md + tooling-feedback.md if missing.
   // The first barrage of every new feature used to abort here because
   // no setup-time path seeded the files. Auto-init closes that gap.
-  const initResult = await ensureAuditArtifactsExist(featureRoot, opts.featureSlug);
-  if (initResult.auditLogInitialized) {
+  //
+  // Post-barrage findings (AUDIT-BARRAGE-codex-01 + claude-01):
+  //   - Init is gated on `opts.apply` so dry-run never mutates disk.
+  //   - Missing-template ENOENT is converted to a clean exit 2 instead
+  //     of an unhandled rejection.
+  const initResult = await ensureAuditArtifactsExist(
+    featureRoot,
+    opts.featureSlug,
+    opts.apply,
+  );
+  if (initResult.missingTemplates.length > 0) {
+    stderr.write(
+      `audit-barrage-lift: bundled template(s) missing from the plugin install: ${initResult.missingTemplates.join(', ')}. ` +
+        `This indicates a packaging defect — file an issue against dw-lifecycle.\n`,
+    );
+    return 2;
+  }
+  if (opts.apply && initResult.auditLogInitialized) {
     stderr.write(
       `audit-barrage-lift: initialized empty audit-log.md from template (first barrage of this feature).\n`,
     );
   }
-  if (initResult.toolingFeedbackInitialized) {
+  if (opts.apply && initResult.toolingFeedbackInitialized) {
     stderr.write(
       `audit-barrage-lift: initialized empty tooling-feedback.md from template.\n`,
+    );
+  }
+  if (!opts.apply && (initResult.auditLogInitialized || initResult.toolingFeedbackInitialized)) {
+    // Dry-run intent line so the operator knows what apply would do.
+    const wouldInit: string[] = [];
+    if (initResult.auditLogInitialized) wouldInit.push('audit-log.md');
+    if (initResult.toolingFeedbackInitialized) wouldInit.push('tooling-feedback.md');
+    stderr.write(
+      `audit-barrage-lift: dry-run — would auto-init ${wouldInit.join(' + ')} from template on --apply.\n`,
     );
   }
   const auditLogPath = join(featureRoot, 'audit-log.md');
@@ -371,7 +437,17 @@ export async function runAuditBarrageLift(
   // supply their own write seam.
   const writer = args.write ?? atomicWriteFile;
 
-  const auditLogText = await reader(auditLogPath);
+  // In dry-run mode the audit-log.md may not exist (auto-init was
+  // suppressed); fall through with an empty starting text so the
+  // findings summary still renders correctly.
+  let auditLogText: string;
+  if (opts.apply) {
+    auditLogText = await reader(auditLogPath);
+  } else if (existsSync(auditLogPath)) {
+    auditLogText = await reader(auditLogPath);
+  } else {
+    auditLogText = '';
+  }
   const highest = highestExistingNn(auditLogText, opts.date);
   const startingNn = highest + 1;
   const { section, assignedIds } = renderSection(
