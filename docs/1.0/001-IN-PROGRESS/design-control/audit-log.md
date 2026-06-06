@@ -327,7 +327,7 @@ The clean structural fix is to make URL-bearing-ness a property of the allowlist
 ### AUDIT-20260606-08 — stylesheet-pin reintroduced the weak `rel.includes('stylesheet')` match that AUDIT-20260606-02 closed in axis-1
 
 Finding-ID: AUDIT-20260606-08 (claude-01 + codex-01; cross-model)
-Status:     open
+Status:     fixed-b8a9e5912c2692d38a4469d1f6252238b575d51e
 Severity:   medium
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (collectStylesheetLinks)
 
@@ -342,7 +342,7 @@ Fix: make the two modules share one rel predicate. Either import a single `isSty
 ### AUDIT-20260606-10 — stylesheet identity-pin read the href off disk before the path-mismatch check (arbitrary file read)
 
 Finding-ID: AUDIT-20260606-10 (claude-02)
-Status:     open
+Status:     fixed-b8a9e5912c2692d38a4469d1f6252238b575d51e
 Severity:   low
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (checkStylesheetIdentity)
 
@@ -351,7 +351,7 @@ Disposition override: slush-merged under -08; a real (LOW) security-adjacent sme
 ### AUDIT-20260606-11 — "canonical path" prose implied realpath but the comparison is lexical
 
 Finding-ID: AUDIT-20260606-11 (claude-03)
-Status:     open
+Status:     fixed-b8a9e5912c2692d38a4469d1f6252238b575d51e
 Severity:   low
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (StylesheetPin.canonicalPath doc)
 
@@ -360,7 +360,7 @@ Disposition override: slush-merged under -08; a real (LOW) doc-honesty defect. F
 ### AUDIT-20260606-12 — SRI integrity compared by exact string, rejecting a spec-valid multi-hash
 
 Finding-ID: AUDIT-20260606-12 (claude-04)
-Status:     open
+Status:     fixed-b8a9e5912c2692d38a4469d1f6252238b575d51e
 Severity:   low
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (SRI check)
 
@@ -369,7 +369,7 @@ Disposition override: slush-merged under -08; a real (LOW) correctness defect. F
 ### AUDIT-20260606-09 — diff contained explicit deferred-work wording in the audit log and source comment
 
 Finding-ID: AUDIT-20260606-09 (codex-02)
-Status:     open
+Status:     fixed-b8a9e5912c2692d38a4469d1f6252238b575d51e
 Severity:   low
 Surface:    docs/1.0/001-IN-PROGRESS/design-control/audit-log.md (AUDIT-07 disposition); plugins/design-control/src/lint/allowlist.ts (URL_ATTRS comment)
 
