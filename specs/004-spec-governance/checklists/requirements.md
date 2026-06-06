@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,5 +31,5 @@
 
 ## Notes
 
-- **3 intentional [NEEDS CLARIFICATION] markers remain** (FR-010 blocking-vs-advisory, FR-011 hook point(s), FR-012 mechanism) — these are the three highest-impact design forks, deliberately deferred to `/speckit-clarify` per the project's capture-don't-cut discipline. The remaining forks (audit-barrage source, findings home, sync-vs-deferred, artifact scope) are captured with documented default assumptions and do not block clarification.
-- Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`. The one open item (NEEDS CLARIFICATION) is resolved by running `/speckit-clarify`.
+- **All clarifications resolved (`/speckit-clarify`, Session 2026-06-06).** The 3 high-impact forks are now decided: FR-010 = blocking via the ported `dw-lifecycle` audit-protocol convergence criterion (0 HIGH+0 MED in one iteration, or 0 HIGH across two consecutive) — an iterative loop; FR-011 = `after_clarify` (configurable `after_plan`); FR-012 = Spec Kit governance extension with hooks. Operator additionally directed porting the audit **protocol** (not just the barrage) from `dw-lifecycle` (FR-006/FR-014) and the migration scope was widened accordingly.
+- Spec is clarification-clean (0 `[NEEDS CLARIFICATION]` markers). Ready for `/speckit-plan`.
