@@ -222,7 +222,7 @@ This is the documented design (the teeth deliberately live in `tsc`, not vitest)
 ### AUDIT-20260606-01 — data-uri rule ran over EVERY attribute value (over-rejection) + value-rules preceded allowlist membership (mislabel)
 
 Finding-ID: AUDIT-20260606-01 (claude-01 + claude-02; cross-model with codex on the surface)
-Status:     open
+Status:     fixed-a718683ccaa739fd213ac797bff59ed96460d721
 Severity:   medium
 Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (`checkElement` attribute loop)
 
@@ -235,7 +235,7 @@ Fix: reorder so allowlist MEMBERSHIP is decided first; scope the `data:` (and sc
 ### AUDIT-20260606-02 — mixed `<link>` rel tokens bypass the non-stylesheet rejection
 
 Finding-ID: AUDIT-20260606-02 (codex-01)
-Status:     open
+Status:     fixed-a718683ccaa739fd213ac797bff59ed96460d721
 Severity:   medium
 Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (the `<link>` rel gate)
 
@@ -246,7 +246,7 @@ The rel gate tested `rel.includes('stylesheet')`, so `rel="stylesheet icon"` / `
 ### AUDIT-20260606-03 — control-char-obfuscated script schemes decode past the start-anchored regex
 
 Finding-ID: AUDIT-20260606-03 (codex-02 + claude-03; cross-model)
-Status:     open
+Status:     fixed-a718683ccaa739fd213ac797bff59ed96460d721
 Severity:   medium
 Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (`SCRIPT_URI_RE`)
 
