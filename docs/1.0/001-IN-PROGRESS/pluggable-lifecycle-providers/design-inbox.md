@@ -1,5 +1,7 @@
 # Design Inbox — stack-control program
 
+> **Interim — sunsets at Feature 8.** This file + its convention are the stopgap until stack-control ships native low-friction insight capture (roadmap Feature 8). Governed by [`.claude/rules/design-inbox.md`](../../../../.claude/rules/design-inbox.md). When Feature 8 lands, this is retired and capture moves to the plugin's mechanism.
+
 A low-friction parking lot for **out-of-sequence design ideas** that surface mid-thread. Capture is instant and append-only; it never blocks the current thread. **Capture ≠ scope** — entries are triaged in a *separate, deliberate pass* (promote to a spec / roadmap feature / GitHub issue, or discard with a reason). This file exists because design and scoping are not a serial process: ideas arrive while other work is fresh, and we must not lose hard-won insights by deferring their capture until "later."
 
 Distinct from:
