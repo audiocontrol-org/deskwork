@@ -382,7 +382,7 @@ The hard constraints for this audit say to surface deferral phrases in the diff.
 ### AUDIT-20260606-13 — SRI multi-hash fix ignores SRI's "strongest-algorithm-wins" rule — passes a pin the browser would not enforce
 
 Finding-ID: AUDIT-20260606-13 (claude-01)
-Status:     open
+Status:     fixed-efe3f2106e8a58e28ffe87c1d5d12781b6c60595
 Severity:   medium
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (SRI check)
 
@@ -399,7 +399,7 @@ A correct fix respects strongest-algorithm semantics: since the pin only carries
 ### AUDIT-20260606-14 — Reworded URL_ATTRS "invariant" still encodes a triggered future structural fix with no tracking artifact
 
 Finding-ID: AUDIT-20260606-14 (claude-02 + codex-01; cross-model)
-Status:     open
+Status:     fixed-efe3f2106e8a58e28ffe87c1d5d12781b6c60595
 Severity:   low
 Surface:    plugins/design-control/src/lint/allowlist.ts (URL_ATTRS comment); docs/1.0/001-IN-PROGRESS/design-control/audit-log.md (AUDIT-07 disposition)
 
