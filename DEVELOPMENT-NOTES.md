@@ -4823,3 +4823,40 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - **Fat-plugin + `git mv` paid off exactly as predicted**: the governance rehome was a clean history-preserving move; dw-lifecycle isolation held with zero runtime changes.
 
 **Next step:** Continue Feature 1 → **US2** (T024–T027: `spec-check` verb + `define`/`extend` authoring skills), then **US3** (T028–T031: isolation/registration verification), then **Polish** (T032–T035: plugin README, stale-ref cleanup, self-hosting proof, full quickstart A–F). Bootstrap with `/session-start` (NOT `/dwss`); the implement session can continue in this worktree. When governing future commits, pass an explicit `GOVERN_DIFF_BASE` at the feature base (TF-12).
+
+## 2026-06-05 (cont. 4): Feature 1 `/speckit-implement` — US2 + US3 + Polish; front door COMPLETE (35/35)
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** Continue the implement session from the US1 MVP. Operator confirmed "continue implementing" → run `/speckit-implement` forward through **US2** (spec-authoring), **US3** (isolation/registration verification), and **Polish** (README, stale-ref cleanup, self-hosting proof, quickstart). Fire the mandatory `after_implement` governance over the increment.
+
+**Accomplished:**
+- **US2 (T024–T027), TDD RED-first.** `stackctl spec-check --spec <dir>` (8 tests; reports `spec=yes plan=yes tasks=no`, exit 0 on the report path, fail-loud on bad input; strict arg parsing mirrors `execute-check`). `define` + `extend` skill+command pairs per `contracts/front-door-skills.md` — `define` drives native `/speckit-specify` to author a NEW spec (authoring-only, `define` ≠ `setup`); `extend` runs the edit/iterate/review loop over an EXISTING spec in place, to runnable.
+- **US3 (T028–T031), verification.** Durable VR-2 isolation guard test (`dw-lifecycle-isolation.test.ts`: greps dw-lifecycle runtime dirs for the moved extension / `spec-kit/` → 0; asserts old path gone). `claude plugin validate` passes (benign no-`author` warning, symmetric with dw-lifecycle); `stackctl version` → 0.37.0 == marketplace lockstep; `specify extension list` shows governance enabled from the new home; **dw-lifecycle suite 2704/211 green unchanged** (isolation invariant, SC-003).
+- **Polish (T032–T035).** `plugins/stack-control/README.md` (no rot-prone version strings — links releases page). T033 stale-ref cleanup: fixed the genuinely-stale forward-looking install command in the governance README (source + re-synced installed copy); historical records (journal, audit-log, slice-001 specs, 003 `git mv` instructions) left intact per `.claude/rules/documentation.md`.
+- **Mandatory `after_implement` governance fired** over the US2/US3/Polish increment (base = session-start tip `6e7732fd`, per TF-12; 2/2 models) → **3 findings AUDIT-20260605-10..12, all fixed + dispositioned in `audit-log.md`, zero open.** AUDIT-12 (medium, cross-model claude+codex): `govern.sh` fold used `break`, dropping smaller later-sorting files behind one big file → fixed to `continue` + cap-approximation acknowledgment, with a **RED-first regression smoke** (`scripts/smoke-govern-untracked-fold.sh`) driving the real `govern.sh`. AUDIT-10/11 (low): README exit-semantics + `define` step-ordering doc fixes.
+- **Self-hosting proof — lightweight variant (T034/T035), operator-chosen.** Ran the full front-door arc on a throwaway spec: `define` (spec-check `spec=yes`) → `extend` (+plan → +tasks) → `execute-check` (fail-loud before runnable → `runnable` after) → native execution of one trivial task → `after_implement` governance fired **automatically** (2/2 models, **0 manual barrage invocations**), findings routed to a throwaway slug so the real audit-log stayed clean. Throwaway removed afterward (all untracked dogfood); real audit-log unchanged (0 open). **Feature 1 = 35/35 tasks; the front door is the surface used to build everything after.**
+
+**Didn't Work / course corrections:**
+- [PROCESS] No substantive approach corrections from the operator. One genuine scope decision was surfaced via `AskUserQuestion` (T034/T035 self-hosting proof drives native execution over a *separate* feature) → operator chose the **lightweight** variant (prove the door, don't build Feature 2). Correct to ask rather than autonomously kick off Feature 2's implementation — that's an operator-owned scope expansion, not a spec-derived pick inside Feature 1's loop.
+- [PROCESS] TF-12 Repro A (diff-base) and Repro B (finding-gate ↔ tasks.md impedance) both recurred exactly as documented; applied the recorded workarounds (explicit `GOVERN_DIFF_BASE`; audit-log-direct disposition). No new TF entry for these — already captured.
+- [PROCESS] The cross-model governance loop again earned its keep **on the agent's own work**: AUDIT-12 (cross-model) caught a latent fold-selection bug in the AUDIT-06 bounding; fixed RED-first this session.
+
+**Quantitative** (re-derived from `git log 6e7732fd..HEAD`):
+- Messages: ~4 (start-confirm, "continue implementing", scope-question answer, session-end)
+- Commits: 6 (`85a5cbf0` US2, `bec5ab48` US3, `f6725852` Polish docs, `659bef47` finding fixes, `1c168fd9` disposition, `427dbe3f` tasks.md) + this session-end commit
+- Files changed: 17 (+573 / −17), pre-journal (excludes the untracked throwaway proof)
+- Tests: stack-control **19 → 29** (+8 spec-check, +2 isolation guard) vitest; plus 1 new local bash smoke (`smoke-govern-untracked-fold.sh`); strict typecheck clean; dw-lifecycle 2704 green unchanged
+- Governance findings: **3** (AUDIT-20260605-10..12) — all fixed, 0 open
+- Corrections: 0 substantive (the [PROCESS] notes are tooling-friction recurrences / a surfaced scope decision, not approach corrections)
+- Tasks: **T024–T035 (12)** this session → Feature 1 now **35/35**
+
+**Open findings at session end:** **0 open** (real feature audit-log). No acknowledged-slush-pile carrying unfixed defects — all 3 this-session findings were fixed. The throwaway-proof's 4 findings (AUDIT-20260606-01..04) were intentionally routed to a removed throwaway slug and are not part of the feature's ledger.
+
+**Insights:**
+- The front door is **self-hosting and exercised end-to-end**: `spec-check`/`execute-check` gate, `define`/`extend` author, `execute` drives native `/speckit-implement`, and the rehomed governance fires automatically — proven on a throwaway without building any downstream feature. This is the bootstrap for US2-onward (parallel engine, migrations).
+- Doc-vs-history discipline mattered in T033: the temptation was to "fix all refs to the old path," but most hits were historical records that describe the past correctly. The only genuine fix was the *forward-looking* install command. Rewriting history would have been the bug.
+- A new tooling seam surfaced (TF-13): `specify extension add` produces a **committed** install copy that drifts from source and is **never executed** (the hook shells to source). Dead-but-committed + drifting is a reviewer trap; the bridge should gitignore the install output or drift-check it.
+
+**Next step:** Feature 1 (stack-control front door) is **complete (35/35), governed, pushed** — the self-hosting bootstrap is live. Next program steps are the operator's call: `/feature-ship` / `/feature-complete` for the PR + doc migration, OR proceed to **Feature 2** (parallel multi-backend execution engine, `specs/002-parallel-execution-engine/`) built *through* the front door, OR the dw-lifecycle migrations (scope-discovery / audit-barrage / session — Features 3–5). Bootstrap the next session with `/session-start` (NOT `/dwss`). When governing future multi-commit work, pass an explicit `GOVERN_DIFF_BASE` at the feature base (TF-12 Repro A).
