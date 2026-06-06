@@ -519,9 +519,50 @@ Finding-ID: AUDIT-20260606-23 (claude-02)
 Status:     informational
 Severity:   informational
 
-Disposition: informational, no code change. Cross-text-node duplicate `disallowed-codepoint` findings carry no positional context — but this matches the lint's existing position-less finding pattern (it is not a regression and not a correctness bug). Global per-document message dedup or positional context is an optional future enhancement at the `checkText`/walk boundary; not done now. Original auditor note follows.
+Disposition: WON'T-DO (accepted observation, no change planned — reworded per AUDIT-20260606-26 to drop deferral phrasing). Position-less findings are the established, consistent pattern across this entire lint; cross-node duplicate `disallowed-codepoint` messages match that pattern and are neither a regression nor a correctness bug. No code change. Original auditor note follows.
 Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts:137-144 (`checkText`) + codepoint.ts:79-91 (`findDisallowedCodepoints`)
 
 `findDisallowedCodepoints` dedupes per call (per text node), and the unit test at codepoint.test.ts:64-71 correctly asserts that. But `checkText` is invoked once per text node during the walk, and the pushed finding carries only `{ rule, message }` with no element/line/offset. So the same disallowed codepoint appearing in N separate text nodes (e.g. an emoji used as an icon in 10 buttons) produces N byte-identical findings — `disallowed codepoint U+1F389 ("🎉") in text content …` ×10 — which is pure noise to the operator since nothing distinguishes the occurrences. The workplan phrasing "deduped per codepoint" reads as a per-codepoint guarantee that holds within a node but not across the document.
 
 This matches the existing position-less finding pattern in this lint, so it is not a regression and not a correctness bug — flagging it as informational. If the operator wants either (a) global per-document dedup of identical messages, or (b) positional context added to findings so duplicates become meaningful, that is a small enhancement at the `checkText`/walk boundary. As-is, a wireframe that reuses one off-allowlist glyph widely will emit a long run of identical findings.
+
+## 2026-06-06 — audit-barrage lift (20260606T155832617Z-design-control)
+
+### AUDIT-20260606-24 — Test only covers the accept path — the NFC-vs-strip invariant (combining marks still rejected when they can't compose) is unasserted
+
+Finding-ID: AUDIT-20260606-24 (claude-01)
+Status:     open
+Severity:   low
+Surface:    plugins/design-control/src/__tests__/lint/codepoint.test.ts
+
+Disposition override: slush-pile; a real (LOW) test-integrity gap (same shape as AUDIT-21). Fixed in this commit — added a test asserting a non-composable combining mark (`String.fromCodePoint(0x0301)`, and `1` + the mark) is STILL flagged, directly pinning "NFC composes, it does not strip" rather than leaning on the accept-fixture's properties.
+
+The fix's load-bearing design choice is *compose-where-possible* (NFC), **not** *strip all combining marks*. The two behaviors are observationally identical for the new test's input (`café Zürich` in NFD, where every combining mark has a composable base in the allowlisted ranges) but diverge on a combining mark that has **no** composable base — e.g. a leading `U+0301`, or a combining mark on a non-composing base like `1\u0301`. NFC leaves those untouched, so the lint must still emit `disallowed-codepoint` for them; a hypothetical strip-based "fix" would wrongly accept them. The new test (lines 75-78) asserts only the accept path (`expect(findDisallowedCodepoints(nfd)).toEqual([])`); nothing in the visible suite asserts the inverse — that a non-composable combining mark survives normalization and is *still* flagged.
+
+This is the same shape the operator flagged in AUDIT-20260606-21 for the SRI fix: the suite verifies the invariant the disposition *claims* only incidentally, leaning on the fixture's properties rather than asserting the boundary directly. A reasonable lock-in: add a test planting a lone/non-composable combining mark (`findDisallowedCodepoints('\u0301')` or `'1\u0301'`) and asserting it returns `[{ codepoint: 0x0301, ... }]`. That directly pins "NFC composes, it does not strip," which is the property the disposition rests on.
+
+### AUDIT-20260606-25 — NFC compose-boundary is narrower than the docstring implies — accents whose precomposed form falls outside the allowlisted ranges still fail in NFD
+
+Finding-ID: AUDIT-20260606-25 (claude-02)
+Status:     open
+Severity:   informational
+Surface:    plugins/design-control/src/lint/codepoint.ts (findDisallowedCodepoints docstring)
+
+Disposition: fixed in this commit (doc-honesty; not a code bug). The docstring now qualifies that NFC rescues NFD input ONLY when the precomposed form is in the allowlisted ranges (Latin-1 Supplement / Latin Extended-A), states that off-allowlist accents (e.g. `Ǎ`=U+01CD) correctly fail in both NFC and NFD, and that NFC composes but does not strip.
+
+The new docstring (lines 78-81) states NFD accented Latin "composes to its precomposed allowlisted form rather than tripping the combining-mark block." That is true only when the precomposed form lands in the allowlisted ranges (per AUDIT-22: U+00C0–U+00FF and U+0100–U+017F). For accented Latin whose precomposed form lives in Latin Extended-B (e.g. `Ǎ` = `A`+caron → U+01CD, outside U+0100–U+017F) or for marks with no precomposed form at all, NFC composition either produces a still-disallowed codepoint or leaves the combining mark in place — so the NFD input still fails.
+
+This is **not a correctness bug** — the behavior is now consistent between NFC and NFD input (NFD `Ǎ` and precomposed `Ǎ` both fail because U+01CD is genuinely off-allowlist), which is the correct invariant. I'm flagging it only because the docstring reads as an unconditional "NFD accented Latin now passes" claim, and a future reader could mistake a legitimately-off-allowlist NFD failure for a regression of this fix. A one-clause qualifier ("…for accents whose precomposed form is in the allowlisted ranges") would make the boundary explicit and prevent that misread.
+
+### AUDIT-20260606-26 — AUDIT-20260606-23 disposition uses soft-deferral phrasing ("not done now" / "optional future enhancement") without an issue link
+
+Finding-ID: AUDIT-20260606-26 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   low
+Surface:    docs/1.0/001-IN-PROGRESS/design-control/audit-log.md (AUDIT-20260606-23 disposition)
+
+Disposition override: slush-pile; a real cross-model LOW — my AUDIT-23 disposition reintroduced the deferral phrasing ("not done now", "optional future enhancement") that the project's "Just for now is bullshit" rule forbids and that I'd been closing elsewhere this session. Fixed in this commit — the AUDIT-23 disposition is reworded to a definitive WON'T-DO ("no change planned"; position-less findings are the established pattern), no scheduling or speculative-work language.
+
+The new AUDIT-23 disposition records an informational observation and twice frames the remediation as deferred-but-coming: "Global per-document message dedup or positional context is an optional future enhancement at the `checkText`/walk boundary; **not done now**" (line 521) and "that is a small enhancement at the `checkText`/walk boundary" (line 526). Per the project's own discipline (`.claude/rules/agent-discipline.md` § "Just for now is bullshit") and the prior triage note at the top of this audit-log that explicitly flagged conditional future-work wording ("to be done when…"), "not done now" reads as the same soft-IOU smell — it implies the work *will* happen without any tracking surface to ensure it does.
+
+The audit prompt's hard constraint also directs surfacing deferral phrasing found in the diff. An informational "no code change" disposition is legitimate, but the wording should commit one way or the other: either file an issue and reference it (`tracked in #NNN`), or state it as an accepted observation that is *not* planned ("position-less findings are the established pattern for this lint; no change planned"). Rewriting to drop "not done now" / "future enhancement" and adopting won't-do/issue-linked framing keeps the record from reintroducing the exact operator-discipline smell the surrounding entries have been closing.

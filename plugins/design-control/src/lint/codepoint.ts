@@ -76,9 +76,13 @@ export interface DisallowedCodepoint {
  * Scan `text` and return each DISTINCT disallowed codepoint once, in first-seen
  * order. The text is NFC-normalized first so that accented Latin written in
  * decomposed (NFD) form — `e`+combining-acute, common from macOS APIs and pasted
- * text — composes to its precomposed allowlisted form rather than tripping the
- * combining-mark block (AUDIT-20260606-22). Iterated by Unicode codepoint, so
- * astral chars like emoji are one unit.
+ * text — composes to its precomposed form (AUDIT-20260606-22). This rescues NFD
+ * input ONLY when the precomposed form lands in the allowlisted ranges (Latin-1
+ * Supplement / Latin Extended-A); an accent whose precomposed form is off-
+ * allowlist (e.g. `Ǎ` = U+01CD, Latin Extended-B) or has no precomposed form
+ * still fails — correctly, and now identically in NFC and NFD. NFC composes; it
+ * does NOT strip combining marks, so a non-composable mark stays flagged.
+ * Iterated by Unicode codepoint, so astral chars like emoji are one unit.
  */
 export function findDisallowedCodepoints(text: string): DisallowedCodepoint[] {
   const seen = new Set<number>();

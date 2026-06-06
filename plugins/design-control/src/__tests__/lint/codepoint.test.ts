@@ -77,6 +77,15 @@ describe('findDisallowedCodepoints', () => {
     expect(findDisallowedCodepoints(nfd)).toEqual([]);
   });
 
+  // AUDIT-20260606-24 (claude-01): NFC COMPOSES, it does not STRIP — a combining
+  // mark with no composable base must still be flagged (locks the invariant the
+  // -22 fix rests on, so a strip-based regression would fail).
+  it('still rejects a non-composable combining mark (NFC does not strip)', () => {
+    const acute = String.fromCodePoint(0x0301); // combining acute, no composable base here
+    expect(findDisallowedCodepoints(acute)).toEqual([{ codepoint: 0x0301, char: acute }]);
+    expect(findDisallowedCodepoints(`1${acute}`).map((f) => f.codepoint)).toEqual([0x0301]);
+  });
+
   it('reports each distinct disallowed codepoint once, with its char', () => {
     const found = findDisallowedCodepoints('Dashboard 𝐃 and 🎉 and 🎉 again');
     const cps = found.map((f) => f.codepoint);
