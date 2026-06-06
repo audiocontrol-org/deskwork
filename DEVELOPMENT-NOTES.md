@@ -4898,3 +4898,40 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - **"complete = merged"** (FR-023) is the spine of dependency-respecting parallelism; it closes the dependents-on-quarantined-work hole structurally rather than by policy.
 
 **Next step:** Feature 2 spec is **clarified + barrage-hardened + decision-complete**. Spec Kit chain is at **plan (interrupted — `plan.md` is the empty template; the spec changed substantially since, so the plan should regenerate)**. NEXT: resume **`/speckit-plan`** against the hardened spec (research → data-model → contracts → quickstart); `/speckit-plan` resolves the deferred items (capability vocabulary content, concurrency formula, the two concrete batch CLIs, SEDA stage design, run-record schema). **One thesis-derived default to confirm or veto: C4 push-as-produced (FR-028).** Codify-inbox-as-rule is DONE (self-sunsetting at Feature 8). Bootstrap next session with `/session-start` (NOT `/dwss`).
+
+## 2026-06-06 (cont.): design/spec-governance — full Spec Kit chain (specify→analyze) + design-first resequence + phase/slug codenames
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** Operator session. Confirm C4 (push-as-produced) for `execution-engine`; examine the design inbox; resequence the program **design-phase-first**; then build the first design-phase feature (`design/spec-governance`) through the Spec Kit chain.
+
+**Accomplished:**
+- **SEDA committed into the `execution-engine` spec** as the **settled, non-optional queue-based architecture** (FR-032) + **FR-032a** state-of-the-art research proviso (operator: *"SEDA in the spec, with a proviso that we research the state of the art… no option but to use some kind of queuing mechanism"*). Confirmed **C4 push-as-produced**.
+- **Roadmap resequenced design-phase-first** (operator: *"focus on the front-end design features now… they facilitate the design of everything else"*): new order `multi/front-door → [design/insight-capture → design/spec-governance → multi/control-plane-frontend design surfaces] → impl/execution-engine → migrations → multi/retire-dw-lifecycle`. Front-door's thin skills-over-CLI architecture kept. Corrected **stale `front-door` status** (roadmap said "Speccing"; it is COMPLETE 35/35).
+- **Feature naming convention (operator):** features identified by **`<phase>/<slug>` codename** (`design/`·`plan/`·`impl/`·`multi/`), retiring opaque `F<n>` (the numbers stopped implying order after two resequences). Applied across roadmap, design-inbox doc + rule, succession rule, README, tooling-feedback.
+- **`design/spec-governance`: full Spec Kit chain specify → clarify → plan → tasks → analyze.** spec 0 NEEDS CLARIFICATION + checklist 16/16; plan Constitution **9/9 PASS**; research (R1–R7) + data-model + 2 contracts + quickstart; **26 TDD-first tasks**; analyze **0 CRITICAL / 0 constitution violations**, 2 coverage gaps remediated (C1 SC-004 persistence, C2 FR-009 clean-run-recorded).
+- **Load-bearing design decision (operator, in clarify):** the spec-governance gate = the **PORTED `dw-lifecycle` audit-protocol convergence criterion** (0 HIGH + 0 MED in one iteration, or 0 HIGH across two consecutive) — making it an **iterative loop**; *"port the audit protocol as well as the audit barrage."* Widened `multi/migrate-audit-barrage` scope to carry the protocol.
+- **Design inbox triaged:** SEDA entry resolved → FR-032/FR-032a; stale capture-as-rule status corrected (the rule already exists).
+
+**Didn't Work / course corrections:**
+- [PROCESS] I proposed starting the design block with `design/insight-capture` (front-door entry); operator redirected to **`design/spec-governance` first**. Made the reasonable first call, operator steered — cheap correction.
+- [PROCESS] Spec Kit prereq friction (**TF-15**): `check-prerequisites.sh --require-tasks` hard-fails the branch-name pattern gate on the one-long-lived-branch convention **before** consulting `feature.json`, blocking `/speckit-analyze`. Proceeded via the known artifact paths (all present; `feature.json` correct). Same root-cause class as TF-14.
+- [DOCUMENTATION] The roadmap's `front-door` status was stale (Speccing vs COMPLETE) — caught by cross-checking the journal + `specs/003` tasks.md (35/35) + the live `plugins/stack-control/`; fixed.
+
+**Quantitative** (re-derived from `git log 230a4fe1..HEAD`):
+- Messages: ~12
+- Commits: **9** (`677961b7..0fe0aba4`)
+- Files changed: **18** (+804 / −40)
+- New feature dir: `specs/004-spec-governance/` (spec, plan, research, data-model, contracts×2, quickstart, tasks, checklist)
+- Spec Kit chain advanced: **specify → clarify → plan → tasks → analyze** (implement pending)
+- Tooling friction logged: **1** (TF-15)
+- Corrections: **1** substantive [PROCESS] redirect (+1 [DOCUMENTATION] stale-status fix)
+
+**Insights:**
+- The operator's FR-010 answer reshaped the feature from a single-pass threshold into an **iterative convergence loop** — and the plan research found that criterion is **already mechanized** (`check-barrage-dampener` Rule A/B), so *"port the protocol"* is **faithful logic reuse**, not re-derivation (T016/T017 enforce port-fidelity).
+- `<phase>/<slug>` codenames make the twice-resequenced roadmap scannable where ordinal `F<n>` had become actively misleading.
+- `design/spec-governance` is itself a spec → the natural **first dogfood target** once built (govern this spec + the `execution-engine` spec — closing the loop the thesis describes).
+- TF-14 + TF-15 are the same root cause (branch-name feature detection vs. the `feature.json` pointer) — both fold into a future `stackctl feature use` verb.
+
+**Next step:** `design/spec-governance` is at **IMPLEMENT** — the chain is complete through analyze with 0 CRITICAL. NEXT: run **`/speckit-implement`** — operator to choose **full task list vs MVP-first (US1 only: auto-governance at `after_clarify`)**. Implement writes the extension + `govern-spec.sh` + `spec-governance-gate.ts` (porting `check-barrage-dampener`) + RED-first tests, then fires the mandatory `after_implement` governance barrage (`impl/governance` dogfooding itself). `impl/execution-engine` (`specs/002`) remains parked at `/speckit-plan` behind the design block. Bootstrap next session with `/session-start`.
