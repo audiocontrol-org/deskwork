@@ -531,7 +531,7 @@ This matches the existing position-less finding pattern in this lint, so it is n
 ### AUDIT-20260606-24 — Test only covers the accept path — the NFC-vs-strip invariant (combining marks still rejected when they can't compose) is unasserted
 
 Finding-ID: AUDIT-20260606-24 (claude-01)
-Status:     open
+Status:     fixed-e281dad397e42a9afae5727acb312e671e27df0d
 Severity:   low
 Surface:    plugins/design-control/src/__tests__/lint/codepoint.test.ts
 
@@ -544,7 +544,7 @@ This is the same shape the operator flagged in AUDIT-20260606-21 for the SRI fix
 ### AUDIT-20260606-25 — NFC compose-boundary is narrower than the docstring implies — accents whose precomposed form falls outside the allowlisted ranges still fail in NFD
 
 Finding-ID: AUDIT-20260606-25 (claude-02)
-Status:     open
+Status:     fixed-e281dad397e42a9afae5727acb312e671e27df0d
 Severity:   informational
 Surface:    plugins/design-control/src/lint/codepoint.ts (findDisallowedCodepoints docstring)
 
@@ -557,7 +557,7 @@ This is **not a correctness bug** — the behavior is now consistent between NFC
 ### AUDIT-20260606-26 — AUDIT-20260606-23 disposition uses soft-deferral phrasing ("not done now" / "optional future enhancement") without an issue link
 
 Finding-ID: AUDIT-20260606-26 (claude-03 + codex-01; cross-model)
-Status:     open
+Status:     fixed-e281dad397e42a9afae5727acb312e671e27df0d
 Severity:   low
 Surface:    docs/1.0/001-IN-PROGRESS/design-control/audit-log.md (AUDIT-20260606-23 disposition)
 
