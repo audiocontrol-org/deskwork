@@ -4806,3 +4806,27 @@ If `TASK_HEADING_RE` is declared with the `g` (or `y`) flag, `RegExp.prototype.e
 ---
 
 I walked all four fixes (#420 auto-position collision defense, #426 first-barrage auto-init, #427 AND-semantic merge, #425 `/tmp` scrub) plus the six new/edited test files. Strongest signals: the unguarded template reads (claude-01) and the AND-semantic narrowing the cross-model agreement signal without a regression test for the paraphrased-heading case (claude-02). The `findDuplicateTaskHeadings` string-sort (non-numeric ordering of `39.7` vs `39.15`) and the `substituteSlug` `$`-in-slug `String.replace` quirk are both real but too low-probability against kebab-case slugs to merit their own blocks.
+
+## 2026-06-06 — audit-barrage lift (20260606T172545822Z-scope-discovery)
+
+### AUDIT-20260606-07 — Duplicate rollback is not atomic for the whole auto command
+
+Finding-ID: AUDIT-20260606-07
+Status:     fixed-a7e36a31
+Severity:   medium
+Surface:    plugins/dw-lifecycle/src/subcommands/promote-findings.ts:424-441,516-529
+
+`promote-findings --auto` can mutate `audit-log.md` before the new duplicate-task rollback point: informational findings are flipped at lines 424-441, then non-informational findings are applied later. If the post-write duplicate check fires at lines 516-529, the rollback restores only `workplan.md`, while the earlier audit-log flips remain durable. The error message then says `no disk mutation persists`, which is false for any mixed batch containing informational findings plus workplan-scoped findings.
+
+This matters because the command returns failure while leaving a partially applied audit-log state. A reasonable fix is to either move informational flips until after the workplan duplicate check succeeds, capture and restore the pre-run audit-log text on this failure path, or narrow the diagnostic so it does not claim full-command atomicity.
+
+### AUDIT-20260606-08 — Missing-template diagnostic test never exercises the missing-template path
+
+Finding-ID: AUDIT-20260606-08
+Status:     fixed-a7e36a31
+Severity:   low
+Surface:    plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/audit-barrage-lift.first-barrage.test.ts:120-139
+
+The test title claims it verifies “clean exit 2 + actionable diagnostic when a bundled template is missing,” but the body calls `ensureAuditArtifactsExist` against the real bundled templates and asserts `missingTemplates` is `[]`. Lines 128-132 explicitly say both templates should be readable, so the ENOENT branch and `runAuditBarrageLift` exit-2 diagnostic are not covered.
+
+This leaves the HIGH fix’s important packaging-defect behavior pinned only by code inspection. Make the template directory injectable, or otherwise test a controlled missing-template fixture through `runAuditBarrageLift`, and assert the non-crashing exit code plus stderr message.
