@@ -207,3 +207,49 @@ This is the documented design (the teeth deliberately live in `tsc`, not vitest)
 ---
 
 **What I checked that came back clean:** the `keyof` guard's teeth for field add/remove (confirmed `EngineAdapterRequest` is a flat single interface, not a union, so `keyof` doesn't collapse to common keys — the failure mode that would have silently weakened the guard); the `Equal<A,B>` definition (standard, correct for unions of string-literal keys); the unreachability of the new throw (superRefine rejects absent payload pre-parse); zod `z.input`/`alwaysSet` reasoning in the doc-comment (internally consistent with how `z.unknown()` materializes keys); and the response schema's double-guard (`satisfies` + `keyof` pin) which is harmless belt-and-suspenders, not a conflict.
+
+## 2026-06-06 — audit-barrage lift (20260606T060403205Z-design-control)
+
+> **Lift note (TF-002 recurrence):** the lift merged FIVE distinct findings under one ID
+> (`claude-01 + claude-02 + claude-03 + codex-01 + codex-02`) but documented only the data-uri
+> one. Per the project rule that slushed "0-open" must not hide real defects, and the TF-002
+> *Medium* fix shape (distinct-mechanism findings stay separate), the merge is SPLIT below into
+> `-01` (data-uri over-rejection + precedence), `-02` (mixed-rel bypass), `-03` (control-char
+> scheme obfuscation). The dampener's `acknowledged-slush-pile` disposition is OVERRIDDEN — these
+> are real defects in code committed this session, fixed with TDD in the same commit that closes
+> them.
+
+### AUDIT-20260606-01 — data-uri rule ran over EVERY attribute value (over-rejection) + value-rules preceded allowlist membership (mislabel)
+
+Finding-ID: AUDIT-20260606-01 (claude-01 + claude-02; cross-model with codex on the surface)
+Status:     open
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (`checkElement` attribute loop)
+
+Disposition override: the dampener slushed the merged entry (2 consecutive 0-HIGH runs), but this is a real over-rejection defect introduced by 5a5a1699. Fix applied in the working tree, closed by commit trailer.
+
+`DATA_URI_RE.test(value)` ran on *every* attribute value of every allowed element, before the allowlist-membership check. So `<div class="data:x">` and `<meta content="…data:…">` / `<div title="…data:…">` were wrongly rejected as `data-uri` — directly contradicting the round-8 invariant (class values are permitted-but-inert because the pinned stylesheet is the sole CSS source) that allowlist.ts documents and a sibling test asserts (the old negative test used `metadata-row`, no colon, so the contradiction was untested). Separately (claude-02), because value-shape rules ran before `isAllowedAttr`, a disallowed attribute carrying a `data:`/presentational value was mislabeled under the wrong rule.
+
+Fix: reorder so allowlist MEMBERSHIP is decided first; scope the `data:` (and scheme) value-checks to `href` only — the single URL-bearing allowed attribute. Regression tests: `class="data:x"` passes, `<meta content="…data:…">`/`title` prose passes, a `data:`-bearing *disallowed* attr reports `disallowed-attribute` not `data-uri`, and `data:` in a link `href` still rejects.
+
+### AUDIT-20260606-02 — mixed `<link>` rel tokens bypass the non-stylesheet rejection
+
+Finding-ID: AUDIT-20260606-02 (codex-01)
+Status:     open
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (the `<link>` rel gate)
+
+Disposition override: slush-merged under -01 by the lift; a real MEDIUM. Fixed in the same commit.
+
+The rel gate tested `rel.includes('stylesheet')`, so `rel="stylesheet icon"` / `rel="stylesheet preload"` passed while still pulling a non-CSS resource (favicon/preload) — weakening the "closed channel" guarantee an allowlist exists to provide. Fix: require the normalized rel token set to be EXACTLY `['stylesheet']`. Regression test: `rel="stylesheet icon"` → `disallowed-link-rel`.
+
+### AUDIT-20260606-03 — control-char-obfuscated script schemes decode past the start-anchored regex
+
+Finding-ID: AUDIT-20260606-03 (codex-02 + claude-03; cross-model)
+Status:     open
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (`SCRIPT_URI_RE`)
+
+Disposition override: slush-merged under -01; cross-model agreement (two independent models flagged it) = high-confidence. claude framed it as the axis-1 boundary for tasks 6–7; codex as a MEDIUM the rule under-delivers on. Closed now (cheap) rather than deferred, per scope-don't-defer.
+
+parse5 decodes HTML entities in attribute values, so `href="java&#x0a;script:alert(1)"` reaches the check as an embedded-newline `java\nscript:` that a start-anchored `^\s*(javascript|vbscript):` regex misses, while browsers that strip the control would still navigate. Fix: reject any C0 control character (U+0000–U+001F) in an `href` value outright, before scheme detection. Regression test: `href="java&#x0a;script:alert(1)"` → `disallowed-uri-scheme`. (The deeper "parse the URL scheme rather than regex-anchor" hardening remains the explicit probe target for the tasks 6–7 adversarial corpus.)

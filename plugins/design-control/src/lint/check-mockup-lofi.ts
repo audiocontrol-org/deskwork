@@ -10,7 +10,7 @@
  * This task ships axis 1 only. The stylesheet identity-pin (single pinned
  * `<link>` by canonical path + content hash) is task 4; the text codepoint
  * allowlist is task 5; the adversarial corpus is tasks 6–7. The pipeline shape
- * (`RULES`) is the seam those tasks extend.
+ * (`walk` + `checkElement`) is the seam those tasks extend.
  */
 
 import { parse, defaultTreeAdapter as ta } from 'parse5';
@@ -54,6 +54,11 @@ export interface LintResult {
 }
 
 const SCRIPT_URI_RE = /^\s*(?:javascript|vbscript):/i;
+// C0 control characters (incl. parse5-decoded \n / \t). They are a scheme-
+// obfuscation channel: `java&#x0a;script:` decodes to an embedded newline that
+// slips a start-anchored scheme regex. Built via RegExp() to keep raw control
+// bytes out of the source.
+const CONTROL_CHAR_RE = new RegExp('[\\u0000-\\u001F]');
 
 function isAllowedAttr(tag: string, attr: string): boolean {
   if (GLOBAL_ATTRS.has(attr)) return true;
@@ -76,6 +81,7 @@ function checkElement(el: Element, findings: LintFinding[]): void {
   for (const { name, value } of ta.getAttrList(el)) {
     const attr = name.toLowerCase();
 
+    // Named-attribute channels first (these are about the attr NAME).
     if (attr === 'style') {
       findings.push({ rule: 'inline-style', tag, attr, message: `inline style= on <${tag}> is a polish channel` });
       continue;
@@ -88,36 +94,48 @@ function checkElement(el: Element, findings: LintFinding[]): void {
       findings.push({ rule: 'presentational-attribute', tag, attr, message: `presentational attribute ${attr} on <${tag}> is rejected` });
       continue;
     }
-    if (DATA_URI_RE.test(value)) {
-      findings.push({ rule: 'data-uri', tag, attr, message: `data: URI in ${attr} on <${tag}> is rejected` });
-      continue;
-    }
+    // Allowlist MEMBERSHIP is decided before any value-shape rule, so a value
+    // that merely looks like a URI on a disallowed attribute is reported as
+    // disallowed-attribute (AUDIT-20260606-01/claude-02), not mislabeled.
     if (!isAllowedAttr(tag, attr)) {
       findings.push({ rule: 'disallowed-attribute', tag, attr, message: `attribute ${attr} on <${tag}> is not in the allowlist` });
       continue;
     }
-    // attribute is allowed — value-level URL checks.
-    // script-bearing schemes are a channel in ANY href (navigation or resource).
-    if (attr === 'href' && SCRIPT_URI_RE.test(value)) {
-      findings.push({ rule: 'disallowed-uri-scheme', tag, attr, message: `script-bearing URI scheme in ${attr} on <${tag}> is rejected` });
-      continue;
-    }
-    // external-resource applies only to genuine resource-LOADING attrs (link href),
-    // not to <a> navigation links.
-    if (RESOURCE_URL_ATTRS[tag]?.has(attr) && EXTERNAL_URL_RE.test(value)) {
-      findings.push({ rule: 'external-resource', tag, attr, message: `external resource URL in ${attr} on <${tag}> is rejected` });
+    // Value-level URL checks apply ONLY to href (the only URL-bearing allowed
+    // attr). Scanning every value for "data:" over-rejected inert class/meta/
+    // title prose and contradicted the round-8 inert-class invariant
+    // (AUDIT-20260606-01/claude-01).
+    if (attr === 'href') {
+      if (CONTROL_CHAR_RE.test(value)) {
+        findings.push({ rule: 'disallowed-uri-scheme', tag, attr, message: `control character in ${attr} on <${tag}> (scheme-obfuscation channel) is rejected` });
+        continue;
+      }
+      if (DATA_URI_RE.test(value)) {
+        findings.push({ rule: 'data-uri', tag, attr, message: `data: URI in ${attr} on <${tag}> is rejected` });
+        continue;
+      }
+      if (SCRIPT_URI_RE.test(value)) {
+        findings.push({ rule: 'disallowed-uri-scheme', tag, attr, message: `script-bearing URI scheme in ${attr} on <${tag}> is rejected` });
+        continue;
+      }
+      // external-resource applies only to genuine resource-LOADING attrs (link
+      // href), not <a> navigation links.
+      if (RESOURCE_URL_ATTRS[tag]?.has(attr) && EXTERNAL_URL_RE.test(value)) {
+        findings.push({ rule: 'external-resource', tag, attr, message: `external resource URL in ${attr} on <${tag}> is rejected` });
+      }
     }
   }
 
-  // Only the pinned sketch-kit stylesheet link is permitted; any other <link>
-  // relation pulls a non-CSS resource (icon/preload/prefetch) — a polish/resource
-  // channel. (The exact path+hash identity-pin is task 4.)
+  // Only the pinned sketch-kit stylesheet link is permitted. The rel token set
+  // must be EXACTLY ['stylesheet'] — a mixed rel like "stylesheet icon" still
+  // pulls a non-CSS resource (AUDIT-20260606-01/codex-01). The exact path+hash
+  // identity-pin is task 4.
   if (tag === 'link') {
     const rel = (ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'rel')?.value ?? '')
       .toLowerCase()
       .split(/\s+/)
       .filter(Boolean);
-    if (!rel.includes('stylesheet')) {
+    if (rel.length !== 1 || rel[0] !== 'stylesheet') {
       findings.push({ rule: 'disallowed-link-rel', tag, message: `only rel="stylesheet" <link> is permitted; got rel="${rel.join(' ')}"` });
     }
   }
