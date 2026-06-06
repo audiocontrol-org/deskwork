@@ -449,3 +449,23 @@ Disposition override: slush-pile; a real (LOW) residual of AUDIT-14 — the #428
 The diff removes the untracked promise shape, but the replacement still says the machine-checking work is “tracked in #428 — to be done when the allowlist first gains a non-resource URL attr.” That is still conditional future-work wording in a code comment, and the audit prompt’s hard constraint explicitly says to surface deferral phrasing found in the diff.
 
 The issue link is a real improvement over the previous untracked comment, so this is narrower than AUDIT-20260606-14. The code comment should state the current invariant and reference `#428` without scheduling language. The audit-log disposition should mirror that wording so the record does not reintroduce the same operator-discipline smell it is claiming to close.
+
+## 2026-06-06 — audit-barrage lift (20260606T144629059Z-design-control)
+
+### AUDIT-20260606-18 — SRI algorithm-prefix comparison is case-sensitive — a browser-valid uppercase-prefixed integrity (e.g. `SHA384-<correct-digest>`) is flagged as a mismatch
+
+Finding-ID: AUDIT-20260606-18 (claude-01 + claude-02 + claude-03 + codex-01; cross-model)
+Status:     acknowledged-slush-pile-2026-06-06
+Severity:   low
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (SRI check)
+
+Disposition: SLUSHED at convergence (round-4 = 0 HIGH + 0 MED; dampener single-run rule), per the operator's "0-HIGH/0-MED ⇒ slush new findings" policy and the documented no-infinite-regress stop. Rounds 1–3 of task-4 were driven by real MEDs (rel match, SRI semantics) and overridden; round-4 is the first all-LOW round = the stop signal. NOT fixed (fixing + re-barraging restarts the loop the breaker exists to stop). The lift merged THREE distinct sub-findings here (TF-002, 5th occurrence in this feature) — surfaced honestly so the merge doesn't hide them:
+- **claude-01 + codex-01 (LOW, cross-model):** SRI algo-prefix match is case-sensitive — `SHA384-<correct-kit-digest>` is detected (detection lowercases) but rejected at the membership step (expected value is lowercase). A false-positive on a browser-valid uppercase pin; one-line fix (lowercase the algo prefix before membership).
+- **claude-02 (LOW):** a spec-valid `?options` suffix on a digest (`sha384-<digest>?foo=bar`) isn't stripped, so a correct pin with options is flagged.
+- **claude-03 (INFO):** `expectedHash` duplicates `expectedSri.sha256`; the interface permits a constructor to set them divergently (no live bug — `buildSketchKitPin` is the only constructor).
+
+These are real LOW/INFO false-positives on rare inputs (uppercase SRI prefixes / `?options` are uncommon in author-written wireframes). Operator owns the call to lift any of these out of slush. Original auditor detail follows.
+
+The strongest-algorithm *detection* normalizes case (`tokens.some((t) => t.toLowerCase().startsWith(\`${algo}-\`))`, line 164, and the filter at line 173 likewise lowercases). But the *match* at line 174 — `strongestTokens.includes(pin.expectedSri[strongest])` — compares the **original-case** token against the always-lowercase expected value produced by `hashStylesheet` (`\`${algo}-\` + ...`, line 55, where `algo` is a lowercase `SriAlgo`). Per W3C SRI, the algorithm token is matched ASCII-case-insensitively (the grammar derives from CSP's case-insensitive `hash-algorithm` production; Chromium/Firefox lowercase it before lookup), so `integrity="SHA384-<genuine-kit-sha384>"` is a fully browser-honored, correct pin. This lint detects `strongest = 'sha384'` correctly but then `strongestTokens = ['SHA384-<digest>']` will never `.includes('sha384-<digest>')`, so it emits `stylesheet-sri-mismatch` against a correct, browser-enforced pin.
+
+This is the same false-positive *class* that AUDIT-20260606-15 set out to close (telling the operator a true pin is broken), just via a different vector — case rather than algorithm strength. The fix is one line: normalize the token before membership, e.g. `tokens.map((t) => t.toLowerCase())` when building `strongestTokens`, or compare `t.toLowerCase() === pin.expectedSri[strongest]` (the expected value is already lowercase). A regression test with an uppercase or mixed-case algorithm prefix (`SHA384-…`) asserting `[]` would lock it in; none of the new tests exercise non-lowercase prefixes.
