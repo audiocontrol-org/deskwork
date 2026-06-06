@@ -69,9 +69,17 @@ verbatim in substance** — when they drift, the PRD wins.
       stylesheet identity-pin (path+hash) is the next task; the codepoint allowlist is task 5; the
       adversarial corpus is tasks 6–7. The pipeline is the seam those extend. 27 tests incl. the
       shipped example-wireframe passing with zero findings.
-- [ ] Stylesheet **identity pin**: the single permitted `<link>` matched by canonical resolved
+- [x] Stylesheet **identity pin**: the single permitted `<link>` matched by canonical resolved
       path + content hash/SRI; assert the "arbitrary class values are inert because the pinned
-      stylesheet is the sole CSS source" invariant.
+      stylesheet is the sole CSS source" invariant. **Implemented** `@/lint/stylesheet-pin`
+      (`checkStylesheetIdentity(html, pin)` + `buildSketchKitPin(baseDir)` + `hashStylesheet`
+      sha256 SRI-format). Rules: stylesheet-missing, stylesheet-not-singleton (exactly one — "not
+      merely at most one"), stylesheet-path-mismatch (canonical resolved path), stylesheet-
+      unresolvable, stylesheet-hash-mismatch (content identity), stylesheet-sri-mismatch (when an
+      `integrity` attr is present). Wired into `lintWireframe(html, { stylesheetPin })` as an
+      OPT-IN axis (the pure axis-1 lint stays filesystem-free); shared rule taxonomy extracted to
+      `@/lint/types` to avoid a cycle. The inert-class invariant is asserted by a test: arbitrary
+      class values pass ONLY alongside a verified pin. 12 tests (real-fs temp fixtures, no mocks).
 - [ ] **Codepoint allowlist** for text content (permit only Basic-Latin letters/digits +
       enumerated punctuation + enumerated whitespace [space/newline/tab] + enumerated accented
       Latin; reject math-alphanumeric/enclosed/fullwidth/fraktur/emoji/box-drawing/tag-chars/

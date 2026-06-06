@@ -5,17 +5,25 @@
  * allowlist lint and its rule taxonomy.
  */
 
+export type { LintRule, LintFinding, LintResult } from '@/lint/types';
+
 export {
-  type LintRule,
-  type LintFinding,
-  type LintResult,
+  type LintOptions,
   lintWireframe,
   ALLOWED_TAGS,
 } from '@/lint/check-mockup-lofi';
 
 export {
+  type StylesheetPin,
+  hashStylesheet,
+  buildSketchKitPin,
+  checkStylesheetIdentity,
+} from '@/lint/stylesheet-pin';
+
+export {
   GLOBAL_ATTRS,
   TAG_ATTRS,
   PRESENTATIONAL_ATTRS,
+  URL_ATTRS,
   RESOURCE_URL_ATTRS,
 } from '@/lint/allowlist';

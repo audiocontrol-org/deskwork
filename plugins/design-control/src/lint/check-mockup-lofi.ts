@@ -27,31 +27,22 @@ import {
 } from '@/lint/allowlist';
 
 export { ALLOWED_TAGS } from '@/lint/allowlist';
+export type { LintRule, LintFinding, LintResult } from '@/lint/types';
+
+import type { LintFinding, LintResult } from '@/lint/types';
+import { checkStylesheetIdentity, type StylesheetPin } from '@/lint/stylesheet-pin';
 
 type AnyNode = DefaultTreeAdapterMap['node'];
 type Element = DefaultTreeAdapterMap['element'];
 
-export type LintRule =
-  | 'disallowed-element'
-  | 'disallowed-attribute'
-  | 'inline-style'
-  | 'event-handler'
-  | 'presentational-attribute'
-  | 'data-uri'
-  | 'external-resource'
-  | 'disallowed-uri-scheme'
-  | 'disallowed-link-rel';
-
-export interface LintFinding {
-  readonly rule: LintRule;
-  readonly message: string;
-  readonly tag?: string;
-  readonly attr?: string;
-}
-
-export interface LintResult {
-  readonly ok: boolean;
-  readonly findings: readonly LintFinding[];
+export interface LintOptions {
+  /**
+   * When supplied, additionally enforce the stylesheet identity-pin (axis 1.5):
+   * exactly one stylesheet `<link>`, resolving to the canonical path, whose
+   * content hash matches the pinned sketch-kit.css. Omit for the pure,
+   * filesystem-free element/attribute lint (axis 1 only).
+   */
+  readonly stylesheetPin?: StylesheetPin;
 }
 
 const SCRIPT_URI_RE = /^\s*(?:javascript|vbscript):/i;
@@ -162,8 +153,11 @@ function walk(node: AnyNode, findings: LintFinding[]): void {
  * Returns all findings (does not short-circuit) so the operator sees every
  * violation in one pass.
  */
-export function lintWireframe(html: string): LintResult {
+export function lintWireframe(html: string, options?: LintOptions): LintResult {
   const findings: LintFinding[] = [];
   walk(parse(html), findings);
+  if (options?.stylesheetPin) {
+    findings.push(...checkStylesheetIdentity(html, options.stylesheetPin));
+  }
   return { ok: findings.length === 0, findings };
 }
