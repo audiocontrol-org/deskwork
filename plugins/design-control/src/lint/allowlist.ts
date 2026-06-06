@@ -61,7 +61,21 @@ export const PRESENTATIONAL_ATTRS: ReadonlySet<string> = new Set([
   'vspace', 'frame', 'rules', 'char', 'charoff', 'clear', 'noshade', 'compact',
 ]);
 
-/** Resource-loading URL attributes, by tag — checked for external/data schemes. */
+/**
+ * Attributes whose VALUE is a URL and must be scheme/control-scanned (data:,
+ * javascript:, control-char obfuscation). This is the SSOT the lint gates its
+ * value-shape checks on — NOT a hardcoded `'href'` literal — so adding a future
+ * URL-bearing attr here automatically extends scheme coverage to it
+ * (AUDIT-20260606-04). Invariant (test-enforced): every attr named in
+ * {@link RESOURCE_URL_ATTRS} must appear here, so every resource attr is scanned.
+ */
+export const URL_ATTRS: ReadonlySet<string> = new Set(['href']);
+
+/**
+ * Resource-LOADING URL attributes, by tag — the subset of {@link URL_ATTRS}
+ * that fetch a resource (vs. `<a href>` navigation), additionally checked for
+ * external (absolute / protocol-relative) URLs.
+ */
 export const RESOURCE_URL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
   link: new Set(['href']),
 };

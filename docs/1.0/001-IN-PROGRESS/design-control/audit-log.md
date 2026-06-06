@@ -253,3 +253,47 @@ Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (`SCRIPT_URI_RE
 Disposition override: slush-merged under -01; cross-model agreement (two independent models flagged it) = high-confidence. claude framed it as the axis-1 boundary for tasks 6–7; codex as a MEDIUM the rule under-delivers on. Closed now (cheap) rather than deferred, per scope-don't-defer.
 
 parse5 decodes HTML entities in attribute values, so `href="java&#x0a;script:alert(1)"` reaches the check as an embedded-newline `java\nscript:` that a start-anchored `^\s*(javascript|vbscript):` regex misses, while browsers that strip the control would still navigate. Fix: reject any C0 control character (U+0000–U+001F) in an `href` value outright, before scheme detection. Regression test: `href="java&#x0a;script:alert(1)"` → `disallowed-uri-scheme`. (The deeper "parse the URL scheme rather than regex-anchor" hardening remains the explicit probe target for the tasks 6–7 adversarial corpus.)
+
+## 2026-06-06 — audit-barrage lift (20260606T061605069Z-design-control)
+
+> **Lift note (TF-002 recurrence, 3rd time):** the lift merged claude-01 + claude-02 + codex-01
+> under `-04`, documenting only claude-01. Split below into `-04` (the MED coupling), `-05`
+> (claude-02 LOW test-name honesty), `-06` (codex-01 LOW breadcrumb drift). Slush OVERRIDDEN —
+> claude-01 is a real latent-coupling defect introduced by the round-1 fix a718683c; all three
+> fixed with TDD in the same commit that closes them. This is the documented convergence pattern
+> (each fix round surfaces a finer finding); round-3 verifies.
+
+### AUDIT-20260606-04 — value-shape checks hardcoded to `attr === 'href'`, making RESOURCE_URL_ATTRS dead + the cross-module URL-attr coupling latent
+
+Finding-ID: AUDIT-20260606-04 (claude-01)
+Status:     open
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (value-shape block); plugins/design-control/src/lint/allowlist.ts (RESOURCE_URL_ATTRS)
+
+Disposition override: slush-merged by the lift; a real MED latent-coupling defect introduced by the round-1 fix (a718683c). Fixed in this commit.
+
+The round-1 fix narrowed value-shape scanning by wrapping the whole block (control-char, data:, script:, external-resource) in `if (attr === 'href')`. That made `RESOURCE_URL_ATTRS` (a per-tag `Record`) effectively dead — its branch can only fire when `attr === 'href'` — and rested the data:/scheme narrowing on the implicit, unenforced assumption that href is the only URL-bearing allowed attr. If a future task added a non-href URL attr (`img src`, `source srcset`, `a ping`), its value would pass completely unscanned, silently weakening the "lint green ⇒ lo-fi" guarantee with no signal.
+
+Fix: introduce `URL_ATTRS` in allowlist.ts as the SSOT of URL-bearing attrs; gate value-shape scanning on `URL_ATTRS.has(attr)` instead of the hardcoded literal; keep external-resource on the `RESOURCE_URL_ATTRS` resource-loading subset. Coverage test asserts every `RESOURCE_URL_ATTRS` attr is in `URL_ATTRS`, making the cross-module invariant explicit — adding a resource attr without scheme coverage now fails a test instead of shipping a latent gap.
+
+### AUDIT-20260606-05 — pre-existing test name "rejects a data: URI in any attribute" contradicts the now-href-scoped contract
+
+Finding-ID: AUDIT-20260606-05 (claude-02)
+Status:     open
+Severity:   low
+Surface:    plugins/design-control/src/__tests__/lint/check-mockup-lofi.test.ts
+
+Disposition override: slush-merged under -04; a real (LOW) test-honesty defect — the suite advertised a guarantee the round-1 fix intentionally removed. Fixed in this commit.
+
+After AUDIT-20260606-01 scoped data: rejection to href only, the test named `rejects a data: URI in any attribute` (which passes only because its fixture uses a link href) sat three lines from the new `permits … data: in a non-URL attribute` tests — an apparent self-contradiction that obscures the real contract. Fix: renamed to `rejects a data: URI in a stylesheet href` (no behavior change; keeps the suite an honest spec).
+
+### AUDIT-20260606-06 — regression-test/source comment breadcrumbs cite the pre-split merged ID
+
+Finding-ID: AUDIT-20260606-06 (codex-01)
+Status:     open
+Severity:   low
+Surface:    plugins/design-control/src/__tests__/lint/check-mockup-lofi.test.ts; plugins/design-control/src/lint/check-mockup-lofi.ts
+
+Disposition override: slush-merged under -04; a real (LOW) breadcrumb-drift defect. Fixed in this commit.
+
+The round-1 fix's code/test comments labeled mixed-rel as `AUDIT-20260606-01/codex-01` and control-char as `AUDIT-20260606-01/...` even though those findings were split into `-02` and `-03` in the audit-log. An operator following the breadcrumb would land on the data-uri entry. Fix: updated the comments to cite `-02` (mixed-rel) and `-03` (control-char) to match the audit-log.

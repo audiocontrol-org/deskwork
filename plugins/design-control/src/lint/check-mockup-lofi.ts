@@ -20,6 +20,7 @@ import {
   GLOBAL_ATTRS,
   TAG_ATTRS,
   PRESENTATIONAL_ATTRS,
+  URL_ATTRS,
   RESOURCE_URL_ATTRS,
   DATA_URI_RE,
   EXTERNAL_URL_RE,
@@ -101,11 +102,13 @@ function checkElement(el: Element, findings: LintFinding[]): void {
       findings.push({ rule: 'disallowed-attribute', tag, attr, message: `attribute ${attr} on <${tag}> is not in the allowlist` });
       continue;
     }
-    // Value-level URL checks apply ONLY to href (the only URL-bearing allowed
-    // attr). Scanning every value for "data:" over-rejected inert class/meta/
-    // title prose and contradicted the round-8 inert-class invariant
-    // (AUDIT-20260606-01/claude-01).
-    if (attr === 'href') {
+    // Value-level URL checks apply ONLY to URL-bearing attrs (URL_ATTRS, the
+    // SSOT — currently just href). Scanning every value for "data:" over-
+    // rejected inert class/meta/title prose and contradicted the round-8 inert-
+    // class invariant (AUDIT-20260606-01). Gating on URL_ATTRS rather than a
+    // hardcoded 'href' keeps coverage in lockstep with the allowlist so a future
+    // URL attr is auto-scanned (AUDIT-20260606-04).
+    if (URL_ATTRS.has(attr)) {
       if (CONTROL_CHAR_RE.test(value)) {
         findings.push({ rule: 'disallowed-uri-scheme', tag, attr, message: `control character in ${attr} on <${tag}> (scheme-obfuscation channel) is rejected` });
         continue;
@@ -128,7 +131,7 @@ function checkElement(el: Element, findings: LintFinding[]): void {
 
   // Only the pinned sketch-kit stylesheet link is permitted. The rel token set
   // must be EXACTLY ['stylesheet'] — a mixed rel like "stylesheet icon" still
-  // pulls a non-CSS resource (AUDIT-20260606-01/codex-01). The exact path+hash
+  // pulls a non-CSS resource (AUDIT-20260606-02/codex-01). The exact path+hash
   // identity-pin is task 4.
   if (tag === 'link') {
     const rel = (ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'rel')?.value ?? '')

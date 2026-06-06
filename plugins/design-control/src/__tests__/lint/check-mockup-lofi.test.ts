@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { lintWireframe, ALLOWED_TAGS } from '@/lint/check-mockup-lofi';
+import { URL_ATTRS, RESOURCE_URL_ATTRS } from '@/lint/allowlist';
 import { SKETCH_KIT_SAMPLE_PATH } from '@/wireframe-kit/sketch-kit';
 
 /** Embed a body fragment in an otherwise-valid lo-fi skeleton to isolate one rule. */
@@ -84,7 +85,7 @@ describe('check-mockup-lofi — rejects external/embedded resources', () => {
       `<link rel="icon" href="favicon.ico"></head><body class="sk">x</body></html>`;
     expect(rules(html)).toContain('disallowed-link-rel');
   });
-  // AUDIT-20260606-01 (codex-01): mixed rel tokens must not slip the gate.
+  // AUDIT-20260606-02 (codex-01): mixed rel tokens must not slip the gate.
   it('rejects a MIXED <link> rel that merely contains stylesheet (rel="stylesheet icon")', () => {
     const html =
       `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
@@ -94,12 +95,12 @@ describe('check-mockup-lofi — rejects external/embedded resources', () => {
   it('rejects a javascript: URI scheme in a navigation href', () => {
     expect(rules(wrap(`<a href="javascript:alert(1)">x</a>`))).toContain('disallowed-uri-scheme');
   });
-  // AUDIT-20260606-01 (codex-02 + claude-03; cross-model): control-char-obfuscated
+  // AUDIT-20260606-03 (codex-02 + claude-03; cross-model): control-char-obfuscated
   // schemes decode past a start-anchored regex — reject C0 controls in href.
   it('rejects a control-char-obfuscated javascript scheme (java\\nscript:)', () => {
     expect(rules(wrap(`<a href="java&#x0a;script:alert(1)">x</a>`))).toContain('disallowed-uri-scheme');
   });
-  it('rejects a data: URI in any attribute', () => {
+  it('rejects a data: URI in a stylesheet href', () => {
     const html =
       `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
       `<link rel="stylesheet" href="data:text/css,body{}"></head><body class="sk">x</body></html>`;
@@ -160,6 +161,19 @@ describe('check-mockup-lofi — allowlist surface', () => {
     }
     for (const ok of ['html', 'head', 'body', 'div', 'span', 'section', 'h1', 'ul', 'li', 'a', 'button', 'link', 'meta']) {
       expect(ALLOWED_TAGS.has(ok)).toBe(true);
+    }
+  });
+
+  // AUDIT-20260606-04 (claude-01): the cross-module invariant must be explicit —
+  // every resource-loading attr is scheme/control-scanned because the lint gates
+  // value-shape checks on URL_ATTRS. If a future task adds a resource attr to
+  // RESOURCE_URL_ATTRS without adding it to URL_ATTRS, this test fails instead of
+  // silently leaving that attr's values unscanned.
+  it('every RESOURCE_URL_ATTRS attribute is covered by URL_ATTRS (scheme-scanned)', () => {
+    for (const attrs of Object.values(RESOURCE_URL_ATTRS)) {
+      for (const attr of attrs) {
+        expect(URL_ATTRS.has(attr), `resource attr ${attr} not in URL_ATTRS`).toBe(true);
+      }
     }
   });
 });
