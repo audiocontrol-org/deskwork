@@ -503,7 +503,7 @@ A reasonable fix: add (1) a test planting `sha384-<correct-digest-with-one-paylo
 ### AUDIT-20260606-22 — Decomposed (NFD) accented Latin produces false positives — combining diacritical marks are rejected while only precomposed forms are accepted
 
 Finding-ID: AUDIT-20260606-22 (claude-01)
-Status:     open
+Status:     fixed-39f4c4e952e3eb313e4ea42023cc02f748d1bd40
 Severity:   low
 Surface:    plugins/design-control/src/lint/codepoint.ts (findDisallowedCodepoints)
 
