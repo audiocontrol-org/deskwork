@@ -1,0 +1,42 @@
+# design-control plugin — read before working here
+
+**Scope:** this file applies ONLY to work on the `design-control` plugin. It lives at the
+plugin root — NOT in the monorepo's top-level `.claude/` — deliberately: per the lifecycle
+philosophy this plugin is built on, **rules are path-scoped and load only where relevant.**
+A session working on `deskwork`, `dw-lifecycle`, or anything else must not be forced to
+carry this context. Claude Code loads this nested `CLAUDE.md` when a session reads or edits
+files under `plugins/design-control/`, which is exactly the scope intended.
+
+## Read the thesis first — every session that touches this plugin
+
+Before changing anything here, read
+[`../../DESIGN-DISCIPLINE-THESIS.md`](../../DESIGN-DISCIPLINE-THESIS.md), starting with its
+opening section **"Why a discipline at all — the lifecycle philosophy."** It is the WHY
+beneath every decision in this plugin. The load-bearing points:
+
+- **Policy is enforced by a process, not a rule.** Agents are capable-but-unreliable
+  ("insane, hyperintelligent toddlers"); you get good outcomes by engineering the crib so
+  the bad outcome can't happen — not by lecturing the agent.
+- **Stochastic correctness.** Pit independent models against the same work via the
+  **audit-barrage**; cross-model agreement is the genuine-defect signal. The lo-fi lint's
+  own correctness is validated by the barrage (the `audit/lint-adversarial-prompt.md`
+  process), NOT by its author's imagined failure cases — the author shares the lint's blind
+  spots.
+- **Scope-discovery.** Drift / coverage / clone tracking is the catalog; discovered
+  leakage classes are registered there, not scattered across ad-hoc tests.
+- **Never roll your own verification** — orchestrate `/frontend-design`. The wireframe's
+  inverted-teeth lint is a crib; "inventory before iterating" and "look, don't deduce" are
+  rituals that replace unreliable agent attention.
+
+design-control is the UX/UI-surface specialization of the sibling **stack-control** plugin's
+stance. Source essay: <https://stackcontrol.org/blog/the-lifecycle-and-why-agents-need-one/>.
+
+## Working conventions (this plugin)
+
+- Adversarial validation of the lint is a **re-runnable process**, not a hand-authored
+  fixture set: `audit/lint-adversarial-prompt.md` fired via `dw-lifecycle audit-barrage`.
+  Codify every genuine defeat into the deterministic vitest corpus (the crib) + register the
+  leakage class via `dw-lifecycle scope-widen`.
+- TypeScript: strict, `@/` imports, no `any`/`as`/`@ts-ignore`, files < 300–500 lines, no
+  fallbacks/mock-data outside tests (throw instead). `npm --workspace @deskwork/plugin-design-control test`
+  runs `tsc --noEmit && vitest`.
