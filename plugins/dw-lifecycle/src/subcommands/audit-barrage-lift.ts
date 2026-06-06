@@ -31,11 +31,19 @@
  * matching Phase 12's hand-curated style. The per-model IDs come from
  * `ExtractedFinding.sourceFindingIds` (e.g., `AUDIT-BARRAGE-claude-02`,
  * stripped to `claude-02`).
+ *
+ * First-barrage auto-init (Phase 29 / #426): when the feature directory
+ * exists but `audit-log.md` does not (the new-feature first-barrage
+ * case), the verb auto-initializes the file from the bundled template
+ * with `<feature-slug>` substitution and proceeds. The symmetric
+ * `tooling-feedback.md` template is initialized at the same time.
+ * Existing files are never overwritten.
  */
 
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { repoRoot } from '../repo.js';
 import {
   extractBarrageFindings,
@@ -88,6 +96,65 @@ const VALUED_FLAGS: ReadonlySet<string> = new Set([
 ]);
 
 const DATE_RE = /^\d{8}$/;
+
+/**
+ * Locate the templates directory. Compiled output sits under
+ * `dist/subcommands/audit-barrage-lift.js`; the templates live at
+ * `templates/scope-discovery/<file>.md` two levels above.
+ */
+function templatesDir(): string {
+  const here = fileURLToPath(import.meta.url);
+  return resolve(here, '..', '..', '..', 'templates', 'scope-discovery');
+}
+
+/**
+ * Auto-initialize `audit-log.md` (and the symmetric `tooling-feedback.md`)
+ * when missing from the feature directory. The bundled templates use
+ * `<feature-slug>` as a placeholder; we substitute the live slug before
+ * writing. Idempotent — existing files are left untouched.
+ *
+ * Per #426: every new feature's first barrage hit the "audit-log not
+ * found" abort in `runAuditBarrageLift` because no setup-time path
+ * seeded the file. Auto-init at lift time closes that gap without
+ * touching the setup flow.
+ */
+export async function ensureAuditArtifactsExist(
+  featureRoot: string,
+  slug: string,
+): Promise<{ readonly auditLogInitialized: boolean; readonly toolingFeedbackInitialized: boolean }> {
+  const tdir = templatesDir();
+  let auditLogInitialized = false;
+  let toolingFeedbackInitialized = false;
+
+  const auditLogPath = join(featureRoot, 'audit-log.md');
+  if (!existsSync(auditLogPath)) {
+    const tmpl = await readFile(join(tdir, 'audit-log.md'), 'utf8');
+    await writeFile(auditLogPath, substituteSlug(tmpl, slug), 'utf8');
+    auditLogInitialized = true;
+  }
+
+  const tfPath = join(featureRoot, 'tooling-feedback.md');
+  if (!existsSync(tfPath)) {
+    const tmpl = await readFile(join(tdir, 'tooling-feedback.md'), 'utf8');
+    await writeFile(tfPath, substituteSlug(tmpl, slug), 'utf8');
+    toolingFeedbackInitialized = true;
+  }
+
+  return { auditLogInitialized, toolingFeedbackInitialized };
+}
+
+/**
+ * Substitute the `<feature-slug>` placeholder. Templates may carry the
+ * placeholder in plain form (`<feature-slug>`) or in HTML-escaped form
+ * (`&lt;feature-slug&gt;`) — the tooling-feedback template uses the
+ * escaped form so other illustrative angle-bracket placeholders in the
+ * body render unchanged. Both forms substitute to the literal slug.
+ */
+function substituteSlug(template: string, slug: string): string {
+  return template
+    .replace(/<feature-slug>/g, slug)
+    .replace(/&lt;feature-slug&gt;/g, slug);
+}
 
 function todayYYYYMMDD(now: Date = new Date()): string {
   const y = now.getUTCFullYear().toString().padStart(4, '0');
@@ -269,11 +336,21 @@ export async function runAuditBarrageLift(
     );
     return 2;
   }
-  const auditLogPath = join(featureRoot, 'audit-log.md');
-  if (!existsSync(auditLogPath)) {
-    stderr.write(`audit-barrage-lift: audit-log not found at ${auditLogPath}.\n`);
-    return 2;
+  // Per #426: auto-init audit-log.md + tooling-feedback.md if missing.
+  // The first barrage of every new feature used to abort here because
+  // no setup-time path seeded the files. Auto-init closes that gap.
+  const initResult = await ensureAuditArtifactsExist(featureRoot, opts.featureSlug);
+  if (initResult.auditLogInitialized) {
+    stderr.write(
+      `audit-barrage-lift: initialized empty audit-log.md from template (first barrage of this feature).\n`,
+    );
   }
+  if (initResult.toolingFeedbackInitialized) {
+    stderr.write(
+      `audit-barrage-lift: initialized empty tooling-feedback.md from template.\n`,
+    );
+  }
+  const auditLogPath = join(featureRoot, 'audit-log.md');
 
   const findings = await extractBarrageFindings({
     runDir: opts.runDir,
