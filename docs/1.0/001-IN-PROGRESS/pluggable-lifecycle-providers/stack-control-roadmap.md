@@ -4,6 +4,21 @@
 
 > **Revision pass — resequenced 2026-06-04 (self-hosting order).** After the exploratory slice-001 implementation and this session's architectural decisions, the operator resequenced the program around a **self-hosting** strategy: the **first feature is native Spec Kit execution itself** — a *thin* control plane (`stackctl` + frontend touch points) that can **curate a spec** and **run it via the native Spec Kit mechanism** (`/speckit-implement`, with governance firing), with the minimal plugin scaffolding folded into that same feature (option b — no separate infra feature). Then **use that front door to spec and build the rest of the plugin** (the parallel multi-backend engine, the migrations, the fuller frontend). The foundational docs were realigned to the stack-control architecture in the same pass. **Consequence:** the execution "two modes" split across features — native execution rides in the Feature 1 front door; the parallel multi-backend engine (the current `specs/002-parallel-execution-engine/`) becomes a later feature built *through* the frontend (this dissolves the earlier "add native mode to the 002 body" gap).
 
+## Thesis (the organizing principle — read this first)
+
+> **Invest heavily in up-front design and tooling; industrialize execution.**
+
+stack-control is a **barbell**. The up-front half — design, scoping, spec authoring, insight capture, cross-model spec governance, scope discovery — is where human judgment and *all* the leverage live, so the control plane invests **disproportionately** there: rich, rigorous, low-friction, well-tooled. The back half — execution — is then **industrialized**: parallel, worktree-isolated, multi-backend, unattended, cheap to run. Execution is the commodity end; design is where value is created.
+
+**What this dictates:** the answer to *"how much should stack-control help with the up-front design and tooling part of product development?"* is **a great deal** — that is the point of the product, not a side quest. Features that make design richer, more rigorous, and lower-friction (insight capture, governing the spec, scope discovery, exploration of alternatives, rigorous iteration) are **first-class, heavily-resourced** work — at least equal to, and the source of leverage over, the execution engine. When weighing investment between a design-phase capability and an execution-phase one, the thesis tilts toward the design phase.
+
+### The two halves of the thesis
+
+| Half | Investment | Features |
+|---|---|---|
+| **Up-front design & tooling** (heavy investment — the leverage) | Disproportionate | Front-door spec authoring (Feature 1 `define`/`extend`), **low-friction insight capture (Feature 8)**, **govern the spec, not just the implementation (Feature 9)**, scope-discovery migration (Feature 3), the design surfaces of the fuller frontend (Feature 6). |
+| **Industrialized execution** (necessary; the commodity end) | Make it cheap & automatic | **Parallel multi-backend execution engine (Feature 2)**, the `after_implement` governance that rides execution (Founding), audit-barrage migration (Feature 4). |
+
 ## What stack-control is
 
 `stack-control` (CLI binary `stackctl`; brand: stackcontrol.org) is a new plugin that becomes the **control plane** for the spec-driven development lifecycle: it initiates and facilitates spec creation, negotiates the spec → implementation handoff, runs scope discovery and audit barrage over the work, and executes the plan — across a frontend **and** a CLI.
