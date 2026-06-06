@@ -137,17 +137,25 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
       message: `stylesheet content hash ${actualHash} does not match the pinned ${pin.expectedHash}`,
     });
   }
-  // SRI permits a whitespace-separated list of digests; the resource is accepted
-  // if ANY listed digest matches. Tokenize + test membership rather than exact
-  // string equality so a spec-valid multi-hash integrity isn't falsely rejected
-  // (AUDIT-20260606-12).
+  // SRI is STRONGEST-ALGORITHM-WINS, not any-match: when `integrity` lists
+  // digests of different algorithms, the browser validates against ONLY the
+  // strongest algorithm present and discards the weaker ones (W3C SRI
+  // "get the strongest metadata from set"). The pin carries a sha256, so the
+  // integrity meaningfully enforces our pin ONLY IF sha256 is the strongest
+  // algorithm present AND the pinned digest is among its tokens. A stronger
+  // sha384/sha512 token would override the sha256 in the browser, defeating the
+  // pin — flag it rather than greenlight a page whose effective SRI isn't the kit
+  // (AUDIT-20260606-13; corrects the earlier any-match reading in -12).
   if (link.integrity !== undefined) {
     const tokens = link.integrity.split(/\s+/).filter(Boolean);
-    if (!tokens.includes(pin.expectedHash)) {
+    const hasStrongerAlgo = tokens.some((t) => /^sha(?:384|512)-/i.test(t));
+    if (hasStrongerAlgo || !tokens.includes(pin.expectedHash)) {
       findings.push({
         rule: 'stylesheet-sri-mismatch',
         attr: 'integrity',
-        message: `SRI integrity "${link.integrity}" does not assert the pinned ${pin.expectedHash}`,
+        message: hasStrongerAlgo
+          ? `SRI integrity "${link.integrity}" carries a stronger-than-sha256 token that overrides the pinned ${pin.expectedHash} in the browser`
+          : `SRI integrity "${link.integrity}" does not assert the pinned ${pin.expectedHash}`,
       });
     }
   }

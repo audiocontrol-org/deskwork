@@ -68,17 +68,17 @@ export const PRESENTATIONAL_ATTRS: ReadonlySet<string> = new Set([
  * URL-bearing attr here automatically extends scheme coverage to it
  * (AUDIT-20260606-04).
  *
- * INVARIANT (AUDIT-20260606-07): every URL-bearing attribute in the allowlist
- * ({@link TAG_ATTRS} / {@link GLOBAL_ATTRS}) is a member of this set, so its
- * values are scheme/control-scanned. Today that holds because the allowlist's
- * only URL attr is `href`, which is present here. The test-enforced half covers
- * the RESOURCE direction (every {@link RESOURCE_URL_ATTRS} attr is here); the
- * non-resource direction (a navigation-URL attr such as `a ping` / `form action`
- * / `q cite`) is currently vacuous — no such attr is in the allowlist. The patch
- * that first adds a non-resource URL attr to the allowlist adds it here in the
- * same change AND replaces this hand-maintained coupling with URL-tagged
- * allowlist entries that derive this set; until such an attr exists the
- * invariant is complete as stated.
+ * INVARIANT: every URL-bearing attribute in the allowlist ({@link TAG_ATTRS} /
+ * {@link GLOBAL_ATTRS}) is a member of this set, so its values are scheme/
+ * control-scanned. This holds today and is non-vacuous: the allowlist's only URL
+ * attr is `href`, which is present here. The RESOURCE direction is test-enforced
+ * (`RESOURCE_URL_ATTRS ⊆ URL_ATTRS`); the non-resource direction (`a ping`,
+ * `form action`, `q cite`) is currently vacuous — no such attr is in the
+ * allowlist, so there is nothing unscanned.
+ *
+ * Machine-checking the non-resource direction (deriving this set from URL-tagged
+ * allowlist entries) is tracked in #428 — to be done when the allowlist first
+ * gains a non-resource URL attr.
  */
 export const URL_ATTRS: ReadonlySet<string> = new Set(['href']);
 

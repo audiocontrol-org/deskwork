@@ -123,12 +123,22 @@ describe('checkStylesheetIdentity', () => {
     expect(rules(findings)).toEqual(['stylesheet-path-mismatch']); // short-circuited, no read
   });
 
-  // AUDIT-20260606-12 (claude-04): a spec-valid multi-hash integrity containing
-  // the pinned digest must pass.
-  it('accepts a whitespace-separated multi-hash integrity that includes the pinned digest', () => {
+  // AUDIT-20260606-13 (claude-01): SRI is strongest-algorithm-wins. A multi-token
+  // integrity with a STRONGER algo overrides the pinned sha256 in the browser, so
+  // it must NOT be greenlit even though it textually contains the pinned digest.
+  it('rejects a multi-hash integrity whose stronger algo would override the pinned sha256', () => {
     const dir = freshDir();
     const pin = buildSketchKitPin(dir);
     const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha384-other ${pin.expectedHash}">`);
+    expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-sri-mismatch');
+  });
+
+  // Same-algorithm multi-token (no stronger algo) including the pinned digest IS
+  // accepted — the browser validates all sha256 tokens and accepts on any match.
+  it('accepts a same-algorithm (sha256) multi-token integrity that includes the pinned digest', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha256-decoyAAAA ${pin.expectedHash}">`);
     expect(checkStylesheetIdentity(html, pin)).toEqual([]);
   });
 });
