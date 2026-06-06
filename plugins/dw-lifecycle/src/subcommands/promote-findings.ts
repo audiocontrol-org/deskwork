@@ -35,7 +35,9 @@ import { applyProposal, ApplyProposalError } from '../scope-discovery/promote-fi
 import { applyStatusFlips } from '../scope-discovery/promote-findings/audit-log-editor.js';
 import {
   AutoPositionError,
+  collectAllTaskIds,
   computeAutoPosition,
+  findDuplicateTaskHeadings,
   nextTaskNumberFactory,
 } from '../scope-discovery/promote-findings/auto-position.js';
 import type {
@@ -475,6 +477,12 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
         result: null,
       })),
     };
+    // Phase 29 / #420: defensive collision-avoidance. Pass the global
+    // set of every Task ID present in the workplan (live + archived
+    // ledger ranges) so `nextTaskNumberFactory` forward-walks past any
+    // pre-existing ID the per-phase scanner can miss (e.g. a task
+    // misplaced under another phase's heading).
+    const takenIds = collectAllTaskIds(workplanText);
     let result;
     try {
       result = await applyProposal({
@@ -482,7 +490,7 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
         featureSlug: opts.featureSlug,
         read: args.read,
         write: args.write,
-        taskNumberFor: nextTaskNumberFactory(position),
+        taskNumberFor: nextTaskNumberFactory(position, takenIds),
       });
     } catch (err) {
       if (err instanceof ApplyProposalError) {
@@ -490,6 +498,21 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
         return 1;
       }
       throw err;
+    }
+    // Phase 29 / #420: post-write assertion. Re-read the workplan
+    // and fail loud if any `### Task X.Y` heading is now duplicated.
+    // Catches every code path that could emit a colliding ID, not just
+    // the auto-positioner's seek logic.
+    if (result.workplanWritten) {
+      const postWorkplan = await args.read.workplan(workplanPath);
+      const dups = findDuplicateTaskHeadings(postWorkplan);
+      if (dups.length > 0) {
+        stderr.write(
+          `promote-findings --auto: post-write check detected duplicate task headings in workplan: ${dups.join(', ')}. ` +
+            `Renumber the duplicates by hand, then re-run; the auto-positioner's seek logic was bypassed by an unknown surface.\n`,
+        );
+        return 1;
+      }
     }
     stdout.write(
       `Auto-applied: ${result.outcomes.filter((o) => o.applied).length} finding(s) at ${position.phaseHeading} (line ${position.insertAfterLine}).\n`,
