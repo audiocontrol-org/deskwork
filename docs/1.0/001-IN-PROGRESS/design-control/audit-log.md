@@ -266,7 +266,7 @@ parse5 decodes HTML entities in attribute values, so `href="java&#x0a;script:ale
 ### AUDIT-20260606-04 — value-shape checks hardcoded to `attr === 'href'`, making RESOURCE_URL_ATTRS dead + the cross-module URL-attr coupling latent
 
 Finding-ID: AUDIT-20260606-04 (claude-01)
-Status:     open
+Status:     fixed-512e312ccf4a004e28be5ada0aa8d1fa78a94ebc
 Severity:   medium
 Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (value-shape block); plugins/design-control/src/lint/allowlist.ts (RESOURCE_URL_ATTRS)
 
@@ -279,7 +279,7 @@ Fix: introduce `URL_ATTRS` in allowlist.ts as the SSOT of URL-bearing attrs; gat
 ### AUDIT-20260606-05 — pre-existing test name "rejects a data: URI in any attribute" contradicts the now-href-scoped contract
 
 Finding-ID: AUDIT-20260606-05 (claude-02)
-Status:     open
+Status:     fixed-512e312ccf4a004e28be5ada0aa8d1fa78a94ebc
 Severity:   low
 Surface:    plugins/design-control/src/__tests__/lint/check-mockup-lofi.test.ts
 
@@ -290,7 +290,7 @@ After AUDIT-20260606-01 scoped data: rejection to href only, the test named `rej
 ### AUDIT-20260606-06 — regression-test/source comment breadcrumbs cite the pre-split merged ID
 
 Finding-ID: AUDIT-20260606-06 (codex-01)
-Status:     open
+Status:     fixed-512e312ccf4a004e28be5ada0aa8d1fa78a94ebc
 Severity:   low
 Surface:    plugins/design-control/src/__tests__/lint/check-mockup-lofi.test.ts; plugins/design-control/src/lint/check-mockup-lofi.ts
 
