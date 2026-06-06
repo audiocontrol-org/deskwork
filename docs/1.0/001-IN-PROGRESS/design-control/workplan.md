@@ -52,14 +52,23 @@ verbatim in substance** — when they drift, the PRD wins.
       stack. SSOT module `@/wireframe-kit/sketch-kit` exports the asset paths, closed vocabulary,
       and theme/font manifests. 21 tests (self-contained: no http/https/data:/`@import`, all
       `url()`s + fonts resolve on disk, one `<link>`, example uses only vocabulary tokens).
-- [ ] `check-mockup-lofi` lint as an **element/attribute allowlist** (permit only the pinned
+- [x] `check-mockup-lofi` lint as an **element/attribute allowlist** (permit only the pinned
       sketch-kit `<link>`, `.sk-*` tags **including `.sk-theme-{marker,blueprint,grayscale}`**,
       `.sk-img`, a closed set of plain structural tags; reject
       all external resources — `<img src>`/`<picture>`/`srcset`/`<iframe>`/`<object>`/`<embed>` —
       `<script>`/`<style>`/inline `style=`, `data:` URIs, presentational attributes). The closed
       `.sk-*` set is sourced from `SK_VOCABULARY` in `@/wireframe-kit/sketch-kit` (single source
       of truth; multi-theme adds only the three `.sk-theme-*` classes, one pinned stylesheet
-      unchanged).
+      unchanged). **Implemented** `@/lint/check-mockup-lofi` on parse5 (WHATWG tree → no
+      parser-differential leakage) as a `lintWireframe(html)` rule pipeline. Rules: disallowed-
+      element, disallowed-attribute (catch-all), inline-style, event-handler, presentational-
+      attribute, data-uri (delimiter-anchored, no "metadata" false-positive), external-resource
+      (resource-loading attrs only), disallowed-uri-scheme (javascript:/vbscript: in href),
+      disallowed-link-rel (only rel=stylesheet permitted). Class VALUES are intentionally
+      unconstrained (inert under the pinned stylesheet, round-8). **Scope: axis 1 only** — the
+      stylesheet identity-pin (path+hash) is the next task; the codepoint allowlist is task 5; the
+      adversarial corpus is tasks 6–7. The pipeline is the seam those extend. 27 tests incl. the
+      shipped example-wireframe passing with zero findings.
 - [ ] Stylesheet **identity pin**: the single permitted `<link>` matched by canonical resolved
       path + content hash/SRI; assert the "arbitrary class values are inert because the pinned
       stylesheet is the sole CSS source" invariant.
