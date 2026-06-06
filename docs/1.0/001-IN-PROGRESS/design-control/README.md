@@ -8,6 +8,14 @@ parentIssue: 424
 
 # Feature: design-control — portable UX/UI surface-change discipline
 
+> **Read [`DESIGN-DISCIPLINE-THESIS.md`](../../../../DESIGN-DISCIPLINE-THESIS.md) first — every session.**
+> Its opening section ("the lifecycle philosophy") is the WHY beneath this whole plugin:
+> agents are capable-but-unreliable, so *policy is enforced by a process, not a rule* —
+> engineer the crib, use stochastic correctness (cross-model audit-barrage) + scope-discovery,
+> and never roll your own verification. Everything in this feature is that philosophy applied
+> to UX/UI surface changes. (Sibling: the in-flight **stack-control** plugin; source essay:
+> <https://stackcontrol.org/blog/the-lifecycle-and-why-agents-need-one/>.)
+
 A deskwork marketplace plugin that productizes a hard-won UX/UI surface-change discipline as
 **workflow tooling orchestrating an existing engine — `/frontend-design` — with NO roll-your-own
 visual-verification engine.** It fixes the failure mode where changing a UI surface "blind"

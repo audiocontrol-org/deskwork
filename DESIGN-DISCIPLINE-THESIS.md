@@ -1,6 +1,6 @@
 ---
 title: Deskwork design-discipline thesis
-description: Why UI-surface changes go wrong, the hard-won discipline that fixes them (lo-fi wireframes for UX intent · a settled design language · /frontend-design as the referee that judges a screenshot against the spirit of the wireframe and the letter of the design language), and the north star of productizing that discipline as a portable deskwork plugin. Core commitment — never roll your own visual verification; orchestrate /frontend-design. Read before any UI-surface work and before defining the design-control plugin.
+description: Why UI-surface changes go wrong, the hard-won discipline that fixes them (lo-fi wireframes for UX intent · a settled design language · /frontend-design as the referee that judges a screenshot against the spirit of the wireframe and the letter of the design language), and the north star of productizing that discipline as a portable deskwork plugin. Opens with the lifecycle philosophy that motivates it all (the sibling stack-control thesis — "policy enforced by a process, not a rule"; engineer the crib; stochastic correctness via cross-model audit-barrage; scope-discovery). Core commitment — never roll your own visual verification; orchestrate /frontend-design. Read before any UI-surface work and before defining the design-control plugin.
 deskwork:
   doc: thesis
   status: load-bearing
@@ -22,6 +22,70 @@ feature branch. The thesis below tells the story uncovered by a session-transcri
 discipline as architectural commitments, and names the north star: **reduce the
 discipline to practice as a portable, reusable deskwork plugin** so any adopter gets it
 from `claude plugin install`, not from re-living the pain.
+
+## Why a discipline at all — the lifecycle philosophy (the WHY beneath this thesis)
+
+Read this section first; it motivates everything below and everything the
+`design-control` plugin does. design-control is one instance of a general stance,
+articulated for the sibling **stack-control** plugin and its founding essay — *["The
+lifecycle, and why agents need one"](https://stackcontrol.org/blog/the-lifecycle-and-why-agents-need-one/)*.
+The stance: coding agents are extraordinarily capable and structurally unreliable **at the
+same time** — "insane, hyperintelligent toddlers." You do not get good outcomes by
+lecturing the agent into compliance (it has no internal governor and a thirty-second
+memory); you get them by **engineering the environment so the bad outcome can't happen** —
+"engineering the crib," not raising your voice when the toddler falls. The load-bearing
+sentence, which every design decision in this plugin should be checked against:
+
+> **Policy embedded in a rule is far weaker than policy enforced by a process.**
+
+**The failure modes this stance is built against** (all observed in real agent work, none
+hypothetical):
+
+- **Memory loss** — context compaction wipes decisions. Cure: durable on-disk
+  source-of-truth (this thesis, the PRD, the workplan, the audit-log), never conversation
+  memory.
+- **Attention drift** — agents abandon tasks mid-completion and declare victory early.
+  Cure: automated rituals + gates that fire whether or not the agent remembers them.
+- **Test theater** — "green checkmarks that proved nothing a human cared about." Cure:
+  verification that *looks* at the real surface (the design-control referee) and
+  adversarial validation that actively tries to *break* the claim.
+- **Quiet failures** — the most dangerous: unannounced scope-deferral ("an agent so eager
+  to keep its diffs small that it would amputate the actual requirement"), code
+  duplication, and missed-update (changed *some* of the code that needed changing, skipped
+  the rest). Cure: scope-discovery scans + cross-model audit.
+
+**The mechanisms that turn policy into a process** (these are the dw-lifecycle capabilities
+this plugin is built on, not bespoke inventions):
+
+- **Stochastic correctness.** A single agent is an unreliable narrator; **pit multiple
+  independent models against the same work and they correct each other.** This is the
+  **audit-barrage** — `claude` + `codex` + `gemini` fired in parallel at every diff;
+  **cross-model agreement is the genuine-defect signal**, single-model noise washes out.
+  design-control uses it not only to review its own code but as the **adversarial
+  validation engine for the lo-fi lint** — a *process*, not a hand-authored fixture set the
+  lint author imagines (the author shares the lint's blind spots; independent models do
+  not).
+- **Scope-discovery.** Automated clone / anti-pattern / coverage scans surface duplicated
+  code and unchanged-elements-that-should-have-changed, replacing the agent's unreliable
+  manual hunting. design-control registers each discovered lint-leakage class here so
+  coverage is tracked and drift is caught — the catalog, not scattered tests.
+- **The lifecycle.** PRD + workplan on disk; path-scoped rules that load only where
+  relevant; skills for repeatable procedures; automated rituals at lifecycle waypoints. (*"A
+  rule in a big document is a rule the agent doesn't follow"* — the essay's author cut a
+  773-line rulebook to 198 by turning policy into process.)
+- **The all-caps tell.** *"Every time I caught myself typing in all caps, it meant the same
+  thing: I had stopped solving the problem and started yelling at it."* An all-caps moment
+  is the signal to **re-architect the process, not escalate the lecture.**
+
+**How this thesis specializes the philosophy.** Everything below is *"engineer the crib"*
+applied to UX/UI surface changes. **"Never roll your own visual verification — orchestrate
+`/frontend-design`"** is *policy enforced by a process*. The lo-fi wireframe's inverted-teeth
+lint is a *crib*: the bad outcome — a polished artifact masquerading as a wireframe — is
+made structurally impossible, not policed after the fact. **"Inventory before iterating"**
+and **"look, don't deduce"** replace unreliable agent attention with a ritual. And the lint's
+own correctness is established by the **audit-barrage + scope-discovery**, because a lint
+validated only by its author's imagined failure cases inherits its author's blind spots —
+exactly what stochastic correctness exists to defeat.
 
 ## The canonical source — the story
 
@@ -172,6 +236,12 @@ redesign and repeat Act I.
 
 ## Provenance
 
+- **Lifecycle philosophy (the motivating frame):** the sibling **stack-control** plugin and
+  its founding essay *"The lifecycle, and why agents need one"* —
+  <https://stackcontrol.org/blog/the-lifecycle-and-why-agents-need-one/>. Source of "policy
+  enforced by a process, not a rule," "engineer the crib," stochastic correctness
+  (cross-model audit-barrage), scope-discovery, and the all-caps tell. design-control is the
+  UX/UI-surface specialization of that general stance; stack-control is its sibling.
 - Session audit (verbatim quotes, decision trail, rejected alternatives):
   `docs/superpowers/specs/audiocontrol-uxui-discipline-session-audit.md`.
 - Infrastructure inventories:
