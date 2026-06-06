@@ -145,8 +145,9 @@ export async function ensureAuditArtifactsExist(
   featureRoot: string,
   slug: string,
   write: boolean = false,
+  templatesDirOverride?: string,
 ): Promise<EnsureAuditArtifactsResult> {
-  const tdir = templatesDir();
+  const tdir = templatesDirOverride ?? templatesDir();
   let auditLogInitialized = false;
   let toolingFeedbackInitialized = false;
   const missingTemplates: string[] = [];
