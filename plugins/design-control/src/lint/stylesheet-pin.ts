@@ -74,6 +74,19 @@ export function buildSketchKitPin(baseDir: string, canonicalPath?: string): Styl
   };
 }
 
+/**
+ * Normalize one SRI token (`<algo>-<base64>[?options]`) for comparison: strip a
+ * trailing `?options` (browser-ignored) and lowercase ONLY the algorithm prefix
+ * (ASCII-case-insensitive per SRI) while preserving the case-sensitive base64
+ * payload.
+ */
+function normalizeSriToken(token: string): string {
+  const noOptions = token.split('?')[0];
+  const dash = noOptions.indexOf('-');
+  if (dash < 0) return noOptions.toLowerCase();
+  return noOptions.slice(0, dash).toLowerCase() + noOptions.slice(dash);
+}
+
 interface StylesheetLink {
   readonly href: string;
   readonly integrity: string | undefined;
@@ -159,10 +172,12 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
   // and an unrecognized-algorithm-only integrity (AUDIT-20260606-15; the prior
   // sha256-only guard over-rejected genuine stronger pins).
   if (link.integrity !== undefined) {
-    const tokens = link.integrity.split(/\s+/).filter(Boolean);
-    const strongest = SRI_ALGOS.find((algo) =>
-      tokens.some((t) => t.toLowerCase().startsWith(`${algo}-`)),
-    );
+    // Normalize each token before comparison: the algorithm prefix is ASCII-
+    // case-insensitive (W3C SRI), and a trailing `?options` is stripped by the
+    // browser — but the base64 payload is case-sensitive, so only the prefix is
+    // lowercased (AUDIT-20260606-18 case, -19 options).
+    const tokens = link.integrity.split(/\s+/).filter(Boolean).map(normalizeSriToken);
+    const strongest = SRI_ALGOS.find((algo) => tokens.some((t) => t.startsWith(`${algo}-`)));
     if (!strongest) {
       findings.push({
         rule: 'stylesheet-sri-mismatch',
@@ -170,7 +185,7 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
         message: `SRI integrity "${link.integrity}" carries no recognized sha256/sha384/sha512 digest`,
       });
     } else {
-      const strongestTokens = tokens.filter((t) => t.toLowerCase().startsWith(`${strongest}-`));
+      const strongestTokens = tokens.filter((t) => t.startsWith(`${strongest}-`));
       if (!strongestTokens.includes(pin.expectedSri[strongest])) {
         findings.push({
           rule: 'stylesheet-sri-mismatch',

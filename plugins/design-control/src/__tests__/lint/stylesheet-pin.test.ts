@@ -167,6 +167,26 @@ describe('checkStylesheetIdentity', () => {
     const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="md5-whatever">`);
     expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-sri-mismatch');
   });
+
+  // AUDIT-20260606-18 (claude-01 + codex-01; cross-model): the SRI algorithm
+  // prefix is ASCII-case-insensitive per W3C SRI — an uppercase prefix on the
+  // correct digest is a browser-honored pin and must be ACCEPTED.
+  it('accepts an uppercase SRI algorithm prefix on the correct digest', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const upper = pin.expectedSri.sha384.replace(/^sha384-/, 'SHA384-');
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="${upper}">`);
+    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
+
+  // AUDIT-20260606-19 (claude-02): a spec-valid `?options` suffix is stripped by
+  // the browser; a correct digest carrying options must be ACCEPTED.
+  it('accepts a correct digest carrying a spec-valid ?options suffix', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="${pin.expectedSri.sha384}?foo=bar">`);
+    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
 });
 
 describe('lintWireframe with stylesheetPin — inert-class invariant', () => {
