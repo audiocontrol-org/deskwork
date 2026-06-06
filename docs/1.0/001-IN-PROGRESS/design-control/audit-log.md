@@ -482,3 +482,18 @@ Severity:   informational
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (StylesheetPin)
 
 Informational (no live bug): `buildSketchKitPin` is the only constructor of a pin and computes `expectedHash` and `expectedSri.sha256` from the same bytes, so they cannot drift in practice. The `StylesheetPin` interface does technically permit a hand-built pin to set them divergently. Recorded as an observation; the content check retains `expectedHash` for its own (non-SRI) identity assertion and the back-compat of existing callers/tests. No code change.
+
+## 2026-06-06 — audit-barrage lift (20260606T150955447Z-design-control)
+
+### AUDIT-20260606-21 — Base64-case-preservation — the central novel behavior of `normalizeSriToken` — is only incidentally tested; no test directly asserts a wrong-case payload is rejected
+
+Finding-ID: AUDIT-20260606-21
+Status:     acknowledged-slush-pile-2026-06-06
+Severity:   low
+Surface:    plugins/design-control/src/__tests__/lint/stylesheet-pin.test.ts:171-191 (and the helper at plugins/design-control/src/lint/stylesheet-pin.ts:80-86)
+
+The entire reason `normalizeSriToken` slices at the first dash instead of calling `.toLowerCase()` on the whole token is to keep the base64 payload case-sensitive (the disposition for AUDIT-18 states this explicitly: "the base64 payload stays case-sensitive"). That is the load-bearing invariant of the fix — yet no test asserts it directly. The two new tests (lines 175-191) exercise (a) an uppercase *prefix* on a correct digest and (b) a `?options` suffix on a correct digest; neither plants a token whose *payload* case is mangled and asserts `stylesheet-sri-mismatch`. The uppercase-prefix test guards the "lowercase everything" regression only *incidentally* — it relies on the real sha384 digest's base64 happening to contain mixed-case characters (statistically near-certain for 48 random bytes, but not an asserted property). A refactor that changed `normalizeSriToken` to `noOptions.toLowerCase()` would be caught today, but only by luck of the fixture's digest; a refactor that lowercased the payload of a *user-supplied* token while leaving the expected value alone could slip a genuinely-wrong (case-mangled) digest past the lint, and the suite wouldn't say so in its own voice.
+
+Two narrower gaps compound this: the new normalize tests are sha384-only (the sha512 strongest path through `normalizeSriToken` is unexercised — the same shape AUDIT-16 flagged for the strength feature), and there is no test combining uppercase-prefix *with* `?options` or a stronger-algo-only token carrying options, so the interaction of the two new normalization steps is untested.
+
+A reasonable fix: add (1) a test planting `sha384-<correct-digest-with-one-payload-char-case-flipped>` asserting `stylesheet-sri-mismatch` (this is the direct assertion that payload case matters), (2) a sha512 uppercase-prefix accept case, and (3) one combined `SHA384-<digest>?foo=bar` accept case. These lock the invariant the disposition claims rather than leaning on the fixture's entropy.
