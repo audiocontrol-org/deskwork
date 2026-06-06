@@ -201,6 +201,54 @@ describe('#420 collectAllTaskIds — global scan beyond per-phase span', () => {
     expect(ids.has('40.1')).toBe(true);
   });
 
+  it('AUDIT-20260606-04: warns on mixed dotted/flat ledger range instead of silent drop', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '<!-- workplan-archive-ledger',
+      'archived-phases: 5',
+      'archived-fix-tasks: 5.1-5.3, 39-39.5',
+      'archive-file: workplan-archive.md',
+      'next-fix-task-id: 5.4',
+      '-->',
+      '',
+      '## Phase 39: current',
+      '',
+      '### Task 39.1: in-phase',
+      '',
+      '- [ ] Step 1.',
+      '',
+    ].join('\n');
+    const warnings: string[] = [];
+    const ids = collectAllTaskIds(wp, (m) => warnings.push(m));
+    // The well-formed dotted range still expands.
+    expect(ids.has('5.1')).toBe(true);
+    expect(ids.has('5.3')).toBe(true);
+    // The mixed-form range emits a warning naming the dropped range.
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings.join('\n')).toContain('39-39.5');
+  });
+
+  it('AUDIT-20260606-04: warns on cross-prefix dotted ledger range', () => {
+    const wp = [
+      '# Workplan',
+      '',
+      '<!-- workplan-archive-ledger',
+      'archived-phases: 5',
+      'archived-fix-tasks: 39.10-40.2',
+      'archive-file: workplan-archive.md',
+      'next-fix-task-id: 5.4',
+      '-->',
+      '',
+      '## Phase 39: current',
+      '',
+    ].join('\n');
+    const warnings: string[] = [];
+    collectAllTaskIds(wp, (m) => warnings.push(m));
+    expect(warnings.join('\n')).toContain('cross-prefix');
+    expect(warnings.join('\n')).toContain('39.10-40.2');
+  });
+
   it('expands archived-fix-tasks ledger ranges into the ID set', () => {
     const wp = [
       '# Workplan',
@@ -289,6 +337,66 @@ describe('#420 nextTaskNumberFactory — takenIds forward-walk avoids collisions
     const ids = collectAllTaskIds(wp);
     const takenFactory = nextTaskNumberFactory(pos, ids);
     expect(takenFactory({}, 0)).toBe('39.9');
+  });
+});
+
+describe('AUDIT-20260606-03 rollback math — newDups = postDups − preDups', () => {
+  it('pre-existing duplicate is NOT flagged as a new duplicate', () => {
+    const preText = [
+      '## Phase 39: ...',
+      '### Task 39.15: ORIGINAL (pre-existing dup)',
+      '### Task 39.15 (fix-finding-X): DUP (pre-existing)',
+      '',
+    ].join('\n');
+    const postText = [
+      '## Phase 39: ...',
+      '### Task 39.15: ORIGINAL (pre-existing dup)',
+      '### Task 39.15 (fix-finding-X): DUP (pre-existing)',
+      '### Task 39.16 (fix-finding-Y): cleanly added by apply',
+      '',
+    ].join('\n');
+    const preDups = new Set(findDuplicateTaskHeadings(preText));
+    const postDups = findDuplicateTaskHeadings(postText);
+    const newDups = postDups.filter((id) => !preDups.has(id));
+    expect(newDups).toEqual([]); // No rollback — pre-existing dup carries forward.
+  });
+
+  it('NEW duplicate introduced by apply IS flagged for rollback', () => {
+    const preText = [
+      '## Phase 39: ...',
+      '### Task 39.15: ORIGINAL',
+      '',
+    ].join('\n');
+    const postText = [
+      '## Phase 39: ...',
+      '### Task 39.15: ORIGINAL',
+      '### Task 39.15 (fix-finding-X): COLLIDING DUP introduced by apply',
+      '',
+    ].join('\n');
+    const preDups = new Set(findDuplicateTaskHeadings(preText));
+    const postDups = findDuplicateTaskHeadings(postText);
+    const newDups = postDups.filter((id) => !preDups.has(id));
+    expect(newDups).toEqual(['39.15']); // Rollback fires.
+  });
+
+  it('multiple new duplicates surface all of them for the rollback error message', () => {
+    const preText = [
+      '## Phase 39: ...',
+      '### Task 39.1: clean',
+      '',
+    ].join('\n');
+    const postText = [
+      '## Phase 39: ...',
+      '### Task 39.1: clean',
+      '### Task 39.1 (fix-finding-X): DUP 1',
+      '### Task 39.2: also clean',
+      '### Task 39.2 (fix-finding-Y): DUP 2',
+      '',
+    ].join('\n');
+    const preDups = new Set(findDuplicateTaskHeadings(preText));
+    const postDups = findDuplicateTaskHeadings(postText);
+    const newDups = postDups.filter((id) => !preDups.has(id));
+    expect(newDups.sort()).toEqual(['39.1', '39.2']);
   });
 });
 

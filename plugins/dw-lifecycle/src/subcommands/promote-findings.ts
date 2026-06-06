@@ -482,7 +482,13 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
     // ledger ranges) so `nextTaskNumberFactory` forward-walks past any
     // pre-existing ID the per-phase scanner can miss (e.g. a task
     // misplaced under another phase's heading).
-    const takenIds = collectAllTaskIds(workplanText);
+    //
+    // Post-AUDIT-20260606-04: surface ledger-range drop warnings on
+    // stderr so the operator sees malformed/mixed-form ranges that
+    // could leave archived IDs re-issuable.
+    const takenIds = collectAllTaskIds(workplanText, (m) =>
+      stderr.write(`promote-findings --auto: ${m}\n`),
+    );
     let result;
     try {
       result = await applyProposal({
@@ -499,17 +505,27 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
       }
       throw err;
     }
-    // Phase 29 / #420: post-write assertion. Re-read the workplan
-    // and fail loud if any `### Task X.Y` heading is now duplicated.
-    // Catches every code path that could emit a colliding ID, not just
-    // the auto-positioner's seek logic.
+    // Phase 29 / #420: post-write assertion + AUDIT-03 atomic-rollback.
+    // Re-read the workplan after applyProposal writes. If the write
+    // introduced any new duplicate `### Task X.Y` heading (post-write
+    // dups not already present pre-write), restore the pre-write
+    // content from `workplanText` (buffered before the write) so the
+    // failure is atomic — the corrupted state never lingers on disk.
+    // Pre-existing dups don't trigger rollback (they survive the
+    // restore unchanged).
     if (result.workplanWritten) {
+      const preDups = new Set(findDuplicateTaskHeadings(workplanText));
       const postWorkplan = await args.read.workplan(workplanPath);
-      const dups = findDuplicateTaskHeadings(postWorkplan);
-      if (dups.length > 0) {
+      const postDups = findDuplicateTaskHeadings(postWorkplan);
+      const newDups = postDups.filter((id) => !preDups.has(id));
+      if (newDups.length > 0) {
+        // Atomic rollback per AUDIT-20260606-03: rewrite the original
+        // workplan content captured before applyProposal ran.
+        await args.write.workplan(workplanPath, workplanText);
         stderr.write(
-          `promote-findings --auto: post-write check detected duplicate task headings in workplan: ${dups.join(', ')}. ` +
-            `Renumber the duplicates by hand, then re-run; the auto-positioner's seek logic was bypassed by an unknown surface.\n`,
+          `promote-findings --auto: post-write check detected NEW duplicate task headings in workplan: ${newDups.join(', ')}. ` +
+            `Workplan restored to its pre-apply content; no disk mutation persists. ` +
+            `Re-run after investigating the auto-positioner's seek logic for the IDs that collided.\n`,
         );
         return 1;
       }

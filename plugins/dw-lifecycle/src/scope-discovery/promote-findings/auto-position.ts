@@ -343,8 +343,20 @@ export function nextTaskNumberFactory(
  * filters by phase-span line range, so a heading misplaced under
  * another phase's section is invisible to it; this set is global and
  * catches every heading the canonical regex recognizes.
+ *
+ * Post-AUDIT-20260606-04: ranges with mixed dotted/flat endpoints or
+ * cross-prefix dotted endpoints (`39.10-40.2`) match neither expansion
+ * branch and were previously silently skipped — leaving those archived
+ * IDs absent from the set and re-issuable by the very forward-walk
+ * that depends on the set being complete. The `warn` sink (when
+ * supplied) now surfaces each dropped range so the operator sees the
+ * gap; the silent-drop is preserved as the default behavior for
+ * call-sites that don't pass `warn`.
  */
-export function collectAllTaskIds(workplanText: string): Set<string> {
+export function collectAllTaskIds(
+  workplanText: string,
+  warn?: (message: string) => void,
+): Set<string> {
   const lines = workplanText.split('\n');
   const ids = new Set<string>();
   for (const line of lines) {
@@ -374,16 +386,35 @@ export function collectAllTaskIds(workplanText: string): Set<string> {
         if (dotStart !== -1 && dotEnd !== -1) {
           const prefix = startStr.slice(0, dotStart);
           const endPrefix = endStr.slice(0, dotEnd);
-          if (prefix !== endPrefix) continue;
+          if (prefix !== endPrefix) {
+            warn?.(
+              `collectAllTaskIds: dropped cross-prefix dotted ledger range ${startStr}-${endStr}; archived IDs in this range may be re-issued`,
+            );
+            continue;
+          }
           const lo = Number(startStr.slice(dotStart + 1));
           const hi = Number(endStr.slice(dotEnd + 1));
-          if (!Number.isFinite(lo) || !Number.isFinite(hi)) continue;
+          if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
+            warn?.(
+              `collectAllTaskIds: dropped non-numeric dotted ledger range ${startStr}-${endStr}`,
+            );
+            continue;
+          }
           for (let m = lo; m <= hi; m += 1) ids.add(`${prefix}.${m}`);
         } else if (dotStart === -1 && dotEnd === -1) {
           const lo = Number(startStr);
           const hi = Number(endStr);
-          if (!Number.isFinite(lo) || !Number.isFinite(hi)) continue;
+          if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
+            warn?.(
+              `collectAllTaskIds: dropped non-numeric flat ledger range ${startStr}-${endStr}`,
+            );
+            continue;
+          }
           for (let n = lo; n <= hi; n += 1) ids.add(`${n}`);
+        } else {
+          warn?.(
+            `collectAllTaskIds: dropped mixed dotted/flat ledger range ${startStr}-${endStr}; archived IDs in this range may be re-issued`,
+          );
         }
       }
     }
