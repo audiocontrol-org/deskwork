@@ -73,13 +73,17 @@ export interface DisallowedCodepoint {
 }
 
 /**
- * Scan `text` (iterated by Unicode codepoint, so astral chars like emoji are one
- * unit) and return each DISTINCT disallowed codepoint once, in first-seen order.
+ * Scan `text` and return each DISTINCT disallowed codepoint once, in first-seen
+ * order. The text is NFC-normalized first so that accented Latin written in
+ * decomposed (NFD) form — `e`+combining-acute, common from macOS APIs and pasted
+ * text — composes to its precomposed allowlisted form rather than tripping the
+ * combining-mark block (AUDIT-20260606-22). Iterated by Unicode codepoint, so
+ * astral chars like emoji are one unit.
  */
 export function findDisallowedCodepoints(text: string): DisallowedCodepoint[] {
   const seen = new Set<number>();
   const out: DisallowedCodepoint[] = [];
-  for (const char of text) {
+  for (const char of text.normalize('NFC')) {
     const codepoint = char.codePointAt(0)!;
     if (!isAllowedCodepoint(codepoint) && !seen.has(codepoint)) {
       seen.add(codepoint);

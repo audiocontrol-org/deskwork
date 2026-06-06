@@ -69,6 +69,14 @@ describe('findDisallowedCodepoints', () => {
   it('returns nothing for clean lo-fi prose', () => {
     expect(findDisallowedCodepoints('Recent entries — café, naïve. 12 items…')).toEqual([]);
   });
+  // AUDIT-20260606-22 (claude-01): NFD-decomposed accented Latin (macOS / pasted
+  // text) must compose to its allowlisted precomposed form, not trip the
+  // combining-mark block.
+  it('accepts NFD-decomposed accented Latin (café / Zürich in decomposed form)', () => {
+    const nfd = 'café Zürich'.normalize('NFD'); // ensure decomposed
+    expect(findDisallowedCodepoints(nfd)).toEqual([]);
+  });
+
   it('reports each distinct disallowed codepoint once, with its char', () => {
     const found = findDisallowedCodepoints('Dashboard 𝐃 and 🎉 and 🎉 again');
     const cps = found.map((f) => f.codepoint);

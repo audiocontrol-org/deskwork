@@ -497,3 +497,31 @@ The entire reason `normalizeSriToken` slices at the first dash instead of callin
 Two narrower gaps compound this: the new normalize tests are sha384-only (the sha512 strongest path through `normalizeSriToken` is unexercised — the same shape AUDIT-16 flagged for the strength feature), and there is no test combining uppercase-prefix *with* `?options` or a stronger-algo-only token carrying options, so the interaction of the two new normalization steps is untested.
 
 A reasonable fix: add (1) a test planting `sha384-<correct-digest-with-one-payload-char-case-flipped>` asserting `stylesheet-sri-mismatch` (this is the direct assertion that payload case matters), (2) a sha512 uppercase-prefix accept case, and (3) one combined `SHA384-<digest>?foo=bar` accept case. These lock the invariant the disposition claims rather than leaning on the fixture's entropy.
+
+## 2026-06-06 — audit-barrage lift (20260606T155241942Z-design-control)
+
+### AUDIT-20260606-22 — Decomposed (NFD) accented Latin produces false positives — combining diacritical marks are rejected while only precomposed forms are accepted
+
+Finding-ID: AUDIT-20260606-22 (claude-01)
+Status:     open
+Severity:   low
+Surface:    plugins/design-control/src/lint/codepoint.ts (findDisallowedCodepoints)
+
+Disposition override: slush-pile; a real LOW false-positive on the feature's own "accented Latin" contract, in the operator's own OS (macOS emits NFD). Fixed in this commit — `findDisallowedCodepoints` now NFC-normalizes the text before scanning, so decomposed accented Latin composes to its allowlisted precomposed form. Same false-positive class as the lifted SRI findings (-18/-19). Regression test: NFD `café`/`Zürich` returns `[]`.
+
+`isAllowedCodepoint` permits precomposed accented Latin (`é` = U+00E9, `ü` = U+00FC, etc. via the U+00C0–U+00FF and U+0100–U+017F ranges) but rejects the U+0300–U+036F combining-mark block, which is not in any allowed set. parse5 does not Unicode-normalize text content (it normalizes only line endings), so an NFD-normalized text node — `e` + combining acute (U+0301), or `u` + combining diaeresis (U+0308) — survives to the walk unchanged and yields a `disallowed-codepoint` finding on the combining mark. The same visible string `café`/`Zürich` therefore passes in NFC and **fails in NFD**.
+
+This matters because the feature's stated contract (workplan: "permit … enumerated accented Latin") and the test suite's own canonical "this is allowed" case (`'café naïve Zürich Łódź Œuvre señor ÿ'`, line 39) establish accented Latin as a first-class permitted category. NFD is not exotic — macOS filesystem APIs emit NFD, and pasted text from assorted sources is frequently NFD — so a wireframe author writing legitimately-accented prose can get a hard lint failure that asserts their correct text is "designed typography outside the lo-fi allowlist." That is the same false-positive class (telling the operator a correct artifact is broken) the AUDIT-15/18/19 SRI fixes set out to close, just via the normalization vector instead of case/options. Reasonable fix: NFC-normalize each text node (`content.normalize('NFC')`) before scanning in `findDisallowedCodepoints` or at the `checkText` boundary, with a regression test planting an NFD `café`/`Zürich` asserting `[]`. If NFC input is instead being assumed as an invariant, that assumption should be documented at the `codepoint.ts` header and asserted somewhere, rather than left implicit.
+
+### AUDIT-20260606-23 — Cross-text-node duplicate `disallowed-codepoint` findings carry no positional disambiguation
+
+Finding-ID: AUDIT-20260606-23 (claude-02)
+Status:     informational
+Severity:   informational
+
+Disposition: informational, no code change. Cross-text-node duplicate `disallowed-codepoint` findings carry no positional context — but this matches the lint's existing position-less finding pattern (it is not a regression and not a correctness bug). Global per-document message dedup or positional context is an optional future enhancement at the `checkText`/walk boundary; not done now. Original auditor note follows.
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts:137-144 (`checkText`) + codepoint.ts:79-91 (`findDisallowedCodepoints`)
+
+`findDisallowedCodepoints` dedupes per call (per text node), and the unit test at codepoint.test.ts:64-71 correctly asserts that. But `checkText` is invoked once per text node during the walk, and the pushed finding carries only `{ rule, message }` with no element/line/offset. So the same disallowed codepoint appearing in N separate text nodes (e.g. an emoji used as an icon in 10 buttons) produces N byte-identical findings — `disallowed codepoint U+1F389 ("🎉") in text content …` ×10 — which is pure noise to the operator since nothing distinguishes the occurrences. The workplan phrasing "deduped per codepoint" reads as a per-codepoint guarantee that holds within a node but not across the document.
+
+This matches the existing position-less finding pattern in this lint, so it is not a regression and not a correctness bug — flagging it as informational. If the operator wants either (a) global per-document dedup of identical messages, or (b) positional context added to findings so duplicates become meaningful, that is a small enhancement at the `checkText`/walk boundary. As-is, a wireframe that reuses one off-allowlist glyph widely will emit a long run of identical findings.
