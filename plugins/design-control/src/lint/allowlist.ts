@@ -77,8 +77,7 @@ export const PRESENTATIONAL_ATTRS: ReadonlySet<string> = new Set([
  * allowlist, so there is nothing unscanned.
  *
  * Machine-checking the non-resource direction (deriving this set from URL-tagged
- * allowlist entries) is tracked in #428 — to be done when the allowlist first
- * gains a non-resource URL attr.
+ * allowlist entries) is tracked in #428.
  */
 export const URL_ATTRS: ReadonlySet<string> = new Set(['href']);
 

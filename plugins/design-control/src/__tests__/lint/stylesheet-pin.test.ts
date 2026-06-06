@@ -123,14 +123,33 @@ describe('checkStylesheetIdentity', () => {
     expect(rules(findings)).toEqual(['stylesheet-path-mismatch']); // short-circuited, no read
   });
 
-  // AUDIT-20260606-13 (claude-01): SRI is strongest-algorithm-wins. A multi-token
-  // integrity with a STRONGER algo overrides the pinned sha256 in the browser, so
-  // it must NOT be greenlit even though it textually contains the pinned digest.
-  it('rejects a multi-hash integrity whose stronger algo would override the pinned sha256', () => {
+  // SRI is strongest-algorithm-wins. A stronger-algo token with a WRONG digest
+  // overrides the pinned sha256 in the browser → must be rejected.
+  it('rejects a stronger-algo token whose digest is not the kit (overrides the sha256)', () => {
     const dir = freshDir();
     const pin = buildSketchKitPin(dir);
-    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha384-other ${pin.expectedHash}">`);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha384-wrong ${pin.expectedHash}">`);
     expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-sri-mismatch');
+  });
+
+  // AUDIT-20260606-15 (claude-01): a legitimately-STRONGER pin (the real kit
+  // sha384 alongside the sha256) is the secure best practice and must be ACCEPTED.
+  it('accepts a stronger-algo integrity whose digest IS the kit (sha384 + sha256)', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(
+      `<link rel="stylesheet" href="sketch-kit.css" integrity="${pin.expectedSri.sha384} ${pin.expectedSri.sha256}">`,
+    );
+    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
+
+  it('verifies sha512 as the strongest algorithm (accept real, reject wrong)', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const good = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="${pin.expectedSri.sha512}">`);
+    expect(checkStylesheetIdentity(good, pin)).toEqual([]);
+    const bad = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha512-wrong">`);
+    expect(rules(checkStylesheetIdentity(bad, pin))).toContain('stylesheet-sri-mismatch');
   });
 
   // Same-algorithm multi-token (no stronger algo) including the pinned digest IS
@@ -140,6 +159,13 @@ describe('checkStylesheetIdentity', () => {
     const pin = buildSketchKitPin(dir);
     const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha256-decoyAAAA ${pin.expectedHash}">`);
     expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
+
+  it('rejects an integrity with no recognized sha algorithm', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="md5-whatever">`);
+    expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-sri-mismatch');
   });
 });
 

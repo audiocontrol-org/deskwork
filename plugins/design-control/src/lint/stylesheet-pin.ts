@@ -27,6 +27,10 @@ import { SKETCH_KIT_CSS_PATH, SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe
 
 type AnyNode = DefaultTreeAdapterMap['node'];
 
+/** SRI hash algorithms, strongest first (the order the SRI spec selects by). */
+export const SRI_ALGOS = ['sha512', 'sha384', 'sha256'] as const;
+export type SriAlgo = (typeof SRI_ALGOS)[number];
+
 export interface StylesheetPin {
   /**
    * Absolute path the single stylesheet `<link>` href must LEXICALLY resolve to
@@ -38,15 +42,17 @@ export interface StylesheetPin {
    * `baseDir`'s. Content identity is anchored by the hash regardless.
    */
   readonly canonicalPath: string;
-  /** Expected SRI-format content hash (`sha256-<base64>`) of that stylesheet. */
+  /** Expected SRI-format sha256 digest of the kit — used for the content check. */
   readonly expectedHash: string;
+  /** Kit digest at EACH SRI algorithm, so a stronger-algorithm integrity can be verified. */
+  readonly expectedSri: Readonly<Record<SriAlgo, string>>;
   /** Directory the wireframe's relative hrefs resolve against. */
   readonly baseDir: string;
 }
 
-/** SRI-format sha256 digest of stylesheet bytes (`sha256-<base64>`). */
-export function hashStylesheet(content: string | Buffer): string {
-  return 'sha256-' + createHash('sha256').update(content).digest('base64');
+/** SRI-format digest of stylesheet bytes (`<algo>-<base64>`); defaults to sha256. */
+export function hashStylesheet(content: string | Buffer, algo: SriAlgo = 'sha256'): string {
+  return `${algo}-` + createHash(algo).update(content).digest('base64');
 }
 
 /**
@@ -55,10 +61,16 @@ export function hashStylesheet(content: string | Buffer): string {
  * sitting next to the wireframe (the conventional adopter layout).
  */
 export function buildSketchKitPin(baseDir: string, canonicalPath?: string): StylesheetPin {
+  const content = readFileSync(SKETCH_KIT_CSS_PATH);
   return {
     baseDir,
     canonicalPath: canonicalPath ?? resolve(baseDir, SKETCH_KIT_STYLESHEET_FILENAME),
-    expectedHash: hashStylesheet(readFileSync(SKETCH_KIT_CSS_PATH)),
+    expectedHash: hashStylesheet(content, 'sha256'),
+    expectedSri: {
+      sha256: hashStylesheet(content, 'sha256'),
+      sha384: hashStylesheet(content, 'sha384'),
+      sha512: hashStylesheet(content, 'sha512'),
+    },
   };
 }
 
@@ -137,26 +149,35 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
       message: `stylesheet content hash ${actualHash} does not match the pinned ${pin.expectedHash}`,
     });
   }
-  // SRI is STRONGEST-ALGORITHM-WINS, not any-match: when `integrity` lists
-  // digests of different algorithms, the browser validates against ONLY the
-  // strongest algorithm present and discards the weaker ones (W3C SRI
-  // "get the strongest metadata from set"). The pin carries a sha256, so the
-  // integrity meaningfully enforces our pin ONLY IF sha256 is the strongest
-  // algorithm present AND the pinned digest is among its tokens. A stronger
-  // sha384/sha512 token would override the sha256 in the browser, defeating the
-  // pin — flag it rather than greenlight a page whose effective SRI isn't the kit
-  // (AUDIT-20260606-13; corrects the earlier any-match reading in -12).
+  // SRI is STRONGEST-ALGORITHM-WINS (W3C SRI "get the strongest metadata from
+  // set"): when `integrity` lists digests of different algorithms, the browser
+  // validates against ONLY the strongest algorithm present. So we determine the
+  // strongest algorithm in the attribute and check that one of its tokens equals
+  // the kit's digest AT THAT ALGORITHM (the pin holds the kit hash for each
+  // algorithm). This accepts a legitimately-stronger pin
+  // (`sha384-<kit-sha384> sha256-<kit-sha256>`) and rejects both a wrong digest
+  // and an unrecognized-algorithm-only integrity (AUDIT-20260606-15; the prior
+  // sha256-only guard over-rejected genuine stronger pins).
   if (link.integrity !== undefined) {
     const tokens = link.integrity.split(/\s+/).filter(Boolean);
-    const hasStrongerAlgo = tokens.some((t) => /^sha(?:384|512)-/i.test(t));
-    if (hasStrongerAlgo || !tokens.includes(pin.expectedHash)) {
+    const strongest = SRI_ALGOS.find((algo) =>
+      tokens.some((t) => t.toLowerCase().startsWith(`${algo}-`)),
+    );
+    if (!strongest) {
       findings.push({
         rule: 'stylesheet-sri-mismatch',
         attr: 'integrity',
-        message: hasStrongerAlgo
-          ? `SRI integrity "${link.integrity}" carries a stronger-than-sha256 token that overrides the pinned ${pin.expectedHash} in the browser`
-          : `SRI integrity "${link.integrity}" does not assert the pinned ${pin.expectedHash}`,
+        message: `SRI integrity "${link.integrity}" carries no recognized sha256/sha384/sha512 digest`,
       });
+    } else {
+      const strongestTokens = tokens.filter((t) => t.toLowerCase().startsWith(`${strongest}-`));
+      if (!strongestTokens.includes(pin.expectedSri[strongest])) {
+        findings.push({
+          rule: 'stylesheet-sri-mismatch',
+          attr: 'integrity',
+          message: `SRI integrity's ${strongest} digest does not match the kit (${pin.expectedSri[strongest]})`,
+        });
+      }
     }
   }
   return findings;
